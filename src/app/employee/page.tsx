@@ -1,5 +1,5 @@
 import React from "react";
-import { ListChecks, Clock, Tool, MapPin, Package, Bell, ChevronRight, User } from "lucide-react";
+import { ListChecks, Clock, MapPin, Package, Bell, ChevronRight, User } from "lucide-react";
 import Image from "next/image";
 
 export default function EmployeeDashboard() {
