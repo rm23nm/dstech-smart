@@ -128,66 +128,103 @@ const FULL_PRODUCT_LIST = [
 
 export default function ProductSection() {
   return (
-    <section id="produk" className="py-48 bg-slate-50 w-full border-y border-slate-200 relative overflow-hidden">
+    <section id="produk" className="py-16 sm:py-24 md:py-32 bg-slate-50 w-full border-y border-slate-200 relative overflow-hidden">
       {/* Decorative Brand Colors */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-dstech-red/5 blur-[100px] rounded-full -mr-48"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-dstech-blue/5 blur-[100px] rounded-full -ml-48"></div>
+      <div className="absolute top-0 right-0 w-80 sm:w-96 h-80 sm:h-96 bg-dstech-red/5 blur-[100px] rounded-full pointer-events-none -mr-48"></div>
+      <div className="absolute bottom-0 left-0 w-80 sm:w-96 h-80 sm:h-96 bg-dstech-blue/5 blur-[100px] rounded-full pointer-events-none -ml-48"></div>
 
-      <div className="max-w-7xl mx-auto px-6 md:px-12 w-full relative z-10">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-32 gap-12">
-          <div className="max-w-3xl text-center md:text-left">
-            <h3 className="text-dstech-red font-black tracking-[0.4em] uppercase text-xs mb-6">ALL SOLUTIONS IN ONE PLACE</h3>
-            <h2 className="text-5xl md:text-9xl font-black tracking-tighter leading-[0.85] text-slate-900 uppercase">Katalog <br /><span className="text-dstech-blue">Layanan Lengkap</span></h2>
-            <p className="mt-8 text-xl text-slate-500 font-bold max-w-xl leading-relaxed">Dari Keamanan Fisik hingga Infrastruktur Digital, kami menyediakan solusi terintegrasi untuk Bisnis Anda.</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 w-full relative z-10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 sm:mb-16 gap-6 sm:gap-8">
+          <div className="max-w-2xl text-center md:text-left">
+            <span className="inline-block px-3.5 py-1 rounded-full bg-dstech-red/10 text-dstech-red font-bold tracking-widest uppercase text-[11px] mb-3">
+              ALL SOLUTIONS IN ONE PLACE
+            </span>
+            <h2 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight leading-tight text-slate-900 uppercase">
+              Katalog <br className="hidden sm:inline" />
+              <span className="text-dstech-blue">Layanan Lengkap</span>
+            </h2>
+            <p className="mt-3 text-sm sm:text-base md:text-lg text-slate-600 font-medium leading-relaxed">
+              Dari Keamanan Fisik hingga Infrastruktur Digital, kami menyediakan solusi terintegrasi untuk Bisnis & Hunian Anda.
+            </p>
           </div>
-          <div className="flex items-center gap-6">
-            <a href="/shop" className="h-24 px-12 flex items-center gap-4 group bg-white border-4 border-dstech-red text-dstech-red rounded-3xl font-black text-2xl hover:bg-dstech-red hover:text-white transition-all shadow-xl shadow-red-500/10 active:scale-95">
-              Belanja Sekarang <ShoppingCart className="w-8 h-8" />
+          <div className="flex justify-center md:justify-end">
+            <a 
+              href="/shop" 
+              className="h-12 sm:h-14 px-6 sm:px-8 flex items-center gap-2.5 bg-white border-2 border-dstech-red text-dstech-red rounded-2xl font-bold text-sm sm:text-base hover:bg-dstech-red hover:text-white transition-all shadow-md shadow-red-500/10 active:scale-95"
+            >
+              <ShoppingCart className="w-5 h-5" /> Belanja Sekarang
             </a>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
+        {/* Product Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
           {FULL_PRODUCT_LIST.map((prod) => (
-            <div key={prod.id} className="group flex flex-col border-2 border-slate-100 rounded-[56px] p-12 hover:border-dstech-blue/30 hover:bg-white transition-all duration-500 relative overflow-hidden bg-white/50 backdrop-blur-sm shadow-sm hover:shadow-2xl h-full">
+            <div 
+              key={prod.id} 
+              className="group flex flex-col border border-slate-200/80 rounded-3xl p-6 sm:p-8 hover:border-dstech-blue/40 hover:bg-white transition-all duration-300 relative overflow-hidden bg-white/70 backdrop-blur-sm shadow-sm hover:shadow-xl h-full"
+            >
               <div className="flex-1">
-                <div className="flex items-center justify-between mb-12">
-                   <div className={`w-20 h-20 rounded-[30px] ${prod.bg} ${prod.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-500 shadow-sm border border-white`}>
+                <div className="flex items-center justify-between mb-6">
+                   <div className={`w-14 h-14 rounded-2xl ${prod.bg} ${prod.color} flex items-center justify-center group-hover:scale-105 transition-transform duration-300 shadow-sm border border-white`}>
                       {prod.icon}
                    </div>
-                   <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-300 group-hover:text-slate-500 transition-colors">
+                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-slate-600 transition-colors">
                     {prod.tag}
                    </span>
                 </div>
-                <h3 className="text-3xl font-black mb-6 text-slate-900 leading-tight group-hover:text-dstech-red transition-all transform group-hover:translate-x-2">{prod.name}</h3>
-                <p className="text-slate-500 text-lg mb-12 font-bold leading-relaxed">{prod.desc}</p>
+                <h3 className="text-xl sm:text-2xl font-black mb-3 text-slate-900 leading-snug group-hover:text-dstech-red transition-colors">
+                  {prod.name}
+                </h3>
+                <p className="text-slate-500 text-xs sm:text-sm mb-6 font-medium leading-relaxed">
+                  {prod.desc}
+                </p>
               </div>
               
-              <div className="pt-10 border-t border-slate-100 flex items-center justify-between mt-auto">
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between mt-auto gap-3">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Kategori</span>
-                  <span className={`text-lg font-black ${prod.color}`}>{prod.type}</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Kategori</span>
+                  <span className={`text-xs sm:text-sm font-black ${prod.color}`}>{prod.type}</span>
                 </div>
-                <a href="/shop" className="h-16 px-8 rounded-2xl bg-slate-900 text-white font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-dstech-blue transition-colors group/btn shadow-xl shadow-slate-900/20 active:scale-95">
-                  Pesan Sekarang <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                <a 
+                  href="/shop" 
+                  className="h-10 sm:h-11 px-4 sm:px-5 rounded-xl bg-slate-900 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 hover:bg-dstech-blue transition-colors group/btn shadow-md active:scale-95"
+                >
+                  <span>Pesan</span> <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
                 </a>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Affiliate Promotion - More Visible Red/Blue */}
-        <div className="mt-40 relative group">
-           <div className="absolute -inset-4 bg-gradient-to-r from-dstech-blue via-dstech-red to-dstech-blue rounded-[72px] blur-3xl opacity-20 group-hover:opacity-40 transition duration-1000"></div>
-           <div className="relative p-16 md:p-32 rounded-[72px] bg-slate-900 flex flex-col lg:flex-row items-center justify-between gap-24 overflow-hidden border-8 border-white/5 shadow-2xl">
-              <div className="text-center lg:text-left relative z-10 max-w-3xl">
-                 <div className="inline-block px-6 py-2 rounded-full bg-dstech-red text-white text-[11px] font-black tracking-widest uppercase mb-12 shadow-lg shadow-red-500/40 transform rotate-1">BECOME OUR PARTNER</div>
-                 <h2 className="text-5xl md:text-8xl font-black mb-10 tracking-tighter leading-[0.9] text-white">Bangun Karir Digital <br /><span className="text-dstech-blue italic">Bersama Kami.</span></h2>
-                 <p className="text-slate-400 text-xl font-bold leading-relaxed">Dapatkan komisi profesional hingga 20% untuk setiap produk dan jasa yang terjual melalui jaringan Anda.</p>
+        {/* Affiliate Promotion Banner */}
+        <div className="mt-16 sm:mt-24 relative group">
+           <div className="relative p-6 sm:p-12 md:p-16 rounded-3xl sm:rounded-[40px] bg-slate-900 flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-12 overflow-hidden border border-slate-800 shadow-2xl">
+              <div className="text-center lg:text-left relative z-10 max-w-2xl">
+                 <span className="inline-block px-3.5 py-1.5 rounded-full bg-dstech-red text-white text-[10px] sm:text-[11px] font-bold tracking-widest uppercase mb-4 shadow-md shadow-red-500/30">
+                   BECOME OUR PARTNER
+                 </span>
+                 <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight leading-tight text-white">
+                   Bangun Karir Digital <br />
+                   <span className="text-dstech-blue italic">Bersama Kami.</span>
+                 </h2>
+                 <p className="text-slate-300 text-xs sm:text-base font-medium leading-relaxed">
+                   Dapatkan komisi profesional hingga 20% untuk setiap produk dan jasa yang terjual melalui jaringan Anda.
+                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-8 w-full sm:w-auto relative z-10">
-                 <a href="/affiliate/register" className="h-28 px-20 flex items-center justify-center rounded-3xl bg-dstech-red text-white font-black text-2xl hover:scale-110 transition-transform shadow-2xl shadow-red-500/50">Daftar Sekarang</a>
-                 <a href="/affiliate" className="h-28 px-16 flex items-center justify-center rounded-3xl border-4 border-white/20 bg-white/5 text-white font-bold text-xl hover:bg-white/10 transition-all">Portal Mitra</a>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto relative z-10">
+                 <a 
+                   href="/affiliate/register" 
+                   className="h-12 sm:h-14 px-6 sm:px-8 flex items-center justify-center rounded-2xl bg-dstech-red hover:bg-red-700 text-white font-bold text-sm sm:text-base transition-all shadow-xl shadow-red-500/30 active:scale-95 text-center"
+                 >
+                   Daftar Sekarang
+                 </a>
+                 <a 
+                   href="/affiliate" 
+                   className="h-12 sm:h-14 px-6 sm:px-8 flex items-center justify-center rounded-2xl border-2 border-white/20 bg-white/5 hover:bg-white/10 text-white font-bold text-sm sm:text-base transition-all text-center"
+                 >
+                   Portal Mitra
+                 </a>
               </div>
            </div>
         </div>
