@@ -33,7 +33,7 @@ export default function AdminDashboard() {
          <div className="lg:col-span-2 p-10 rounded-[48px] bg-white border border-slate-100 shadow-sm">
             <div className="flex items-center justify-between mb-10">
                <h3 className="text-2xl font-black text-slate-900">Recent Inventory</h3>
-               <button className="text-xs font-black text-dstech-blue uppercase tracking-widest hover:text-dstech-red transition-colors">See All Products</button>
+               <a href="/admin/products" className="text-xs font-black text-dstech-blue uppercase tracking-widest hover:text-dstech-red transition-colors">See All Products</a>
             </div>
             <div className="space-y-6">
                {[
@@ -78,8 +78,38 @@ export default function AdminDashboard() {
                  </div>
                ))}
             </div>
-            <button className="w-full mt-12 py-5 rounded-3xl bg-white text-dstech-blue font-black text-xs uppercase tracking-widest hover:bg-dstech-red hover:text-white transition-all">Review Requests</button>
+            <a href="/admin/partners" className="block text-center w-full mt-12 py-5 rounded-3xl bg-white text-dstech-blue font-black text-xs uppercase tracking-widest hover:bg-dstech-red hover:text-white transition-all">Review Requests</a>
          </div>
+      </div>
+
+      {/* Quick Action Banner: Materi Promosi & E-Katalog */}
+      <div className="p-8 sm:p-10 rounded-[40px] bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white border border-slate-700/60 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="space-y-2 text-center md:text-left">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-black uppercase tracking-wider">
+            <span>Pusat Materi Resmi</span>
+          </div>
+          <h3 className="text-2xl font-black tracking-tight">Materi Promosi & Unduh Katalog</h3>
+          <p className="text-slate-400 text-sm max-w-2xl font-medium">
+            Tambah dan kelola file e-katalog produk CCTV & Smart Home, brosur penawaran tender, flyer promosi, dan social media kit yang dapat diunduh langsung oleh seluruh mitra affiliate dan tim lapangan.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-center md:justify-end">
+          <a
+            href="/admin/promotions"
+            className="px-6 py-4 rounded-2xl bg-dstech-red hover:bg-red-600 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-red-600/30 active:scale-95 text-center w-full sm:w-auto"
+          >
+            + Kelola & Tambah Materi
+          </a>
+          <a
+            href="/affiliate"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-6 py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase tracking-wider border border-white/10 transition-all text-center w-full sm:w-auto"
+          >
+            Pratinjau Halaman Mitra &rarr;
+          </a>
+        </div>
       </div>
     </div>
   );

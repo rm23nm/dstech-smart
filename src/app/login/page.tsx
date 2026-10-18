@@ -63,6 +63,15 @@ function LoginForm() {
           setIsSubmitting(false);
           router.push("/admin");
         } else {
+          const employeeSession = {
+            isLoggedIn: true,
+            role: "EMPLOYEE",
+            name: email.split("@")[0].replace(/[._]/g, " ").toUpperCase() || "Teknisi DSTech",
+            email: email.trim(),
+            loginTime: new Date().toISOString(),
+          };
+          localStorage.setItem("dstech_employee_auth", JSON.stringify(employeeSession));
+          localStorage.setItem("dstech_auth_token", `dstech_emp_tok_${Date.now()}`);
           setIsSubmitting(false);
           router.push("/employee");
         }

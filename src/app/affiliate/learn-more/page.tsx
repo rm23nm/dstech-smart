@@ -109,8 +109,8 @@ export default function LearnMorePage() {
          </div>
       </section>
 
-      <footer className="py-20 border-t border-white/5 text-center text-zinc-600 font-bold text-xs tracking-widest uppercase">
-         PT. DSTech Smart Perkasa &copy; 2025
+      <footer className="py-20 border-t border-white/5 text-center text-zinc-500 font-bold text-xs tracking-widest uppercase">
+         PT. DSTech Smart Perkasa &copy; {new Date().getFullYear()}
       </footer>
     </div>
   )

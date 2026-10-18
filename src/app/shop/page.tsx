@@ -21,6 +21,8 @@ import {
   Award,
   Package,
   Star,
+  Download,
+  FileText,
 } from "lucide-react";
 
 interface Product {
@@ -107,6 +109,8 @@ export default function ShopPage() {
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [showOnlyWishlist, setShowOnlyWishlist] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
+  const [promotions, setPromotions] = useState<any[]>([]);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -114,6 +118,19 @@ export default function ShopPage() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Fetch promotions & catalogs
+  const fetchPromotions = async () => {
+    try {
+      const res = await fetch("/api/promotions?t=" + Date.now());
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.data)) {
+        setPromotions(data.data);
+      }
+    } catch (err) {
+      console.error("Gagal memuat katalog promosi:", err);
+    }
   };
 
   // Load wishlist from localStorage on mount
@@ -300,23 +317,35 @@ export default function ShopPage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start pt-2">
+              <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3.5 justify-center lg:justify-start pt-2">
                 <a
                   href="#katalog-produk"
-                  className="h-13 sm:h-14 px-8 rounded-2xl bg-gradient-to-r from-dstech-red to-red-700 hover:from-red-600 hover:to-red-800 text-white font-bold text-sm sm:text-base flex items-center justify-center gap-3 shadow-xl shadow-red-600/30 transition-all active:scale-95 w-full sm:w-auto"
+                  className="h-13 sm:h-14 px-7 rounded-2xl bg-gradient-to-r from-dstech-red to-red-700 hover:from-red-600 hover:to-red-800 text-white font-bold text-sm flex items-center justify-center gap-2.5 shadow-xl shadow-red-600/30 transition-all active:scale-95 w-full sm:w-auto"
                 >
-                  <span>Jelajahi Koleksi Produk</span>
+                  <span>Jelajahi Koleksi</span>
                   <ArrowRight className="w-4 h-4" />
                 </a>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchPromotions();
+                    setIsCatalogModalOpen(true);
+                  }}
+                  className="h-13 sm:h-14 px-6 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-sm flex items-center justify-center gap-2 backdrop-blur-md transition-all active:scale-95 w-full sm:w-auto"
+                >
+                  <Download className="w-4 h-4 text-cyan-400" />
+                  <span>Unduh E-Katalog PDF</span>
+                </button>
 
                 <a
                   href="https://wa.me/6282259494242?text=Halo%20DSTech%20Smart,%20saya%20ingin%20konsultasi%20pengadaan%20perangkat."
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="h-13 sm:h-14 px-6 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 text-white font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 backdrop-blur-md transition-all active:scale-95 w-full sm:w-auto"
+                  className="h-13 sm:h-14 px-6 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold text-sm flex items-center justify-center gap-2 backdrop-blur-md transition-all active:scale-95 w-full sm:w-auto"
                 >
                   <Phone className="w-4 h-4 text-emerald-400" />
-                  <span>Konsultasi Kebutuhan</span>
+                  <span>Konsultasi WA</span>
                 </a>
               </div>
             </div>
@@ -716,6 +745,81 @@ export default function ShopPage() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: UNDUH E-KATALOG & BROSUR RESMI */}
+      {isCatalogModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 border border-slate-200 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setIsCatalogModalOpen(false)}
+              className="absolute top-6 right-6 p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3.5 mb-6">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 text-dstech-red flex items-center justify-center">
+                <Download className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">Unduh E-Katalog & Brosur Resmi</h3>
+                <p className="text-xs font-bold text-slate-400">Pilih dokumen resmi PT. DSTech Smart Perkasa untuk diunduh</p>
+              </div>
+            </div>
+
+            <div className="space-y-3.5">
+              {promotions.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 font-bold text-sm">
+                  Memuat katalog & brosur resmi...
+                </div>
+              ) : (
+                promotions.map((promo) => (
+                  <div
+                    key={promo.id}
+                    className="p-5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-dstech-blue transition-all"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-dstech-blue font-black text-[10px] uppercase tracking-wider">
+                          {promo.category}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {promo.fileType} &bull; {promo.fileSize}
+                        </span>
+                      </div>
+                      <h4 className="font-black text-slate-900 text-sm">{promo.title}</h4>
+                      <p className="text-xs text-slate-500 font-medium">{promo.description}</p>
+                    </div>
+
+                    <a
+                      href={promo.fileUrl}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-5 py-2.5 rounded-xl bg-dstech-blue hover:bg-dstech-red text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-md active:scale-95 shrink-0 self-stretch sm:self-auto justify-center"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Unduh File</span>
+                    </a>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <span className="text-slate-400 font-medium text-center sm:text-left">Butuh penawaran custom atau tender instansi?</span>
+              <a
+                href="https://wa.me/6282259494242?text=Halo%20DSTech%20Smart,%20saya%20ingin%20minta%20penawaran%20resmi%20katalog."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-dstech-red font-black hover:underline flex items-center gap-1"
+              >
+                Hubungi Tim Sales &rarr;
+              </a>
             </div>
           </div>
         </div>
