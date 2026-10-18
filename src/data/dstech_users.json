@@ -1,5 +1,15 @@
 [
   {
+    "id": "dstech_usr_1792294880630",
+    "name": "Test User Agent",
+    "email": "test.agent@dstechsmart.com",
+    "role": "AFFILIATE",
+    "phone": "081233445566",
+    "status": "ACTIVE",
+    "createdAt": "2026-10-18T03:41:20.630Z",
+    "updatedAt": "2026-10-18T03:41:20.630Z"
+  },
+  {
     "id": "dstech_usr_1",
     "name": "Super Admin DStech",
     "email": "superadmin@dstechsmart.com",
