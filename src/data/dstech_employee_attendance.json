@@ -1,0 +1,89 @@
+{
+  "monthlyStats": {
+    "totalHours": 168,
+    "overtimeHours": 14,
+    "targetHours": 160,
+    "presenceDays": 21,
+    "absentDays": 0
+  },
+  "attendance": [
+    {
+      "id": "dstech_att_1",
+      "date": "2026-10-18",
+      "employeeName": "Ikhsan Maulidi",
+      "checkIn": "07:48 WIB",
+      "checkOut": "-",
+      "location": "Kawasan Industri Krakatau Posco",
+      "status": "Hadir Lapangan",
+      "notes": "Langsung meluncur ke lokasi proyek penarikan kabel CCTV"
+    },
+    {
+      "id": "dstech_att_2",
+      "date": "2026-10-17",
+      "employeeName": "Ikhsan Maulidi",
+      "checkIn": "07:55 WIB",
+      "checkOut": "17:15 WIB",
+      "location": "Kantor DSTech Cilegon",
+      "status": "Tepat Waktu",
+      "notes": "Persiapan material kabel & tes NVR laboratorium"
+    },
+    {
+      "id": "dstech_att_3",
+      "date": "2026-10-16",
+      "employeeName": "Ikhsan Maulidi",
+      "checkIn": "08:02 WIB",
+      "checkOut": "17:30 WIB",
+      "location": "Hotel Pesona Merak",
+      "status": "Hadir Lapangan",
+      "notes": "Penyelesaian setting CCTV area parkir dan cloud DDNS"
+    },
+    {
+      "id": "dstech_att_4",
+      "date": "2026-10-15",
+      "employeeName": "Ikhsan Maulidi",
+      "checkIn": "07:50 WIB",
+      "checkOut": "20:00 WIB",
+      "location": "Kantor & Workshop DSTech",
+      "status": "Lembur",
+      "notes": "Pengerjaan perakitan kabinet panel barrier gate"
+    }
+  ],
+  "overtime": [
+    {
+      "id": "dstech_ot_1",
+      "employeeName": "Ikhsan Maulidi",
+      "date": "2026-10-18",
+      "startTime": "17:30 WIB",
+      "endTime": "20:30 WIB",
+      "hours": 3,
+      "taskTitle": "Instalasi CCTV (4 Titik) - PT. Krakatau Posco",
+      "reason": "Mengejar deadline penarikan kabel outdoor sebelum jalur operasional pabrik aktif kembali",
+      "status": "Menunggu Persetujuan",
+      "appliedAt": "2026-10-18 16:15"
+    },
+    {
+      "id": "dstech_ot_2",
+      "employeeName": "Ikhsan Maulidi",
+      "date": "2026-10-15",
+      "startTime": "17:00 WIB",
+      "endTime": "20:00 WIB",
+      "hours": 3,
+      "taskTitle": "Perakitan Modul Kontrol Barrier Gate Metro Royal",
+      "reason": "Wiring controller palang dan uji sensor RFID UHF",
+      "status": "Disetujui",
+      "appliedAt": "2026-10-15 15:30"
+    },
+    {
+      "id": "dstech_ot_3",
+      "employeeName": "Ikhsan Maulidi",
+      "date": "2026-10-10",
+      "startTime": "18:00 WIB",
+      "endTime": "22:00 WIB",
+      "hours": 4,
+      "taskTitle": "Emergency Maintenance DVR RS Kurnia Cilegon",
+      "reason": "Harddisk DVR error dan perlu penggantian storage surveillance darurat",
+      "status": "Disetujui",
+      "appliedAt": "2026-10-10 17:45"
+    }
+  ]
+}

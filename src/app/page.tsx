@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import ProductSection from "@/components/ProductSection";
 import PortfolioSection from "@/components/PortfolioSection";
@@ -26,8 +26,61 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
+interface SiteSettings {
+  companyName: string;
+  tagline: string;
+  whatsapp: string;
+  whatsappDisplay: string;
+  email: string;
+  phone: string;
+  address: string;
+  googleMapsUrl: string;
+  instagram: string;
+  facebook: string;
+  linkedin: string;
+}
+
+const DEFAULT_SETTINGS: SiteSettings = {
+  companyName: "PT. DSTech Smart Perkasa",
+  tagline: "Penyedia Solusi Teknologi Keamanan, Smart Home & IT Infrastructure Terpercaya untuk Perumahan, Korporat & Industri.",
+  whatsapp: "6282259494242",
+  whatsappDisplay: "+62 822-5949-4242",
+  email: "cs@dstechsmart.com",
+  phone: "0822-5949-4242",
+  address: "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON, KOTA CILEGON - BANTEN",
+  googleMapsUrl: "https://maps.google.com/?q=Perum+Bukit+Cilegon+Asri+Cilegon+Banten",
+  instagram: "https://instagram.com/dstechsmart",
+  facebook: "https://facebook.com/dstechsmart",
+  linkedin: "https://linkedin.com/company/dstechsmart",
+};
+
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json && json.success && json.data) {
+          setSettings((prev) => ({
+            ...prev,
+            ...json.data,
+            companyName: json.data.companyName || prev.companyName,
+            tagline: json.data.tagline || prev.tagline,
+            whatsapp: json.data.whatsapp || prev.whatsapp,
+            whatsappDisplay: json.data.whatsappDisplay || json.data.phone || prev.whatsappDisplay,
+            email: json.data.email || prev.email,
+            phone: json.data.phone || json.data.whatsappDisplay || prev.phone,
+            address: json.data.address || prev.address,
+            googleMapsUrl: json.data.googleMapsUrl || prev.googleMapsUrl,
+          }));
+        }
+      })
+      .catch((err) => {
+        console.error("Gagal memuat pengaturan situs dinamis:", err);
+      });
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-white text-slate-900 font-sans overflow-x-hidden selection:bg-dstech-red selection:text-white">
@@ -71,7 +124,7 @@ export default function Home() {
             </Link>
 
             <a 
-              href="https://wa.me/6282259494242"
+              href={`https://wa.me/${(settings.whatsapp || "6282259494242").replace(/[^0-9]/g, "")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 bg-dstech-red hover:bg-red-700 text-white px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-red-500/20 active:scale-95"
@@ -131,6 +184,16 @@ export default function Home() {
                 Portofolio Proyek
               </a>
               <div className="pt-3 border-t border-slate-100 flex flex-col gap-2.5">
+                <a
+                  href={`https://wa.me/${(settings.whatsapp || "6282259494242").replace(/[^0-9]/g, "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-sm transition-all"
+                >
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>WhatsApp CS ({settings.phone || settings.whatsappDisplay})</span>
+                </a>
+
                 <Link
                   href="/login"
                   onClick={() => setMobileMenuOpen(false)}
@@ -354,10 +417,10 @@ export default function Home() {
             {/* Col 1: About */}
             <div className="lg:col-span-2 space-y-6">
                <div className="relative w-40 sm:w-52 h-12 sm:h-16">
-                  <Image src="/logo.png" alt="DSTech Logo" fill className="object-contain object-left" />
+                  <Image src="/logo.png" alt={settings.companyName || "DSTech Logo"} fill className="object-contain object-left" />
                </div>
                <p className="text-sm sm:text-base text-slate-600 font-medium leading-relaxed max-w-md">
-                  Penyedia Solusi Teknologi Keamanan, Smart Home & IT Infrastructure Terpercaya untuk Perumahan, Korporat & Industri.
+                  {settings.tagline}
                </p>
                <div className="flex gap-3 pt-2">
                   <a 
@@ -368,7 +431,7 @@ export default function Home() {
                     <Globe className="w-5 h-5" />
                   </a>
                   <a 
-                    href="https://wa.me/6282259494242" 
+                    href={`https://wa.me/${(settings.whatsapp || "6282259494242").replace(/[^0-9]/g, "")}`} 
                     target="_blank"
                     rel="noopener noreferrer"
                     className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all shadow-sm"
@@ -385,26 +448,26 @@ export default function Home() {
                <ul className="space-y-4 font-medium text-sm">
                   <li>
                      <a 
-                       href="https://wa.me/6282259494242" 
+                       href={`https://wa.me/${(settings.whatsapp || "6282259494242").replace(/[^0-9]/g, "")}`} 
                        target="_blank"
                        rel="noopener noreferrer"
                        className="flex items-start gap-3 hover:text-dstech-red transition-colors"
                      >
                         <Phone className="w-5 h-5 text-dstech-blue flex-shrink-0 mt-0.5" />
                         <div className="flex flex-col">
-                           <span className="font-bold text-slate-800">0822-5949-4242</span>
+                           <span className="font-bold text-slate-800">{settings.phone || settings.whatsappDisplay}</span>
                            <span className="text-slate-400 text-xs">Customer Service (WhatsApp)</span>
                         </div>
                      </a>
                   </li>
                   <li>
                      <a 
-                       href="mailto:cs@dstechsmart.com" 
+                       href={`mailto:${settings.email}`} 
                        className="flex items-start gap-3 hover:text-dstech-red transition-colors"
                      >
                         <Mail className="w-5 h-5 text-dstech-red flex-shrink-0 mt-0.5" />
                         <div className="flex flex-col">
-                           <span className="font-bold text-slate-800">cs@dstechsmart.com</span>
+                           <span className="font-bold text-slate-800">{settings.email}</span>
                            <span className="text-slate-400 text-xs">Official Support Email</span>
                         </div>
                      </a>
@@ -418,11 +481,11 @@ export default function Home() {
                <div className="flex items-start gap-3 text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
                   <MapPin className="w-5 h-5 text-dstech-red flex-shrink-0 mt-0.5" />
                   <span>
-                     PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON, KOTA CILEGON - BANTEN
+                     {settings.address}
                   </span>
                </div>
                <div className="pt-4 border-t border-slate-100 text-xs font-bold text-slate-400">
-                  PT. DSTech Smart Perkasa &bull; Est. 2017
+                  {settings.companyName} &bull; Est. 2017
                </div>
             </div>
          </div>
@@ -430,7 +493,7 @@ export default function Home() {
          {/* Bottom Footer Bar */}
          <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 pt-8 border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
             <p className="text-slate-500 text-xs font-medium">
-              &copy; {new Date().getFullYear()} PT. DSTech Smart Perkasa. All rights reserved.
+              &copy; {new Date().getFullYear()} {settings.companyName}. All rights reserved.
             </p>
             <div className="flex gap-6 text-xs font-bold text-slate-500">
                <a href="/admin" className="hover:text-dstech-blue transition-colors">Admin Portal</a>

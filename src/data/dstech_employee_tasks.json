@@ -1,0 +1,96 @@
+[
+  {
+    "id": "dstech_task_1",
+    "title": "Instalasi CCTV (4 Titik)",
+    "client": "PT. Krakatau Posco Energy",
+    "location": "Kawasan Industri Krakatau Steel, Cilegon",
+    "date": "2026-10-18",
+    "deadline": "2026-10-20",
+    "status": "In Progress",
+    "priority": "High",
+    "technician": "Ikhsan Maulidi",
+    "technicianPhone": "+6282259494242",
+    "scope": [
+      "Penarikan kabel UTP Cat6 outdoor 250 meter dalam pipa konduit",
+      "Pemasangan 4 unit IP Camera Hikvision 4MP DarkFighter",
+      "Konfigurasi IP Static dan Subnet pada NVR 8 Channel",
+      "Integrasi streaming live ke ruang kontrol security dan HP Management"
+    ],
+    "equipment": [
+      "Kabel UTP Cat6 Belden (1 Roll)",
+      "IP Camera Hikvision 4MP (4 Unit)",
+      "NVR Hikvision 8CH PoE (1 Unit)",
+      "Konektor RJ45 Cat6 Commscope (16 pcs)",
+      "Pipa Konduit 20mm (15 Batang)"
+    ],
+    "report": "Progres 70%: Kabel sudah ditarik 4 titik dan 3 kamera sudah terpasang. Menunggu tes akhir dan integrasi NVR besok pagi."
+  },
+  {
+    "id": "dstech_task_2",
+    "title": "Maintenance Access Control & Digital Lock",
+    "client": "RS Kurnia Cilegon",
+    "location": "Gedung Rawat Inap Lt. 3, RS Kurnia Cilegon",
+    "date": "2026-10-19",
+    "deadline": "2026-10-19",
+    "status": "Pending",
+    "priority": "Urgent",
+    "technician": "Ikhsan Maulidi",
+    "technicianPhone": "+6282259494242",
+    "scope": [
+      "Pengecekan power supply backup drop lock 12V 5A",
+      "Kalibrasi sensor RFID card reader pintu IGD & Farmasi",
+      "Pembersihan modul optik biometric fingerprint reader"
+    ],
+    "equipment": [
+      "Power Supply 12V 5A dengan Battery Backup (1 Unit)",
+      "RFID Reader 13.56MHz Mifare (1 Pcs)",
+      "Digital Multitester & Screwdriver set"
+    ],
+    "report": ""
+  },
+  {
+    "id": "dstech_task_3",
+    "title": "Survey & Pengukuran Barrier Gate Otomatis",
+    "client": "Perumahan Metro Royal",
+    "location": "Pos Utama Gerbang Masuk Metro Royal, Cilegon",
+    "date": "2026-10-21",
+    "deadline": "2026-10-22",
+    "status": "Pending",
+    "priority": "Medium",
+    "technician": "Ikhsan Maulidi",
+    "technicianPhone": "+6282259494242",
+    "scope": [
+      "Pengukuran pondasi tapak barrier gate kanan dan kiri",
+      "Pengecekan jalur pipa kabel power bawah tanah ke pos security",
+      "Uji jarak jangkau sensor RFID UHF Long Range 8 meter"
+    ],
+    "equipment": [
+      "Meteran Baja 30 Meter",
+      "Spray Marking Cat Pondasi",
+      "Sample Kartu RFID UHF"
+    ],
+    "report": ""
+  },
+  {
+    "id": "dstech_task_4",
+    "title": "Perbaikan CCTV Area Parkir & Setting DDNS",
+    "client": "Hotel Pesona Merak",
+    "location": "Jl. Raya Merak No. 12, Pulo Merak, Cilegon",
+    "date": "2026-10-15",
+    "deadline": "2026-10-16",
+    "status": "Completed",
+    "priority": "Medium",
+    "technician": "Ikhsan Maulidi",
+    "technicianPhone": "+6282259494242",
+    "scope": [
+      "Penggantian adaptor 12V 2A kamera outdoor nomor 07",
+      "Re-crimping konektor RJ45 yang korosi terkena angin laut",
+      "Setting ulang port forwarding dan DDNS cloud monitoring"
+    ],
+    "equipment": [
+      "Adaptor Waterproof 12V 2A (1 pcs)",
+      "Konektor RJ45 & Rubber Boot (4 pcs)"
+    ],
+    "report": "Pekerjaan tuntas. Seluruh 16 channel CCTV kembali online dan streaming lancar pada aplikasi HP General Manager."
+  }
+]

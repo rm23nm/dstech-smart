@@ -1,0 +1,119 @@
+{
+  "materials": [
+    {
+      "id": "dstech_mat_1",
+      "name": "Kabel UTP Cat6 Belden Original (305m)",
+      "category": "Kabel & Jaringan",
+      "stock": 2,
+      "unit": "Roll",
+      "minStock": 5,
+      "status": "Menipis",
+      "location": "Gudang Utama DSTech - Rak B3",
+      "description": "Kabel LAN outdoor/indoor high performance untuk CCTV IP & Data LAN"
+    },
+    {
+      "id": "dstech_mat_2",
+      "name": "Konektor RJ45 Cat6 Commscope Gold Plated",
+      "category": "Aksesoris & Konektor",
+      "stock": 140,
+      "unit": "Pcs",
+      "minStock": 50,
+      "status": "Aman",
+      "location": "Gudang Utama DSTech - Kotak A1",
+      "description": "Konektor modular plug Cat6 anti-korosi"
+    },
+    {
+      "id": "dstech_mat_3",
+      "name": "Kamera IP Hikvision 4MP DarkFighter (DS-2CD2043G2-I)",
+      "category": "Kamera & DVR/NVR",
+      "stock": 6,
+      "unit": "Unit",
+      "minStock": 3,
+      "status": "Aman",
+      "location": "Gudang Utama DSTech - Rak A2",
+      "description": "Kamera outdoor bullet IP dengan sensor malam berwarna"
+    },
+    {
+      "id": "dstech_mat_4",
+      "name": "Power Supply Jaring 12V 10A + Box Fan",
+      "category": "Kelistrikan & Power",
+      "stock": 1,
+      "unit": "Unit",
+      "minStock": 4,
+      "status": "Menipis",
+      "location": "Gudang Utama DSTech - Rak C1",
+      "description": "Power supply terpusat untuk kamera analog dan access control"
+    },
+    {
+      "id": "dstech_mat_5",
+      "name": "BNC Connector + Screw Terminal",
+      "category": "Aksesoris & Konektor",
+      "stock": 85,
+      "unit": "Pcs",
+      "minStock": 30,
+      "status": "Aman",
+      "location": "Gudang Utama DSTech - Kotak A2",
+      "description": "Konektor video coaxial kabel RG59/RG6"
+    },
+    {
+      "id": "dstech_mat_6",
+      "name": "Toolkit Crimping & Cable Tester NF-8209",
+      "category": "Alat Kerja Teknisi",
+      "stock": 3,
+      "unit": "Set",
+      "minStock": 2,
+      "status": "Aman",
+      "location": "Ruang Alat Teknisi - Loker T1",
+      "description": "Tang crimping pass-through RJ45 dan tracker kabel fiber/LAN"
+    },
+    {
+      "id": "dstech_mat_7",
+      "name": "Adaptor Switching 12V 2A Waterproof Outdoor",
+      "category": "Kelistrikan & Power",
+      "stock": 0,
+      "unit": "Pcs",
+      "minStock": 10,
+      "status": "Habis",
+      "location": "Gudang Utama DSTech - Rak C2",
+      "description": "Adaptor outdoor khusus kamera dan sensor barrier gate"
+    }
+  ],
+  "requests": [
+    {
+      "id": "dstech_req_1",
+      "materialId": "dstech_mat_1",
+      "materialName": "Kabel UTP Cat6 Belden Original (305m)",
+      "qty": 1,
+      "unit": "Roll",
+      "taskTitle": "Instalasi CCTV (4 Titik) - PT. Krakatau Posco Energy",
+      "requestedBy": "Ikhsan Maulidi",
+      "date": "2026-10-18",
+      "status": "Disetujui",
+      "notes": "Pengambilan langsung untuk penarikan kabel outdoor hari pertama"
+    },
+    {
+      "id": "dstech_req_2",
+      "materialId": "dstech_mat_2",
+      "materialName": "Konektor RJ45 Cat6 Commscope Gold Plated",
+      "qty": 20,
+      "unit": "Pcs",
+      "taskTitle": "Instalasi CCTV (4 Titik) - PT. Krakatau Posco Energy",
+      "requestedBy": "Ikhsan Maulidi",
+      "date": "2026-10-18",
+      "status": "Disetujui",
+      "notes": "Terminasi 4 titik kamera dan koneksi ke NVR"
+    },
+    {
+      "id": "dstech_req_3",
+      "materialId": "dstech_mat_4",
+      "materialName": "Power Supply Jaring 12V 10A + Box Fan",
+      "qty": 1,
+      "unit": "Unit",
+      "taskTitle": "Maintenance Access Control & Digital Lock - RS Kurnia Cilegon",
+      "requestedBy": "Ikhsan Maulidi",
+      "date": "2026-10-18",
+      "status": "Menunggu Approval",
+      "notes": "Untuk penggantian unit drop lock yang bermasalah di Lt. 3"
+    }
+  ]
+}
