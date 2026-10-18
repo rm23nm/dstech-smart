@@ -1,0 +1,52 @@
+[
+  {
+    "id": "dstech_usr_1",
+    "name": "Super Admin DStech",
+    "email": "superadmin@dstechsmart.com",
+    "role": "SUPERADMIN",
+    "phone": "081287654321",
+    "status": "ACTIVE",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "dstech_usr_2",
+    "name": "Admin Operasional",
+    "email": "admin@dstechsmart.com",
+    "role": "ADMIN",
+    "phone": "081298765432",
+    "status": "ACTIVE",
+    "createdAt": "2026-01-10T08:00:00.000Z",
+    "updatedAt": "2026-01-10T08:00:00.000Z"
+  },
+  {
+    "id": "dstech_usr_3",
+    "name": "Teknisi Hendra",
+    "email": "hendra@dstechsmart.com",
+    "role": "EMPLOYEE",
+    "phone": "085712345678",
+    "status": "ACTIVE",
+    "createdAt": "2026-02-01T09:00:00.000Z",
+    "updatedAt": "2026-02-01T09:00:00.000Z"
+  },
+  {
+    "id": "dstech_usr_4",
+    "name": "Ahmad Rizky (Mitra Cilegon)",
+    "email": "ahmad.rizky@gmail.com",
+    "role": "AFFILIATE",
+    "phone": "087811223344",
+    "status": "ACTIVE",
+    "createdAt": "2026-02-15T10:00:00.000Z",
+    "updatedAt": "2026-02-15T10:00:00.000Z"
+  },
+  {
+    "id": "dstech_usr_5",
+    "name": "PT. Krakatau Posco",
+    "email": "procurement@krakatauposco.co.id",
+    "role": "CLIENT",
+    "phone": "0254391234",
+    "status": "ACTIVE",
+    "createdAt": "2026-03-01T11:00:00.000Z",
+    "updatedAt": "2026-03-01T11:00:00.000Z"
+  }
+]

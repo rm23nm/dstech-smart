@@ -29,21 +29,33 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               </a>
             </li>
             <li>
-              <a href="/superadmin/products" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-500 hover:bg-white/5 hover:text-white transition-all font-bold">
+              <a href="/superadmin/products" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-400 hover:bg-white/5 hover:text-white transition-all font-bold">
                 <Package className="w-5 h-5" />
                 Produk & Komisi
               </a>
             </li>
             <li>
-              <a href="/superadmin/portfolios" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-500 hover:bg-white/5 hover:text-white transition-all font-bold">
+              <a href="/admin/users" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-400 hover:bg-white/5 hover:text-white transition-all font-bold">
+                <Users className="w-5 h-5" />
+                User Management
+              </a>
+            </li>
+            <li>
+              <a href="/admin/partners" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-400 hover:bg-white/5 hover:text-white transition-all font-bold">
+                <Users className="w-5 h-5" />
+                Affiliate Network
+              </a>
+            </li>
+            <li>
+              <a href="/superadmin/portfolios" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-400 hover:bg-white/5 hover:text-white transition-all font-bold">
                 <ImageIcon className="w-5 h-5" />
                 Manajemen Portfolio
               </a>
             </li>
             <li>
-              <a href="#affiliates" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-500 hover:bg-white/5 hover:text-white transition-all font-bold">
-                <Users className="w-5 h-5" />
-                Daftar Affiliate
+              <a href="/admin/settings" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-400 hover:bg-white/5 hover:text-white transition-all font-bold">
+                <Shield className="w-5 h-5" />
+                Site Settings
               </a>
             </li>
           </ul>
