@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   ArrowRight,
   FolderTree,
+  FolderKanban,
 } from "lucide-react";
 
 interface SearchResult {
@@ -32,6 +33,7 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Dashboard Overview", category: "Navigasi", url: "/admin", desc: "Ringkasan metrik omset, stok, dan partner" },
   { title: "Manajemen Produk (CRUD)", category: "Produk", url: "/admin/products", desc: "Tambah, edit, hapus inventori CCTV & Smart Home" },
   { title: "Kategori & Sub-Kategori", category: "Produk", url: "/admin/categories", desc: "Kelola klasifikasi kategori dan sub-kategori produk" },
+  { title: "Portofolio Proyek", category: "Navigasi", url: "/admin/portfolios", desc: "Kelola dokumentasi proyek selesai, foto & video instalasi" },
   { title: "CCTV Hikvision 4CH", category: "Produk", url: "/admin/products", desc: "Paket CCTV Security 4 Channel HD" },
   { title: "Smart Doorlock X-100", category: "Produk", url: "/admin/products", desc: "Doorlock biometrik RFID & Fingerprint" },
   { title: "Running Text LED Red Outdoor", category: "Produk", url: "/admin/products", desc: "Display running text outdoor WiFi" },
@@ -126,6 +128,12 @@ export default function AdminLayout({
       href: "/admin/categories",
       icon: FolderTree,
       active: pathname.startsWith("/admin/categories"),
+    },
+    {
+      label: "Portofolio Proyek",
+      href: "/admin/portfolios",
+      icon: FolderKanban,
+      active: pathname.startsWith("/admin/portfolios"),
     },
     {
       label: "User Management",
