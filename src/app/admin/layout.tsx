@@ -20,6 +20,7 @@ import {
   ArrowRight,
   FolderTree,
   FolderKanban,
+  FileDown,
 } from "lucide-react";
 
 interface SearchResult {
@@ -40,6 +41,7 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Fingerprint ZKTeco", category: "Produk", url: "/admin/products", desc: "Mesin absensi sidik jari & RFID" },
   { title: "User Management", category: "User", url: "/admin/users", desc: "Kelola akun Superadmin, Admin, Teknisi, & Klien" },
   { title: "Daftar Akun Karyawan & Teknisi", category: "User", url: "/admin/users", desc: "Manajemen hak akses staf operasional" },
+  { title: "Materi Promosi & Katalog", category: "Navigasi", url: "/admin/promotions", desc: "Kelola e-katalog produk dan brosur unduhan mitra" },
   { title: "Affiliate Network & Komisi", category: "Mitra", url: "/admin/partners", desc: "Daftar agen referral dan persetujuan komisi" },
   { title: "Ahmad Rizky Pratama (Gold Agent)", category: "Mitra", url: "/admin/partners", desc: "Mitra referral wilayah Cilegon" },
   { title: "Siti Sarah Nuraini (Platinum)", category: "Mitra", url: "/admin/partners", desc: "Mitra referral wilayah Serang" },
@@ -134,6 +136,12 @@ export default function AdminLayout({
       href: "/admin/portfolios",
       icon: FolderKanban,
       active: pathname.startsWith("/admin/portfolios"),
+    },
+    {
+      label: "Materi Promosi & Katalog",
+      href: "/admin/promotions",
+      icon: FileDown,
+      active: pathname.startsWith("/admin/promotions"),
     },
     {
       label: "User Management",

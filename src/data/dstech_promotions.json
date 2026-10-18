@@ -1,0 +1,46 @@
+[
+  {
+    "id": "dstech_promo_1",
+    "title": "Katalog Produk CCTV & Smart Home DSTech 2026",
+    "category": "Katalog Produk",
+    "description": "Katalog resmi perangkat keamanan CCTV resolusi tinggi, smart doorlock, dan barrier gate lengkap dengan spesifikasi teknis dan rincian harga.",
+    "fileUrl": "/portfolio-industrial.png",
+    "fileType": "PDF",
+    "fileSize": "5.4 MB",
+    "downloadCount": 184,
+    "createdAt": "2026-03-01T08:00:00.000Z"
+  },
+  {
+    "id": "dstech_promo_2",
+    "title": "Brosur Penawaran Solusi Keamanan Gedung & Perumahan",
+    "category": "Brosur Promosi",
+    "description": "Brosur cetak dan digital beresolusi tinggi siap kirim ke calon klien perumahan, instansi, dan kawasan industri.",
+    "fileUrl": "/service-cctv.png",
+    "fileType": "PDF",
+    "fileSize": "3.2 MB",
+    "downloadCount": 126,
+    "createdAt": "2026-03-05T10:00:00.000Z"
+  },
+  {
+    "id": "dstech_promo_3",
+    "title": "Panduan & Skema Komisi Program Mitra DSTech",
+    "category": "Panduan Mitra",
+    "description": "Panduan lengkap alur referral, perhitungan komisi hingga 20%, simulasi pencairan fee, dan tips penutupan penjualan.",
+    "fileUrl": "/about-image.png",
+    "fileType": "PDF",
+    "fileSize": "2.8 MB",
+    "downloadCount": 240,
+    "createdAt": "2026-03-10T11:30:00.000Z"
+  },
+  {
+    "id": "dstech_promo_4",
+    "title": "Social Media Kit & Banner Promosi WhatsApp / IG",
+    "category": "Social Media Kit",
+    "description": "Template feed Instagram, story Canva, flyer promosi, dan copy teks iklan WhatsApp siap pakai untuk mitra affiliate.",
+    "fileUrl": "/logo.png",
+    "fileType": "ZIP",
+    "fileSize": "12.8 MB",
+    "downloadCount": 315,
+    "createdAt": "2026-03-15T14:00:00.000Z"
+  }
+]

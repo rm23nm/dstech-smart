@@ -59,6 +59,12 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               </a>
             </li>
             <li>
+              <a href="/admin/promotions" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-400 hover:bg-white/5 hover:text-white transition-all font-bold">
+                <Package className="w-5 h-5" />
+                Materi Promosi & Katalog
+              </a>
+            </li>
+            <li>
               <a href="/admin/settings" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-400 hover:bg-white/5 hover:text-white transition-all font-bold">
                 <Shield className="w-5 h-5" />
                 Site Settings

@@ -45,6 +45,21 @@ export default function AffiliateDashboard() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState("");
 
+  // Promotional Materials state
+  const [promotions, setPromotions] = useState<any[]>([]);
+  const [selectedPromo, setSelectedPromo] = useState<any | null>(null);
+
+  useEffect(() => {
+    fetch("/api/promotions?t=" + Date.now())
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.data)) {
+          setPromotions(data.data);
+        }
+      })
+      .catch((err) => console.error("Error loading promotions:", err));
+  }, []);
+
   // Check auth on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -398,44 +413,67 @@ export default function AffiliateDashboard() {
 
           {/* Marketing Assets */}
           <div id="marketing-assets" className="p-8 rounded-3xl border border-slate-200 bg-white space-y-6 shadow-sm">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-red-50 text-dstech-red flex items-center justify-center">
-                <Download className="w-6 h-6" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-red-50 text-dstech-red flex items-center justify-center">
+                  <Download className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black tracking-tight">Materi Promosi & Unduh Katalog</h3>
+                  <p className="text-xs font-bold text-slate-400">Unduh brosur resmi & media kit untuk presentasi ke calon klien</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-black tracking-tight">Materi Promosi & Katalog</h3>
-                <p className="text-xs font-bold text-slate-400">Unduh brosur resmi untuk presentasi ke klien</p>
-              </div>
+              <span className="px-3.5 py-1 rounded-full bg-blue-50 text-dstech-blue font-bold text-xs uppercase tracking-wider self-start sm:self-auto">
+                {promotions.length} Materi Tersedia
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <a
-                href="/about-image.png"
-                download
-                className="p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-dstech-blue flex items-center justify-between transition-all group"
-              >
-                <div>
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-800 group-hover:text-dstech-blue block">
-                    Katalog CCTV & Smart Home
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-bold">PDF Brosur Produk</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              {promotions.length === 0 ? (
+                <div className="col-span-2 text-center py-8 text-slate-400 font-bold text-xs">
+                  Memuat materi promosi & katalog resmi...
                 </div>
-                <Download className="w-4 h-4 text-slate-400 group-hover:text-dstech-blue shrink-0" />
-              </a>
+              ) : (
+                promotions.map((promo) => (
+                  <div
+                    key={promo.id}
+                    className="p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-dstech-blue flex flex-col justify-between gap-4 transition-all group hover:bg-white hover:shadow-md"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="px-2.5 py-0.5 rounded-full bg-white text-dstech-blue font-black text-[10px] uppercase tracking-wider border border-slate-200">
+                          {promo.category}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {promo.fileType} &bull; {promo.fileSize}
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-black text-slate-900 group-hover:text-dstech-blue transition-colors leading-snug">
+                        {promo.title}
+                      </h4>
+                      <p className="text-slate-500 text-xs mt-1 line-clamp-2 font-medium">
+                        {promo.description}
+                      </p>
+                    </div>
 
-              <a
-                href="/logo.png"
-                download
-                className="p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-dstech-red flex items-center justify-between transition-all group"
-              >
-                <div>
-                  <span className="text-xs font-black uppercase tracking-wider text-slate-800 group-hover:text-dstech-red block">
-                    Social Media Kit
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-bold">Banner & Feed Template</span>
-                </div>
-                <Download className="w-4 h-4 text-slate-400 group-hover:text-dstech-red shrink-0" />
-              </a>
+                    <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {promo.downloadCount || 0}x diunduh
+                      </span>
+                      <a
+                        href={promo.fileUrl}
+                        download
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-dstech-red text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Unduh File</span>
+                      </a>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
