@@ -1,5 +1,5 @@
 import React from 'react'
-import { LayoutDashboard, Package, Image as ImageIcon, Users, LogOut, Bell, Shield } from 'lucide-react'
+import { LayoutDashboard, Package, Image as ImageIcon, Users, LogOut, Bell, Shield, FolderTree } from 'lucide-react'
 
 export const metadata = {
   title: 'Command Center - DSTech Smart',
@@ -32,6 +32,12 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
               <a href="/superadmin/products" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-400 hover:bg-white/5 hover:text-white transition-all font-bold">
                 <Package className="w-5 h-5" />
                 Produk & Komisi
+              </a>
+            </li>
+            <li>
+              <a href="/superadmin/categories" className="flex items-center gap-3 px-4 py-3.5 rounded-2xl text-zinc-400 hover:bg-white/5 hover:text-white transition-all font-bold">
+                <FolderTree className="w-5 h-5" />
+                Kategori & Sub-Kategori
               </a>
             </li>
             <li>

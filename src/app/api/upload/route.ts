@@ -4,6 +4,14 @@ import path from "path";
 
 export async function POST(request: Request) {
   try {
+    const contentType = request.headers.get("content-type") || "";
+    if (!contentType.includes("multipart/form-data")) {
+      return NextResponse.json(
+        { success: false, message: "Permintaan harus berupa multipart/form-data." },
+        { status: 400 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
 

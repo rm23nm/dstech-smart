@@ -21,8 +21,10 @@ import {
   Star,
   Menu,
   X,
-  ArrowRight
+  ArrowRight,
+  LogIn
 } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -58,15 +60,24 @@ export default function Home() {
           </div>
 
           {/* Action Button & Mobile Hamburger */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link
+              href="/login"
+              id="btn-header-login"
+              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider text-slate-700 hover:text-dstech-blue bg-slate-100 hover:bg-slate-200 transition-all border border-slate-200 active:scale-95 shadow-sm"
+            >
+              <LogIn className="w-3.5 h-3.5 text-dstech-blue" />
+              <span>Login</span>
+            </Link>
+
             <a 
               href="https://wa.me/6282259494242"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 bg-dstech-red hover:bg-red-700 text-white px-3.5 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-red-500/20 active:scale-95"
+              className="inline-flex items-center gap-1.5 bg-dstech-red hover:bg-red-700 text-white px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-red-500/20 active:scale-95"
             >
               <Phone className="w-3.5 h-3.5" />
-              <span>Konsultasi</span>
+              <span className="hidden sm:inline">Konsultasi</span>
             </a>
 
             {/* Mobile Hamburger Button */}
@@ -119,11 +130,23 @@ export default function Home() {
               >
                 Portofolio Proyek
               </a>
-              <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+              <div className="pt-3 border-t border-slate-100 flex flex-col gap-2.5">
+                <Link
+                  href="/login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="py-3 px-4 rounded-2xl bg-slate-900 hover:bg-black text-white font-bold text-xs uppercase tracking-wider flex items-center justify-between shadow-md transition-all active:scale-95"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <LogIn className="w-4 h-4 text-dstech-blue" />
+                    <span>Masuk ke Portal Login</span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-slate-400" />
+                </Link>
+
                 <a 
                   href="/affiliate" 
                   onClick={() => setMobileMenuOpen(false)}
-                  className="py-2.5 px-3 rounded-xl bg-dstech-blue text-white text-center font-bold text-xs uppercase tracking-wider"
+                  className="py-2.5 px-3 rounded-xl bg-dstech-blue text-white text-center font-bold text-xs uppercase tracking-wider shadow-sm"
                 >
                   Program Partner & Affiliate
                 </a>

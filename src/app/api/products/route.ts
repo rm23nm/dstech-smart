@@ -131,7 +131,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, category, price, stock, commission, commissionType, desc, image } = body;
+    const { name, category, subCategory, price, stock, commission, commissionType, desc, image } = body;
 
     if (!name || name.trim() === "") {
       return NextResponse.json({ success: false, message: "Nama produk wajib diisi" }, { status: 400 });
@@ -145,7 +145,8 @@ export async function POST(req: Request) {
     const newProduct = {
       id: `dstech_prod_${Date.now()}`,
       name: name.trim(),
-      category: category?.trim() || "Security",
+      category: category?.trim() || "Security System",
+      subCategory: subCategory?.trim() || "",
       price: parsedPrice,
       stock: parsedStock,
       commission: `${commRate}%`,
@@ -170,7 +171,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, category, price, stock, commission, commissionType, desc, image } = body;
+    const { id, name, category, subCategory, price, stock, commission, commissionType, desc, image } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, message: "ID produk wajib disertakan" }, { status: 400 });
@@ -191,6 +192,7 @@ export async function PUT(req: Request) {
       ...products[index],
       name: name !== undefined ? name.trim() : products[index].name,
       category: category !== undefined ? category.trim() : products[index].category,
+      subCategory: subCategory !== undefined ? subCategory.trim() : (products[index].subCategory || ""),
       price: parsedPrice,
       stock: parsedStock,
       commission: `${commRate}%`,

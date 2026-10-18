@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from 'react'
-import { Plus, Edit2, Trash2, Loader2, X, Check, AlertCircle, UploadCloud, Package } from 'lucide-react'
+import { Plus, Edit2, Trash2, Loader2, X, Check, AlertCircle, UploadCloud, Package, FolderTree } from 'lucide-react'
 import { ProductItem } from '@/app/admin/products/page'
 
 export default function ProductsAdminPage() {
@@ -157,12 +157,20 @@ export default function ProductsAdminPage() {
           <h2 className="text-2xl font-bold text-slate-900">Produk & Pengaturan Referral</h2>
           <p className="text-slate-500 text-xs mt-1">Inventaris produk terpusat PT. DSTech Smart Perkasa</p>
         </div>
-        <button
-          onClick={handleOpenAdd}
-          className="bg-dstech-blue text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition flex items-center gap-2 shadow-md shadow-blue-500/20"
-        >
-          <Plus className="w-4 h-4" /> Tambah Produk
-        </button>
+        <div className="flex items-center gap-3">
+          <a
+            href="/superadmin/categories"
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-2 border border-slate-200"
+          >
+            <FolderTree className="w-4 h-4 text-dstech-blue" /> Kelola Kategori & Sub
+          </a>
+          <button
+            onClick={handleOpenAdd}
+            className="bg-dstech-blue text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 transition flex items-center gap-2 shadow-md shadow-blue-500/20"
+          >
+            <Plus className="w-4 h-4" /> Tambah Produk
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">

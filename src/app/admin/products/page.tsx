@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { 
   Plus, 
   Search, 
@@ -14,13 +15,16 @@ import {
   ArrowUpDown,
   Filter,
   UploadCloud,
-  ImageIcon
+  ImageIcon,
+  FolderTree,
+  Tag
 } from "lucide-react";
 
 export interface ProductItem {
   id: string | number;
   name: string;
   category: string;
+  subCategory?: string;
   price: number;
   stock: number;
   commission: string;
@@ -32,15 +36,21 @@ export interface ProductItem {
   updatedAt?: string;
 }
 
+export interface CategoryOption {
+  id: string;
+  name: string;
+  slug: string;
+  subCategories: { id: string; name: string; slug: string }[];
+}
+
 const CATEGORIES = [
   "All Categories",
-  "Security",
-  "Smart Home",
-  "Software",
-  "Visual",
-  "Parking",
-  "Jaringan & Fiber Optik",
-  "Komunikasi",
+  "Security System",
+  "Smart Home & Automation",
+  "Visual Display & Signage",
+  "Parking & Barrier System",
+  "Jaringan & IT Infrastructure",
+  "Software & Web Development",
   "Lainnya"
 ];
 
@@ -49,6 +59,7 @@ export default function ProductAdmin() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
+  const [dynamicCategories, setDynamicCategories] = useState<CategoryOption[]>([]);
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -59,9 +70,10 @@ export default function ProductAdmin() {
   // Form State
   const [formData, setFormData] = useState({
     name: "",
-    category: "Security",
+    category: "Security System",
+    subCategory: "",
     price: "",
-    stock: "",
+    stock: "10",
     commission: "10",
     commissionType: "ONETIME",
     image: "",
@@ -110,9 +122,40 @@ export default function ProductAdmin() {
     setIsLoading(false);
   };
 
+  // Fetch dynamic categories
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch("/api/categories");
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setDynamicCategories(json.data);
+        }
+      }
+    } catch (err) {
+      console.warn("Fetch categories error:", err);
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
   }, []);
+
+  // Category & Sub-Category Options
+  const categoryList = useMemo(() => {
+    if (dynamicCategories.length > 0) {
+      return ["All Categories", ...dynamicCategories.map((c) => c.name)];
+    }
+    return CATEGORIES;
+  }, [dynamicCategories]);
+
+  const currentSubCategories = useMemo(() => {
+    const found = dynamicCategories.find(
+      (c) => c.name.toLowerCase() === formData.category.toLowerCase()
+    );
+    return found?.subCategories || [];
+  }, [dynamicCategories, formData.category]);
 
   // Filter & Search logic
   const filteredProducts = useMemo(() => {
@@ -120,6 +163,7 @@ export default function ProductAdmin() {
       const matchesSearch = 
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (p.subCategory && p.subCategory.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (p.desc && p.desc.toLowerCase().includes(searchQuery.toLowerCase()));
       
       const matchesCategory = 
@@ -161,11 +205,16 @@ export default function ProductAdmin() {
 
   // Handle Open Add Modal
   const handleOpenAdd = () => {
+    const defaultCat = dynamicCategories.length > 0 ? dynamicCategories[0].name : "Security System";
+    const defaultSub = dynamicCategories.length > 0 && dynamicCategories[0].subCategories?.length > 0
+      ? dynamicCategories[0].subCategories[0].name
+      : "";
     setFormData({
       name: "",
-      category: "Security",
+      category: defaultCat,
+      subCategory: defaultSub,
       price: "",
-      stock: "",
+      stock: "10",
       commission: "10",
       commissionType: "ONETIME",
       image: "",
@@ -180,6 +229,7 @@ export default function ProductAdmin() {
     setFormData({
       name: product.name,
       category: product.category,
+      subCategory: product.subCategory || "",
       price: String(product.price),
       stock: String(product.stock),
       commission: String(product.commissionRate || parseInt(String(product.commission).replace(/[^0-9]/g, ""), 10) || 10),
@@ -208,6 +258,7 @@ export default function ProductAdmin() {
     const newPayload = {
       name: formData.name.trim(),
       category: formData.category,
+      subCategory: formData.subCategory?.trim() || "",
       price: parseFloat(formData.price) || 0,
       stock: parseInt(formData.stock, 10) || 0,
       commission: `${formData.commission}%`,
@@ -265,6 +316,7 @@ export default function ProductAdmin() {
       id: selectedProduct.id,
       name: formData.name.trim(),
       category: formData.category,
+      subCategory: formData.subCategory?.trim() || "",
       price: parseFloat(formData.price) || 0,
       stock: parseInt(formData.stock, 10) || 0,
       commission: `${formData.commission}%`,
@@ -363,14 +415,23 @@ export default function ProductAdmin() {
             Kelola inventaris hardware CCTV, Smart Home, Running Text, Barrier Gate, dan Software
           </p>
         </div>
-        <button
-          onClick={handleOpenAdd}
-          id="btn-add-product"
-          className="h-12 px-6 rounded-2xl bg-dstech-red hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-xl shadow-red-500/20 active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Produk</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/admin/categories"
+            className="h-12 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-all self-start sm:self-auto"
+          >
+            <FolderTree className="w-4 h-4 text-dstech-blue" />
+            <span>Kelola Kategori & Sub</span>
+          </Link>
+          <button
+            onClick={handleOpenAdd}
+            id="btn-add-product"
+            className="h-12 px-6 rounded-2xl bg-dstech-red hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-xl shadow-red-500/20 active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Produk</span>
+          </button>
+        </div>
       </div>
 
       {/* Search & Category Filter */}
@@ -400,7 +461,7 @@ export default function ProductAdmin() {
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="w-full h-12 sm:h-14 px-4 rounded-2xl bg-slate-50 border border-slate-200 font-bold text-slate-700 text-xs uppercase tracking-wider focus:outline-none focus:border-dstech-blue transition-all"
           >
-            {CATEGORIES.map((cat) => (
+            {categoryList.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
               </option>
@@ -464,10 +525,16 @@ export default function ProductAdmin() {
                           <p className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-dstech-blue transition-colors">
                             {p.name}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                               {p.category}
                             </span>
+                            {p.subCategory && (
+                              <span className="text-[10px] font-semibold text-dstech-blue bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 flex items-center gap-1">
+                                <Tag className="w-2.5 h-2.5" />
+                                {p.subCategory}
+                              </span>
+                            )}
                             {p.commissionType && (
                               <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
                                 {p.commissionType}
@@ -629,22 +696,62 @@ export default function ProductAdmin() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Kategori
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Kategori
+                    </label>
+                    <Link
+                      href="/admin/categories"
+                      target="_blank"
+                      className="text-[10px] font-bold text-dstech-blue hover:underline flex items-center gap-1"
+                    >
+                      <FolderTree className="w-3 h-3" /> Kelola
+                    </Link>
+                  </div>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      const found = dynamicCategories.find((c) => c.name.toLowerCase() === newCat.toLowerCase());
+                      const firstSub = found && found.subCategories?.length > 0 ? found.subCategories[0].name : "";
+                      setFormData({ ...formData, category: newCat, subCategory: firstSub });
+                    }}
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue bg-white"
                   >
-                    {CATEGORIES.filter((c) => c !== "All Categories").map((c) => (
-                      <option key={c} value={c}>
-                        {c}
+                    {dynamicCategories.length > 0
+                      ? dynamicCategories.map((c) => (
+                          <option key={c.id} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))
+                      : CATEGORIES.filter((c) => c !== "All Categories").map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Sub-Kategori
+                  </label>
+                  <select
+                    value={formData.subCategory}
+                    onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue bg-white"
+                  >
+                    <option value="">-- Pilih Sub-Kategori (Opsional) --</option>
+                    {currentSubCategories.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
                       </option>
                     ))}
                   </select>
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Harga (Rp) <span className="text-dstech-red">*</span>
@@ -659,9 +766,7 @@ export default function ProductAdmin() {
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Stok (Unit)
@@ -675,7 +780,9 @@ export default function ProductAdmin() {
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                   />
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Komisi (%)
@@ -840,22 +947,62 @@ export default function ProductAdmin() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Kategori
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      Kategori
+                    </label>
+                    <Link
+                      href="/admin/categories"
+                      target="_blank"
+                      className="text-[10px] font-bold text-dstech-blue hover:underline flex items-center gap-1"
+                    >
+                      <FolderTree className="w-3 h-3" /> Kelola
+                    </Link>
+                  </div>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    onChange={(e) => {
+                      const newCat = e.target.value;
+                      const found = dynamicCategories.find((c) => c.name.toLowerCase() === newCat.toLowerCase());
+                      const firstSub = found && found.subCategories?.length > 0 ? found.subCategories[0].name : "";
+                      setFormData({ ...formData, category: newCat, subCategory: firstSub });
+                    }}
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue bg-white"
                   >
-                    {CATEGORIES.filter((c) => c !== "All Categories").map((c) => (
-                      <option key={c} value={c}>
-                        {c}
+                    {dynamicCategories.length > 0
+                      ? dynamicCategories.map((c) => (
+                          <option key={c.id} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))
+                      : CATEGORIES.filter((c) => c !== "All Categories").map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Sub-Kategori
+                  </label>
+                  <select
+                    value={formData.subCategory}
+                    onChange={(e) => setFormData({ ...formData, subCategory: e.target.value })}
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue bg-white"
+                  >
+                    <option value="">-- Pilih Sub-Kategori (Opsional) --</option>
+                    {currentSubCategories.map((s) => (
+                      <option key={s.id} value={s.name}>
+                        {s.name}
                       </option>
                     ))}
                   </select>
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Harga (Rp) <span className="text-dstech-red">*</span>
@@ -869,9 +1016,7 @@ export default function ProductAdmin() {
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Stok (Unit)
@@ -884,7 +1029,9 @@ export default function ProductAdmin() {
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                   />
                 </div>
+              </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Komisi (%)

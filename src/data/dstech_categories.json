@@ -1,0 +1,76 @@
+[
+  {
+    "id": "dstech_cat_1",
+    "name": "Security System",
+    "slug": "security-system",
+    "icon": "Shield",
+    "description": "Perangkat keamanan CCTV, alarm sensor, patrol guard & akses kontrol terpadu.",
+    "subCategories": [
+      { "id": "dstech_subcat_1_1", "name": "CCTV Analogue & HD", "slug": "cctv-analogue" },
+      { "id": "dstech_subcat_1_2", "name": "CCTV IP Camera & NVR", "slug": "cctv-ip-camera" },
+      { "id": "dstech_subcat_1_3", "name": "Akses Kontrol & Fingerprint", "slug": "akses-kontrol-fingerprint" },
+      { "id": "dstech_subcat_1_4", "name": "Video Intercom & Alarm", "slug": "video-intercom-alarm" }
+    ]
+  },
+  {
+    "id": "dstech_cat_2",
+    "name": "Smart Home & Automation",
+    "slug": "smart-home",
+    "icon": "Home",
+    "description": "Otomasi rumah cerdas, smart lock, voice assistant, dan lighting control.",
+    "subCategories": [
+      { "id": "dstech_subcat_2_1", "name": "Smart Door Lock", "slug": "smart-door-lock" },
+      { "id": "dstech_subcat_2_2", "name": "Smart Lighting & Switch", "slug": "smart-lighting-switch" },
+      { "id": "dstech_subcat_2_3", "name": "Motorized Curtain", "slug": "motorized-curtain" },
+      { "id": "dstech_subcat_2_4", "name": "Smart Sensor & Gateway", "slug": "smart-sensor-gateway" }
+    ]
+  },
+  {
+    "id": "dstech_cat_3",
+    "name": "Visual Display & Signage",
+    "slug": "visual-display",
+    "icon": "Tv",
+    "description": "Layar digital modern, videotron indoor/outdoor, dan display komersial.",
+    "subCategories": [
+      { "id": "dstech_subcat_3_1", "name": "LED Running Text", "slug": "led-running-text" },
+      { "id": "dstech_subcat_3_2", "name": "Videotron Indoor & Outdoor", "slug": "videotron" },
+      { "id": "dstech_subcat_3_3", "name": "Digital Signage Kiosk", "slug": "digital-signage" }
+    ]
+  },
+  {
+    "id": "dstech_cat_4",
+    "name": "Parking & Barrier System",
+    "slug": "parking-system",
+    "icon": "Car",
+    "description": "Sistem palang parkir otomatis, RFID card reader, dan manless ticketing gate.",
+    "subCategories": [
+      { "id": "dstech_subcat_4_1", "name": "Barrier Gate Otomatis", "slug": "barrier-gate-otomatis" },
+      { "id": "dstech_subcat_4_2", "name": "Palang Parkir RFID Tap", "slug": "palang-parkir-rfid" },
+      { "id": "dstech_subcat_4_3", "name": "Manless Ticket Dispenser", "slug": "ticket-dispenser" }
+    ]
+  },
+  {
+    "id": "dstech_cat_5",
+    "name": "Jaringan & IT Infrastructure",
+    "slug": "jaringan-it-infra",
+    "icon": "Network",
+    "description": "Infrastruktur fiber optic, switch, router enterprise, server rack & wifi access point.",
+    "subCategories": [
+      { "id": "dstech_subcat_5_1", "name": "Fiber Optic & Splicing", "slug": "fiber-optic" },
+      { "id": "dstech_subcat_5_2", "name": "Switch, Router & AP Wifi", "slug": "switch-router-wifi" },
+      { "id": "dstech_subcat_5_3", "name": "Server & Rack Cabinet", "slug": "server-rack" }
+    ]
+  },
+  {
+    "id": "dstech_cat_6",
+    "name": "Software & Web Development",
+    "slug": "software-web",
+    "icon": "Code",
+    "description": "Aplikasi custom, landing page corporate, web profil PT, dan integrasi cloud IoT.",
+    "subCategories": [
+      { "id": "dstech_subcat_6_1", "name": "Website Profil Perusahaan", "slug": "web-profil-perusahaan" },
+      { "id": "dstech_subcat_6_2", "name": "Aplikasi Bisnis Custom", "slug": "aplikasi-bisnis" },
+      { "id": "dstech_subcat_6_3", "name": "Integrasi IoT & Cloud", "slug": "integrasi-iot" }
+    ]
+  }
+]
