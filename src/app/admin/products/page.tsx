@@ -12,7 +12,9 @@ import {
   AlertCircle, 
   Loader2, 
   ArrowUpDown,
-  Filter
+  Filter,
+  UploadCloud,
+  ImageIcon
 } from "lucide-react";
 
 export interface ProductItem {
@@ -24,6 +26,7 @@ export interface ProductItem {
   commission: string;
   commissionRate?: number;
   commissionType?: string;
+  image?: string;
   desc?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -61,10 +64,12 @@ export default function ProductAdmin() {
     stock: "",
     commission: "10",
     commissionType: "ONETIME",
+    image: "",
     desc: ""
   });
 
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Show auto-dismissing toast
@@ -125,6 +130,35 @@ export default function ProductAdmin() {
     });
   }, [products, searchQuery, selectedCategory]);
 
+  // Handle Image Upload via API
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingImage(true);
+    const data = new FormData();
+    data.append("file", file);
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: data,
+      });
+      const result = await res.json();
+
+      if (result.success && result.url) {
+        setFormData((prev) => ({ ...prev, image: result.url }));
+        showToast("Gambar produk berhasil diunggah!");
+      } else {
+        showToast(result.message || "Gagal mengunggah gambar.", "error");
+      }
+    } catch {
+      showToast("Terjadi kesalahan saat mengunggah gambar.", "error");
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   // Handle Open Add Modal
   const handleOpenAdd = () => {
     setFormData({
@@ -134,6 +168,7 @@ export default function ProductAdmin() {
       stock: "",
       commission: "10",
       commissionType: "ONETIME",
+      image: "",
       desc: ""
     });
     setIsAddModalOpen(true);
@@ -149,6 +184,7 @@ export default function ProductAdmin() {
       stock: String(product.stock),
       commission: String(product.commissionRate || parseInt(String(product.commission).replace(/[^0-9]/g, ""), 10) || 10),
       commissionType: product.commissionType || "ONETIME",
+      image: product.image || "",
       desc: product.desc || ""
     });
     setIsEditModalOpen(true);
@@ -177,6 +213,7 @@ export default function ProductAdmin() {
       commission: `${formData.commission}%`,
       commissionRate: parseInt(formData.commission, 10) || 10,
       commissionType: formData.commissionType,
+      image: formData.image.trim(),
       desc: formData.desc.trim()
     };
 
@@ -208,7 +245,7 @@ export default function ProductAdmin() {
       setProducts(updated);
       localStorage.setItem("dstech_products_inventory", JSON.stringify(updated));
       setIsAddModalOpen(false);
-      showToast("Produk baru berhasil ditambahkan (Lokal)!");
+      showToast("Produk baru ditambahkan (Penyimpanan Lokal)!");
     } finally {
       setFormSubmitting(false);
     }
@@ -233,6 +270,7 @@ export default function ProductAdmin() {
       commission: `${formData.commission}%`,
       commissionRate: parseInt(formData.commission, 10) || 10,
       commissionType: formData.commissionType,
+      image: formData.image.trim(),
       desc: formData.desc.trim()
     };
 
@@ -283,7 +321,7 @@ export default function ProductAdmin() {
         setProducts(updated);
         localStorage.setItem("dstech_products_inventory", JSON.stringify(updated));
         setIsDeleteModalOpen(false);
-        showToast(`Produk "${selectedProduct.name}" berhasil dihapus!`);
+        showToast("Produk berhasil dihapus!");
       } else {
         showToast(data.message || "Gagal menghapus produk.", "error");
       }
@@ -293,7 +331,7 @@ export default function ProductAdmin() {
       setProducts(updated);
       localStorage.setItem("dstech_products_inventory", JSON.stringify(updated));
       setIsDeleteModalOpen(false);
-      showToast(`Produk "${selectedProduct.name}" berhasil dihapus (Lokal)!`);
+      showToast("Produk berhasil dihapus (Lokal)!");
     } finally {
       setFormSubmitting(false);
     }
@@ -301,50 +339,44 @@ export default function ProductAdmin() {
 
   return (
     <div className="space-y-8">
-      {/* Toast Notification */}
+      {/* Toast Feedback */}
       {toastMessage && (
         <div
-          className={`fixed top-8 right-8 z-50 flex items-center gap-3 px-6 py-4 rounded-2xl shadow-2xl transition-all duration-300 animate-in slide-in-from-top-4 ${
-            toastMessage.type === "success"
-              ? "bg-slate-900 text-white border border-emerald-500/40"
-              : "bg-red-600 text-white shadow-red-500/30"
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl text-white font-bold text-xs uppercase tracking-wider transition-all animate-in slide-in-from-bottom-5 ${
+            toastMessage.type === "success" ? "bg-emerald-600" : "bg-red-600"
           }`}
         >
           {toastMessage.type === "success" ? (
-            <Check className="w-5 h-5 text-emerald-400" />
+            <Check className="w-4 h-4 text-white" />
           ) : (
-            <AlertCircle className="w-5 h-5 text-white" />
+            <AlertCircle className="w-4 h-4 text-white" />
           )}
-          <span className="font-bold text-sm">{toastMessage.text}</span>
-          <button
-            onClick={() => setToastMessage(null)}
-            className="ml-2 text-slate-400 hover:text-white"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <span>{toastMessage.text}</span>
         </div>
       )}
 
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      {/* Header Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-sm">
         <div>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">Product Inventory</h2>
-          <p className="text-slate-500 font-bold text-xs uppercase tracking-wider mt-1">
-            Kelola katalog produk, stok, harga, dan pengaturan komisi mitra DSTech Smart
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Product Inventory</h2>
+          <p className="text-slate-400 font-medium text-xs mt-1">
+            Kelola inventaris hardware CCTV, Smart Home, Running Text, Barrier Gate, dan Software
           </p>
         </div>
         <button
           onClick={handleOpenAdd}
-          className="h-13 sm:h-14 px-6 sm:px-8 rounded-2xl bg-dstech-red hover:bg-red-700 text-white font-bold text-sm inline-flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-red-500/25 active:scale-95"
+          id="btn-add-product"
+          className="h-12 px-6 rounded-2xl bg-dstech-red hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-xl shadow-red-500/20 active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
         >
-          <Plus className="w-5 h-5" /> Tambah Produk
+          <Plus className="w-4 h-4" />
+          <span>Tambah Produk</span>
         </button>
       </div>
 
-      {/* Filters & Search Bar */}
-      <div className="p-4 sm:p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm flex flex-col md:flex-row gap-4 items-center">
-        <div className="flex-1 relative w-full">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+      {/* Search & Category Filter */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full md:flex-1">
+          <Search className="w-5 h-5 text-slate-400 absolute left-5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchQuery}
@@ -415,9 +447,19 @@ export default function ProductAdmin() {
                   <tr key={p.id} className="hover:bg-slate-50/70 transition-colors group">
                     <td className="p-5 sm:p-6">
                       <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-400 flex-shrink-0">
-                          <Package className="w-6 h-6 text-dstech-blue" />
-                        </div>
+                        {p.image ? (
+                          <div className="w-12 h-12 rounded-xl border border-slate-200 overflow-hidden flex-shrink-0 bg-white shadow-sm">
+                            <img
+                              src={p.image}
+                              alt={p.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-400 flex-shrink-0">
+                            <Package className="w-6 h-6 text-dstech-blue" />
+                          </div>
+                        )}
                         <div>
                           <p className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-dstech-blue transition-colors">
                             {p.name}
@@ -435,32 +477,45 @@ export default function ProductAdmin() {
                         </div>
                       </div>
                     </td>
-                    <td className="p-5 sm:p-6 text-center font-bold text-slate-900 text-sm sm:text-base">
-                      Rp {Number(p.price || 0).toLocaleString("id-ID")}
+                    <td className="p-5 sm:p-6 text-center font-black text-slate-900 text-sm sm:text-base">
+                      Rp {p.price.toLocaleString("id-ID")}
                     </td>
                     <td className="p-5 sm:p-6 text-center">
-                      <span className="px-3.5 py-1.5 rounded-full bg-blue-50 text-dstech-blue font-bold text-xs">
+                      <span
+                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${
+                          p.stock > 10
+                            ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                            : p.stock > 0
+                            ? "bg-amber-50 text-amber-600 border border-amber-100"
+                            : "bg-red-50 text-red-600 border border-red-100"
+                        }`}
+                      >
                         {p.stock} Unit
                       </span>
                     </td>
                     <td className="p-5 sm:p-6 text-center">
-                      <span className="px-3.5 py-1.5 rounded-full bg-red-50 text-dstech-red font-bold text-xs">
-                        {p.commission || `${p.commissionRate || 10}%`} Fee
-                      </span>
+                      <div className="inline-flex flex-col items-center">
+                        <span className="text-xs font-black text-dstech-blue bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                          {p.commission}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                          ≈ Rp {((p.price * (p.commissionRate || 10)) / 100).toLocaleString("id-ID")}
+                        </span>
+                      </div>
                     </td>
                     <td className="p-5 sm:p-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="inline-flex items-center gap-2">
                         <button
                           onClick={() => handleOpenEdit(p)}
+                          className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-dstech-blue border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer"
                           title="Edit Produk"
-                          className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-dstech-blue hover:text-white text-slate-600 flex items-center justify-center transition-all active:scale-95 shadow-sm"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleOpenDelete(p)}
+                          className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer"
                           title="Hapus Produk"
-                          className="w-10 h-10 rounded-xl bg-slate-100 hover:bg-red-600 hover:text-white text-slate-600 flex items-center justify-center transition-all active:scale-95 shadow-sm"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -477,11 +532,11 @@ export default function ProductAdmin() {
       {/* MODAL: Tambah Produk */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
               <div>
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900">Tambah Produk Baru</h3>
-                <p className="text-slate-400 font-medium text-xs mt-0.5">Lengkapi formulir untuk memasukkan produk ke inventaris</p>
+                <p className="text-slate-400 font-medium text-xs mt-0.5">Isi data kelengkapan produk dan komisi penjualan</p>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
@@ -504,6 +559,72 @@ export default function ProductAdmin() {
                   placeholder="Contoh: CCTV Hikvision 8CH Full HD"
                   className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                 />
+              </div>
+
+              {/* Upload Gambar Produk */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Foto / Gambar Produk
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70">
+                  {formData.image ? (
+                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm flex-shrink-0 group">
+                      <img
+                        src={formData.image}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, image: "" })}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-colors shadow"
+                        title="Hapus gambar"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl border border-dashed border-slate-300 bg-white flex flex-col items-center justify-center text-slate-400 flex-shrink-0">
+                      <UploadCloud className="w-8 h-8 text-slate-300 mb-1" />
+                      <span className="text-[10px] font-bold text-slate-400">Belum Ada</span>
+                    </div>
+                  )}
+
+                  <div className="flex-1 w-full space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue text-xs font-bold text-slate-700 hover:text-dstech-blue shadow-sm transition-all">
+                        <UploadCloud className="w-4 h-4 text-dstech-blue" />
+                        <span>{uploadingImage ? "Mengunggah..." : "Pilih File Gambar..."}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingImage}
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      {formData.image && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, image: "" })}
+                          className="px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 transition-colors"
+                        >
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formData.image}
+                        onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                        placeholder="Atau tempelkan URL gambar (https://...)"
+                        className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-dstech-blue"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400">Format: JPG, PNG, WEBP (Maksimal 10MB)</p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -608,7 +729,7 @@ export default function ProductAdmin() {
                 </button>
                 <button
                   type="submit"
-                  disabled={formSubmitting}
+                  disabled={formSubmitting || uploadingImage}
                   className="h-11 px-6 rounded-xl bg-dstech-red hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-lg shadow-red-500/25 active:scale-95 disabled:opacity-50"
                 >
                   {formSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -623,7 +744,7 @@ export default function ProductAdmin() {
       {/* MODAL: Edit Produk */}
       {isEditModalOpen && selectedProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
               <div>
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900">Edit Produk</h3>
@@ -649,6 +770,72 @@ export default function ProductAdmin() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                 />
+              </div>
+
+              {/* Upload Gambar Produk */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Foto / Gambar Produk
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70">
+                  {formData.image ? (
+                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm flex-shrink-0 group">
+                      <img
+                        src={formData.image}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, image: "" })}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-colors shadow"
+                        title="Hapus gambar"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl border border-dashed border-slate-300 bg-white flex flex-col items-center justify-center text-slate-400 flex-shrink-0">
+                      <UploadCloud className="w-8 h-8 text-slate-300 mb-1" />
+                      <span className="text-[10px] font-bold text-slate-400">Belum Ada</span>
+                    </div>
+                  )}
+
+                  <div className="flex-1 w-full space-y-2">
+                    <div className="flex flex-wrap gap-2">
+                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue text-xs font-bold text-slate-700 hover:text-dstech-blue shadow-sm transition-all">
+                        <UploadCloud className="w-4 h-4 text-dstech-blue" />
+                        <span>{uploadingImage ? "Mengunggah..." : "Ganti Gambar..."}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingImage}
+                          onChange={handleImageUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      {formData.image && (
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, image: "" })}
+                          className="px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 transition-colors"
+                        >
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={formData.image}
+                        onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                        placeholder="Atau tempelkan URL gambar (https://...)"
+                        className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-dstech-blue"
+                      />
+                    </div>
+                    <p className="text-[10px] text-slate-400">Format: JPG, PNG, WEBP (Maksimal 10MB)</p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -749,7 +936,7 @@ export default function ProductAdmin() {
                 </button>
                 <button
                   type="submit"
-                  disabled={formSubmitting}
+                  disabled={formSubmitting || uploadingImage}
                   className="h-11 px-6 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-50"
                 >
                   {formSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -761,23 +948,23 @@ export default function ProductAdmin() {
         </div>
       )}
 
-      {/* MODAL: Konfirmasi Hapus Produk */}
+      {/* MODAL: Hapus Produk */}
       {isDeleteModalOpen && selectedProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4">
-              <Trash2 className="w-8 h-8" />
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 rounded-2xl bg-red-50 text-dstech-red flex items-center justify-center mx-auto mb-4 border border-red-100">
+              <Trash2 className="w-7 h-7" />
             </div>
-            <h3 className="text-xl font-black text-slate-900 mb-2">Hapus Produk Ini?</h3>
-            <p className="text-slate-500 text-sm mb-6 leading-relaxed">
-              Apakah Anda yakin ingin menghapus produk <strong className="text-slate-900">"{selectedProduct.name}"</strong>? Tindakan ini tidak dapat dibatalkan.
+            <h3 className="text-xl font-black text-slate-900 text-center">Hapus Produk Ini?</h3>
+            <p className="text-slate-500 font-medium text-xs text-center mt-2 leading-relaxed">
+              Apakah Anda yakin ingin menghapus produk <strong className="text-slate-800">&quot;{selectedProduct.name}&quot;</strong>? Tindakan ini tidak dapat dibatalkan.
             </p>
 
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-3 mt-6">
               <button
                 type="button"
                 onClick={() => setIsDeleteModalOpen(false)}
-                className="h-11 px-5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 transition-colors"
+                className="flex-1 h-11 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 transition-colors"
               >
                 Batal
               </button>
@@ -785,10 +972,11 @@ export default function ProductAdmin() {
                 type="button"
                 disabled={formSubmitting}
                 onClick={handleDeleteSubmit}
-                className="h-11 px-6 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-lg shadow-red-600/30 active:scale-95 disabled:opacity-50"
+                id="btn-confirm-delete-product"
+                className="flex-1 h-11 rounded-xl bg-dstech-red hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-lg shadow-red-500/25 active:scale-95 disabled:opacity-50"
               >
                 {formSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                <span>Ya, Hapus Produk</span>
+                <span>Ya, Hapus</span>
               </button>
             </div>
           </div>

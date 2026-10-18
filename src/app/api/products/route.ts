@@ -14,6 +14,7 @@ const DEFAULT_PRODUCTS = [
     commission: "15%",
     commissionRate: 15,
     commissionType: "ONETIME",
+    image: "/portfolio-residential.png",
     desc: "Smart Doorlock dengan Fingerprint, RFID, PIN, & Bluetooth App Control untuk hunian dan perkantoran.",
     createdAt: "2026-01-15T08:00:00.000Z",
     updatedAt: "2026-01-15T08:00:00.000Z"
@@ -27,6 +28,7 @@ const DEFAULT_PRODUCTS = [
     commission: "10%",
     commissionRate: 10,
     commissionType: "ONETIME",
+    image: "/service-cctv.png",
     desc: "Paket CCTV 4 Channel Resolusi HD lengkap dengan DVR, HDD 1TB, dan kabel coaxial 50 meter.",
     createdAt: "2026-01-20T09:30:00.000Z",
     updatedAt: "2026-01-20T09:30:00.000Z"
@@ -40,6 +42,7 @@ const DEFAULT_PRODUCTS = [
     commission: "10%",
     commissionRate: 10,
     commissionType: "ONETIME",
+    image: "/about-image.png",
     desc: "Mesin absensi sidik jari & RFID berkapasitas 1000 user dengan rekapitulasi laporan Excel otomatis.",
     createdAt: "2026-02-01T11:00:00.000Z",
     updatedAt: "2026-02-01T11:00:00.000Z"
@@ -53,6 +56,7 @@ const DEFAULT_PRODUCTS = [
     commission: "15%",
     commissionRate: 15,
     commissionType: "ONETIME",
+    image: "/service-it.png",
     desc: "Display LED Running Text outdoor tahan cuaca, setting teks mudah via WiFi smartphone.",
     createdAt: "2026-02-10T14:15:00.000Z",
     updatedAt: "2026-02-10T14:15:00.000Z"
@@ -66,6 +70,7 @@ const DEFAULT_PRODUCTS = [
     commission: "10%",
     commissionRate: 10,
     commissionType: "ONETIME",
+    image: "/portfolio-industrial.png",
     desc: "Palang parkir otomatis dengan loop detector, remote kontrol nirkabel, dan integrasi reader RFID.",
     createdAt: "2026-02-25T10:00:00.000Z",
     updatedAt: "2026-02-25T10:00:00.000Z"
@@ -79,6 +84,7 @@ const DEFAULT_PRODUCTS = [
     commission: "20%",
     commissionRate: 20,
     commissionType: "RECURRING",
+    image: "/service-it.png",
     desc: "Pembuatan website profil perusahaan & toko online modern terintegrasi domain .com dan hosting 1 tahun.",
     createdAt: "2026-03-05T13:20:00.000Z",
     updatedAt: "2026-03-05T13:20:00.000Z"
@@ -125,7 +131,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, category, price, stock, commission, commissionType, desc } = body;
+    const { name, category, price, stock, commission, commissionType, desc, image } = body;
 
     if (!name || name.trim() === "") {
       return NextResponse.json({ success: false, message: "Nama produk wajib diisi" }, { status: 400 });
@@ -145,6 +151,7 @@ export async function POST(req: Request) {
       commission: `${commRate}%`,
       commissionRate: commRate,
       commissionType: commissionType === "RECURRING" ? "RECURRING" : "ONETIME",
+      image: image?.trim() || "",
       desc: desc?.trim() || "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -163,7 +170,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, category, price, stock, commission, commissionType, desc } = body;
+    const { id, name, category, price, stock, commission, commissionType, desc, image } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, message: "ID produk wajib disertakan" }, { status: 400 });
@@ -189,6 +196,7 @@ export async function PUT(req: Request) {
       commission: `${commRate}%`,
       commissionRate: commRate,
       commissionType: commissionType !== undefined ? commissionType : products[index].commissionType,
+      image: image !== undefined ? image.trim() : (products[index].image || ""),
       desc: desc !== undefined ? desc.trim() : products[index].desc,
       updatedAt: new Date().toISOString(),
     };
@@ -212,7 +220,7 @@ export async function DELETE(req: Request) {
         const body = await req.json();
         id = body.id;
       } catch {
-        // ignore body parse error if id in searchParams
+        // query param fallback
       }
     }
 
@@ -229,7 +237,7 @@ export async function DELETE(req: Request) {
 
     writeProducts(filtered);
 
-    return NextResponse.json({ success: true, message: "Produk berhasil dihapus", deletedId: id });
+    return NextResponse.json({ success: true, message: "Produk berhasil dihapus", id });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : "Terjadi kesalahan server";
     return NextResponse.json({ success: false, message: errorMessage }, { status: 500 });
