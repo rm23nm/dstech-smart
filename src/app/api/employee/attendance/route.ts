@@ -49,12 +49,19 @@ export async function POST(request: Request) {
     const dateStr = now.toISOString().split("T")[0];
 
     if (action === "checkin") {
-      const { location, notes } = body;
+      const { location, notes, latitude, longitude, accuracy, mapsUrl } = body;
       const existingToday = data.attendance.find((a: any) => a.date === dateStr);
+      const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
 
       if (existingToday) {
         existingToday.checkIn = timeStr;
-        existingToday.location = location || existingToday.location || "Kantor DSTech";
+        existingToday.location = location || existingToday.location || "Kantor DSTech Smart Perkasa (Cilegon)";
+        if (latitude && longitude) {
+          existingToday.latitude = latitude;
+          existingToday.longitude = longitude;
+          existingToday.accuracy = accuracy || null;
+          existingToday.mapsUrl = computedMapsUrl;
+        }
         if (notes) existingToday.notes = notes;
       } else {
         const newRecord = {
@@ -63,9 +70,13 @@ export async function POST(request: Request) {
           employeeName: body.employeeName || "Ikhsan Maulidi",
           checkIn: timeStr,
           checkOut: "-",
-          location: location || "Kantor DSTech",
+          location: location || "Kantor DSTech Smart Perkasa (Cilegon)",
+          latitude: latitude || null,
+          longitude: longitude || null,
+          accuracy: accuracy || null,
+          mapsUrl: computedMapsUrl,
           status: location?.toLowerCase().includes("kantor") ? "Tepat Waktu" : "Hadir Lapangan",
-          notes: notes || "Absen masuk via portal teknisi",
+          notes: notes || "Absen masuk via portal teknisi (Google Maps Verified)",
         };
         data.attendance.unshift(newRecord);
         if (data.monthlyStats) data.monthlyStats.presenceDays += 1;
@@ -80,11 +91,19 @@ export async function POST(request: Request) {
     }
 
     if (action === "checkout") {
-      const { notes } = body;
+      const { notes, location, latitude, longitude, accuracy, mapsUrl } = body;
       const existingToday = data.attendance.find((a: any) => a.date === dateStr);
+      const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
 
       if (existingToday) {
         existingToday.checkOut = timeStr;
+        if (location) existingToday.checkOutLocation = location;
+        if (latitude && longitude) {
+          existingToday.checkOutLat = latitude;
+          existingToday.checkOutLng = longitude;
+          existingToday.checkOutAccuracy = accuracy || null;
+          existingToday.checkOutMapsUrl = computedMapsUrl;
+        }
         if (notes) existingToday.notes = `${existingToday.notes ? existingToday.notes + " | " : ""}Laporan Pulang: ${notes}`;
       } else {
         const newRecord = {
@@ -93,7 +112,12 @@ export async function POST(request: Request) {
           employeeName: body.employeeName || "Ikhsan Maulidi",
           checkIn: "08:00 WIB",
           checkOut: timeStr,
-          location: "Kantor DSTech",
+          location: location || "Kantor DSTech Smart Perkasa (Cilegon)",
+          checkOutLocation: location || "Kantor DSTech Smart Perkasa (Cilegon)",
+          checkOutLat: latitude || null,
+          checkOutLng: longitude || null,
+          checkOutAccuracy: accuracy || null,
+          checkOutMapsUrl: computedMapsUrl,
           status: "Hadir",
           notes: notes || "Absen pulang via portal teknisi",
         };

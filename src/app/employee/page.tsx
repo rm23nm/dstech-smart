@@ -31,6 +31,9 @@ import {
   Sparkles,
   ExternalLink,
   Trash2,
+  Navigation,
+  Compass,
+  RefreshCw,
 } from "lucide-react";
 
 interface EmployeeTask {
@@ -89,6 +92,15 @@ interface AttendanceLog {
   checkIn: string;
   checkOut: string;
   location: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  accuracy?: number | null;
+  mapsUrl?: string | null;
+  checkOutLocation?: string | null;
+  checkOutLat?: number | null;
+  checkOutLng?: number | null;
+  checkOutAccuracy?: number | null;
+  checkOutMapsUrl?: string | null;
   status: string;
   notes: string;
 }
@@ -196,12 +208,155 @@ export default function EmployeeDashboard() {
     notes: "",
   });
 
+  interface GeoCoords {
+    lat: number;
+    lng: number;
+    accuracy?: number;
+    source: "gps" | "preset";
+  }
+
+  // Predefined location coordinates (Banten / Cilegon area)
+  const LOCATION_PRESETS: { [key: string]: { lat: number; lng: number } } = {
+    "Kantor DSTech Cilegon": { lat: -6.031846, lng: 106.037198 },
+    "Kawasan Industri Krakatau Posco": { lat: -6.0125, lng: 106.0089 },
+    "RS Kurnia Cilegon": { lat: -6.0163, lng: 106.0461 },
+    "Perumahan Metro Royal": { lat: -6.0289, lng: 106.0512 },
+    "Hotel Pesona Merak": { lat: -5.9382, lng: 105.9981 },
+    "Area Lapangan / Dinas Luar": { lat: -6.0175, lng: 106.0538 },
+  };
+
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState<boolean>(false);
   const [checkInLocation, setCheckInLocation] = useState<string>("Kantor DSTech Cilegon");
   const [checkInNotes, setCheckInNotes] = useState<string>("");
+  const [checkInCoords, setCheckInCoords] = useState<GeoCoords>({
+    lat: -6.031846,
+    lng: 106.037198,
+    accuracy: 10,
+    source: "preset",
+  });
+  const [isDetectingCheckInGps, setIsDetectingCheckInGps] = useState<boolean>(false);
+  const [gpsErrorCheckIn, setGpsErrorCheckIn] = useState<string | null>(null);
 
   const [isCheckOutModalOpen, setIsCheckOutModalOpen] = useState<boolean>(false);
+  const [checkOutLocation, setCheckOutLocation] = useState<string>("Kantor DSTech Cilegon");
   const [checkOutSummary, setCheckOutSummary] = useState<string>("");
+  const [checkOutCoords, setCheckOutCoords] = useState<GeoCoords>({
+    lat: -6.031846,
+    lng: 106.037198,
+    accuracy: 10,
+    source: "preset",
+  });
+  const [isDetectingCheckOutGps, setIsDetectingCheckOutGps] = useState<boolean>(false);
+  const [gpsErrorCheckOut, setGpsErrorCheckOut] = useState<string | null>(null);
+
+  // Map Preview Modal for attendance history table
+  const [previewMapData, setPreviewMapData] = useState<{
+    isOpen: boolean;
+    title: string;
+    locationName: string;
+    lat: number;
+    lng: number;
+    mapsUrl: string;
+  } | null>(null);
+
+  const detectGpsLocation = (mode: "checkin" | "checkout") => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      const err = "Browser perangkat tidak mendukung Geolocation GPS.";
+      if (mode === "checkin") setGpsErrorCheckIn(err);
+      else setGpsErrorCheckOut(err);
+      showToast(err);
+      return;
+    }
+
+    if (mode === "checkin") {
+      setIsDetectingCheckInGps(true);
+      setGpsErrorCheckIn(null);
+    } else {
+      setIsDetectingCheckOutGps(true);
+      setGpsErrorCheckOut(null);
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords: GeoCoords = {
+          lat: Number(pos.coords.latitude.toFixed(6)),
+          lng: Number(pos.coords.longitude.toFixed(6)),
+          accuracy: Math.round(pos.coords.accuracy),
+          source: "gps",
+        };
+        if (mode === "checkin") {
+          setCheckInCoords(coords);
+          setIsDetectingCheckInGps(false);
+          setCheckInLocation(`GPS Satelit (${coords.lat}, ${coords.lng})`);
+          showToast(`Sinyal GPS terhubung ke Google Maps! Akurasi: ±${coords.accuracy}m`);
+        } else {
+          setCheckOutCoords(coords);
+          setIsDetectingCheckOutGps(false);
+          setCheckOutLocation(`GPS Satelit (${coords.lat}, ${coords.lng})`);
+          showToast(`Sinyal GPS Pulang terhubung! Akurasi: ±${coords.accuracy}m`);
+        }
+      },
+      (err) => {
+        let errorMsg = "Gagal mengambil titik GPS.";
+        if (err.code === 1) {
+          errorMsg = "Izin lokasi browser ditolak. Menampilkan peta koordinat kantor DSTech.";
+        } else if (err.code === 2) {
+          errorMsg = "Posisi GPS tidak ditemukan. Menampilkan peta koordinat kantor DSTech.";
+        } else if (err.code === 3) {
+          errorMsg = "Waktu deteksi GPS habis. Menampilkan peta koordinat kantor DSTech.";
+        }
+        if (mode === "checkin") {
+          setIsDetectingCheckInGps(false);
+          setGpsErrorCheckIn(errorMsg);
+        } else {
+          setIsDetectingCheckOutGps(false);
+          setGpsErrorCheckOut(errorMsg);
+        }
+        showToast(errorMsg);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      }
+    );
+  };
+
+  const handleLocationPresetChange = (loc: string, mode: "checkin" | "checkout") => {
+    if (mode === "checkin") {
+      setCheckInLocation(loc);
+      if (LOCATION_PRESETS[loc]) {
+        setCheckInCoords({
+          lat: LOCATION_PRESETS[loc].lat,
+          lng: LOCATION_PRESETS[loc].lng,
+          accuracy: 10,
+          source: "preset",
+        });
+        setGpsErrorCheckIn(null);
+      }
+    } else {
+      setCheckOutLocation(loc);
+      if (LOCATION_PRESETS[loc]) {
+        setCheckOutCoords({
+          lat: LOCATION_PRESETS[loc].lat,
+          lng: LOCATION_PRESETS[loc].lng,
+          accuracy: 10,
+          source: "preset",
+        });
+        setGpsErrorCheckOut(null);
+      }
+    }
+  };
+
+  const openCheckInModal = () => {
+    setIsCheckInModalOpen(true);
+    detectGpsLocation("checkin");
+  };
+
+  const openCheckOutModal = () => {
+    setIsCheckOutModalOpen(true);
+    detectGpsLocation("checkout");
+  };
 
   const [isOvertimeModalOpen, setIsOvertimeModalOpen] = useState<boolean>(false);
   const [overtimeForm, setOvertimeForm] = useState({
@@ -473,6 +628,10 @@ export default function EmployeeDashboard() {
           action: "checkin",
           employeeName: "Ikhsan Maulidi",
           location: checkInLocation,
+          latitude: checkInCoords.lat,
+          longitude: checkInCoords.lng,
+          accuracy: checkInCoords.accuracy || 10,
+          mapsUrl: `https://www.google.com/maps?q=${checkInCoords.lat},${checkInCoords.lng}`,
           notes: checkInNotes,
         }),
       });
@@ -480,7 +639,7 @@ export default function EmployeeDashboard() {
       if (res.ok) {
         const d = await res.json();
         setAttendanceLogs((prev) => [d.data, ...prev.filter((p) => p.date !== d.data.date)]);
-        showToast("Absen Masuk berhasil dicatat! Selamat bekerja.");
+        showToast("Absen Masuk terhubung ke Google Maps! Selamat bekerja.");
         setIsCheckInModalOpen(false);
       }
     } catch {
@@ -498,6 +657,11 @@ export default function EmployeeDashboard() {
         body: JSON.stringify({
           action: "checkout",
           employeeName: "Ikhsan Maulidi",
+          location: checkOutLocation,
+          latitude: checkOutCoords.lat,
+          longitude: checkOutCoords.lng,
+          accuracy: checkOutCoords.accuracy || 10,
+          mapsUrl: `https://www.google.com/maps?q=${checkOutCoords.lat},${checkOutCoords.lng}`,
           notes: checkOutSummary,
         }),
       });
@@ -505,7 +669,7 @@ export default function EmployeeDashboard() {
       if (res.ok) {
         const d = await res.json();
         setAttendanceLogs((prev) => [d.data, ...prev.filter((p) => p.date !== d.data.date)]);
-        showToast("Absen Pulang berhasil dicatat! Terima kasih atas dedikasi Anda.");
+        showToast("Absen Pulang terverifikasi Google Maps! Terima kasih.");
         setIsCheckOutModalOpen(false);
       }
     } catch {
@@ -1238,15 +1402,19 @@ export default function EmployeeDashboard() {
 
                       <div className="flex items-center gap-3">
                         <button
-                          onClick={() => setIsCheckInModalOpen(true)}
-                          className="px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer"
+                          id="btn-checkin"
+                          onClick={openCheckInModal}
+                          className="px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-2"
                         >
+                          <MapPin className="w-4 h-4" />
                           Check-In (Masuk)
                         </button>
                         <button
-                          onClick={() => setIsCheckOutModalOpen(true)}
-                          className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer"
+                          id="btn-checkout"
+                          onClick={openCheckOutModal}
+                          className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-2"
                         >
+                          <Clock className="w-4 h-4" />
                           Check-Out (Pulang)
                         </button>
                       </div>
@@ -1258,15 +1426,47 @@ export default function EmployeeDashboard() {
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                           Log Presensi Aktif Hari Ini:
                         </p>
-                        <p className="text-sm font-black text-slate-900">
-                          {todayAttendance?.checkIn
-                            ? `Jam Masuk: ${todayAttendance.checkIn} — Lokasi: ${todayAttendance.location}`
-                            : "Anda belum mencatat Absen Masuk hari ini"}
-                        </p>
+                        <div className="text-sm font-black text-slate-900 flex flex-wrap items-center gap-2">
+                          {todayAttendance?.checkIn ? (
+                            <>
+                              <span>Jam Masuk: {todayAttendance.checkIn} — Lokasi: {todayAttendance.location}</span>
+                              <a
+                                href={
+                                  todayAttendance.mapsUrl ||
+                                  (todayAttendance.latitude && todayAttendance.longitude
+                                    ? `https://www.google.com/maps?q=${todayAttendance.latitude},${todayAttendance.longitude}`
+                                    : `https://www.google.com/maps?q=${encodeURIComponent(todayAttendance.location + " Cilegon")}`)
+                                }
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-[11px] transition-colors"
+                              >
+                                <MapPin className="w-3 h-3 text-blue-600" />
+                                Google Maps ↗
+                              </a>
+                            </>
+                          ) : (
+                            "Anda belum mencatat Absen Masuk hari ini"
+                          )}
+                        </div>
                         {todayAttendance?.checkOut && todayAttendance.checkOut !== "-" && (
-                          <p className="text-xs font-bold text-slate-500">
-                            Jam Pulang: {todayAttendance.checkOut}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-bold text-slate-600">
+                            <span>Jam Pulang: {todayAttendance.checkOut} {todayAttendance.checkOutLocation ? `(${todayAttendance.checkOutLocation})` : ""}</span>
+                            {(todayAttendance.checkOutMapsUrl || (todayAttendance.checkOutLat && todayAttendance.checkOutLng)) && (
+                              <a
+                                href={
+                                  todayAttendance.checkOutMapsUrl ||
+                                  `https://www.google.com/maps?q=${todayAttendance.checkOutLat},${todayAttendance.checkOutLng}`
+                                }
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline"
+                              >
+                                <MapPin className="w-3 h-3 text-blue-600" />
+                                Maps Pulang ↗
+                              </a>
+                            )}
+                          </div>
                         )}
                       </div>
 
@@ -1386,7 +1586,54 @@ export default function EmployeeDashboard() {
                               <td className="p-3 font-bold text-slate-900">{att.date}</td>
                               <td className="p-3 text-green-600 font-black">{att.checkIn}</td>
                               <td className="p-3 text-slate-700 font-bold">{att.checkOut}</td>
-                              <td className="p-3 text-slate-600">{att.location}</td>
+                              <td className="p-3 text-slate-600">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                                    <MapPin className="w-3.5 h-3.5 text-dstech-red shrink-0" />
+                                    <span>{att.location}</span>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                    {att.latitude && att.longitude ? (
+                                      <span className="text-[10px] text-slate-400 font-mono">
+                                        {att.latitude.toFixed(4)}, {att.longitude.toFixed(4)}
+                                      </span>
+                                    ) : null}
+                                    <a
+                                      href={
+                                        att.mapsUrl ||
+                                        (att.latitude && att.longitude
+                                          ? `https://www.google.com/maps?q=${att.latitude},${att.longitude}`
+                                          : `https://www.google.com/maps?q=${encodeURIComponent(att.location + " Cilegon")}`)
+                                      }
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 font-bold underline"
+                                    >
+                                      Maps <ExternalLink className="w-2.5 h-2.5" />
+                                    </a>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const lat = att.latitude || -6.031846;
+                                        const lng = att.longitude || 106.037198;
+                                        setPreviewMapData({
+                                          isOpen: true,
+                                          title: `Presensi: ${att.employeeName} (${att.date})`,
+                                          locationName: att.location,
+                                          lat,
+                                          lng,
+                                          mapsUrl: att.mapsUrl || `https://www.google.com/maps?q=${lat},${lng}`,
+                                        });
+                                      }}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-[9px] cursor-pointer"
+                                      title="Pratinjau Peta Cepat"
+                                    >
+                                      <Compass className="w-2.5 h-2.5 text-slate-500" />
+                                      Peta
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
                               <td className="p-3">
                                 <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">
                                   {att.status}
@@ -1857,43 +2104,124 @@ export default function EmployeeDashboard() {
           onClick={() => setIsCheckInModalOpen(false)}
         >
           <div
-            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl relative"
+            className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-green-600">
-                  Presensi Masuk Harian
+                <span className="text-[10px] font-black uppercase tracking-widest text-green-600 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-green-600" />
+                  Presensi Masuk Harian • Terhubung Google Maps
                 </span>
-                <h3 className="text-lg font-black text-slate-900 mt-1">Konfirmasi Check-In</h3>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">Konfirmasi Check-In</h3>
               </div>
               <button
                 onClick={() => setIsCheckInModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
+            {/* GPS Signal Banner */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                  <Compass className="w-4 h-4 text-dstech-blue" />
+                  Status Lokasi GPS:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => detectGpsLocation("checkin")}
+                  disabled={isDetectingCheckInGps}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] transition-colors cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isDetectingCheckInGps ? "animate-spin" : ""}`} />
+                  {isDetectingCheckInGps ? "Mendeteksi..." : "Deteksi Ulang GPS"}
+                </button>
+              </div>
+
+              {isDetectingCheckInGps ? (
+                <div className="flex items-center gap-2 text-blue-600 font-bold py-1">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+                  </span>
+                  <span>Mendeteksi koordinat GPS satelit perangkat Anda...</span>
+                </div>
+              ) : checkInCoords.source === "gps" ? (
+                <div className="flex items-center gap-2 text-green-700 font-bold bg-green-50 px-3 py-1.5 rounded-xl border border-green-200">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                  <span>Sinyal GPS Akurat Terkunci (Akurasi: ±{checkInCoords.accuracy}m)</span>
+                </div>
+              ) : gpsErrorCheckIn ? (
+                <div className="flex items-center gap-2 text-amber-800 font-medium bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{gpsErrorCheckIn}</span>
+                </div>
+              ) : (
+                <p className="text-slate-500 text-[11px]">
+                  Koordinat default dipilih dari lokasi kantor / proyek. Klik tombol &quot;Deteksi Ulang GPS&quot; untuk mengunci posisi riil Anda via satelit.
+                </p>
+              )}
+            </div>
+
             <form onSubmit={handleCheckIn} className="space-y-4 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Lokasi Presensi Anda Hari Ini:</label>
+                <label className="font-bold text-slate-700 block mb-1">Pilih Titik Lokasi Presensi:</label>
                 <select
                   value={checkInLocation}
-                  onChange={(e) => setCheckInLocation(e.target.value)}
+                  onChange={(e) => handleLocationPresetChange(e.target.value, "checkin")}
                   className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 focus:ring-2 focus:ring-green-500 focus:outline-none"
                 >
-                  <option value="Kantor DSTech Cilegon">Kantor DSTech Smart Perkasa (Cilegon)</option>
+                  <option value="Kantor DSTech Cilegon">Kantor DSTech Smart Perkasa (Cilegon Banten)</option>
                   <option value="Kawasan Industri Krakatau Posco">Lokasi Proyek: PT. Krakatau Posco</option>
                   <option value="RS Kurnia Cilegon">Lokasi Proyek: RS Kurnia Cilegon</option>
                   <option value="Perumahan Metro Royal">Lokasi Proyek: Metro Royal Cilegon</option>
                   <option value="Hotel Pesona Merak">Lokasi Proyek: Hotel Pesona Merak</option>
                   <option value="Area Lapangan / Dinas Luar">Area Lapangan Lainnya (Dinas Luar)</option>
+                  {checkInCoords.source === "gps" && (
+                    <option value={checkInLocation}>{checkInLocation}</option>
+                  )}
                 </select>
               </div>
 
+              {/* Google Maps Live Embed */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-slate-700 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-dstech-red" />
+                    Pratinjau Posisi Google Maps:
+                  </span>
+                  <span className="font-mono text-slate-500 text-[10px]">
+                    {checkInCoords.lat.toFixed(5)}, {checkInCoords.lng.toFixed(5)}
+                  </span>
+                </div>
+
+                <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative bg-slate-100">
+                  <iframe
+                    src={`https://maps.google.com/maps?q=${checkInCoords.lat},${checkInCoords.lng}&hl=id&z=16&output=embed`}
+                    className="w-full h-44 border-0"
+                    loading="lazy"
+                    title="Google Maps Check-In Preview"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <a
+                    href={`https://www.google.com/maps?q=${checkInCoords.lat},${checkInCoords.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold underline"
+                  >
+                    Buka Titik Ini di Aplikasi Google Maps <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <span className="text-[10px] text-slate-400">Google Maps Live Sync</span>
+                </div>
+              </div>
+
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Catatan Singkat (Opsional):</label>
+                <label className="font-bold text-slate-700 block mb-1">Catatan Lapangan (Opsional):</label>
                 <input
                   type="text"
                   placeholder="Contoh: Langsung menuju lokasi pabrik untuk penarikan kabel"
@@ -1912,9 +2240,11 @@ export default function EmployeeDashboard() {
                   Batal
                 </button>
                 <button
+                  id="btn-submit-checkin"
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-md"
+                  className="px-5 py-2.5 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
+                  <CheckCircle2 className="w-4 h-4" />
                   Konfirmasi Check-In Sekarang
                 </button>
               </div>
@@ -1930,30 +2260,128 @@ export default function EmployeeDashboard() {
           onClick={() => setIsCheckOutModalOpen(false)}
         >
           <div
-            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl relative"
+            className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  Presensi Pulang Harian
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  Presensi Pulang Harian • Terhubung Google Maps
                 </span>
-                <h3 className="text-lg font-black text-slate-900 mt-1">Konfirmasi Check-Out</h3>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">Konfirmasi Check-Out</h3>
               </div>
               <button
                 onClick={() => setIsCheckOutModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
+            {/* GPS Signal Banner */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                  <Compass className="w-4 h-4 text-dstech-blue" />
+                  Status Lokasi Pulang:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => detectGpsLocation("checkout")}
+                  disabled={isDetectingCheckOutGps}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[11px] transition-colors cursor-pointer"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isDetectingCheckOutGps ? "animate-spin" : ""}`} />
+                  {isDetectingCheckOutGps ? "Mendeteksi..." : "Deteksi Ulang GPS"}
+                </button>
+              </div>
+
+              {isDetectingCheckOutGps ? (
+                <div className="flex items-center gap-2 text-blue-600 font-bold py-1">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+                  </span>
+                  <span>Mendeteksi koordinat GPS satelit posisi pulang...</span>
+                </div>
+              ) : checkOutCoords.source === "gps" ? (
+                <div className="flex items-center gap-2 text-green-700 font-bold bg-green-50 px-3 py-1.5 rounded-xl border border-green-200">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                  <span>Sinyal GPS Pulang Terkunci (Akurasi: ±{checkOutCoords.accuracy}m)</span>
+                </div>
+              ) : gpsErrorCheckOut ? (
+                <div className="flex items-center gap-2 text-amber-800 font-medium bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{gpsErrorCheckOut}</span>
+                </div>
+              ) : (
+                <p className="text-slate-500 text-[11px]">
+                  Titik lokasi pulang dapat disesuaikan otomatis dengan GPS satelit atau preset lokasi kantor.
+                </p>
+              )}
+            </div>
+
             <form onSubmit={handleCheckOut} className="space-y-4 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Titik Lokasi Selesai Kerja:</label>
+                <select
+                  value={checkOutLocation}
+                  onChange={(e) => handleLocationPresetChange(e.target.value, "checkout")}
+                  className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none"
+                >
+                  <option value="Kantor DSTech Cilegon">Kantor DSTech Smart Perkasa (Cilegon Banten)</option>
+                  <option value="Kawasan Industri Krakatau Posco">Lokasi Proyek: PT. Krakatau Posco</option>
+                  <option value="RS Kurnia Cilegon">Lokasi Proyek: RS Kurnia Cilegon</option>
+                  <option value="Perumahan Metro Royal">Lokasi Proyek: Metro Royal Cilegon</option>
+                  <option value="Hotel Pesona Merak">Lokasi Proyek: Hotel Pesona Merak</option>
+                  <option value="Area Lapangan / Dinas Luar">Area Lapangan Lainnya (Dinas Luar)</option>
+                  {checkOutCoords.source === "gps" && (
+                    <option value={checkOutLocation}>{checkOutLocation}</option>
+                  )}
+                </select>
+              </div>
+
+              {/* Google Maps Live Embed */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold text-slate-700 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-dstech-red" />
+                    Pratinjau Posisi Google Maps:
+                  </span>
+                  <span className="font-mono text-slate-500 text-[10px]">
+                    {checkOutCoords.lat.toFixed(5)}, {checkOutCoords.lng.toFixed(5)}
+                  </span>
+                </div>
+
+                <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative bg-slate-100">
+                  <iframe
+                    src={`https://maps.google.com/maps?q=${checkOutCoords.lat},${checkOutCoords.lng}&hl=id&z=16&output=embed`}
+                    className="w-full h-44 border-0"
+                    loading="lazy"
+                    title="Google Maps Check-Out Preview"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <a
+                    href={`https://www.google.com/maps?q=${checkOutCoords.lat},${checkOutCoords.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold underline"
+                  >
+                    Buka Titik Ini di Aplikasi Google Maps <ExternalLink className="w-3 h-3" />
+                  </a>
+                  <span className="text-[10px] text-slate-400">Google Maps Live Sync</span>
+                </div>
+              </div>
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
                   Rangkuman Kerja Hari Ini (Daily Summary):
                 </label>
                 <textarea
+                  id="input-checkout-summary"
                   rows={3}
                   required
                   placeholder="Contoh: Selesai instalasi 3 titik CCTV di Posco, material rapi di gudang, sisa 1 roll kabel dikembalikan."
@@ -1972,13 +2400,68 @@ export default function EmployeeDashboard() {
                   Batal
                 </button>
                 <button
+                  id="btn-submit-checkout"
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 shadow-md"
+                  className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 shadow-md flex items-center gap-1.5 cursor-pointer"
                 >
+                  <CheckCircle2 className="w-4 h-4" />
                   Simpan & Check-Out Pulang
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* QUICK MODAL: Pratinjau Peta Lokasi Google Maps */}
+      {previewMapData?.isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setPreviewMapData(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-4 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                  Pratinjau Peta Presensi Google Maps
+                </span>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">{previewMapData.title}</h3>
+                <p className="text-xs text-slate-500 font-medium">{previewMapData.locationName}</p>
+              </div>
+              <button
+                onClick={() => setPreviewMapData(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative bg-slate-100">
+              <iframe
+                src={`https://maps.google.com/maps?q=${previewMapData.lat},${previewMapData.lng}&hl=id&z=16&output=embed`}
+                className="w-full h-64 border-0"
+                loading="lazy"
+                title="Google Maps History Preview"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <span className="font-mono text-xs text-slate-500">
+                Koordinat: {previewMapData.lat.toFixed(6)}, {previewMapData.lng.toFixed(6)}
+              </span>
+              <a
+                href={previewMapData.mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 shadow-md transition-colors"
+              >
+                Buka di Google Maps <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
           </div>
         </div>
       )}

@@ -3,10 +3,29 @@
     "totalHours": 168,
     "overtimeHours": 14,
     "targetHours": 160,
-    "presenceDays": 21,
+    "presenceDays": 22,
     "absentDays": 0
   },
   "attendance": [
+    {
+      "id": "dstech_att_1792370915612",
+      "date": "2026-10-19",
+      "employeeName": "Ikhsan Maulidi",
+      "checkIn": "07:48 WIB",
+      "checkOut": "07:55 WIB",
+      "location": "Kawasan Industri Krakatau Posco",
+      "latitude": -6.0125,
+      "longitude": 106.0089,
+      "accuracy": 10,
+      "mapsUrl": "https://www.google.com/maps?q=-6.0125,106.0089",
+      "status": "Hadir Lapangan",
+      "notes": "Check-in rutin proyek Krakatau Posco | Laporan Pulang: Pekerjaan setting CCTV dan koneksi NVR selesai dengan baik. Titik pulang terverifikasi Google Maps.",
+      "checkOutLocation": "Kantor DSTech Cilegon",
+      "checkOutLat": -6.031846,
+      "checkOutLng": 106.037198,
+      "checkOutAccuracy": 10,
+      "checkOutMapsUrl": "https://www.google.com/maps?q=-6.031846,106.037198"
+    },
     {
       "id": "dstech_att_1",
       "date": "2026-10-18",
