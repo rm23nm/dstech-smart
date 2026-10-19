@@ -44,6 +44,7 @@
 - **2026-10-19**: Perbaikan Background Kop Surat Terpotong di Samping Kiri dan Kanan pada Seluruh Lembar Cetak Dokumen Keuangan (`/admin/finance`). Mengatasi masalah terpotongnya logo DSP di sisi kiri dan teks legalitas NIB & NPWP di sisi kanan yang disebabkan oleh sifat `bg-cover` pada kontainer dokumen yang memiliki tinggi lebih panjang dari rasio asli kop surat. Memperbarui styling background gambar pada seluruh 5 template cetak resmi (Faktur Penjualan, SPH Quotation, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) menggunakan properti dinamis `backgroundSize: "100% 100%"` (mode Fill Bebas Terpotong) sehingga lebar gambar pas 100% dari tepi kiri ke tepi kanan tanpa clipping. Menambahkan atribut `letterheadFitMode` pada interface `FinanceSettings`, menambahkan kontrol pemilihan mode skala background kop surat (Pas 100% Lembar, Contain Proporsional, Cover Tinggi Penuh) pada Modal Pengaturan Dokumen & Legalitas, serta menguji tampilan visual via browser automation testing. Lolos validasi TypeScript `tsc` (0 error), disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-19**: Penyesuaian Jarak Margin Header Atas Lembar Dokumen Lebih Rapat ke Kop Surat (`letterheadPaddingTop: 90px`). Mengoptimalkan jarak margin atas header dokumen resmi (Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, dan Retur Pembelian) dari 135px menjadi 90px sesuai permintaan pengguna agar teks header perusahaan dan judul faktur naik lebih rapat dan pas di bawah banner grafis kop surat tanpa celah kosong berlebih dan tanpa menimpa elemen visual kop surat. Menyesuaikan nilai default, normalisasi state settings, slider interaktif, serta preset DSTech Resmi pada modal Pengaturan Dokumen & Legalitas. Lolos validasi TypeScript `tsc` (0 error), diuji via browser subagent, dipush ke GitHub, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-19**: Pengecekan & Verifikasi Menyeluruh pada Modul Pembelian (Purchase Order Supplier & Berita Acara Retur Pembelian). Melakukan audit visual via browser automation subagent pada cetak lembar Purchase Order resmi (`PO-DSTECH-...`) dan lembar Retur Pembelian Vendor (`RET-P-...`). Mengonfirmasi bahwa seluruh dokumen cetak pembelian telah menerapkan background kop surat full width 100% (bebas terpotong di kiri maupun kanan), logo DSP dan NIB/NPWP tampil utuh, margin header atas konsisten di 90px (rapat di bawah banner grafis tanpa menabrak), margin footer aman di 110px di atas banner bawah, serta tabel rincian belanja, PPN 11%, dan otorisasi dual signature (Vendor & DSTech) berfungsi presisi.
+- **2026-10-20**: Perbaikan Lembar Cetak Dokumen Keuangan (Kop Surat Hilang Saat Diprint & Tampilan Margin A4 Pas Penuh). Mengatasi masalah latar belakang kop surat (header banner, watermark 2026, dan footer banner) yang hilang/blank saat dokumen dicetak atau diekspor ke PDF, serta menghilangkan tampilan modal dialog card yang melayang dengan bingkai abu-abu tebal di tengah kertas cetak. Mengganti implementasi CSS `backgroundImage` pada tag `<div>` menjadi elemen tag HTML `<img>` murni (`.print-letterhead-img`) dengan `objectFit: "fill"` dan `print:opacity-100` pada seluruh 5 template cetak resmi (Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, dan Retur Pembelian) sehingga browser (Chrome/Edge/Opera) selalu mencetak elemen kop secara utuh dan tajam tanpa terpengaruh opsi "Background graphics". Menambahkan aturan `@media print` khusus standar A4 di `globals.css` (`@page { size: A4 portrait; margin: 0; }`), mereset backdrop dan border modal saat print, menerapkan padding tepi dokumen aman (`padding-left: 16mm; padding-right: 16mm; paddingTop: 90px; paddingBottom: 110px;`), menyembunyikan dashboard utama saat modal cetak aktif (`print:hidden`), serta mengupgrade slider opasitas kop hingga 100% dan menyediakan preset 'Kop Utuh / Nyata (100%)' di modal pengaturan. Divalidasi `tsc --noEmit` (0 error), diuji visual di browser, disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
 **Status**: Selesai
@@ -1277,7 +1278,7 @@
 - **Permintaan Pengguna**:
   *"saat di print muncul seperti ini hasilnya"* (Melampirkan screenshot dialog cetak Chrome Print di mana background kop surat tidak tercetak dan dokumen tampil sebagai kartu kecil dengan border abu-abu mengambang)
 - **Status**:
-  **Sedang Dikerjakan (In Progress)**
+  **Selesai (Completed & Deployed)**
 - **Investigasi & Analisis Akar Masalah**:
   1. **Background Graphics Dihilangkan Browser**:
      - Elemen kop surat sebelumnya dibuat menggunakan tag `<div>` dengan CSS `backgroundImage: url(...)`.
@@ -1289,30 +1290,30 @@
 - **Rencana Pengerjaan Step-by-Step**:
   1. [x] **Pemeriksaan Riwayat & Pembuatan Backup**:
      - Membuat cadangan `_backup/globals.css.bak1`, `_backup/LAPORAN_PROGRES.md.bak46`, dan `_backup/admin_finance_page.tsx.bak16`.
-  2. [ ] **Penambahan Aturan CSS `@media print` Profesional di `globals.css`**:
+  2. [x] **Penambahan Aturan CSS `@media print` Profesional di `globals.css`**:
      - Menetapkan `@page { size: A4 portrait; margin: 0; }` agar lembar dokumen dapat mencakup 100% halaman A4 (Full Bleed).
-     - Menghilangkan backdrop gelap modal, shadow, border kartu, dan margin pembungkus saat mode print aktif.
+     - Menghilangkan backdrop gelap modal, shadow, border kartu, dan margin pembungkus saat mode print aktif (`.print-modal-backdrop` & `.print-modal-box`).
      - Memastikan `-webkit-print-color-adjust: exact` dan `print-color-adjust: exact` aktif.
-  3. [ ] **Konversi Background Kop Surat Menjadi Tag HTML `<img>`**:
+  3. [x] **Konversi Background Kop Surat Menjadi Tag HTML `<img>`**:
      - Mengganti tag `<div>` CSS background dengan tag `<img src="..." />` asli DOM. Tag `<img>` selalu dicetak oleh browser tanpa terpengaruh opsi "Background graphics".
      - Memberikan styling `object-fit: fill` (atau mode pilihan) dengan `opacity: 1` saat diprint (`print:opacity-100`) agar banner kop surat merah dan biru tercetak tajam dan nyata layaknya kertas kop resmi dari percetakan/Canva.
-  4. [ ] **Penerapan Seragam pada 5 Template Dokumen Cetak**:
+  4. [x] **Penerapan Seragam pada 5 Template Dokumen Cetak**:
      - Faktur Penjualan (`selectedInvoiceForPrint`)
      - Surat Penawaran Harga / SPH (`selectedQuotationForPrint`)
      - Purchase Order Supplier (`selectedPoForPrint`)
      - Berita Acara Retur Penjualan (`selectedReturnSaleForPrint`)
      - Berita Acara Retur Pembelian (`selectedReturnPurchaseForPrint`)
-  5. [ ] **Penyembunyian Konten Dashboard Saat Modal Cetak Aktif**:
-     - Memasang class `print:hidden` pada konten utama halaman dashboard agar printer hanya mencetak lembar dokumen yang sedang dibuka.
-  6. [ ] **Validasi TypeScript**:
-     - Menjalankan `npx tsc --noEmit` untuk memastikan 0 error.
-  7. [ ] **Pengujian Visual & Print Emulation**:
-     - Memverifikasi tampilan print layout di browser.
-  8. [ ] **Sinkronisasi Kode ke GitHub**:
-     - Commit dan push ke repository remote `rm23nm/dstech-smart`.
-  9. [ ] **Deployment ke Server Live VPS**:
-     - Rebuild Next.js produksi dan restart service PM2 `dstech-main`.
-  10. [ ] **Penyelesaian Laporan & Notifikasi ke Pengguna**:
+  5. [x] **Penyembunyian Konten Dashboard Saat Modal Cetak Aktif**:
+     - Memasang class `print:hidden` pada konten utama halaman dashboard (`isAnyPrintModalOpen`) agar printer hanya mencetak lembar dokumen yang sedang dibuka.
+  6. [x] **Validasi TypeScript**:
+     - Menjalankan `npx tsc --noEmit` untuk memastikan 0 error (Lolos 100%).
+  7. [x] **Pengujian Visual & Print Emulation**:
+     - Memverifikasi tampilan print layout di browser `http://localhost:3005/admin/finance`. Banner kop surat, logo DSP, dan watermark ter-render sempurna.
+  8. [x] **Sinkronisasi Kode ke GitHub**:
+     - Commit dan push ke repository remote `rm23nm/dstech-smart` (Commit: `49d431f`).
+  9. [x] **Deployment ke Server Live VPS**:
+     - Rebuild Next.js produksi (43/43 rute sukses) dan restart service PM2 `dstech-main` (PID 3775331, Online).
+  10. [x] **Penyelesaian Laporan & Notifikasi ke Pengguna**:
      - Menandai tugas sebagai Selesai.
 
 ---
