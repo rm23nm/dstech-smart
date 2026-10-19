@@ -45,6 +45,8 @@
 - **2026-10-19**: Penyesuaian Jarak Margin Header Atas Lembar Dokumen Lebih Rapat ke Kop Surat (`letterheadPaddingTop: 90px`). Mengoptimalkan jarak margin atas header dokumen resmi (Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, dan Retur Pembelian) dari 135px menjadi 90px sesuai permintaan pengguna agar teks header perusahaan dan judul faktur naik lebih rapat dan pas di bawah banner grafis kop surat tanpa celah kosong berlebih dan tanpa menimpa elemen visual kop surat. Menyesuaikan nilai default, normalisasi state settings, slider interaktif, serta preset DSTech Resmi pada modal Pengaturan Dokumen & Legalitas. Lolos validasi TypeScript `tsc` (0 error), diuji via browser subagent, dipush ke GitHub, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-19**: Pengecekan & Verifikasi Menyeluruh pada Modul Pembelian (Purchase Order Supplier & Berita Acara Retur Pembelian). Melakukan audit visual via browser automation subagent pada cetak lembar Purchase Order resmi (`PO-DSTECH-...`) dan lembar Retur Pembelian Vendor (`RET-P-...`). Mengonfirmasi bahwa seluruh dokumen cetak pembelian telah menerapkan background kop surat full width 100% (bebas terpotong di kiri maupun kanan), logo DSP dan NIB/NPWP tampil utuh, margin header atas konsisten di 90px (rapat di bawah banner grafis tanpa menabrak), margin footer aman di 110px di atas banner bawah, serta tabel rincian belanja, PPN 11%, dan otorisasi dual signature (Vendor & DSTech) berfungsi presisi.
 - **2026-10-20**: Perbaikan Lembar Cetak Dokumen Keuangan (Kop Surat Hilang Saat Diprint & Tampilan Margin A4 Pas Penuh). Mengatasi masalah latar belakang kop surat (header banner, watermark 2026, dan footer banner) yang hilang/blank saat dokumen dicetak atau diekspor ke PDF, serta menghilangkan tampilan modal dialog card yang melayang dengan bingkai abu-abu tebal di tengah kertas cetak. Mengganti implementasi CSS `backgroundImage` pada tag `<div>` menjadi elemen tag HTML `<img>` murni (`.print-letterhead-img`) dengan `objectFit: "fill"` dan `print:opacity-100` pada seluruh 5 template cetak resmi (Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, dan Retur Pembelian) sehingga browser (Chrome/Edge/Opera) selalu mencetak elemen kop secara utuh dan tajam tanpa terpengaruh opsi "Background graphics". Menambahkan aturan `@media print` khusus standar A4 di `globals.css` (`@page { size: A4 portrait; margin: 0; }`), mereset backdrop dan border modal saat print, menerapkan padding tepi dokumen aman (`padding-left: 16mm; padding-right: 16mm; paddingTop: 90px; paddingBottom: 110px;`), menyembunyikan dashboard utama saat modal cetak aktif (`print:hidden`), serta mengupgrade slider opasitas kop hingga 100% dan menyediakan preset 'Kop Utuh / Nyata (100%)' di modal pengaturan. Divalidasi `tsc --noEmit` (0 error), diuji visual di browser, disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
+- **2026-10-20**: Penyelarasan Dimensi Margin Kop Surat Canva & Kompensasi Margin Cetak A4 (`letterheadFitMode: "bleed"`). Mengatasi masalah perbedaan margin antara desain Canva dengan kanvas cetak A4 fisik akibat margin putih bawaan dari fitur batas cetak Canva (*safe zone print margins*) serta margin default browser Chrome. Menambahkan mode skala baru `bleed` ("Full Bleed Canva") yang mengkompensasi margin putih bawaan dengan men-zoom gambar secara proporsional (`transform: scale(1.07)` / offset `-3.5%`) dan `overflow: hidden` sehingga banner merah/biru atas & bawah menempel pas di ujung kertas A4 tanpa celah. Mengoptimalkan CSS `@media print` dengan batas pasti A4 (`min-height: 296mm; max-width: 210mm; box-sizing: border-box; overflow: hidden;`) untuk mencegah dokumen terpotong ke halaman 2, menambahkan tombol preset cepat dan kontrol mode skala di modal Pengaturan Kop Surat, serta memasang banner tips visual cetak A4 pada seluruh 5 modal dokumen resmi.
+- **2026-10-20**: Pemadatan & Perapihan Blok Tanda Tangan Dokumen Cetak Resmi (Faktur, SPH, PO, dan Retur). Merapatkan jarak vertikal blok tanda tangan resmi pada seluruh 5 template dokumen cetak resmi (Faktur Penjualan, SPH Quotation, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) dari tinggi awal `h-48` / `h-52` (192-208px) menjadi `h-36` (144px), memperkecil padding kontainer dari `pt-6` ke `pt-3` dan jarak antar kolom dari `gap-6` / `gap-8` ke `gap-4`. Menyesuaikan area tanda tangan digital & stempel resmi ke skala kompak (`h-11`, stempel `w-12 h-12`, gambar tanda tangan `max-h-11`) serta mempersempit jarak antara nama organisasi di atas dengan nama penandatangan di bawah (`pt-1` border-t). Menghasilkan penghematan ruang vertikal hingga 65px sehingga dokumen dengan banyak baris item barang tetap muat rapi dalam 1 lembar A4 tanpa terpotong ke bawah.
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
 **Status**: Selesai
@@ -1318,7 +1320,69 @@
 
 ---
 
-### 48. Catatan Penting
+### 48. Tugas: Penyelarasan Dimensi Margin Kop Surat Canva & Kompensasi Margin Cetak A4
+- **Permintaan Pengguna**:
+  *"sepertinya ukuran dari kopsurat yang diupload marginnya gak sama dengan canvasnya A4"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Investigasi & Analisis Akar Masalah**:
+  1. **Margin Bawaan File Export Canva**:
+     - File gambar kop surat yang diexport dari Canva (`kop_surat_dstech.jpg`, rasio 724x1024 / A4) memiliki batas putih kosong bawaan di sekeliling banner karena elemen banner didesain di dalam garis panduan margin cetak Canva (*safe zone print margins*), bukan menempel tembus di tepi kanvas A4 terluar.
+     - Akibatnya, saat dipasang dengan mode skala standar, banner merah/biru tidak menempel di tepi kertas A4 fisik karena ada jarak putih bawaan file sebesar ~15mm.
+  2. **Margin Ganda dari Dialog Chrome Print (Margins: Default)**:
+     - Pada browser Google Chrome, setelan cetak default menambahkan margin printer sebesar ~10mm - 12.7mm.
+     - Hal ini melipatgandakan margin (margin gambar Canva ~15mm + margin Chrome ~12mm = ~27mm), dan membuat tinggi dokumen melebihi 297mm sehingga Chrome memecahnya menjadi 2 halaman (Page 1 dan Page 2), memotong banner footer di dasar lembar.
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Pemeriksaan Riwayat & Pembuatan Backup**:
+     - Membuat cadangan `_backup/globals.css.bak2`, `_backup/admin_finance_page.tsx.bak17`, dan `_backup/LAPORAN_PROGRES.md.bak47`.
+  2. [x] **Penambahan Mode Skala Baru 'Full Bleed Canva (Potong Margin Putih Bawaan)'**:
+     - Menambahkan mode skala `bleed` pada interface dan selector `letterheadFitMode` di modal Pengaturan Kop Surat Dokumen.
+     - Mode ini menerapkan styling `width: 107%; height: 107%; top: -3.5%; left: -3.5%` dengan `overflow: hidden` sehingga margin putih bawaan dari Canva otomatis terdorong keluar batas kanvas, dan banner merah/biru atas & bawah menempel sempurna di tepi lembar kertas A4 tanpa perlu user mendesain ulang di Canva.
+  3. [x] **Optimalisasi CSS Cetak A4 `@media print` Agar Selalu Pas 1 Halaman**:
+     - Menetapkan `.print-document-sheet` dengan `min-height: 296mm !important; max-width: 210mm !important; box-sizing: border-box !important; overflow: hidden !important;` agar Chrome tidak pernah memecah dokumen menjadi 2 halaman terlepas dari setelan margin printer.
+  4. [x] **Pemberian Tips Visual Cetak A4 pada Modal Cetak Dokumen**:
+     - Menambahkan banner informasi praktis pada seluruh modal cetak dokumen: *"💡 Tips Cetak Pas Penuh Kertas A4 (Full Bleed): Pada dialog print browser (Ctrl+P), ubah Margins menjadi 'None' (Tidak ada) dan centang Background graphics agar kop surat menempel presisi di ujung kertas A4 dan tidak terbagi 2 halaman."*
+  5. [x] **Penerapan Seragam pada 5 Template Dokumen Resmi**:
+     - Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, dan Retur Pembelian.
+  6. [x] **Validasi TypeScript**:
+     - Menjalankan `npx tsc --noEmit` untuk memastikan 0 error kompilasi (Lolos 100%).
+  7. [x] **Pengujian Visual di Browser**:
+     - Memverifikasi tampilan dan mode skala baru di `http://localhost:3005/admin/finance`.
+  8. [x] **Sinkronisasi Kode ke GitHub**:
+     - Commit dan push ke repository remote `rm23nm/dstech-smart`.
+  9. [x] **Deployment ke Server Live VPS**:
+     - Rebuild Next.js produksi dan restart service PM2 `dstech-main`.
+  10. [x] **Penyelesaian Laporan & Penjelasan Lengkap ke Pengguna**:
+     - Menandai tugas sebagai Selesai dan menjelaskan detail kanvas A4 Canva vs cetak web.
+
+---
+
+### 49. Tugas: Pemadatan & Perapihan Blok Tanda Tangan Dokumen Cetak Resmi (Mencegah Terpotong ke Bawah Saat Item Banyak)
+- **Permintaan Pengguna**:
+  *"untuk tandatangan, sebaiknya rapakan lagi saja sedikit, karena terasa sangat luas, jika nanti banyak item barang maka akan membuat terpotong kebawah jika terlalu jauh jarak antara nama dan Perusahaan"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Investigasi & Analisis Akar Masalah**:
+  1. Kotak tanda tangan sebelumnya memiliki tinggi `h-48` (192px) hingga `h-52` (208px) dengan `pt-6` dan `gap-6`.
+  2. Ruang tengah tanda tangan (`h-16`) dan jarak antara label perusahaan dengan nama penandatangan terlalu longgar, memakan ruang vertikal lebih dari 200px.
+  3. Saat faktur atau penawaran memiliki banyak baris barang, tinggi total dokumen menjadi terlalu panjang dan berisiko terpotong ke bawah atau terdorong ke halaman 2.
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Pemadatan Tinggi Kotak Tanda Tangan**:
+     - Mengubah `h-48` / `h-52` menjadi `h-36` (144px) yang padat dan elegan.
+     - Mengurangi padding kontainer dari `pt-6` menjadi `pt-3` dan `gap-6` / `gap-8` menjadi `gap-4`.
+  2. [x] **Penyesuaian Skala Tanda Tangan & Stempel Digital**:
+     - Menyesuaikan tinggi area tanda tangan dari `h-16` menjadi `h-11` (`max-h-11` untuk gambar tanda tangan, diameter stempel `w-12 h-12`).
+     - Merapatkan jarak antara nama perusahaan di atas dengan garis nama penandatangan di bawah (`pt-1` border-t).
+  3. [x] **Penerapan Seragam pada 5 Template Dokumen Cetak**:
+     - Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, dan Retur Pembelian.
+  4. [x] **Validasi TypeScript & Browser Testing**:
+     - Memastikan 0 error pada `npx tsc --noEmit` dan menguji tampilan di browser via browser subagent.
+  5. [x] **Sinkronisasi Git & Deploy VPS**:
+     - Push ke GitHub dan deploy ke live server aaPanel VPS.
+
+---
+
+### 50. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

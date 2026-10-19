@@ -151,7 +151,7 @@ interface FinanceSettings {
   watermarkOpacity: number;
   letterheadPaddingTop?: number;
   letterheadPaddingBottom?: number;
-  letterheadFitMode?: "fill" | "cover" | "contain";
+  letterheadFitMode?: "fill" | "cover" | "contain" | "bleed";
   signerName?: string;
   signerTitle?: string;
   masterSignatureUrl?: string;
@@ -5578,6 +5578,17 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
+            {/* Tips Cetak Pas Penuh Kertas A4 */}
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 print:hidden">
+              <span className="text-base leading-none">💡</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Tips Cetak Pas Penuh Kertas A4 (Full Bleed):</p>
+                <p className="text-[11px] text-amber-800">
+                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4 dan tidak terbagi 2 halaman.
+                </p>
+              </div>
+            </div>
+
             {/* FAKTUR CONTENT CONTAINER (Siap Cetak & Watermarked) */}
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
@@ -5591,7 +5602,9 @@ export default function AdminFinanceERPPage() {
                 <img
                   src={financeSettings.letterheadUrl}
                   alt="Kop Surat Resmi"
-                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
+                  className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                    financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                  }`}
                   style={{
                     objectFit:
                       financeSettings.letterheadFitMode === "cover"
@@ -5600,6 +5613,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -5800,43 +5817,43 @@ export default function AdminFinanceERPPage() {
                 </div>
 
                 {/* Tanda Tangan Resmi Sesuai Kaidah Administrasi Korporat */}
-                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200 text-xs">
+                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
                   {/* Sisi Kiri: Penerima / Klien */}
-                  <div className="flex flex-col justify-between h-48 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                  <div className="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
                     <div>
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Penerima / Klien</p>
-                      <p className="text-xs font-black text-slate-900 mt-1">{selectedInvoiceForPrint.customerName}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Penerima / Klien</p>
+                      <p className="text-xs font-black text-slate-900 mt-0.5">{selectedInvoiceForPrint.customerName}</p>
                     </div>
 
-                    <div className="h-16 flex items-center justify-center text-slate-300 text-[10px] italic">
+                    <div className="h-11 flex items-center justify-center text-slate-300 text-[9px] italic">
                       (Tanda Tangan & Stempel Resmi Klien)
                     </div>
 
-                    <div className="pt-2 border-t border-slate-300">
+                    <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
                         ( ................................................................ )
                       </p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
+                      <p className="text-[9px] text-slate-500">
                         Nama & Jabatan Penandatangan Klien
                       </p>
                     </div>
                   </div>
 
                   {/* Sisi Kanan: Pengirim / PT. DSTech Smart Perkasa */}
-                  <div className="flex flex-col justify-between h-48 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                  <div className="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
                     <div>
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
                       <p className="text-xs font-black text-dstech-blue mt-0.5">PT. DSTech Smart Perkasa</p>
                     </div>
 
-                    <div className="h-16 relative flex items-center justify-center">
+                    <div className="h-11 relative flex items-center justify-center">
                       {selectedInvoiceForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi PT DSTech */}
-                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-dstech-blue/50 flex flex-col items-center justify-center text-[7px] text-dstech-blue font-bold uppercase rotate-[-12deg] pointer-events-none bg-blue-50/40">
-                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
-                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
-                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">DIGITAL SIGN</span>
+                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-dstech-blue/50 flex flex-col items-center justify-center text-[6px] text-dstech-blue font-bold uppercase rotate-[-12deg] pointer-events-none bg-blue-50/40">
+                            <span className="font-black text-[5.5px]">PT. DSTECH</span>
+                            <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">DIGITAL SIGN</span>
                           </div>
 
                           {/* Tanda Tangan Goresan / Gambar */}
@@ -5844,10 +5861,10 @@ export default function AdminFinanceERPPage() {
                             <img
                               src={selectedInvoiceForPrint.signatureImage}
                               alt="Tanda Tangan Digital"
-                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                              className="max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
-                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                            <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
                               {selectedInvoiceForPrint.approvedBy || "H. Agus Supriyadi"}
                             </div>
                           )}
@@ -6515,6 +6532,17 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
+            {/* Tips Cetak Pas Penuh Kertas A4 */}
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 print:hidden">
+              <span className="text-base leading-none">💡</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Tips Cetak Pas Penuh Kertas A4 (Full Bleed):</p>
+                <p className="text-[11px] text-amber-800">
+                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4 dan tidak terbagi 2 halaman.
+                </p>
+              </div>
+            </div>
+
             {/* SPH OFFICIAL LETTER CONTAINER (A4 Standard Print Layout) */}
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
@@ -6528,7 +6556,9 @@ export default function AdminFinanceERPPage() {
                 <img
                   src={financeSettings.letterheadUrl}
                   alt="Kop Surat Resmi"
-                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
+                  className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                    financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                  }`}
                   style={{
                     objectFit:
                       financeSettings.letterheadFitMode === "cover"
@@ -6537,6 +6567,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -6725,45 +6759,45 @@ export default function AdminFinanceERPPage() {
                 </div>
 
                 {/* Tanda Tangan Dual Approval (Klien & Direktur DSTech) */}
-                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200 text-xs">
+                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
                   {/* Sisi Kiri: Penerima / Klien */}
-                  <div className="flex flex-col justify-between h-52 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                  <div className="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
                     <div>
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Disetujui & Diterima Oleh,</p>
-                      <p className="text-xs font-black text-slate-900 mt-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Disetujui & Diterima Oleh,</p>
+                      <p className="text-xs font-black text-slate-900 mt-0.5">
                         {selectedQuotationForPrint.customerOrg || selectedQuotationForPrint.customerName}
                       </p>
                     </div>
 
-                    <div className="h-16 flex items-center justify-center text-slate-300 text-[10px] italic">
+                    <div className="h-11 flex items-center justify-center text-slate-300 text-[9px] italic">
                       (Tanda Tangan, Nama Jelas & Stempel Klien)
                     </div>
 
-                    <div className="pt-2 border-t border-slate-300">
+                    <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
                         {selectedQuotationForPrint.customerName ? `( ${selectedQuotationForPrint.customerName} )` : "( ................................................................ )"}
                       </p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
+                      <p className="text-[9px] text-slate-500">
                         PIC / Purchasing / Manajer Terkait
                       </p>
                     </div>
                   </div>
 
                   {/* Sisi Kanan: Hormat Kami PT. DSTech Smart Perkasa */}
-                  <div className="flex flex-col justify-between h-52 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                  <div className="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
                     <div>
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
                       <p className="text-xs font-black text-indigo-700 mt-0.5">PT. DSTech Smart Perkasa</p>
                     </div>
 
-                    <div className="h-16 relative flex items-center justify-center">
+                    <div className="h-11 relative flex items-center justify-center">
                       {selectedQuotationForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi PT DSTech */}
-                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[7px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
-                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
-                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
-                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL SPH</span>
+                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[6px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
+                            <span className="font-black text-[5.5px]">PT. DSTECH</span>
+                            <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL SPH</span>
                           </div>
 
                           {/* Tanda Tangan Goresan / Gambar */}
@@ -6771,10 +6805,10 @@ export default function AdminFinanceERPPage() {
                             <img
                               src={selectedQuotationForPrint.signatureImage}
                               alt="Tanda Tangan Digital"
-                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                              className="max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
-                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                            <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
                               {selectedQuotationForPrint.approvedBy || "H. Agus Supriyadi"}
                             </div>
                           )}
@@ -8338,6 +8372,17 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
+            {/* Tips Cetak Pas Penuh Kertas A4 */}
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 print:hidden">
+              <span className="text-base leading-none">💡</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Tips Cetak Pas Penuh Kertas A4 (Full Bleed):</p>
+                <p className="text-[11px] text-amber-800">
+                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4 dan tidak terbagi 2 halaman.
+                </p>
+              </div>
+            </div>
+
             {/* PO OFFICIAL PRINT CONTAINER (A4 Standard Print Layout) */}
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
@@ -8351,7 +8396,9 @@ export default function AdminFinanceERPPage() {
                 <img
                   src={financeSettings.letterheadUrl}
                   alt="Kop Surat Resmi"
-                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
+                  className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                    financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                  }`}
                   style={{
                     objectFit:
                       financeSettings.letterheadFitMode === "cover"
@@ -8360,6 +8407,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -8507,51 +8558,51 @@ export default function AdminFinanceERPPage() {
                 </div>
 
                 {/* Tanda Tangan Dual Approval (Vendor & Direktur DSTech) */}
-                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-200 text-xs">
+                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
                   {/* Sisi Kiri: Vendor / Rekanan Supplier */}
-                  <div className="flex flex-col justify-between h-52 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                  <div className="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
                     <div>
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                         Dikonfirmasi & Diterima Oleh,
                       </p>
-                      <p className="text-xs font-black text-slate-900 mt-1">
+                      <p className="text-xs font-black text-slate-900 mt-0.5">
                         {selectedPoForPrint.supplierName}
                       </p>
                     </div>
 
-                    <div className="h-16 flex items-center justify-center text-slate-300 text-[10px] italic">
+                    <div className="h-11 flex items-center justify-center text-slate-300 text-[9px] italic">
                       (Tanda Tangan, Nama Jelas & Stempel Vendor)
                     </div>
 
-                    <div className="pt-2 border-t border-slate-300">
+                    <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
                         {selectedPoForPrint.supplierContact
                           ? `( ${selectedPoForPrint.supplierContact.split("(")[0].trim()} )`
                           : "( ................................................................ )"}
                       </p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
+                      <p className="text-[9px] text-slate-500">
                         Sales / PIC Rekanan Vendor
                       </p>
                     </div>
                   </div>
 
                   {/* Sisi Kanan: Pemesan Resmi PT. DSTech Smart Perkasa */}
-                  <div className="flex flex-col justify-between h-52 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                  <div className="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
                     <div>
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                         Pemesan Resmi,
                       </p>
                       <p className="text-xs font-black text-amber-800 mt-0.5">PT. DSTech Smart Perkasa</p>
                     </div>
 
-                    <div className="h-16 relative flex items-center justify-center">
+                    <div className="h-11 relative flex items-center justify-center">
                       {selectedPoForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi PT DSTech */}
-                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[7px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
-                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
-                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
-                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL PO</span>
+                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[6px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
+                            <span className="font-black text-[5.5px]">PT. DSTECH</span>
+                            <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL PO</span>
                           </div>
 
                           {/* Tanda Tangan Goresan / Gambar */}
@@ -8559,10 +8610,10 @@ export default function AdminFinanceERPPage() {
                             <img
                               src={selectedPoForPrint.signatureImage}
                               alt="Tanda Tangan Digital"
-                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                              className="max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
-                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                            <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
                               {selectedPoForPrint.approvedBy || "H. Agus Supriyadi"}
                             </div>
                           )}
@@ -9676,6 +9727,17 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
+            {/* Tips Cetak Pas Penuh Kertas A4 */}
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 print:hidden">
+              <span className="text-base leading-none">💡</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Tips Cetak Pas Penuh Kertas A4 (Full Bleed):</p>
+                <p className="text-[11px] text-amber-800">
+                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4 dan tidak terbagi 2 halaman.
+                </p>
+              </div>
+            </div>
+
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
@@ -9689,7 +9751,9 @@ export default function AdminFinanceERPPage() {
                 <img
                   src={financeSettings.letterheadUrl}
                   alt="Kop Surat Resmi"
-                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
+                  className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                    financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                  }`}
                   style={{
                     objectFit:
                       financeSettings.letterheadFitMode === "cover"
@@ -9698,6 +9762,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -9834,51 +9902,51 @@ export default function AdminFinanceERPPage() {
                 </div>
 
                 {/* Kolom Tanda Tangan Dual Pihak */}
-                <div className="grid grid-cols-2 gap-8 pt-4">
+                <div className="grid grid-cols-2 gap-4 pt-2.5">
                   {/* Pihak I: Klien */}
-                  <div className="text-center space-y-2">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="text-center space-y-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       Pihak I (Yang Menyerahkan),
                     </p>
                     <p className="text-xs font-black text-slate-800">{selectedReturnSaleForPrint.customerName}</p>
-                    <div className="h-16 flex items-center justify-center">
-                      <div className="font-serif italic text-base text-slate-400 select-none">
+                    <div className="h-11 flex items-center justify-center">
+                      <div className="font-serif italic text-sm text-slate-400 select-none">
                         ( Tanda Tangan & Nama Terang )
                       </div>
                     </div>
-                    <div className="pt-2 border-t border-slate-300">
+                    <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-800 text-xs">
                         ( {selectedReturnSaleForPrint.customerName.split(" ")[0] || "Perwakilan Klien"} )
                       </p>
-                      <p className="text-[10px] text-slate-500">Pemohon Retur Resmi</p>
+                      <p className="text-[9px] text-slate-500">Pemohon Retur Resmi</p>
                     </div>
                   </div>
 
                   {/* Pihak II: DSTech */}
-                  <div className="text-center space-y-2 relative">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="text-center space-y-1 relative">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       Pihak II (Pemeriksa Mutu & Otorisasi),
                     </p>
                     <p className="text-xs font-black text-red-600">PT. DSTech Smart Perkasa</p>
 
-                    <div className="h-16 relative flex items-center justify-center">
+                    <div className="h-11 relative flex items-center justify-center">
                       {selectedReturnSaleForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi DSTech */}
-                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-red-500/50 flex flex-col items-center justify-center text-[7px] text-red-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-red-50/40">
-                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
-                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
-                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">QC APPROVED</span>
+                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-red-500/50 flex flex-col items-center justify-center text-[6px] text-red-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-red-50/40">
+                            <span className="font-black text-[5.5px]">PT. DSTECH</span>
+                            <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">QC APPROVED</span>
                           </div>
 
                           {selectedReturnSaleForPrint.signatureImage ? (
                             <img
                               src={selectedReturnSaleForPrint.signatureImage}
                               alt="Tanda Tangan QC"
-                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                              className="max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
-                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                            <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
                               {selectedReturnSaleForPrint.approvedBy || "H. Agus Supriyadi"}
                             </div>
                           )}
@@ -9965,6 +10033,17 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
+            {/* Tips Cetak Pas Penuh Kertas A4 */}
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 print:hidden">
+              <span className="text-base leading-none">💡</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Tips Cetak Pas Penuh Kertas A4 (Full Bleed):</p>
+                <p className="text-[11px] text-amber-800">
+                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4 dan tidak terbagi 2 halaman.
+                </p>
+              </div>
+            </div>
+
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
@@ -9978,7 +10057,9 @@ export default function AdminFinanceERPPage() {
                 <img
                   src={financeSettings.letterheadUrl}
                   alt="Kop Surat Resmi"
-                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
+                  className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                    financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                  }`}
                   style={{
                     objectFit:
                       financeSettings.letterheadFitMode === "cover"
@@ -9987,6 +10068,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -10123,47 +10208,47 @@ export default function AdminFinanceERPPage() {
                 </div>
 
                 {/* Kolom Tanda Tangan Dual Pihak */}
-                <div className="grid grid-cols-2 gap-8 pt-4">
+                <div className="grid grid-cols-2 gap-4 pt-2.5">
                   {/* Pihak I: DSTech Logistik */}
-                  <div className="text-center space-y-2 relative">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="text-center space-y-1 relative">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       Pihak I (Logistik & Pengadaan),
                     </p>
                     <p className="text-xs font-black text-amber-800">PT. DSTech Smart Perkasa</p>
 
-                    <div className="h-16 relative flex items-center justify-center">
+                    <div className="h-11 relative flex items-center justify-center">
                       {selectedReturnPurchaseForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi DSTech */}
-                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[7px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
-                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
-                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
-                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">RMA OFFICIAL</span>
+                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[6px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
+                            <span className="font-black text-[5.5px]">PT. DSTECH</span>
+                            <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">RMA OFFICIAL</span>
                           </div>
 
                           {selectedReturnPurchaseForPrint.signatureImage ? (
                             <img
                               src={selectedReturnPurchaseForPrint.signatureImage}
                               alt="Tanda Tangan Logistik"
-                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                              className="max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
-                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                            <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
                               {selectedReturnPurchaseForPrint.approvedBy || "H. Agus Supriyadi"}
                             </div>
                           )}
                         </>
                       ) : (
-                        <div className="flex flex-col items-center justify-center border border-dashed border-amber-300 bg-amber-50/80 rounded-lg p-2 w-full">
-                          <Clock className="w-4 h-4 text-amber-600 mb-0.5" />
-                          <span className="text-[9px] font-black text-amber-800 uppercase">Menunggu Otorisasi Logistik</span>
+                        <div className="flex flex-col items-center justify-center border border-dashed border-amber-300 bg-amber-50/80 rounded-lg p-1.5 w-full">
+                          <Clock className="w-3.5 h-3.5 text-amber-600 mb-0.5" />
+                          <span className="text-[8.5px] font-black text-amber-800 uppercase">Menunggu Otorisasi Logistik</span>
                           <button
                             type="button"
                             onClick={() => {
                               setSelectedReturnPurchaseForPrint(null);
                               handleOpenApprovalReturnPurchase(selectedReturnPurchaseForPrint);
                             }}
-                            className="mt-1 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-[9px] cursor-pointer shadow-sm"
+                            className="mt-0.5 px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-[8.5px] cursor-pointer shadow-sm"
                           >
                             Setujui Sekarang
                           </button>
@@ -10171,15 +10256,15 @@ export default function AdminFinanceERPPage() {
                       )}
                     </div>
 
-                    <div className="pt-2 border-t border-slate-300">
+                    <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
                         ( {selectedReturnPurchaseForPrint.approvedBy || "H. Agus Supriyadi, S.T., M.Kom."} )
                       </p>
-                      <p className="text-[10px] text-slate-500 mt-0.5">
+                      <p className="text-[9px] text-slate-500 mt-0.5">
                         {selectedReturnPurchaseForPrint.approvedTitle || "Kepala Logistik & Pengadaan"}
                       </p>
                       {selectedReturnPurchaseForPrint.verificationCode && (
-                        <p className="text-[9px] font-mono text-emerald-700 font-bold mt-0.5">
+                        <p className="text-[8px] font-mono text-emerald-700 font-bold mt-0.5">
                           Verifikasi: {selectedReturnPurchaseForPrint.verificationCode}
                         </p>
                       )}
@@ -10187,21 +10272,21 @@ export default function AdminFinanceERPPage() {
                   </div>
 
                   {/* Pihak II: Supplier / Ekspedisi */}
-                  <div className="text-center space-y-2">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <div className="text-center space-y-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       Pihak II (Tanda Terima Vendor / Ekspedisi),
                     </p>
                     <p className="text-xs font-black text-slate-800">{selectedReturnPurchaseForPrint.supplierName}</p>
-                    <div className="h-16 flex items-center justify-center">
-                      <div className="font-serif italic text-base text-slate-400 select-none">
+                    <div className="h-11 flex items-center justify-center">
+                      <div className="font-serif italic text-sm text-slate-400 select-none">
                         ( Stempel & Tanda Tangan Penerima )
                       </div>
                     </div>
-                    <div className="pt-2 border-t border-slate-300">
+                    <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-800 text-xs">
                         ( {selectedReturnPurchaseForPrint.supplierContact ? selectedReturnPurchaseForPrint.supplierContact.split(" ")[0] : "Service Center Vendor"} )
                       </p>
-                      <p className="text-[10px] text-slate-500">Tanda Terima Resmi Distributor</p>
+                      <p className="text-[9px] text-slate-500">Tanda Terima Resmi Distributor</p>
                     </div>
                   </div>
                 </div>
@@ -11119,10 +11204,26 @@ export default function AdminFinanceERPPage() {
                         ...prev,
                         letterheadUrl: "/kop_surat_dstech.jpg",
                         letterheadEnabled: true,
+                        letterheadFitMode: "bleed",
                         watermarkOpacity: 1.0,
                       }))
                     }
                     className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-dstech-blue font-bold text-[10px] cursor-pointer"
+                  >
+                    Full Bleed Canva (100%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTempSettings((prev) => ({
+                        ...prev,
+                        letterheadUrl: "/kop_surat_dstech.jpg",
+                        letterheadEnabled: true,
+                        letterheadFitMode: "fill",
+                        watermarkOpacity: 1.0,
+                      }))
+                    }
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
                   >
                     Kop Utuh / Nyata (100%)
                   </button>
@@ -11173,9 +11274,22 @@ export default function AdminFinanceERPPage() {
               <div className="pt-2 border-t border-slate-100 space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-slate-700 block">Mode Skala Background Kop Surat:</label>
-                  <span className="text-[10px] text-slate-500 font-medium">Mencegah terpotong samping kiri/kanan</span>
+                  <span className="text-[10px] text-slate-500 font-medium">Pilih sesuai jenis file kop surat Anda</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTempSettings({ ...tempSettings, letterheadFitMode: "bleed" })}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer transition ${
+                      tempSettings.letterheadFitMode === "bleed"
+                        ? "border-dstech-blue bg-blue-50/80 text-dstech-blue font-bold shadow-sm"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">Full Bleed Canva</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">Potong margin putih bawaan Canva</div>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setTempSettings({ ...tempSettings, letterheadFitMode: "fill" })}
