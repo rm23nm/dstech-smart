@@ -30,6 +30,7 @@ import {
   HardHat,
   Sparkles,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 
 interface EmployeeTask {
@@ -60,8 +61,16 @@ interface MaterialItem {
   description: string;
 }
 
+interface MaterialRequestItem {
+  materialId: string;
+  materialName: string;
+  qty: number;
+  unit: string;
+}
+
 interface MaterialRequest {
   id: string;
+  items?: MaterialRequestItem[];
   materialId: string;
   materialName: string;
   qty: number;
@@ -143,11 +152,29 @@ export default function EmployeeDashboard() {
     report: "",
   });
 
+  interface FormRequestItem {
+    materialId: string;
+    materialName: string;
+    qty: number;
+    unit: string;
+    maxStock: number;
+  }
+
   const [isRequestModalOpen, setIsRequestModalOpen] = useState<boolean>(false);
-  const [requestForm, setRequestForm] = useState({
-    materialName: "",
-    qty: 1,
-    unit: "Pcs",
+  const [requestForm, setRequestForm] = useState<{
+    items: FormRequestItem[];
+    taskTitle: string;
+    notes: string;
+  }>({
+    items: [
+      {
+        materialId: "",
+        materialName: "",
+        qty: 1,
+        unit: "Pcs",
+        maxStock: 999,
+      },
+    ],
     taskTitle: "",
     notes: "",
   });
@@ -276,33 +303,137 @@ export default function EmployeeDashboard() {
     }
   };
 
-  // Handler submit material request
+  // Multi-item material request helpers
+  const handleAddRequestItem = () => {
+    const selectedIds = requestForm.items.map((i) => i.materialId).filter(Boolean);
+    const availableMat = materials.find((m) => !selectedIds.includes(m.id) && m.stock > 0) || materials[0];
+
+    setRequestForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          materialId: availableMat?.id || "",
+          materialName: availableMat?.name || "",
+          qty: 1,
+          unit: availableMat?.unit || "Pcs",
+          maxStock: availableMat?.stock || 999,
+        },
+      ],
+    }));
+  };
+
+  const handleRemoveRequestItem = (index: number) => {
+    if (requestForm.items.length <= 1) return;
+    setRequestForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleItemSelectChange = (index: number, selectedId: string) => {
+    const mat = materials.find((m) => m.id === selectedId);
+    if (!mat) return;
+    setRequestForm((prev) => {
+      const updated = [...prev.items];
+      updated[index] = {
+        materialId: mat.id,
+        materialName: mat.name,
+        qty: 1,
+        unit: mat.unit,
+        maxStock: mat.stock,
+      };
+      return { ...prev, items: updated };
+    });
+  };
+
+  const handleItemQtyChange = (index: number, qtyVal: number) => {
+    setRequestForm((prev) => {
+      const updated = [...prev.items];
+      const safeQty = Math.max(1, qtyVal);
+      updated[index] = {
+        ...updated[index],
+        qty: safeQty,
+      };
+      return { ...prev, items: updated };
+    });
+  };
+
+  // Handler submit material request (Multi-Item)
   const handleSubmitMaterialRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!requestForm.materialName || !requestForm.qty) {
-      showToast("Mohon lengkapi nama material dan jumlah!");
+
+    // Validasi: setiap baris wajib memilih material dari stok gudang
+    const invalidItem = requestForm.items.find((i) => !i.materialId || !i.materialName);
+    if (invalidItem || requestForm.items.length === 0) {
+      showToast("Mohon pilih material dari daftar stok yang tersedia untuk setiap baris!");
       return;
     }
 
+    // Validasi duplikasi material
+    const ids = requestForm.items.map((i) => i.materialId);
+    const hasDuplicates = new Set(ids).size !== ids.length;
+    if (hasDuplicates) {
+      showToast("Terdapat material yang sama dipilih lebih dari 1 kali. Mohon gabungkan jumlahnya.");
+      return;
+    }
+
+    // Validasi stok gudang
+    for (const item of requestForm.items) {
+      const mat = materials.find((m) => m.id === item.materialId);
+      if (mat && mat.stock <= 0) {
+        showToast(`Stok untuk "${item.materialName}" sedang habis di gudang!`);
+        return;
+      }
+      if (mat && item.qty > mat.stock) {
+        showToast(
+          `Jumlah untuk "${item.materialName}" (${item.qty} ${item.unit}) melebihi sisa stok gudang (${mat.stock} ${mat.unit})!`
+        );
+        return;
+      }
+    }
+
     try {
+      const defaultTask = tasks.length > 0 ? `${tasks[0].title} - ${tasks[0].client}` : "Penugasan Lapangan";
       const res = await fetch("/api/employee/inventory", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...requestForm,
+          items: requestForm.items.map((it) => ({
+            materialId: it.materialId,
+            materialName: it.materialName,
+            qty: it.qty,
+            unit: it.unit,
+          })),
+          taskTitle: requestForm.taskTitle || defaultTask,
           requestedBy: "Ikhsan Maulidi",
+          notes: requestForm.notes,
         }),
       });
 
       if (res.ok) {
         const d = await res.json();
         setRequests((prev) => [d.data, ...prev]);
-        showToast("Permohonan material berhasil diajukan ke Gudang!");
+        showToast(`Permohonan ${requestForm.items.length} item material berhasil diajukan ke Gudang!`);
         setIsRequestModalOpen(false);
-        setRequestForm({ materialName: "", qty: 1, unit: "Pcs", taskTitle: "", notes: "" });
+        const firstMat = materials.find((m) => m.stock > 0) || materials[0];
+        setRequestForm({
+          items: [
+            {
+              materialId: firstMat?.id || "",
+              materialName: firstMat?.name || "",
+              qty: 1,
+              unit: firstMat?.unit || "Pcs",
+              maxStock: firstMat?.stock || 999,
+            },
+          ],
+          taskTitle: "",
+          notes: "",
+        });
         setInventorySubTab("requests");
       } else {
-        showToast("Gagal mengajukan material");
+        const d = await res.json().catch(() => null);
+        showToast(d?.error || "Gagal mengajukan permohonan material");
       }
     } catch {
       showToast("Terjadi kesalahan jaringan");
@@ -892,7 +1023,23 @@ export default function EmployeeDashboard() {
                       </div>
 
                       <button
-                        onClick={() => setIsRequestModalOpen(true)}
+                        onClick={() => {
+                          const firstMat = materials.find((m) => m.stock > 0) || materials[0];
+                          setRequestForm({
+                            items: [
+                              {
+                                materialId: firstMat?.id || "",
+                                materialName: firstMat?.name || "",
+                                qty: 1,
+                                unit: firstMat?.unit || "Pcs",
+                                maxStock: firstMat?.stock || 999,
+                              },
+                            ],
+                            taskTitle: tasks[0] ? `${tasks[0].title} - ${tasks[0].client}` : "",
+                            notes: "",
+                          });
+                          setIsRequestModalOpen(true);
+                        }}
                         className="px-4 py-2.5 rounded-2xl bg-dstech-red hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2 cursor-pointer"
                       >
                         <Plus className="w-4 h-4" />
@@ -951,10 +1098,16 @@ export default function EmployeeDashboard() {
                                     <button
                                       onClick={() => {
                                         setRequestForm({
-                                          materialName: mat.name,
-                                          qty: 1,
-                                          unit: mat.unit,
-                                          taskTitle: activeTask?.title || "",
+                                          items: [
+                                            {
+                                              materialId: mat.id,
+                                              materialName: mat.name,
+                                              qty: 1,
+                                              unit: mat.unit,
+                                              maxStock: mat.stock,
+                                            },
+                                          ],
+                                          taskTitle: tasks[0] ? `${tasks[0].title} - ${tasks[0].client}` : "",
                                           notes: "",
                                         });
                                         setIsRequestModalOpen(true);
@@ -980,7 +1133,7 @@ export default function EmployeeDashboard() {
                             <tr>
                               <th className="p-3">Tanggal</th>
                               <th className="p-3">Material yang Diminta</th>
-                              <th className="p-3">Jumlah</th>
+                              <th className="p-3">Rincian Qty</th>
                               <th className="p-3">Penugasan Terkait</th>
                               <th className="p-3">Status Gudang</th>
                             </tr>
@@ -988,13 +1141,38 @@ export default function EmployeeDashboard() {
                           <tbody className="divide-y divide-slate-100">
                             {requests.map((req) => (
                               <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
-                                <td className="p-3 font-medium text-slate-500">{req.date}</td>
-                                <td className="p-3 font-bold text-slate-900">{req.materialName}</td>
-                                <td className="p-3 font-black text-slate-700">
-                                  {req.qty} {req.unit}
+                                <td className="p-3 font-medium text-slate-500 whitespace-nowrap">{req.date}</td>
+                                <td className="p-3">
+                                  {req.items && req.items.length > 0 ? (
+                                    <div className="space-y-1.5 py-1">
+                                      {req.items.map((it, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 text-xs">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-dstech-blue shrink-0"></span>
+                                          <span className="font-bold text-slate-900">{it.materialName}</span>
+                                          <span className="px-2 py-0.5 rounded-full bg-slate-100 font-extrabold text-[10px] text-slate-700 whitespace-nowrap">
+                                            {it.qty} {it.unit}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="font-bold text-slate-900">{req.materialName}</p>
+                                  )}
+                                </td>
+                                <td className="p-3 whitespace-nowrap">
+                                  {req.items && req.items.length > 1 ? (
+                                    <span className="px-2.5 py-1 rounded-lg bg-blue-50 text-dstech-blue font-bold text-[11px] border border-blue-200/60 inline-flex items-center gap-1.5">
+                                      <Package className="w-3.5 h-3.5" />
+                                      <span>{req.items.length} Macam Item ({req.qty} total)</span>
+                                    </span>
+                                  ) : (
+                                    <span className="font-black text-slate-700">
+                                      {req.qty} {req.unit}
+                                    </span>
+                                  )}
                                 </td>
                                 <td className="p-3 text-slate-600">{req.taskTitle}</td>
-                                <td className="p-3">
+                                <td className="p-3 whitespace-nowrap">
                                   <span
                                     className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${
                                       req.status === "Disetujui"
@@ -1457,114 +1635,193 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
-      {/* MODAL 3: Ajukan Pengambilan Material */}
+      {/* MODAL 3: Ajukan Pengambilan Material (Multi-Item) */}
       {isRequestModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsRequestModalOpen(false)}
         >
           <div
-            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl relative"
+            className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-5 shadow-2xl relative max-h-[92vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4 shrink-0">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-dstech-red">
                   Formulir Logistik Gudang
                 </span>
-                <h3 className="text-lg font-black text-slate-900 mt-1">Ajukan Pengambilan Material</h3>
+                <h3 className="text-lg font-black text-slate-900 mt-1">Ajukan Pengambilan Material (Multi-Item)</h3>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  Pilih material dari stok gudang yang tersedia. Anda dapat mengajukan beberapa item sekaligus.
+                </p>
               </div>
               <button
                 onClick={() => setIsRequestModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center shrink-0 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSubmitMaterialRequest} className="space-y-4 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Nama Material / Sparepart:</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Kabel UTP Cat6 / Konektor RJ45 / Adaptor 12V"
-                  value={requestForm.materialName}
-                  onChange={(e) => setRequestForm({ ...requestForm, materialName: e.target.value })}
-                  className="w-full p-3 rounded-xl border border-slate-200 font-medium focus:ring-2 focus:ring-dstech-red focus:outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Jumlah (Qty):</label>
-                  <input
-                    type="number"
-                    min={1}
-                    required
-                    value={requestForm.qty}
-                    onChange={(e) => setRequestForm({ ...requestForm, qty: Number(e.target.value) })}
-                    className="w-full p-3 rounded-xl border border-slate-200 font-bold focus:ring-2 focus:ring-dstech-red focus:outline-none"
-                  />
+            <form onSubmit={handleSubmitMaterialRequest} className="space-y-4 text-xs overflow-y-auto pr-1 flex-1">
+              {/* Dynamic Repeater of Material Items */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="font-black text-slate-800 uppercase tracking-wider text-[11px]">
+                    Daftar Item Material yang Diminta ({requestForm.items.length})
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-semibold">* Wajib dipilih dari stok gudang</span>
                 </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Satuan:</label>
-                  <select
-                    value={requestForm.unit}
-                    onChange={(e) => setRequestForm({ ...requestForm, unit: e.target.value })}
-                    className="w-full p-3 rounded-xl border border-slate-200 bg-white font-medium focus:ring-2 focus:ring-dstech-red focus:outline-none"
+
+                {requestForm.items.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-slate-50/70 space-y-3 relative transition-all"
                   >
-                    <option value="Pcs">Pcs</option>
-                    <option value="Roll">Roll</option>
-                    <option value="Unit">Unit</option>
-                    <option value="Meter">Meter</option>
-                    <option value="Batang">Batang</option>
-                  </select>
-                </div>
-              </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-[11px] text-slate-800 flex items-center gap-1.5">
+                        <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-[10px] font-black">
+                          {idx + 1}
+                        </span>
+                        <span>Item #{idx + 1}</span>
+                      </span>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Terkait Proyek / Surat Tugas:</label>
-                <select
-                  value={requestForm.taskTitle}
-                  onChange={(e) => setRequestForm({ ...requestForm, taskTitle: e.target.value })}
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-white font-medium focus:ring-2 focus:ring-dstech-red focus:outline-none"
-                >
-                  <option value="">Pilih Proyek Lapangan</option>
-                  {tasks.map((t) => (
-                    <option key={t.id} value={`${t.title} - ${t.client}`}>
-                      {t.title} ({t.client})
-                    </option>
-                  ))}
-                  <option value="Stok Cadangan Mobil Operasional">Stok Cadangan Mobil Operasional</option>
-                </select>
-              </div>
+                      {requestForm.items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveRequestItem(idx)}
+                          className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                          title="Hapus baris item ini"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus Baris</span>
+                        </button>
+                      )}
+                    </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Catatan / Alasan Keperluan:</label>
-                <textarea
-                  rows={2}
-                  placeholder="Contoh: Pengambilan kabel untuk penarikan jalur CCTV pabrik Posco..."
-                  value={requestForm.notes}
-                  onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
-                  className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-dstech-red focus:outline-none"
-                />
-              </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">
+                        Pilih Material / Alat Kerja dari Stok Gudang:
+                      </label>
+                      <select
+                        required
+                        value={item.materialId}
+                        onChange={(e) => handleItemSelectChange(idx, e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 focus:ring-2 focus:ring-dstech-red focus:outline-none text-xs"
+                      >
+                        <option value="">-- Pilih Material dari Stok Gudang --</option>
+                        {materials.map((m) => (
+                          <option key={m.id} value={m.id} disabled={m.stock <= 0}>
+                            {m.name} [Stok: {m.stock} {m.unit}] - {m.location} {m.stock <= 0 ? "(HABIS)" : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-              <div className="flex items-center justify-end gap-3 pt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                      <div>
+                        <label className="font-bold text-slate-700 block mb-1">Jumlah Diambil (Qty):</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            min={1}
+                            max={item.maxStock > 0 ? item.maxStock : undefined}
+                            required
+                            value={item.qty}
+                            onChange={(e) => handleItemQtyChange(idx, Number(e.target.value))}
+                            className="w-full p-2.5 rounded-xl border border-slate-200 font-black text-slate-900 focus:ring-2 focus:ring-dstech-red focus:outline-none text-xs bg-white"
+                          />
+                          <span className="px-3 py-2.5 rounded-xl bg-slate-200 font-bold text-slate-700 text-xs shrink-0">
+                            {item.unit || "Pcs"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div
+                          className={`p-2.5 rounded-xl border text-[11px] font-bold flex items-center justify-between ${
+                            item.maxStock <= 0
+                              ? "bg-red-50 border-red-200 text-red-700"
+                              : item.maxStock <= 2
+                              ? "bg-amber-50 border-amber-200 text-amber-700"
+                              : "bg-green-50 border-green-200 text-green-700"
+                          }`}
+                        >
+                          <span>Stok Gudang:</span>
+                          <span className="font-black">
+                            {item.maxStock} {item.unit}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add Item Button */}
                 <button
                   type="button"
-                  onClick={() => setIsRequestModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                  onClick={handleAddRequestItem}
+                  className="w-full py-2.5 px-4 rounded-xl border-2 border-dashed border-dstech-blue/50 hover:border-dstech-blue text-dstech-blue hover:bg-blue-50/70 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
-                  Batal
+                  <Plus className="w-4 h-4" />
+                  <span>+ Tambah Item Barang Lainnya</span>
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-dstech-red text-white font-bold hover:bg-red-700 shadow-md"
-                >
-                  Kirim Permohonan
-                </button>
+              </div>
+
+              {/* Shared Metadata */}
+              <div className="border-t border-slate-200/80 pt-3 space-y-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Terkait Proyek / Surat Tugas:</label>
+                  <select
+                    value={requestForm.taskTitle}
+                    onChange={(e) => setRequestForm({ ...requestForm, taskTitle: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium focus:ring-2 focus:ring-dstech-red focus:outline-none text-xs"
+                  >
+                    <option value="">Pilih Proyek Lapangan Terkait</option>
+                    {tasks.map((t) => (
+                      <option key={t.id} value={`${t.title} - ${t.client}`}>
+                        {t.title} ({t.client})
+                      </option>
+                    ))}
+                    <option value="Stok Cadangan Mobil Operasional">Stok Cadangan Mobil Operasional</option>
+                    <option value="Perbaikan & Maintenance Mandiri">Perbaikan & Maintenance Mandiri</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Catatan / Alasan Keperluan:</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Contoh: Pengambilan kabel & konektor untuk instalasi CCTV pabrik..."
+                    value={requestForm.notes}
+                    onChange={(e) => setRequestForm({ ...requestForm, notes: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-dstech-red focus:outline-none bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100 shrink-0">
+                <span className="text-[11px] font-bold text-slate-500">
+                  Total Permohonan: <strong className="text-slate-900">{requestForm.items.length} Macam Material</strong>
+                </span>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsRequestModalOpen(false)}
+                    className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-dstech-red text-white font-bold hover:bg-red-700 shadow-md flex items-center gap-2 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Kirim Permohonan ({requestForm.items.length} Item)</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

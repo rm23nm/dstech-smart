@@ -80,6 +80,58 @@
   ],
   "requests": [
     {
+      "id": "dstech_req_1792369228065",
+      "items": [
+        {
+          "materialId": "dstech_mat_1",
+          "materialName": "Kabel UTP Cat6 Belden Original (305m)",
+          "qty": 1,
+          "unit": "Roll"
+        },
+        {
+          "materialId": "dstech_mat_2",
+          "materialName": "Konektor RJ45 Cat6 Commscope Gold Plated",
+          "qty": 10,
+          "unit": "Pcs"
+        }
+      ],
+      "materialId": "dstech_mat_1",
+      "materialName": "Kabel UTP Cat6 Belden Original (305m) (+1 item lainnya)",
+      "qty": 11,
+      "unit": "Item",
+      "taskTitle": "Instalasi CCTV (4 Titik) - PT. Krakatau Posco Energy",
+      "requestedBy": "Ikhsan Maulidi",
+      "date": "2026-10-19",
+      "status": "Menunggu Approval",
+      "notes": "Uji coba permohonan multi-item via browser automation"
+    },
+    {
+      "id": "dstech_req_1792366626595",
+      "items": [
+        {
+          "materialId": "dstech_mat_1",
+          "materialName": "Kabel UTP Cat6 Belden Original (305m)",
+          "qty": 1,
+          "unit": "Roll"
+        },
+        {
+          "materialId": "dstech_mat_2",
+          "materialName": "Konektor RJ45 Cat6 Commscope Gold Plated",
+          "qty": 25,
+          "unit": "Pcs"
+        }
+      ],
+      "materialId": "dstech_mat_1",
+      "materialName": "Kabel UTP Cat6 Belden Original (305m) (+1 item lainnya)",
+      "qty": 26,
+      "unit": "Item",
+      "taskTitle": "Instalasi CCTV Krakatau Posco",
+      "requestedBy": "Ikhsan Maulidi",
+      "date": "2026-10-18",
+      "status": "Menunggu Approval",
+      "notes": "Uji multi-item permohonan material"
+    },
+    {
       "id": "dstech_req_1",
       "materialId": "dstech_mat_1",
       "materialName": "Kabel UTP Cat6 Belden Original (305m)",
