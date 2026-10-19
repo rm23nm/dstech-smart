@@ -35,6 +35,9 @@
 - **2026-10-19**: Penambahan Modul Master Data 'Daftar Klien' & 'Daftar Supplier' di Portal Keuangan & ERP Admin/Superadmin (`/admin/finance` & `/superadmin/finance`), Endpoint CRUD API (`/api/finance`), Integrasi Auto-Fill Pilihan Klien pada Faktur & Supplier pada PO, serta Pembuatan & Sinkronisasi Tabel `dstech_clients` dan `dstech_suppliers` ke Database MySQL Live `DStechSmart`. Menyediakan 2 tab terdedikasi baru: Tab "Daftar Klien" (direktori klien industri B2B, komersial, instansi, residensial, PIC, kontak WhatsApp, email, NPWP, kota, akumulasi faktur & piutang, modal tambah/edit/hapus klien) dan Tab "Daftar Supplier" (direktori vendor pemasok CCTV, kabel LAN, biometrik, aksesoris, PIC sales, rekening bank transfer pelunasan PO, termin TOP, akumulasi PO & hutang, modal tambah/edit/hapus vendor). Mengupgrade modal terbit Faktur Penjualan dengan quick selector Master Klien dan modal terbit PO dengan quick selector Master Supplier. Divalidasi `tsc --noEmit` 0 error, diuji via browser automation subagent, sinkronisasi ke tabel live `dstech_clients` & `dstech_suppliers` ber-prefix `dstech_`, di-push ke GitHub `rm23nm/dstech-smart`, dan dideploy sukses ke server VPS PM2 `dstech-main` (`https://dstechsmart.com/admin/finance`).
 - **2026-10-19**: Sistem Manajemen Faktur & Dokumen Keuangan Terpadu (Aksi Icon-Only, Pengajuan & Breakdown DP, Modal Terima Pembayaran Kas Masuk, Manajemen Nomor Rekening Resmi DSTech, Kop Surat & Background Watermark Slider, Fitur Approval & Tanda Tangan Digital Resmi via Canvas Pad / Master / Upload, serta Format Tata Letak Tanda Tangan Penerima & DSTech Sesuai Standar Administrasi Korporat). Tombol aksi baris faktur telah diubah menjadi icon-only (CreditCard, Printer, Edit3, Trash2, PenTool), modal terima pembayaran otomatis membukukan kas masuk ke `dstech_cash_flow`, modal pengaturan rekening bank DSTech (Mandiri, BCA, dll.), modal pengaturan background kop surat resmi (`/kop_surat_dstech.jpg`) dan slider watermark (5%-60%), alur approval tanda tangan digital interaktif (HTML5 Canvas Signature Pad gores tangan langsung di layar sentuh/mouse, tanda tangan master, atau upload berkas gambar), stempel bulat digital resmi PT DSTech Smart Perkasa bertumpuk, barcode kode verifikasi sistem (`DST-APP-YYYYMM-XXXX`), serta penyempurnaan lembar tanda tangan cetak faktur (Penerima: Nama Organisasi di bawah label Penerima/Klien, ruang tanda tangan, dan nama penandatangan + jabatan di bawah; DSTech: PT DSTech Smart Perkasa di atas, tanda tangan digital + stempel di tengah, nama direktur dan jabatan di bawah). Lolos uji kompilasi `tsc`, diuji subagent browser, di-push ke GitHub, dan di-deploy sukses ke server live VPS (`https://dstechsmart.com/admin/finance`).
 - **2026-10-19**: Penambahan Input Password User Baru pada Modal Admin & Pendaftaran Mitra, Pembuatan Endpoint Otentikasi Ketat (/api/auth/login), dan Penutupan Celah Akses Sembarang Akun. Menambahkan field kata sandi pada Modal Tambah Pengguna Baru (minimal 6 karakter dengan toggle mata Eye/EyeOff) dan opsi Ubah Password pada Modal Edit Pengguna di `/admin/users`, menambahkan badge keamanan `[🔒 Sandi Aktif]` pada tabel pengguna, menyinkronkan kata sandi pada pendaftaran mitra di `/affiliate/register`, memperbarui `src/app/api/users/route.ts` untuk menyimpan password secara persisten, membuat backend autentikasi resmi `/api/auth/login` yang memverifikasi email, password, status akun aktif, dan kecocokan hak akses role terhadap portal, serta mengganti mock simulasi login pada `/login/page.tsx` menjadi validasi API nyata ke database fisik `dstech_users`. Lolos pengujian 6 skenario HTTP (penolakan email tak terdaftar, password salah, role mismatch, login superadmin sukses, pembuatan user dengan password dan login ulang), validasi `npx tsc --noEmit` (0 error), dipush ke GitHub, dideploy ke live VPS PM2 `dstech-main` (PID 3512194), dan terverifikasi live di `https://dstechsmart.com/api/auth/login`.
+- **2026-10-19**: Manajemen Multi-Gudang & Cabang (CRUD Titik Gudang & Kantor Cabang) serta Fitur Unggah Gambar Kustom Kop Surat & Background Watermark Faktur Resmi. Menambahkan tombol aksi Tambah, Edit, dan Hapus pada Titik Gudang dan Kantor Cabang dengan modal formulir interaktif lengkap (kode gudang, alamat, PIC, valuasi stok), memperbaiki API `PUT /api/finance` settings handler agar singleton settings tersimpan sukses tanpa error ID, serta menambahkan input file unggah kop surat (PNG/JPG) dengan pembacaan DataURL dan pratinjau A4 live.
+- **2026-10-19**: Penyelarasan Total Akun Rekening Bank Resmi Perusahaan di Seluruh Transaksi & Sistem ERP Keuangan. Menghilangkan seluruh hardcode teks rekening bank lama (`Bank BCA DSTech` dan `Bank Mandiri PT DSTech Smart Perkasa`) pada backend API `/api/finance` dan frontend `/admin/finance`. Mengikat inisialisasi state dan pilihan transaksi (Catat Arus Kas, Pelunasan Faktur, Buat Faktur, dan Edit Faktur) secara 100% dinamis terhadap rekening bank aktif di `data.bank_accounts`. Menambahkan tombol pintas 'Atur Rekening Resmi' pada seluruh modal transaksi serta menambahkan Filter Rekening Bank / Kas Tunai dinamis pada Tab Buku Arus Kas beserta badge visual akun yang seragam. Lolos kompilasi `tsc` (0 error), dipush ke GitHub, dan dideploy ke server VPS live.
+- **2026-10-19**: Sistem Manajemen Pengadaan & Purchase Order (PO) Supplier Terpadu (Pencarian & Filter Status Real-time, Modal Edit PO Lengkap Repeater Barang & Auto-Kalkulasi PPN 11%, Otorisasi Approval & Tanda Tangan Digital Resmi via Canvas Pad / Master / Upload Berkas Gambar dengan Stempel Bulat & Barcode Verifikasi Sistem `DST-APP-...`, Fungsionalitas Hapus PO dengan Konfirmasi Aman, serta Format Cetak Lembar Purchase Order A4 Ber-Kop Surat Resmi DSTech). Menambahkan kolom 'Otorisasi & Approval' dan tombol aksi icon-only (Cetak, Approval, Edit, Hapus) pada tabel PO di portal keuangan (`/admin/finance`), memperbarui backend API (`/api/finance`) untuk PUT update kalkulasi total & DELETE purchase order, mengintegrasikan auto-fill Master Supplier (`dstech_suppliers`) pada modal edit PO, menyediakan pratinjau lembar cetak standar korporat ber-kop surat resmi PT DSTech Smart Perkasa lengkap syarat & ketentuan pengadaan dan dual signature acceptance. Divalidasi `npx tsc --noEmit` (0 error), diuji dengan browser subagent, disinkronkan ke GitHub `rm23nm/dstech-smart` commit `b7ae80f`, dan dideploy sukses ke server live VPS PM2 `dstech-main` (PID 3625729).
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
 **Status**: Selesai
@@ -921,14 +924,151 @@
 
 ---
 
-### 37. Catatan Penting
+### 37. Selesai: Modul Manajemen Multi-Gudang & Kantor Cabang (Tambah, Edit, Hapus Gudang & Cabang)
+- **Permintaan Pengguna**:
+  *"benar sekali, edit, tambah dan hapus"* (menanggapi opsi penambahan fitur Tambah, Edit, dan Hapus pada tab Gudang & Cabang).
+- **Tujuan**:
+  Menyediakan fungsionalitas CRUD lengkap (Tambah baru, Edit data, dan Hapus) untuk Titik Gudang Logistik dan Kantor Cabang pada tab "Gudang & Cabang" di portal Keuangan & ERP (`/admin/finance` dan `/superadmin/finance`), sehingga Superadmin dan Admin dapat mengelola jaringan multi-gudang dan kantor cabang perusahaan secara dinamis dan mandiri.
+- **Rincian Pekerjaan Selesai**:
+  1. [x] **Skema Data & Prefix Terisolasi**:
+     - Entitas gudang menggunakan ID ber-prefix `dstech_wh_...` dan kantor cabang ber-prefix `dstech_branch_...` di backend dan basis data.
+  2. [x] **Backend API Route (`/api/finance`)**:
+     - Menambahkan handler `actionType: "warehouse"` untuk `POST` (tambah gudang baru), `PUT` (edit gudang), dan `DELETE` (hapus gudang).
+     - Menambahkan handler `actionType: "branch"` untuk `POST` (tambah cabang baru), `PUT` (edit cabang), dan `DELETE` (hapus cabang).
+  3. [x] **Antarmuka & Tombol Aksi di Tab Gudang & Cabang (`/admin/finance/page.tsx`)**:
+     - Menambahkan tombol aksi utama: **`+ Tambah Titik Gudang`** dan **`+ Tambah Kantor Cabang`** pada header masing-masing seksi.
+     - Menambahkan tombol aksi icon-only pada tiap kartu gudang: ✏️ Edit Gudang dan 🗑️ Hapus Gudang.
+     - Menambahkan tombol aksi icon-only pada tiap kartu cabang: ✏️ Edit Cabang dan 🗑️ Hapus Cabang.
+  4. [x] **Modal Interaktif Formulir Gudang & Cabang**:
+     - Modal Tambah / Edit Titik Gudang: Kode Gudang, Nama Gudang, Tipe (Gudang Pusat, Gudang Transit, Depo Distribusi, Unit Mobile), Alamat, Kota, Nama PIC Gudang, No. Telepon, Estimasi Valuasi Stok, Catatan, Status.
+     - Modal Tambah / Edit Kantor Cabang: Kode Cabang, Nama Kantor Cabang, Kepala Cabang / Branch Manager, Alamat, Kota, Telepon/WA, Email Cabang, Wilayah Layanan (Coverage Area), Catatan, Status.
+  5. [x] **Pengujian Lokal & Validasi TypeScript**:
+     - Pengujian script otomatis Node.js membuktikan semua 6 operasi CRUD (POST, PUT, DELETE untuk Gudang & Cabang) sukses 100%.
+     - Kompilasi `npx tsc --noEmit` lolos 0 error.
+
+---
+
+### 38. Selesai: Modul Unggah Kustom Kop Surat & Sinkronisasi Rekening Bank Dinamis
+- **Permintaan Pengguna**:
+  1. *"tolong set agar bisa unggah kop suratnya"*
+  2. *"setelah di edit tidak bisa disimpan"*
+  3. *"akun rekening bank tidak sama"*
+- **Penyebab Masalah (Root Cause)**:
+  1. Pada API `PUT /api/finance`, terdapat validasi `if (!id || !updates)` di baris awal yang memblokir permintaan pembaruan pengaturan (`actionType === "settings"`) karena objek settings tidak memiliki `id`. Hal ini mengakibatkan error 400 *"ID dan data pembaruan wajib disertakan"* saat tombol "Simpan Pengaturan" diklik.
+  2. Modal "Pengaturan Kop Surat & Background" sebelumnya hanya memiliki input teks path/URL tanpa tombol unggah berkas gambar langsung (`<input type="file">`).
+  3. Pilihan rekening bank di modal Arus Kas, Faktur Penjualan, dan Pelunasan Faktur masih bersifat statis (hardcoded), sehingga tidak sinkron dengan data rekening resmi yang dikonfigurasi di "Pengaturan Rekening Bank Resmi".
+- **Rincian Perbaikan Selesai**:
+  1. [x] **Perbaikan API Settings (`src/app/api/finance/route.ts`)**:
+     - Memindahkan penanganan `actionType === "settings"` sebelum pengecekan `id`, sehingga pembaruan pengaturan dapat disimpan dengan sukses ke `dstech_finance_erp.json`.
+     - Pengujian API membuktikan PUT settings mengembalikan status 200 `{ success: true, message: 'Pengaturan berhasil diperbarui' }`.
+  2. [x] **Fitur Unggah File Kop Surat Gambar**:
+     - Menambahkan tombol `Unggah File Kop Surat (PNG/JPG)` dengan komponen file input tersembunyi dan handler `FileReader.readAsDataURL`.
+     - Pengguna dapat mengunggah gambar kop surat kustom langsung dari komputer/HP hingga ukuran 8MB.
+     - Gambar otomatis tampil di kotak preview dokumen proporsional A4 dan tersimpan secara persisten.
+     - Disediakan tombol "Reset Kop Standar" dan opsi transparansi watermark (5% s/d 60%).
+  3. [x] **Sinkronisasi Rekening Bank Dinamis**:
+     - Mengubah dropdown rekening bank pada modal Arus Kas (`isNewCashModalOpen`), modal Buat Faktur Penjualan (`isNewSaleModalOpen`), dan modal Edit Faktur (`isEditSaleModalOpen`) menjadi dinamis berdasarkan data `bankAccounts` yang aktif (`data.bank_accounts`).
+  4. [x] **Sinkronisasi State Modal**:
+     - Menggunakan `handleOpenSettingsModal` di seluruh tombol pemanggil modal agar data yang tampil selalu sinkron dengan state `financeSettings` terkini.
+
+### 39. Selesai: Penyelarasan Total Akun Rekening Bank Resmi Perusahaan di Seluruh Transaksi & Sistem
+- **Permintaan Pengguna**:
+  *"akun rekening bank tidak sama"* (disertai tangkapan layar modal Catat Arus Kas vs modal Pengaturan Rekening Bank Resmi).
+- **Status**: Selesai
+- **Identifikasi Masalah (Root Cause)**:
+  1. Pada Modal "Catat Transaksi Arus Kas" (`isNewCashModalOpen`), opsi rekening bank sebelumnya menggunakan format string statis yang berbeda dan default akun masih di-hardcode ke `"Bank Mandiri PT DSTech Smart Perkasa"`, sehingga tidak cocok dengan rekening yang telah diatur pengguna (misal Bank BCA `295-074-0321`).
+  2. Pada Backend API (`/api/finance/route.ts`), pencatatan kas masuk dari pelunasan invoice/penjualan masih di-hardcode ke string `"Bank BCA DSTech"` atau `"Bank Mandiri PT DSTech Smart Perkasa"` alih-alih mengambil rekening default aktif dari `data.bank_accounts`. Akibatnya riwayat transaksi di Buku Arus Kas menampilkan nama rekening yang tidak sama dengan rekening resmi perusahaan.
+  3. Pada Modal "Terima Pembayaran / Kas Masuk Pelunasan Faktur", value dropdown rekening menggunakan format `${acc.bankName} PT DSTech Smart Perkasa`, yang berbeda dengan format di Arus Kas `${acc.bankName} - ${acc.accountNumber} (${acc.accountHolder})`.
+  4. Pada Tab Buku Arus Kas belum terdapat filter berdasarkan akun rekening bank resmi, sehingga seluruh mutasi tercampur tanpa identifikasi akun bank yang spesifik.
+- **Rincian Perbaikan Selesai (Step-by-Step)**:
+  1. [x] **Backend API (`/api/finance/route.ts`)**:
+     - Menghapus seluruh hardcode `"Bank BCA DSTech"` dan `"Bank Mandiri PT DSTech Smart Perkasa"`.
+     - Membuat fungsi helper `getDefaultBankAccountLabel(data)` dan `formatAccountFromPaymentMethod(method, data)` yang otomatis mengambil rekening utama/default aktif secara dinamis dari `data.bank_accounts` (`${defaultBank.bankName} - ${defaultBank.accountNumber} (${defaultBank.accountHolder})`).
+     - Menyinkronkan mutasi kas masuk pelunasan invoice, pencatatan penjualan, dan konversi SPH ke rekening yang benar-benar dipilih pengguna.
+     - Memastikan selalu ada 1 akun bank default aktif saat penghapusan rekening dilakukan.
+  2. [x] **Frontend (`/admin/finance/page.tsx`)**:
+     - Menstandarisasi format tampilan dan nilai akun bank di seluruh sistem: `${b.bankName} - ${b.accountNumber} (${b.accountHolder})`.
+     - Mengikat inisialisasi state `cashForm.account`, `saleForm.paymentMethod`, dan `paymentForm.paymentMethod` ke rekening utama (default) yang aktif dari `bankAccounts`.
+     - Menyelaraskan dropdown pada Modal Catat Arus Kas (`isNewCashModalOpen`), Modal Terima Pembayaran (`isPayInvoiceModalOpen`), Modal Buat Faktur (`isNewSaleModalOpen`), dan Modal Edit Faktur (`isEditSaleModalOpen`).
+     - Menambahkan tombol pintas "Atur Rekening Resmi" di samping label pilihan rekening pada seluruh modal transaksi.
+     - Menambahkan Filter Akun Bank / Kas pada Tab Buku Arus Kas (`Semua Rekening`, per bank, atau `Kas Tunai / Petty Cash`) agar pengguna dapat memfilter mutasi per rekening bank resmi secara independen.
+     - Menampilkan badge visual ber-ikon bank atau dompet kas pada kolom "Rekening Akun" tabel Buku Arus Kas.
+  3. [x] **Validasi & Deployment**:
+     - Uji kompilasi TypeScript (`npx tsc --noEmit` lolos 0 error).
+     - Push ke GitHub repository `rm23nm/dstech-smart`.
+     - Deploy ke live server VPS via SSH & rebuild Next.js.
+     - Verifikasi live respon API dan halaman admin.
+
+---
+
+### 40. Selesai: Modul Pembelian & Purchase Order (PO) - Edit, Approval Tanda Tangan, Hapus, dan Lembar Cetak
+- **Permintaan Pengguna**:
+  *"di pembelian dan PO, masih belum bisa edit, aproval tandatangan, hapus, cetak"* (disertai tangkapan layar tab Pembelian & PO).
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Tujuan**:
+  Menyediakan fungsionalitas lengkap untuk Purchase Order (PO) kepada Supplier / Vendor:
+  1. Modal Edit PO (mengubah vendor, item, kuantitas, harga beli, termin pembayaran, tanggal jatuh tempo).
+  2. Modal Approval & Tanda Tangan Digital PO (otorisasi direksi/manager dengan tanda tangan canvas / master signature & stempel resmi).
+  3. Fungsionalitas Hapus PO dengan dialog konfirmasi dan sinkronisasi saldo pengeluaran / hutang dagang.
+  4. Lembar Cetak Resmi Dokumen Purchase Order ber-Kop Surat DSTech, QR Code verifikasi, dan legalitas stempel.
+- **Rincian Langkah Pengerjaan yang Telah Diselesaikan**:
+  1. [x] **Backend API (`/api/finance/route.ts`)**:
+     - Memperbarui handler `PUT` `actionType === "purchase"` agar melakukan auto-kalkulasi `subtotal`, `taxAmount` (11%), dan `grandTotal` saat item belanja diubah, serta mendukung update atribut PO lengkap.
+     - Menambahkan handler `DELETE` `actionType === "purchase"` untuk menghapus data PO secara aman berdasarkan ID atau no. PO.
+     - Memastikan endpoint `actionType === "approve_document"` terhubung sempurna dengan `documentType === "purchase"`.
+  2. [x] **Model Data & State Frontend (`/admin/finance/page.tsx`)**:
+     - Memperluas interface `PurchaseOrder` dengan atribut otorisasi: `approvalStatus`, `approvedBy`, `approvedTitle`, `approvedAt`, `verificationCode`, `signatureImage`, `approvalNotes`.
+     - Menambahkan state: `poSearchQuery`, `poStatusFilter`, `isEditPoModalOpen`, `editingPo`, `editPoForm`, `selectedPoForApproval`, `isApprovalPoModalOpen`, `selectedPoForPrint`, `isPrintPoModalOpen`.
+  3. [x] **Handler Fungsionalitas PO (`/admin/finance/page.tsx`)**:
+     - Handler Edit PO: `handleOpenEditPo`, `handleEditPoItemChange`, `handleAddEditPoItem`, `handleRemoveEditPoItem`, `calculateEditPoTotals`, `handleSaveEditPo`.
+     - Handler Approval PO: `handleOpenApprovalPo`, `handleApprovePo` (mendukung Canvas Signature Pad gores layar, Master Direktur, dan Upload Gambar berkas).
+     - Handler Hapus PO: `handleDeletePo` dengan konfirmasi `confirm()` dan toast feedback.
+     - Handler Cetak PO: `handleOpenPrintPo`.
+  4. [x] **Antarmuka Tabel PO (`activeTab === "purchases"`)**:
+     - Menambahkan filter pencarian & status PO real-time.
+     - Menambahkan kolom `Otorisasi & Approval` dengan badge status (Hijau emerald: Disetujui & Sah; Kuning amber: Menunggu Approval).
+     - Menambahkan kolom `Aksi` dengan tombol icon-only: 🖨️ Cetak Dokumen PO, ✍️ Approval & Tanda Tangan Digital, ✏️ Edit Data PO, 🗑️ Hapus PO.
+  5. [x] **Modal Interaktif Formulir Edit PO & Modal Approval PO**:
+     - Modal Edit PO dengan auto-fill Master Supplier (`dstech_suppliers`), tanggal pesan, estimasi tiba, repeater baris barang belanja, auto-math total & PPN 11%, dan catatan.
+     - Modal Approval PO dengan canvas gores tanda tangan sentuh/mouse, pemilihan master signature, stempel resmi, nama penandatangan, dan kode verifikasi.
+  6. [x] **Lembar Cetak Resmi Dokumen Purchase Order (PO A4)**:
+     - Menggunakan background Kop Surat resmi PT DSTech Smart Perkasa (`letterheadUrl`) & watermark slider.
+     - Kop perusahaan resmi Cilegon, NIB, NPWP, kontak CS.
+     - Judul resmi: `SURAT PESANAN PEMBELIAN (PURCHASE ORDER)`
+     - Tabel spesifikasi teknis barang pesanan lengkap nomor, deskripsi, kuantitas, harga, total, subtotal, PPN, grand total.
+     - Dual approval signature: Tanda Terima Vendor Supplier (kiri) dan Otorisasi DSTech (kanan) lengkap stempel digital bulat dan barcode sistem verifikasi.
+  7. [x] **Validasi, Uji Coba, Sinkronisasi GitHub, dan Deployment Live VPS**:
+     - Kompilasi TypeScript `npx tsc --noEmit` lolos 0 error.
+     - Uji coba via script dan browser automation subagent.
+     - Push commit ke GitHub `rm23nm/dstech-smart` commit `b7ae80f` via `push_with_native_git.js`.
+     - Deploy ke VPS `157.66.34.199:11587` & restart PM2 `dstech-main` (PID 3625729).
+     - Verifikasi live API dan visual antarmuka: status 200 OK.
+
+---
+
+### 41. Antrian Pekerjaan: Modul Retur Barang (Penjualan & Pembelian) - Edit, Approval Tanda Tangan, Hapus, dan Lembar Cetak
+- **Permintaan Pengguna**:
+  *"retur barang juga sama"* (menanggapi fungsionalitas retur penjualan dan retur pembelian ke supplier).
+- **Status**:
+  **Dalam Antrian** (akan dikerjakan setelah Task 40 selesai).
+- **Tujuan**:
+  Menyediakan fungsionalitas lengkap untuk Retur Penjualan (Customer Return / RMA) dan Retur Pembelian (Vendor Return / RMA):
+  1. Edit Data Retur Barang (kuantitas retur, alasan kerusakan, status penggantian/refund).
+  2. Approval & Otorisasi Tanda Tangan Digital Pemeriksaan QC / Gudang.
+  3. Hapus Transaksi Retur dengan dialog konfirmasi.
+  4. Cetak Formulir Tanda Terima / Berita Acara Retur Barang Resmi DSTech.
+
+---
+
+### 42. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
 - Folder utama proyek lokal: `dstech-smart` (Port lokal: **3005**).
 - Folder server live: `/www/wwwroot/dstechsmart.com` (Port live internal: **3005**).
 - Database MySQL aktif: `DStechSmart` (User: `DstechSmart`, Port: 3306) di live server aaPanel.
-- Seluruh tabel database wajib menggunakan prefix aplikasi: `dstech_` (contoh: `dstech_clients`, `dstech_suppliers`, `dstech_users`, `dstech_finance_sales`, `dstech_sph_...`, dll.).
+- Seluruh tabel database wajib menggunakan prefix aplikasi: `dstech_` (contoh: `dstech_clients`, `dstech_suppliers`, `dstech_users`, `dstech_finance_sales`, `dstech_sph_...`, `dstech_wh_...`, `dstech_branch_...`, dll.).
 - Aplikasi POS tetap mandiri dan tidak boleh diutak-atik.
 - Aplikasi live berjalan di PM2 dengan nama `dstech-main` (PID aktif, port internal 3005).
 - Port 3000 pada server digunakan oleh aplikasi `masjidkusmart-app` (jangan pernah ditabrak).
