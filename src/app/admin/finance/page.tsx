@@ -565,7 +565,7 @@ export default function AdminFinanceERPPage() {
     letterheadUrl: "/kop_surat_dstech.jpg",
     letterheadEnabled: true,
     watermarkOpacity: 0.15,
-    letterheadPaddingTop: 135,
+    letterheadPaddingTop: 90,
     letterheadPaddingBottom: 110,
     letterheadFitMode: "fill",
     signerName: "H. Agus Supriyadi, S.T., M.Kom.",
@@ -606,7 +606,7 @@ export default function AdminFinanceERPPage() {
     letterheadUrl: "/kop_surat_dstech.jpg",
     letterheadEnabled: true,
     watermarkOpacity: 0.15,
-    letterheadPaddingTop: 135,
+    letterheadPaddingTop: 90,
     letterheadPaddingBottom: 110,
     letterheadFitMode: "fill",
     signerName: "H. Agus Supriyadi, S.T., M.Kom.",
@@ -846,8 +846,16 @@ export default function AdminFinanceERPPage() {
             }
           }
           if (d.data.settings) {
-            setFinanceSettings(d.data.settings);
-            setTempSettings(d.data.settings);
+            const rawTop = d.data.settings.letterheadPaddingTop;
+            const normalizedTop = (!rawTop || rawTop === 135) ? 90 : rawTop;
+            const mergedSettings: FinanceSettings = {
+              ...d.data.settings,
+              letterheadPaddingTop: normalizedTop,
+              letterheadPaddingBottom: d.data.settings.letterheadPaddingBottom || 110,
+              letterheadFitMode: d.data.settings.letterheadFitMode || "fill",
+            };
+            setFinanceSettings(mergedSettings);
+            setTempSettings(mergedSettings);
           }
           if (d.data.summary) setSummary(d.data.summary);
         }
@@ -1505,7 +1513,7 @@ export default function AdminFinanceERPPage() {
   const handleOpenSettingsModal = () => {
     setTempSettings({
       ...financeSettings,
-      letterheadPaddingTop: financeSettings.letterheadPaddingTop || 135,
+      letterheadPaddingTop: financeSettings.letterheadPaddingTop || 90,
       letterheadPaddingBottom: financeSettings.letterheadPaddingBottom || 110,
       letterheadFitMode: financeSettings.letterheadFitMode || "fill",
       signerName: financeSettings.signerName !== undefined ? financeSettings.signerName : "H. Agus Supriyadi, S.T., M.Kom.",
@@ -1541,7 +1549,7 @@ export default function AdminFinanceERPPage() {
     try {
       const sanitizedSettings = {
         ...tempSettings,
-        letterheadPaddingTop: tempSettings.letterheadPaddingTop || 135,
+        letterheadPaddingTop: tempSettings.letterheadPaddingTop || 90,
         letterheadPaddingBottom: tempSettings.letterheadPaddingBottom || 110,
         letterheadFitMode: tempSettings.letterheadFitMode || "fill",
         signerName: tempSettings.signerName?.trim() || "H. Agus Supriyadi, S.T., M.Kom.",
@@ -5563,7 +5571,7 @@ export default function AdminFinanceERPPage() {
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-6 text-slate-800 overflow-hidden shadow-sm"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
               }}
             >
@@ -6497,7 +6505,7 @@ export default function AdminFinanceERPPage() {
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
               }}
             >
@@ -8317,7 +8325,7 @@ export default function AdminFinanceERPPage() {
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
               }}
             >
@@ -9652,7 +9660,7 @@ export default function AdminFinanceERPPage() {
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
               }}
             >
@@ -9938,7 +9946,7 @@ export default function AdminFinanceERPPage() {
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
               }}
             >
@@ -11180,7 +11188,7 @@ export default function AdminFinanceERPPage() {
                     <div className="flex items-center justify-between text-[11px]">
                       <label className="font-bold text-slate-700">Jarak Turun Header Atas:</label>
                       <span className="font-mono font-bold text-dstech-blue">
-                        {tempSettings.letterheadPaddingTop || 135}px
+                        {tempSettings.letterheadPaddingTop || 90}px
                       </span>
                     </div>
                     <input
@@ -11188,15 +11196,15 @@ export default function AdminFinanceERPPage() {
                       min="24"
                       max="240"
                       step="5"
-                      value={tempSettings.letterheadPaddingTop || 135}
+                      value={tempSettings.letterheadPaddingTop || 90}
                       onChange={(e) =>
-                        setTempSettings({ ...tempSettings, letterheadPaddingTop: parseInt(e.target.value) || 135 })
+                        setTempSettings({ ...tempSettings, letterheadPaddingTop: parseInt(e.target.value) || 90 })
                       }
                       className="w-full cursor-pointer"
                     />
                     <div className="flex justify-between text-[9px] text-slate-400">
                       <span>Rapat (24px)</span>
-                      <span>Standar (135px)</span>
+                      <span>Standar (90px)</span>
                       <span>Luas (240px)</span>
                     </div>
                   </div>
@@ -11232,13 +11240,13 @@ export default function AdminFinanceERPPage() {
                     onClick={() =>
                       setTempSettings((prev) => ({
                         ...prev,
-                        letterheadPaddingTop: 135,
+                        letterheadPaddingTop: 90,
                         letterheadPaddingBottom: 110,
                       }))
                     }
                     className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] cursor-pointer"
                   >
-                    Preset DSTech Resmi (Header 135px, Footer 110px)
+                    Preset DSTech Resmi (Header 90px, Footer 110px)
                   </button>
                   <button
                     type="button"

@@ -42,6 +42,7 @@
 - **2026-10-19**: Perbaikan Bug Controlled Input Nama Direktur Penandatangan & Jabatan Dokumen Legalitas (`/admin/finance`). Mengatasi masalah reset otomatis saat pengguna menghapus karakter dengan mengganti fallback string `||` menjadi `?? ""` dan menambahkan atribut `placeholder`. Memperbaiki handler modal & penyimpanan sanitasi sehingga pengguna dapat mengosongkan, mengedit, atau mengganti nama penandatangan dengan nama baru tanpa membal kembali ke string default. Lolos verifikasi kompilasi `tsc` 0 error, pengujian visual browser subagent, commit GitHub `1d3e700`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-19**: Penyesuaian Jarak Margin Header & Footer Lembar Cetak Dokumen Ber-Kop Surat (`/admin/finance`). Mengatur jarak padding atas (`paddingTop: 135px`) dan padding bawah (`paddingBottom: 110px`) secara dinamis pada seluruh 5 kontainer dokumen resmi (Faktur Penjualan, Surat Penawaran Harga SPH, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) agar teks judul/isi header tidak menimpa banner grafis atas kop surat dan blok tanda tangan direksi/verifikasi naik aman di atas banner grafis footer. Menambahkan kontrol slider interaktif dan 3 tombol preset di Modal Pengaturan Kop Surat sehingga margin dapat disesuaikan fleksibel sesuai variasi desain kop surat yang diunggah. Lolos validasi TypeScript `tsc` (0 error), diuji via browser subagent, dipush ke GitHub commit `57de659`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-19**: Perbaikan Background Kop Surat Terpotong di Samping Kiri dan Kanan pada Seluruh Lembar Cetak Dokumen Keuangan (`/admin/finance`). Mengatasi masalah terpotongnya logo DSP di sisi kiri dan teks legalitas NIB & NPWP di sisi kanan yang disebabkan oleh sifat `bg-cover` pada kontainer dokumen yang memiliki tinggi lebih panjang dari rasio asli kop surat. Memperbarui styling background gambar pada seluruh 5 template cetak resmi (Faktur Penjualan, SPH Quotation, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) menggunakan properti dinamis `backgroundSize: "100% 100%"` (mode Fill Bebas Terpotong) sehingga lebar gambar pas 100% dari tepi kiri ke tepi kanan tanpa clipping. Menambahkan atribut `letterheadFitMode` pada interface `FinanceSettings`, menambahkan kontrol pemilihan mode skala background kop surat (Pas 100% Lembar, Contain Proporsional, Cover Tinggi Penuh) pada Modal Pengaturan Dokumen & Legalitas, serta menguji tampilan visual via browser automation testing. Lolos validasi TypeScript `tsc` (0 error), disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
+- **2026-10-19**: Penyesuaian Jarak Margin Header Atas Lembar Dokumen Lebih Rapat ke Kop Surat (`letterheadPaddingTop: 90px`). Mengoptimalkan jarak margin atas header dokumen resmi (Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, dan Retur Pembelian) dari 135px menjadi 90px sesuai permintaan pengguna agar teks header perusahaan dan judul faktur naik lebih rapat dan pas di bawah banner grafis kop surat tanpa celah kosong berlebih dan tanpa menimpa elemen visual kop surat. Menyesuaikan nilai default, normalisasi state settings, slider interaktif, serta preset DSTech Resmi pada modal Pengaturan Dokumen & Legalitas. Lolos validasi TypeScript `tsc` (0 error), diuji via browser subagent, dipush ke GitHub, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
 **Status**: Selesai
@@ -1217,7 +1218,38 @@
 
 ---
 
-### 45. Catatan Penting
+### 45. Tugas: Penyesuaian Jarak Margin Header Atas Lembar Dokumen Lebih Rapat ke Kop Surat
+- **Permintaan Pengguna**:
+  *"bagian atasnya masih bisa dinaikkan sedikit, agar rapat dengan bagian atas"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Investigasi & Analisis Akar Masalah**:
+  - Pada perubahan sebelumnya (Task 43), `letterheadPaddingTop` dinaikkan menjadi 135px untuk mencegah teks menimpa banner grafis kop surat yang diunggah.
+  - Namun setelah kop surat disesuaikan menjadi 100% lebar lembar, banner grafis kop surat atas memiliki tinggi ~65px - 75px. Pengaturan 135px menyisakan ruang kosong putih sekitar 55px - 60px antara banner atas dan teks `PT. DSTECH SMART PERKASA` serta judul faktur.
+  - Pengguna meminta agar bagian atas tersebut dinaikkan sedikit agar lebih rapat ("rapat dengan bagian atas").
+- **Tindakan & Solusi**:
+  1. [x] **Pemeriksaan Riwayat & Pembuatan Backup**:
+     - Memastikan Task 44 selesai dan terdeploy.
+     - Membuat cadangan `_backup/LAPORAN_PROGRES.md.bak44` dan `_backup/admin_finance_page.tsx.bak15`.
+  2. [x] **Optimalisasi Nilai Default `letterheadPaddingTop` menjadi 90px**:
+     - Menurunkan padding atas dari 135px ke 90px pada initial state `financeSettings`, `tempSettings`, dan fallback styling seluruh 5 template cetak resmi (Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, dan Retur Pembelian).
+     - Menambahkan normalisasi otomatis saat data dimuat dari API (`fetchFinanceData`) agar nilai lama 135px otomatis bermigrasi ke 90px.
+  3. [x] **Penyelarasan Slider & Preset di Modal Pengaturan Kop Surat**:
+     - Memperbarui label penanda slider ("Standar (90px)") dan preset tombol "Preset DSTech Resmi (Header 90px, Footer 110px)".
+  4. [x] **Validasi Kompilasi TypeScript**:
+     - `npx tsc --noEmit` lolos dengan 0 error.
+  5. [x] **Pengujian Visual Browser Automation**:
+     - Memverifikasi tampilan modal cetak faktur di browser lokal: teks header naik pas dan rapi tanpa celah berlebih dan tanpa menabrak banner grafis kop surat.
+  6. [x] **Sinkronisasi Kode ke GitHub**:
+     - Commit dan push ke repository remote `rm23nm/dstech-smart` via `push_with_native_git.js`.
+  7. [x] **Deployment ke Server Live VPS**:
+     - Pull, build produksi Next.js, dan restart PM2 `dstech-main` pada server 157.66.34.199.
+  8. [x] **Penyelesaian Laporan & Notifikasi Pengguna**:
+     - Update status menjadi Selesai.
+
+---
+
+### 46. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
