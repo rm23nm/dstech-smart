@@ -412,6 +412,60 @@ export async function POST(request: Request) {
         });
       }
 
+      if (documentType === "return_sales") {
+        const returnsSales = data.returns_sales || [];
+        const index = returnsSales.findIndex((r: any) => r.id === id || r.returnNumber === id);
+        if (index === -1) {
+          return NextResponse.json({ success: false, error: "Data retur penjualan tidak ditemukan" }, { status: 404 });
+        }
+
+        returnsSales[index].approvalStatus = "Disetujui & Sah";
+        returnsSales[index].approvedBy = signer;
+        returnsSales[index].approvedTitle = title;
+        returnsSales[index].approvedAt = approvedAt;
+        returnsSales[index].verificationCode = verificationCode;
+        if (signatureImage) {
+          returnsSales[index].signatureImage = signatureImage;
+        }
+        if (notes) {
+          returnsSales[index].approvalNotes = notes;
+        }
+
+        writeFinanceData(data);
+        return NextResponse.json({
+          success: true,
+          message: `Berita Acara Retur Penjualan ${returnsSales[index].returnNumber} berhasil disetujui & disahkan oleh ${signer}`,
+          data: returnsSales[index],
+        });
+      }
+
+      if (documentType === "return_purchase") {
+        const returnsPurchase = data.returns_purchase || [];
+        const index = returnsPurchase.findIndex((r: any) => r.id === id || r.returnNumber === id);
+        if (index === -1) {
+          return NextResponse.json({ success: false, error: "Data retur pembelian tidak ditemukan" }, { status: 404 });
+        }
+
+        returnsPurchase[index].approvalStatus = "Disetujui & Sah";
+        returnsPurchase[index].approvedBy = signer;
+        returnsPurchase[index].approvedTitle = title;
+        returnsPurchase[index].approvedAt = approvedAt;
+        returnsPurchase[index].verificationCode = verificationCode;
+        if (signatureImage) {
+          returnsPurchase[index].signatureImage = signatureImage;
+        }
+        if (notes) {
+          returnsPurchase[index].approvalNotes = notes;
+        }
+
+        writeFinanceData(data);
+        return NextResponse.json({
+          success: true,
+          message: `Berita Acara Retur Pembelian ${returnsPurchase[index].returnNumber} berhasil disetujui & disahkan oleh ${signer}`,
+          data: returnsPurchase[index],
+        });
+      }
+
       return NextResponse.json({ success: false, error: "Tipe dokumen tidak dikenali" }, { status: 400 });
     }
 
@@ -1038,6 +1092,44 @@ export async function PUT(request: Request) {
       });
     }
 
+    if (actionType === "return_sales") {
+      const index = (data.returns_sales || []).findIndex((r: any) => r.id === id || r.returnNumber === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Retur penjualan tidak ditemukan" }, { status: 404 });
+      }
+
+      data.returns_sales[index] = {
+        ...data.returns_sales[index],
+        ...updates,
+      };
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Retur penjualan ${data.returns_sales[index].returnNumber} berhasil diperbarui`,
+        data: data.returns_sales[index],
+      });
+    }
+
+    if (actionType === "return_purchase") {
+      const index = (data.returns_purchase || []).findIndex((r: any) => r.id === id || r.returnNumber === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Retur pembelian tidak ditemukan" }, { status: 404 });
+      }
+
+      data.returns_purchase[index] = {
+        ...data.returns_purchase[index],
+        ...updates,
+      };
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Retur pembelian ${data.returns_purchase[index].returnNumber} berhasil diperbarui`,
+        data: data.returns_purchase[index],
+      });
+    }
+
     return NextResponse.json({ success: false, error: "Tipe aksi tidak dikenali" }, { status: 400 });
   } catch (err) {
     console.error("Error updating finance record:", err);
@@ -1138,6 +1230,26 @@ export async function DELETE(request: Request) {
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Kantor Cabang berhasil dihapus" });
+    }
+
+    if (actionType === "return_sales") {
+      const initialLen = (data.returns_sales || []).length;
+      data.returns_sales = (data.returns_sales || []).filter((r: any) => r.id !== id && r.returnNumber !== id);
+      if (data.returns_sales.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Retur penjualan tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Retur penjualan berhasil dihapus" });
+    }
+
+    if (actionType === "return_purchase") {
+      const initialLen = (data.returns_purchase || []).length;
+      data.returns_purchase = (data.returns_purchase || []).filter((r: any) => r.id !== id && r.returnNumber !== id);
+      if (data.returns_purchase.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Retur pembelian tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Retur pembelian berhasil dihapus" });
     }
 
     return NextResponse.json({ success: false, error: "Tipe aksi DELETE tidak dikenali" }, { status: 400 });

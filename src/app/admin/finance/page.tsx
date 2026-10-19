@@ -193,6 +193,8 @@ interface SalesReturn {
   returnNumber: string;
   invoiceNumber: string;
   customerName: string;
+  customerPhone?: string;
+  customerAddress?: string;
   date: string;
   productName: string;
   qty: number;
@@ -203,6 +205,14 @@ interface SalesReturn {
   resolution: string;
   status: string;
   handledBy: string;
+  notes?: string;
+  approvalStatus?: string;
+  approvedBy?: string;
+  approvedTitle?: string;
+  approvedAt?: string;
+  verificationCode?: string;
+  signatureImage?: string;
+  approvalNotes?: string;
 }
 
 interface PurchaseReturn {
@@ -210,6 +220,8 @@ interface PurchaseReturn {
   returnNumber: string;
   poNumber: string;
   supplierName: string;
+  supplierContact?: string;
+  supplierAddress?: string;
   date: string;
   productName: string;
   qty: number;
@@ -220,6 +232,14 @@ interface PurchaseReturn {
   resolution: string;
   status: string;
   handledBy: string;
+  notes?: string;
+  approvalStatus?: string;
+  approvedBy?: string;
+  approvedTitle?: string;
+  approvedAt?: string;
+  verificationCode?: string;
+  signatureImage?: string;
+  approvalNotes?: string;
 }
 
 interface CashTransaction {
@@ -415,6 +435,96 @@ export default function AdminFinanceERPPage() {
   const [isNewCashModalOpen, setIsNewCashModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<SaleInvoice | null>(null);
   const [cashAccountFilter, setCashAccountFilter] = useState<string>("ALL");
+
+  // Retur Penjualan (Customer Returns) States
+  const [isNewReturnSaleModalOpen, setIsNewReturnSaleModalOpen] = useState<boolean>(false);
+  const [isEditReturnSaleModalOpen, setIsEditReturnSaleModalOpen] = useState<boolean>(false);
+  const [editingReturnSale, setEditingReturnSale] = useState<SalesReturn | null>(null);
+  const [returnSaleForm, setReturnSaleForm] = useState<{
+    id: string;
+    returnNumber: string;
+    invoiceNumber: string;
+    customerName: string;
+    customerPhone: string;
+    customerAddress: string;
+    date: string;
+    productName: string;
+    qty: number;
+    unit: string;
+    price: number;
+    totalRefund: number;
+    reason: string;
+    resolution: string;
+    status: string;
+    handledBy: string;
+    notes: string;
+  }>({
+    id: "",
+    returnNumber: "",
+    invoiceNumber: "",
+    customerName: "",
+    customerPhone: "",
+    customerAddress: "",
+    date: new Date().toISOString().split("T")[0],
+    productName: "",
+    qty: 1,
+    unit: "Unit",
+    price: 0,
+    totalRefund: 0,
+    reason: "Cacat Fungsi / Tidak Menyala",
+    resolution: "Ganti Barang Baru",
+    status: "Sedang Diproses",
+    handledBy: "DSTech QC & Logistik",
+    notes: "",
+  });
+  const [selectedReturnSaleForApproval, setSelectedReturnSaleForApproval] = useState<SalesReturn | null>(null);
+  const [isApprovalReturnSaleModalOpen, setIsApprovalReturnSaleModalOpen] = useState<boolean>(false);
+  const [selectedReturnSaleForPrint, setSelectedReturnSaleForPrint] = useState<SalesReturn | null>(null);
+
+  // Retur Pembelian (Vendor Returns) States
+  const [isNewReturnPurchaseModalOpen, setIsNewReturnPurchaseModalOpen] = useState<boolean>(false);
+  const [isEditReturnPurchaseModalOpen, setIsEditReturnPurchaseModalOpen] = useState<boolean>(false);
+  const [editingReturnPurchase, setEditingReturnPurchase] = useState<PurchaseReturn | null>(null);
+  const [returnPurchaseForm, setReturnPurchaseForm] = useState<{
+    id: string;
+    returnNumber: string;
+    poNumber: string;
+    supplierName: string;
+    supplierContact: string;
+    supplierAddress: string;
+    date: string;
+    productName: string;
+    qty: number;
+    unit: string;
+    price: number;
+    totalCredit: number;
+    reason: string;
+    resolution: string;
+    status: string;
+    handledBy: string;
+    notes: string;
+  }>({
+    id: "",
+    returnNumber: "",
+    poNumber: "",
+    supplierName: "",
+    supplierContact: "",
+    supplierAddress: "",
+    date: new Date().toISOString().split("T")[0],
+    productName: "",
+    qty: 1,
+    unit: "Unit",
+    price: 0,
+    totalCredit: 0,
+    reason: "Cacat Pabrik / Dead on Arrival (DOA)",
+    resolution: "Klaim Garansi Tukar Baru",
+    status: "Dalam Proses RMA Vendor",
+    handledBy: "DSTech Gudang",
+    notes: "",
+  });
+  const [selectedReturnPurchaseForApproval, setSelectedReturnPurchaseForApproval] = useState<PurchaseReturn | null>(null);
+  const [isApprovalReturnPurchaseModalOpen, setIsApprovalReturnPurchaseModalOpen] = useState<boolean>(false);
+  const [selectedReturnPurchaseForPrint, setSelectedReturnPurchaseForPrint] = useState<PurchaseReturn | null>(null);
 
   // Bank Accounts & Settings States
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
@@ -1906,6 +2016,429 @@ export default function AdminFinanceERPPage() {
     setSelectedPoForPrint(po);
   };
 
+  // Retur Penjualan (Customer Return) Handlers
+  const handleOpenAddReturnSale = () => {
+    const firstInv = sales[0];
+    const firstItem = firstInv?.items[0];
+    setReturnSaleForm({
+      id: "",
+      returnNumber: `RET-S-${new Date().toISOString().slice(0, 7).replace("-", "")}-${Math.floor(100 + Math.random() * 900)}`,
+      invoiceNumber: firstInv?.invoiceNumber || "",
+      customerName: firstInv?.customerName || "",
+      customerPhone: firstInv?.customerPhone || "",
+      customerAddress: firstInv?.customerAddress || "",
+      date: new Date().toISOString().split("T")[0],
+      productName: firstItem ? firstItem.productName : "Kamera CCTV / Perangkat Jaringan",
+      qty: 1,
+      unit: firstItem?.unit || "Unit",
+      price: firstItem?.price || 0,
+      totalRefund: firstItem?.price || 0,
+      reason: "Cacat Fungsi / Tidak Menyala",
+      resolution: "Ganti Barang Baru",
+      status: "Sedang Diproses",
+      handledBy: "DSTech QC & Logistik",
+      notes: "Unit diterima untuk uji teknis laboratorium dan klaim garansi resmi.",
+    });
+    setIsNewReturnSaleModalOpen(true);
+  };
+
+  const handleSelectInvoiceForReturnSale = (invNumber: string) => {
+    const inv = sales.find((s) => s.invoiceNumber === invNumber);
+    if (inv) {
+      const it = inv.items[0];
+      setReturnSaleForm((prev) => ({
+        ...prev,
+        invoiceNumber: inv.invoiceNumber,
+        customerName: inv.customerName,
+        customerPhone: inv.customerPhone || "",
+        customerAddress: inv.customerAddress || "",
+        productName: it ? it.productName : prev.productName,
+        unit: it ? it.unit : prev.unit,
+        price: it ? it.price : prev.price,
+        totalRefund: (it ? it.price : prev.price) * prev.qty,
+      }));
+    }
+  };
+
+  const handleCreateReturnSaleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "return_sales",
+          payload: returnSaleForm,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setReturnsSales((prev) => [json.data, ...prev]);
+        setIsNewReturnSaleModalOpen(false);
+        showToast(json.message || "Retur penjualan berhasil dicatat!");
+      } else {
+        showToast(json.error || "Gagal mencatat retur penjualan");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat mencatat retur penjualan");
+    }
+  };
+
+  const handleOpenEditReturnSale = (ret: SalesReturn) => {
+    setEditingReturnSale(ret);
+    setReturnSaleForm({
+      id: ret.id,
+      returnNumber: ret.returnNumber,
+      invoiceNumber: ret.invoiceNumber,
+      customerName: ret.customerName,
+      customerPhone: ret.customerPhone || "",
+      customerAddress: ret.customerAddress || "",
+      date: ret.date,
+      productName: ret.productName,
+      qty: ret.qty,
+      unit: ret.unit,
+      price: ret.price,
+      totalRefund: ret.totalRefund,
+      reason: ret.reason,
+      resolution: ret.resolution,
+      status: ret.status,
+      handledBy: ret.handledBy,
+      notes: ret.notes || "",
+    });
+    setIsEditReturnSaleModalOpen(true);
+  };
+
+  const handleSaveEditReturnSale = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingReturnSale) return;
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "return_sales",
+          id: editingReturnSale.id,
+          updates: returnSaleForm,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setReturnsSales((prev) =>
+          prev.map((r) => (r.id === editingReturnSale.id ? json.data : r))
+        );
+        if (selectedReturnSaleForPrint && selectedReturnSaleForPrint.id === editingReturnSale.id) {
+          setSelectedReturnSaleForPrint(json.data);
+        }
+        setIsEditReturnSaleModalOpen(false);
+        showToast(json.message || "Retur penjualan berhasil diperbarui");
+      } else {
+        showToast(json.error || "Gagal memperbarui retur penjualan");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat memperbarui retur");
+    }
+  };
+
+  const handleDeleteReturnSale = async (ret: SalesReturn) => {
+    if (!confirm(`Hapus berkas retur penjualan ${ret.returnNumber} (${ret.customerName})?`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=return_sales&id=${ret.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setReturnsSales((prev) => prev.filter((r) => r.id !== ret.id));
+        showToast(json.message || "Retur penjualan berhasil dihapus");
+      } else {
+        showToast(json.error || "Gagal menghapus retur penjualan");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menghapus retur");
+    }
+  };
+
+  const handleOpenApprovalReturnSale = (ret: SalesReturn) => {
+    setSelectedReturnSaleForApproval(ret);
+    setSignerNameInput(ret.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom.");
+    setSignerTitleInput(ret.approvedTitle || "Kepala Penjamin Mutu & QC");
+    setApprovalNotesInput(ret.approvalNotes || "Pemeriksaan unit selesai. Klaim garansi / retur disetujui & sah.");
+    setUploadedSignatureBase64(ret.signatureImage || "");
+    setApprovalMode("canvas");
+    setIsApprovalReturnSaleModalOpen(true);
+    setHasDrawn(false);
+    setTimeout(() => {
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext("2d");
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+    }, 150);
+  };
+
+  const handleApproveReturnSale = async () => {
+    if (!selectedReturnSaleForApproval) return;
+    setIsSubmittingApproval(true);
+    try {
+      let signatureImage = "";
+      if (approvalMode === "canvas" && canvasRef.current && hasDrawn) {
+        signatureImage = canvasRef.current.toDataURL("image/png");
+      } else if (approvalMode === "upload") {
+        signatureImage = uploadedSignatureBase64;
+      } else if (approvalMode === "master") {
+        signatureImage = financeSettings.masterSignatureUrl || "";
+      }
+
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "approve_document",
+          payload: {
+            id: selectedReturnSaleForApproval.id,
+            documentType: "return_sales",
+            signatureImage,
+            signerName: signerNameInput,
+            signerTitle: signerTitleInput,
+            notes: approvalNotesInput,
+          },
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setReturnsSales((prev) =>
+          prev.map((r) => (r.id === selectedReturnSaleForApproval.id ? json.data : r))
+        );
+        if (selectedReturnSaleForPrint && selectedReturnSaleForPrint.id === selectedReturnSaleForApproval.id) {
+          setSelectedReturnSaleForPrint(json.data);
+        }
+        setIsApprovalReturnSaleModalOpen(false);
+        showToast(json.message || "Berita Acara Retur Penjualan berhasil disahkan!");
+      } else {
+        showToast(json.error || "Gagal menyetujui retur penjualan");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat approval retur penjualan");
+    } finally {
+      setIsSubmittingApproval(false);
+    }
+  };
+
+  const handleOpenPrintReturnSale = (ret: SalesReturn) => {
+    setSelectedReturnSaleForPrint(ret);
+  };
+
+  // Retur Pembelian (Vendor Return) Handlers
+  const handleOpenAddReturnPurchase = () => {
+    const firstPo = purchases[0];
+    const firstItem = firstPo?.items[0];
+    setReturnPurchaseForm({
+      id: "",
+      returnNumber: `RET-P-${new Date().toISOString().slice(0, 7).replace("-", "")}-${Math.floor(100 + Math.random() * 900)}`,
+      poNumber: firstPo?.poNumber || "",
+      supplierName: firstPo?.supplierName || (suppliers[0]?.name || ""),
+      supplierContact: firstPo?.supplierContact || (suppliers[0]?.phone || ""),
+      supplierAddress: suppliers[0]?.address || "",
+      date: new Date().toISOString().split("T")[0],
+      productName: firstItem ? firstItem.productName : "Perangkat Elektronik / Modul",
+      qty: 1,
+      unit: firstItem?.unit || "Unit",
+      price: firstItem?.price || 0,
+      totalCredit: firstItem?.price || 0,
+      reason: "Cacat Pabrik / Dead on Arrival (DOA)",
+      resolution: "Klaim Garansi Tukar Baru",
+      status: "Dalam Proses RMA Vendor",
+      handledBy: "DSTech Gudang & Logistik",
+      notes: "Unit dikirim kembali ke vendor untuk proses klaim garansi RMA resmi.",
+    });
+    setIsNewReturnPurchaseModalOpen(true);
+  };
+
+  const handleSelectPoForReturnPurchase = (poNumber: string) => {
+    const po = purchases.find((p) => p.poNumber === poNumber);
+    if (po) {
+      const it = po.items[0];
+      const supp = suppliers.find((s) => s.name === po.supplierName);
+      setReturnPurchaseForm((prev) => ({
+        ...prev,
+        poNumber: po.poNumber,
+        supplierName: po.supplierName,
+        supplierContact: po.supplierContact || (supp?.phone || ""),
+        supplierAddress: supp?.address || "",
+        productName: it ? it.productName : prev.productName,
+        unit: it ? it.unit : prev.unit,
+        price: it ? it.price : prev.price,
+        totalCredit: (it ? it.price : prev.price) * prev.qty,
+      }));
+    }
+  };
+
+  const handleCreateReturnPurchaseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "return_purchase",
+          payload: returnPurchaseForm,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setReturnsPurchase((prev) => [json.data, ...prev]);
+        setIsNewReturnPurchaseModalOpen(false);
+        showToast(json.message || "Retur pembelian ke supplier berhasil dicatat!");
+      } else {
+        showToast(json.error || "Gagal mencatat retur pembelian");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat mencatat retur pembelian");
+    }
+  };
+
+  const handleOpenEditReturnPurchase = (ret: PurchaseReturn) => {
+    setEditingReturnPurchase(ret);
+    setReturnPurchaseForm({
+      id: ret.id,
+      returnNumber: ret.returnNumber,
+      poNumber: ret.poNumber,
+      supplierName: ret.supplierName,
+      supplierContact: ret.supplierContact || "",
+      supplierAddress: ret.supplierAddress || "",
+      date: ret.date,
+      productName: ret.productName,
+      qty: ret.qty,
+      unit: ret.unit,
+      price: ret.price,
+      totalCredit: ret.totalCredit,
+      reason: ret.reason,
+      resolution: ret.resolution,
+      status: ret.status,
+      handledBy: ret.handledBy,
+      notes: ret.notes || "",
+    });
+    setIsEditReturnPurchaseModalOpen(true);
+  };
+
+  const handleSaveEditReturnPurchase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingReturnPurchase) return;
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "return_purchase",
+          id: editingReturnPurchase.id,
+          updates: returnPurchaseForm,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setReturnsPurchase((prev) =>
+          prev.map((r) => (r.id === editingReturnPurchase.id ? json.data : r))
+        );
+        if (selectedReturnPurchaseForPrint && selectedReturnPurchaseForPrint.id === editingReturnPurchase.id) {
+          setSelectedReturnPurchaseForPrint(json.data);
+        }
+        setIsEditReturnPurchaseModalOpen(false);
+        showToast(json.message || "Retur pembelian berhasil diperbarui");
+      } else {
+        showToast(json.error || "Gagal memperbarui retur pembelian");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat memperbarui retur pembelian");
+    }
+  };
+
+  const handleDeleteReturnPurchase = async (ret: PurchaseReturn) => {
+    if (!confirm(`Hapus berkas retur pembelian ${ret.returnNumber} (${ret.supplierName})?`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=return_purchase&id=${ret.id}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        setReturnsPurchase((prev) => prev.filter((r) => r.id !== ret.id));
+        showToast(json.message || "Retur pembelian berhasil dihapus");
+      } else {
+        showToast(json.error || "Gagal menghapus retur pembelian");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menghapus retur pembelian");
+    }
+  };
+
+  const handleOpenApprovalReturnPurchase = (ret: PurchaseReturn) => {
+    setSelectedReturnPurchaseForApproval(ret);
+    setSignerNameInput(ret.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom.");
+    setSignerTitleInput(ret.approvedTitle || "Kepala Logistik & Pengadaan");
+    setApprovalNotesInput(ret.approvalNotes || "Dokumen retur pengembalian vendor disetujui & sah untuk klaim RMA.");
+    setUploadedSignatureBase64(ret.signatureImage || "");
+    setApprovalMode("canvas");
+    setIsApprovalReturnPurchaseModalOpen(true);
+    setHasDrawn(false);
+    setTimeout(() => {
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext("2d");
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+    }, 150);
+  };
+
+  const handleApproveReturnPurchase = async () => {
+    if (!selectedReturnPurchaseForApproval) return;
+    setIsSubmittingApproval(true);
+    try {
+      let signatureImage = "";
+      if (approvalMode === "canvas" && canvasRef.current && hasDrawn) {
+        signatureImage = canvasRef.current.toDataURL("image/png");
+      } else if (approvalMode === "upload") {
+        signatureImage = uploadedSignatureBase64;
+      } else if (approvalMode === "master") {
+        signatureImage = financeSettings.masterSignatureUrl || "";
+      }
+
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "approve_document",
+          payload: {
+            id: selectedReturnPurchaseForApproval.id,
+            documentType: "return_purchase",
+            signatureImage,
+            signerName: signerNameInput,
+            signerTitle: signerTitleInput,
+            notes: approvalNotesInput,
+          },
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setReturnsPurchase((prev) =>
+          prev.map((r) => (r.id === selectedReturnPurchaseForApproval.id ? json.data : r))
+        );
+        if (selectedReturnPurchaseForPrint && selectedReturnPurchaseForPrint.id === selectedReturnPurchaseForApproval.id) {
+          setSelectedReturnPurchaseForPrint(json.data);
+        }
+        setIsApprovalReturnPurchaseModalOpen(false);
+        showToast(json.message || "Berita Acara Retur Pembelian berhasil disahkan!");
+      } else {
+        showToast(json.error || "Gagal menyetujui retur pembelian");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat approval retur pembelian");
+    } finally {
+      setIsSubmittingApproval(false);
+    }
+  };
+
+  const handleOpenPrintReturnPurchase = (ret: PurchaseReturn) => {
+    setSelectedReturnPurchaseForPrint(ret);
+  };
+
   // Client Master Handlers
   const handleOpenAddClient = () => {
     setEditingClient(null);
@@ -3307,72 +3840,386 @@ export default function AdminFinanceERPPage() {
         {/* TAB 3: RETUR PENJUALAN & RETUR PEMBELIAN */}
         {activeTab === "returns" && (
           <div className="space-y-6">
+            {/* Top Summary Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-red-50 to-rose-100/60 border border-red-200/80 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-red-700">Retur Penjualan (Klien)</p>
+                  <p className="text-xl font-black text-red-950 mt-1">
+                    {formatRupiah(returnsSales.reduce((acc, r) => acc + (Number(r.totalRefund) || 0), 0))}
+                  </p>
+                  <p className="text-[10px] text-red-600 font-bold mt-0.5">{returnsSales.length} kasus klaim pelanggan</p>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-red-600 text-white flex items-center justify-center shadow-md shadow-red-500/20">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/60 border border-amber-200/80 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-amber-800">Retur Pembelian (Vendor)</p>
+                  <p className="text-xl font-black text-amber-950 mt-1">
+                    {formatRupiah(returnsPurchase.reduce((acc, r) => acc + (Number(r.totalCredit) || 0), 0))}
+                  </p>
+                  <p className="text-[10px] text-amber-700 font-bold mt-0.5">{returnsPurchase.length} klaim RMA supplier</p>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-amber-600 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
+                  <Truck className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-100/60 border border-emerald-200/80 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-wider text-emerald-800">Otorisasi & Sah</p>
+                  <p className="text-xl font-black text-emerald-950 mt-1">
+                    {
+                      returnsSales.filter((r) => r.approvalStatus === "Disetujui & Sah").length +
+                      returnsPurchase.filter((r) => r.approvalStatus === "Disetujui & Sah").length
+                    }{" "}
+                    / {returnsSales.length + returnsPurchase.length}
+                  </p>
+                  <p className="text-[10px] text-emerald-700 font-bold mt-0.5">Dokumen berstempel & sah digital</p>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Retur Penjualan (Dari Pelanggan) */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              {/* Retur Penjualan (Dari Pelanggan / Klien) */}
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                    <h3 className="font-black text-sm text-slate-900">Retur Penjualan (Dari Klien)</h3>
+                    <div className="w-3 h-3 rounded-full bg-red-500 ring-4 ring-red-100"></div>
+                    <div>
+                      <h3 className="font-black text-sm text-slate-900">Retur Penjualan (Dari Klien)</h3>
+                      <p className="text-[11px] text-slate-500">Klaim cacat fungsi, garansi, & permohonan retur konsumen</p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold text-slate-500">{returnsSales.length} Kasus</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
+                      {returnsSales.length} Kasus
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleOpenAddReturnSale}
+                      className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition-all hover:scale-105"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Catat Retur</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  {returnsSales.map((ret) => (
-                    <div key={ret.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-black text-red-600">{ret.returnNumber}</span>
-                        <span className="text-[10px] font-bold bg-green-100 text-green-800 px-2 py-0.5 rounded-md">
-                          {ret.status}
-                        </span>
-                      </div>
-                      <p className="font-bold text-slate-900 text-xs">
-                        {ret.customerName} (Ref: {ret.invoiceNumber})
-                      </p>
-                      <div className="p-2.5 rounded-xl bg-white border border-slate-100 text-xs space-y-1">
-                        <p className="font-bold text-slate-800">
-                          {ret.productName} ({ret.qty} {ret.unit})
-                        </p>
-                        <p className="text-[11px] text-slate-500">Alasan: {ret.reason}</p>
-                        <p className="text-[11px] text-dstech-blue font-bold">Solusi: {ret.resolution}</p>
-                      </div>
+                <div className="space-y-3">
+                  {returnsSales.length === 0 ? (
+                    <div className="p-8 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-2">
+                      <RotateCcw className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-500">Belum ada riwayat retur penjualan dari klien</p>
                     </div>
-                  ))}
+                  ) : (
+                    returnsSales.map((ret) => (
+                      <div
+                        key={ret.id}
+                        className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition-all space-y-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg border border-red-100">
+                              {ret.returnNumber}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-medium">({ret.date})</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                ret.status === "Selesai Diganti" || ret.status === "Selesai Diterima & Diganti"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : ret.status === "Ditolak"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {ret.status}
+                            </span>
+
+                            {ret.approvalStatus === "Disetujui & Sah" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800">
+                                <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>Sah</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApprovalReturnSale(ret)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer"
+                                title="Klik untuk tanda tangani berkas retur"
+                              >
+                                <Clock className="w-2.5 h-2.5 text-amber-600" />
+                                <span>Pending QC</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="font-black text-slate-900 text-xs">{ret.customerName}</p>
+                          <p className="text-[11px] text-slate-500">
+                            Ref Faktur: <span className="font-bold text-slate-700">{ret.invoiceNumber}</span>
+                            {ret.customerPhone && <span> • Telp: {ret.customerPhone}</span>}
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-bold text-slate-800">
+                              {ret.productName} ({ret.qty} {ret.unit})
+                            </p>
+                            <span className="font-black text-red-600 whitespace-nowrap">
+                              {formatRupiah(ret.totalRefund)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            <span className="font-semibold text-slate-700">Alasan:</span> {ret.reason}
+                          </p>
+                          <p className="text-[11px] text-dstech-blue font-bold">
+                            <span className="font-semibold text-slate-700">Solusi:</span> {ret.resolution}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            Pemeriksa: {ret.handledBy}
+                            {ret.approvedBy && (
+                              <span className="text-emerald-700 font-bold"> • Disahkan oleh: {ret.approvedBy}</span>
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Action buttons toolbar */}
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {ret.verificationCode || "BAST-RET-DSTECH"}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {/* Cetak BAST Retur A4 */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPrintReturnSale(ret)}
+                              title="Cetak Berita Acara Retur Resmi (A4)"
+                              className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Approval QC */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenApprovalReturnSale(ret)}
+                              title={
+                                ret.approvalStatus === "Disetujui & Sah"
+                                  ? "Perbarui Tanda Tangan QC"
+                                  : "Approval & Tanda Tangan Digital QC"
+                              }
+                              className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-sm hover:scale-105 ${
+                                ret.approvalStatus === "Disetujui & Sah"
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-700 hover:text-white"
+                                  : "bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white"
+                              }`}
+                            >
+                              <PenTool className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Edit */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditReturnSale(ret)}
+                              title="Edit Data Retur"
+                              className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Hapus */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReturnSale(ret)}
+                              title="Hapus Data Retur"
+                              className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
               {/* Retur Pembelian (Ke Vendor / Supplier) */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div>
-                    <h3 className="font-black text-sm text-slate-900">Retur Pembelian (Ke Supplier)</h3>
+                    <div className="w-3 h-3 rounded-full bg-amber-500 ring-4 ring-amber-100"></div>
+                    <div>
+                      <h3 className="font-black text-sm text-slate-900">Retur Pembelian (Ke Supplier)</h3>
+                      <p className="text-[11px] text-slate-500">RMA vendor, pengembalian cacat pabrik, & nota kredit</p>
+                    </div>
                   </div>
-                  <span className="text-[10px] font-bold text-slate-500">{returnsPurchase.length} Kasus</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                      {returnsPurchase.length} Kasus
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleOpenAddReturnPurchase}
+                      className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm cursor-pointer transition-all hover:scale-105"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Catat Retur</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  {returnsPurchase.map((ret) => (
-                    <div key={ret.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-black text-amber-700">{ret.returnNumber}</span>
-                        <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-md">
-                          {ret.status}
-                        </span>
-                      </div>
-                      <p className="font-bold text-slate-900 text-xs">
-                        {ret.supplierName} (Ref: {ret.poNumber})
-                      </p>
-                      <div className="p-2.5 rounded-xl bg-white border border-slate-100 text-xs space-y-1">
-                        <p className="font-bold text-slate-800">
-                          {ret.productName} ({ret.qty} {ret.unit})
-                        </p>
-                        <p className="text-[11px] text-slate-500">Alasan: {ret.reason}</p>
-                        <p className="text-[11px] text-amber-800 font-bold">Klaim: {ret.resolution}</p>
-                      </div>
+                <div className="space-y-3">
+                  {returnsPurchase.length === 0 ? (
+                    <div className="p-8 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-2">
+                      <Truck className="w-8 h-8 text-slate-300 mx-auto" />
+                      <p className="text-xs font-bold text-slate-500">Belum ada riwayat retur pembelian ke supplier</p>
                     </div>
-                  ))}
+                  ) : (
+                    returnsPurchase.map((ret) => (
+                      <div
+                        key={ret.id}
+                        className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition-all space-y-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-black text-amber-800 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                              {ret.returnNumber}
+                            </span>
+                            <span className="text-[11px] text-slate-400 font-medium">({ret.date})</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                ret.status === "Selesai Diganti Vendor"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : ret.status === "Dibatalkan"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}
+                            >
+                              {ret.status}
+                            </span>
+
+                            {ret.approvalStatus === "Disetujui & Sah" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800">
+                                <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                                <span>Sah</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApprovalReturnPurchase(ret)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 hover:bg-amber-200 cursor-pointer"
+                                title="Klik untuk tanda tangani berkas retur vendor"
+                              >
+                                <Clock className="w-2.5 h-2.5 text-amber-600" />
+                                <span>Pending Logistik</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div>
+                          <p className="font-black text-slate-900 text-xs">{ret.supplierName}</p>
+                          <p className="text-[11px] text-slate-500">
+                            Ref PO: <span className="font-bold text-slate-700">{ret.poNumber}</span>
+                            {ret.supplierContact && <span> • Kontak: {ret.supplierContact}</span>}
+                          </p>
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-bold text-slate-800">
+                              {ret.productName} ({ret.qty} {ret.unit})
+                            </p>
+                            <span className="font-black text-amber-800 whitespace-nowrap">
+                              {formatRupiah(ret.totalCredit)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-600">
+                            <span className="font-semibold text-slate-700">Alasan:</span> {ret.reason}
+                          </p>
+                          <p className="text-[11px] text-amber-900 font-bold">
+                            <span className="font-semibold text-slate-700">Klaim:</span> {ret.resolution}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            Penanggung Jawab: {ret.handledBy}
+                            {ret.approvedBy && (
+                              <span className="text-emerald-700 font-bold"> • Disahkan oleh: {ret.approvedBy}</span>
+                            )}
+                          </p>
+                        </div>
+
+                        {/* Action buttons toolbar */}
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {ret.verificationCode || "BAST-RMA-VENDOR"}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {/* Cetak BAST Retur A4 */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPrintReturnPurchase(ret)}
+                              title="Cetak Berita Acara RMA Vendor Resmi (A4)"
+                              className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Approval Logistik */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenApprovalReturnPurchase(ret)}
+                              title={
+                                ret.approvalStatus === "Disetujui & Sah"
+                                  ? "Perbarui Tanda Tangan Logistik"
+                                  : "Approval & Tanda Tangan Digital Logistik"
+                              }
+                              className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-sm hover:scale-105 ${
+                                ret.approvalStatus === "Disetujui & Sah"
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-700 hover:text-white"
+                                  : "bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white"
+                              }`}
+                            >
+                              <PenTool className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Edit */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditReturnPurchase(ret)}
+                              title="Edit Data Retur"
+                              className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+
+                            {/* Hapus */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReturnPurchase(ret)}
+                              title="Hapus Data Retur"
+                              className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -7668,7 +8515,1578 @@ export default function AdminFinanceERPPage() {
         </div>
       )}
 
-      {/* MODAL TERIMA PEMBAYARAN FAKTUR */}
+      {/* MODAL TAMBAH & EDIT RETUR PENJUALAN (DARI KLIEN) */}
+      {(isNewReturnSaleModalOpen || (isEditReturnSaleModalOpen && editingReturnSale)) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => {
+            setIsNewReturnSaleModalOpen(false);
+            setIsEditReturnSaleModalOpen(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                  <RotateCcw className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900">
+                    {isEditReturnSaleModalOpen ? "Edit Berkas Retur Penjualan" : "Catat Retur Penjualan dari Klien"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Klaim garansi, unit cacat fungsi, atau permohonan retur pelanggan
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNewReturnSaleModalOpen(false);
+                  setIsEditReturnSaleModalOpen(false);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={isEditReturnSaleModalOpen ? handleSaveEditReturnSale : handleCreateReturnSaleSubmit}
+              className="space-y-4 text-xs"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nomor Retur</label>
+                  <input
+                    type="text"
+                    value={returnSaleForm.returnNumber}
+                    readOnly
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono font-bold text-red-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Tanggal Retur *</label>
+                  <input
+                    type="date"
+                    required
+                    value={returnSaleForm.date}
+                    onChange={(e) => setReturnSaleForm({ ...returnSaleForm, date: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Pilih Referensi Faktur Penjualan */}
+              <div className="p-3 bg-red-50/50 border border-red-100 rounded-2xl space-y-2">
+                <label className="block text-red-900 font-black">Referensi Faktur Penjualan</label>
+                <select
+                  value={returnSaleForm.invoiceNumber}
+                  onChange={(e) => handleSelectInvoiceForReturnSale(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-red-200 bg-white font-medium text-xs cursor-pointer"
+                >
+                  <option value="">-- Pilih Faktur Penjualan DSTech --</option>
+                  {sales.map((inv) => (
+                    <option key={inv.id} value={inv.invoiceNumber}>
+                      {inv.invoiceNumber} — {inv.customerName} ({formatRupiah(inv.grandTotal)})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-red-700">
+                  *Memilih faktur akan otomatis mengisi nama pelanggan, no. telepon, dan barang terkait.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nama Klien / Pelanggan *</label>
+                  <input
+                    type="text"
+                    required
+                    value={returnSaleForm.customerName}
+                    onChange={(e) => setReturnSaleForm({ ...returnSaleForm, customerName: e.target.value })}
+                    placeholder="Contoh: PT. Krakatau Steel / RS Kurnia"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Kontak / No. Telepon Klien</label>
+                  <input
+                    type="text"
+                    value={returnSaleForm.customerPhone}
+                    onChange={(e) => setReturnSaleForm({ ...returnSaleForm, customerPhone: e.target.value })}
+                    placeholder="Contoh: 0812-3456-7890"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Nama Barang / Unit yang Diretur *</label>
+                <input
+                  type="text"
+                  required
+                  value={returnSaleForm.productName}
+                  onChange={(e) => setReturnSaleForm({ ...returnSaleForm, productName: e.target.value })}
+                  placeholder="Contoh: Kamera IP Hikvision 4MP DarkFighter (DS-2CD2043G2-I)"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Kuantitas *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={returnSaleForm.qty}
+                    onChange={(e) => {
+                      const qty = Number(e.target.value) || 1;
+                      setReturnSaleForm({
+                        ...returnSaleForm,
+                        qty,
+                        totalRefund: qty * returnSaleForm.price,
+                      });
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Satuan</label>
+                  <input
+                    type="text"
+                    value={returnSaleForm.unit}
+                    onChange={(e) => setReturnSaleForm({ ...returnSaleForm, unit: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Harga Satuan (Rp)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={returnSaleForm.price}
+                    onChange={(e) => {
+                      const price = Number(e.target.value) || 0;
+                      setReturnSaleForm({
+                        ...returnSaleForm,
+                        price,
+                        totalRefund: returnSaleForm.qty * price,
+                      });
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nilai Refund (Rp)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={returnSaleForm.totalRefund}
+                    onChange={(e) =>
+                      setReturnSaleForm({ ...returnSaleForm, totalRefund: Number(e.target.value) || 0 })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Alasan Retur / Kerusakan *</label>
+                  <select
+                    value={returnSaleForm.reason}
+                    onChange={(e) => setReturnSaleForm({ ...returnSaleForm, reason: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white cursor-pointer"
+                  >
+                    <option value="Cacat Fungsi / Tidak Menyala">Cacat Fungsi / Tidak Menyala</option>
+                    <option value="Salah Spesifikasi Tipe Barang">Salah Spesifikasi Tipe Barang</option>
+                    <option value="Kerusakan Fisik Saat Pengiriman">Kerusakan Fisik Saat Pengiriman</option>
+                    <option value="Port Konektor Longgar / Masalah Hardware">Port Konektor Longgar / Hardware</option>
+                    <option value="Klaim Garansi Resmi Kerusakan Operasional">Klaim Garansi Kerusakan Operasional</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Solusi Penanganan Retur *</label>
+                  <select
+                    value={returnSaleForm.resolution}
+                    onChange={(e) => setReturnSaleForm({ ...returnSaleForm, resolution: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white cursor-pointer font-bold text-dstech-blue"
+                  >
+                    <option value="Ganti Barang Baru">Ganti Barang Baru (Tukar Unit)</option>
+                    <option value="Servis & Perbaikan Laboratorium">Servis & Perbaikan Laboratorium</option>
+                    <option value="Pengembalian Dana (Refund Kas)">Pengembalian Dana (Refund Kas)</option>
+                    <option value="Nota Kredit Pemotongan Faktur">Nota Kredit Pemotongan Faktur</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Status Progres Retur</label>
+                  <select
+                    value={returnSaleForm.status}
+                    onChange={(e) => setReturnSaleForm({ ...returnSaleForm, status: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white cursor-pointer font-medium"
+                  >
+                    <option value="Sedang Diproses">Sedang Diproses (Uji QC)</option>
+                    <option value="Selesai Diganti">Selesai Diganti & Diterima Klien</option>
+                    <option value="Ditolak">Ditolak (Di luar Masa Garansi / Void)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Pemeriksa / QC Lapangan</label>
+                  <input
+                    type="text"
+                    value={returnSaleForm.handledBy}
+                    onChange={(e) => setReturnSaleForm({ ...returnSaleForm, handledBy: e.target.value })}
+                    placeholder="Contoh: Ikhsan Maulidi (Teknisi Senior)"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Catatan Tambahan / Hasil Tes</label>
+                <textarea
+                  rows={2}
+                  value={returnSaleForm.notes}
+                  onChange={(e) => setReturnSaleForm({ ...returnSaleForm, notes: e.target.value })}
+                  placeholder="Keterangan kondisi fisik perangkat, kelengkapan kardus/adaptor, atau instruksi garansi..."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewReturnSaleModalOpen(false);
+                    setIsEditReturnSaleModalOpen(false);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs shadow-md shadow-red-500/20 cursor-pointer"
+                >
+                  {isEditReturnSaleModalOpen ? "Simpan Perubahan Retur" : "Catat Berkas Retur"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TAMBAH & EDIT RETUR PEMBELIAN (KE SUPPLIER) */}
+      {(isNewReturnPurchaseModalOpen || (isEditReturnPurchaseModalOpen && editingReturnPurchase)) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => {
+            setIsNewReturnPurchaseModalOpen(false);
+            setIsEditReturnPurchaseModalOpen(false);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                  <Truck className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900">
+                    {isEditReturnPurchaseModalOpen
+                      ? "Edit Berkas Retur Pembelian Vendor"
+                      : "Catat Retur Pembelian ke Supplier (Vendor RMA)"}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Klaim pengembalian cacat pabrik, garansi distributor, & nota kredit supplier
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNewReturnPurchaseModalOpen(false);
+                  setIsEditReturnPurchaseModalOpen(false);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={isEditReturnPurchaseModalOpen ? handleSaveEditReturnPurchase : handleCreateReturnPurchaseSubmit}
+              className="space-y-4 text-xs"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nomor Retur Pembelian</label>
+                  <input
+                    type="text"
+                    value={returnPurchaseForm.returnNumber}
+                    readOnly
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-slate-50 font-mono font-bold text-amber-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Tanggal Retur *</label>
+                  <input
+                    type="date"
+                    required
+                    value={returnPurchaseForm.date}
+                    onChange={(e) =>
+                      setReturnPurchaseForm({ ...returnPurchaseForm, date: e.target.value })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Referensi Purchase Order (PO) */}
+              <div className="p-3 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-2">
+                <label className="block text-amber-900 font-black">Referensi Purchase Order (PO)</label>
+                <select
+                  value={returnPurchaseForm.poNumber}
+                  onChange={(e) => handleSelectPoForReturnPurchase(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-amber-300 bg-white font-medium text-xs cursor-pointer"
+                >
+                  <option value="">-- Pilih Purchase Order DSTech --</option>
+                  {purchases.map((po) => (
+                    <option key={po.id} value={po.poNumber}>
+                      {po.poNumber} — {po.supplierName} ({formatRupiah(po.grandTotal)})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-amber-700">
+                  *Memilih PO akan otomatis memuat nama supplier resmi, kontak sales, dan produk pesanan.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nama Supplier / Vendor *</label>
+                  <input
+                    type="text"
+                    required
+                    value={returnPurchaseForm.supplierName}
+                    onChange={(e) =>
+                      setReturnPurchaseForm({ ...returnPurchaseForm, supplierName: e.target.value })
+                    }
+                    placeholder="Contoh: PT. Hikvision Indonesia Mega Distributor"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Kontak Sales / Layanan RMA Vendor</label>
+                  <input
+                    type="text"
+                    value={returnPurchaseForm.supplierContact}
+                    onChange={(e) =>
+                      setReturnPurchaseForm({ ...returnPurchaseForm, supplierContact: e.target.value })
+                    }
+                    placeholder="Contoh: 021-555-8899 / RMA Center"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Nama Barang / Modul yang Diretur *</label>
+                <input
+                  type="text"
+                  required
+                  value={returnPurchaseForm.productName}
+                  onChange={(e) =>
+                    setReturnPurchaseForm({ ...returnPurchaseForm, productName: e.target.value })
+                  }
+                  placeholder="Contoh: Kamera IP Hikvision 4MP DarkFighter (DS-2CD2043G2-I)"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Kuantitas *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={returnPurchaseForm.qty}
+                    onChange={(e) => {
+                      const qty = Number(e.target.value) || 1;
+                      setReturnPurchaseForm({
+                        ...returnPurchaseForm,
+                        qty,
+                        totalCredit: qty * returnPurchaseForm.price,
+                      });
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Satuan</label>
+                  <input
+                    type="text"
+                    value={returnPurchaseForm.unit}
+                    onChange={(e) =>
+                      setReturnPurchaseForm({ ...returnPurchaseForm, unit: e.target.value })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Harga Beli Satuan (Rp)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={returnPurchaseForm.price}
+                    onChange={(e) => {
+                      const price = Number(e.target.value) || 0;
+                      setReturnPurchaseForm({
+                        ...returnPurchaseForm,
+                        price,
+                        totalCredit: returnPurchaseForm.qty * price,
+                      });
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Total Nilai Kredit (Rp)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={returnPurchaseForm.totalCredit}
+                    onChange={(e) =>
+                      setReturnPurchaseForm({
+                        ...returnPurchaseForm,
+                        totalCredit: Number(e.target.value) || 0,
+                      })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Alasan Retur ke Vendor *</label>
+                  <select
+                    value={returnPurchaseForm.reason}
+                    onChange={(e) =>
+                      setReturnPurchaseForm({ ...returnPurchaseForm, reason: e.target.value })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white cursor-pointer"
+                  >
+                    <option value="Cacat Pabrik / Dead on Arrival (DOA)">Cacat Pabrik / Dead on Arrival (DOA)</option>
+                    <option value="Ketidaksesuaian Spesifikasi PO">Ketidaksesuaian Spesifikasi PO</option>
+                    <option value="Port Konektor / Firmware Bermasalah">Port Konektor / Firmware Bermasalah</option>
+                    <option value="Kerusakan Kemasan & Fisik Saat Pengiriman">Kerusakan Fisik Pengiriman</option>
+                    <option value="Klaim Garansi Distributor Resmi">Klaim Garansi Distributor Resmi</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Klaim Solusi RMA Vendor *</label>
+                  <select
+                    value={returnPurchaseForm.resolution}
+                    onChange={(e) =>
+                      setReturnPurchaseForm({ ...returnPurchaseForm, resolution: e.target.value })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white cursor-pointer font-bold text-amber-800"
+                  >
+                    <option value="Klaim Garansi Tukar Baru">Klaim Garansi Tukar Baru (Replace Unit)</option>
+                    <option value="Kredit Nota Pemotongan Hutang">Kredit Nota Pemotongan Hutang PO</option>
+                    <option value="Pengembalian Tunai / Transfer Kas">Pengembalian Tunai / Transfer Kas</option>
+                    <option value="Perbaikan Sparepart oleh Distributor">Perbaikan Sparepart Distributor</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Status Progres RMA</label>
+                  <select
+                    value={returnPurchaseForm.status}
+                    onChange={(e) =>
+                      setReturnPurchaseForm({ ...returnPurchaseForm, status: e.target.value })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white cursor-pointer font-medium"
+                  >
+                    <option value="Dalam Proses RMA Vendor">Dalam Proses RMA Vendor</option>
+                    <option value="Selesai Diganti Vendor">Selesai Diganti Unit Baru</option>
+                    <option value="Dibatalkan">Dibatalkan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Petugas Pengirim / Logistik</label>
+                  <input
+                    type="text"
+                    value={returnPurchaseForm.handledBy}
+                    onChange={(e) =>
+                      setReturnPurchaseForm({ ...returnPurchaseForm, handledBy: e.target.value })
+                    }
+                    placeholder="Contoh: Hendra (Gudang DSTech)"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Catatan Tambahan & No. Resi RMA</label>
+                <textarea
+                  rows={2}
+                  value={returnPurchaseForm.notes}
+                  onChange={(e) =>
+                    setReturnPurchaseForm({ ...returnPurchaseForm, notes: e.target.value })
+                  }
+                  placeholder="Keterangan nomor tiket RMA vendor, ekspedisi kurir pengembalian, nomor resi tracking..."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewReturnPurchaseModalOpen(false);
+                    setIsEditReturnPurchaseModalOpen(false);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs shadow-md shadow-amber-500/20 cursor-pointer"
+                >
+                  {isEditReturnPurchaseModalOpen ? "Simpan Perubahan RMA" : "Catat Retur Pembelian"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL APPROVAL TANDA TANGAN DIGITAL RETUR PENJUALAN */}
+      {isApprovalReturnSaleModalOpen && selectedReturnSaleForApproval && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsApprovalReturnSaleModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-red-100 text-red-600 flex items-center justify-center">
+                  <PenTool className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900">
+                    Approval & Tanda Tangan Digital QC Retur
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Otorisasi pemeriksaan kelayakan klaim garansi & penggantian unit
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsApprovalReturnSaleModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Document Info Box */}
+            <div className="p-4 rounded-2xl bg-red-50/60 border border-red-100 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-black text-red-700 text-sm">
+                  {selectedReturnSaleForApproval.returnNumber}
+                </span>
+                <span className="font-bold text-slate-500">Ref: {selectedReturnSaleForApproval.invoiceNumber}</span>
+              </div>
+              <p className="font-bold text-slate-900">{selectedReturnSaleForApproval.customerName}</p>
+              <div className="flex items-center justify-between text-slate-700">
+                <span>
+                  {selectedReturnSaleForApproval.productName} ({selectedReturnSaleForApproval.qty}{" "}
+                  {selectedReturnSaleForApproval.unit})
+                </span>
+                <span className="font-black text-red-600">
+                  {formatRupiah(selectedReturnSaleForApproval.totalRefund)}
+                </span>
+              </div>
+              <p className="text-[11px] text-dstech-blue font-bold">
+                Solusi: {selectedReturnSaleForApproval.resolution}
+              </p>
+            </div>
+
+            {/* Signature Modes Selector */}
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setApprovalMode("canvas")}
+                  className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all ${
+                    approvalMode === "canvas" ? "bg-red-600 text-white shadow-sm" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  ✍️ Gores Layar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApprovalMode("master")}
+                  className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all ${
+                    approvalMode === "master" ? "bg-red-600 text-white shadow-sm" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  📂 Master QC DSTech
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApprovalMode("upload")}
+                  className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all ${
+                    approvalMode === "upload" ? "bg-red-600 text-white shadow-sm" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  📤 Upload Berkas
+                </button>
+              </div>
+
+              {/* Mode 1: Canvas Drawing */}
+              {approvalMode === "canvas" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-slate-700 font-bold">Goreskan Tanda Tangan Anda:</label>
+                    <button
+                      type="button"
+                      onClick={clearCanvas}
+                      className="text-[10px] text-red-600 font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <Eraser className="w-3 h-3" /> Bersihkan
+                    </button>
+                  </div>
+                  <div className="relative border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50">
+                    <canvas
+                      ref={canvasRef}
+                      width={500}
+                      height={160}
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseLeave={stopDrawing}
+                      onTouchStart={startDrawing}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDrawing}
+                      className="w-full h-40 bg-white rounded-lg cursor-crosshair touch-none"
+                    />
+                    {!hasDrawn && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs italic">
+                        ✍️ Bubuhkan tanda tangan pemeriksaan di area ini
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Mode 2: Master Stored Signature */}
+              {approvalMode === "master" && (
+                <div className="p-4 rounded-xl border border-red-200 bg-red-50/50 text-center space-y-2">
+                  <p className="text-[11px] text-slate-600">
+                    Menggunakan tanda tangan digital tersimpan Kepala Mutu & QC PT DSTech Smart Perkasa:
+                  </p>
+                  <div className="py-2 flex items-center justify-center">
+                    {financeSettings.masterSignatureUrl ? (
+                      <img
+                        src={financeSettings.masterSignatureUrl}
+                        alt="Master Signature"
+                        className="max-h-16 object-contain"
+                      />
+                    ) : (
+                      <div className="font-serif italic text-2xl font-black text-slate-800 tracking-wider">
+                        {signerNameInput || "H. Agus Supriyadi"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Mode 3: Upload Signature File */}
+              {approvalMode === "upload" && (
+                <div className="space-y-2">
+                  <label className="block text-slate-700 font-bold">Pilih Berkas Gambar Tanda Tangan:</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (uploadEvent) => {
+                        const base64 = uploadEvent.target?.result as string;
+                        if (base64) setUploadedSignatureBase64(base64);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-xs"
+                  />
+                  {uploadedSignatureBase64 && (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                      <img
+                        src={uploadedSignatureBase64}
+                        alt="Preview Tanda Tangan"
+                        className="max-h-16 mx-auto object-contain"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Signer Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nama Penandatangan QC *</label>
+                  <input
+                    type="text"
+                    value={signerNameInput}
+                    onChange={(e) => setSignerNameInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Jabatan Resmi *</label>
+                  <input
+                    type="text"
+                    value={signerTitleInput}
+                    onChange={(e) => setSignerTitleInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Catatan Rekomendasi Teknis QC</label>
+                <textarea
+                  rows={2}
+                  value={approvalNotesInput}
+                  onChange={(e) => setApprovalNotesInput(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsApprovalReturnSaleModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleApproveReturnSale}
+                disabled={isSubmittingApproval}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs shadow-md shadow-red-500/20 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <CheckCheck className="w-4 h-4" />
+                <span>{isSubmittingApproval ? "Memproses..." : "Sahkan & Bubuhkan Tanda Tangan"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL APPROVAL TANDA TANGAN DIGITAL RETUR PEMBELIAN */}
+      {isApprovalReturnPurchaseModalOpen && selectedReturnPurchaseForApproval && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsApprovalReturnPurchaseModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
+                  <PenTool className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900">
+                    Approval & Tanda Tangan Digital RMA Vendor
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Otorisasi resmi pengiriman retur & pemotongan tagihan hutang supplier
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsApprovalReturnPurchaseModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Document Info Box */}
+            <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-black text-amber-800 text-sm">
+                  {selectedReturnPurchaseForApproval.returnNumber}
+                </span>
+                <span className="font-bold text-slate-500">Ref PO: {selectedReturnPurchaseForApproval.poNumber}</span>
+              </div>
+              <p className="font-bold text-slate-900">{selectedReturnPurchaseForApproval.supplierName}</p>
+              <div className="flex items-center justify-between text-slate-700">
+                <span>
+                  {selectedReturnPurchaseForApproval.productName} ({selectedReturnPurchaseForApproval.qty}{" "}
+                  {selectedReturnPurchaseForApproval.unit})
+                </span>
+                <span className="font-black text-amber-800">
+                  {formatRupiah(selectedReturnPurchaseForApproval.totalCredit)}
+                </span>
+              </div>
+              <p className="text-[11px] text-amber-900 font-bold">
+                Klaim: {selectedReturnPurchaseForApproval.resolution}
+              </p>
+            </div>
+
+            {/* Signature Modes Selector */}
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setApprovalMode("canvas")}
+                  className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all ${
+                    approvalMode === "canvas" ? "bg-amber-600 text-white shadow-sm" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  ✍️ Gores Layar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApprovalMode("master")}
+                  className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all ${
+                    approvalMode === "master" ? "bg-amber-600 text-white shadow-sm" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  📂 Master DSTech
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setApprovalMode("upload")}
+                  className={`px-3 py-1.5 rounded-xl font-bold cursor-pointer transition-all ${
+                    approvalMode === "upload" ? "bg-amber-600 text-white shadow-sm" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  📤 Upload Berkas
+                </button>
+              </div>
+
+              {/* Mode 1: Canvas Drawing */}
+              {approvalMode === "canvas" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-slate-700 font-bold">Goreskan Tanda Tangan Logistik:</label>
+                    <button
+                      type="button"
+                      onClick={clearCanvas}
+                      className="text-[10px] text-amber-800 font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                    >
+                      <Eraser className="w-3 h-3" /> Bersihkan
+                    </button>
+                  </div>
+                  <div className="relative border-2 border-dashed border-slate-300 rounded-xl overflow-hidden bg-slate-50">
+                    <canvas
+                      ref={canvasRef}
+                      width={500}
+                      height={160}
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseLeave={stopDrawing}
+                      onTouchStart={startDrawing}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDrawing}
+                      className="w-full h-40 bg-white rounded-lg cursor-crosshair touch-none"
+                    />
+                    {!hasDrawn && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs italic">
+                        ✍️ Bubuhkan tanda tangan otorisasi di area ini
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Mode 2: Master Stored Signature */}
+              {approvalMode === "master" && (
+                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 text-center space-y-2">
+                  <p className="text-[11px] text-slate-600">
+                    Menggunakan tanda tangan digital tersimpan Kepala Logistik PT DSTech Smart Perkasa:
+                  </p>
+                  <div className="py-2 flex items-center justify-center">
+                    {financeSettings.masterSignatureUrl ? (
+                      <img
+                        src={financeSettings.masterSignatureUrl}
+                        alt="Master Signature"
+                        className="max-h-16 object-contain"
+                      />
+                    ) : (
+                      <div className="font-serif italic text-2xl font-black text-slate-800 tracking-wider">
+                        {signerNameInput || "H. Agus Supriyadi"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Mode 3: Upload Signature File */}
+              {approvalMode === "upload" && (
+                <div className="space-y-2">
+                  <label className="block text-slate-700 font-bold">Pilih Berkas Gambar Tanda Tangan:</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (uploadEvent) => {
+                        const base64 = uploadEvent.target?.result as string;
+                        if (base64) setUploadedSignatureBase64(base64);
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-xs"
+                  />
+                  {uploadedSignatureBase64 && (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                      <img
+                        src={uploadedSignatureBase64}
+                        alt="Preview Tanda Tangan"
+                        className="max-h-16 mx-auto object-contain"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Signer Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nama Penandatangan Logistik *</label>
+                  <input
+                    type="text"
+                    value={signerNameInput}
+                    onChange={(e) => setSignerNameInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Jabatan Resmi *</label>
+                  <input
+                    type="text"
+                    value={signerTitleInput}
+                    onChange={(e) => setSignerTitleInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Catatan Rekomendasi RMA Vendor</label>
+                <textarea
+                  rows={2}
+                  value={approvalNotesInput}
+                  onChange={(e) => setApprovalNotesInput(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsApprovalReturnPurchaseModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleApproveReturnPurchase}
+                disabled={isSubmittingApproval}
+                className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs shadow-md shadow-amber-500/20 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <CheckCheck className="w-4 h-4" />
+                <span>{isSubmittingApproval ? "Memproses..." : "Sahkan & Bubuhkan Tanda Tangan"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CETAK LEMBAR BERITA ACARA RETUR PENJUALAN KLIEN (A4 FORMAT) */}
+      {selectedReturnSaleForPrint && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedReturnSaleForPrint(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Action Bar (Top) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Printer className="w-4 h-4 text-red-600" />
+                Berita Acara Serah Terima Retur Barang (BAST-RMA) Klien
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenSettingsModal}
+                  title="Ganti Background Kop Surat"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-red-600" />
+                  <span>Kop Surat</span>
+                </button>
+
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak BAST / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setSelectedReturnSaleForPrint(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* A4 OFFICIAL PRINT CONTAINER */}
+            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-10 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+              {/* Background Kop Surat Resmi DSTech */}
+              {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                <div
+                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  style={{
+                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    opacity: financeSettings.watermarkOpacity || 0.15,
+                  }}
+                />
+              )}
+
+              <div className="relative z-10 space-y-6">
+                {/* Kop Surat Perusahaan */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
+                  <div className="space-y-1">
+                    <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
+                      PT. DSTECH SMART PERKASA
+                    </span>
+                    <p className="text-xs font-semibold text-slate-700">
+                      IT Infrastructure, Security System & Smart Technology Solutions
+                    </p>
+                    <p className="text-[11px] text-slate-500 max-w-md">
+                      Jl. Bojonegara No. 88, Jombang, Kota Cilegon, Banten 42411 • Telp/WA: 0812-1188-3344 • Email:
+                      support@dstechsmart.com • NIB: 1204220019283
+                    </p>
+                  </div>
+                  <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
+                    <span className="inline-block px-3 py-1 rounded-md bg-red-100 text-red-800 font-black text-xs uppercase tracking-wider">
+                      BERITA ACARA RETUR (BAST-RMA)
+                    </span>
+                    <p className="font-mono text-base font-black text-slate-900 mt-1">
+                      {selectedReturnSaleForPrint.returnNumber}
+                    </p>
+                    <p className="text-[11px] text-slate-500">Tanggal Pengajuan: {selectedReturnSaleForPrint.date}</p>
+                    <p className="text-[11px] text-slate-500">
+                      Ref Faktur:{" "}
+                      <span className="font-bold text-slate-800">{selectedReturnSaleForPrint.invoiceNumber}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sub Judul & Para Pihak */}
+                <div className="text-center space-y-1">
+                  <h2 className="text-base font-black text-slate-900 tracking-wide uppercase">
+                    BERITA ACARA SERAH TERIMA PENGEMBALIAN BARANG (RETUR KLIEN)
+                  </h2>
+                  <p className="text-[11px] text-slate-500 italic">
+                    Dokumen ini merupakan bukti sah serah terima fisik barang untuk pemeriksaan kelayakan garansi.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50/80 border border-slate-200 text-xs">
+                  <div className="space-y-1">
+                    <p className="font-black text-red-700 uppercase tracking-wider text-[10px]">
+                      PIHAK I (KLIEN / PEMOHON RETUR):
+                    </p>
+                    <p className="font-bold text-slate-900 text-sm">{selectedReturnSaleForPrint.customerName}</p>
+                    <p className="text-slate-600">No. Kontak: {selectedReturnSaleForPrint.customerPhone || "-"}</p>
+                    <p className="text-slate-600">Alamat: {selectedReturnSaleForPrint.customerAddress || "Banten & Sekitarnya"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-black text-slate-700 uppercase tracking-wider text-[10px]">
+                      PIHAK II (PENERIMA & PEMERIKSA TEKNIS):
+                    </p>
+                    <p className="font-bold text-slate-900 text-sm">PT. DSTech Smart Perkasa</p>
+                    <p className="text-slate-600">Divisi: Unit Penjamin Mutu & Laboratorium QC DSTech</p>
+                    <p className="text-slate-600">Petugas Pemeriksa: {selectedReturnSaleForPrint.handledBy}</p>
+                  </div>
+                </div>
+
+                {/* Tabel Spesifikasi Unit Retur */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-900 text-white font-bold">
+                      <tr>
+                        <th className="p-2.5 text-center w-10">No</th>
+                        <th className="p-2.5">Deskripsi Produk / Komponen yang Diretur</th>
+                        <th className="p-2.5 text-center w-24">Jumlah</th>
+                        <th className="p-2.5 text-right w-32">Harga Satuan</th>
+                        <th className="p-2.5 text-right w-36">Total Nilai Barang</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      <tr>
+                        <td className="p-2.5 text-center font-bold">1</td>
+                        <td className="p-2.5">
+                          <p className="font-bold text-slate-900">{selectedReturnSaleForPrint.productName}</p>
+                          <p className="text-[11px] text-red-600 mt-0.5">
+                            <span className="font-bold text-slate-700">Alasan Retur / Gejala Kerusakan:</span>{" "}
+                            {selectedReturnSaleForPrint.reason}
+                          </p>
+                          <p className="text-[11px] text-dstech-blue">
+                            <span className="font-bold text-slate-700">Tindakan / Solusi yang Disetujui:</span>{" "}
+                            {selectedReturnSaleForPrint.resolution}
+                          </p>
+                        </td>
+                        <td className="p-2.5 text-center font-bold">
+                          {selectedReturnSaleForPrint.qty} {selectedReturnSaleForPrint.unit}
+                        </td>
+                        <td className="p-2.5 text-right font-medium text-slate-700">
+                          {formatRupiah(selectedReturnSaleForPrint.price)}
+                        </td>
+                        <td className="p-2.5 text-right font-bold text-slate-900">
+                          {formatRupiah(selectedReturnSaleForPrint.totalRefund)}
+                        </td>
+                      </tr>
+                    </tbody>
+                    <tfoot className="bg-slate-50 font-bold border-t border-slate-300">
+                      <tr>
+                        <td colSpan={4} className="p-2.5 text-right uppercase tracking-wider text-[11px]">
+                          Total Nilai Penggantian / Refund:
+                        </td>
+                        <td className="p-2.5 text-right font-black text-red-600 text-sm">
+                          {formatRupiah(selectedReturnSaleForPrint.totalRefund)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Pernyataan & Ketentuan Garansi */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] space-y-1.5 text-slate-600">
+                  <p className="font-bold text-slate-800">Ketentuan & Catatan Garansi Resmi DSTech:</p>
+                  <p>
+                    1. Unit yang diretur telah diperiksa kelayakan nomor seri (Serial Number) dan tidak ditemukan tanda
+                    kelalaian fisik luar (terbakar tegangan petir / tercelup cairan) yang membatalkan segel resmi.
+                  </p>
+                  <p>
+                    2. Solusi penanganan disepakati berupa{" "}
+                    <strong className="text-slate-900">{selectedReturnSaleForPrint.resolution}</strong> sesuai klausul
+                    perjanjian pengadaan.
+                  </p>
+                  {selectedReturnSaleForPrint.notes && (
+                    <p className="italic text-slate-700 font-medium">
+                      Catatan Tambahan Pemeriksa: {selectedReturnSaleForPrint.notes}
+                    </p>
+                  )}
+                </div>
+
+                {/* Kolom Tanda Tangan Dual Pihak */}
+                <div className="grid grid-cols-2 gap-8 pt-4">
+                  {/* Pihak I: Klien */}
+                  <div className="text-center space-y-2">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Pihak I (Yang Menyerahkan),
+                    </p>
+                    <p className="text-xs font-black text-slate-800">{selectedReturnSaleForPrint.customerName}</p>
+                    <div className="h-16 flex items-center justify-center">
+                      <div className="font-serif italic text-base text-slate-400 select-none">
+                        ( Tanda Tangan & Nama Terang )
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-800 text-xs">
+                        ( {selectedReturnSaleForPrint.customerName.split(" ")[0] || "Perwakilan Klien"} )
+                      </p>
+                      <p className="text-[10px] text-slate-500">Pemohon Retur Resmi</p>
+                    </div>
+                  </div>
+
+                  {/* Pihak II: DSTech */}
+                  <div className="text-center space-y-2 relative">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Pihak II (Pemeriksa Mutu & Otorisasi),
+                    </p>
+                    <p className="text-xs font-black text-red-600">PT. DSTech Smart Perkasa</p>
+
+                    <div className="h-16 relative flex items-center justify-center">
+                      {selectedReturnSaleForPrint.approvalStatus === "Disetujui & Sah" ? (
+                        <>
+                          {/* Stempel Bulat Digital Resmi DSTech */}
+                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-red-500/50 flex flex-col items-center justify-center text-[7px] text-red-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-red-50/40">
+                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
+                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">QC APPROVED</span>
+                          </div>
+
+                          {selectedReturnSaleForPrint.signatureImage ? (
+                            <img
+                              src={selectedReturnSaleForPrint.signatureImage}
+                              alt="Tanda Tangan QC"
+                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                            />
+                          ) : (
+                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                              {selectedReturnSaleForPrint.approvedBy || "H. Agus Supriyadi"}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center border border-dashed border-amber-300 bg-amber-50/80 rounded-lg p-2 w-full">
+                          <Clock className="w-4 h-4 text-amber-600 mb-0.5" />
+                          <span className="text-[9px] font-black text-amber-800 uppercase">Menunggu Pengesahan QC</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReturnSaleForPrint(null);
+                              handleOpenApprovalReturnSale(selectedReturnSaleForPrint);
+                            }}
+                            className="mt-1 px-2.5 py-1 rounded bg-red-600 hover:bg-red-700 text-white font-bold text-[9px] cursor-pointer shadow-sm"
+                          >
+                            Setujui Sekarang
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-xs">
+                        ( {selectedReturnSaleForPrint.approvedBy || "H. Agus Supriyadi, S.T., M.Kom."} )
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {selectedReturnSaleForPrint.approvedTitle || "Kepala Penjamin Mutu & QC"}
+                      </p>
+                      {selectedReturnSaleForPrint.verificationCode && (
+                        <p className="text-[9px] font-mono text-emerald-700 font-bold mt-0.5">
+                          Verifikasi: {selectedReturnSaleForPrint.verificationCode}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CETAK LEMBAR BERITA ACARA RETUR PEMBELIAN VENDOR RMA (A4 FORMAT) */}
+      {selectedReturnPurchaseForPrint && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedReturnPurchaseForPrint(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Action Bar (Top) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Printer className="w-4 h-4 text-amber-700" />
+                Berita Acara Pengembalian Barang ke Vendor (Vendor RMA Form)
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenSettingsModal}
+                  title="Ganti Background Kop Surat"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Kop Surat</span>
+                </button>
+
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak Form RMA / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setSelectedReturnPurchaseForPrint(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* A4 OFFICIAL PRINT CONTAINER */}
+            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-10 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+              {/* Background Kop Surat Resmi DSTech */}
+              {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                <div
+                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  style={{
+                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    opacity: financeSettings.watermarkOpacity || 0.15,
+                  }}
+                />
+              )}
+
+              <div className="relative z-10 space-y-6">
+                {/* Kop Surat Perusahaan */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
+                  <div className="space-y-1">
+                    <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
+                      PT. DSTECH SMART PERKASA
+                    </span>
+                    <p className="text-xs font-semibold text-slate-700">
+                      IT Infrastructure, Security System & Smart Technology Solutions
+                    </p>
+                    <p className="text-[11px] text-slate-500 max-w-md">
+                      Jl. Bojonegara No. 88, Jombang, Kota Cilegon, Banten 42411 • Telp/WA: 0812-1188-3344 • Email:
+                      procurement@dstechsmart.com • NIB: 1204220019283
+                    </p>
+                  </div>
+                  <div className="text-left sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
+                    <span className="inline-block px-3 py-1 rounded-md bg-amber-100 text-amber-800 font-black text-xs uppercase tracking-wider">
+                      BERITA ACARA RMA VENDOR
+                    </span>
+                    <p className="font-mono text-base font-black text-slate-900 mt-1">
+                      {selectedReturnPurchaseForPrint.returnNumber}
+                    </p>
+                    <p className="text-[11px] text-slate-500">Tanggal: {selectedReturnPurchaseForPrint.date}</p>
+                    <p className="text-[11px] text-slate-500">
+                      Ref PO:{" "}
+                      <span className="font-bold text-slate-800">{selectedReturnPurchaseForPrint.poNumber}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sub Judul & Para Pihak */}
+                <div className="text-center space-y-1">
+                  <h2 className="text-base font-black text-slate-900 tracking-wide uppercase">
+                    BERITA ACARA PENGEMBALIAN BARANG KE SUPPLIER (RETURN MERCHANDISE AUTHORIZATION)
+                  </h2>
+                  <p className="text-[11px] text-slate-500 italic">
+                    Dokumen ini adalah bukti resmi pengembalian barang cacat QC pabrik / DOA kepada distributor resmi.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50/80 border border-slate-200 text-xs">
+                  <div className="space-y-1">
+                    <p className="font-black text-amber-800 uppercase tracking-wider text-[10px]">
+                      PIHAK I (PENGIRIM RETUR):
+                    </p>
+                    <p className="font-bold text-slate-900 text-sm">PT. DSTech Smart Perkasa</p>
+                    <p className="text-slate-600">Departemen: Gudang & Manajemen Logistik DSTech</p>
+                    <p className="text-slate-600">Petugas Logistik: {selectedReturnPurchaseForPrint.handledBy}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="font-black text-slate-700 uppercase tracking-wider text-[10px]">
+                      PIHAK II (SUPPLIER / DISTRIBUTOR TUJUAN):
+                    </p>
+                    <p className="font-bold text-slate-900 text-sm">{selectedReturnPurchaseForPrint.supplierName}</p>
+                    <p className="text-slate-600">Kontak Service Center: {selectedReturnPurchaseForPrint.supplierContact || "-"}</p>
+                    <p className="text-slate-600">Alamat: {selectedReturnPurchaseForPrint.supplierAddress || "Pusat Distributor Jakarta/Tangerang"}</p>
+                  </div>
+                </div>
+
+                {/* Tabel Spesifikasi Unit Retur */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-900 text-white font-bold">
+                      <tr>
+                        <th className="p-2.5 text-center w-10">No</th>
+                        <th className="p-2.5">Deskripsi Produk & Komponen RMA</th>
+                        <th className="p-2.5 text-center w-24">Jumlah</th>
+                        <th className="p-2.5 text-right w-32">Harga Beli Satuan</th>
+                        <th className="p-2.5 text-right w-36">Total Nilai Kredit</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      <tr>
+                        <td className="p-2.5 text-center font-bold">1</td>
+                        <td className="p-2.5">
+                          <p className="font-bold text-slate-900">{selectedReturnPurchaseForPrint.productName}</p>
+                          <p className="text-[11px] text-amber-900 mt-0.5">
+                            <span className="font-bold text-slate-700">Alasan Retur / Cacat Pabrik:</span>{" "}
+                            {selectedReturnPurchaseForPrint.reason}
+                          </p>
+                          <p className="text-[11px] text-slate-600">
+                            <span className="font-bold text-slate-700">Klaim Garansi:</span>{" "}
+                            {selectedReturnPurchaseForPrint.resolution}
+                          </p>
+                        </td>
+                        <td className="p-2.5 text-center font-bold">
+                          {selectedReturnPurchaseForPrint.qty} {selectedReturnPurchaseForPrint.unit}
+                        </td>
+                        <td className="p-2.5 text-right font-medium text-slate-700">
+                          {formatRupiah(selectedReturnPurchaseForPrint.price)}
+                        </td>
+                        <td className="p-2.5 text-right font-bold text-amber-900">
+                          {formatRupiah(selectedReturnPurchaseForPrint.totalCredit)}
+                        </td>
+                      </tr>
+                    </tbody>
+                    <tfoot className="bg-slate-50 font-bold border-t border-slate-300">
+                      <tr>
+                        <td colSpan={4} className="p-2.5 text-right uppercase tracking-wider text-[11px]">
+                          Total Nilai Kredit / Penggantian Supplier:
+                        </td>
+                        <td className="p-2.5 text-right font-black text-amber-900 text-sm">
+                          {formatRupiah(selectedReturnPurchaseForPrint.totalCredit)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* Klausul Ketentuan Vendor RMA */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] space-y-1.5 text-slate-600">
+                  <p className="font-bold text-slate-800">Ketentuan Proses RMA Vendor:</p>
+                  <p>
+                    1. Pengembalian barang dilakukan sesuai masa garansi garansi distributor resmi atas Purchase Order{" "}
+                    <strong>{selectedReturnPurchaseForPrint.poNumber}</strong>.
+                  </p>
+                  <p>
+                    2. Pihak Supplier diharapkan memproses{" "}
+                    <strong className="text-slate-900">{selectedReturnPurchaseForPrint.resolution}</strong> dalam jangka
+                    waktu maksimal 7 (tujuh) hari kerja sejak dokumen dan unit fisik diterima.
+                  </p>
+                  {selectedReturnPurchaseForPrint.notes && (
+                    <p className="italic text-slate-700 font-medium">
+                      Nomor Tiket RMA / Resi Pengiriman: {selectedReturnPurchaseForPrint.notes}
+                    </p>
+                  )}
+                </div>
+
+                {/* Kolom Tanda Tangan Dual Pihak */}
+                <div className="grid grid-cols-2 gap-8 pt-4">
+                  {/* Pihak I: DSTech Logistik */}
+                  <div className="text-center space-y-2 relative">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Pihak I (Logistik & Pengadaan),
+                    </p>
+                    <p className="text-xs font-black text-amber-800">PT. DSTech Smart Perkasa</p>
+
+                    <div className="h-16 relative flex items-center justify-center">
+                      {selectedReturnPurchaseForPrint.approvalStatus === "Disetujui & Sah" ? (
+                        <>
+                          {/* Stempel Bulat Digital Resmi DSTech */}
+                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[7px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
+                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
+                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">RMA OFFICIAL</span>
+                          </div>
+
+                          {selectedReturnPurchaseForPrint.signatureImage ? (
+                            <img
+                              src={selectedReturnPurchaseForPrint.signatureImage}
+                              alt="Tanda Tangan Logistik"
+                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                            />
+                          ) : (
+                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                              {selectedReturnPurchaseForPrint.approvedBy || "H. Agus Supriyadi"}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center border border-dashed border-amber-300 bg-amber-50/80 rounded-lg p-2 w-full">
+                          <Clock className="w-4 h-4 text-amber-600 mb-0.5" />
+                          <span className="text-[9px] font-black text-amber-800 uppercase">Menunggu Otorisasi Logistik</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedReturnPurchaseForPrint(null);
+                              handleOpenApprovalReturnPurchase(selectedReturnPurchaseForPrint);
+                            }}
+                            className="mt-1 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-[9px] cursor-pointer shadow-sm"
+                          >
+                            Setujui Sekarang
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-xs">
+                        ( {selectedReturnPurchaseForPrint.approvedBy || "H. Agus Supriyadi, S.T., M.Kom."} )
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {selectedReturnPurchaseForPrint.approvedTitle || "Kepala Logistik & Pengadaan"}
+                      </p>
+                      {selectedReturnPurchaseForPrint.verificationCode && (
+                        <p className="text-[9px] font-mono text-emerald-700 font-bold mt-0.5">
+                          Verifikasi: {selectedReturnPurchaseForPrint.verificationCode}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pihak II: Supplier / Ekspedisi */}
+                  <div className="text-center space-y-2">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Pihak II (Tanda Terima Vendor / Ekspedisi),
+                    </p>
+                    <p className="text-xs font-black text-slate-800">{selectedReturnPurchaseForPrint.supplierName}</p>
+                    <div className="h-16 flex items-center justify-center">
+                      <div className="font-serif italic text-base text-slate-400 select-none">
+                        ( Stempel & Tanda Tangan Penerima )
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-800 text-xs">
+                        ( {selectedReturnPurchaseForPrint.supplierContact ? selectedReturnPurchaseForPrint.supplierContact.split(" ")[0] : "Service Center Vendor"} )
+                      </p>
+                      <p className="text-[10px] text-slate-500">Tanda Terima Resmi Distributor</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {isPayInvoiceModalOpen && selectedInvoiceForPayment && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
