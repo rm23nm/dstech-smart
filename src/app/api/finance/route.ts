@@ -481,6 +481,17 @@ export async function POST(request: Request) {
         (data.purchases?.length || 0) + 1
       ).padStart(3, "0")}`;
 
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      const computedSubtotal = items.reduce(
+        (acc: number, curr: any) =>
+          acc + (Number(curr.total) || Number(curr.qty) * Number(curr.price) || 0),
+        0
+      );
+      const subtotal = Number(payload.subtotal) || computedSubtotal;
+      const taxRate = payload.taxRate !== undefined ? Number(payload.taxRate) : 11;
+      const taxAmount = Number(payload.taxAmount) || Math.round((subtotal * taxRate) / 100);
+      const grandTotal = Number(payload.grandTotal) || subtotal + taxAmount;
+
       const newPurchase = {
         id: `dstech_po_${Date.now()}`,
         poNumber: payload.poNumber || newPoNumber,
@@ -488,14 +499,19 @@ export async function POST(request: Request) {
         supplierContact: payload.supplierContact || "-",
         date: payload.date || new Date().toISOString().split("T")[0],
         expectedDelivery: payload.expectedDelivery || new Date().toISOString().split("T")[0],
-        items: payload.items || [],
-        subtotal: Number(payload.subtotal) || 0,
-        taxAmount: Number(payload.taxAmount) || 0,
-        grandTotal: Number(payload.grandTotal) || 0,
+        items: items,
+        subtotal: subtotal,
+        taxAmount: taxAmount,
+        grandTotal: grandTotal,
         status: payload.status || "Draf",
         paymentStatus: payload.paymentStatus || "Hutang Usaha",
         warehouseId: payload.warehouseId || "dstech_wh_1",
         notes: payload.notes || "-",
+        approvalStatus: payload.approvalStatus || "Menunggu Approval",
+        approvedBy: payload.approvedBy || "",
+        approvedTitle: payload.approvedTitle || "",
+        approvedAt: payload.approvedAt || "",
+        verificationCode: payload.verificationCode || "",
       };
 
       if (!data.purchases) data.purchases = [];
@@ -901,7 +917,7 @@ export async function PUT(request: Request) {
     }
 
     if (actionType === "purchase") {
-      const index = (data.purchases || []).findIndex((p: any) => p.id === id);
+      const index = (data.purchases || []).findIndex((p: any) => p.id === id || p.poNumber === id);
       if (index === -1) {
         return NextResponse.json({ success: false, error: "Purchase Order tidak ditemukan" }, { status: 404 });
       }
@@ -911,10 +927,24 @@ export async function PUT(request: Request) {
         ...updates,
       };
 
+      if (updates.items) {
+        const items = data.purchases[index].items || [];
+        const subtotal = items.reduce(
+          (acc: number, curr: any) =>
+            acc + (Number(curr.total) || Number(curr.qty) * Number(curr.price) || 0),
+          0
+        );
+        const taxRate = updates.taxRate !== undefined ? Number(updates.taxRate) : 11;
+        const taxAmount = taxRate > 0 ? Math.round((subtotal * taxRate) / 100) : 0;
+        data.purchases[index].subtotal = subtotal;
+        data.purchases[index].taxAmount = taxAmount;
+        data.purchases[index].grandTotal = subtotal + taxAmount;
+      }
+
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
-        message: `PO ${data.purchases[index].poNumber} berhasil diperbarui`,
+        message: `Purchase Order ${data.purchases[index].poNumber} berhasil diperbarui`,
         data: data.purchases[index],
       });
     }
@@ -1078,6 +1108,16 @@ export async function DELETE(request: Request) {
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Surat Penawaran berhasil dihapus" });
+    }
+
+    if (actionType === "purchase") {
+      const initialLen = (data.purchases || []).length;
+      data.purchases = (data.purchases || []).filter((p: any) => p.id !== id && p.poNumber !== id);
+      if (data.purchases.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Purchase Order tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Purchase Order berhasil dihapus" });
     }
 
     if (actionType === "warehouse") {

@@ -175,10 +175,17 @@ interface PurchaseOrder {
   subtotal: number;
   taxAmount: number;
   grandTotal: number;
-  status: "Draf" | "Dalam Pengiriman" | "Diterima & Lunas" | "Dibatalkan";
+  status: "Draf" | "Dalam Pengiriman" | "Diterima & Lunas" | "Dibatalkan" | string;
   paymentStatus: string;
   warehouseId: string;
   notes: string;
+  approvalStatus?: string;
+  approvedBy?: string;
+  approvedTitle?: string;
+  approvedAt?: string;
+  verificationCode?: string;
+  signatureImage?: string;
+  approvalNotes?: string;
 }
 
 interface SalesReturn {
@@ -373,6 +380,38 @@ export default function AdminFinanceERPPage() {
   // Modal States
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState<boolean>(false);
   const [isNewPoModalOpen, setIsNewPoModalOpen] = useState<boolean>(false);
+  const [poSearchQuery, setPoSearchQuery] = useState<string>("");
+  const [poStatusFilter, setPoStatusFilter] = useState<string>("Semua");
+  const [isEditPoModalOpen, setIsEditPoModalOpen] = useState<boolean>(false);
+  const [editingPo, setEditingPo] = useState<PurchaseOrder | null>(null);
+  const [editPoForm, setEditPoForm] = useState<{
+    id: string;
+    poNumber: string;
+    supplierName: string;
+    supplierContact: string;
+    date: string;
+    expectedDelivery: string;
+    status: string;
+    paymentStatus: string;
+    warehouseId: string;
+    notes: string;
+    items: PurchaseItem[];
+  }>({
+    id: "",
+    poNumber: "",
+    supplierName: "",
+    supplierContact: "",
+    date: "",
+    expectedDelivery: "",
+    status: "Draf",
+    paymentStatus: "Hutang Usaha",
+    warehouseId: "dstech_wh_1",
+    notes: "",
+    items: [],
+  });
+  const [selectedPoForApproval, setSelectedPoForApproval] = useState<PurchaseOrder | null>(null);
+  const [isApprovalPoModalOpen, setIsApprovalPoModalOpen] = useState<boolean>(false);
+  const [selectedPoForPrint, setSelectedPoForPrint] = useState<PurchaseOrder | null>(null);
   const [isNewCashModalOpen, setIsNewCashModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<SaleInvoice | null>(null);
   const [cashAccountFilter, setCashAccountFilter] = useState<string>("ALL");
@@ -1667,6 +1706,206 @@ export default function AdminFinanceERPPage() {
     }
   };
 
+  // PO Management (Edit, Delete, Approval, Print) Handlers
+  const handleOpenEditPo = (po: PurchaseOrder) => {
+    setEditingPo(po);
+    setEditPoForm({
+      id: po.id,
+      poNumber: po.poNumber,
+      supplierName: po.supplierName,
+      supplierContact: po.supplierContact,
+      date: po.date,
+      expectedDelivery: po.expectedDelivery,
+      status: po.status,
+      paymentStatus: po.paymentStatus,
+      warehouseId: po.warehouseId || "dstech_wh_1",
+      notes: po.notes || "",
+      items:
+        po.items && po.items.length > 0
+          ? po.items.map((it) => ({ ...it }))
+          : [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
+    });
+    setIsEditPoModalOpen(true);
+  };
+
+  const handleAddEditPoItem = () => {
+    setEditPoForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { id: String(Date.now()), productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
+      ],
+    }));
+  };
+
+  const handleRemoveEditPoItem = (idx: number) => {
+    if (editPoForm.items.length <= 1) return;
+    setEditPoForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleEditPoItemChange = (idx: number, field: string, val: any) => {
+    setEditPoForm((prev) => {
+      const updated = [...prev.items];
+      const item = { ...updated[idx], [field]: val };
+      if (field === "qty" || field === "price") {
+        item.total = Number(item.qty || 0) * Number(item.price || 0);
+      }
+      updated[idx] = item;
+      return { ...prev, items: updated };
+    });
+  };
+
+  const calculateEditPoTotals = () => {
+    const subtotal = editPoForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+    const taxAmount = Math.round((subtotal * 11) / 100); // PPN 11%
+    const grandTotal = subtotal + taxAmount;
+    return { subtotal, taxAmount, grandTotal };
+  };
+
+  const handleSaveEditPo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPo) return;
+    const { subtotal, taxAmount, grandTotal } = calculateEditPoTotals();
+
+    if (editPoForm.items.some((it) => !it.productName || it.price <= 0)) {
+      showToast("Mohon isi nama barang dan harga satuan valid untuk semua baris item PO!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "purchase",
+          id: editingPo.id,
+          updates: {
+            supplierName: editPoForm.supplierName,
+            supplierContact: editPoForm.supplierContact,
+            date: editPoForm.date,
+            expectedDelivery: editPoForm.expectedDelivery,
+            status: editPoForm.status,
+            paymentStatus: editPoForm.paymentStatus,
+            warehouseId: editPoForm.warehouseId,
+            notes: editPoForm.notes,
+            items: editPoForm.items,
+            subtotal,
+            taxAmount,
+            grandTotal,
+          },
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message || "Purchase Order berhasil diperbarui!");
+        setIsEditPoModalOpen(false);
+        setEditingPo(null);
+        fetchFinanceData();
+      } else {
+        showToast(json.error || "Gagal memperbarui Purchase Order");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menyimpan perubahan PO");
+    }
+  };
+
+  const handleDeletePo = async (po: PurchaseOrder) => {
+    if (
+      !confirm(
+        `Apakah Anda yakin ingin menghapus Purchase Order "${po.poNumber}" (${po.supplierName})? Data belanja dan status pengadaan ini akan dihapus.`
+      )
+    )
+      return;
+    try {
+      const res = await fetch(`/api/finance?actionType=purchase&id=${encodeURIComponent(po.id)}`, {
+        method: "DELETE",
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast(`Purchase Order ${po.poNumber} berhasil dihapus!`);
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal menghapus Purchase Order");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menghapus PO");
+    }
+  };
+
+  const handleOpenApprovalPo = (po: PurchaseOrder) => {
+    setSelectedPoForApproval(po);
+    setSignerNameInput(po.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom.");
+    setSignerTitleInput(po.approvedTitle || financeSettings.signerTitle || "Direktur Keuangan & Operasional");
+    setApprovalNotesInput(po.approvalNotes || "Disetujui untuk pengadaan barang operasional/proyek resmi.");
+    setUploadedSignatureBase64(po.signatureImage || "");
+    setApprovalMode("canvas");
+    setIsApprovalPoModalOpen(true);
+    setHasDrawn(false);
+    setTimeout(() => {
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext("2d");
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+    }, 150);
+  };
+
+  const handleApprovePo = async () => {
+    if (!selectedPoForApproval) return;
+    setIsSubmittingApproval(true);
+    try {
+      let signatureImage = "";
+      if (approvalMode === "canvas" && canvasRef.current && hasDrawn) {
+        signatureImage = canvasRef.current.toDataURL("image/png");
+      } else if (approvalMode === "upload") {
+        signatureImage = uploadedSignatureBase64;
+      } else if (approvalMode === "master") {
+        signatureImage = financeSettings.masterSignatureUrl || "";
+      }
+
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "approve_document",
+          payload: {
+            id: selectedPoForApproval.id,
+            documentType: "purchase",
+            signatureImage,
+            signerName: signerNameInput,
+            signerTitle: signerTitleInput,
+            notes: approvalNotesInput,
+          },
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setPurchases((prev) =>
+          prev.map((p) => (p.id === selectedPoForApproval.id ? json.data : p))
+        );
+        if (selectedPoForPrint && selectedPoForPrint.id === selectedPoForApproval.id) {
+          setSelectedPoForPrint(json.data);
+        }
+        setIsApprovalPoModalOpen(false);
+        showToast(json.message || "Purchase Order berhasil disetujui & disahkan!");
+      } else {
+        showToast(json.error || "Gagal menyetujui Purchase Order");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat approval PO");
+    } finally {
+      setIsSubmittingApproval(false);
+    }
+  };
+
+  const handleOpenPrintPo = (po: PurchaseOrder) => {
+    setSelectedPoForPrint(po);
+  };
+
   // Client Master Handlers
   const handleOpenAddClient = () => {
     setEditingClient(null);
@@ -2884,17 +3123,33 @@ export default function AdminFinanceERPPage() {
                 <input
                   type="text"
                   placeholder="Cari nomor PO, supplier, atau barang belanja..."
+                  value={poSearchQuery}
+                  onChange={(e) => setPoSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
               </div>
 
-              <button
-                onClick={() => setIsNewPoModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Buat PO Baru</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <select
+                  value={poStatusFilter}
+                  onChange={(e) => setPoStatusFilter(e.target.value)}
+                  className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-700 focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                >
+                  <option value="Semua">Semua Status PO</option>
+                  <option value="Draf">Draf</option>
+                  <option value="Dalam Pengiriman">Dalam Pengiriman</option>
+                  <option value="Diterima & Lunas">Diterima & Lunas</option>
+                  <option value="Dibatalkan">Dibatalkan</option>
+                </select>
+
+                <button
+                  onClick={() => setIsNewPoModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Buat PO Baru</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -2908,50 +3163,141 @@ export default function AdminFinanceERPPage() {
                     <th className="p-3">Total Belanja</th>
                     <th className="p-3">Status Pengiriman</th>
                     <th className="p-3">Status Pembayaran</th>
+                    <th className="p-3">Otorisasi & Approval</th>
+                    <th className="p-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {purchases.map((po) => (
-                    <tr key={po.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="p-3 font-mono font-black text-amber-700 whitespace-nowrap">
-                        {po.poNumber}
-                      </td>
-                      <td className="p-3 font-bold text-slate-900">
-                        <p>{po.supplierName}</p>
-                        <p className="text-[10px] text-slate-400 font-normal">{po.supplierContact}</p>
-                      </td>
-                      <td className="p-3 text-slate-500 whitespace-nowrap">
-                        <p className="font-medium">{po.date}</p>
-                        <p className="text-[10px] text-slate-400">Est. Tiba: {po.expectedDelivery}</p>
-                      </td>
-                      <td className="p-3">
-                        <div className="space-y-1">
-                          {po.items.map((it, idx) => (
-                            <p key={idx} className="text-[11px] text-slate-700 font-medium">
-                              • {it.productName} ({it.qty} {it.unit})
-                            </p>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-3 font-black text-slate-900 whitespace-nowrap">
-                        {formatRupiah(po.grandTotal)}
-                      </td>
-                      <td className="p-3 whitespace-nowrap">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
-                            po.status === "Diterima & Lunas"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-blue-100 text-blue-800"
-                          }`}
-                        >
-                          {po.status}
-                        </span>
-                      </td>
-                      <td className="p-3 whitespace-nowrap font-bold text-slate-700">
-                        {po.paymentStatus}
-                      </td>
-                    </tr>
-                  ))}
+                  {purchases
+                    .filter((po) => {
+                      const q = poSearchQuery.toLowerCase();
+                      const matchQuery =
+                        !poSearchQuery ||
+                        (po.poNumber && po.poNumber.toLowerCase().includes(q)) ||
+                        (po.supplierName && po.supplierName.toLowerCase().includes(q)) ||
+                        (po.supplierContact && po.supplierContact.toLowerCase().includes(q)) ||
+                        (po.items &&
+                          po.items.some((it) => it.productName && it.productName.toLowerCase().includes(q)));
+                      const matchStatus = poStatusFilter === "Semua" || po.status === poStatusFilter;
+                      return matchQuery && matchStatus;
+                    })
+                    .map((po) => (
+                      <tr key={po.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-3 font-mono font-black text-amber-700 whitespace-nowrap">
+                          {po.poNumber}
+                        </td>
+                        <td className="p-3 font-bold text-slate-900">
+                          <p>{po.supplierName}</p>
+                          <p className="text-[10px] text-slate-400 font-normal">{po.supplierContact}</p>
+                        </td>
+                        <td className="p-3 text-slate-500 whitespace-nowrap">
+                          <p className="font-medium">{po.date}</p>
+                          <p className="text-[10px] text-slate-400">Est. Tiba: {po.expectedDelivery}</p>
+                        </td>
+                        <td className="p-3">
+                          <div className="space-y-1">
+                            {po.items.map((it, idx) => (
+                              <p key={idx} className="text-[11px] text-slate-700 font-medium">
+                                • {it.productName} ({it.qty} {it.unit})
+                              </p>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="p-3 font-black text-slate-900 whitespace-nowrap">
+                          {formatRupiah(po.grandTotal)}
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                              po.status === "Diterima & Lunas"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : po.status === "Dibatalkan"
+                                ? "bg-rose-100 text-rose-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
+                            {po.status}
+                          </span>
+                        </td>
+                        <td className="p-3 whitespace-nowrap font-bold text-slate-700">
+                          {po.paymentStatus}
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          {po.approvalStatus === "Disetujui & Sah" ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                                <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                <span>Disetujui & Sah</span>
+                              </span>
+                              <span className="text-[9px] text-slate-400 font-mono">
+                                {po.verificationCode || "DST-APP"}
+                              </span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenApprovalPo(po)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors cursor-pointer"
+                              title="Klik untuk menyetujui & bubuhkan tanda tangan digital resmi"
+                            >
+                              <Clock className="w-3 h-3 text-amber-600" />
+                              <span>Menunggu Approval</span>
+                            </button>
+                          )}
+                        </td>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Cetak PO */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPrintPo(po)}
+                              title="Cetak Purchase Order Resmi"
+                              className="p-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </button>
+
+                            {/* Approval PO */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenApprovalPo(po)}
+                              title={
+                                po.approvalStatus === "Disetujui & Sah"
+                                  ? "Perbarui Tanda Tangan Digital PO"
+                                  : "Approval & Tanda Tangan Digital Direktur"
+                              }
+                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
+                                po.approvalStatus === "Disetujui & Sah"
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-700 hover:text-white"
+                                  : "bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white"
+                              }`}
+                            >
+                              <PenTool className="w-4 h-4" />
+                            </button>
+
+                            {/* Edit PO */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditPo(po)}
+                              title="Edit Data PO"
+                              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+
+                            {/* Hapus PO */}
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePo(po)}
+                              title="Hapus Purchase Order"
+                              className="p-2 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -6505,6 +6851,819 @@ export default function AdminFinanceERPPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT PURCHASE ORDER (PO) */}
+      {isEditPoModalOpen && editingPo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsEditPoModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-700">
+                  Perubahan Data Dokumen
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">
+                  Edit Purchase Order ({editingPo.poNumber})
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsEditPoModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditPo} className="space-y-4 text-xs">
+              {/* Quick Select Supplier from Master Data */}
+              <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-amber-800 flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Pilih dari Master Data Supplier Mitra:</span>
+                  </label>
+                  <span className="text-[10px] text-amber-600 font-medium">Auto-fill Nama & Kontak Sales</span>
+                </div>
+                <select
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const found = suppliers.find((s) => s.id === val);
+                    if (found) {
+                      setEditPoForm((prev) => ({
+                        ...prev,
+                        supplierName: found.name,
+                        supplierContact: `${found.pic} (${found.phone})`,
+                      }));
+                    }
+                  }}
+                  defaultValue=""
+                  className="w-full p-2.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                >
+                  <option value="">-- Ganti Supplier dari Direktori (atau edit manual) --</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.category}) — {s.city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nama Supplier / Vendor:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nama distributor / toko..."
+                    value={editPoForm.supplierName}
+                    onChange={(e) => setEditPoForm({ ...editPoForm, supplierName: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kontak Sales Vendor:</label>
+                  <input
+                    type="text"
+                    placeholder="PIC / No Telp sales..."
+                    value={editPoForm.supplierContact}
+                    onChange={(e) => setEditPoForm({ ...editPoForm, supplierContact: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Tanggal Pesan:</label>
+                  <input
+                    type="date"
+                    required
+                    value={editPoForm.date}
+                    onChange={(e) => setEditPoForm({ ...editPoForm, date: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Estimasi Tiba:</label>
+                  <input
+                    type="date"
+                    required
+                    value={editPoForm.expectedDelivery}
+                    onChange={(e) => setEditPoForm({ ...editPoForm, expectedDelivery: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Status Pengiriman:</label>
+                  <select
+                    value={editPoForm.status}
+                    onChange={(e) => setEditPoForm({ ...editPoForm, status: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    <option value="Draf">Draf</option>
+                    <option value="Dalam Pengiriman">Dalam Pengiriman</option>
+                    <option value="Diterima & Lunas">Diterima & Lunas</option>
+                    <option value="Dibatalkan">Dibatalkan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Status Pembayaran:</label>
+                  <select
+                    value={editPoForm.paymentStatus}
+                    onChange={(e) => setEditPoForm({ ...editPoForm, paymentStatus: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    <option value="Hutang Usaha">Hutang Usaha (Jatuh Tempo 30 Hari)</option>
+                    <option value="Lunas">Lunas (Transfer Cash)</option>
+                    <option value="Uang Muka 50%">Uang Muka (DP 50%)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Items Table Repeater */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="font-black text-slate-800 uppercase tracking-wider text-[11px]">
+                    Daftar Barang yang Dipesan ({editPoForm.items.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddEditPoItem}
+                    className="text-amber-700 font-bold text-xs hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Tambah Baris Barang</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {editPoForm.items.map((it, idx) => (
+                    <div
+                      key={it.id || idx}
+                      className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
+                    >
+                      <div className="col-span-5">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nama Barang / Sparepart..."
+                          value={it.productName}
+                          onChange={(e) => handleEditPoItemChange(idx, "productName", e.target.value)}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          min={1}
+                          required
+                          placeholder="Qty"
+                          value={it.qty}
+                          onChange={(e) => handleEditPoItemChange(idx, "qty", Number(e.target.value))}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="text"
+                          placeholder="Satuan"
+                          value={it.unit}
+                          onChange={(e) => handleEditPoItemChange(idx, "unit", e.target.value)}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-medium text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          min={0}
+                          required
+                          placeholder="Harga Satuan (Rp)"
+                          value={it.price}
+                          onChange={(e) => handleEditPoItemChange(idx, "price", Number(e.target.value))}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-1 text-center">
+                        {editPoForm.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditPoItem(idx)}
+                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calculations Box */}
+              {(() => {
+                const { subtotal, taxAmount, grandTotal } = calculateEditPoTotals();
+                return (
+                  <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>Subtotal Belanja:</span>
+                      <span className="font-bold">{formatRupiah(subtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>PPN Masukan (11%):</span>
+                      <span className="font-bold">{formatRupiah(taxAmount)}</span>
+                    </div>
+                    <div className="border-t border-white/20 pt-2 flex items-center justify-between text-base font-black">
+                      <span className="text-amber-400">TOTAL BELANJA PO:</span>
+                      <span className="text-xl text-emerald-400">{formatRupiah(grandTotal)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Catatan PO / Petunjuk Pengiriman:</label>
+                <textarea
+                  rows={2}
+                  placeholder="Kirim ke Gudang Utama Cilegon, instruksi ekspedisi..."
+                  value={editPoForm.notes}
+                  onChange={(e) => setEditPoForm({ ...editPoForm, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditPoModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-2"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Simpan Perubahan PO</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL APPROVAL & TANDA TANGAN DIGITAL PURCHASE ORDER (PO) */}
+      {isApprovalPoModalOpen && selectedPoForApproval && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsApprovalPoModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[92vh] overflow-y-auto border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-gradient-to-r from-amber-50 to-orange-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-600 text-white shadow-md">
+                  <PenTool className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Approval & Otorisasi Purchase Order</h3>
+                  <p className="text-xs text-slate-500">
+                    Pengesahan Resmi PO {selectedPoForApproval.poNumber} kepada {selectedPoForApproval.supplierName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsApprovalPoModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white/80 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              {/* Ringkasan PO */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Supplier / Vendor:</span>
+                  <p className="font-black text-slate-900 text-xs">{selectedPoForApproval.supplierName}</p>
+                  <p className="text-[10px] text-slate-500">{selectedPoForApproval.supplierContact}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Total Nilai Belanja:</span>
+                  <p className="font-black text-amber-700 text-sm">
+                    {formatRupiah(selectedPoForApproval.grandTotal)}
+                  </p>
+                  <span className="text-[10px] font-bold text-slate-500">
+                    Termin: {selectedPoForApproval.paymentStatus}
+                  </span>
+                </div>
+              </div>
+
+              {/* Tab Metode Tanda Tangan */}
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5">Pilih Metode Tanda Tangan:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setApprovalMode("canvas")}
+                    className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                      approvalMode === "canvas"
+                        ? "bg-amber-50 border-amber-500 text-amber-800 ring-2 ring-amber-200"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    ✍️ Gores Layar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApprovalMode("master")}
+                    className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                      approvalMode === "master"
+                        ? "bg-amber-50 border-amber-500 text-amber-800 ring-2 ring-amber-200"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    🛡️ Tanda Tangan Master
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApprovalMode("upload")}
+                    className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                      approvalMode === "upload"
+                        ? "bg-amber-50 border-amber-500 text-amber-800 ring-2 ring-amber-200"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    📁 Upload Gambar
+                  </button>
+                </div>
+              </div>
+
+              {/* Mode 1: Canvas Drawing Signature Pad */}
+              {approvalMode === "canvas" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Tanda tangani langsung di bawah ini (Touch / Mouse):</span>
+                    <button
+                      type="button"
+                      onClick={clearCanvas}
+                      className="text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eraser className="w-3.5 h-3.5" />
+                      Hapus Goresan
+                    </button>
+                  </div>
+                  <div className="relative border-2 border-dashed border-amber-300 rounded-xl bg-slate-50/50 p-1 flex justify-center items-center shadow-inner">
+                    <canvas
+                      ref={canvasRef}
+                      width={480}
+                      height={160}
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseLeave={stopDrawing}
+                      onTouchStart={startDrawing}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDrawing}
+                      className="w-full h-40 bg-white rounded-lg cursor-crosshair touch-none"
+                    />
+                    {!hasDrawn && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs italic">
+                        ✍️ Bubuhkan tanda tangan Anda di area ini
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    *Goresan digital akan dibubuhkan secara otomatis pada lembar Purchase Order resmi.
+                  </p>
+                </div>
+              )}
+
+              {/* Mode 2: Master Stored Signature */}
+              {approvalMode === "master" && (
+                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 text-center space-y-2">
+                  <p className="text-[11px] text-slate-600">
+                    Menggunakan tanda tangan digital tersimpan Direktur PT DSTech Smart Perkasa:
+                  </p>
+                  <div className="py-2 flex items-center justify-center">
+                    {financeSettings.masterSignatureUrl ? (
+                      <img
+                        src={financeSettings.masterSignatureUrl}
+                        alt="Master Signature"
+                        className="max-h-16 object-contain"
+                      />
+                    ) : (
+                      <div className="font-serif italic text-2xl font-black text-slate-800 tracking-wider">
+                        {signerNameInput || "H. Agus Supriyadi"}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    *Tanda tangan master resmi terdaftar dan tersimpan di sistem manajemen dokumen.
+                  </p>
+                </div>
+              )}
+
+              {/* Mode 3: Upload Signature File */}
+              {approvalMode === "upload" && (
+                <div className="space-y-2">
+                  <label className="block text-slate-700 font-bold">Pilih Berkas Gambar Tanda Tangan:</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (uploadEvent) => {
+                        const base64 = uploadEvent.target?.result as string;
+                        if (base64) {
+                          setUploadedSignatureBase64(base64);
+                        }
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white text-xs"
+                  />
+                  {uploadedSignatureBase64 && (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                      <p className="text-[10px] text-slate-500 mb-1">Pratinjau Tanda Tangan:</p>
+                      <img
+                        src={uploadedSignatureBase64}
+                        alt="Uploaded Signature"
+                        className="max-h-16 mx-auto object-contain"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Data Pejabat yang Mengesahkan */}
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Nama Pejabat Otorisasi:</label>
+                  <input
+                    type="text"
+                    value={signerNameInput}
+                    onChange={(e) => setSignerNameInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Jabatan:</label>
+                  <input
+                    type="text"
+                    value={signerTitleInput}
+                    onChange={(e) => setSignerTitleInput(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Catatan Otorisasi / Pengadaan:</label>
+                <textarea
+                  rows={2}
+                  value={approvalNotesInput}
+                  onChange={(e) => setApprovalNotesInput(e.target.value)}
+                  placeholder="Catatan verifikasi dokumen..."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                />
+              </div>
+
+              {/* Stempel & Verifikasi Info */}
+              <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-amber-900 text-[11px] flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-700 flex-shrink-0" />
+                <span>
+                  Sistem akan otomatis membubuhkan Stempel Bulat Digital Resmi PT. DSTech Smart Perkasa dan Barcode Verifikasi Sistem (DST-APP) pada lembar PO.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsApprovalPoModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingApproval}
+                  onClick={handleApprovePo}
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                >
+                  <CheckCheck className="w-4 h-4" />
+                  <span>{isSubmittingApproval ? "Menyimpan Otorisasi..." : "Setujui & Sahkan PO"}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CETAK / PRATINJAU DOKUMEN PURCHASE ORDER (PO) A4 */}
+      {selectedPoForPrint && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedPoForPrint(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Action Bar (Top) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Printer className="w-4 h-4 text-amber-600" />
+                Format Purchase Order Resmi (PO) PT. DSTech Smart Perkasa
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenSettingsModal}
+                  title="Ganti Background Kop Surat"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Kop Surat</span>
+                </button>
+
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak PO / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setSelectedPoForPrint(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* PO OFFICIAL PRINT CONTAINER (A4 Standard Print Layout) */}
+            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-10 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+              {/* Background Kop Surat Resmi DSTech */}
+              {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                <div
+                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  style={{
+                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    opacity: financeSettings.watermarkOpacity || 0.15,
+                  }}
+                />
+              )}
+
+              <div className="relative z-10 space-y-6">
+                {/* Kop Surat Perusahaan DSTech */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
+                        PT. DSTECH SMART PERKASA
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-bold text-slate-600">
+                      Solusi Security System, CCTV AI, Barrier Gate, IoT & IT Infrastructure
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-relaxed max-w-md">
+                      Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
+                      <br />
+                      <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>
+                      <br />
+                      WhatsApp: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
+                    </p>
+                  </div>
+
+                  <div className="text-left sm:text-right space-y-1">
+                    <span className="px-3 py-1 rounded-md bg-amber-800 text-white font-black text-xs uppercase tracking-wider inline-block">
+                      PURCHASE ORDER (PO)
+                    </span>
+                    <p className="font-mono font-black text-sm text-amber-700">
+                      {selectedPoForPrint.poNumber}
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Tanggal Order: {selectedPoForPrint.date}
+                    </p>
+                    <p className="text-[11px] text-slate-700 font-bold">
+                      Est. Tiba: {selectedPoForPrint.expectedDelivery}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Info Vendor & Pengiriman */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
+                  <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200/80 space-y-1">
+                    <p className="text-[10px] font-black text-amber-800 uppercase tracking-wider">
+                      DITUJUKAN KEPADA (VENDOR / SUPPLIER):
+                    </p>
+                    <p className="font-black text-slate-900 text-sm mt-0.5">{selectedPoForPrint.supplierName}</p>
+                    <p className="text-slate-600 text-[11px]">Kontak Sales: {selectedPoForPrint.supplierContact || "-"}</p>
+                    <p className="text-[11px] text-slate-700 font-medium">
+                      Status Pembayaran: <span className="font-bold text-amber-800">{selectedPoForPrint.paymentStatus}</span>
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                      ALAMAT PENERIMAAN BARANG:
+                    </p>
+                    <p className="font-black text-slate-900 text-sm mt-0.5">Gudang Utama PT. DSTech Smart Perkasa</p>
+                    <p className="text-slate-600 text-[11px]">
+                      Perum Bukit Cilegon Asri Blok DB No. 19, Cilegon - Banten
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      PIC Penerima Logistik: Staff Gudang DSTech (0822-5949-4242)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Items Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border border-slate-200">
+                    <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-200">
+                      <tr>
+                        <th className="p-2.5 text-center w-10">No</th>
+                        <th className="p-2.5">Deskripsi Barang / Spesifikasi Teknis</th>
+                        <th className="p-2.5 text-center w-20">Qty</th>
+                        <th className="p-2.5 text-center w-20">Satuan</th>
+                        <th className="p-2.5 text-right w-36">Harga Satuan (Rp)</th>
+                        <th className="p-2.5 text-right w-36">Total (Rp)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {selectedPoForPrint.items.map((item, idx) => (
+                        <tr key={item.id || idx}>
+                          <td className="p-2.5 text-center text-slate-400 font-mono">{idx + 1}</td>
+                          <td className="p-2.5 font-bold text-slate-900">{item.productName}</td>
+                          <td className="p-2.5 text-center font-bold text-slate-800">{item.qty}</td>
+                          <td className="p-2.5 text-center text-slate-600">{item.unit}</td>
+                          <td className="p-2.5 text-right font-medium text-slate-700">
+                            {formatRupiah(item.price)}
+                          </td>
+                          <td className="p-2.5 text-right font-bold text-slate-900">
+                            {formatRupiah(item.total || item.qty * item.price)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Financial Summary */}
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                  <div className="sm:max-w-md w-full bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1">
+                    <span className="font-bold text-slate-700 block text-[11px]">Catatan / Instruksi Pengiriman:</span>
+                    <p className="text-slate-600 text-[11px] whitespace-pre-line">
+                      {selectedPoForPrint.notes ||
+                        "Kirim barang sesuai jadwal yang telah disepakati dan sertakan Surat Jalan serta Faktur Pajak/Kwitansi resmi."}
+                    </p>
+                  </div>
+
+                  <div className="w-full sm:w-72 space-y-1.5 text-xs">
+                    <div className="flex justify-between py-1 text-slate-600 border-b border-slate-100">
+                      <span>Subtotal Belanja:</span>
+                      <span className="font-bold text-slate-900">{formatRupiah(selectedPoForPrint.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between py-1 text-slate-600 border-b border-slate-100">
+                      <span>PPN Masukan (11%):</span>
+                      <span className="font-bold text-slate-900">{formatRupiah(selectedPoForPrint.taxAmount)}</span>
+                    </div>
+                    <div className="flex justify-between py-2 text-sm font-black text-slate-900 border-t-2 border-slate-900">
+                      <span className="text-amber-800">TOTAL BELANJA PO:</span>
+                      <span className="text-emerald-700">{formatRupiah(selectedPoForPrint.grandTotal)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Syarat & Ketentuan PO */}
+                <div className="text-[10px] leading-relaxed text-slate-500 border-t border-slate-200 pt-3 space-y-0.5">
+                  <p className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                    Syarat & Ketentuan Purchase Order:
+                  </p>
+                  <p>1. Barang yang dikirim harus 100% baru (Brand New in Box), original dan bergaransi resmi dari distributor/pabrik.</p>
+                  <p>
+                    2. Setiap pengiriman wajib melampirkan Surat Jalan dan mencantumkan Nomor PO resmi ini:{" "}
+                    <strong>{selectedPoForPrint.poNumber}</strong>.
+                  </p>
+                  <p>3. Pemeriksaan fisik dan Quality Control (QC) dilakukan saat barang tiba di gudang PT. DSTech Smart Perkasa.</p>
+                  <p>
+                    4. Pembayaran akan diproses sesuai kesepakatan ({selectedPoForPrint.paymentStatus}) setelah barang dan dokumen
+                    penagihan lengkap diterima.
+                  </p>
+                </div>
+
+                {/* Tanda Tangan Dual Approval (Vendor & Direktur DSTech) */}
+                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-200 text-xs">
+                  {/* Sisi Kiri: Vendor / Rekanan Supplier */}
+                  <div className="flex flex-col justify-between h-52 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        Dikonfirmasi & Diterima Oleh,
+                      </p>
+                      <p className="text-xs font-black text-slate-900 mt-1">
+                        {selectedPoForPrint.supplierName}
+                      </p>
+                    </div>
+
+                    <div className="h-16 flex items-center justify-center text-slate-300 text-[10px] italic">
+                      (Tanda Tangan, Nama Jelas & Stempel Vendor)
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-xs">
+                        {selectedPoForPrint.supplierContact
+                          ? `( ${selectedPoForPrint.supplierContact.split("(")[0].trim()} )`
+                          : "( ................................................................ )"}
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        Sales / PIC Rekanan Vendor
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sisi Kanan: Pemesan Resmi PT. DSTech Smart Perkasa */}
+                  <div className="flex flex-col justify-between h-52 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                        Pemesan Resmi,
+                      </p>
+                      <p className="text-xs font-black text-amber-800 mt-0.5">PT. DSTech Smart Perkasa</p>
+                    </div>
+
+                    <div className="h-16 relative flex items-center justify-center">
+                      {selectedPoForPrint.approvalStatus === "Disetujui & Sah" ? (
+                        <>
+                          {/* Stempel Bulat Digital Resmi PT DSTech */}
+                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[7px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
+                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
+                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL PO</span>
+                          </div>
+
+                          {/* Tanda Tangan Goresan / Gambar */}
+                          {selectedPoForPrint.signatureImage ? (
+                            <img
+                              src={selectedPoForPrint.signatureImage}
+                              alt="Tanda Tangan Digital"
+                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                            />
+                          ) : (
+                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                              {selectedPoForPrint.approvedBy || "H. Agus Supriyadi"}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center border border-dashed border-amber-300 bg-amber-50/80 rounded-lg p-2 w-full">
+                          <Clock className="w-4 h-4 text-amber-600 mb-0.5" />
+                          <span className="text-[9px] font-black text-amber-800 uppercase">Menunggu Approval Direksi</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedPoForPrint(null);
+                              handleOpenApprovalPo(selectedPoForPrint);
+                            }}
+                            className="mt-1 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-700 text-white font-bold text-[9px] cursor-pointer shadow-sm"
+                          >
+                            Setujui Sekarang
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-xs">
+                        ( {selectedPoForPrint.approvedBy || "H. Agus Supriyadi, S.T., M.Kom."} )
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {selectedPoForPrint.approvedTitle || "Direktur Keuangan & Operasional"}
+                      </p>
+                      {selectedPoForPrint.verificationCode && (
+                        <p className="text-[9px] font-mono text-emerald-700 font-bold mt-0.5">
+                          Verifikasi: {selectedPoForPrint.verificationCode}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
