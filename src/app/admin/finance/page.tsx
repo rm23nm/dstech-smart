@@ -43,6 +43,9 @@ import {
   Mail,
   Landmark,
   UserPlus,
+  PenTool,
+  CheckCheck,
+  Eraser,
 } from "lucide-react";
 
 interface SaleItem {
@@ -69,13 +72,46 @@ interface SaleInvoice {
   taxAmount: number;
   grandTotal: number;
   paymentMethod: string;
-  paymentStatus: "Lunas" | "Belum Lunas" | "Sebagian" | "Jatuh Tempo";
+  paymentStatus: string;
   paidAmount: number;
   remainingAmount: number;
+  invoiceType?: "Standar" | "DP";
+  dpPercentage?: number;
+  dpAmount?: number;
+  dpStatus?: string;
+  dpPaidAmount?: number;
+  dpNotes?: string;
   warehouseId: string;
   branchId: string;
   salesPerson: string;
   notes: string;
+  approvalStatus?: string;
+  approvedBy?: string;
+  approvedTitle?: string;
+  approvedAt?: string;
+  verificationCode?: string;
+  signatureImage?: string;
+  approvalNotes?: string;
+}
+
+interface BankAccount {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountHolder: string;
+  branch: string;
+  isDefault?: boolean;
+  status: string;
+}
+
+interface FinanceSettings {
+  letterheadUrl: string;
+  letterheadEnabled: boolean;
+  watermarkOpacity: number;
+  signerName?: string;
+  signerTitle?: string;
+  masterSignatureUrl?: string;
+  masterStampUrl?: string;
 }
 
 interface PurchaseItem {
@@ -289,6 +325,90 @@ export default function AdminFinanceERPPage() {
   const [isNewCashModalOpen, setIsNewCashModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<SaleInvoice | null>(null);
 
+  // Bank Accounts & Settings States
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
+    {
+      id: "dstech_bank_1",
+      bankName: "Bank Mandiri",
+      accountNumber: "163-00-1122334-5",
+      accountHolder: "PT. DSTech Smart Perkasa",
+      branch: "KCP Cilegon City Square",
+      isDefault: true,
+      status: "Aktif",
+    },
+    {
+      id: "dstech_bank_2",
+      bankName: "Bank BCA",
+      accountNumber: "295-888-9900",
+      accountHolder: "PT. DSTech Smart Perkasa",
+      branch: "KCU Cilegon",
+      isDefault: false,
+      status: "Aktif",
+    },
+  ]);
+
+  const [financeSettings, setFinanceSettings] = useState<FinanceSettings>({
+    letterheadUrl: "/kop_surat_dstech.jpg",
+    letterheadEnabled: true,
+    watermarkOpacity: 0.15,
+    signerName: "H. Agus Supriyadi, S.T., M.Kom.",
+    signerTitle: "Direktur Keuangan & Operasional",
+    masterSignatureUrl: "",
+    masterStampUrl: "",
+  });
+
+  // Terima Pembayaran Modal State
+  const [isPayInvoiceModalOpen, setIsPayInvoiceModalOpen] = useState<boolean>(false);
+  const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<SaleInvoice | null>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    amount: 0,
+    paymentMethod: "Bank Mandiri PT DSTech Smart Perkasa",
+    paymentDate: new Date().toISOString().split("T")[0],
+    notes: "",
+  });
+
+  // Edit Sale Modal State
+  const [isEditSaleModalOpen, setIsEditSaleModalOpen] = useState<boolean>(false);
+  const [editingSale, setEditingSale] = useState<SaleInvoice | null>(null);
+
+  // Bank Account Settings Modal State
+  const [isBankAccountsModalOpen, setIsBankAccountsModalOpen] = useState<boolean>(false);
+  const [editingBankAccount, setEditingBankAccount] = useState<BankAccount | null>(null);
+  const [bankAccountForm, setBankAccountForm] = useState({
+    bankName: "Bank Mandiri",
+    accountNumber: "",
+    accountHolder: "PT. DSTech Smart Perkasa",
+    branch: "Cilegon",
+    isDefault: false,
+    status: "Aktif",
+  });
+
+  // Letterhead Settings Modal State
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+  const [tempSettings, setTempSettings] = useState<FinanceSettings>({
+    letterheadUrl: "/kop_surat_dstech.jpg",
+    letterheadEnabled: true,
+    watermarkOpacity: 0.15,
+    signerName: "H. Agus Supriyadi, S.T., M.Kom.",
+    signerTitle: "Direktur Keuangan & Operasional",
+    masterSignatureUrl: "",
+    masterStampUrl: "",
+  });
+
+  // Approval & Digital Signature Modal States
+  const [isApprovalModalOpen, setIsApprovalModalOpen] = useState<boolean>(false);
+  const [selectedInvoiceForApproval, setSelectedInvoiceForApproval] = useState<SaleInvoice | null>(null);
+  const [approvalMode, setApprovalMode] = useState<"canvas" | "master" | "upload">("canvas");
+  const [signerNameInput, setSignerNameInput] = useState<string>("H. Agus Supriyadi, S.T., M.Kom.");
+  const [signerTitleInput, setSignerTitleInput] = useState<string>("Direktur Keuangan & Operasional");
+  const [approvalNotesInput, setApprovalNotesInput] = useState<string>("Disetujui untuk diterbitkan secara sah kepada klien.");
+  const [uploadedSignatureBase64, setUploadedSignatureBase64] = useState<string>("");
+  const [isSubmittingApproval, setIsSubmittingApproval] = useState<boolean>(false);
+
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [hasDrawn, setHasDrawn] = useState<boolean>(false);
+
   // Master Client Modal State
   const [isClientModalOpen, setIsClientModalOpen] = useState<boolean>(false);
   const [editingClient, setEditingClient] = useState<ClientItem | null>(null);
@@ -330,6 +450,10 @@ export default function AdminFinanceERPPage() {
     date: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
     paymentMethod: "Transfer Bank Mandiri PT DSTech Smart Perkasa",
+    invoiceType: "Standar" as "Standar" | "DP",
+    dpPercentage: 50,
+    dpAmount: 0,
+    dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Instalasi & Pengadaan",
     items: [
       { id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
     ],
@@ -395,6 +519,11 @@ export default function AdminFinanceERPPage() {
           setExpenses(d.data.expenses || []);
           setClients(d.data.clients || []);
           setSuppliers(d.data.suppliers || []);
+          if (d.data.bank_accounts) setBankAccounts(d.data.bank_accounts);
+          if (d.data.settings) {
+            setFinanceSettings(d.data.settings);
+            setTempSettings(d.data.settings);
+          }
           if (d.data.summary) setSummary(d.data.summary);
         }
       }
@@ -446,12 +575,18 @@ export default function AdminFinanceERPPage() {
     const afterDiscount = Math.max(0, subtotal - Number(saleForm.discount || 0));
     const taxAmount = (afterDiscount * Number(saleForm.taxRate || 0)) / 100;
     const grandTotal = afterDiscount + taxAmount;
-    return { subtotal, afterDiscount, taxAmount, grandTotal };
+    const dpAmount =
+      saleForm.invoiceType === "DP"
+        ? saleForm.dpAmount > 0
+          ? saleForm.dpAmount
+          : Math.round(grandTotal * (Number(saleForm.dpPercentage || 50) / 100))
+        : 0;
+    return { subtotal, afterDiscount, taxAmount, grandTotal, dpAmount };
   };
 
   const handleCreateSaleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { subtotal, taxAmount, grandTotal } = calculateSaleTotals();
+    const { subtotal, taxAmount, grandTotal, dpAmount } = calculateSaleTotals();
 
     if (saleForm.items.some((it) => !it.productName || it.price <= 0)) {
       showToast("Mohon isi nama produk dan harga valid untuk semua baris item!");
@@ -471,6 +606,10 @@ export default function AdminFinanceERPPage() {
             date: saleForm.date,
             dueDate: saleForm.dueDate,
             paymentMethod: saleForm.paymentMethod,
+            invoiceType: saleForm.invoiceType,
+            dpPercentage: saleForm.invoiceType === "DP" ? Number(saleForm.dpPercentage) : 0,
+            dpAmount: saleForm.invoiceType === "DP" ? dpAmount : 0,
+            dpNotes: saleForm.invoiceType === "DP" ? saleForm.dpNotes : "-",
             items: saleForm.items,
             subtotal,
             discount: Number(saleForm.discount),
@@ -493,6 +632,10 @@ export default function AdminFinanceERPPage() {
           date: new Date().toISOString().split("T")[0],
           dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
           paymentMethod: "Transfer Bank Mandiri PT DSTech Smart Perkasa",
+          invoiceType: "Standar",
+          dpPercentage: 50,
+          dpAmount: 0,
+          dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Instalasi & Pengadaan",
           items: [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
           discount: 0,
           taxRate: 11,
@@ -506,6 +649,428 @@ export default function AdminFinanceERPPage() {
     } catch {
       showToast("Terjadi kesalahan jaringan");
     }
+  };
+
+  // Handler Terima Pembayaran
+  const handleOpenPayInvoice = (invoice: SaleInvoice) => {
+    setSelectedInvoiceForPayment(invoice);
+    let defaultAmount = invoice.remainingAmount;
+    if (invoice.invoiceType === "DP" && (Number(invoice.dpPaidAmount) || 0) < (Number(invoice.dpAmount) || 0)) {
+      defaultAmount = Math.max(0, (Number(invoice.dpAmount) || 0) - (Number(invoice.dpPaidAmount) || 0));
+    }
+    const defaultAcc =
+      bankAccounts.find((b) => b.isDefault)?.bankName
+        ? `${bankAccounts.find((b) => b.isDefault)?.bankName} PT DSTech Smart Perkasa`
+        : "Bank Mandiri PT DSTech Smart Perkasa";
+
+    setPaymentForm({
+      amount: defaultAmount,
+      paymentMethod: defaultAcc,
+      paymentDate: new Date().toISOString().split("T")[0],
+      notes: invoice.invoiceType === "DP" ? "Penerimaan Pembayaran Uang Muka (DP)" : "Penerimaan Pelunasan Faktur",
+    });
+    setIsPayInvoiceModalOpen(true);
+  };
+
+  const handleRecordPaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInvoiceForPayment) return;
+    if (paymentForm.amount <= 0) {
+      showToast("Nominal pembayaran harus lebih besar dari Rp 0!");
+      return;
+    }
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "record_payment",
+          payload: {
+            invoiceId: selectedInvoiceForPayment.id,
+            paymentAmount: Number(paymentForm.amount),
+            paymentMethod: paymentForm.paymentMethod,
+            paymentDate: paymentForm.paymentDate,
+            notes: paymentForm.notes,
+          },
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast(result.message || "Pembayaran berhasil dibukukan ke kas masuk!");
+        setIsPayInvoiceModalOpen(false);
+        setSelectedInvoiceForPayment(null);
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal membukukan pembayaran");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menyimpan pembayaran");
+    }
+  };
+
+  // Handler Edit Faktur
+  const handleOpenEditSale = (sale: SaleInvoice) => {
+    setEditingSale({
+      ...sale,
+      items: sale.items.map((it) => ({ ...it })),
+    });
+    setIsEditSaleModalOpen(true);
+  };
+
+  const handleEditSaleItemChange = (idx: number, field: string, val: any) => {
+    if (!editingSale) return;
+    const updated = [...editingSale.items];
+    const item = { ...updated[idx], [field]: val };
+    if (field === "qty" || field === "price") {
+      item.total = Number(item.qty || 0) * Number(item.price || 0);
+    }
+    updated[idx] = item;
+
+    const subtotal = updated.reduce((acc, curr) => acc + (curr.total || 0), 0);
+    const afterDiscount = Math.max(0, subtotal - Number(editingSale.discount || 0));
+    const taxAmount = (afterDiscount * Number(editingSale.taxRate || 0)) / 100;
+    const grandTotal = afterDiscount + taxAmount;
+    const dpPercentage = editingSale.dpPercentage || 50;
+    const dpAmount =
+      editingSale.invoiceType === "DP" ? Math.round(grandTotal * (dpPercentage / 100)) : 0;
+    const remainingAmount = Math.max(0, grandTotal - (Number(editingSale.paidAmount) || 0));
+
+    setEditingSale({
+      ...editingSale,
+      items: updated,
+      subtotal,
+      taxAmount,
+      grandTotal,
+      dpAmount,
+      remainingAmount,
+    });
+  };
+
+  const handleAddEditSaleItem = () => {
+    if (!editingSale) return;
+    setEditingSale({
+      ...editingSale,
+      items: [
+        ...editingSale.items,
+        { id: String(Date.now()), productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
+      ],
+    });
+  };
+
+  const handleRemoveEditSaleItem = (idx: number) => {
+    if (!editingSale || editingSale.items.length <= 1) return;
+    const updated = editingSale.items.filter((_, i) => i !== idx);
+    const subtotal = updated.reduce((acc, curr) => acc + (curr.total || 0), 0);
+    const afterDiscount = Math.max(0, subtotal - Number(editingSale.discount || 0));
+    const taxAmount = (afterDiscount * Number(editingSale.taxRate || 0)) / 100;
+    const grandTotal = afterDiscount + taxAmount;
+    const dpAmount =
+      editingSale.invoiceType === "DP"
+        ? Math.round(grandTotal * ((editingSale.dpPercentage || 50) / 100))
+        : 0;
+    const remainingAmount = Math.max(0, grandTotal - (Number(editingSale.paidAmount) || 0));
+
+    setEditingSale({
+      ...editingSale,
+      items: updated,
+      subtotal,
+      taxAmount,
+      grandTotal,
+      dpAmount,
+      remainingAmount,
+    });
+  };
+
+  const handleEditSaleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSale) return;
+
+    if (editingSale.items.some((it) => !it.productName || it.price <= 0)) {
+      showToast("Mohon isi nama produk dan harga valid untuk semua baris item!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "sale",
+          id: editingSale.id,
+          updates: {
+            customerName: editingSale.customerName,
+            customerPhone: editingSale.customerPhone,
+            customerAddress: editingSale.customerAddress,
+            date: editingSale.date,
+            dueDate: editingSale.dueDate,
+            invoiceType: editingSale.invoiceType,
+            dpPercentage: editingSale.dpPercentage,
+            dpAmount: editingSale.dpAmount,
+            dpNotes: editingSale.dpNotes,
+            items: editingSale.items,
+            subtotal: editingSale.subtotal,
+            discount: Number(editingSale.discount || 0),
+            taxRate: Number(editingSale.taxRate || 0),
+            taxAmount: editingSale.taxAmount,
+            grandTotal: editingSale.grandTotal,
+            paidAmount: Number(editingSale.paidAmount || 0),
+            paymentMethod: editingSale.paymentMethod,
+            notes: editingSale.notes,
+          },
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast(`Faktur ${editingSale.invoiceNumber} berhasil diperbarui!`);
+        setIsEditSaleModalOpen(false);
+        setEditingSale(null);
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal memperbarui faktur penjualan");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menyimpan perubahan faktur");
+    }
+  };
+
+  // Handler Hapus Faktur
+  const handleDeleteSale = async (id: string, invoiceNumber: string) => {
+    if (!window.confirm(`Yakin ingin menghapus Faktur ${invoiceNumber}? Data yang dihapus tidak dapat dipulihkan.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/finance?actionType=sale&id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast(`Faktur ${invoiceNumber} berhasil dihapus!`);
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal menghapus faktur penjualan");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menghapus faktur");
+    }
+  };
+
+  // Handler Rekening Bank
+  const handleSaveBankAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingBankAccount) {
+        const res = await fetch("/api/finance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "bank_account",
+            id: editingBankAccount.id,
+            updates: bankAccountForm,
+          }),
+        });
+        const d = await res.json();
+        if (d.success) {
+          showToast(`Rekening ${bankAccountForm.bankName} berhasil diperbarui!`);
+          setEditingBankAccount(null);
+          setBankAccountForm({
+            bankName: "Bank Mandiri",
+            accountNumber: "",
+            accountHolder: "PT. DSTech Smart Perkasa",
+            branch: "Cilegon",
+            isDefault: false,
+            status: "Aktif",
+          });
+          fetchFinanceData();
+        }
+      } else {
+        const res = await fetch("/api/finance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "bank_account",
+            payload: bankAccountForm,
+          }),
+        });
+        const d = await res.json();
+        if (d.success) {
+          showToast(`Rekening ${bankAccountForm.bankName} berhasil ditambahkan!`);
+          setBankAccountForm({
+            bankName: "Bank Mandiri",
+            accountNumber: "",
+            accountHolder: "PT. DSTech Smart Perkasa",
+            branch: "Cilegon",
+            isDefault: false,
+            status: "Aktif",
+          });
+          fetchFinanceData();
+        }
+      }
+    } catch {
+      showToast("Gagal menyimpan rekening bank");
+    }
+  };
+
+  const handleDeleteBankAccount = async (id: string, bankName: string) => {
+    if (!window.confirm(`Hapus rekening ${bankName}?`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=bank_account&id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const d = await res.json();
+      if (d.success) {
+        showToast("Rekening bank berhasil dihapus");
+        fetchFinanceData();
+      }
+    } catch {
+      showToast("Gagal menghapus rekening");
+    }
+  };
+
+  // Handler Pengaturan Kop Surat
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "settings",
+          updates: tempSettings,
+        }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setFinanceSettings(tempSettings);
+        showToast("Pengaturan kop surat & background faktur berhasil disimpan!");
+        setIsSettingsModalOpen(false);
+      }
+    } catch {
+      showToast("Gagal menyimpan pengaturan kop surat");
+    }
+  };
+
+  // Canvas Drawing & Digital Signature Handlers
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    setIsDrawing(true);
+    setHasDrawn(true);
+    const rect = canvas.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#1e3a8a"; // Navy Corporate Blue
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasDrawn(false);
+  };
+
+  const handleOpenApprovalModal = (invoice: SaleInvoice) => {
+    setSelectedInvoiceForApproval(invoice);
+    setSignerNameInput(invoice.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom.");
+    setSignerTitleInput(invoice.approvedTitle || financeSettings.signerTitle || "Direktur Keuangan & Operasional");
+    setApprovalNotesInput(invoice.approvalNotes || "Disetujui untuk diterbitkan secara sah kepada klien.");
+    setUploadedSignatureBase64(invoice.signatureImage || "");
+    setApprovalMode("canvas");
+    setIsApprovalModalOpen(true);
+    setHasDrawn(false);
+    setTimeout(() => {
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext("2d");
+        if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+    }, 150);
+  };
+
+  const handleApproveInvoice = async () => {
+    if (!selectedInvoiceForApproval) return;
+    setIsSubmittingApproval(true);
+    try {
+      let signatureImage = "";
+      if (approvalMode === "canvas" && canvasRef.current && hasDrawn) {
+        signatureImage = canvasRef.current.toDataURL("image/png");
+      } else if (approvalMode === "upload") {
+        signatureImage = uploadedSignatureBase64;
+      } else if (approvalMode === "master") {
+        signatureImage = financeSettings.masterSignatureUrl || "";
+      }
+
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "approve_document",
+          payload: {
+            id: selectedInvoiceForApproval.id,
+            documentType: "sale",
+            signatureImage,
+            signerName: signerNameInput,
+            signerTitle: signerTitleInput,
+            notes: approvalNotesInput,
+          },
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        setSales((prev) =>
+          prev.map((s) => (s.id === selectedInvoiceForApproval.id ? json.data : s))
+        );
+        if (selectedInvoiceForPrint && selectedInvoiceForPrint.id === selectedInvoiceForApproval.id) {
+          setSelectedInvoiceForPrint(json.data);
+        }
+        setIsApprovalModalOpen(false);
+        showToast(json.message || "Faktur berhasil disetujui & disahkan!");
+      } else {
+        showToast(json.error || "Gagal menyetujui faktur.");
+      }
+    } catch (err) {
+      console.error("Error approving invoice:", err);
+      showToast("Terjadi kesalahan saat menyetujui faktur.");
+    } finally {
+      setIsSubmittingApproval(false);
+    }
+  };
+
+  const handleSignatureFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setUploadedSignatureBase64(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   // Handler Cash Form Submit
@@ -1129,7 +1694,7 @@ export default function AdminFinanceERPPage() {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
@@ -1137,8 +1702,30 @@ export default function AdminFinanceERPPage() {
                 >
                   <option value="Semua">Semua Status Bayar</option>
                   <option value="Lunas">Lunas</option>
+                  <option value="Menunggu DP">Menunggu DP</option>
+                  <option value="DP Lunas (Sisa Pelunasan)">DP Lunas (Sisa Pelunasan)</option>
                   <option value="Belum Lunas">Belum Lunas</option>
                 </select>
+
+                {/* Tombol Pengaturan Rekening Bank DSTech */}
+                <button
+                  onClick={() => setIsBankAccountsModalOpen(true)}
+                  title="Kelola Rekening Bank Perusahaan DSTech"
+                  className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Landmark className="w-4 h-4 text-emerald-600" />
+                  <span className="hidden sm:inline">Rekening Bank DSTech</span>
+                </button>
+
+                {/* Tombol Pengaturan Kop Surat */}
+                <button
+                  onClick={() => setIsSettingsModalOpen(true)}
+                  title="Atur Background Kop Surat Resmi Faktur"
+                  className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-4 h-4 text-dstech-blue" />
+                  <span className="hidden sm:inline">Kop Surat & Watermark</span>
+                </button>
 
                 <button
                   onClick={() => setIsNewSaleModalOpen(true)}
@@ -1175,7 +1762,14 @@ export default function AdminFinanceERPPage() {
                     .map((sale) => (
                       <tr key={sale.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="p-3 font-black text-slate-900 whitespace-nowrap">
-                          <span className="font-mono text-dstech-blue">{sale.invoiceNumber}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-dstech-blue">{sale.invoiceNumber}</span>
+                            {sale.invoiceType === "DP" && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800 uppercase tracking-wider">
+                                DP {sale.dpPercentage || 50}%
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-3">
                           <p className="font-bold text-slate-900">{sale.customerName}</p>
@@ -1196,31 +1790,112 @@ export default function AdminFinanceERPPage() {
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <p className="font-black text-slate-900">{formatRupiah(sale.grandTotal)}</p>
-                          {sale.remainingAmount > 0 && (
+                          {sale.invoiceType === "DP" && (
+                            <p className="text-[10px] text-amber-700 font-bold">
+                              Tagihan DP: {formatRupiah(sale.dpAmount || 0)}
+                            </p>
+                          )}
+                          {sale.remainingAmount > 0 ? (
                             <p className="text-[10px] text-red-600 font-bold">
                               Sisa Piutang: {formatRupiah(sale.remainingAmount)}
                             </p>
+                          ) : (
+                            <p className="text-[10px] text-emerald-600 font-bold">Lunas Terbayar</p>
                           )}
                         </td>
                         <td className="p-3 whitespace-nowrap">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
-                              sale.paymentStatus === "Lunas"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-amber-100 text-amber-800"
-                            }`}
-                          >
-                            {sale.paymentStatus}
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                sale.paymentStatus === "Lunas"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : sale.paymentStatus?.includes("DP Lunas")
+                                  ? "bg-blue-100 text-dstech-blue"
+                                  : sale.paymentStatus?.includes("DP")
+                                  ? "bg-amber-100 text-amber-800"
+                                  : "bg-rose-100 text-rose-800"
+                              }`}
+                            >
+                              {sale.paymentStatus}
+                            </span>
+                            {sale.approvalStatus === "Disetujui & Sah" ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                <ShieldCheck className="w-3 h-3 text-indigo-600" />
+                                Sah Digital
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                <Clock className="w-3 h-3 text-amber-500" />
+                                Menunggu Approval
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-3 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => setSelectedInvoiceForPrint(sale)}
-                            className="px-3 py-1.5 rounded-xl bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white font-bold text-[11px] transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span>Cetak Faktur</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Approval & Tanda Tangan Digital */}
+                            <button
+                              onClick={() => handleOpenApprovalModal(sale)}
+                              title={
+                                sale.approvalStatus === "Disetujui & Sah"
+                                  ? `Disetujui & Sah oleh ${sale.approvedBy || "Direktur"} (Klik untuk atur ulang / tanda tangani)`
+                                  : "Approval & Tanda Tangan Digital Direktur"
+                              }
+                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
+                                sale.approvalStatus === "Disetujui & Sah"
+                                  ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white"
+                                  : "bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white ring-1 ring-amber-300"
+                              }`}
+                            >
+                              <PenTool className="w-4 h-4" />
+                            </button>
+
+                            {/* Terima Pembayaran / Bayar DP */}
+                            {sale.remainingAmount > 0 ? (
+                              <button
+                                onClick={() => handleOpenPayInvoice(sale)}
+                                title="Terima Pembayaran / Bayar DP"
+                                className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <CreditCard className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <button
+                                disabled
+                                title="Faktur Sudah Lunas"
+                                className="p-2 rounded-xl bg-slate-100 text-slate-300 cursor-not-allowed"
+                              >
+                                <CheckCircle2 className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {/* Cetak Faktur Resmi Kop DSTech */}
+                            <button
+                              onClick={() => setSelectedInvoiceForPrint(sale)}
+                              title="Cetak Faktur Resmi Kop DSTech"
+                              className="p-2 rounded-xl bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </button>
+
+                            {/* Edit Faktur */}
+                            <button
+                              onClick={() => handleOpenEditSale(sale)}
+                              title="Edit Faktur Penjualan"
+                              className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+
+                            {/* Hapus Faktur */}
+                            <button
+                              onClick={() => handleDeleteSale(sale.id, sale.invoiceNumber)}
+                              title="Hapus Faktur"
+                              className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -2144,7 +2819,7 @@ export default function AdminFinanceERPPage() {
 
               {/* Calculations Box */}
               {(() => {
-                const { subtotal, taxAmount, grandTotal } = calculateSaleTotals();
+                const { subtotal, taxAmount, grandTotal, dpAmount } = calculateSaleTotals();
                 return (
                   <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
                     <div className="flex items-center justify-between text-slate-300">
@@ -2182,10 +2857,143 @@ export default function AdminFinanceERPPage() {
                       <span className="text-xl text-emerald-400">{formatRupiah(grandTotal)}</span>
                     </div>
 
+                    {/* Opsi Tipe Faktur: Standar vs Pengajuan DP */}
+                    <div className="pt-2 border-t border-slate-700/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-bold text-amber-300 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5" />
+                          <span>Tipe Faktur Penjualan:</span>
+                        </label>
+                        <div className="flex rounded-lg overflow-hidden border border-slate-700 p-0.5 bg-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => setSaleForm({ ...saleForm, invoiceType: "Standar" })}
+                            className={`px-2.5 py-1 text-[10px] font-black rounded cursor-pointer ${
+                              saleForm.invoiceType === "Standar" ? "bg-dstech-blue text-white" : "text-slate-400"
+                            }`}
+                          >
+                            Standar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSaleForm({ ...saleForm, invoiceType: "DP" })}
+                            className={`px-2.5 py-1 text-[10px] font-black rounded cursor-pointer ${
+                              saleForm.invoiceType === "DP" ? "bg-amber-500 text-slate-900" : "text-slate-400"
+                            }`}
+                          >
+                            Pengajuan DP
+                          </button>
+                        </div>
+                      </div>
+
+                      {saleForm.invoiceType === "DP" && (
+                        <div className="p-2.5 rounded-xl bg-slate-800/90 border border-amber-500/40 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] text-amber-300 font-bold">Pilih Termin Uang Muka (DP):</span>
+                            <div className="flex gap-1">
+                              {[30, 50, 70].map((pct) => (
+                                <button
+                                  key={pct}
+                                  type="button"
+                                  onClick={() =>
+                                    setSaleForm({
+                                      ...saleForm,
+                                      dpPercentage: pct,
+                                      dpAmount: Math.round(grandTotal * (pct / 100)),
+                                      paidAmount: 0,
+                                    })
+                                  }
+                                  className={`px-2 py-0.5 text-[10px] font-black rounded cursor-pointer ${
+                                    saleForm.dpPercentage === pct
+                                      ? "bg-amber-400 text-slate-900"
+                                      : "bg-slate-700 text-slate-300"
+                                  }`}
+                                >
+                                  {pct}%
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-0.5">Persen DP (%):</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={saleForm.dpPercentage}
+                                onChange={(e) => {
+                                  const pct = Number(e.target.value);
+                                  setSaleForm({
+                                    ...saleForm,
+                                    dpPercentage: pct,
+                                    dpAmount: Math.round(grandTotal * (pct / 100)),
+                                  });
+                                }}
+                                className="w-full p-1.5 rounded bg-slate-900 border border-slate-700 text-white font-mono font-bold text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-400 block mb-0.5">Nilai Tagihan DP (Rp):</label>
+                              <input
+                                type="number"
+                                min={0}
+                                max={grandTotal}
+                                value={dpAmount}
+                                onChange={(e) =>
+                                  setSaleForm({
+                                    ...saleForm,
+                                    dpAmount: Number(e.target.value),
+                                    dpPercentage:
+                                      grandTotal > 0
+                                        ? Math.round((Number(e.target.value) / grandTotal) * 100)
+                                        : 0,
+                                  })
+                                }
+                                className="w-full p-1.5 rounded bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-xs"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-0.5">Catatan / Termin DP:</label>
+                            <input
+                              type="text"
+                              value={saleForm.dpNotes}
+                              onChange={(e) => setSaleForm({ ...saleForm, dpNotes: e.target.value })}
+                              placeholder="Contoh: DP 50% sebelum instalasi dimulai..."
+                              className="w-full p-1.5 rounded bg-slate-900 border border-slate-700 text-slate-200 text-xs"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-700 text-slate-300">
+                            <span>Sisa Pelunasan Setelah BAST:</span>
+                            <span className="font-mono text-emerald-400 font-bold">
+                              {formatRupiah(Math.max(0, grandTotal - dpAmount))}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="pt-2">
-                      <label className="text-[10px] text-slate-400 block mb-1">
-                        Jumlah Dibayar Sekarang (DP / Lunas):
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] text-slate-400">
+                          {saleForm.invoiceType === "DP"
+                            ? "Uang Muka (DP) Sudah Diterima Sekarang? (Rp):"
+                            : "Jumlah Dibayar Sekarang (Rp):"}
+                        </label>
+                        {saleForm.invoiceType === "DP" && dpAmount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSaleForm({ ...saleForm, paidAmount: dpAmount })}
+                            className="text-[10px] text-amber-400 hover:underline cursor-pointer"
+                          >
+                            Set Lunas DP ({formatRupiah(dpAmount)})
+                          </button>
+                        )}
+                      </div>
                       <input
                         type="number"
                         min={0}
@@ -2364,12 +3172,32 @@ export default function AdminFinanceERPPage() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Action Bar (Top) */}
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 print:hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
               <span className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                 <Printer className="w-4 h-4 text-dstech-blue" />
                 Format Faktur Resmi PT. DSTech Smart Perkasa
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsModalOpen(true)}
+                  title="Ganti Background Kop Surat"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-dstech-blue" />
+                  <span>Kop Surat</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBankAccountsModalOpen(true)}
+                  title="Atur Nomor Rekening"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Rekening</span>
+                </button>
+
                 <button
                   onClick={() => window.print()}
                   className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
@@ -2379,169 +3207,305 @@ export default function AdminFinanceERPPage() {
                 </button>
                 <button
                   onClick={() => setSelectedInvoiceForPrint(null)}
-                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
-            {/* FAKTUR CONTENT CONTAINER (Siap Cetak) */}
-            <div className="p-6 sm:p-8 rounded-2xl border border-slate-300 bg-white space-y-6 text-slate-800">
-              {/* Kop Surat Perusahaan */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
-                      PT. DSTECH SMART PERKASA
-                    </span>
+            {/* FAKTUR CONTENT CONTAINER (Siap Cetak & Watermarked) */}
+            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-8 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+              {/* Background Kop Surat Resmi DSTech */}
+              {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                <div
+                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  style={{
+                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    opacity: financeSettings.watermarkOpacity || 0.15,
+                  }}
+                />
+              )}
+
+              <div className="relative z-10 space-y-6">
+                {/* Kop Surat Perusahaan */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
+                        PT. DSTECH SMART PERKASA
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-bold text-slate-600">
+                      Solusi Security System, CCTV, Access Control, IoT & IT Infrastructure
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-relaxed max-w-md">
+                      Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
+                      <br />
+                      <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>
+                      <br />
+                      WhatsApp CS: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
+                    </p>
                   </div>
-                  <p className="text-[11px] font-bold text-slate-600">
-                    Solusi Security System, CCTV, Access Control, IoT & IT Infrastructure
-                  </p>
-                  <p className="text-[10px] text-slate-500 leading-relaxed max-w-md">
-                    Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
-                    <br />
-                    WhatsApp CS: 0822-5949-4242 | Email: cs@dstechsmart.com | Website: https://dstechsmart.com
-                  </p>
+
+                  <div className="text-left sm:text-right space-y-1">
+                    <span className="px-3 py-1 rounded-md bg-slate-900 text-white font-black text-xs uppercase tracking-wider inline-block">
+                      {selectedInvoiceForPrint.invoiceType === "DP"
+                        ? `FAKTUR PENGAJUAN UANG MUKA (DP ${selectedInvoiceForPrint.dpPercentage || 50}%)`
+                        : "FAKTUR PENJUALAN"}
+                    </span>
+                    <p className="font-mono font-black text-sm text-dstech-blue">
+                      {selectedInvoiceForPrint.invoiceNumber}
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Tanggal: {selectedInvoiceForPrint.date}
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Jatuh Tempo: {selectedInvoiceForPrint.dueDate}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="text-left sm:text-right space-y-1">
-                  <span className="px-3 py-1 rounded-md bg-slate-900 text-white font-black text-xs uppercase tracking-wider inline-block">
-                    FAKTUR PENJUALAN
-                  </span>
-                  <p className="font-mono font-black text-sm text-dstech-blue">
-                    {selectedInvoiceForPrint.invoiceNumber}
-                  </p>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    Tanggal: {selectedInvoiceForPrint.date}
-                  </p>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    Jatuh Tempo: {selectedInvoiceForPrint.dueDate}
-                  </p>
-                </div>
-              </div>
+                {/* Banner Rincian Pengajuan DP (Khusus Faktur DP) */}
+                {selectedInvoiceForPrint.invoiceType === "DP" && (
+                  <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div>
+                      <span className="font-black flex items-center gap-1.5 text-amber-900">
+                        <Sparkles className="w-4 h-4 text-amber-600" />
+                        Pengajuan Uang Muka (Down Payment {selectedInvoiceForPrint.dpPercentage || 50}%)
+                      </span>
+                      <p className="text-[11px] text-amber-800 mt-0.5">
+                        {selectedInvoiceForPrint.dpNotes ||
+                          "Uang muka pelaksanaan pekerjaan/proyek. Sisa pelunasan dibayarkan setelah Berita Acara Serah Terima (BAST)."}
+                      </p>
+                    </div>
+                    <div className="sm:text-right whitespace-nowrap bg-white/80 p-2 rounded-xl border border-amber-200">
+                      <span className="text-[9px] text-amber-700 block uppercase font-bold tracking-wider">
+                        Jumlah Tagihan DP:
+                      </span>
+                      <span className="text-base font-black font-mono text-amber-900">
+                        {formatRupiah(selectedInvoiceForPrint.dpAmount || 0)}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
-              {/* Data Klien */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tagihan Kepada:</p>
-                  <p className="font-black text-slate-900 text-sm mt-0.5">
-                    {selectedInvoiceForPrint.customerName}
-                  </p>
-                  <p className="text-slate-600 mt-0.5">{selectedInvoiceForPrint.customerPhone}</p>
-                  <p className="text-slate-500">{selectedInvoiceForPrint.customerAddress}</p>
+                {/* Data Klien */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-50/90 p-4 rounded-xl border border-slate-200">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tagihan Kepada:</p>
+                    <p className="font-black text-slate-900 text-sm mt-0.5">
+                      {selectedInvoiceForPrint.customerName}
+                    </p>
+                    <p className="text-slate-600 mt-0.5">{selectedInvoiceForPrint.customerPhone}</p>
+                    <p className="text-slate-500">{selectedInvoiceForPrint.customerAddress}</p>
+                  </div>
+                  <div className="sm:text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Status Pembayaran:</p>
+                    <span
+                      className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-black uppercase ${
+                        selectedInvoiceForPrint.paymentStatus === "Lunas"
+                          ? "bg-green-100 text-green-800"
+                          : selectedInvoiceForPrint.paymentStatus?.includes("DP")
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-rose-100 text-rose-800"
+                      }`}
+                    >
+                      {selectedInvoiceForPrint.paymentStatus}
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Metode: {selectedInvoiceForPrint.paymentMethod}
+                    </p>
+                  </div>
                 </div>
-                <div className="sm:text-right">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Status Pembayaran:</p>
-                  <span
-                    className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-black uppercase ${
-                      selectedInvoiceForPrint.paymentStatus === "Lunas"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-amber-100 text-amber-800"
-                    }`}
-                  >
-                    {selectedInvoiceForPrint.paymentStatus}
-                  </span>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Metode: {selectedInvoiceForPrint.paymentMethod}
-                  </p>
-                </div>
-              </div>
 
-              {/* Tabel Item Faktur */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-wider">
-                    <tr>
-                      <th className="p-2.5">No</th>
-                      <th className="p-2.5">Deskripsi Produk / Layanan</th>
-                      <th className="p-2.5 text-center">Qty</th>
-                      <th className="p-2.5 text-center">Satuan</th>
-                      <th className="p-2.5 text-right">Harga Satuan</th>
-                      <th className="p-2.5 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {selectedInvoiceForPrint.items.map((it, idx) => (
-                      <tr key={idx}>
-                        <td className="p-2.5 font-bold text-slate-500">{idx + 1}</td>
-                        <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
-                        <td className="p-2.5 text-center font-bold">{it.qty}</td>
-                        <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
-                        <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
-                        <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
+                {/* Tabel Item Faktur */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-wider">
+                      <tr>
+                        <th className="p-2.5">No</th>
+                        <th className="p-2.5">Deskripsi Produk / Layanan</th>
+                        <th className="p-2.5 text-center">Qty</th>
+                        <th className="p-2.5 text-center">Satuan</th>
+                        <th className="p-2.5 text-right">Harga Satuan</th>
+                        <th className="p-2.5 text-right">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Rincian Perhitungan */}
-              <div className="flex flex-col sm:flex-row justify-between gap-4 pt-3 border-t border-slate-200 text-xs">
-                <div className="space-y-2 max-w-sm">
-                  <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 text-[11px] space-y-1">
-                    <p className="font-bold text-dstech-blue">Instruksi Pembayaran Resmi Transfer Bank:</p>
-                    <p className="text-slate-700">
-                      • <strong>Bank Mandiri</strong>: 163-00-1122334-5 a/n PT DSTech Smart Perkasa
-                    </p>
-                    <p className="text-slate-700">
-                      • <strong>Bank BCA</strong>: 295-888-9900 a/n PT DSTech Smart Perkasa
-                    </p>
-                    <p className="text-[10px] text-slate-500 italic mt-1">
-                      Harap sertakan nomor faktur ({selectedInvoiceForPrint.invoiceNumber}) pada berita transfer.
-                    </p>
-                  </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white/70">
+                      {selectedInvoiceForPrint.items.map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="p-2.5 font-bold text-slate-500">{idx + 1}</td>
+                          <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
+                          <td className="p-2.5 text-center font-bold">{it.qty}</td>
+                          <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
+                          <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
+                          <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
-                <div className="space-y-1.5 sm:w-72">
-                  <div className="flex items-center justify-between text-slate-600">
-                    <span>Subtotal:</span>
-                    <span className="font-bold text-slate-900">{formatRupiah(selectedInvoiceForPrint.subtotal)}</span>
-                  </div>
-                  {selectedInvoiceForPrint.discount > 0 && (
-                    <div className="flex items-center justify-between text-red-600">
-                      <span>Diskon:</span>
-                      <span className="font-bold">- {formatRupiah(selectedInvoiceForPrint.discount)}</span>
+                {/* Rincian Perhitungan & Instruksi Rekening */}
+                <div className="flex flex-col sm:flex-row justify-between gap-4 pt-3 border-t border-slate-200 text-xs">
+                  <div className="space-y-2 max-w-sm">
+                    <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] space-y-1">
+                      <div className="flex items-center justify-between border-b border-blue-200/60 pb-1 mb-1">
+                        <p className="font-bold text-dstech-blue">Instruksi Pembayaran Resmi Transfer Bank:</p>
+                        <button
+                          type="button"
+                          onClick={() => setIsBankAccountsModalOpen(true)}
+                          className="text-[10px] text-blue-600 underline font-medium print:hidden cursor-pointer"
+                        >
+                          Atur Rekening
+                        </button>
+                      </div>
+                      {bankAccounts.filter((b) => b.status === "Aktif").map((acc) => (
+                        <p key={acc.id} className="text-slate-700">
+                          • <strong>{acc.bankName}</strong>: {acc.accountNumber} a/n {acc.accountHolder} ({acc.branch})
+                        </p>
+                      ))}
+                      <p className="text-[10px] text-slate-500 italic mt-1.5">
+                        Harap sertakan nomor faktur ({selectedInvoiceForPrint.invoiceNumber}) pada berita transfer.
+                      </p>
                     </div>
-                  )}
-                  <div className="flex items-center justify-between text-slate-600">
-                    <span>PPN ({selectedInvoiceForPrint.taxRate}%):</span>
-                    <span className="font-bold text-slate-900">{formatRupiah(selectedInvoiceForPrint.taxAmount)}</span>
                   </div>
-                  <div className="border-t-2 border-slate-900 pt-2 flex items-center justify-between text-sm font-black text-slate-900">
-                    <span>TOTAL TAGIHAN:</span>
-                    <span className="text-base text-dstech-blue">{formatRupiah(selectedInvoiceForPrint.grandTotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-600 text-[11px]">
-                    <span>Sudah Dibayar:</span>
-                    <span className="font-bold text-emerald-600">{formatRupiah(selectedInvoiceForPrint.paidAmount)}</span>
-                  </div>
-                  {selectedInvoiceForPrint.remainingAmount > 0 && (
-                    <div className="flex items-center justify-between text-red-600 text-[11px] font-bold">
-                      <span>Sisa Piutang:</span>
-                      <span>{formatRupiah(selectedInvoiceForPrint.remainingAmount)}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Tanda Tangan */}
-              <div className="grid grid-cols-2 gap-4 pt-6 border-t border-slate-200 text-center text-xs">
-                <div>
-                  <p className="text-slate-500">Penerima / Klien</p>
-                  <div className="h-16"></div>
-                  <p className="font-bold text-slate-900 underline">{selectedInvoiceForPrint.customerName}</p>
-                </div>
-                <div>
-                  <p className="text-slate-500">Hormat Kami,</p>
-                  <p className="text-[10px] font-bold text-slate-400">PT. DSTech Smart Perkasa</p>
-                  <div className="h-14 flex items-center justify-center">
-                    <span className="px-2 py-0.5 rounded border border-emerald-500 text-emerald-600 font-mono text-[9px] uppercase font-black">
-                      [Terkonfirmasi Sistem DSTech]
-                    </span>
+                  <div className="space-y-1.5 sm:w-72">
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Subtotal Kontrak:</span>
+                      <span className="font-bold text-slate-900">{formatRupiah(selectedInvoiceForPrint.subtotal)}</span>
+                    </div>
+                    {selectedInvoiceForPrint.discount > 0 && (
+                      <div className="flex items-center justify-between text-red-600">
+                        <span>Diskon:</span>
+                        <span className="font-bold">- {formatRupiah(selectedInvoiceForPrint.discount)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>PPN ({selectedInvoiceForPrint.taxRate}%):</span>
+                      <span className="font-bold text-slate-900">{formatRupiah(selectedInvoiceForPrint.taxAmount)}</span>
+                    </div>
+                    <div className="border-t-2 border-slate-900 pt-2 flex items-center justify-between text-sm font-black text-slate-900">
+                      <span>TOTAL KONTRAK:</span>
+                      <span className="text-base text-dstech-blue">{formatRupiah(selectedInvoiceForPrint.grandTotal)}</span>
+                    </div>
+
+                    {/* Breakdown DP jika faktur bertipe DP */}
+                    {selectedInvoiceForPrint.invoiceType === "DP" && (
+                      <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 space-y-1 text-[11px] my-1">
+                        <div className="flex items-center justify-between text-amber-900 font-bold">
+                          <span>Tagihan Uang Muka ({selectedInvoiceForPrint.dpPercentage}%):</span>
+                          <span>{formatRupiah(selectedInvoiceForPrint.dpAmount || 0)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-500">
+                          <span>Sisa Pelunasan Pasca BAST:</span>
+                          <span>{formatRupiah(Math.max(0, selectedInvoiceForPrint.grandTotal - (selectedInvoiceForPrint.dpAmount || 0)))}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                      <span>Sudah Dibayar:</span>
+                      <span className="font-bold text-emerald-600">{formatRupiah(selectedInvoiceForPrint.paidAmount)}</span>
+                    </div>
+                    {selectedInvoiceForPrint.remainingAmount > 0 && (
+                      <div className="flex items-center justify-between text-red-600 text-[11px] font-bold">
+                        <span>Sisa Piutang:</span>
+                        <span>{formatRupiah(selectedInvoiceForPrint.remainingAmount)}</span>
+                      </div>
+                    )}
                   </div>
-                  <p className="font-bold text-slate-900 underline">Direktur Keuangan & Operasional</p>
+                </div>
+
+                {/* Tanda Tangan Resmi Sesuai Kaidah Administrasi Korporat */}
+                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200 text-xs">
+                  {/* Sisi Kiri: Penerima / Klien */}
+                  <div className="flex flex-col justify-between h-48 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Penerima / Klien</p>
+                      <p className="text-xs font-black text-slate-900 mt-1">{selectedInvoiceForPrint.customerName}</p>
+                    </div>
+
+                    <div className="h-16 flex items-center justify-center text-slate-300 text-[10px] italic">
+                      (Tanda Tangan & Stempel Resmi Klien)
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-xs">
+                        ( ................................................................ )
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        Nama & Jabatan Penandatangan Klien
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sisi Kanan: Pengirim / PT. DSTech Smart Perkasa */}
+                  <div className="flex flex-col justify-between h-48 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
+                      <p className="text-xs font-black text-dstech-blue mt-0.5">PT. DSTech Smart Perkasa</p>
+                    </div>
+
+                    <div className="h-16 relative flex items-center justify-center">
+                      {selectedInvoiceForPrint.approvalStatus === "Disetujui & Sah" ? (
+                        <>
+                          {/* Stempel Bulat Digital Resmi PT DSTech */}
+                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-dstech-blue/50 flex flex-col items-center justify-center text-[7px] text-dstech-blue font-bold uppercase rotate-[-12deg] pointer-events-none bg-blue-50/40">
+                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
+                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">DIGITAL SIGN</span>
+                          </div>
+
+                          {/* Tanda Tangan Goresan / Gambar */}
+                          {selectedInvoiceForPrint.signatureImage ? (
+                            <img
+                              src={selectedInvoiceForPrint.signatureImage}
+                              alt="Tanda Tangan Digital"
+                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                            />
+                          ) : (
+                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                              {selectedInvoiceForPrint.approvedBy || "H. Agus Supriyadi"}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center border border-dashed border-amber-300 bg-amber-50/80 rounded-lg p-2 w-full">
+                          <Clock className="w-4 h-4 text-amber-600 mb-0.5" />
+                          <span className="text-[9px] font-black text-amber-800 uppercase">Menunggu Approval Direksi</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const inv = selectedInvoiceForPrint;
+                              setSelectedInvoiceForPrint(null);
+                              handleOpenApprovalModal(inv);
+                            }}
+                            className="mt-1 px-2.5 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[9px] font-bold shadow-sm flex items-center gap-1 cursor-pointer print:hidden"
+                          >
+                            <PenTool className="w-2.5 h-2.5" />
+                            Approval Sekarang
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 underline text-xs">
+                        {selectedInvoiceForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom."}
+                      </p>
+                      <p className="text-[10px] text-slate-600 mt-0.5 font-medium">
+                        {selectedInvoiceForPrint.approvedTitle || financeSettings.signerTitle || "Direktur Keuangan & Operasional"}
+                      </p>
+                      {selectedInvoiceForPrint.approvalStatus === "Disetujui & Sah" && (
+                        <p className="text-[8px] text-emerald-700 font-mono font-bold mt-0.5">
+                          [VERIFIKASI: {selectedInvoiceForPrint.verificationCode || "DST-APP-202610-001"}]
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -3148,6 +4112,1164 @@ export default function AdminFinanceERPPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL TERIMA PEMBAYARAN FAKTUR */}
+      {isPayInvoiceModalOpen && selectedInvoiceForPayment && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsPayInvoiceModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                  <CreditCard className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900">Terima Pembayaran Faktur</h3>
+                  <p className="text-[10px] text-slate-400 font-mono">
+                    {selectedInvoiceForPayment.invoiceNumber} — {selectedInvoiceForPayment.customerName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPayInvoiceModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Info Tagihan */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Total Tagihan Kontrak:</span>
+                <span className="font-black text-slate-900 font-mono">
+                  {formatRupiah(selectedInvoiceForPayment.grandTotal)}
+                </span>
+              </div>
+              {selectedInvoiceForPayment.invoiceType === "DP" && (
+                <div className="flex items-center justify-between text-amber-800 font-bold bg-amber-50 p-2 rounded-xl border border-amber-200">
+                  <span>Tagihan Uang Muka (DP {selectedInvoiceForPayment.dpPercentage || 50}%):</span>
+                  <span className="font-mono">{formatRupiah(selectedInvoiceForPayment.dpAmount || 0)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-slate-600">
+                <span>Sudah Pernah Dibayar:</span>
+                <span className="font-bold text-emerald-600 font-mono">
+                  {formatRupiah(selectedInvoiceForPayment.paidAmount)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-red-600 font-black border-t border-slate-200 pt-1.5">
+                <span>Sisa Piutang Saat Ini:</span>
+                <span className="font-mono text-sm">{formatRupiah(selectedInvoiceForPayment.remainingAmount)}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleRecordPaymentSubmit} className="space-y-3.5 text-xs">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">Nominal Pembayaran Masuk (Rp):</label>
+                  <div className="flex items-center gap-1">
+                    {selectedInvoiceForPayment.invoiceType === "DP" &&
+                      (Number(selectedInvoiceForPayment.dpPaidAmount) || 0) <
+                        (Number(selectedInvoiceForPayment.dpAmount) || 0) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const dpRem = Math.max(
+                              0,
+                              (Number(selectedInvoiceForPayment.dpAmount) || 0) -
+                                (Number(selectedInvoiceForPayment.dpPaidAmount) || 0)
+                            );
+                            setPaymentForm({ ...paymentForm, amount: dpRem });
+                          }}
+                          className="text-[10px] text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded font-bold cursor-pointer"
+                        >
+                          Bayar DP
+                        </button>
+                      )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPaymentForm({
+                          ...paymentForm,
+                          amount: selectedInvoiceForPayment.remainingAmount,
+                        })
+                      }
+                      className="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded font-bold cursor-pointer"
+                    >
+                      Bayar Lunas Semua
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={selectedInvoiceForPayment.remainingAmount}
+                  required
+                  value={paymentForm.amount}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: Number(e.target.value) })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-mono font-black text-sm text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Rekening Bank Tujuan Penerimaan:</label>
+                <select
+                  value={paymentForm.paymentMethod}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white"
+                >
+                  {bankAccounts
+                    .filter((b) => b.status === "Aktif")
+                    .map((acc) => (
+                      <option key={acc.id} value={`${acc.bankName} PT DSTech Smart Perkasa`}>
+                        {acc.bankName} - {acc.accountNumber} ({acc.accountHolder})
+                      </option>
+                    ))}
+                  <option value="Kas Tunai DSTech (Petty Cash)">Kas Tunai DSTech (Cash Kantor)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Tanggal Penerimaan:</label>
+                <input
+                  type="date"
+                  required
+                  value={paymentForm.paymentDate}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Keterangan / Catatan Bukti Transfer:</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Transfer termin 1 via Mandiri ref TR-99882..."
+                  value={paymentForm.notes}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsPayInvoiceModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black shadow-md cursor-pointer flex items-center gap-2"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>Simpan & Bukukan Kas Masuk</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT FAKTUR PENJUALAN */}
+      {isEditSaleModalOpen && editingSale && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsEditSaleModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">
+                  Perbarui Data Faktur
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">
+                  Edit Faktur: {editingSale.invoiceNumber}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsEditSaleModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditSaleSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nama Klien / Pelanggan:</label>
+                  <input
+                    type="text"
+                    required
+                    value={editingSale.customerName}
+                    onChange={(e) => setEditingSale({ ...editingSale, customerName: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nomor WhatsApp / Telp:</label>
+                  <input
+                    type="text"
+                    value={editingSale.customerPhone}
+                    onChange={(e) => setEditingSale({ ...editingSale, customerPhone: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Metode Pembayaran:</label>
+                  <select
+                    value={editingSale.paymentMethod}
+                    onChange={(e) => setEditingSale({ ...editingSale, paymentMethod: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white"
+                  >
+                    <option value="Transfer Bank Mandiri PT DSTech Smart Perkasa">Transfer Bank Mandiri</option>
+                    <option value="Transfer Bank BCA DSTech">Transfer Bank BCA</option>
+                    <option value="Tunai / Kas Langsung">Tunai / Kas Langsung</option>
+                    <option value="Tempo 14 Hari">Tempo 14 Hari</option>
+                    <option value="Tempo 30 Hari">Tempo 30 Hari</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Tanggal Faktur:</label>
+                  <input
+                    type="date"
+                    required
+                    value={editingSale.date}
+                    onChange={(e) => setEditingSale({ ...editingSale, date: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Jatuh Tempo:</label>
+                  <input
+                    type="date"
+                    required
+                    value={editingSale.dueDate}
+                    onChange={(e) => setEditingSale({ ...editingSale, dueDate: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Alamat Pemasangan / Proyek:</label>
+                <input
+                  type="text"
+                  value={editingSale.customerAddress}
+                  onChange={(e) => setEditingSale({ ...editingSale, customerAddress: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              {/* Items Table Repeater */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="font-black text-slate-800 uppercase tracking-wider text-[11px]">
+                    Daftar Produk / Jasa ({editingSale.items.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddEditSaleItem}
+                    className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold text-xs flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Baris</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {editingSale.items.map((it, idx) => (
+                    <div
+                      key={it.id || idx}
+                      className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
+                    >
+                      <div className="col-span-5">
+                        <input
+                          type="text"
+                          required
+                          value={it.productName}
+                          onChange={(e) => handleEditSaleItemChange(idx, "productName", e.target.value)}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          min={1}
+                          required
+                          value={it.qty}
+                          onChange={(e) => handleEditSaleItemChange(idx, "qty", Number(e.target.value))}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="text"
+                          value={it.unit}
+                          onChange={(e) => handleEditSaleItemChange(idx, "unit", e.target.value)}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-medium text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          min={0}
+                          required
+                          value={it.price}
+                          onChange={(e) => handleEditSaleItemChange(idx, "price", Number(e.target.value))}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-1 text-center">
+                        {editingSale.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveEditSaleItem(idx)}
+                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calculations Box */}
+              <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Subtotal:</span>
+                  <span className="font-bold">{formatRupiah(editingSale.subtotal)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">Diskon Potongan (Rp):</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editingSale.discount || 0}
+                      onChange={(e) => {
+                        const discount = Number(e.target.value);
+                        const afterDiscount = Math.max(0, editingSale.subtotal - discount);
+                        const taxAmount = (afterDiscount * Number(editingSale.taxRate || 0)) / 100;
+                        const grandTotal = afterDiscount + taxAmount;
+                        setEditingSale({
+                          ...editingSale,
+                          discount,
+                          taxAmount,
+                          grandTotal,
+                          remainingAmount: Math.max(0, grandTotal - (Number(editingSale.paidAmount) || 0)),
+                        });
+                      }}
+                      className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 block mb-1">PPN (%):</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={editingSale.taxRate || 11}
+                      onChange={(e) => {
+                        const taxRate = Number(e.target.value);
+                        const afterDiscount = Math.max(0, editingSale.subtotal - Number(editingSale.discount || 0));
+                        const taxAmount = (afterDiscount * taxRate) / 100;
+                        const grandTotal = afterDiscount + taxAmount;
+                        setEditingSale({
+                          ...editingSale,
+                          taxRate,
+                          taxAmount,
+                          grandTotal,
+                          remainingAmount: Math.max(0, grandTotal - (Number(editingSale.paidAmount) || 0)),
+                        });
+                      }}
+                      className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Pajak PPN ({editingSale.taxRate}%):</span>
+                  <span className="font-bold">{formatRupiah(editingSale.taxAmount)}</span>
+                </div>
+                <div className="border-t border-white/20 pt-2 flex items-center justify-between text-base font-black">
+                  <span className="text-amber-400">GRAND TOTAL:</span>
+                  <span className="text-xl text-emerald-400">{formatRupiah(editingSale.grandTotal)}</span>
+                </div>
+
+                {/* Tipe Faktur Standar vs DP */}
+                <div className="pt-2 border-t border-slate-700 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-amber-300">Tipe Faktur:</span>
+                    <div className="flex rounded-lg overflow-hidden border border-slate-700 p-0.5 bg-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setEditingSale({ ...editingSale, invoiceType: "Standar" })}
+                        className={`px-2.5 py-1 text-[10px] font-black rounded cursor-pointer ${
+                          editingSale.invoiceType === "Standar" ? "bg-dstech-blue text-white" : "text-slate-400"
+                        }`}
+                      >
+                        Standar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditingSale({
+                            ...editingSale,
+                            invoiceType: "DP",
+                            dpPercentage: editingSale.dpPercentage || 50,
+                            dpAmount: Math.round(editingSale.grandTotal * ((editingSale.dpPercentage || 50) / 100)),
+                          })
+                        }
+                        className={`px-2.5 py-1 text-[10px] font-black rounded cursor-pointer ${
+                          editingSale.invoiceType === "DP" ? "bg-amber-500 text-slate-900" : "text-slate-400"
+                        }`}
+                      >
+                        Pengajuan DP
+                      </button>
+                    </div>
+                  </div>
+
+                  {editingSale.invoiceType === "DP" && (
+                    <div className="p-2 rounded-xl bg-slate-800 border border-amber-500/40 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-0.5">Persen DP (%):</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={editingSale.dpPercentage || 50}
+                            onChange={(e) => {
+                              const pct = Number(e.target.value);
+                              setEditingSale({
+                                ...editingSale,
+                                dpPercentage: pct,
+                                dpAmount: Math.round(editingSale.grandTotal * (pct / 100)),
+                              });
+                            }}
+                            className="w-full p-1.5 rounded bg-slate-900 border border-slate-700 text-white font-mono font-bold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-400 block mb-0.5">Nilai DP (Rp):</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={editingSale.dpAmount || 0}
+                            onChange={(e) =>
+                              setEditingSale({
+                                ...editingSale,
+                                dpAmount: Number(e.target.value),
+                              })
+                            }
+                            className="w-full p-1.5 rounded bg-slate-900 border border-slate-700 text-amber-300 font-mono font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-0.5">Catatan DP:</label>
+                        <input
+                          type="text"
+                          value={editingSale.dpNotes || ""}
+                          onChange={(e) => setEditingSale({ ...editingSale, dpNotes: e.target.value })}
+                          className="w-full p-1.5 rounded bg-slate-900 border border-slate-700 text-slate-200 text-xs"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2">
+                  <label className="text-[10px] text-slate-400 block mb-1">Total Sudah Dibayar (Rp):</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={editingSale.grandTotal}
+                    value={editingSale.paidAmount || 0}
+                    onChange={(e) => {
+                      const paid = Number(e.target.value);
+                      setEditingSale({
+                        ...editingSale,
+                        paidAmount: paid,
+                        remainingAmount: Math.max(0, editingSale.grandTotal - paid),
+                      });
+                    }}
+                    className="w-full p-2 rounded-lg bg-slate-800 border border-slate-700 text-emerald-300 text-sm font-black"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Catatan Tambahan:</label>
+                <textarea
+                  rows={2}
+                  value={editingSale.notes}
+                  onChange={(e) => setEditingSale({ ...editingSale, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditSaleModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-2"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Simpan Perubahan Faktur</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PENGATURAN REKENING BANK DSTECH */}
+      {isBankAccountsModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsBankAccountsModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-emerald-100 text-emerald-700">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900">Pengaturan Rekening Bank DSTech</h3>
+                  <p className="text-[10px] text-slate-400">
+                    Rekening ini otomatis dicetak pada Kop Faktur & instruksi transfer klien
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsBankAccountsModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* List Rekening Aktif */}
+            <div className="space-y-2">
+              <h4 className="font-black text-xs text-slate-700 uppercase tracking-wider">
+                Daftar Rekening Resmi ({bankAccounts.length})
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {bankAccounts.map((acc) => (
+                  <div
+                    key={acc.id}
+                    className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 relative"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-xs text-dstech-blue">{acc.bankName}</span>
+                      {acc.isDefault ? (
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800">
+                          Utama (Default)
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-medium">{acc.status}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-mono font-bold text-sm text-slate-900">{acc.accountNumber}</p>
+                      <p className="text-[11px] text-slate-600 font-medium">a/n {acc.accountHolder}</p>
+                      <p className="text-[10px] text-slate-400">Cabang: {acc.branch}</p>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingBankAccount(acc);
+                          setBankAccountForm({
+                            bankName: acc.bankName,
+                            accountNumber: acc.accountNumber,
+                            accountHolder: acc.accountHolder,
+                            branch: acc.branch,
+                            isDefault: Boolean(acc.isDefault),
+                            status: acc.status,
+                          });
+                        }}
+                        className="text-[11px] text-amber-600 hover:text-amber-700 font-bold cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                      {bankAccounts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteBankAccount(acc.id, acc.bankName)}
+                          className="text-[11px] text-rose-600 hover:text-rose-700 font-bold cursor-pointer"
+                        >
+                          Hapus
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Form Tambah / Edit Rekening */}
+            <form
+              onSubmit={handleSaveBankAccount}
+              className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200/80 space-y-3 text-xs"
+            >
+              <h4 className="font-black text-xs text-dstech-blue flex items-center gap-1.5">
+                <Plus className="w-4 h-4" />
+                <span>{editingBankAccount ? "Edit Rekening Bank" : "Tambah Rekening Baru"}</span>
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nama Bank:</label>
+                  <select
+                    value={bankAccountForm.bankName}
+                    onChange={(e) => setBankAccountForm({ ...bankAccountForm, bankName: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    <option value="Bank Mandiri">Bank Mandiri</option>
+                    <option value="Bank BCA">Bank BCA</option>
+                    <option value="Bank BNI">Bank BNI</option>
+                    <option value="Bank BRI">Bank BRI</option>
+                    <option value="Bank BSI">Bank Syariah Indonesia (BSI)</option>
+                    <option value="Bank BJB">Bank BJB Banten</option>
+                    <option value="Bank CIMB Niaga">Bank CIMB Niaga</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nomor Rekening:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: 163-00-1122334-5"
+                    value={bankAccountForm.accountNumber}
+                    onChange={(e) => setBankAccountForm({ ...bankAccountForm, accountNumber: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Atas Nama (Holder):</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="PT. DSTech Smart Perkasa"
+                    value={bankAccountForm.accountHolder}
+                    onChange={(e) => setBankAccountForm({ ...bankAccountForm, accountHolder: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kantor Cabang (KCP/KCU):</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: KCP Cilegon City Square"
+                    value={bankAccountForm.branch}
+                    onChange={(e) => setBankAccountForm({ ...bankAccountForm, branch: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={bankAccountForm.isDefault}
+                    onChange={(e) => setBankAccountForm({ ...bankAccountForm, isDefault: e.target.checked })}
+                    className="rounded text-dstech-blue"
+                  />
+                  <span className="font-bold text-slate-700 text-xs">Jadikan Rekening Utama</span>
+                </label>
+
+                <div className="flex items-center gap-2">
+                  {editingBankAccount && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingBankAccount(null);
+                        setBankAccountForm({
+                          bankName: "Bank Mandiri",
+                          accountNumber: "",
+                          accountHolder: "PT. DSTech Smart Perkasa",
+                          branch: "Cilegon",
+                          isDefault: false,
+                          status: "Aktif",
+                        });
+                      }}
+                      className="px-3 py-1.5 rounded-xl text-slate-500 hover:bg-slate-200 font-bold"
+                    >
+                      Batal Edit
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold cursor-pointer shadow-sm"
+                  >
+                    {editingBankAccount ? "Simpan Perubahan" : "Tambah Rekening"}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PENGATURAN KOP SURAT & WATERMARK BACKGROUND */}
+      {isSettingsModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsSettingsModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-blue-100 text-dstech-blue">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-slate-900">Pengaturan Kop Surat & Background</h3>
+                  <p className="text-[10px] text-slate-400">
+                    Ganti template gambar kop surat dan watermark cetak resmi DSTech
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsSettingsModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Pratinjau Gambar Saat Ini */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center space-y-2">
+              <p className="font-bold text-xs text-slate-700">Pratinjau Template Kop Surat Aktif:</p>
+              <div className="w-48 h-64 rounded-xl border border-slate-300 overflow-hidden shadow-inner relative bg-white flex items-center justify-center">
+                {tempSettings.letterheadUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={tempSettings.letterheadUrl}
+                    alt="Kop Surat DSTech"
+                    className="w-full h-full object-contain"
+                    style={{ opacity: tempSettings.letterheadEnabled ? 1 : 0.3 }}
+                  />
+                ) : (
+                  <span className="text-slate-400 text-xs">Belum ada gambar</span>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-500">File lokal: public/kop_surat_dstech.jpg</p>
+            </div>
+
+            <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
+              <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200/80 flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-slate-900">Aktifkan Background Kop Surat</p>
+                  <p className="text-[10px] text-slate-500">
+                    Tampilkan latar belakang kop surat resmi pada pratinjau dan PDF faktur
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={tempSettings.letterheadEnabled}
+                  onChange={(e) => setTempSettings({ ...tempSettings, letterheadEnabled: e.target.checked })}
+                  className="w-5 h-5 rounded text-dstech-blue cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Path / URL Gambar Kop Surat (Letterhead):
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={tempSettings.letterheadUrl}
+                  onChange={(e) => setTempSettings({ ...tempSettings, letterheadUrl: e.target.value })}
+                  placeholder="/kop_surat_dstech.jpg atau URL gambar luar"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-mono text-xs"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">Tingkat Transparansi Watermark:</label>
+                  <span className="font-mono font-bold text-dstech-blue">
+                    {Math.round((tempSettings.watermarkOpacity || 0.15) * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.05"
+                  max="0.6"
+                  step="0.02"
+                  value={tempSettings.watermarkOpacity}
+                  onChange={(e) =>
+                    setTempSettings({ ...tempSettings, watermarkOpacity: parseFloat(e.target.value) })
+                  }
+                  className="w-full cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                  <span>Sangat Transparan (5%)</span>
+                  <span>Standar (15%)</span>
+                  <span>Sangat Jelas (60%)</span>
+                </div>
+              </div>
+
+              {/* Tombol Preset Cepat */}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTempSettings({
+                      letterheadUrl: "/kop_surat_dstech.jpg",
+                      letterheadEnabled: true,
+                      watermarkOpacity: 0.15,
+                    })
+                  }
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
+                >
+                  Reset Kop Resmi DSTech
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTempSettings({ ...tempSettings, watermarkOpacity: 0.08 })}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
+                >
+                  Mode Lembut (8%)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTempSettings({ ...tempSettings, watermarkOpacity: 0.25 })}
+                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
+                >
+                  Mode Jelas (25%)
+                </button>
+              </div>
+
+              {/* Penandatangan Dokumen Resmi DSTech */}
+              <div className="pt-3 border-t border-slate-100 space-y-3">
+                <h4 className="font-bold text-slate-800 text-xs">Penandatangan Resmi Dokumen (Direksi DSTech):</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Nama Direktur Penandatangan:</label>
+                    <input
+                      type="text"
+                      value={tempSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom."}
+                      onChange={(e) => setTempSettings({ ...tempSettings, signerName: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Jabatan Resmi:</label>
+                    <input
+                      type="text"
+                      value={tempSettings.signerTitle || "Direktur Keuangan & Operasional"}
+                      onChange={(e) => setTempSettings({ ...tempSettings, signerTitle: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-2"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Simpan Pengaturan Kop Surat</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL APPROVAL & TANDA TANGAN DIGITAL DOKUMEN */}
+      {isApprovalModalOpen && selectedInvoiceForApproval && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsApprovalModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl max-w-xl w-full max-h-[92vh] overflow-y-auto border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-blue-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-md">
+                  <PenTool className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Approval & Tanda Tangan Digital</h3>
+                  <p className="text-xs text-slate-500">
+                    Pengesahan Resmi Faktur {selectedInvoiceForApproval.invoiceNumber}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsApprovalModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white/80 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              {/* Ringkasan Faktur yang dimintakan approval */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-2 gap-3">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Klien / Penerima:</span>
+                  <p className="font-black text-slate-900 text-xs">{selectedInvoiceForApproval.customerName}</p>
+                  <p className="text-[10px] text-slate-500">{selectedInvoiceForApproval.customerPhone}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Total Nilai Faktur:</span>
+                  <p className="font-black text-dstech-blue text-sm">
+                    {formatRupiah(selectedInvoiceForApproval.grandTotal)}
+                  </p>
+                  {selectedInvoiceForApproval.invoiceType === "DP" && (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded">
+                      Tagihan DP {selectedInvoiceForApproval.dpPercentage}%: {formatRupiah(selectedInvoiceForApproval.dpAmount || 0)}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Tab Metode Tanda Tangan */}
+              <div>
+                <label className="block text-slate-700 font-bold mb-1.5">Pilih Metode Tanda Tangan:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setApprovalMode("canvas")}
+                    className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                      approvalMode === "canvas"
+                        ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-200"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    ✍️ Gores Layar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApprovalMode("master")}
+                    className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                      approvalMode === "master"
+                        ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-200"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    🛡️ Tanda Tangan Master
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApprovalMode("upload")}
+                    className={`p-2 rounded-xl border text-center font-bold text-[11px] transition-all cursor-pointer ${
+                      approvalMode === "upload"
+                        ? "bg-indigo-50 border-indigo-500 text-indigo-700 ring-2 ring-indigo-200"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    📁 Upload Gambar
+                  </button>
+                </div>
+              </div>
+
+              {/* Mode 1: Canvas Drawing Signature Pad */}
+              {approvalMode === "canvas" && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">Tanda tangani langsung di bawah ini (Touch / Mouse):</span>
+                    <button
+                      type="button"
+                      onClick={clearCanvas}
+                      className="text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <Eraser className="w-3.5 h-3.5" />
+                      Hapus Goresan
+                    </button>
+                  </div>
+                  <div className="relative border-2 border-dashed border-indigo-300 rounded-xl bg-slate-50/50 p-1 flex justify-center items-center shadow-inner">
+                    <canvas
+                      ref={canvasRef}
+                      width={480}
+                      height={160}
+                      onMouseDown={startDrawing}
+                      onMouseMove={draw}
+                      onMouseUp={stopDrawing}
+                      onMouseLeave={stopDrawing}
+                      onTouchStart={startDrawing}
+                      onTouchMove={draw}
+                      onTouchEnd={stopDrawing}
+                      className="w-full h-40 bg-white rounded-lg cursor-crosshair touch-none"
+                    />
+                    {!hasDrawn && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-slate-400 text-xs italic">
+                        ✍️ Bubuhkan tanda tangan Anda di area ini
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    *Goresan digital akan dienkode dan dibubuhkan secara otomatis pada faktur cetak resmi.
+                  </p>
+                </div>
+              )}
+
+              {/* Mode 2: Master Stored Signature */}
+              {approvalMode === "master" && (
+                <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 text-center space-y-2">
+                  <p className="text-[11px] text-slate-600">
+                    Menggunakan tanda tangan digital tersimpan Direktur PT DSTech Smart Perkasa:
+                  </p>
+                  <div className="py-2 flex items-center justify-center">
+                    {financeSettings.masterSignatureUrl ? (
+                      <img
+                        src={financeSettings.masterSignatureUrl}
+                        alt="Master Signature"
+                        className="max-h-16 object-contain"
+                      />
+                    ) : (
+                      <div className="font-serif italic text-2xl font-black text-slate-800 tracking-wider">
+                        {signerNameInput || "H. Agus Supriyadi"}
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Tanda tangan master ini dapat disesuaikan pada menu Pengaturan Kop Surat & Dokumen.
+                  </p>
+                </div>
+              )}
+
+              {/* Mode 3: Upload Signature File */}
+              {approvalMode === "upload" && (
+                <div className="space-y-2">
+                  <label className="block text-slate-700 font-bold">Unggah Berkas Tanda Tangan (PNG Transparan / JPG):</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleSignatureFileUpload}
+                    className="w-full text-xs p-2 rounded-xl border border-slate-200 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                  />
+                  {uploadedSignatureBase64 && (
+                    <div className="p-3 border border-slate-200 rounded-xl bg-slate-50 flex items-center justify-center">
+                      <img
+                        src={uploadedSignatureBase64}
+                        alt="Pratinjau Tanda Tangan"
+                        className="max-h-20 max-w-[200px] object-contain"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Form Identitas Penandatangan */}
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nama Penandatangan:</label>
+                  <input
+                    type="text"
+                    value={signerNameInput}
+                    onChange={(e) => setSignerNameInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Nama Direktur..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Jabatan:</label>
+                  <input
+                    type="text"
+                    value={signerTitleInput}
+                    onChange={(e) => setSignerTitleInput(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                    placeholder="Jabatan Resmi..."
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Catatan Persetujuan (Opsional):</label>
+                <input
+                  type="text"
+                  value={approvalNotesInput}
+                  onChange={(e) => setApprovalNotesInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="Catatan approval..."
+                />
+              </div>
+
+              {/* Keabsahan Sistem Info */}
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-[11px] text-emerald-800">
+                <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                <div>
+                  <p className="font-bold">Keabsahan Dokumen Digital Terlindungi</p>
+                  <p className="text-[10px] text-emerald-600">
+                    Sistem akan membubuhkan Stempel Digital Resmi PT DSTech Smart Perkasa & kode verifikasi unik otomatis.
+                  </p>
+                </div>
+              </div>
+
+              {/* Tombol Aksi */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsApprovalModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApproveInvoice}
+                  disabled={isSubmittingApproval}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isSubmittingApproval ? "Memproses Approval..." : "Setujui & Sahkan Faktur Sekarang"}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

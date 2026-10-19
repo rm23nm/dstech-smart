@@ -8,6 +8,12 @@
       "customerAddress": "Kawasan Industri Krakatau Kav. E3, Cilegon - Banten",
       "date": "2026-10-18",
       "dueDate": "2026-11-18",
+      "invoiceType": "Standard",
+      "dpPercentage": 0,
+      "dpAmount": 0,
+      "dpStatus": "Bukan DP",
+      "dpPaidAmount": 0,
+      "dpNotes": "-",
       "items": [
         {
           "id": "item_1",
@@ -46,7 +52,13 @@
       "warehouseId": "dstech_wh_1",
       "branchId": "dstech_branch_1",
       "salesPerson": "DSTech Commercial Team",
-      "notes": "Proyek pengadaan & instalasi CCTV area Boiler Krakatau Posco"
+      "notes": "Proyek pengadaan & instalasi CCTV area Boiler Krakatau Posco",
+      "approvalStatus": "Disetujui & Sah",
+      "approvedBy": "H. Agus Supriyadi, S.T., M.Kom.",
+      "approvedTitle": "Direktur Keuangan & Operasional",
+      "approvedAt": "2026-10-18 14:30 WIB",
+      "verificationCode": "DST-APP-202610-001",
+      "signatureImage": ""
     },
     {
       "id": "dstech_inv_1792361002",
@@ -56,6 +68,12 @@
       "customerAddress": "Jl. Jombang Masjid No. 4, Cilegon - Banten",
       "date": "2026-10-17",
       "dueDate": "2026-11-01",
+      "invoiceType": "DP",
+      "dpPercentage": 50,
+      "dpAmount": 4000000,
+      "dpStatus": "Lunas DP",
+      "dpPaidAmount": 4000000,
+      "dpNotes": "Uang Muka (DP) 50% untuk pengadaan unit Smart Doorlock dan material emergency exit",
       "items": [
         {
           "id": "item_1",
@@ -88,13 +106,72 @@
       "taxAmount": 863500,
       "grandTotal": 8713500,
       "paymentMethod": "Transfer Bank Mandiri (Tempo 14 Hari)",
-      "paymentStatus": "Belum Lunas",
+      "paymentStatus": "DP Lunas (Sisa Pelunasan)",
       "paidAmount": 4000000,
       "remainingAmount": 4713500,
       "warehouseId": "dstech_wh_1",
       "branchId": "dstech_branch_1",
       "salesPerson": "DSTech Commercial Team",
-      "notes": "Peremajaan access control pintu ruang rawat inap Lt. 3"
+      "notes": "Peremajaan access control pintu ruang rawat inap Lt. 3 (DP 50% Diterima)",
+      "approvalStatus": "Disetujui & Sah",
+      "approvedBy": "H. Agus Supriyadi, S.T., M.Kom.",
+      "approvedTitle": "Direktur Keuangan & Operasional",
+      "approvedAt": "2026-10-19 10:58 WIB",
+      "verificationCode": "DST-APP-202610-2954",
+      "signatureImage": "data:image/png;base64,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",
+      "approvalNotes": "Disetujui untuk diterbitkan secara sah kepada klien."
+    },
+    {
+      "id": "dstech_inv_1792361004",
+      "invoiceNumber": "INV-DSTECH-202610-004",
+      "customerName": "PT. Chandra Asri Petrochemical Tbk",
+      "customerPhone": "0813-8877-6655",
+      "customerAddress": "Jl. Raya Anyer Km. 123, Ciwandan, Kota Cilegon",
+      "date": "2026-10-19",
+      "dueDate": "2026-10-26",
+      "invoiceType": "DP",
+      "dpPercentage": 50,
+      "dpAmount": 21367500,
+      "dpStatus": "Menunggu Pembayaran DP",
+      "dpPaidAmount": 0,
+      "dpNotes": "Pengajuan Uang Muka (DP 50%) pengadaan CCTV Explosion-Proof dermaga & tangki bahan bakar",
+      "items": [
+        {
+          "id": "item_1",
+          "productName": "Kamera IP Explosion-Proof ATEX Certified 4MP (Area Kilang)",
+          "qty": 3,
+          "unit": "Unit",
+          "price": 11500000,
+          "total": 34500000
+        },
+        {
+          "id": "item_2",
+          "productName": "Pipa Konduit Stainless Steel 316 + Flexible Explosion-Proof",
+          "qty": 10,
+          "unit": "Batang",
+          "price": 400000,
+          "total": 4000000
+        }
+      ],
+      "subtotal": 38500000,
+      "discount": 0,
+      "taxRate": 11,
+      "taxAmount": 4235000,
+      "grandTotal": 42735000,
+      "paymentMethod": "Transfer Bank Mandiri PT DSTech Smart Perkasa",
+      "paymentStatus": "Menunggu DP",
+      "paidAmount": 0,
+      "remainingAmount": 42735000,
+      "warehouseId": "dstech_wh_1",
+      "branchId": "dstech_branch_1",
+      "salesPerson": "DSTech Commercial Team",
+      "notes": "Pengajuan Uang Muka (DP) 50% untuk pengadaan material CCTV Explosion-Proof sebelum instalasi",
+      "approvalStatus": "Menunggu Approval",
+      "approvedBy": "",
+      "approvedTitle": "",
+      "approvedAt": "",
+      "verificationCode": "",
+      "signatureImage": ""
     },
     {
       "id": "dstech_inv_1792361003",
@@ -134,7 +211,13 @@
       "warehouseId": "dstech_wh_1",
       "branchId": "dstech_branch_1",
       "salesPerson": "DSTech Commercial Team",
-      "notes": "Pengadaan gerbang otomatis cluster barat dan timur"
+      "notes": "Pengadaan gerbang otomatis cluster barat dan timur",
+      "approvalStatus": "Disetujui & Sah",
+      "approvedBy": "H. Agus Supriyadi, S.T., M.Kom.",
+      "approvedTitle": "Direktur Keuangan & Operasional",
+      "approvedAt": "2026-10-18 16:45 WIB",
+      "verificationCode": "DST-APP-202610-003",
+      "signatureImage": ""
     }
   ],
   "purchases": [
@@ -593,5 +676,34 @@
       "unpaidPayable": 0,
       "notes": "Supplier aksesoris instalasi dan material kelistrikan lokal"
     }
-  ]
+  ],
+  "bank_accounts": [
+    {
+      "id": "dstech_bank_1",
+      "bankName": "Bank Mandiri",
+      "accountNumber": "163-00-1122334-5",
+      "accountHolder": "PT. DSTech Smart Perkasa",
+      "branch": "KCP Cilegon City Square",
+      "isDefault": true,
+      "status": "Aktif"
+    },
+    {
+      "id": "dstech_bank_2",
+      "bankName": "Bank BCA",
+      "accountNumber": "295-888-9900",
+      "accountHolder": "PT. DSTech Smart Perkasa",
+      "branch": "KCU Cilegon",
+      "isDefault": false,
+      "status": "Aktif"
+    }
+  ],
+  "settings": {
+    "letterheadUrl": "/kop_surat_dstech.jpg",
+    "letterheadEnabled": true,
+    "watermarkOpacity": 0.15,
+    "signerName": "H. Agus Supriyadi, S.T., M.Kom.",
+    "signerTitle": "Direktur Keuangan & Operasional",
+    "masterSignatureUrl": "",
+    "masterStampUrl": ""
+  }
 }

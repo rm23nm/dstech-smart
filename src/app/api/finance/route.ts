@@ -163,6 +163,30 @@ export async function POST(request: Request) {
       });
     }
 
+    if (actionType === "bank_account") {
+      const newBank = {
+        id: payload.id || `dstech_bank_${Date.now()}`,
+        bankName: payload.bankName || "Bank Mandiri",
+        accountNumber: payload.accountNumber || "-",
+        accountHolder: payload.accountHolder || "PT. DSTech Smart Perkasa",
+        branch: payload.branch || "Cilegon",
+        isDefault: Boolean(payload.isDefault),
+        status: payload.status || "Aktif",
+      };
+
+      if (!data.bank_accounts) data.bank_accounts = [];
+      if (newBank.isDefault) {
+        data.bank_accounts.forEach((b: any) => (b.isDefault = false));
+      }
+      data.bank_accounts.push(newBank);
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Rekening ${newBank.bankName} berhasil disimpan`,
+        data: newBank,
+      });
+    }
+
     if (actionType === "sale") {
       const newInvoiceNumber = `INV-DSTECH-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(
         (data.sales?.length || 0) + 1
@@ -171,6 +195,24 @@ export async function POST(request: Request) {
       const grandTotal = Number(payload.grandTotal) || 0;
       const paidAmount = Number(payload.paidAmount) || 0;
       const remainingAmount = Math.max(0, grandTotal - paidAmount);
+      const isDp = payload.invoiceType === "DP";
+      const dpAmount = Number(payload.dpAmount) || 0;
+      const dpPercentage = Number(payload.dpPercentage) || (grandTotal > 0 ? Math.round((dpAmount / grandTotal) * 100) : 0);
+
+      let paymentStatus = "Belum Lunas";
+      if (remainingAmount === 0) {
+        paymentStatus = "Lunas";
+      } else if (isDp) {
+        if (paidAmount >= dpAmount && dpAmount > 0) {
+          paymentStatus = "DP Lunas (Sisa Pelunasan)";
+        } else if (paidAmount > 0) {
+          paymentStatus = "Sebagian DP";
+        } else {
+          paymentStatus = "Menunggu DP";
+        }
+      } else if (paidAmount > 0) {
+        paymentStatus = "Sebagian";
+      }
 
       const newSale = {
         id: `dstech_inv_${Date.now()}`,
@@ -180,37 +222,56 @@ export async function POST(request: Request) {
         customerAddress: payload.customerAddress || "-",
         date: payload.date || new Date().toISOString().split("T")[0],
         dueDate: payload.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+        invoiceType: isDp ? "DP" : "Standard",
+        dpPercentage: isDp ? dpPercentage : 0,
+        dpAmount: isDp ? dpAmount : 0,
+        dpStatus: isDp
+          ? paidAmount >= dpAmount && dpAmount > 0
+            ? "Lunas DP"
+            : paidAmount > 0
+            ? "Sebagian DP"
+            : "Menunggu Pembayaran DP"
+          : "Bukan DP",
+        dpPaidAmount: isDp ? Math.min(paidAmount, dpAmount) : 0,
+        dpNotes: payload.dpNotes || (isDp ? `Pengajuan Uang Muka (DP ${dpPercentage}%) pelaksanaan pekerjaan` : "-"),
         items: payload.items || [],
         subtotal: Number(payload.subtotal) || 0,
         discount: Number(payload.discount) || 0,
         taxRate: Number(payload.taxRate) || 11,
         taxAmount: Number(payload.taxAmount) || 0,
         grandTotal,
-        paymentMethod: payload.paymentMethod || "Transfer Bank Mandiri",
-        paymentStatus: remainingAmount === 0 ? "Lunas" : paidAmount > 0 ? "Sebagian" : "Belum Lunas",
+        paymentMethod: payload.paymentMethod || "Transfer Bank Mandiri PT DSTech Smart Perkasa",
+        paymentStatus: payload.paymentStatus || paymentStatus,
         paidAmount,
         remainingAmount,
         warehouseId: payload.warehouseId || "dstech_wh_1",
         branchId: payload.branchId || "dstech_branch_1",
         salesPerson: payload.salesPerson || "DSTech Admin",
         notes: payload.notes || "-",
+        approvalStatus: payload.approvalStatus || "Menunggu Approval",
+        approvedBy: payload.approvedBy || "",
+        approvedTitle: payload.approvedTitle || "",
+        approvedAt: payload.approvedAt || "",
+        verificationCode: payload.verificationCode || "",
+        signatureImage: payload.signatureImage || "",
       };
 
       if (!data.sales) data.sales = [];
       data.sales.unshift(newSale);
 
-      // Catat ke arus kas jika ada pembayaran masuk
+      // Catat ke arus kas jika ada pembayaran masuk langsung
       if (paidAmount > 0) {
         if (!data.cash_flow) data.cash_flow = [];
+        const cashCategory = isDp ? "Uang Muka Penjualan" : "Penerimaan Penjualan";
         data.cash_flow.unshift({
           id: `dstech_cash_${Date.now()}`,
           date: newSale.date,
           type: "IN",
-          category: "Penerimaan Penjualan",
+          category: cashCategory,
           amount: paidAmount,
           account: newSale.paymentMethod.includes("BCA") ? "Bank BCA DSTech" : "Bank Mandiri PT DSTech Smart Perkasa",
           reference: newSale.invoiceNumber,
-          description: `Penerimaan faktur penjualan ${newSale.invoiceNumber} - ${newSale.customerName}`,
+          description: `Penerimaan ${isDp ? "DP" : "faktur"} penjualan ${newSale.invoiceNumber} - ${newSale.customerName}`,
           balanceAfter: 0,
         });
       }
@@ -218,8 +279,133 @@ export async function POST(request: Request) {
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
-        message: `Faktur penjualan ${newSale.invoiceNumber} berhasil disimpan`,
+        message: `Faktur penjualan ${newSale.invoiceNumber} ${isDp ? "(Pengajuan DP)" : ""} berhasil disimpan`,
         data: newSale,
+      });
+    }
+
+    if (actionType === "approve_document") {
+      const { documentType = "sale", id, signatureImage, signerName, signerTitle, notes } = payload;
+      const signer = signerName || data.settings?.signerName || "H. Agus Supriyadi, S.T., M.Kom.";
+      const title = signerTitle || data.settings?.signerTitle || "Direktur Keuangan & Operasional";
+      const now = new Date();
+      const codeDate = now.toISOString().slice(0, 7).replace("-", "");
+      const randomDigits = Math.floor(1000 + Math.random() * 9000);
+      const verificationCode = `DST-APP-${codeDate}-${randomDigits}`;
+      const approvedAt = `${now.toISOString().split("T")[0]} ${now.toTimeString().slice(0, 5)} WIB`;
+
+      if (documentType === "sale") {
+        const sales = data.sales || [];
+        const index = sales.findIndex((s: any) => s.id === id || s.invoiceNumber === id);
+        if (index === -1) {
+          return NextResponse.json({ success: false, error: "Faktur penjualan tidak ditemukan" }, { status: 404 });
+        }
+
+        sales[index].approvalStatus = "Disetujui & Sah";
+        sales[index].approvedBy = signer;
+        sales[index].approvedTitle = title;
+        sales[index].approvedAt = approvedAt;
+        sales[index].verificationCode = verificationCode;
+        if (signatureImage) {
+          sales[index].signatureImage = signatureImage;
+        }
+        if (notes) {
+          sales[index].approvalNotes = notes;
+        }
+
+        writeFinanceData(data);
+        return NextResponse.json({
+          success: true,
+          message: `Faktur ${sales[index].invoiceNumber} berhasil disetujui & disahkan secara resmi oleh ${signer}`,
+          data: sales[index],
+        });
+      }
+
+      if (documentType === "purchase") {
+        const purchases = data.purchases || [];
+        const index = purchases.findIndex((p: any) => p.id === id || p.poNumber === id);
+        if (index === -1) {
+          return NextResponse.json({ success: false, error: "Purchase Order tidak ditemukan" }, { status: 404 });
+        }
+
+        purchases[index].approvalStatus = "Disetujui & Sah";
+        purchases[index].approvedBy = signer;
+        purchases[index].approvedTitle = title;
+        purchases[index].approvedAt = approvedAt;
+        purchases[index].verificationCode = verificationCode;
+        if (signatureImage) {
+          purchases[index].signatureImage = signatureImage;
+        }
+
+        writeFinanceData(data);
+        return NextResponse.json({
+          success: true,
+          message: `Purchase Order ${purchases[index].poNumber} berhasil disetujui & disahkan oleh ${signer}`,
+          data: purchases[index],
+        });
+      }
+
+      return NextResponse.json({ success: false, error: "Tipe dokumen tidak dikenali" }, { status: 400 });
+    }
+
+    if (actionType === "record_payment") {
+      const { invoiceId, paymentAmount, paymentMethod, paymentDate, notes } = payload;
+      const sales = data.sales || [];
+      const invoiceIndex = sales.findIndex((s: any) => s.id === invoiceId || s.invoiceNumber === invoiceId);
+
+      if (invoiceIndex === -1) {
+        return NextResponse.json({ success: false, error: "Faktur penjualan tidak ditemukan" }, { status: 404 });
+      }
+
+      const invoice = sales[invoiceIndex];
+      const amountToPay = Number(paymentAmount) || 0;
+      if (amountToPay <= 0) {
+        return NextResponse.json({ success: false, error: "Nominal pembayaran harus lebih besar dari Rp 0" }, { status: 400 });
+      }
+
+      const newPaidAmount = (Number(invoice.paidAmount) || 0) + amountToPay;
+      const newRemaining = Math.max(0, (Number(invoice.grandTotal) || 0) - newPaidAmount);
+
+      let newPaymentStatus = "Sebagian";
+      if (newRemaining === 0) {
+        newPaymentStatus = "Lunas";
+      } else if (invoice.invoiceType === "DP") {
+        if (newPaidAmount >= (Number(invoice.dpAmount) || 0)) {
+          newPaymentStatus = "DP Lunas (Sisa Pelunasan)";
+          invoice.dpStatus = "Lunas DP";
+          invoice.dpPaidAmount = Math.min(newPaidAmount, Number(invoice.dpAmount) || newPaidAmount);
+        } else {
+          newPaymentStatus = "Sebagian DP";
+          invoice.dpStatus = "Sebagian DP";
+        }
+      }
+
+      invoice.paidAmount = newPaidAmount;
+      invoice.remainingAmount = newRemaining;
+      invoice.paymentStatus = newPaymentStatus;
+
+      // Catat ke Arus Kas
+      if (!data.cash_flow) data.cash_flow = [];
+      const isDpPayment = invoice.invoiceType === "DP" && newPaidAmount <= (Number(invoice.dpAmount) || 0);
+      const cashCategory = isDpPayment ? "Uang Muka Penjualan" : "Pelunasan Penjualan";
+
+      data.cash_flow.unshift({
+        id: `dstech_cash_${Date.now()}`,
+        date: paymentDate || new Date().toISOString().split("T")[0],
+        type: "IN",
+        category: cashCategory,
+        amount: amountToPay,
+        account: paymentMethod || invoice.paymentMethod || "Bank Mandiri PT DSTech Smart Perkasa",
+        reference: invoice.invoiceNumber,
+        description: `Penerimaan ${invoice.invoiceType === "DP" ? "DP / Termin" : "Pelunasan"} ${invoice.invoiceNumber} - ${invoice.customerName} (${notes || "Pembayaran Masuk"})`,
+        balanceAfter: 0,
+      });
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Pembayaran sebesar Rp ${amountToPay.toLocaleString("id-ID")} berhasil dibukukan untuk faktur ${invoice.invoiceNumber}`,
+        data: invoice,
       });
     }
 
@@ -417,12 +603,30 @@ export async function PUT(request: Request) {
         ...updates,
       };
 
-      // Recalculate remaining amount if paid amount updated
-      if (updates.paidAmount !== undefined) {
-        data.sales[index].remainingAmount = Math.max(0, data.sales[index].grandTotal - Number(updates.paidAmount));
-        if (data.sales[index].remainingAmount === 0) {
-          data.sales[index].paymentStatus = "Lunas";
+      // Recalculate remaining amount and status
+      const currentGrand = Number(data.sales[index].grandTotal) || 0;
+      const currentPaid = Number(data.sales[index].paidAmount) || 0;
+      const currentDp = Number(data.sales[index].dpAmount) || 0;
+      const currentRemaining = Math.max(0, currentGrand - currentPaid);
+      data.sales[index].remainingAmount = currentRemaining;
+
+      if (currentRemaining === 0) {
+        data.sales[index].paymentStatus = "Lunas";
+      } else if (data.sales[index].invoiceType === "DP") {
+        if (currentPaid >= currentDp && currentDp > 0) {
+          data.sales[index].paymentStatus = "DP Lunas (Sisa Pelunasan)";
+          data.sales[index].dpStatus = "Lunas DP";
+        } else if (currentPaid > 0) {
+          data.sales[index].paymentStatus = "Sebagian DP";
+          data.sales[index].dpStatus = "Sebagian DP";
+        } else {
+          data.sales[index].paymentStatus = "Menunggu DP";
+          data.sales[index].dpStatus = "Menunggu Pembayaran DP";
         }
+      } else if (currentPaid > 0) {
+        data.sales[index].paymentStatus = "Sebagian";
+      } else {
+        data.sales[index].paymentStatus = "Belum Lunas";
       }
 
       writeFinanceData(data);
@@ -449,6 +653,39 @@ export async function PUT(request: Request) {
         success: true,
         message: `PO ${data.purchases[index].poNumber} berhasil diperbarui`,
         data: data.purchases[index],
+      });
+    }
+
+    if (actionType === "bank_account") {
+      const index = (data.bank_accounts || []).findIndex((b: any) => b.id === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Rekening bank tidak ditemukan" }, { status: 404 });
+      }
+      if (updates.isDefault) {
+        (data.bank_accounts || []).forEach((b: any) => (b.isDefault = false));
+      }
+      data.bank_accounts[index] = {
+        ...data.bank_accounts[index],
+        ...updates,
+      };
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Rekening bank ${data.bank_accounts[index].bankName} berhasil diperbarui`,
+        data: data.bank_accounts[index],
+      });
+    }
+
+    if (actionType === "settings") {
+      data.settings = {
+        ...(data.settings || {}),
+        ...updates,
+      };
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: "Pengaturan berhasil diperbarui",
+        data: data.settings,
       });
     }
 
@@ -489,6 +726,26 @@ export async function DELETE(request: Request) {
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Supplier berhasil dihapus" });
+    }
+
+    if (actionType === "sale") {
+      const initialLen = (data.sales || []).length;
+      data.sales = (data.sales || []).filter((s: any) => s.id !== id && s.invoiceNumber !== id);
+      if (data.sales.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Faktur tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Faktur penjualan berhasil dihapus" });
+    }
+
+    if (actionType === "bank_account") {
+      const initialLen = (data.bank_accounts || []).length;
+      data.bank_accounts = (data.bank_accounts || []).filter((b: any) => b.id !== id);
+      if (data.bank_accounts.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Rekening tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Rekening bank berhasil dihapus" });
     }
 
     return NextResponse.json({ success: false, error: "Tipe aksi DELETE tidak dikenali" }, { status: 400 });
