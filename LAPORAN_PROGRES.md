@@ -1273,7 +1273,51 @@
 
 ---
 
-### 47. Catatan Penting
+### 47. Tugas: Perbaikan Lembar Cetak Dokumen (Kop Surat Hilang Saat Diprint & Tampilan Margin A4 Pas Penuh)
+- **Permintaan Pengguna**:
+  *"saat di print muncul seperti ini hasilnya"* (Melampirkan screenshot dialog cetak Chrome Print di mana background kop surat tidak tercetak dan dokumen tampil sebagai kartu kecil dengan border abu-abu mengambang)
+- **Status**:
+  **Sedang Dikerjakan (In Progress)**
+- **Investigasi & Analisis Akar Masalah**:
+  1. **Background Graphics Dihilangkan Browser**:
+     - Elemen kop surat sebelumnya dibuat menggunakan tag `<div>` dengan CSS `backgroundImage: url(...)`.
+     - Browser Chromium (Chrome, Edge, Opera) secara standar menonaktifkan cetak CSS background image jika pengguna tidak mencentang kotak "Background graphics" di setelan lanjutan print.
+  2. **Opasitas Terlalu Rendah (15%)**:
+     - Opasitas kop surat default 0.15 membuat banner merah & biru atas serta banner footer bawah memudar ekstrem sehingga pada kertas cetak tampak putih/blank.
+  3. **Ketiadaan CSS `@media print` Khusus Halaman A4**:
+     - Modal dialog dicetak apa adanya dengan class `p-4`, `bg-black/80`, `max-w-3xl`, `rounded-2xl`, dan `border border-slate-300`, sehingga dokumen di kertas A4 tampak mengecil di tengah kertas dan dikelilingi bingkai abu-abu serta margin putih tebal.
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Pemeriksaan Riwayat & Pembuatan Backup**:
+     - Membuat cadangan `_backup/globals.css.bak1`, `_backup/LAPORAN_PROGRES.md.bak46`, dan `_backup/admin_finance_page.tsx.bak16`.
+  2. [ ] **Penambahan Aturan CSS `@media print` Profesional di `globals.css`**:
+     - Menetapkan `@page { size: A4 portrait; margin: 0; }` agar lembar dokumen dapat mencakup 100% halaman A4 (Full Bleed).
+     - Menghilangkan backdrop gelap modal, shadow, border kartu, dan margin pembungkus saat mode print aktif.
+     - Memastikan `-webkit-print-color-adjust: exact` dan `print-color-adjust: exact` aktif.
+  3. [ ] **Konversi Background Kop Surat Menjadi Tag HTML `<img>`**:
+     - Mengganti tag `<div>` CSS background dengan tag `<img src="..." />` asli DOM. Tag `<img>` selalu dicetak oleh browser tanpa terpengaruh opsi "Background graphics".
+     - Memberikan styling `object-fit: fill` (atau mode pilihan) dengan `opacity: 1` saat diprint (`print:opacity-100`) agar banner kop surat merah dan biru tercetak tajam dan nyata layaknya kertas kop resmi dari percetakan/Canva.
+  4. [ ] **Penerapan Seragam pada 5 Template Dokumen Cetak**:
+     - Faktur Penjualan (`selectedInvoiceForPrint`)
+     - Surat Penawaran Harga / SPH (`selectedQuotationForPrint`)
+     - Purchase Order Supplier (`selectedPoForPrint`)
+     - Berita Acara Retur Penjualan (`selectedReturnSaleForPrint`)
+     - Berita Acara Retur Pembelian (`selectedReturnPurchaseForPrint`)
+  5. [ ] **Penyembunyian Konten Dashboard Saat Modal Cetak Aktif**:
+     - Memasang class `print:hidden` pada konten utama halaman dashboard agar printer hanya mencetak lembar dokumen yang sedang dibuka.
+  6. [ ] **Validasi TypeScript**:
+     - Menjalankan `npx tsc --noEmit` untuk memastikan 0 error.
+  7. [ ] **Pengujian Visual & Print Emulation**:
+     - Memverifikasi tampilan print layout di browser.
+  8. [ ] **Sinkronisasi Kode ke GitHub**:
+     - Commit dan push ke repository remote `rm23nm/dstech-smart`.
+  9. [ ] **Deployment ke Server Live VPS**:
+     - Rebuild Next.js produksi dan restart service PM2 `dstech-main`.
+  10. [ ] **Penyelesaian Laporan & Notifikasi ke Pengguna**:
+     - Menandai tugas sebagai Selesai.
+
+---
+
+### 48. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

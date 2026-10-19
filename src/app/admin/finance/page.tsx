@@ -2871,11 +2871,19 @@ export default function AdminFinanceERPPage() {
     }
   };
 
+  const isAnyPrintModalOpen = Boolean(
+    selectedInvoiceForPrint ||
+    selectedQuotationForPrint ||
+    selectedPoForPrint ||
+    selectedReturnSaleForPrint ||
+    selectedReturnPurchaseForPrint
+  );
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 animate-bounce">
+        <div className="fixed top-6 right-6 z-50 animate-bounce print:hidden">
           <div className="px-5 py-3 rounded-2xl bg-slate-900 text-white font-bold text-xs shadow-2xl border border-slate-700 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-400" />
             <span>{toastMessage}</span>
@@ -2883,8 +2891,10 @@ export default function AdminFinanceERPPage() {
         </div>
       )}
 
-      {/* Header Banner */}
-      <div className="p-6 sm:p-8 rounded-[36px] bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white border border-slate-800 shadow-xl relative overflow-hidden">
+      {/* Main Dashboard Interactive Elements (Hidden during print if modal is open) */}
+      <div className={`space-y-6 ${isAnyPrintModalOpen ? "print:hidden" : ""}`}>
+        {/* Header Banner */}
+        <div className="p-6 sm:p-8 rounded-[36px] bg-gradient-to-r from-slate-950 via-slate-900 to-blue-950 text-white border border-slate-800 shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 pointer-events-none bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-400 via-sky-600 to-transparent"></div>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
@@ -5513,15 +5523,16 @@ export default function AdminFinanceERPPage() {
           </div>
         </div>
       )}
+      </div>
 
       {/* MODAL 3: CETAK FAKTUR PENJUALAN RESMI (PRINT PREVIEW) */}
       {selectedInvoiceForPrint && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
           onClick={() => setSelectedInvoiceForPrint(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Action Bar (Top) */}
@@ -5569,7 +5580,7 @@ export default function AdminFinanceERPPage() {
 
             {/* FAKTUR CONTENT CONTAINER (Siap Cetak & Watermarked) */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
@@ -5577,18 +5588,21 @@ export default function AdminFinanceERPPage() {
             >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
-                <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
+                <img
+                  src={financeSettings.letterheadUrl}
+                  alt="Kop Surat Resmi"
+                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
                   style={{
-                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
-                    backgroundSize:
+                    objectFit:
                       financeSettings.letterheadFitMode === "cover"
                         ? "cover"
                         : financeSettings.letterheadFitMode === "contain"
                         ? "contain"
-                        : "100% 100%",
-                    backgroundPosition: "top center",
-                    opacity: financeSettings.watermarkOpacity || 0.15,
+                        : "fill",
+                    objectPosition: "top center",
+                    opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                    WebkitPrintColorAdjust: "exact",
+                    printColorAdjust: "exact",
                   }}
                 />
               )}
@@ -6451,11 +6465,11 @@ export default function AdminFinanceERPPage() {
       {/* MODAL 3.5: CETAK & PRATINJAU SURAT PENAWARAN HARGA RESMI (SPH BER-KOP DSTECH) */}
       {selectedQuotationForPrint && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
           onClick={() => setSelectedQuotationForPrint(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Action Bar (Top) */}
@@ -6503,7 +6517,7 @@ export default function AdminFinanceERPPage() {
 
             {/* SPH OFFICIAL LETTER CONTAINER (A4 Standard Print Layout) */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
@@ -6511,18 +6525,21 @@ export default function AdminFinanceERPPage() {
             >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
-                <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
+                <img
+                  src={financeSettings.letterheadUrl}
+                  alt="Kop Surat Resmi"
+                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
                   style={{
-                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
-                    backgroundSize:
+                    objectFit:
                       financeSettings.letterheadFitMode === "cover"
                         ? "cover"
                         : financeSettings.letterheadFitMode === "contain"
                         ? "contain"
-                        : "100% 100%",
-                    backgroundPosition: "top center",
-                    opacity: financeSettings.watermarkOpacity || 0.15,
+                        : "fill",
+                    objectPosition: "top center",
+                    opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                    WebkitPrintColorAdjust: "exact",
+                    printColorAdjust: "exact",
                   }}
                 />
               )}
@@ -8281,11 +8298,11 @@ export default function AdminFinanceERPPage() {
       {/* MODAL CETAK / PRATINJAU DOKUMEN PURCHASE ORDER (PO) A4 */}
       {selectedPoForPrint && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
           onClick={() => setSelectedPoForPrint(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Action Bar (Top) */}
@@ -8323,7 +8340,7 @@ export default function AdminFinanceERPPage() {
 
             {/* PO OFFICIAL PRINT CONTAINER (A4 Standard Print Layout) */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
@@ -8331,18 +8348,21 @@ export default function AdminFinanceERPPage() {
             >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
-                <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
+                <img
+                  src={financeSettings.letterheadUrl}
+                  alt="Kop Surat Resmi"
+                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
                   style={{
-                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
-                    backgroundSize:
+                    objectFit:
                       financeSettings.letterheadFitMode === "cover"
                         ? "cover"
                         : financeSettings.letterheadFitMode === "contain"
                         ? "contain"
-                        : "100% 100%",
-                    backgroundPosition: "top center",
-                    opacity: financeSettings.watermarkOpacity || 0.15,
+                        : "fill",
+                    objectPosition: "top center",
+                    opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                    WebkitPrintColorAdjust: "exact",
+                    printColorAdjust: "exact",
                   }}
                 />
               )}
@@ -9616,11 +9636,11 @@ export default function AdminFinanceERPPage() {
       {/* MODAL CETAK LEMBAR BERITA ACARA RETUR PENJUALAN KLIEN (A4 FORMAT) */}
       {selectedReturnSaleForPrint && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
           onClick={() => setSelectedReturnSaleForPrint(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Action Bar (Top) */}
@@ -9658,7 +9678,7 @@ export default function AdminFinanceERPPage() {
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
@@ -9666,18 +9686,21 @@ export default function AdminFinanceERPPage() {
             >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
-                <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
+                <img
+                  src={financeSettings.letterheadUrl}
+                  alt="Kop Surat Resmi"
+                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
                   style={{
-                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
-                    backgroundSize:
+                    objectFit:
                       financeSettings.letterheadFitMode === "cover"
                         ? "cover"
                         : financeSettings.letterheadFitMode === "contain"
                         ? "contain"
-                        : "100% 100%",
-                    backgroundPosition: "top center",
-                    opacity: financeSettings.watermarkOpacity || 0.15,
+                        : "fill",
+                    objectPosition: "top center",
+                    opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                    WebkitPrintColorAdjust: "exact",
+                    printColorAdjust: "exact",
                   }}
                 />
               )}
@@ -9902,11 +9925,11 @@ export default function AdminFinanceERPPage() {
       {/* MODAL CETAK LEMBAR BERITA ACARA RETUR PEMBELIAN VENDOR RMA (A4 FORMAT) */}
       {selectedReturnPurchaseForPrint && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
           onClick={() => setSelectedReturnPurchaseForPrint(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Action Bar (Top) */}
@@ -9944,7 +9967,7 @@ export default function AdminFinanceERPPage() {
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
@@ -9952,18 +9975,21 @@ export default function AdminFinanceERPPage() {
             >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
-                <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
+                <img
+                  src={financeSettings.letterheadUrl}
+                  alt="Kop Surat Resmi"
+                  className="absolute inset-0 w-full h-full pointer-events-none z-0 select-none print-letterhead-img"
                   style={{
-                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
-                    backgroundSize:
+                    objectFit:
                       financeSettings.letterheadFitMode === "cover"
                         ? "cover"
                         : financeSettings.letterheadFitMode === "contain"
                         ? "contain"
-                        : "100% 100%",
-                    backgroundPosition: "top center",
-                    opacity: financeSettings.watermarkOpacity || 0.15,
+                        : "fill",
+                    objectPosition: "top center",
+                    opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                    WebkitPrintColorAdjust: "exact",
+                    printColorAdjust: "exact",
                   }}
                 />
               )}
@@ -11061,24 +11087,24 @@ export default function AdminFinanceERPPage() {
                 <div className="flex items-center justify-between mb-1">
                   <label className="font-bold text-slate-700">Tingkat Transparansi Watermark:</label>
                   <span className="font-mono font-bold text-dstech-blue">
-                    {Math.round((tempSettings.watermarkOpacity || 0.15) * 100)}%
+                    {Math.round((tempSettings.watermarkOpacity !== undefined ? tempSettings.watermarkOpacity : 1) * 100)}%
                   </span>
                 </div>
                 <input
                   type="range"
                   min="0.05"
-                  max="0.6"
-                  step="0.02"
-                  value={tempSettings.watermarkOpacity}
+                  max="1.0"
+                  step="0.05"
+                  value={tempSettings.watermarkOpacity !== undefined ? tempSettings.watermarkOpacity : 1}
                   onChange={(e) =>
                     setTempSettings({ ...tempSettings, watermarkOpacity: parseFloat(e.target.value) })
                   }
                   className="w-full cursor-pointer"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                  <span>Sangat Transparan (5%)</span>
-                  <span>Standar (15%)</span>
-                  <span>Sangat Jelas (60%)</span>
+                  <span>Lembut (15%)</span>
+                  <span>Jelas (50%)</span>
+                  <span>Kop Utuh / Nyata (100%)</span>
                 </div>
               </div>
 
@@ -11093,12 +11119,26 @@ export default function AdminFinanceERPPage() {
                         ...prev,
                         letterheadUrl: "/kop_surat_dstech.jpg",
                         letterheadEnabled: true,
+                        watermarkOpacity: 1.0,
+                      }))
+                    }
+                    className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-dstech-blue font-bold text-[10px] cursor-pointer"
+                  >
+                    Kop Utuh / Nyata (100%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTempSettings((prev) => ({
+                        ...prev,
+                        letterheadUrl: "/kop_surat_dstech.jpg",
+                        letterheadEnabled: true,
                         watermarkOpacity: 0.15,
                       }))
                     }
                     className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
                   >
-                    Kop Resmi Standar (15%)
+                    Watermark Lembut (15%)
                   </button>
                   <button
                     type="button"
