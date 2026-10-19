@@ -1,6 +1,68 @@
 {
   "sales": [
     {
+      "id": "dstech_inv_1792384426532",
+      "invoiceNumber": "INV-DSTECH-202610-005",
+      "customerName": "Bapak Ir. Bambang Sugianto",
+      "customerPhone": "0811-2233-4455",
+      "customerAddress": "Jl. Raya Anyer Km. 123, Ciwandan, Cilegon",
+      "date": "2026-10-19",
+      "dueDate": "2026-11-18",
+      "invoiceType": "DP",
+      "dpPercentage": 50,
+      "dpAmount": 63825000,
+      "dpStatus": "Menunggu Pembayaran DP",
+      "dpPaidAmount": 0,
+      "dpNotes": "Tagihan Uang Muka DP 50% Proyek CCTV & Barrier Gate PT Chandra Asri",
+      "items": [
+        {
+          "id": "1",
+          "productName": "CCTV Hikvision Explosion Proof Thermal Camera",
+          "qty": 4,
+          "unit": "Unit",
+          "price": 18500000,
+          "discount": 500000,
+          "total": 73500000
+        },
+        {
+          "id": "2",
+          "productName": "Barrier Gate Heavy Duty High Speed 1.5s",
+          "qty": 2,
+          "unit": "Unit",
+          "price": 16500000,
+          "discount": 0,
+          "total": 33000000
+        },
+        {
+          "id": "3",
+          "productName": "Jasa Instalasi, Piping Konduit & Komisioning",
+          "qty": 1,
+          "unit": "Lot",
+          "price": 12000000,
+          "discount": 0,
+          "total": 12000000
+        }
+      ],
+      "subtotal": 118500000,
+      "discount": 3500000,
+      "taxRate": 11,
+      "taxAmount": 12650000,
+      "grandTotal": 127650000,
+      "paymentMethod": "Transfer Bank Mandiri",
+      "paymentStatus": "Menunggu DP",
+      "paidAmount": 0,
+      "remainingAmount": 127650000,
+      "warehouseId": "dstech_wh_1",
+      "branchId": "dstech_branch_1",
+      "salesPerson": "DSTech Commercial Team",
+      "notes": "Konversi otomatis dari Surat Penawaran SPH-DSTECH-202610-003 (Penawaran Pengadaan CCTV Thermal Explosion Proof & Barrier Gate Otomatis)",
+      "approvalStatus": "Menunggu Approval",
+      "approvedBy": "",
+      "approvedTitle": "",
+      "approvedAt": "",
+      "verificationCode": ""
+    },
+    {
       "id": "dstech_inv_1792361001",
       "invoiceNumber": "INV-DSTECH-202610-001",
       "customerName": "PT. Krakatau Posco Energy",
@@ -695,6 +757,194 @@
       "branch": "KCU Cilegon",
       "isDefault": false,
       "status": "Aktif"
+    }
+  ],
+  "quotations": [
+    {
+      "id": "dstech_sph_1792384426505",
+      "quotationNumber": "SPH-DSTECH-202610-003",
+      "clientId": "dstech_client_1",
+      "customerName": "Bapak Ir. Bambang Sugianto",
+      "customerOrg": "PT. Chandra Asri Petrochemical Tbk",
+      "customerPhone": "0811-2233-4455",
+      "customerAddress": "Jl. Raya Anyer Km. 123, Ciwandan, Cilegon",
+      "subject": "Penawaran Pengadaan CCTV Thermal Explosion Proof & Barrier Gate Otomatis",
+      "date": "2026-10-19",
+      "validUntil": "2026-11-02",
+      "validityDays": 14,
+      "items": [
+        {
+          "id": "1",
+          "productName": "CCTV Hikvision Explosion Proof Thermal Camera",
+          "qty": 4,
+          "unit": "Unit",
+          "price": 18500000,
+          "discount": 500000,
+          "total": 73500000
+        },
+        {
+          "id": "2",
+          "productName": "Barrier Gate Heavy Duty High Speed 1.5s",
+          "qty": 2,
+          "unit": "Unit",
+          "price": 16500000,
+          "discount": 0,
+          "total": 33000000
+        },
+        {
+          "id": "3",
+          "productName": "Jasa Instalasi, Piping Konduit & Komisioning",
+          "qty": 1,
+          "unit": "Lot",
+          "price": 12000000,
+          "discount": 0,
+          "total": 12000000
+        }
+      ],
+      "subtotal": 118500000,
+      "discount": 3500000,
+      "taxRate": 11,
+      "taxAmount": 12650000,
+      "grandTotal": 127650000,
+      "terms": "1. Garansi 2 tahun.\n2. SLA response time 4 jam.\n3. DP 50%, Pelunasan 50% setelah BAST.",
+      "status": "Terkonversi Faktur",
+      "convertedInvoiceId": "INV-DSTECH-202610-005",
+      "approvalStatus": "Menunggu Approval",
+      "approvedBy": "",
+      "approvedTitle": "",
+      "approvedAt": "",
+      "verificationCode": "",
+      "notes": "-"
+    },
+    {
+      "id": "dstech_sph_1792384001",
+      "quotationNumber": "SPH-DSTECH-202610-001",
+      "clientId": "dstech_cli_1",
+      "customerName": "PT. Krakatau Posco Energy",
+      "customerOrg": "PT. Krakatau Posco Energy",
+      "customerPhone": "0812-9876-5432",
+      "customerAddress": "Kawasan Industri Krakatau Kav. E3, Cilegon - Banten",
+      "subject": "Penawaran Pengadaan & Instalasi CCTV AI Thermal & Smart Perimeter Security",
+      "date": "2026-10-18",
+      "validUntil": "2026-11-01",
+      "validityDays": 14,
+      "items": [
+        {
+          "id": "sph_item_1",
+          "productName": "Kamera CCTV Thermal Bi-spectrum AI 4MP DeepinView",
+          "qty": 2,
+          "unit": "Unit",
+          "price": 8500000,
+          "discount": 0,
+          "total": 17000000
+        },
+        {
+          "id": "sph_item_2",
+          "productName": "Network Video Recorder (NVR) AI AcuSense 16 Channel 4K",
+          "qty": 1,
+          "unit": "Unit",
+          "price": 6200000,
+          "discount": 0,
+          "total": 6200000
+        },
+        {
+          "id": "sph_item_3",
+          "productName": "Kabel UTP Cat6 Outdoor Shielded FTP Belden (305m)",
+          "qty": 2,
+          "unit": "Roll",
+          "price": 2850000,
+          "discount": 0,
+          "total": 5700000
+        },
+        {
+          "id": "sph_item_4",
+          "productName": "Jasa Instalasi, Setting Server AI, Commissioning & Pelatihan Operator",
+          "qty": 1,
+          "unit": "Lot",
+          "price": 3500000,
+          "discount": 0,
+          "total": 3500000
+        }
+      ],
+      "subtotal": 32400000,
+      "discount": 1000000,
+      "taxRate": 11,
+      "taxAmount": 3454000,
+      "grandTotal": 34854000,
+      "terms": "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender.",
+      "status": "Disetujui Klien",
+      "convertedInvoiceId": "",
+      "approvalStatus": "Disetujui & Sah",
+      "approvedBy": "H. Agus Supriyadi, S.T., M.Kom.",
+      "approvedTitle": "Direktur Keuangan & Operasional",
+      "approvedAt": "2026-10-18 16:00 WIB",
+      "verificationCode": "DST-SPH-202610-001",
+      "notes": "Penawaran resmi kebutuhan perimeter safety pabrik utama."
+    },
+    {
+      "id": "dstech_sph_1792384002",
+      "quotationNumber": "SPH-DSTECH-202610-002",
+      "clientId": "dstech_cli_2",
+      "customerName": "RS Kurnia Cilegon (PT. Medika Kurnia Sejahtera)",
+      "customerOrg": "RS Kurnia Cilegon",
+      "customerPhone": "0813-8899-1122",
+      "customerAddress": "Jl. Jombang Masjid No. 4, Jombang, Kota Cilegon - Banten",
+      "subject": "Penawaran Sistem Barrier Gate Parkir Otomatis RFID & License Plate Recognition (LPR)",
+      "date": "2026-10-19",
+      "validUntil": "2026-11-02",
+      "validityDays": 14,
+      "items": [
+        {
+          "id": "sph_item_2_1",
+          "productName": "Barrier Gate Automatic High Speed Servo 1.5s dengan Boom Arm LED",
+          "qty": 2,
+          "unit": "Unit",
+          "price": 12500000,
+          "discount": 0,
+          "total": 25000000
+        },
+        {
+          "id": "sph_item_2_2",
+          "productName": "Smart Controller RFID Long Range & Kamera ANPR/LPR Pendeteksi Plat Nomor",
+          "qty": 2,
+          "unit": "Set",
+          "price": 7800000,
+          "discount": 0,
+          "total": 15600000
+        },
+        {
+          "id": "sph_item_2_3",
+          "productName": "Loop Detector Vehicle Sensor & Safety Anti-Crash",
+          "qty": 2,
+          "unit": "Set",
+          "price": 1200000,
+          "discount": 0,
+          "total": 2400000
+        },
+        {
+          "id": "sph_item_2_4",
+          "productName": "Pekerjaan Sipil Pondasi, Instalasi Kabel Bawah Tanah & Konfigurasi Software",
+          "qty": 1,
+          "unit": "Lot",
+          "price": 4500000,
+          "discount": 0,
+          "total": 4500000
+        }
+      ],
+      "subtotal": 47500000,
+      "discount": 1500000,
+      "taxRate": 11,
+      "taxAmount": 5060000,
+      "grandTotal": 51060000,
+      "terms": "1. Harga sudah termasuk seluruh perangkat barrier gate, perapihan sipil dudukan, dan integrasi software parkir.\n2. Garansi motor penggerak barrier gate 3 (tiga) tahun dan sparepart pendukung 1 (satu) tahun.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penandatanganan SPK, Pelunasan 50% maksimal 14 hari setelah BAST.\n4. Penawaran berlaku selama 14 hari kerja.",
+      "status": "Terkirim",
+      "convertedInvoiceId": "",
+      "approvalStatus": "Menunggu Approval",
+      "approvedBy": "",
+      "approvedTitle": "",
+      "approvedAt": "",
+      "verificationCode": "",
+      "notes": "Proposal penawaran sistem parkir gerbang masuk dan keluar RS Kurnia."
     }
   ],
   "settings": {

@@ -94,6 +94,47 @@ interface SaleInvoice {
   approvalNotes?: string;
 }
 
+interface QuotationItem {
+  id: string;
+  productName: string;
+  qty: number;
+  unit: string;
+  price: number;
+  discount: number;
+  total: number;
+}
+
+interface Quotation {
+  id: string;
+  quotationNumber: string;
+  clientId?: string;
+  customerName: string;
+  customerOrg?: string;
+  customerPhone: string;
+  customerAddress: string;
+  subject: string;
+  date: string;
+  validUntil: string;
+  validityDays: number;
+  items: QuotationItem[];
+  subtotal: number;
+  discount: number;
+  taxRate: number;
+  taxAmount: number;
+  grandTotal: number;
+  terms: string;
+  status: "Draf" | "Terkirim" | "Disetujui Klien" | "Ditolak" | "Terkonversi Faktur" | string;
+  convertedInvoiceId?: string;
+  approvalStatus?: string;
+  approvedBy?: string;
+  approvedTitle?: string;
+  approvedAt?: string;
+  verificationCode?: string;
+  signatureImage?: string;
+  approvalNotes?: string;
+  notes?: string;
+}
+
 interface BankAccount {
   id: string;
   bankName: string;
@@ -190,13 +231,15 @@ interface WarehouseItem {
   id: string;
   code: string;
   name: string;
-  type: string;
+  type?: string;
   address: string;
+  city?: string;
   pic: string;
-  phone: string;
-  totalItemTypes: number;
+  phone?: string;
+  totalItemTypes?: number;
   totalValuation: number;
   status: string;
+  notes?: string;
 }
 
 interface BranchItem {
@@ -206,8 +249,11 @@ interface BranchItem {
   city: string;
   address: string;
   head: string;
-  phone: string;
+  phone?: string;
+  email?: string;
+  coverage?: string;
   status: string;
+  notes?: string;
 }
 
 interface ExpenseItem {
@@ -271,11 +317,15 @@ interface FinanceSummary {
   totalBranchCount: number;
   totalClientsCount?: number;
   totalSuppliersCount?: number;
+  totalQuotationsCount?: number;
+  totalQuotationsValue?: number;
+  totalQuotationsPending?: number;
+  totalQuotationsApproved?: number;
 }
 
 export default function AdminFinanceERPPage() {
   const [activeTab, setActiveTab] = useState<
-    "sales" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses" | "clients" | "suppliers"
+    "sales" | "quotations" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses" | "clients" | "suppliers"
   >("sales");
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -283,6 +333,7 @@ export default function AdminFinanceERPPage() {
 
   // Data states
   const [sales, setSales] = useState<SaleInvoice[]>([]);
+  const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [purchases, setPurchases] = useState<PurchaseOrder[]>([]);
   const [returnsSales, setReturnsSales] = useState<SalesReturn[]>([]);
   const [returnsPurchase, setReturnsPurchase] = useState<PurchaseReturn[]>([]);
@@ -442,6 +493,72 @@ export default function AdminFinanceERPPage() {
     notes: "",
   });
 
+  // Master Warehouse Modal State
+  const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState<boolean>(false);
+  const [editingWarehouse, setEditingWarehouse] = useState<WarehouseItem | null>(null);
+  const [warehouseForm, setWarehouseForm] = useState({
+    code: "",
+    name: "",
+    type: "Gudang Pusat",
+    address: "",
+    city: "Cilegon",
+    pic: "",
+    phone: "",
+    totalItemTypes: 0,
+    totalValuation: 0,
+    status: "Aktif",
+    notes: "",
+  });
+
+  // Master Branch Modal State
+  const [isBranchModalOpen, setIsBranchModalOpen] = useState<boolean>(false);
+  const [editingBranch, setEditingBranch] = useState<BranchItem | null>(null);
+  const [branchForm, setBranchForm] = useState({
+    code: "",
+    name: "",
+    city: "Cilegon",
+    address: "",
+    head: "",
+    phone: "",
+    email: "",
+    coverage: "",
+    status: "Kantor Cabang",
+    notes: "",
+  });
+
+  // Quotations States & Modals
+  const [quotationSearchQuery, setQuotationSearchQuery] = useState<string>("");
+  const [quotationStatusFilter, setQuotationStatusFilter] = useState<string>("Semua");
+  const [isNewQuotationModalOpen, setIsNewQuotationModalOpen] = useState<boolean>(false);
+  const [isEditQuotationModalOpen, setIsEditQuotationModalOpen] = useState<boolean>(false);
+  const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
+  const [selectedQuotationForPrint, setSelectedQuotationForPrint] = useState<Quotation | null>(null);
+  const [selectedQuotationForConvert, setSelectedQuotationForConvert] = useState<Quotation | null>(null);
+  const [isConvertModalOpen, setIsConvertModalOpen] = useState<boolean>(false);
+  const [convertForm, setConvertForm] = useState({
+    invoiceType: "Standar" as "Standar" | "DP",
+    dpPercentage: 50,
+    dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Proyek",
+  });
+
+  const [quotationForm, setQuotationForm] = useState({
+    clientId: "",
+    customerName: "",
+    customerOrg: "",
+    customerPhone: "",
+    customerAddress: "",
+    subject: "Penawaran Pengadaan & Instalasi Sistem CCTV AI & Smart Security",
+    date: new Date().toISOString().split("T")[0],
+    validityDays: 14,
+    items: [
+      { id: "1", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
+    ],
+    discount: 0,
+    taxRate: 11,
+    terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
+    notes: "",
+  });
+
   // New Sale Form State
   const [saleForm, setSaleForm] = useState({
     customerName: "",
@@ -502,6 +619,34 @@ export default function AdminFinanceERPPage() {
     }).format(num || 0);
   };
 
+  const angkaTerbilang = (nilai: number): string => {
+    const bilangan = [
+      "",
+      "Satu",
+      "Dua",
+      "Tiga",
+      "Empat",
+      "Lima",
+      "Enam",
+      "Tujuh",
+      "Delapan",
+      "Sembilan",
+      "Sepuluh",
+      "Sebelas",
+    ];
+    nilai = Math.floor(Math.abs(nilai));
+    if (nilai < 12) return bilangan[nilai];
+    if (nilai < 20) return angkaTerbilang(nilai - 10) + " Belas";
+    if (nilai < 100) return angkaTerbilang(Math.floor(nilai / 10)) + " Puluh " + angkaTerbilang(nilai % 10);
+    if (nilai < 200) return "Seratus " + angkaTerbilang(nilai - 100);
+    if (nilai < 1000) return angkaTerbilang(Math.floor(nilai / 100)) + " Ratus " + angkaTerbilang(nilai % 100);
+    if (nilai < 2000) return "Seribu " + angkaTerbilang(nilai - 1000);
+    if (nilai < 1000000) return angkaTerbilang(Math.floor(nilai / 1000)) + " Ribu " + angkaTerbilang(nilai % 1000);
+    if (nilai < 1000000000) return angkaTerbilang(Math.floor(nilai / 1000000)) + " Juta " + angkaTerbilang(nilai % 1000000);
+    if (nilai < 1000000000000) return angkaTerbilang(Math.floor(nilai / 1000000000)) + " Milyar " + angkaTerbilang(nilai % 1000000000);
+    return "";
+  };
+
   const fetchFinanceData = async () => {
     try {
       setIsLoading(true);
@@ -510,6 +655,7 @@ export default function AdminFinanceERPPage() {
         const d = await res.json();
         if (d.data) {
           setSales(d.data.sales || []);
+          setQuotations(d.data.quotations || []);
           setPurchases(d.data.purchases || []);
           setReturnsSales(d.data.returns_sales || []);
           setReturnsPurchase(d.data.returns_purchase || []);
@@ -568,6 +714,259 @@ export default function AdminFinanceERPPage() {
       updated[idx] = item;
       return { ...prev, items: updated };
     });
+  };
+
+  // Handler Quotation Form Dynamic Items
+  const handleAddQuotationItem = () => {
+    setQuotationForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { id: String(Date.now()), productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
+      ],
+    }));
+  };
+
+  const handleRemoveQuotationItem = (idx: number) => {
+    if (quotationForm.items.length <= 1) return;
+    setQuotationForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handleQuotationItemChange = (idx: number, field: string, val: any) => {
+    setQuotationForm((prev) => {
+      const updated = [...prev.items];
+      const item = { ...updated[idx], [field]: val };
+      if (field === "qty" || field === "price" || field === "discount") {
+        const itemGross = Number(item.qty || 0) * Number(item.price || 0);
+        item.total = Math.max(0, itemGross - Number(item.discount || 0));
+      }
+      updated[idx] = item;
+      return { ...prev, items: updated };
+    });
+  };
+
+  const calculateQuotationTotals = () => {
+    const subtotal = quotationForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+    const afterDiscount = Math.max(0, subtotal - Number(quotationForm.discount || 0));
+    const taxAmount = (afterDiscount * Number(quotationForm.taxRate || 0)) / 100;
+    const grandTotal = afterDiscount + taxAmount;
+    return { subtotal, afterDiscount, taxAmount, grandTotal };
+  };
+
+  const handleClientSelectForQuotation = (clientId: string) => {
+    const cl = clients.find((c) => c.id === clientId);
+    if (cl) {
+      setQuotationForm((prev) => ({
+        ...prev,
+        clientId: cl.id,
+        customerName: cl.name,
+        customerOrg: cl.name,
+        customerPhone: cl.phone,
+        customerAddress: cl.address ? `${cl.address}, ${cl.city}` : cl.city,
+      }));
+    }
+  };
+
+  const handleCreateQuotationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { subtotal, taxAmount, grandTotal } = calculateQuotationTotals();
+
+    if (!quotationForm.customerName.trim()) {
+      showToast("Nama Klien / Perusahaan wajib diisi!");
+      return;
+    }
+
+    if (quotationForm.items.some((it) => !it.productName || it.price <= 0)) {
+      showToast("Mohon isi deskripsi produk/jasa dan harga valid untuk semua baris!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "quotation",
+          payload: {
+            clientId: quotationForm.clientId,
+            customerName: quotationForm.customerName,
+            customerOrg: quotationForm.customerOrg || quotationForm.customerName,
+            customerPhone: quotationForm.customerPhone,
+            customerAddress: quotationForm.customerAddress,
+            subject: quotationForm.subject,
+            date: quotationForm.date,
+            validityDays: Number(quotationForm.validityDays) || 14,
+            items: quotationForm.items,
+            subtotal,
+            discount: Number(quotationForm.discount) || 0,
+            taxRate: Number(quotationForm.taxRate) || 0,
+            taxAmount,
+            grandTotal,
+            terms: quotationForm.terms,
+            notes: quotationForm.notes,
+            status: "Terkirim",
+          },
+        }),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        showToast("Surat Penawaran Harga (SPH) berhasil dibuat!");
+        setIsNewQuotationModalOpen(false);
+        setQuotationForm({
+          clientId: "",
+          customerName: "",
+          customerOrg: "",
+          customerPhone: "",
+          customerAddress: "",
+          subject: "Penawaran Pengadaan & Instalasi CCTV AI & Smart Security",
+          date: new Date().toISOString().split("T")[0],
+          validityDays: 14,
+          items: [
+            { id: "1", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
+          ],
+          discount: 0,
+          taxRate: 11,
+          terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
+          notes: "",
+        });
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal membuat surat penawaran");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat membuat surat penawaran");
+    }
+  };
+
+  const handleOpenEditQuotation = (q: Quotation) => {
+    setEditingQuotation(q);
+    setQuotationForm({
+      clientId: q.clientId || "",
+      customerName: q.customerName,
+      customerOrg: q.customerOrg || q.customerName,
+      customerPhone: q.customerPhone,
+      customerAddress: q.customerAddress,
+      subject: q.subject,
+      date: q.date,
+      validityDays: q.validityDays || 14,
+      items: q.items && q.items.length > 0 ? q.items : [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 }],
+      discount: q.discount || 0,
+      taxRate: q.taxRate || 0,
+      terms: q.terms,
+      notes: q.notes || "",
+    });
+    setIsEditQuotationModalOpen(true);
+  };
+
+  const handleSaveEditQuotationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingQuotation) return;
+    const { subtotal, taxAmount, grandTotal } = calculateQuotationTotals();
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "quotation",
+          id: editingQuotation.id,
+          updates: {
+            clientId: quotationForm.clientId,
+            customerName: quotationForm.customerName,
+            customerOrg: quotationForm.customerOrg || quotationForm.customerName,
+            customerPhone: quotationForm.customerPhone,
+            customerAddress: quotationForm.customerAddress,
+            subject: quotationForm.subject,
+            date: quotationForm.date,
+            validityDays: Number(quotationForm.validityDays) || 14,
+            items: quotationForm.items,
+            subtotal,
+            discount: Number(quotationForm.discount) || 0,
+            taxRate: Number(quotationForm.taxRate) || 0,
+            taxAmount,
+            grandTotal,
+            terms: quotationForm.terms,
+            notes: quotationForm.notes,
+          },
+        }),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        showToast(`Surat Penawaran ${editingQuotation.quotationNumber} berhasil diperbarui!`);
+        setIsEditQuotationModalOpen(false);
+        setEditingQuotation(null);
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal memperbarui surat penawaran");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  const handleDeleteQuotation = async (id: string, quotationNumber: string) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus Surat Penawaran "${quotationNumber}"?`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=quotation&id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast(`Surat Penawaran ${quotationNumber} berhasil dihapus!`);
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal menghapus penawaran");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menghapus penawaran");
+    }
+  };
+
+  const handleOpenConvertQuotation = (q: Quotation) => {
+    setSelectedQuotationForConvert(q);
+    setConvertForm({
+      invoiceType: "DP",
+      dpPercentage: 50,
+      dpNotes: `Pengajuan Uang Muka (DP 50%) atas SPH ${q.quotationNumber} - ${q.subject}`,
+    });
+    setIsConvertModalOpen(true);
+  };
+
+  const handleExecuteConvertQuotation = async () => {
+    if (!selectedQuotationForConvert) return;
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "convert_quotation_to_sale",
+          payload: {
+            quotationId: selectedQuotationForConvert.id,
+            invoiceType: convertForm.invoiceType,
+            dpPercentage: convertForm.invoiceType === "DP" ? convertForm.dpPercentage : 0,
+            dpNotes: convertForm.dpNotes,
+          },
+        }),
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        showToast(result.message || "Surat Penawaran berhasil dikonversi ke Faktur Penjualan!");
+        setIsConvertModalOpen(false);
+        setSelectedQuotationForConvert(null);
+        setActiveTab("sales");
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal mengonversi surat penawaran");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat konversi");
+    }
   };
 
   const calculateSaleTotals = () => {
@@ -927,6 +1326,33 @@ export default function AdminFinanceERPPage() {
   };
 
   // Handler Pengaturan Kop Surat
+  const handleOpenSettingsModal = () => {
+    setTempSettings({ ...financeSettings });
+    setIsSettingsModalOpen(true);
+  };
+
+  const handleLetterheadFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      showToast("Ukuran file gambar maksimal 8MB!");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const base64Url = uploadEvent.target?.result as string;
+      if (base64Url) {
+        setTempSettings((prev) => ({
+          ...prev,
+          letterheadUrl: base64Url,
+          letterheadEnabled: true,
+        }));
+        showToast("Gambar kop surat baru berhasil dimuat! Klik Simpan Pengaturan.");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -940,9 +1366,12 @@ export default function AdminFinanceERPPage() {
       });
       const d = await res.json();
       if (d.success) {
-        setFinanceSettings(tempSettings);
-        showToast("Pengaturan kop surat & background faktur berhasil disimpan!");
+        setFinanceSettings({ ...tempSettings });
+        showToast("Pengaturan kop surat & background dokumen berhasil disimpan!");
         setIsSettingsModalOpen(false);
+        fetchFinanceData();
+      } else {
+        showToast(d.error || "Gagal menyimpan pengaturan kop surat");
       }
     } catch {
       showToast("Gagal menyimpan pengaturan kop surat");
@@ -1405,6 +1834,206 @@ export default function AdminFinanceERPPage() {
     }
   };
 
+  // Warehouse Master Handlers
+  const handleOpenAddWarehouse = () => {
+    setEditingWarehouse(null);
+    setWarehouseForm({
+      code: `GD-${warehouses.length + 1}`,
+      name: "",
+      type: "Gudang Pusat",
+      address: "",
+      city: "Cilegon",
+      pic: "",
+      phone: "",
+      totalItemTypes: 0,
+      totalValuation: 0,
+      status: "Aktif",
+      notes: "",
+    });
+    setIsWarehouseModalOpen(true);
+  };
+
+  const handleOpenEditWarehouse = (wh: WarehouseItem) => {
+    setEditingWarehouse(wh);
+    setWarehouseForm({
+      code: wh.code || "",
+      name: wh.name || "",
+      type: wh.type || "Gudang Pusat",
+      address: wh.address || "",
+      city: wh.city || "Cilegon",
+      pic: wh.pic || "",
+      phone: wh.phone || "",
+      totalItemTypes: wh.totalItemTypes || 0,
+      totalValuation: wh.totalValuation || 0,
+      status: wh.status || "Aktif",
+      notes: wh.notes || "",
+    });
+    setIsWarehouseModalOpen(true);
+  };
+
+  const handleSaveWarehouseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!warehouseForm.name.trim()) {
+      showToast("Nama Gudang wajib diisi!");
+      return;
+    }
+
+    try {
+      if (editingWarehouse) {
+        const res = await fetch("/api/finance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "warehouse",
+            id: editingWarehouse.id,
+            updates: warehouseForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Data gudang ${warehouseForm.name} berhasil diperbarui!`);
+          setIsWarehouseModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal memperbarui data gudang");
+        }
+      } else {
+        const res = await fetch("/api/finance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "warehouse",
+            payload: warehouseForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Gudang baru ${warehouseForm.name} berhasil ditambahkan!`);
+          setIsWarehouseModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal menambahkan titik gudang");
+        }
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  const handleDeleteWarehouse = async (wh: WarehouseItem) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus gudang "${wh.name}"? Stok terkait mungkin terpengaruh.`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=warehouse&id=${wh.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        showToast(`Gudang ${wh.name} berhasil dihapus`);
+        fetchFinanceData();
+      } else {
+        showToast("Gagal menghapus gudang");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  // Branch Master Handlers
+  const handleOpenAddBranch = () => {
+    setEditingBranch(null);
+    setBranchForm({
+      code: `BR-${String(branches.length + 1).padStart(2, "0")}`,
+      name: "",
+      city: "Cilegon",
+      address: "",
+      head: "",
+      phone: "",
+      email: "",
+      coverage: "",
+      status: "Kantor Cabang",
+      notes: "",
+    });
+    setIsBranchModalOpen(true);
+  };
+
+  const handleOpenEditBranch = (br: BranchItem) => {
+    setEditingBranch(br);
+    setBranchForm({
+      code: br.code || "",
+      name: br.name || "",
+      city: br.city || "Cilegon",
+      address: br.address || "",
+      head: br.head || "",
+      phone: br.phone || "",
+      email: br.email || "",
+      coverage: br.coverage || "",
+      status: br.status || "Kantor Cabang",
+      notes: br.notes || "",
+    });
+    setIsBranchModalOpen(true);
+  };
+
+  const handleSaveBranchSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!branchForm.name.trim()) {
+      showToast("Nama Kantor / Cabang wajib diisi!");
+      return;
+    }
+
+    try {
+      if (editingBranch) {
+        const res = await fetch("/api/finance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "branch",
+            id: editingBranch.id,
+            updates: branchForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Data cabang ${branchForm.name} berhasil diperbarui!`);
+          setIsBranchModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal memperbarui data kantor cabang");
+        }
+      } else {
+        const res = await fetch("/api/finance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "branch",
+            payload: branchForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Kantor cabang ${branchForm.name} berhasil ditambahkan!`);
+          setIsBranchModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal menambahkan kantor cabang");
+        }
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  const handleDeleteBranch = async (br: BranchItem) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus kantor cabang "${br.name}"?`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=branch&id=${br.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        showToast(`Kantor cabang ${br.name} berhasil dihapus`);
+        fetchFinanceData();
+      } else {
+        showToast("Gagal menghapus kantor cabang");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -1577,6 +2206,21 @@ export default function AdminFinanceERPPage() {
           </button>
 
           <button
+            onClick={() => setActiveTab("quotations")}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "quotations"
+                ? "bg-slate-900 text-white shadow-md"
+                : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            }`}
+          >
+            <FileText className="w-4 h-4 text-indigo-600" />
+            <span>Surat Penawaran (SPH)</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-[10px]">
+              {quotations.length}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab("purchases")}
             className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === "purchases"
@@ -1719,7 +2363,7 @@ export default function AdminFinanceERPPage() {
 
                 {/* Tombol Pengaturan Kop Surat */}
                 <button
-                  onClick={() => setIsSettingsModalOpen(true)}
+                  onClick={handleOpenSettingsModal}
                   title="Atur Background Kop Surat Resmi Faktur"
                   className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
@@ -1891,6 +2535,299 @@ export default function AdminFinanceERPPage() {
                             <button
                               onClick={() => handleDeleteSale(sale.id, sale.invoiceNumber)}
                               title="Hapus Faktur"
+                              className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 1.5: SURAT PENAWARAN HARGA (QUOTATION / SPH) */}
+        {activeTab === "quotations" && (
+          <div className="space-y-6">
+            {/* Top Control Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="Cari nomor SPH (SPH-DSTECH-...), nama instansi klien, atau perihal pengadaan..."
+                  value={quotationSearchQuery}
+                  onChange={(e) => setQuotationSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={quotationStatusFilter}
+                  onChange={(e) => setQuotationStatusFilter(e.target.value)}
+                  className="p-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white focus:outline-none"
+                >
+                  <option value="Semua">Semua Status SPH</option>
+                  <option value="Terkirim">Terkirim</option>
+                  <option value="Disetujui Klien">Disetujui Klien</option>
+                  <option value="Terkonversi Faktur">Terkonversi Faktur</option>
+                  <option value="Draf">Draf</option>
+                  <option value="Ditolak">Ditolak</option>
+                </select>
+
+                <button
+                  onClick={() => setIsNewQuotationModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Buat Surat Penawaran (SPH)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Quotation Mini KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Total SPH Terbit</p>
+                  <h4 className="text-xl font-black text-slate-900 mt-1">{quotations.length} Surat</h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Penawaran Resmi</p>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
+                  <FileText className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Total Nilai Penawaran</p>
+                  <h4 className="text-xl font-black text-slate-900 mt-1">
+                    {formatRupiah(quotations.reduce((acc, curr) => acc + (Number(curr.grandTotal) || 0), 0))}
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Akumulasi Proposal</p>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
+                  <TrendingUp className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Disetujui Klien</p>
+                  <h4 className="text-xl font-black text-slate-900 mt-1">
+                    {quotations.filter((q) => q.status === "Disetujui Klien").length} SPH
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Siap Pelaksanaan</p>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md">
+                  <CheckCheck className="w-5 h-5" />
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-blue-700">Telah Jadi Faktur</p>
+                  <h4 className="text-xl font-black text-slate-900 mt-1">
+                    {quotations.filter((q) => q.status === "Terkonversi Faktur" || q.convertedInvoiceId).length} SPH
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Terkonversi Proyek</p>
+                </div>
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
+                  <Receipt className="w-5 h-5" />
+                </div>
+              </div>
+            </div>
+
+            {/* Quotations Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                  <tr>
+                    <th className="p-3">No. SPH & Perihal</th>
+                    <th className="p-3">Klien & Instansi</th>
+                    <th className="p-3">Tanggal & Tempo SPH</th>
+                    <th className="p-3">Rincian Paket & Item</th>
+                    <th className="p-3">Total Penawaran</th>
+                    <th className="p-3">Status & Approval</th>
+                    <th className="p-3 text-right">Aksi Cepat</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {quotations
+                    .filter((sph) => {
+                      const matchQuery =
+                        sph.quotationNumber.toLowerCase().includes(quotationSearchQuery.toLowerCase()) ||
+                        sph.customerName.toLowerCase().includes(quotationSearchQuery.toLowerCase()) ||
+                        sph.subject.toLowerCase().includes(quotationSearchQuery.toLowerCase());
+                      const matchStatus =
+                        quotationStatusFilter === "Semua" || sph.status === quotationStatusFilter;
+                      return matchQuery && matchStatus;
+                    })
+                    .map((sph) => (
+                      <tr key={sph.id} className="hover:bg-slate-50/80 transition-colors">
+                        {/* No SPH & Perihal */}
+                        <td className="p-3">
+                          <span className="font-mono font-black text-indigo-700 block text-xs">
+                            {sph.quotationNumber}
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-800 line-clamp-1 mt-0.5 max-w-[220px]" title={sph.subject}>
+                            {sph.subject}
+                          </span>
+                          {sph.convertedInvoiceId && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mt-1">
+                              <Receipt className="w-3 h-3 text-emerald-600" />
+                              Faktur: {sph.convertedInvoiceId}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Klien & Instansi */}
+                        <td className="p-3">
+                          <p className="font-bold text-slate-900 line-clamp-1">{sph.customerName}</p>
+                          <p className="text-[10px] text-slate-400">{sph.customerPhone || "-"}</p>
+                          <p className="text-[10px] text-slate-400 line-clamp-1 max-w-[180px]">{sph.customerAddress || "-"}</p>
+                        </td>
+
+                        {/* Tanggal & Tempo */}
+                        <td className="p-3 whitespace-nowrap">
+                          <p className="text-slate-800 font-medium">Terbit: {sph.date}</p>
+                          <p className="text-[10px] font-semibold text-amber-700 flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3 text-amber-500" />
+                            Berlaku s/d: {sph.validUntil} ({sph.validityDays || 14} hari)
+                          </p>
+                        </td>
+
+                        {/* Rincian Item */}
+                        <td className="p-3">
+                          <div className="space-y-0.5 max-w-[200px]">
+                            {sph.items.slice(0, 2).map((it, idx) => (
+                              <p key={idx} className="text-[11px] text-slate-600 truncate">
+                                • {it.productName} ({it.qty} {it.unit})
+                              </p>
+                            ))}
+                            {sph.items.length > 2 && (
+                              <p className="text-[10px] font-bold text-indigo-600">
+                                + {sph.items.length - 2} item perangkat lainnya...
+                              </p>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Total Penawaran */}
+                        <td className="p-3 whitespace-nowrap font-bold">
+                          <span className="text-sm font-black text-slate-900 block">
+                            {formatRupiah(sph.grandTotal)}
+                          </span>
+                          {sph.discount > 0 && (
+                            <span className="text-[10px] text-red-500 font-semibold block">
+                              Diskon: -{formatRupiah(sph.discount)}
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-400 font-semibold">
+                            PPN {sph.taxRate || 0}%: {formatRupiah(sph.taxAmount || 0)}
+                          </span>
+                        </td>
+
+                        {/* Status SPH & Approval */}
+                        <td className="p-3 whitespace-nowrap space-y-1">
+                          <span
+                            className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              sph.status === "Disetujui Klien"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : sph.status === "Terkonversi Faktur"
+                                ? "bg-blue-100 text-blue-800"
+                                : sph.status === "Terkirim"
+                                ? "bg-amber-100 text-amber-800"
+                                : sph.status === "Ditolak"
+                                ? "bg-red-100 text-red-800"
+                                : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {sph.status}
+                          </span>
+
+                          <div>
+                            {sph.approvalStatus === "Disetujui & Sah" ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                                <ShieldCheck className="w-3 h-3 text-indigo-600" />
+                                Sah Digital
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                <Clock className="w-3 h-3 text-amber-500" />
+                                Menunggu Approval
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Aksi */}
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* Cetak / Preview SPH */}
+                            <button
+                              onClick={() => setSelectedQuotationForPrint(sph)}
+                              title="Cetak & Pratinjau Surat Penawaran Kop DSTech"
+                              className="p-2 rounded-xl bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Printer className="w-4 h-4" />
+                            </button>
+
+                            {/* Konversi ke Faktur Penjualan (1-Klik) */}
+                            {sph.status !== "Terkonversi Faktur" && (
+                              <button
+                                onClick={() => handleOpenConvertQuotation(sph)}
+                                title="Konversi SPH ini Menjadi Faktur Penjualan Resmi"
+                                className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <ArrowRight className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            {/* Approval Tanda Tangan Direktur */}
+                            <button
+                              onClick={() => {
+                                setSelectedInvoiceForApproval({
+                                  ...sph,
+                                  invoiceNumber: sph.quotationNumber,
+                                  dueDate: sph.validUntil,
+                                  paymentMethod: "SPH Proposal",
+                                  paymentStatus: sph.status,
+                                  paidAmount: 0,
+                                  remainingAmount: sph.grandTotal,
+                                  warehouseId: "dstech_wh_1",
+                                  branchId: "dstech_branch_1",
+                                  salesPerson: "DSTech Commercial Team",
+                                } as any);
+                                setIsApprovalModalOpen(true);
+                              }}
+                              title={sph.approvalStatus === "Disetujui & Sah" ? "Perbarui Tanda Tangan Digital SPH" : "Approval & Tanda Tangan Digital Direktur SPH"}
+                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
+                                sph.approvalStatus === "Disetujui & Sah"
+                                  ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-700 hover:text-white"
+                                  : "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white"
+                              }`}
+                            >
+                              <PenTool className="w-4 h-4" />
+                            </button>
+
+                            {/* Edit SPH */}
+                            <button
+                              onClick={() => handleOpenEditQuotation(sph)}
+                              title="Edit Surat Penawaran"
+                              className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+
+                            {/* Hapus SPH */}
+                            <button
+                              onClick={() => handleDeleteQuotation(sph.id, sph.quotationNumber)}
+                              title="Hapus Surat Penawaran"
                               className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -2232,24 +3169,58 @@ export default function AdminFinanceERPPage() {
           <div className="space-y-6">
             {/* Gudang Operasional */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-2 gap-2">
                 <div className="flex items-center gap-2">
                   <Warehouse className="w-4 h-4 text-dstech-blue" />
                   <h3 className="font-black text-sm text-slate-900">Daftar Titik Gudang & Logistik</h3>
                 </div>
-                <span className="text-[10px] font-bold text-slate-500">{warehouses.length} Lokasi</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-500">{warehouses.length} Lokasi</span>
+                  <button
+                    onClick={handleOpenAddWarehouse}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-dstech-blue text-white text-xs font-bold hover:bg-blue-600 transition shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Titik Gudang</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {warehouses.map((wh) => (
-                  <div key={wh.id} className="p-5 rounded-3xl bg-slate-50 border border-slate-200/80 space-y-3">
+                  <div key={wh.id} className="p-5 rounded-3xl bg-slate-50 border border-slate-200/80 space-y-3 relative group hover:border-dstech-blue/50 transition shadow-sm">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-black text-dstech-blue bg-blue-100 px-2 py-0.5 rounded-md">
-                        {wh.code}
-                      </span>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        {wh.status}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-xs font-black text-dstech-blue bg-blue-100 px-2 py-0.5 rounded-md">
+                          {wh.code}
+                        </span>
+                        {wh.type && (
+                          <span className="text-[10px] font-bold text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-md">
+                            {wh.type}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          {wh.status}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => handleOpenEditWarehouse(wh)}
+                            title="Edit Data Gudang"
+                            className="p-1 rounded-lg text-slate-400 hover:text-dstech-blue hover:bg-blue-50 transition cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteWarehouse(wh)}
+                            title="Hapus Gudang"
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div>
@@ -2258,6 +3229,12 @@ export default function AdminFinanceERPPage() {
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                         <span>{wh.address}</span>
                       </p>
+                      {wh.phone && wh.phone !== "-" && (
+                        <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{wh.phone}</span>
+                        </p>
+                      )}
                     </div>
 
                     <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
@@ -2277,24 +3254,51 @@ export default function AdminFinanceERPPage() {
 
             {/* Kantor Cabang */}
             <div className="space-y-3 pt-4 border-t border-slate-100">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-2 gap-2">
                 <div className="flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-purple-600" />
                   <h3 className="font-black text-sm text-slate-900">Kantor Pusat & Kantor Cabang DSTech</h3>
                 </div>
-                <span className="text-[10px] font-bold text-slate-500">{branches.length} Cabang</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-500">{branches.length} Cabang</span>
+                  <button
+                    onClick={handleOpenAddBranch}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 text-white text-xs font-bold hover:bg-purple-700 transition shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Kantor Cabang</span>
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {branches.map((br) => (
-                  <div key={br.id} className="p-5 rounded-3xl bg-slate-50 border border-slate-200/80 space-y-3">
+                  <div key={br.id} className="p-5 rounded-3xl bg-slate-50 border border-slate-200/80 space-y-3 relative group hover:border-purple-300 transition shadow-sm">
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-xs font-black text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md">
                         {br.code}
                       </span>
-                      <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-                        {br.status}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                          {br.status}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={() => handleOpenEditBranch(br)}
+                            title="Edit Data Cabang"
+                            className="p-1 rounded-lg text-slate-400 hover:text-purple-600 hover:bg-purple-50 transition cursor-pointer"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBranch(br)}
+                            title="Hapus Kantor Cabang"
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div>
@@ -2303,6 +3307,18 @@ export default function AdminFinanceERPPage() {
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
                         <span>{br.address}</span>
                       </p>
+                      {br.phone && br.phone !== "-" && (
+                        <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                          <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{br.phone}</span>
+                        </p>
+                      )}
+                      {br.email && br.email !== "-" && (
+                        <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+                          <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>{br.email}</span>
+                        </p>
+                      )}
                     </div>
 
                     <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
@@ -2311,8 +3327,8 @@ export default function AdminFinanceERPPage() {
                         <p className="font-bold text-slate-800">{br.head}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] text-slate-400 font-bold uppercase">Wilayah</p>
-                        <p className="font-bold text-slate-800">{br.city}</p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase">Wilayah / Coverage</p>
+                        <p className="font-bold text-slate-800">{br.city}{br.coverage && br.coverage !== "-" ? ` • ${br.coverage}` : ""}</p>
                       </div>
                     </div>
                   </div>
@@ -2716,10 +3732,11 @@ export default function AdminFinanceERPPage() {
                     onChange={(e) => setSaleForm({ ...saleForm, paymentMethod: e.target.value })}
                     className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white"
                   >
-                    <option value="Transfer Bank Mandiri PT DSTech Smart Perkasa">
-                      Transfer Bank Mandiri PT DSTech
-                    </option>
-                    <option value="Transfer Bank BCA DSTech">Transfer Bank BCA DSTech</option>
+                    {bankAccounts.map((b) => (
+                      <option key={b.id} value={`Transfer ${b.bankName} (${b.accountNumber} - ${b.accountHolder})`}>
+                        Transfer {b.bankName} ({b.accountNumber} - {b.accountHolder})
+                      </option>
+                    ))}
                     <option value="Tunai / Kas Langsung">Tunai / Kas Langsung</option>
                     <option value="Tempo 14 Hari">Tempo 14 Hari</option>
                     <option value="Tempo 30 Hari">Tempo 30 Hari</option>
@@ -3114,17 +4131,19 @@ export default function AdminFinanceERPPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Rekening Akun:</label>
+                <label className="font-bold text-slate-700 block mb-1">Rekening Akun Kas / Bank:</label>
                 <select
                   value={cashForm.account}
                   onChange={(e) => setCashForm({ ...cashForm, account: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
                 >
-                  <option value="Bank Mandiri PT DSTech Smart Perkasa">
-                    Bank Mandiri PT DSTech Smart Perkasa
-                  </option>
-                  <option value="Bank BCA DSTech">Bank BCA DSTech</option>
-                  <option value="Kas Kecil (Petty Cash)">Kas Kecil (Petty Cash Kantor)</option>
+                  {bankAccounts.map((b) => (
+                    <option key={b.id} value={`${b.bankName} - ${b.accountNumber} (${b.accountHolder})`}>
+                      {b.bankName} - {b.accountNumber} ({b.accountHolder})
+                    </option>
+                  ))}
+                  <option value="Kas Kecil (Petty Cash Kantor)">Kas Kecil (Petty Cash Kantor)</option>
+                  <option value="Kas Tunai Operasional">Kas Tunai Operasional</option>
                 </select>
               </div>
 
@@ -3180,7 +4199,7 @@ export default function AdminFinanceERPPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsSettingsModalOpen(true)}
+                  onClick={handleOpenSettingsModal}
                   title="Ganti Background Kop Surat"
                   className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
@@ -3502,6 +4521,929 @@ export default function AdminFinanceERPPage() {
                       {selectedInvoiceForPrint.approvalStatus === "Disetujui & Sah" && (
                         <p className="text-[8px] text-emerald-700 font-mono font-bold mt-0.5">
                           [VERIFIKASI: {selectedInvoiceForPrint.verificationCode || "DST-APP-202610-001"}]
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SPH: BUAT / EDIT SURAT PENAWARAN HARGA (QUOTATION) */}
+      {(isNewQuotationModalOpen || isEditQuotationModalOpen) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => {
+            setIsNewQuotationModalOpen(false);
+            setIsEditQuotationModalOpen(false);
+            setEditingQuotation(null);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">
+                  {isEditQuotationModalOpen ? `Pembaruan ${editingQuotation?.quotationNumber}` : "Formulir Surat Penawaran Resmi"}
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">
+                  {isEditQuotationModalOpen ? "Edit Surat Penawaran Harga (SPH)" : "Buat Surat Penawaran Harga (SPH) Baru"}
+                </h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsNewQuotationModalOpen(false);
+                  setIsEditQuotationModalOpen(false);
+                  setEditingQuotation(null);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={isEditQuotationModalOpen ? handleSaveEditQuotationSubmit : handleCreateQuotationSubmit}
+              className="space-y-4 text-xs"
+            >
+              {/* Quick Select Client from Master Data */}
+              <div className="p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-indigo-900 flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Pilih Klien dari Master Data Rekanan (Auto-Fill):</span>
+                  </label>
+                  <span className="text-[10px] text-indigo-600 font-medium">Opsional</span>
+                </div>
+                <select
+                  value={quotationForm.clientId}
+                  onChange={(e) => handleClientSelectForQuotation(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-white border border-indigo-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Pilih dari Master Data Klien (atau isi manual di bawah) --</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.category}) — {c.pic ? `PIC: ${c.pic}` : c.city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Data Klien & Tujuan Penawaran */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Nama Klien / PIC Penerima <span className="text-red-500">*</span>:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Bapak H. Hendra Wijaya"
+                    value={quotationForm.customerName}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, customerName: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Nama Perusahaan / Instansi Klien:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: PT. Krakatau Posco Energy"
+                    value={quotationForm.customerOrg}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, customerOrg: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Nomor Telepon / WhatsApp <span className="text-red-500">*</span>:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: 0812-9988-7766"
+                    value={quotationForm.customerPhone}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, customerPhone: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Alamat Proyek / Lokasi Klien:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Kawasan Industri Krakatau Steel Kav. D-2, Cilegon"
+                    value={quotationForm.customerAddress}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, customerAddress: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Subjek & Perihal Penawaran */}
+              <div className="space-y-2 pt-1 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-700 block">
+                    Perihal / Subjek Surat Penawaran <span className="text-red-500">*</span>:
+                  </label>
+                  <span className="text-[10px] text-slate-400">Pilih Preset Cepat:</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pb-1">
+                  {[
+                    "CCTV AI & Security",
+                    "Smart Barrier Gate RFID",
+                    "Smart Access Door Intercom",
+                    "IT Server & Networking",
+                    "Kontrak Maintenance Tahunan",
+                  ].map((preset) => (
+                    <button
+                      type="button"
+                      key={preset}
+                      onClick={() =>
+                        setQuotationForm({
+                          ...quotationForm,
+                          subject:
+                            preset === "CCTV AI & Security"
+                              ? "Penawaran Pengadaan & Instalasi Sistem CCTV AI & Security Surveillance"
+                              : preset === "Smart Barrier Gate RFID"
+                              ? "Penawaran Pengadaan & Pemasangan Sistem Smart Barrier Gate RFID & Manless Tap"
+                              : preset === "Smart Access Door Intercom"
+                              ? "Penawaran Pengadaan & Instalasi Smart Access Door Intercom & RFID Card"
+                              : preset === "IT Server & Networking"
+                              ? "Penawaran Pengadaan Server, Rack Cabinet & Infrastruktur Jaringan LAN/Fiber Optic"
+                              : "Penawaran Kontrak Pemeliharaan (Maintenance & SLA Support) Tahunan Sistem Keamanan",
+                        })
+                      }
+                      className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 font-bold text-[10px] cursor-pointer transition-colors"
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  required
+                  value={quotationForm.subject}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, subject: e.target.value })}
+                  placeholder="Ketik perihal surat penawaran harga..."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Tanggal & Masa Berlaku */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Tanggal Terbit Penawaran:</label>
+                  <input
+                    type="date"
+                    required
+                    value={quotationForm.date}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, date: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Masa Berlaku Penawaran:</label>
+                  <select
+                    value={quotationForm.validityDays}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, validityDays: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    <option value={7}>7 Hari Kalender</option>
+                    <option value={14}>14 Hari Kalender (Standar)</option>
+                    <option value={30}>30 Hari Kalender (Proyek Korporat)</option>
+                    <option value={60}>60 Hari Kalender</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Items Repeater */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="font-black text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Daftar Barang & Jasa Teknis ({quotationForm.items.length} Item)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddQuotationItem}
+                    className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Baris</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {quotationForm.items.map((it, idx) => (
+                    <div
+                      key={it.id || idx}
+                      className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
+                    >
+                      <div className="col-span-5">
+                        <label className="text-[9px] text-slate-400 block mb-0.5">Deskripsi Produk / Jasa & Spek</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nama barang & spesifikasi teknis..."
+                          value={it.productName}
+                          onChange={(e) => handleQuotationItemChange(idx, "productName", e.target.value)}
+                          className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-1 focus:ring-indigo-500"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[9px] text-slate-400 block mb-0.5">Qty</label>
+                        <input
+                          type="number"
+                          min={1}
+                          required
+                          value={it.qty}
+                          onChange={(e) => handleQuotationItemChange(idx, "qty", Number(e.target.value))}
+                          className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs text-center"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <label className="text-[9px] text-slate-400 block mb-0.5">Satuan</label>
+                        <input
+                          type="text"
+                          value={it.unit}
+                          onChange={(e) => handleQuotationItemChange(idx, "unit", e.target.value)}
+                          className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-medium text-xs text-center"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-[9px] text-slate-400 block mb-0.5">Harga Satuan (Rp)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          required
+                          value={it.price}
+                          onChange={(e) => handleQuotationItemChange(idx, "price", Number(e.target.value))}
+                          className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <label className="text-[9px] text-slate-400 block mb-0.5">Diskon</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={it.discount || 0}
+                          onChange={(e) => handleQuotationItemChange(idx, "discount", Number(e.target.value))}
+                          className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-1 text-center">
+                        <label className="text-[9px] text-transparent block mb-0.5">Del</label>
+                        {quotationForm.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveQuotationItem(idx)}
+                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calculations Box */}
+              {(() => {
+                const { subtotal, afterDiscount, taxAmount, grandTotal } = calculateQuotationTotals();
+                return (
+                  <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>Subtotal Barang & Jasa:</span>
+                      <span className="font-bold">{formatRupiah(subtotal)}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Diskon Tambahan (Rp):</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={quotationForm.discount || 0}
+                          onChange={(e) => setQuotationForm({ ...quotationForm, discount: Number(e.target.value) })}
+                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Tarif Pajak PPN (%):</label>
+                        <select
+                          value={quotationForm.taxRate}
+                          onChange={(e) => setQuotationForm({ ...quotationForm, taxRate: Number(e.target.value) })}
+                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                        >
+                          <option value={0}>Bebas PPN (0%)</option>
+                          <option value={11}>PPN 11% (Standar)</option>
+                          <option value={12}>PPN 12%</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>Pajak Pertambahan Nilai ({quotationForm.taxRate}%):</span>
+                      <span className="font-bold">{formatRupiah(taxAmount)}</span>
+                    </div>
+
+                    <div className="border-t border-white/20 pt-2 flex items-center justify-between text-base font-black">
+                      <span className="text-indigo-400">TOTAL PENAWARAN (GRAND TOTAL):</span>
+                      <span className="text-xl text-emerald-400">{formatRupiah(grandTotal)}</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-[11px]">
+                      <span className="text-slate-400">Terbilang: </span>
+                      <span className="font-bold text-amber-300 italic">
+                        "{angkaTerbilang(grandTotal)} Rupiah"
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Syarat & Ketentuan (Terms & Conditions) */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Syarat & Ketentuan Teknis & Garansi (Terms & Conditions):
+                </label>
+                <textarea
+                  rows={4}
+                  value={quotationForm.terms}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, terms: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-mono text-[11px] leading-relaxed focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  placeholder="Klausul syarat & ketentuan..."
+                />
+              </div>
+
+              {/* Catatan Internal Tambahan */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Catatan Tambahan (Opsional):</label>
+                <input
+                  type="text"
+                  placeholder="Catatan tambahan untuk tim teknisi atau sales..."
+                  value={quotationForm.notes}
+                  onChange={(e) => setQuotationForm({ ...quotationForm, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsNewQuotationModalOpen(false);
+                    setIsEditQuotationModalOpen(false);
+                    setEditingQuotation(null);
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>{isEditQuotationModalOpen ? "Simpan Perubahan SPH" : "Terbitkan Surat Penawaran (SPH)"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONVERSI SPH KE FAKTUR PENJUALAN RESMI */}
+      {isConvertModalOpen && selectedQuotationForConvert && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => {
+            setIsConvertModalOpen(false);
+            setSelectedQuotationForConvert(null);
+          }}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2.5 rounded-xl bg-emerald-100 text-emerald-700">
+                  <ArrowRight className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                    Konversi Otomatis Penawaran
+                  </span>
+                  <h3 className="text-base font-black text-slate-900 mt-0.5">
+                    Konversi SPH ke Faktur Penjualan
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setIsConvertModalOpen(false);
+                  setSelectedQuotationForConvert(null);
+                }}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Info SPH yang Dikonversi */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 uppercase font-bold text-[10px]">Nomor SPH:</span>
+                <span className="font-mono font-black text-indigo-700">{selectedQuotationForConvert.quotationNumber}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 uppercase font-bold text-[10px]">Klien / Instansi:</span>
+                <span className="font-bold text-slate-800 text-right">
+                  {selectedQuotationForConvert.customerOrg || selectedQuotationForConvert.customerName}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 uppercase font-bold text-[10px]">Perihal:</span>
+                <span className="font-medium text-slate-700 text-right truncate max-w-[240px]">
+                  {selectedQuotationForConvert.subject}
+                </span>
+              </div>
+              <div className="border-t border-slate-200 pt-2 flex items-center justify-between">
+                <span className="font-bold text-slate-700">Total Nilai Penawaran:</span>
+                <span className="font-black text-emerald-600 text-sm">
+                  {formatRupiah(selectedQuotationForConvert.grandTotal)}
+                </span>
+              </div>
+            </div>
+
+            {/* Form Pilihan Tipe Faktur Hasil Konversi */}
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Skema Penerbitan Faktur:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConvertForm({ ...convertForm, invoiceType: "Standar" })}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      convertForm.invoiceType === "Standar"
+                        ? "border-dstech-blue bg-blue-50 text-dstech-blue ring-2 ring-blue-500/20"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="font-black text-xs">Faktur Penuh (100%)</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Penagihan total sekaligus</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setConvertForm({ ...convertForm, invoiceType: "DP" })}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      convertForm.invoiceType === "DP"
+                        ? "border-amber-500 bg-amber-50 text-amber-800 ring-2 ring-amber-500/20"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="font-black text-xs">Faktur Uang Muka (DP)</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Penagihan termin proyek</p>
+                  </button>
+                </div>
+              </div>
+
+              {convertForm.invoiceType === "DP" && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-bold text-amber-900 text-xs">Persentase Uang Muka (DP):</label>
+                    <div className="flex gap-1">
+                      {[30, 50, 70].map((pct) => (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => setConvertForm({ ...convertForm, dpPercentage: pct })}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                            convertForm.dpPercentage === pct
+                              ? "bg-amber-600 text-white"
+                              : "bg-white text-amber-800 border border-amber-300"
+                          }`}
+                        >
+                          {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={10}
+                      max={90}
+                      value={convertForm.dpPercentage}
+                      onChange={(e) => setConvertForm({ ...convertForm, dpPercentage: Number(e.target.value) })}
+                      className="w-24 p-2 rounded-xl border border-amber-300 bg-white font-black text-sm text-center"
+                    />
+                    <span className="font-bold text-slate-600">% =</span>
+                    <span className="font-black text-emerald-700 text-sm">
+                      {formatRupiah((selectedQuotationForConvert.grandTotal * (convertForm.dpPercentage || 50)) / 100)}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-amber-800 font-bold block mb-1">
+                      Keterangan Termin Faktur:
+                    </label>
+                    <input
+                      type="text"
+                      value={convertForm.dpNotes}
+                      onChange={(e) => setConvertForm({ ...convertForm, dpNotes: e.target.value })}
+                      className="w-full p-2 rounded-xl border border-amber-200 bg-white text-xs font-medium"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[10px] text-slate-500 italic">
+                *Faktur penjualan baru (INV-DSTECH-...) akan otomatis dibuat, dan status SPH ini akan diperbarui menjadi "Terkonversi Faktur".
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsConvertModalOpen(false);
+                  setSelectedQuotationForConvert(null);
+                }}
+                className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteConvertQuotation}
+                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Konversi Menjadi Faktur Penjualan</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3.5: CETAK & PRATINJAU SURAT PENAWARAN HARGA RESMI (SPH BER-KOP DSTECH) */}
+      {selectedQuotationForPrint && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedQuotationForPrint(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Action Bar (Top) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Printer className="w-4 h-4 text-indigo-600" />
+                Format Surat Penawaran Resmi (SPH) PT. DSTech Smart Perkasa
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenSettingsModal}
+                  title="Ganti Background Kop Surat"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Kop Surat</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenConvertQuotation(selectedQuotationForPrint)}
+                  title="Konversi ke Faktur Penjualan"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <ArrowRight className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Konversi ke Faktur</span>
+                </button>
+
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak SPH / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setSelectedQuotationForPrint(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* SPH OFFICIAL LETTER CONTAINER (A4 Standard Print Layout) */}
+            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-10 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+              {/* Background Kop Surat Resmi DSTech */}
+              {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                <div
+                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  style={{
+                    backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    opacity: financeSettings.watermarkOpacity || 0.15,
+                  }}
+                />
+              )}
+
+              <div className="relative z-10 space-y-6">
+                {/* Kop Surat Perusahaan DSTech */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
+                        PT. DSTECH SMART PERKASA
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-bold text-slate-600">
+                      Solusi Security System, CCTV AI, Barrier Gate, IoT & IT Infrastructure
+                    </p>
+                    <p className="text-[10px] text-slate-500 leading-relaxed max-w-md">
+                      Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
+                      <br />
+                      <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>
+                      <br />
+                      WhatsApp: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
+                    </p>
+                  </div>
+
+                  <div className="text-left sm:text-right space-y-1">
+                    <span className="px-3 py-1 rounded-md bg-indigo-900 text-white font-black text-xs uppercase tracking-wider inline-block">
+                      SURAT PENAWARAN HARGA (SPH)
+                    </span>
+                    <p className="font-mono font-black text-sm text-indigo-700">
+                      {selectedQuotationForPrint.quotationNumber}
+                    </p>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Tanggal: {selectedQuotationForPrint.date}
+                    </p>
+                    <p className="text-[11px] text-slate-700 font-bold">
+                      Masa Berlaku: s/d {selectedQuotationForPrint.validUntil} ({selectedQuotationForPrint.validityDays} Hari)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Nomor, Lampiran, Perihal Surat Niaga */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
+                  <div className="space-y-1">
+                    <table className="text-xs">
+                      <tbody>
+                        <tr>
+                          <td className="pr-2 font-bold text-slate-500">Nomor</td>
+                          <td className="pr-2">:</td>
+                          <td className="font-mono font-bold text-slate-900">{selectedQuotationForPrint.quotationNumber}</td>
+                        </tr>
+                        <tr>
+                          <td className="pr-2 font-bold text-slate-500">Lampiran</td>
+                          <td className="pr-2">:</td>
+                          <td className="text-slate-800">1 (Satu) Berkas Penawaran Harga</td>
+                        </tr>
+                        <tr>
+                          <td className="pr-2 font-bold text-slate-500">Perihal</td>
+                          <td className="pr-2">:</td>
+                          <td className="font-bold text-indigo-900">{selectedQuotationForPrint.subject}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="sm:text-right bg-slate-50/90 p-3 rounded-xl border border-slate-200 text-xs">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Kepada Yth:</p>
+                    <p className="font-black text-slate-900 text-sm mt-0.5">{selectedQuotationForPrint.customerName}</p>
+                    {selectedQuotationForPrint.customerOrg && selectedQuotationForPrint.customerOrg !== selectedQuotationForPrint.customerName && (
+                      <p className="font-bold text-slate-700">{selectedQuotationForPrint.customerOrg}</p>
+                    )}
+                    <p className="text-slate-600 text-[11px] mt-0.5">{selectedQuotationForPrint.customerPhone}</p>
+                    <p className="text-slate-500 text-[10px]">{selectedQuotationForPrint.customerAddress}</p>
+                  </div>
+                </div>
+
+                {/* Paragraf Pembuka Resmi */}
+                <div className="text-xs leading-relaxed text-slate-700 space-y-1.5 border-t border-slate-100 pt-3">
+                  <p className="font-bold text-slate-900">Dengan hormat,</p>
+                  <p>
+                    Sehubungan dengan rencana pengadaan dan kebutuhan sistem pengamanan / teknologi informasi pada instansi Bapak/Ibu, bersama surat ini kami PT. DSTech Smart Perkasa bermaksud mengajukan penawaran harga pengadaan unit perangkat, material pendukung, serta jasa instalasi teknis dengan rincian spesifikasi sebagai berikut:
+                  </p>
+                </div>
+
+                {/* Tabel Item Penawaran & Spesifikasi */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border border-slate-200">
+                    <thead className="bg-indigo-950 text-white uppercase text-[10px] font-black tracking-wider">
+                      <tr>
+                        <th className="p-2.5 text-center w-8">No</th>
+                        <th className="p-2.5">Deskripsi Produk / Jasa & Spesifikasi Teknis</th>
+                        <th className="p-2.5 text-center">Qty</th>
+                        <th className="p-2.5 text-center">Satuan</th>
+                        <th className="p-2.5 text-right">Harga Satuan (Rp)</th>
+                        {selectedQuotationForPrint.items.some((it) => (it.discount || 0) > 0) && (
+                          <th className="p-2.5 text-right">Diskon</th>
+                        )}
+                        <th className="p-2.5 text-right">Total (Rp)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 bg-white/70">
+                      {selectedQuotationForPrint.items.map((it, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/50">
+                          <td className="p-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
+                          <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
+                          <td className="p-2.5 text-center font-bold">{it.qty}</td>
+                          <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
+                          <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
+                          {selectedQuotationForPrint.items.some((item) => (item.discount || 0) > 0) && (
+                            <td className="p-2.5 text-right text-red-600 font-bold">
+                              {it.discount ? `- ${formatRupiah(it.discount)}` : "-"}
+                            </td>
+                          )}
+                          <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Rincian Perhitungan & Terbilang */}
+                <div className="flex flex-col sm:flex-row justify-between gap-4 pt-2 text-xs">
+                  {/* Kotak Terbilang & Rekening Bank */}
+                  <div className="space-y-3 max-w-sm flex-1">
+                    <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px]">
+                      <span className="font-bold text-amber-900 uppercase text-[10px] block mb-0.5">Terbilang:</span>
+                      <p className="font-serif italic font-bold text-slate-800">
+                        "{angkaTerbilang(selectedQuotationForPrint.grandTotal)} Rupiah"
+                      </p>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] space-y-1">
+                      <p className="font-bold text-dstech-blue">Rekening Resmi Pembayaran PT. DSTech Smart Perkasa:</p>
+                      {bankAccounts.filter((b) => b.status === "Aktif").map((acc) => (
+                        <p key={acc.id} className="text-slate-700 text-[10px]">
+                          • <strong>{acc.bankName}</strong>: {acc.accountNumber} a/n {acc.accountHolder} ({acc.branch})
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Summary Totals */}
+                  <div className="space-y-1.5 sm:w-72 bg-slate-50/90 p-3.5 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Subtotal Barang & Jasa:</span>
+                      <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.subtotal)}</span>
+                    </div>
+                    {selectedQuotationForPrint.discount > 0 && (
+                      <div className="flex items-center justify-between text-red-600">
+                        <span>Diskon Khusus:</span>
+                        <span className="font-bold">- {formatRupiah(selectedQuotationForPrint.discount)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>PPN ({selectedQuotationForPrint.taxRate}%):</span>
+                      <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.taxAmount)}</span>
+                    </div>
+                    <div className="border-t-2 border-indigo-950 pt-2 flex items-center justify-between text-sm font-black text-slate-900">
+                      <span className="text-indigo-900">TOTAL PENAWARAN:</span>
+                      <span className="text-base text-emerald-600">{formatRupiah(selectedQuotationForPrint.grandTotal)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Syarat & Ketentuan Teknis Penawaran */}
+                {selectedQuotationForPrint.terms && (
+                  <div className="p-4 rounded-xl bg-slate-50/90 border border-slate-200 text-xs space-y-1.5">
+                    <h5 className="font-black text-slate-900 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Syarat & Ketentuan Teknis (Terms & Conditions):</span>
+                    </h5>
+                    <div className="text-[10px] text-slate-600 whitespace-pre-line leading-relaxed font-sans">
+                      {selectedQuotationForPrint.terms}
+                    </div>
+                  </div>
+                )}
+
+                {/* Penutup Surat */}
+                <div className="text-xs leading-relaxed text-slate-700">
+                  <p>
+                    Demikian surat penawaran harga ini kami sampaikan. Besar harapan kami agar usulan solusi teknologi ini dapat memenuhi ekspektasi dan menjadi awal kerjasama yang baik antara PT. DSTech Smart Perkasa dengan {selectedQuotationForPrint.customerOrg || selectedQuotationForPrint.customerName}. Atas perhatian dan kerjasamanya, kami ucapkan terima kasih.
+                  </p>
+                </div>
+
+                {/* Tanda Tangan Dual Approval (Klien & Direktur DSTech) */}
+                <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200 text-xs">
+                  {/* Sisi Kiri: Penerima / Klien */}
+                  <div className="flex flex-col justify-between h-52 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Disetujui & Diterima Oleh,</p>
+                      <p className="text-xs font-black text-slate-900 mt-1">
+                        {selectedQuotationForPrint.customerOrg || selectedQuotationForPrint.customerName}
+                      </p>
+                    </div>
+
+                    <div className="h-16 flex items-center justify-center text-slate-300 text-[10px] italic">
+                      (Tanda Tangan, Nama Jelas & Stempel Klien)
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-xs">
+                        {selectedQuotationForPrint.customerName ? `( ${selectedQuotationForPrint.customerName} )` : "( ................................................................ )"}
+                      </p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        PIC / Purchasing / Manajer Terkait
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sisi Kanan: Hormat Kami PT. DSTech Smart Perkasa */}
+                  <div className="flex flex-col justify-between h-52 border border-slate-200/80 rounded-xl p-3.5 bg-white/70 shadow-sm text-center">
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
+                      <p className="text-xs font-black text-indigo-700 mt-0.5">PT. DSTech Smart Perkasa</p>
+                    </div>
+
+                    <div className="h-16 relative flex items-center justify-center">
+                      {selectedQuotationForPrint.approvalStatus === "Disetujui & Sah" ? (
+                        <>
+                          {/* Stempel Bulat Digital Resmi PT DSTech */}
+                          <div className="absolute right-3 w-16 h-16 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[7px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
+                            <span className="font-black text-[6.5px]">PT. DSTECH</span>
+                            <span className="text-[5.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[5px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL SPH</span>
+                          </div>
+
+                          {/* Tanda Tangan Goresan / Gambar */}
+                          {selectedQuotationForPrint.signatureImage ? (
+                            <img
+                              src={selectedQuotationForPrint.signatureImage}
+                              alt="Tanda Tangan Digital"
+                              className="max-h-16 max-w-[140px] object-contain relative z-10"
+                            />
+                          ) : (
+                            <div className="font-serif italic text-lg text-slate-800 font-black relative z-10 select-none tracking-wider">
+                              {selectedQuotationForPrint.approvedBy || "H. Agus Supriyadi"}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center border border-dashed border-amber-300 bg-amber-50/80 rounded-lg p-2 w-full">
+                          <Clock className="w-4 h-4 text-amber-600 mb-0.5" />
+                          <span className="text-[9px] font-black text-amber-800 uppercase">Menunggu Approval Direksi</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const sph = selectedQuotationForPrint;
+                              setSelectedQuotationForPrint(null);
+                              setSelectedInvoiceForApproval({
+                                ...sph,
+                                invoiceNumber: sph.quotationNumber,
+                                dueDate: sph.validUntil,
+                                paymentMethod: "SPH Proposal",
+                                paymentStatus: sph.status,
+                                paidAmount: 0,
+                                remainingAmount: sph.grandTotal,
+                                warehouseId: "dstech_wh_1",
+                                branchId: "dstech_branch_1",
+                                salesPerson: "DSTech Commercial Team",
+                              } as any);
+                              setIsApprovalModalOpen(true);
+                            }}
+                            className="mt-1 px-2.5 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[9px] font-bold shadow-sm flex items-center gap-1 cursor-pointer print:hidden"
+                          >
+                            <PenTool className="w-2.5 h-2.5" />
+                            Approval SPH Sekarang
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 underline text-xs">
+                        {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom."}
+                      </p>
+                      <p className="text-[10px] text-slate-600 mt-0.5 font-medium">
+                        {selectedQuotationForPrint.approvedTitle || financeSettings.signerTitle || "Direktur Keuangan & Operasional"}
+                      </p>
+                      {selectedQuotationForPrint.approvalStatus === "Disetujui & Sah" && (
+                        <p className="text-[8px] text-emerald-700 font-mono font-bold mt-0.5">
+                          [VERIFIKASI: {selectedQuotationForPrint.verificationCode || "DST-SPH-202610-001"}]
                         </p>
                       )}
                     </div>
@@ -3856,6 +5798,348 @@ export default function AdminFinanceERPPage() {
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>{editingSupplier ? "Simpan Perubahan" : "Simpan Supplier Baru"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MASTER DATA: TAMBAH / EDIT TITIK GUDANG */}
+      {isWarehouseModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsWarehouseModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-dstech-blue">
+                  Master Data Titik Gudang & Logistik
+                </span>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">
+                  {editingWarehouse ? "Edit Data Titik Gudang" : "Tambah Titik Gudang Baru"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsWarehouseModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveWarehouseSubmit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kode Gudang:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: GD-01"
+                    value={warehouseForm.code}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, code: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-mono font-bold text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Tipe Gudang:</label>
+                  <select
+                    value={warehouseForm.type}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, type: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
+                  >
+                    <option value="Gudang Pusat">Gudang Pusat Logistik</option>
+                    <option value="Gudang Transit">Gudang Transit Proyek</option>
+                    <option value="Depo Distribusi">Depo Distribusi</option>
+                    <option value="Unit Mobile">Unit Mobile / Service Van</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Nama Titik Gudang:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Gudang Pusat Cilegon"
+                  value={warehouseForm.name}
+                  onChange={(e) => setWarehouseForm({ ...warehouseForm, name: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="font-bold text-slate-700 block mb-1">Alamat Lokasi Gudang:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Jl. Industri Raya No. 12, Kawasan Industri Krakatau"
+                    value={warehouseForm.address}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, address: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kota:</label>
+                  <input
+                    type="text"
+                    placeholder="Cilegon"
+                    value={warehouseForm.city}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, city: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nama PIC Gudang:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Hendra Setiawan"
+                    value={warehouseForm.pic}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, pic: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">No. Kontak / WA PIC:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 0812-3456-7890"
+                    value={warehouseForm.phone}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, phone: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Status Operasional:</label>
+                  <select
+                    value={warehouseForm.status}
+                    onChange={(e) => setWarehouseForm({ ...warehouseForm, status: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    <option value="Aktif">Aktif</option>
+                    <option value="Kapasitas Penuh">Kapasitas Penuh</option>
+                    <option value="Renovasi">Renovasi / Maintenance</option>
+                    <option value="Nonaktif">Nonaktif</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Valuasi Stok Awal (Rp):</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={warehouseForm.totalValuation}
+                    onChange={(e) =>
+                      setWarehouseForm({ ...warehouseForm, totalValuation: Number(e.target.value) || 0 })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Catatan Gudang:</label>
+                <textarea
+                  rows={2}
+                  placeholder="Keterangan fasilitas gudang, kapasitas palet, jam operasional..."
+                  value={warehouseForm.notes}
+                  onChange={(e) => setWarehouseForm({ ...warehouseForm, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWarehouseModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{editingWarehouse ? "Simpan Perubahan Gudang" : "Simpan Titik Gudang"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MASTER DATA: TAMBAH / EDIT KANTOR CABANG */}
+      {isBranchModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsBranchModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-purple-600">
+                  Jaringan Kantor Cabang DSTech
+                </span>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">
+                  {editingBranch ? "Edit Data Kantor Cabang" : "Tambah Kantor Cabang Baru"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsBranchModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBranchSubmit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kode Cabang:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: BR-02"
+                    value={branchForm.code}
+                    onChange={(e) => setBranchForm({ ...branchForm, code: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-mono font-bold text-purple-700"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Status / Tipe Kantor:</label>
+                  <select
+                    value={branchForm.status}
+                    onChange={(e) => setBranchForm({ ...branchForm, status: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    <option value="Kantor Pusat Operasional">Kantor Pusat Operasional</option>
+                    <option value="Kantor Cabang">Kantor Cabang</option>
+                    <option value="Kantor Perwakilan Wilayah">Kantor Perwakilan Wilayah</option>
+                    <option value="Service Point">Service Point</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Nama Kantor Cabang:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Kantor Cabang Serang - Banten"
+                  value={branchForm.name}
+                  onChange={(e) => setBranchForm({ ...branchForm, name: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kota / Domisili:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: Serang"
+                    value={branchForm.city}
+                    onChange={(e) => setBranchForm({ ...branchForm, city: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Cakupan Wilayah (Coverage):</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Kota & Kab. Serang, Anyer"
+                    value={branchForm.coverage}
+                    onChange={(e) => setBranchForm({ ...branchForm, coverage: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Alamat Lengkap Kantor:</label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Jl. Ahmad Yani No. 88, Serang"
+                  value={branchForm.address}
+                  onChange={(e) => setBranchForm({ ...branchForm, address: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kepala Cabang (Branch Manager):</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Ahmad Fauzi, S.T."
+                    value={branchForm.head}
+                    onChange={(e) => setBranchForm({ ...branchForm, head: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">No. Telepon / Hotline Cabang:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 0254-889911 / 0812-xxx"
+                    value={branchForm.phone}
+                    onChange={(e) => setBranchForm({ ...branchForm, phone: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Email Resmi Cabang:</label>
+                <input
+                  type="email"
+                  placeholder="cabang.serang@dstechsmart.com"
+                  value={branchForm.email}
+                  onChange={(e) => setBranchForm({ ...branchForm, email: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Catatan Operasional Cabang:</label>
+                <textarea
+                  rows={2}
+                  placeholder="Keterangan tim teknisi cabang, armada mobil, dll..."
+                  value={branchForm.notes}
+                  onChange={(e) => setBranchForm({ ...branchForm, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsBranchModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{editingBranch ? "Simpan Perubahan Cabang" : "Simpan Kantor Cabang"}</span>
                 </button>
               </div>
             </form>
@@ -4330,14 +6614,17 @@ export default function AdminFinanceERPPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Metode Pembayaran:</label>
+                  <label className="font-bold text-slate-700 block mb-1">Metode & Rekening Pembayaran:</label>
                   <select
                     value={editingSale.paymentMethod}
                     onChange={(e) => setEditingSale({ ...editingSale, paymentMethod: e.target.value })}
                     className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white"
                   >
-                    <option value="Transfer Bank Mandiri PT DSTech Smart Perkasa">Transfer Bank Mandiri</option>
-                    <option value="Transfer Bank BCA DSTech">Transfer Bank BCA</option>
+                    {bankAccounts.map((b) => (
+                      <option key={b.id} value={`Transfer ${b.bankName} (${b.accountNumber} - ${b.accountHolder})`}>
+                        Transfer {b.bankName} ({b.accountNumber} - {b.accountHolder})
+                      </option>
+                    ))}
                     <option value="Tunai / Kas Langsung">Tunai / Kas Langsung</option>
                     <option value="Tempo 14 Hari">Tempo 14 Hari</option>
                     <option value="Tempo 30 Hari">Tempo 30 Hari</option>
@@ -4876,30 +7163,69 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* Pratinjau Gambar Saat Ini */}
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center space-y-2">
-              <p className="font-bold text-xs text-slate-700">Pratinjau Template Kop Surat Aktif:</p>
-              <div className="w-48 h-64 rounded-xl border border-slate-300 overflow-hidden shadow-inner relative bg-white flex items-center justify-center">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center space-y-3">
+              <div className="flex items-center justify-between w-full">
+                <span className="text-[10px] font-black uppercase tracking-wider text-dstech-blue">
+                  Preview Resolusi Pas Dokumen A4
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold">
+                  {tempSettings.letterheadEnabled ? "Kop Aktif" : "Kop Nonaktif"}
+                </span>
+              </div>
+
+              <div className="w-48 h-64 rounded-xl border-2 border-dashed border-slate-300 overflow-hidden shadow-inner relative bg-white flex items-center justify-center p-1">
                 {tempSettings.letterheadUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={tempSettings.letterheadUrl}
                     alt="Kop Surat DSTech"
                     className="w-full h-full object-contain"
-                    style={{ opacity: tempSettings.letterheadEnabled ? 1 : 0.3 }}
+                    style={{ opacity: tempSettings.letterheadEnabled ? 1 : 0.25 }}
                   />
                 ) : (
-                  <span className="text-slate-400 text-xs">Belum ada gambar</span>
+                  <span className="text-slate-400 text-xs font-bold">Belum ada gambar</span>
                 )}
               </div>
-              <p className="text-[10px] text-slate-500">File lokal: public/kop_surat_dstech.jpg</p>
+
+              {/* Tombol Unggah File Langsung */}
+              <div className="flex flex-col sm:flex-row items-center gap-2 w-full justify-center pt-1">
+                <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-600 text-white font-bold text-xs cursor-pointer shadow-md transition">
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unggah File Kop Surat (PNG/JPG)</span>
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/jpg, image/webp"
+                    onChange={handleLetterheadFileUpload}
+                    className="hidden"
+                  />
+                </label>
+                {tempSettings.letterheadUrl && tempSettings.letterheadUrl !== "/kop_surat_dstech.jpg" && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTempSettings((prev) => ({
+                        ...prev,
+                        letterheadUrl: "/kop_surat_dstech.jpg",
+                        letterheadEnabled: true,
+                      }))
+                    }
+                    className="px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer transition"
+                  >
+                    Reset Kop Standar
+                  </button>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-500 text-center">
+                Format: PNG / JPG / WebP transparan atau ber-header kop surat. Resolusi rekomendasi proporsional lembar A4.
+              </p>
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
               <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200/80 flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-slate-900">Aktifkan Background Kop Surat</p>
+                  <p className="font-bold text-slate-900">Tampilkan Kop Surat & Background Resmi</p>
                   <p className="text-[10px] text-slate-500">
-                    Tampilkan latar belakang kop surat resmi pada pratinjau dan PDF faktur
+                    Terapkan latar belakang kop surat pada lembar cetak penawaran SPH, faktur tagihan, dan PO
                   </p>
                 </div>
                 <input
@@ -4912,14 +7238,14 @@ export default function AdminFinanceERPPage() {
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
-                  Path / URL Gambar Kop Surat (Letterhead):
+                  Path / URL / Sumber Gambar Kop Surat:
                 </label>
                 <input
                   type="text"
                   required
                   value={tempSettings.letterheadUrl}
                   onChange={(e) => setTempSettings({ ...tempSettings, letterheadUrl: e.target.value })}
-                  placeholder="/kop_surat_dstech.jpg atau URL gambar luar"
+                  placeholder="/kop_surat_dstech.jpg atau unggah file di atas"
                   className="w-full p-2.5 rounded-xl border border-slate-200 font-mono text-xs"
                 />
               </div>
@@ -4950,34 +7276,50 @@ export default function AdminFinanceERPPage() {
               </div>
 
               {/* Tombol Preset Cepat */}
-              <div className="flex flex-wrap gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setTempSettings({
-                      letterheadUrl: "/kop_surat_dstech.jpg",
-                      letterheadEnabled: true,
-                      watermarkOpacity: 0.15,
-                    })
-                  }
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
-                >
-                  Reset Kop Resmi DSTech
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTempSettings({ ...tempSettings, watermarkOpacity: 0.08 })}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
-                >
-                  Mode Lembut (8%)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTempSettings({ ...tempSettings, watermarkOpacity: 0.25 })}
-                  className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
-                >
-                  Mode Jelas (25%)
-                </button>
+              <div className="space-y-1.5 pt-1">
+                <label className="font-bold text-slate-700 block">Pilihan Preset Background Cepat:</label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTempSettings((prev) => ({
+                        ...prev,
+                        letterheadUrl: "/kop_surat_dstech.jpg",
+                        letterheadEnabled: true,
+                        watermarkOpacity: 0.15,
+                      }))
+                    }
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
+                  >
+                    Kop Resmi Standar (15%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTempSettings((prev) => ({ ...prev, watermarkOpacity: 0.08 }))}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
+                  >
+                    Watermark Lembut (8%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTempSettings((prev) => ({ ...prev, watermarkOpacity: 0.25 }))}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
+                  >
+                    Watermark Jelas (25%)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTempSettings((prev) => ({
+                        ...prev,
+                        letterheadEnabled: false,
+                      }))
+                    }
+                    className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] cursor-pointer"
+                  >
+                    Nonaktifkan Kop
+                  </button>
+                </div>
               </div>
 
               {/* Penandatangan Dokumen Resmi DSTech */}

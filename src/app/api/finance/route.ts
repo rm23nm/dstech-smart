@@ -47,6 +47,7 @@ export async function GET() {
   const cashFlow = data.cash_flow || [];
   const clients = data.clients || [];
   const suppliers = data.suppliers || [];
+  const quotations = data.quotations || [];
 
   const totalSalesRevenue = sales.reduce((acc: number, curr: any) => acc + (Number(curr.grandTotal) || 0), 0);
   const totalSalesPaid = sales.reduce((acc: number, curr: any) => acc + (Number(curr.paidAmount) || 0), 0);
@@ -66,6 +67,10 @@ export async function GET() {
   const totalCashOut = cashFlow.filter((c: any) => c.type === "OUT").reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
   const currentCashBalance = totalCashIn - totalCashOut;
 
+  const totalQuotationsValue = quotations.reduce((acc: number, curr: any) => acc + (Number(curr.grandTotal) || 0), 0);
+  const totalQuotationsPending = quotations.filter((q: any) => q.status === "Terkirim" || q.status === "Draf").length;
+  const totalQuotationsApproved = quotations.filter((q: any) => q.status === "Disetujui Klien").length;
+
   const summary = {
     totalSalesRevenue,
     totalSalesPaid,
@@ -84,6 +89,10 @@ export async function GET() {
     totalBranchCount: (data.branches || []).length,
     totalClientsCount: clients.length,
     totalSuppliersCount: suppliers.length,
+    totalQuotationsCount: quotations.length,
+    totalQuotationsValue,
+    totalQuotationsPending,
+    totalQuotationsApproved,
   };
 
   return NextResponse.json({
@@ -345,6 +354,33 @@ export async function POST(request: Request) {
         });
       }
 
+      if (documentType === "quotation") {
+        const quotations = data.quotations || [];
+        const index = quotations.findIndex((q: any) => q.id === id || q.quotationNumber === id);
+        if (index === -1) {
+          return NextResponse.json({ success: false, error: "Surat Penawaran tidak ditemukan" }, { status: 404 });
+        }
+
+        quotations[index].approvalStatus = "Disetujui & Sah";
+        quotations[index].approvedBy = signer;
+        quotations[index].approvedTitle = title;
+        quotations[index].approvedAt = approvedAt;
+        quotations[index].verificationCode = verificationCode;
+        if (signatureImage) {
+          quotations[index].signatureImage = signatureImage;
+        }
+        if (notes) {
+          quotations[index].approvalNotes = notes;
+        }
+
+        writeFinanceData(data);
+        return NextResponse.json({
+          success: true,
+          message: `Surat Penawaran ${quotations[index].quotationNumber} berhasil disetujui & disahkan secara resmi oleh ${signer}`,
+          data: quotations[index],
+        });
+      }
+
       return NextResponse.json({ success: false, error: "Tipe dokumen tidak dikenali" }, { status: 400 });
     }
 
@@ -537,6 +573,185 @@ export async function POST(request: Request) {
       });
     }
 
+    if (actionType === "quotation") {
+      const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
+      const newSphNumber = `SPH-DSTECH-${yearMonth}-${String((data.quotations?.length || 0) + 1).padStart(3, "0")}`;
+
+      const items = Array.isArray(payload.items) ? payload.items : [];
+      const subtotal = items.reduce((acc: number, curr: any) => acc + (Number(curr.total) || 0), 0);
+      const discount = Number(payload.discount) || 0;
+      const afterDiscount = Math.max(0, subtotal - discount);
+      const taxRate = Number(payload.taxRate) || 0;
+      const taxAmount = taxRate > 0 ? Math.round((afterDiscount * taxRate) / 100) : 0;
+      const grandTotal = afterDiscount + taxAmount;
+
+      const dateStr = payload.date || new Date().toISOString().split("T")[0];
+      const validityDays = Number(payload.validityDays) || 14;
+      const validUntilDate = new Date(new Date(dateStr).getTime() + validityDays * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+
+      const newQuotation = {
+        id: `dstech_sph_${Date.now()}`,
+        quotationNumber: payload.quotationNumber || newSphNumber,
+        clientId: payload.clientId || "",
+        customerName: payload.customerName || "Klien DSTech",
+        customerOrg: payload.customerOrg || payload.customerName || "-",
+        customerPhone: payload.customerPhone || "-",
+        customerAddress: payload.customerAddress || "-",
+        subject: payload.subject || "Penawaran Pengadaan & Instalasi Sistem Keamanan",
+        date: dateStr,
+        validUntil: payload.validUntil || validUntilDate,
+        validityDays: validityDays,
+        items: items,
+        subtotal: subtotal,
+        discount: discount,
+        taxRate: taxRate,
+        taxAmount: taxAmount,
+        grandTotal: grandTotal,
+        terms: payload.terms || "1. Harga sudah termasuk instalasi, kabel pelindung, dan pengujian kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan pemeliharaan teknis 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak diterbitkan.",
+        status: payload.status || "Terkirim",
+        convertedInvoiceId: "",
+        approvalStatus: payload.approvalStatus || "Menunggu Approval",
+        approvedBy: payload.approvedBy || "",
+        approvedTitle: payload.approvedTitle || "",
+        approvedAt: payload.approvedAt || "",
+        verificationCode: payload.verificationCode || "",
+        notes: payload.notes || "-",
+      };
+
+      if (!data.quotations) data.quotations = [];
+      data.quotations.unshift(newQuotation);
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Surat Penawaran ${newQuotation.quotationNumber} berhasil dibuat`,
+        data: newQuotation,
+      });
+    }
+
+    if (actionType === "convert_quotation_to_sale") {
+      const { quotationId, invoiceType, dpPercentage, dpNotes } = payload;
+      const quotations = data.quotations || [];
+      const qIndex = quotations.findIndex((q: any) => q.id === quotationId || q.quotationNumber === quotationId);
+
+      if (qIndex === -1) {
+        return NextResponse.json({ success: false, error: "Surat Penawaran (SPH) tidak ditemukan" }, { status: 404 });
+      }
+
+      const sph = quotations[qIndex];
+      const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
+      const newInvoiceNumber = `INV-DSTECH-${yearMonth}-${String((data.sales?.length || 0) + 1).padStart(3, "0")}`;
+
+      const grandTotal = Number(sph.grandTotal) || 0;
+      const isDp = invoiceType === "DP" || (Number(dpPercentage) > 0);
+      const dpPct = isDp ? (Number(dpPercentage) || 50) : 0;
+      const dpAmount = isDp ? Math.round((grandTotal * dpPct) / 100) : 0;
+
+      const newSale = {
+        id: `dstech_inv_${Date.now()}`,
+        invoiceNumber: newInvoiceNumber,
+        customerName: sph.customerName,
+        customerPhone: sph.customerPhone,
+        customerAddress: sph.customerAddress,
+        date: new Date().toISOString().split("T")[0],
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        invoiceType: isDp ? "DP" : "Standard",
+        dpPercentage: dpPct,
+        dpAmount: dpAmount,
+        dpStatus: isDp ? "Menunggu Pembayaran DP" : "Bukan DP",
+        dpPaidAmount: 0,
+        dpNotes: dpNotes || `Pengajuan DP ${dpPct}% dari penawaran ${sph.quotationNumber}`,
+        items: sph.items || [],
+        subtotal: sph.subtotal,
+        discount: sph.discount,
+        taxRate: sph.taxRate,
+        taxAmount: sph.taxAmount,
+        grandTotal: grandTotal,
+        paymentMethod: "Transfer Bank Mandiri",
+        paymentStatus: isDp ? "Menunggu DP" : "Belum Lunas",
+        paidAmount: 0,
+        remainingAmount: grandTotal,
+        warehouseId: "dstech_wh_1",
+        branchId: "dstech_branch_1",
+        salesPerson: "DSTech Commercial Team",
+        notes: `Konversi otomatis dari Surat Penawaran ${sph.quotationNumber} (${sph.subject})`,
+        approvalStatus: sph.approvalStatus || "Menunggu Approval",
+        approvedBy: sph.approvedBy || "",
+        approvedTitle: sph.approvedTitle || "",
+        approvedAt: sph.approvedAt || "",
+        verificationCode: sph.verificationCode || "",
+      };
+
+      if (!data.sales) data.sales = [];
+      data.sales.unshift(newSale);
+
+      // Perbarui status SPH
+      sph.status = "Terkonversi Faktur";
+      sph.convertedInvoiceId = newSale.invoiceNumber;
+      quotations[qIndex] = sph;
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Surat Penawaran ${sph.quotationNumber} berhasil dikonversi menjadi Faktur Penjualan ${newSale.invoiceNumber}!`,
+        data: {
+          sale: newSale,
+          quotation: sph,
+        },
+      });
+    }
+
+    if (actionType === "warehouse") {
+      const newWarehouse = {
+        id: payload.id || `dstech_wh_${Date.now()}`,
+        code: payload.code || `GD-${(data.warehouses?.length || 0) + 1}`,
+        name: payload.name || "Gudang Logistik Baru",
+        type: payload.type || "Gudang Pusat",
+        address: payload.address || "-",
+        city: payload.city || "Cilegon",
+        pic: payload.pic || "Staff Gudang",
+        phone: payload.phone || "-",
+        totalItemTypes: Number(payload.totalItemTypes) || 0,
+        totalValuation: Number(payload.totalValuation) || 0,
+        status: payload.status || "Aktif",
+        notes: payload.notes || "-",
+      };
+
+      if (!data.warehouses) data.warehouses = [];
+      data.warehouses.push(newWarehouse);
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Titik Gudang ${newWarehouse.name} berhasil ditambahkan`,
+        data: newWarehouse,
+      });
+    }
+
+    if (actionType === "branch") {
+      const newBranch = {
+        id: payload.id || `dstech_branch_${Date.now()}`,
+        code: payload.code || `BR-${String((data.branches?.length || 0) + 1).padStart(2, "0")}`,
+        name: payload.name || "Kantor Cabang Baru",
+        city: payload.city || "Cilegon",
+        address: payload.address || "-",
+        head: payload.head || "Kepala Cabang",
+        phone: payload.phone || "-",
+        email: payload.email || "-",
+        coverage: payload.coverage || "-",
+        status: payload.status || "Kantor Cabang",
+        notes: payload.notes || "-",
+      };
+
+      if (!data.branches) data.branches = [];
+      data.branches.push(newBranch);
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Kantor Cabang ${newBranch.name} berhasil ditambahkan`,
+        data: newBranch,
+      });
+    }
+
     return NextResponse.json({ success: false, error: "Tipe aksi (actionType) tidak dikenali" }, { status: 400 });
   } catch (err) {
     console.error("Error creating financial record:", err);
@@ -550,8 +765,25 @@ export async function PUT(request: Request) {
     const { actionType, id, updates } = body;
     const data = readFinanceData();
 
-    if (!id || !updates) {
-      return NextResponse.json({ success: false, error: "ID dan data pembaruan wajib disertakan" }, { status: 400 });
+    if (!updates) {
+      return NextResponse.json({ success: false, error: "Data pembaruan wajib disertakan" }, { status: 400 });
+    }
+
+    if (actionType === "settings") {
+      data.settings = {
+        ...(data.settings || {}),
+        ...updates,
+      };
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: "Pengaturan berhasil diperbarui",
+        data: data.settings,
+      });
+    }
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "ID wajib disertakan" }, { status: 400 });
     }
 
     if (actionType === "client") {
@@ -676,16 +908,72 @@ export async function PUT(request: Request) {
       });
     }
 
-    if (actionType === "settings") {
-      data.settings = {
-        ...(data.settings || {}),
+    if (actionType === "quotation") {
+      const index = (data.quotations || []).findIndex((q: any) => q.id === id || q.quotationNumber === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Surat Penawaran tidak ditemukan" }, { status: 404 });
+      }
+
+      data.quotations[index] = {
+        ...data.quotations[index],
         ...updates,
       };
+
+      if (updates.items || updates.discount !== undefined || updates.taxRate !== undefined) {
+        const items = data.quotations[index].items || [];
+        const subtotal = items.reduce((acc: number, curr: any) => acc + (Number(curr.total) || 0), 0);
+        const discount = Number(data.quotations[index].discount) || 0;
+        const afterDiscount = Math.max(0, subtotal - discount);
+        const taxRate = Number(data.quotations[index].taxRate) || 0;
+        const taxAmount = taxRate > 0 ? Math.round((afterDiscount * taxRate) / 100) : 0;
+        data.quotations[index].subtotal = subtotal;
+        data.quotations[index].taxAmount = taxAmount;
+        data.quotations[index].grandTotal = afterDiscount + taxAmount;
+      }
+
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
-        message: "Pengaturan berhasil diperbarui",
-        data: data.settings,
+        message: `Surat Penawaran ${data.quotations[index].quotationNumber} berhasil diperbarui`,
+        data: data.quotations[index],
+      });
+    }
+
+    if (actionType === "warehouse") {
+      const index = (data.warehouses || []).findIndex((w: any) => w.id === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Gudang tidak ditemukan" }, { status: 404 });
+      }
+
+      data.warehouses[index] = {
+        ...data.warehouses[index],
+        ...updates,
+      };
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Titik Gudang ${data.warehouses[index].name} berhasil diperbarui`,
+        data: data.warehouses[index],
+      });
+    }
+
+    if (actionType === "branch") {
+      const index = (data.branches || []).findIndex((b: any) => b.id === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Cabang tidak ditemukan" }, { status: 404 });
+      }
+
+      data.branches[index] = {
+        ...data.branches[index],
+        ...updates,
+      };
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Kantor Cabang ${data.branches[index].name} berhasil diperbarui`,
+        data: data.branches[index],
       });
     }
 
@@ -746,6 +1034,36 @@ export async function DELETE(request: Request) {
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Rekening bank berhasil dihapus" });
+    }
+
+    if (actionType === "quotation") {
+      const initialLen = (data.quotations || []).length;
+      data.quotations = (data.quotations || []).filter((q: any) => q.id !== id && q.quotationNumber !== id);
+      if (data.quotations.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Surat Penawaran tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Surat Penawaran berhasil dihapus" });
+    }
+
+    if (actionType === "warehouse") {
+      const initialLen = (data.warehouses || []).length;
+      data.warehouses = (data.warehouses || []).filter((w: any) => w.id !== id);
+      if (data.warehouses.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Gudang tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Titik Gudang berhasil dihapus" });
+    }
+
+    if (actionType === "branch") {
+      const initialLen = (data.branches || []).length;
+      data.branches = (data.branches || []).filter((b: any) => b.id !== id);
+      if (data.branches.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Cabang tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Kantor Cabang berhasil dihapus" });
     }
 
     return NextResponse.json({ success: false, error: "Tipe aksi DELETE tidak dikenali" }, { status: 400 });
