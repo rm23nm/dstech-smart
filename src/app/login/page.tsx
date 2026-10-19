@@ -24,59 +24,76 @@ function LoginForm() {
     }
   }, [initialRoleParam]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
 
     if (!email.trim() || !password.trim()) {
-      setErrorMsg("Mohon isi email dan password dengan benar.");
+      setErrorMsg("Mohon isi email dan kata sandi dengan benar.");
       return;
     }
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: password.trim(),
+          portalRole: role,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        setErrorMsg(json.message || "Email atau kata sandi tidak sesuai.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      const userData = json.data;
+
       if (typeof window !== "undefined") {
-        if (role === "PARTNER") {
-          const partnerSession = {
-            isLoggedIn: true,
-            role: "PARTNER",
-            name: email.split("@")[0].replace(/[._]/g, " ").toUpperCase(),
-            email: email.trim(),
-            refCode: `DST-${Math.floor(1000 + Math.random() * 9000)}`,
-            loginTime: new Date().toISOString(),
-          };
-          localStorage.setItem("dstech_partner_auth", JSON.stringify(partnerSession));
-          localStorage.setItem("dstech_auth_token", `dstech_tok_${Date.now()}`);
-          setIsSubmitting(false);
+        const sessionPayload = {
+          isLoggedIn: true,
+          id: userData.id,
+          role: userData.role,
+          name: userData.name,
+          email: userData.email,
+          phone: userData.phone,
+          loginTime: new Date().toISOString(),
+        };
+
+        if (role === "PARTNER" || userData.role === "AFFILIATE") {
+          localStorage.setItem("dstech_partner_auth", JSON.stringify({
+            ...sessionPayload,
+            refCode: `DST-${userData.id.slice(-4)}`,
+          }));
+          localStorage.setItem("dstech_auth_token", userData.token);
           router.push("/affiliate");
-        } else if (role === "ADMIN") {
-          const adminSession = {
-            isLoggedIn: true,
-            role: "ADMIN",
-            name: "Administrator DSTech",
-            email: email.trim(),
-            loginTime: new Date().toISOString(),
-          };
-          localStorage.setItem("dstech_admin_auth", JSON.stringify(adminSession));
-          localStorage.setItem("dstech_auth_token", `dstech_admin_tok_${Date.now()}`);
-          setIsSubmitting(false);
-          router.push("/admin");
+        } else if (role === "ADMIN" || userData.role === "ADMIN" || userData.role === "SUPERADMIN") {
+          localStorage.setItem("dstech_admin_auth", JSON.stringify(sessionPayload));
+          localStorage.setItem("dstech_auth_token", userData.token);
+          if (userData.role === "SUPERADMIN") {
+            router.push("/superadmin");
+          } else {
+            router.push("/admin");
+          }
         } else {
-          const employeeSession = {
-            isLoggedIn: true,
-            role: "EMPLOYEE",
-            name: email.split("@")[0].replace(/[._]/g, " ").toUpperCase() || "Teknisi DSTech",
-            email: email.trim(),
-            loginTime: new Date().toISOString(),
-          };
-          localStorage.setItem("dstech_employee_auth", JSON.stringify(employeeSession));
-          localStorage.setItem("dstech_auth_token", `dstech_emp_tok_${Date.now()}`);
-          setIsSubmitting(false);
+          localStorage.setItem("dstech_employee_auth", JSON.stringify(sessionPayload));
+          localStorage.setItem("dstech_auth_token", userData.token);
           router.push("/employee");
         }
       }
-    }, 600);
+    } catch (err) {
+      console.error("Login fetch error:", err);
+      setErrorMsg("Gagal menghubungi server autentikasi. Silakan periksa koneksi Anda.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

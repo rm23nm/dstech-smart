@@ -10,6 +10,7 @@ const DEFAULT_USERS = [
     name: "Super Admin DStech",
     email: "superadmin@dstechsmart.com",
     role: "SUPERADMIN",
+    password: "M4m4cantik@MAMA344",
     phone: "081287654321",
     status: "ACTIVE",
     createdAt: "2026-01-01T00:00:00.000Z",
@@ -20,6 +21,7 @@ const DEFAULT_USERS = [
     name: "Admin Operasional",
     email: "admin@dstechsmart.com",
     role: "ADMIN",
+    password: "admin123",
     phone: "081298765432",
     status: "ACTIVE",
     createdAt: "2026-01-10T08:00:00.000Z",
@@ -30,6 +32,7 @@ const DEFAULT_USERS = [
     name: "Teknisi Hendra",
     email: "hendra@dstechsmart.com",
     role: "EMPLOYEE",
+    password: "teknisi123",
     phone: "085712345678",
     status: "ACTIVE",
     createdAt: "2026-02-01T09:00:00.000Z",
@@ -40,6 +43,7 @@ const DEFAULT_USERS = [
     name: "Ahmad Rizky (Mitra Cilegon)",
     email: "ahmad.rizky@gmail.com",
     role: "AFFILIATE",
+    password: "mitra123",
     phone: "087811223344",
     status: "ACTIVE",
     createdAt: "2026-02-15T10:00:00.000Z",
@@ -50,6 +54,7 @@ const DEFAULT_USERS = [
     name: "PT. Krakatau Posco",
     email: "procurement@krakatauposco.co.id",
     role: "CLIENT",
+    password: "klien123",
     phone: "0254391234",
     status: "ACTIVE",
     createdAt: "2026-03-01T11:00:00.000Z",
@@ -131,7 +136,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, role, phone, status } = body;
+    const { name, email, role, phone, status, password } = body;
 
     if (!name || !email) {
       return NextResponse.json(
@@ -155,6 +160,7 @@ export async function POST(request: Request) {
       name: name.trim(),
       email: email.trim().toLowerCase(),
       role: role || "CLIENT",
+      password: password && password.trim() ? password.trim() : "dstech123",
       phone: phone ? phone.trim() : "",
       status: status || "ACTIVE",
       createdAt: new Date().toISOString(),
@@ -190,7 +196,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, email, role, phone, status } = body;
+    const { id, name, email, role, phone, status, password } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -227,6 +233,7 @@ export async function PUT(request: Request) {
       name: name !== undefined ? name.trim() : users[index].name,
       email: email !== undefined ? email.trim().toLowerCase() : users[index].email,
       role: role !== undefined ? role : users[index].role,
+      password: password && password.trim() ? password.trim() : users[index].password,
       phone: phone !== undefined ? phone.trim() : users[index].phone,
       status: status !== undefined ? status : users[index].status,
       updatedAt: new Date().toISOString(),

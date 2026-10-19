@@ -66,6 +66,7 @@ export default function RegisterPage() {
             phone: phone.trim(),
             role: 'AFFILIATE',
             status: 'ACTIVE',
+            password: password.trim(),
           }),
         })
       } catch (userErr) {

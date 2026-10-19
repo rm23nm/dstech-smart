@@ -19,6 +19,10 @@ import {
   UserCheck,
   Briefcase,
   Layers,
+  Lock,
+  Key,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 interface UserItem {
@@ -27,6 +31,7 @@ interface UserItem {
   email: string;
   role: "SUPERADMIN" | "ADMIN" | "EMPLOYEE" | "AFFILIATE" | "CLIENT";
   phone: string;
+  password?: string;
   status: "ACTIVE" | "INACTIVE";
   createdAt: string;
   updatedAt: string;
@@ -96,6 +101,10 @@ export default function AdminUsersPage() {
   const [formPhone, setFormPhone] = useState("");
   const [formRole, setFormRole] = useState<UserItem["role"]>("EMPLOYEE");
   const [formStatus, setFormStatus] = useState<UserItem["status"]>("ACTIVE");
+  const [formPassword, setFormPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [formNewPassword, setFormNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch users from API
@@ -138,6 +147,8 @@ export default function AdminUsersPage() {
     setFormPhone(u.phone);
     setFormRole(u.role);
     setFormStatus(u.status);
+    setFormNewPassword("");
+    setShowNewPassword(false);
     setIsEditModalOpen(true);
   };
 
@@ -150,8 +161,12 @@ export default function AdminUsersPage() {
   // Submit Add User
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formName.trim() || !formEmail.trim()) {
-      showToast("error", "Nama lengkap dan email wajib diisi.");
+    if (!formName.trim() || !formEmail.trim() || !formPassword.trim()) {
+      showToast("error", "Nama lengkap, email, dan kata sandi (password) wajib diisi.");
+      return;
+    }
+    if (formPassword.trim().length < 6) {
+      showToast("error", "Kata sandi minimal harus 6 karakter.");
       return;
     }
 
@@ -166,6 +181,7 @@ export default function AdminUsersPage() {
           phone: formPhone.trim(),
           role: formRole,
           status: formStatus,
+          password: formPassword.trim(),
         }),
       });
       const data = await res.json();
@@ -176,6 +192,8 @@ export default function AdminUsersPage() {
         setFormName("");
         setFormEmail("");
         setFormPhone("");
+        setFormPassword("");
+        setShowPassword(false);
         setFormRole("EMPLOYEE");
         setFormStatus("ACTIVE");
         fetchUsers();
@@ -194,19 +212,29 @@ export default function AdminUsersPage() {
     e.preventDefault();
     if (!selectedUser) return;
 
+    if (formNewPassword.trim() && formNewPassword.trim().length < 6) {
+      showToast("error", "Password baru minimal harus 6 karakter.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
+      const payload: any = {
+        id: selectedUser.id,
+        name: formName.trim(),
+        email: formEmail.trim().toLowerCase(),
+        phone: formPhone.trim(),
+        role: formRole,
+        status: formStatus,
+      };
+      if (formNewPassword.trim()) {
+        payload.password = formNewPassword.trim();
+      }
+
       const res = await fetch("/api/users", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: selectedUser.id,
-          name: formName.trim(),
-          email: formEmail.trim().toLowerCase(),
-          phone: formPhone.trim(),
-          role: formRole,
-          status: formStatus,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
 
@@ -214,6 +242,8 @@ export default function AdminUsersPage() {
         showToast("success", "Data pengguna berhasil diperbarui.");
         setIsEditModalOpen(false);
         setSelectedUser(null);
+        setFormNewPassword("");
+        setShowNewPassword(false);
         fetchUsers();
       } else {
         showToast("error", data.message || "Gagal mengupdate pengguna.");
@@ -470,10 +500,16 @@ export default function AdminUsersPage() {
                             <p className="font-bold text-slate-900 group-hover:text-dstech-blue transition-colors">
                               {user.name}
                             </p>
-                            <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                              <Mail className="w-3 h-3 text-slate-300" />
-                              {user.email}
-                            </p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <p className="text-xs text-slate-400 flex items-center gap-1.5">
+                                <Mail className="w-3 h-3 text-slate-300" />
+                                {user.email}
+                              </p>
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100">
+                                <Lock className="w-2.5 h-2.5 text-emerald-500" />
+                                Sandi Aktif
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -615,6 +651,37 @@ export default function AdminUsersPage() {
                   onChange={(e) => setFormEmail(e.target.value)}
                   className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:border-dstech-blue"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
+                  Kata Sandi (Password Akun) *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={6}
+                    placeholder="Minimal 6 karakter sandi akun"
+                    value={formPassword}
+                    onChange={(e) => setFormPassword(e.target.value)}
+                    className="w-full pl-10 pr-11 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:border-dstech-blue"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
+                  <Key className="w-3 h-3 text-dstech-blue" />
+                  Kata sandi ini digunakan untuk masuk ke portal sistem DSTech Smart.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -789,6 +856,36 @@ export default function AdminUsersPage() {
                   <option value="ACTIVE">Aktif (Dapat Login)</option>
                   <option value="INACTIVE">Nonaktif (Akses Ditutup)</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
+                  Ubah Kata Sandi Baru (Opsional)
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    minLength={6}
+                    placeholder="Kosongkan jika tidak ingin mengubah password"
+                    value={formNewPassword}
+                    onChange={(e) => setFormNewPassword(e.target.value)}
+                    className="w-full pl-10 pr-11 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:border-dstech-blue"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1.5 flex items-center gap-1">
+                  <Key className="w-3 h-3 text-amber-500" />
+                  Biarkan kosong jika tetap menggunakan kata sandi lama.
+                </p>
               </div>
 
               <div className="pt-4 flex gap-3">
