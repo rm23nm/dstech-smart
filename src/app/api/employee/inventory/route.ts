@@ -40,7 +40,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { items, materialName, qty, unit, taskTitle, requestedBy, notes } = body;
 
-    let requestItems: Array<{ materialId: string; materialName: string; qty: number; unit: string }> = [];
+    let requestItems: Array<{
+      materialId: string;
+      materialName: string;
+      qty: number;
+      unit: string;
+      selectedUnit?: string;
+      equivalentQty?: number;
+      equivalentUnit?: string;
+      conversionLabel?: string;
+    }> = [];
 
     if (Array.isArray(items) && items.length > 0) {
       for (const item of items) {
@@ -54,7 +63,11 @@ export async function POST(request: Request) {
           materialId: item.materialId || `dstech_mat_${Date.now()}`,
           materialName: item.materialName,
           qty: Number(item.qty),
-          unit: item.unit || "Pcs",
+          unit: item.selectedUnit || item.unit || "Pcs",
+          selectedUnit: item.selectedUnit || item.unit || "Pcs",
+          equivalentQty: item.equivalentQty !== undefined ? Number(item.equivalentQty) : undefined,
+          equivalentUnit: item.equivalentUnit,
+          conversionLabel: item.conversionLabel,
         });
       }
     } else if (materialName && qty) {
@@ -63,7 +76,11 @@ export async function POST(request: Request) {
         materialId: body.materialId || `dstech_mat_${Date.now()}`,
         materialName,
         qty: Number(qty),
-        unit: unit || "Pcs",
+        unit: body.selectedUnit || unit || "Pcs",
+        selectedUnit: body.selectedUnit || unit || "Pcs",
+        equivalentQty: body.equivalentQty !== undefined ? Number(body.equivalentQty) : undefined,
+        equivalentUnit: body.equivalentUnit,
+        conversionLabel: body.conversionLabel,
       });
     } else {
       return NextResponse.json(

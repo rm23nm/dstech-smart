@@ -34,6 +34,8 @@ import {
   Navigation,
   Compass,
   RefreshCw,
+  ArrowRightLeft,
+  Calculator,
 } from "lucide-react";
 
 interface EmployeeTask {
@@ -62,6 +64,11 @@ interface MaterialItem {
   status: "Aman" | "Menipis" | "Habis";
   location: string;
   description: string;
+  hasConversion?: boolean;
+  subUnit?: string;
+  conversionRatio?: number;
+  subStockTotal?: number;
+  conversionLabel?: string;
 }
 
 interface MaterialRequestItem {
@@ -69,6 +76,10 @@ interface MaterialRequestItem {
   materialName: string;
   qty: number;
   unit: string;
+  selectedUnit?: string;
+  equivalentQty?: number;
+  equivalentUnit?: string;
+  conversionLabel?: string;
 }
 
 interface MaterialRequest {
@@ -187,6 +198,14 @@ export default function EmployeeDashboard() {
     qty: number;
     unit: string;
     maxStock: number;
+    hasConversion?: boolean;
+    subUnit?: string;
+    conversionRatio?: number;
+    subStockTotal?: number;
+    conversionLabel?: string;
+    selectedUnit?: string;
+    equivalentQty?: number;
+    equivalentUnit?: string;
   }
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState<boolean>(false);
@@ -202,11 +221,18 @@ export default function EmployeeDashboard() {
         qty: 1,
         unit: "Pcs",
         maxStock: 999,
+        hasConversion: false,
+        selectedUnit: "Pcs",
       },
     ],
     taskTitle: "",
     notes: "",
   });
+
+  // Quick Converter Calculator State
+  const [calcMaterialId, setCalcMaterialId] = useState<string>("dstech_mat_1");
+  const [calcInputQty, setCalcInputQty] = useState<number>(1);
+  const [calcDirection, setCalcDirection] = useState<"primary_to_sub" | "sub_to_primary">("primary_to_sub");
 
   interface GeoCoords {
     lat: number;
@@ -485,6 +511,10 @@ export default function EmployeeDashboard() {
     const selectedIds = requestForm.items.map((i) => i.materialId).filter(Boolean);
     const availableMat = materials.find((m) => !selectedIds.includes(m.id) && m.stock > 0) || materials[0];
 
+    const hasConv = !!availableMat?.hasConversion;
+    const initialQty = 1;
+    const eqQty = hasConv && availableMat?.conversionRatio ? initialQty * availableMat.conversionRatio : undefined;
+
     setRequestForm((prev) => ({
       ...prev,
       items: [
@@ -492,9 +522,17 @@ export default function EmployeeDashboard() {
         {
           materialId: availableMat?.id || "",
           materialName: availableMat?.name || "",
-          qty: 1,
+          qty: initialQty,
           unit: availableMat?.unit || "Pcs",
           maxStock: availableMat?.stock || 999,
+          hasConversion: hasConv,
+          subUnit: availableMat?.subUnit,
+          conversionRatio: availableMat?.conversionRatio,
+          subStockTotal: availableMat?.subStockTotal,
+          conversionLabel: availableMat?.conversionLabel,
+          selectedUnit: availableMat?.unit || "Pcs",
+          equivalentQty: eqQty,
+          equivalentUnit: hasConv ? availableMat?.subUnit : undefined,
         },
       ],
     }));
@@ -513,12 +551,59 @@ export default function EmployeeDashboard() {
     if (!mat) return;
     setRequestForm((prev) => {
       const updated = [...prev.items];
+      const hasConv = !!mat.hasConversion;
+      const initialQty = 1;
+      const eqQty = hasConv && mat.conversionRatio ? initialQty * mat.conversionRatio : undefined;
+
       updated[index] = {
         materialId: mat.id,
         materialName: mat.name,
-        qty: 1,
+        qty: initialQty,
         unit: mat.unit,
         maxStock: mat.stock,
+        hasConversion: hasConv,
+        subUnit: mat.subUnit,
+        conversionRatio: mat.conversionRatio,
+        subStockTotal: mat.subStockTotal,
+        conversionLabel: mat.conversionLabel,
+        selectedUnit: mat.unit,
+        equivalentQty: eqQty,
+        equivalentUnit: hasConv ? mat.subUnit : undefined,
+      };
+      return { ...prev, items: updated };
+    });
+  };
+
+  const handleItemUnitChange = (index: number, newUnit: string) => {
+    setRequestForm((prev) => {
+      const updated = [...prev.items];
+      const it = updated[index];
+      const mat = materials.find((m) => m.id === it.materialId);
+      if (!mat) return prev;
+
+      let newMaxStock = mat.stock;
+      let eqQty: number | undefined = undefined;
+      let eqUnit: string | undefined = undefined;
+      const currentQty = it.qty || 1;
+
+      if (mat.hasConversion && mat.conversionRatio && mat.subUnit) {
+        if (newUnit === mat.subUnit) {
+          newMaxStock = mat.subStockTotal || mat.stock * mat.conversionRatio;
+          eqQty = Number((currentQty / mat.conversionRatio).toFixed(2));
+          eqUnit = mat.unit;
+        } else {
+          newMaxStock = mat.stock;
+          eqQty = currentQty * mat.conversionRatio;
+          eqUnit = mat.subUnit;
+        }
+      }
+
+      updated[index] = {
+        ...it,
+        selectedUnit: newUnit,
+        maxStock: newMaxStock,
+        equivalentQty: eqQty,
+        equivalentUnit: eqUnit,
       };
       return { ...prev, items: updated };
     });
@@ -527,16 +612,34 @@ export default function EmployeeDashboard() {
   const handleItemQtyChange = (index: number, qtyVal: number) => {
     setRequestForm((prev) => {
       const updated = [...prev.items];
+      const it = updated[index];
       const safeQty = Math.max(1, qtyVal);
+      const mat = materials.find((m) => m.id === it.materialId);
+
+      let eqQty: number | undefined = undefined;
+      let eqUnit: string | undefined = undefined;
+
+      if (mat?.hasConversion && mat.conversionRatio && mat.subUnit) {
+        if (it.selectedUnit === mat.subUnit) {
+          eqQty = Number((safeQty / mat.conversionRatio).toFixed(2));
+          eqUnit = mat.unit;
+        } else {
+          eqQty = safeQty * mat.conversionRatio;
+          eqUnit = mat.subUnit;
+        }
+      }
+
       updated[index] = {
-        ...updated[index],
+        ...it,
         qty: safeQty,
+        equivalentQty: eqQty,
+        equivalentUnit: eqUnit,
       };
       return { ...prev, items: updated };
     });
   };
 
-  // Handler submit material request (Multi-Item)
+  // Handler submit material request (Multi-Item dengan Konversi Satuan)
   const handleSubmitMaterialRequest = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -555,18 +658,26 @@ export default function EmployeeDashboard() {
       return;
     }
 
-    // Validasi stok gudang
+    // Validasi stok gudang dengan konversi satuan
     for (const item of requestForm.items) {
       const mat = materials.find((m) => m.id === item.materialId);
       if (mat && mat.stock <= 0) {
         showToast(`Stok untuk "${item.materialName}" sedang habis di gudang!`);
         return;
       }
-      if (mat && item.qty > mat.stock) {
-        showToast(
-          `Jumlah untuk "${item.materialName}" (${item.qty} ${item.unit}) melebihi sisa stok gudang (${mat.stock} ${mat.unit})!`
-        );
-        return;
+      if (mat) {
+        const isSubUnit = mat.hasConversion && item.selectedUnit === mat.subUnit;
+        const limitStock = isSubUnit
+          ? mat.subStockTotal || (mat.stock * (mat.conversionRatio || 1))
+          : mat.stock;
+        const displayUnit = item.selectedUnit || mat.unit;
+
+        if (item.qty > limitStock) {
+          showToast(
+            `Jumlah untuk "${item.materialName}" (${item.qty} ${displayUnit}) melebihi sisa stok gudang (${limitStock} ${displayUnit})!`
+          );
+          return;
+        }
       }
     }
 
@@ -580,7 +691,11 @@ export default function EmployeeDashboard() {
             materialId: it.materialId,
             materialName: it.materialName,
             qty: it.qty,
-            unit: it.unit,
+            unit: it.selectedUnit || it.unit,
+            selectedUnit: it.selectedUnit || it.unit,
+            equivalentQty: it.equivalentQty,
+            equivalentUnit: it.equivalentUnit,
+            conversionLabel: it.conversionLabel,
           })),
           taskTitle: requestForm.taskTitle || defaultTask,
           requestedBy: "Ikhsan Maulidi",
@@ -594,6 +709,7 @@ export default function EmployeeDashboard() {
         showToast(`Permohonan ${requestForm.items.length} item material berhasil diajukan ke Gudang!`);
         setIsRequestModalOpen(false);
         const firstMat = materials.find((m) => m.stock > 0) || materials[0];
+        const hasConv = !!firstMat?.hasConversion;
         setRequestForm({
           items: [
             {
@@ -602,6 +718,14 @@ export default function EmployeeDashboard() {
               qty: 1,
               unit: firstMat?.unit || "Pcs",
               maxStock: firstMat?.stock || 999,
+              hasConversion: hasConv,
+              subUnit: firstMat?.subUnit,
+              conversionRatio: firstMat?.conversionRatio,
+              subStockTotal: firstMat?.subStockTotal,
+              conversionLabel: firstMat?.conversionLabel,
+              selectedUnit: firstMat?.unit || "Pcs",
+              equivalentQty: hasConv && firstMat?.conversionRatio ? firstMat.conversionRatio : undefined,
+              equivalentUnit: hasConv ? firstMat?.subUnit : undefined,
             },
           ],
           taskTitle: "",
@@ -1211,6 +1335,9 @@ export default function EmployeeDashboard() {
                       <button
                         onClick={() => {
                           const firstMat = materials.find((m) => m.stock > 0) || materials[0];
+                          const hasConv = !!firstMat?.hasConversion;
+                          const activeTasks = tasks.filter((t) => t.status !== "Completed");
+                          const defaultTask = activeTasks.length > 0 ? `${activeTasks[0].title} - ${activeTasks[0].client}` : "";
                           setRequestForm({
                             items: [
                               {
@@ -1219,9 +1346,17 @@ export default function EmployeeDashboard() {
                                 qty: 1,
                                 unit: firstMat?.unit || "Pcs",
                                 maxStock: firstMat?.stock || 999,
+                                hasConversion: hasConv,
+                                subUnit: firstMat?.subUnit,
+                                conversionRatio: firstMat?.conversionRatio,
+                                subStockTotal: firstMat?.subStockTotal,
+                                conversionLabel: firstMat?.conversionLabel,
+                                selectedUnit: firstMat?.unit || "Pcs",
+                                equivalentQty: hasConv && firstMat?.conversionRatio ? firstMat.conversionRatio : undefined,
+                                equivalentUnit: hasConv ? firstMat?.subUnit : undefined,
                               },
                             ],
-                            taskTitle: tasks[0] ? `${tasks[0].title} - ${tasks[0].client}` : "",
+                            taskTitle: defaultTask,
                             notes: "",
                           });
                           setIsRequestModalOpen(true);
@@ -1235,7 +1370,180 @@ export default function EmployeeDashboard() {
 
                     {/* Stock Table */}
                     {inventorySubTab === "stock" && (
-                      <div className="space-y-4">
+                      <div className="space-y-5">
+                        {/* Interactive Unit Converter Calculator Card */}
+                        <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-blue-950 text-white shadow-md border border-slate-700/60 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                            <div className="flex items-center gap-2">
+                              <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-400/30">
+                                <Calculator className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <h4 className="text-xs sm:text-sm font-black tracking-wide">
+                                  Kalkulator Konversi Satuan Lapangan
+                                </h4>
+                                <p className="text-[10px] text-slate-300">
+                                  Konversi otomatis Roll ⇄ Meter, Dus ⇄ Pcs, Pack ⇄ Pcs secara instan
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-bold text-amber-300 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded-full self-start sm:self-auto">
+                              ⚡ Konversi Presisi Real-time
+                            </span>
+                          </div>
+
+                          {/* Controls */}
+                          {(() => {
+                            const convertibleMaterials = materials.filter((m) => m.hasConversion && m.subUnit && m.conversionRatio);
+                            const currentMat = convertibleMaterials.find((m) => m.id === calcMaterialId) || convertibleMaterials[0] || materials[0];
+                            const ratio = currentMat?.conversionRatio || 1;
+                            const pUnit = currentMat?.unit || "Unit";
+                            const sUnit = currentMat?.subUnit || "Pcs";
+
+                            const convertedVal =
+                              calcDirection === "primary_to_sub"
+                                ? (calcInputQty * ratio).toLocaleString("id-ID")
+                                : (calcInputQty / ratio).toFixed(2);
+
+                            const fromUnit = calcDirection === "primary_to_sub" ? pUnit : sUnit;
+                            const toUnit = calcDirection === "primary_to_sub" ? sUnit : pUnit;
+
+                            return (
+                              <div className="space-y-3 pt-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-300 block mb-1">
+                                      Pilih Material Berkonversi:
+                                    </label>
+                                    <select
+                                      value={currentMat?.id}
+                                      onChange={(e) => setCalcMaterialId(e.target.value)}
+                                      className="w-full p-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-bold focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                    >
+                                      {convertibleMaterials.map((m) => (
+                                        <option key={m.id} value={m.id} className="bg-slate-900 text-white">
+                                          {m.name} ({m.conversionLabel || `1 ${m.unit} = ${m.conversionRatio} ${m.subUnit}`})
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-300 block mb-1">
+                                      Arah Konversi Satuan:
+                                    </label>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => setCalcDirection("primary_to_sub")}
+                                        className={`flex-1 py-2 px-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                                          calcDirection === "primary_to_sub"
+                                            ? "bg-blue-600 text-white shadow"
+                                            : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                                        }`}
+                                      >
+                                        {pUnit} ➔ {sUnit}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setCalcDirection("sub_to_primary")}
+                                        className={`flex-1 py-2 px-2 rounded-xl text-[11px] font-bold transition-all cursor-pointer ${
+                                          calcDirection === "sub_to_primary"
+                                            ? "bg-blue-600 text-white shadow"
+                                            : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                                        }`}
+                                      >
+                                        {sUnit} ➔ {pUnit}
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-300 block mb-1">
+                                      Jumlah Input ({fromUnit}):
+                                    </label>
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        value={calcInputQty}
+                                        onChange={(e) => setCalcInputQty(Math.max(1, Number(e.target.value)))}
+                                        className="w-full p-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs font-black focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                      />
+                                      <span className="text-xs font-bold text-slate-300 px-2 py-2 bg-slate-700/60 rounded-xl shrink-0">
+                                        {fromUnit}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Result Output Box */}
+                                <div className="p-3 rounded-xl bg-white/5 border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-400/30 flex items-center justify-center font-black text-sm shrink-0">
+                                      =
+                                    </div>
+                                    <div>
+                                      <div className="flex items-baseline gap-2">
+                                        <span className="text-lg sm:text-xl font-black text-white">
+                                          {convertedVal} {toUnit}
+                                        </span>
+                                        <span className="text-xs text-slate-400 font-medium">
+                                          (dari {calcInputQty} {fromUnit})
+                                        </span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-300">
+                                        Rasio Acuan: <strong className="text-amber-300">{currentMat?.conversionLabel || `1 ${pUnit} = ${ratio} ${sUnit}`}</strong> | Sisa Stok: {currentMat?.stock} {pUnit} (≈ {currentMat?.subStockTotal || (currentMat?.stock * ratio)} {sUnit})
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const hasConv = !!currentMat?.hasConversion;
+                                      const activeTasks = tasks.filter((t) => t.status !== "Completed");
+                                      const defaultTask = activeTasks.length > 0 ? `${activeTasks[0].title} - ${activeTasks[0].client}` : "";
+                                      const isSub = calcDirection === "sub_to_primary";
+                                      const selectedUnit = isSub ? sUnit : pUnit;
+                                      const maxStock = isSub ? (currentMat.subStockTotal || currentMat.stock * ratio) : currentMat.stock;
+                                      const eqQty = isSub ? Number((calcInputQty / ratio).toFixed(2)) : calcInputQty * ratio;
+                                      const eqUnit = isSub ? pUnit : sUnit;
+
+                                      setRequestForm({
+                                        items: [
+                                          {
+                                            materialId: currentMat.id,
+                                            materialName: currentMat.name,
+                                            qty: calcInputQty,
+                                            unit: pUnit,
+                                            maxStock: maxStock,
+                                            hasConversion: hasConv,
+                                            subUnit: sUnit,
+                                            conversionRatio: ratio,
+                                            subStockTotal: currentMat.subStockTotal,
+                                            conversionLabel: currentMat.conversionLabel,
+                                            selectedUnit: selectedUnit,
+                                            equivalentQty: eqQty,
+                                            equivalentUnit: eqUnit,
+                                          },
+                                        ],
+                                        taskTitle: defaultTask,
+                                        notes: `Pengambilan via kalkulator konversi: ${calcInputQty} ${selectedUnit} (≈ ${eqQty} ${eqUnit})`,
+                                      });
+                                      setIsRequestModalOpen(true);
+                                    }}
+                                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all shadow shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+                                  >
+                                    <span>Ambil Material Ini</span>
+                                    <ChevronRight className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
                         <div className="relative">
                           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                           <input
@@ -1253,7 +1561,7 @@ export default function EmployeeDashboard() {
                               <tr>
                                 <th className="p-3">Nama Material</th>
                                 <th className="p-3">Kategori</th>
-                                <th className="p-3">Sisa Stok</th>
+                                <th className="p-3">Sisa Stok Gudang</th>
                                 <th className="p-3">Lokasi Gudang</th>
                                 <th className="p-3 text-right">Aksi</th>
                               </tr>
@@ -1262,27 +1570,52 @@ export default function EmployeeDashboard() {
                               {filteredMaterials.map((mat) => (
                                 <tr key={mat.id} className="hover:bg-slate-50/80 transition-colors">
                                   <td className="p-3 font-bold text-slate-900">
-                                    <p>{mat.name}</p>
+                                    <p className="flex items-center gap-1.5 flex-wrap">
+                                      <span>{mat.name}</span>
+                                      {mat.hasConversion && (
+                                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-blue-50 text-dstech-blue border border-blue-200">
+                                          Dual Unit
+                                        </span>
+                                      )}
+                                    </p>
                                     <p className="text-[10px] text-slate-400 font-normal">{mat.description}</p>
                                   </td>
                                   <td className="p-3 text-slate-600">{mat.category}</td>
                                   <td className="p-3">
-                                    <span
-                                      className={`px-2 py-1 rounded-md font-black text-[10px] uppercase ${
-                                        mat.status === "Aman"
-                                          ? "bg-green-100 text-green-700"
-                                          : mat.status === "Menipis"
-                                          ? "bg-amber-100 text-amber-700"
-                                          : "bg-red-100 text-red-700"
-                                      }`}
-                                    >
-                                      {mat.stock} {mat.unit} ({mat.status})
-                                    </span>
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span
+                                          className={`px-2 py-1 rounded-md font-black text-[10px] uppercase ${
+                                            mat.status === "Aman"
+                                              ? "bg-green-100 text-green-700"
+                                              : mat.status === "Menipis"
+                                              ? "bg-amber-100 text-amber-700"
+                                              : "bg-red-100 text-red-700"
+                                          }`}
+                                        >
+                                          {mat.stock} {mat.unit} ({mat.status})
+                                        </span>
+                                        {mat.hasConversion && mat.subUnit && (
+                                          <span className="px-2 py-0.5 rounded-md font-extrabold text-[10px] bg-blue-100 text-dstech-blue">
+                                            ≈ {mat.subStockTotal || (mat.stock * (mat.conversionRatio || 1))} {mat.subUnit}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {mat.hasConversion && mat.conversionLabel && (
+                                        <p className="text-[10px] font-semibold text-slate-500 flex items-center gap-1">
+                                          <ArrowRightLeft className="w-3 h-3 text-dstech-blue shrink-0" />
+                                          <span>{mat.conversionLabel}</span>
+                                        </p>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="p-3 text-slate-500 font-medium">{mat.location}</td>
                                   <td className="p-3 text-right">
                                     <button
                                       onClick={() => {
+                                        const hasConv = !!mat.hasConversion;
+                                        const activeTasks = tasks.filter((t) => t.status !== "Completed");
+                                        const defaultTask = activeTasks.length > 0 ? `${activeTasks[0].title} - ${activeTasks[0].client}` : "";
                                         setRequestForm({
                                           items: [
                                             {
@@ -1291,9 +1624,17 @@ export default function EmployeeDashboard() {
                                               qty: 1,
                                               unit: mat.unit,
                                               maxStock: mat.stock,
+                                              hasConversion: hasConv,
+                                              subUnit: mat.subUnit,
+                                              conversionRatio: mat.conversionRatio,
+                                              subStockTotal: mat.subStockTotal,
+                                              conversionLabel: mat.conversionLabel,
+                                              selectedUnit: mat.unit,
+                                              equivalentQty: hasConv && mat.conversionRatio ? mat.conversionRatio : undefined,
+                                              equivalentUnit: hasConv ? mat.subUnit : undefined,
                                             },
                                           ],
-                                          taskTitle: tasks[0] ? `${tasks[0].title} - ${tasks[0].client}` : "",
+                                          taskTitle: defaultTask,
                                           notes: "",
                                         });
                                         setIsRequestModalOpen(true);
@@ -1332,12 +1673,17 @@ export default function EmployeeDashboard() {
                                   {req.items && req.items.length > 0 ? (
                                     <div className="space-y-1.5 py-1">
                                       {req.items.map((it, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 text-xs">
+                                        <div key={idx} className="flex items-center gap-2 text-xs flex-wrap">
                                           <span className="w-1.5 h-1.5 rounded-full bg-dstech-blue shrink-0"></span>
                                           <span className="font-bold text-slate-900">{it.materialName}</span>
                                           <span className="px-2 py-0.5 rounded-full bg-slate-100 font-extrabold text-[10px] text-slate-700 whitespace-nowrap">
                                             {it.qty} {it.unit}
                                           </span>
+                                          {it.equivalentQty !== undefined && it.equivalentUnit && (
+                                            <span className="text-[10px] font-semibold text-dstech-blue bg-blue-50 px-2 py-0.5 rounded-md">
+                                              ≈ {it.equivalentQty} {it.equivalentUnit}
+                                            </span>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
@@ -1981,15 +2327,57 @@ export default function EmployeeDashboard() {
                         <option value="">-- Pilih Material dari Stok Gudang --</option>
                         {materials.map((m) => (
                           <option key={m.id} value={m.id} disabled={m.stock <= 0}>
-                            {m.name} [Stok: {m.stock} {m.unit}] - {m.location} {m.stock <= 0 ? "(HABIS)" : ""}
+                            {m.name} [Stok: {m.stock} {m.unit}
+                            {m.hasConversion && m.subUnit ? ` ≈ ${m.subStockTotal || m.stock * (m.conversionRatio || 1)} ${m.subUnit}` : ""}] - {m.location} {m.stock <= 0 ? "(HABIS)" : ""}
                           </option>
                         ))}
                       </select>
                     </div>
 
+                    {/* Dual Unit Selector & Conversion Details */}
+                    {item.hasConversion && item.subUnit && (
+                      <div className="p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/80 space-y-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px]">
+                          <span className="font-black text-dstech-blue flex items-center gap-1.5">
+                            <ArrowRightLeft className="w-3.5 h-3.5" />
+                            <span>Pilihan Satuan Pengambilan:</span>
+                          </span>
+                          <span className="text-[10px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-blue-200 self-start sm:self-auto">
+                            Rasio: {item.conversionLabel || `1 ${item.unit} = ${item.conversionRatio} ${item.subUnit}`}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleItemUnitChange(idx, item.unit)}
+                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                              item.selectedUnit === item.unit
+                                ? "bg-dstech-blue text-white shadow-sm"
+                                : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            Satuan Utama ({item.unit})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleItemUnitChange(idx, item.subUnit!)}
+                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                              item.selectedUnit === item.subUnit
+                                ? "bg-dstech-blue text-white shadow-sm"
+                                : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            Satuan Eceran ({item.subUnit})
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
                       <div>
-                        <label className="font-bold text-slate-700 block mb-1">Jumlah Diambil (Qty):</label>
+                        <label className="font-bold text-slate-700 block mb-1">
+                          Jumlah Diambil ({item.selectedUnit || item.unit}):
+                        </label>
                         <div className="flex items-center gap-2">
                           <input
                             type="number"
@@ -2000,8 +2388,8 @@ export default function EmployeeDashboard() {
                             onChange={(e) => handleItemQtyChange(idx, Number(e.target.value))}
                             className="w-full p-2.5 rounded-xl border border-slate-200 font-black text-slate-900 focus:ring-2 focus:ring-dstech-red focus:outline-none text-xs bg-white"
                           />
-                          <span className="px-3 py-2.5 rounded-xl bg-slate-200 font-bold text-slate-700 text-xs shrink-0">
-                            {item.unit || "Pcs"}
+                          <span className="px-3 py-2.5 rounded-xl bg-slate-200 font-black text-slate-800 text-xs shrink-0">
+                            {item.selectedUnit || item.unit || "Pcs"}
                           </span>
                         </div>
                       </div>
@@ -2016,13 +2404,24 @@ export default function EmployeeDashboard() {
                               : "bg-green-50 border-green-200 text-green-700"
                           }`}
                         >
-                          <span>Stok Gudang:</span>
+                          <span>Batas Sisa Stok:</span>
                           <span className="font-black">
-                            {item.maxStock} {item.unit}
+                            {item.maxStock} {item.selectedUnit || item.unit}
                           </span>
                         </div>
                       </div>
                     </div>
+
+                    {/* Live Conversion Preview */}
+                    {item.hasConversion && item.equivalentQty !== undefined && item.equivalentUnit && (
+                      <div className="p-2 rounded-xl bg-amber-50 border border-amber-200/80 text-[11px] font-bold text-amber-900 flex items-center gap-2">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span>
+                          Hasil Konversi: <strong>{item.qty} {item.selectedUnit || item.unit}</strong> setara dengan{" "}
+                          <strong className="text-dstech-blue">{item.equivalentQty} {item.equivalentUnit}</strong>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -2040,18 +2439,25 @@ export default function EmployeeDashboard() {
               {/* Shared Metadata */}
               <div className="border-t border-slate-200/80 pt-3 space-y-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Terkait Proyek / Surat Tugas:</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-700 block">Terkait Proyek / Surat Tugas:</label>
+                    <span className="text-[10px] text-green-700 bg-green-50 px-2 py-0.5 rounded-md font-bold border border-green-200">
+                      Filter: Hanya Proyek Sedang Berjalan
+                    </span>
+                  </div>
                   <select
                     value={requestForm.taskTitle}
                     onChange={(e) => setRequestForm({ ...requestForm, taskTitle: e.target.value })}
                     className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium focus:ring-2 focus:ring-dstech-red focus:outline-none text-xs"
                   >
-                    <option value="">Pilih Proyek Lapangan Terkait</option>
-                    {tasks.map((t) => (
-                      <option key={t.id} value={`${t.title} - ${t.client}`}>
-                        {t.title} ({t.client})
-                      </option>
-                    ))}
+                    <option value="">Pilih Proyek Lapangan (Hanya Proyek Aktif Berjalan)</option>
+                    {tasks
+                      .filter((t) => t.status !== "Completed")
+                      .map((t) => (
+                        <option key={t.id} value={`${t.title} - ${t.client}`}>
+                          {t.title} ({t.client}) - [Status: {t.status === "In Progress" ? "Progres Pelaksanaan" : "Terjadwal"}]
+                        </option>
+                      ))}
                     <option value="Stok Cadangan Mobil Operasional">Stok Cadangan Mobil Operasional</option>
                     <option value="Perbaikan & Maintenance Mandiri">Perbaikan & Maintenance Mandiri</option>
                   </select>
@@ -2539,18 +2945,25 @@ export default function EmployeeDashboard() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Terkait Penugasan / Proyek:</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700 block">Terkait Penugasan / Proyek:</label>
+                  <span className="text-[10px] text-green-700 bg-green-50 px-2 py-0.5 rounded-md font-bold border border-green-200">
+                    Filter: Hanya Proyek Sedang Berjalan
+                  </span>
+                </div>
                 <select
                   value={overtimeForm.taskTitle}
                   onChange={(e) => setOvertimeForm({ ...overtimeForm, taskTitle: e.target.value })}
                   className="w-full p-3 rounded-xl border border-slate-200 bg-white font-medium"
                 >
-                  <option value="">Pilih Proyek Terkait</option>
-                  {tasks.map((t) => (
-                    <option key={t.id} value={`${t.title} - ${t.client}`}>
-                      {t.title} ({t.client})
-                    </option>
-                  ))}
+                  <option value="">Pilih Proyek Terkait (Hanya Proyek Aktif Berjalan)</option>
+                  {tasks
+                    .filter((t) => t.status !== "Completed")
+                    .map((t) => (
+                      <option key={t.id} value={`${t.title} - ${t.client}`}>
+                        {t.title} ({t.client}) - [Status: {t.status === "In Progress" ? "Progres Pelaksanaan" : "Terjadwal"}]
+                      </option>
+                    ))}
                   <option value="Maintenance Workshop & Perakitan">Maintenance Workshop & Perakitan</option>
                 </select>
               </div>

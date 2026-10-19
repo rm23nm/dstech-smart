@@ -9,18 +9,28 @@
       "minStock": 5,
       "status": "Menipis",
       "location": "Gudang Utama DSTech - Rak B3",
-      "description": "Kabel LAN outdoor/indoor high performance untuk CCTV IP & Data LAN"
+      "description": "Kabel LAN outdoor/indoor high performance untuk CCTV IP & Data LAN (1 Roll = 305 Meter)",
+      "hasConversion": true,
+      "subUnit": "Meter",
+      "conversionRatio": 305,
+      "subStockTotal": 610,
+      "conversionLabel": "1 Roll = 305 Meter"
     },
     {
       "id": "dstech_mat_2",
       "name": "Konektor RJ45 Cat6 Commscope Gold Plated",
       "category": "Aksesoris & Konektor",
-      "stock": 140,
-      "unit": "Pcs",
-      "minStock": 50,
+      "stock": 3,
+      "unit": "Dus",
+      "minStock": 1,
       "status": "Aman",
       "location": "Gudang Utama DSTech - Kotak A1",
-      "description": "Konektor modular plug Cat6 anti-korosi"
+      "description": "Konektor modular plug Cat6 anti-korosi (1 Dus isi 50 Pcs)",
+      "hasConversion": true,
+      "subUnit": "Pcs",
+      "conversionRatio": 50,
+      "subStockTotal": 150,
+      "conversionLabel": "1 Dus = 50 Pcs"
     },
     {
       "id": "dstech_mat_3",
@@ -31,7 +41,12 @@
       "minStock": 3,
       "status": "Aman",
       "location": "Gudang Utama DSTech - Rak A2",
-      "description": "Kamera outdoor bullet IP dengan sensor malam berwarna"
+      "description": "Kamera outdoor bullet IP dengan sensor malam berwarna",
+      "hasConversion": false,
+      "subUnit": "Unit",
+      "conversionRatio": 1,
+      "subStockTotal": 6,
+      "conversionLabel": "1 Unit = 1 Unit"
     },
     {
       "id": "dstech_mat_4",
@@ -42,18 +57,28 @@
       "minStock": 4,
       "status": "Menipis",
       "location": "Gudang Utama DSTech - Rak C1",
-      "description": "Power supply terpusat untuk kamera analog dan access control"
+      "description": "Power supply terpusat untuk kamera analog dan access control",
+      "hasConversion": false,
+      "subUnit": "Unit",
+      "conversionRatio": 1,
+      "subStockTotal": 1,
+      "conversionLabel": "1 Unit = 1 Unit"
     },
     {
       "id": "dstech_mat_5",
       "name": "BNC Connector + Screw Terminal",
       "category": "Aksesoris & Konektor",
-      "stock": 85,
-      "unit": "Pcs",
-      "minStock": 30,
+      "stock": 2,
+      "unit": "Pack",
+      "minStock": 1,
       "status": "Aman",
       "location": "Gudang Utama DSTech - Kotak A2",
-      "description": "Konektor video coaxial kabel RG59/RG6"
+      "description": "Konektor video coaxial kabel RG59/RG6 (1 Pack isi 50 Pcs)",
+      "hasConversion": true,
+      "subUnit": "Pcs",
+      "conversionRatio": 50,
+      "subStockTotal": 100,
+      "conversionLabel": "1 Pack = 50 Pcs"
     },
     {
       "id": "dstech_mat_6",
@@ -64,7 +89,12 @@
       "minStock": 2,
       "status": "Aman",
       "location": "Ruang Alat Teknisi - Loker T1",
-      "description": "Tang crimping pass-through RJ45 dan tracker kabel fiber/LAN"
+      "description": "Tang crimping pass-through RJ45 dan tracker kabel fiber/LAN",
+      "hasConversion": false,
+      "subUnit": "Set",
+      "conversionRatio": 1,
+      "subStockTotal": 3,
+      "conversionLabel": "1 Set = 1 Set"
     },
     {
       "id": "dstech_mat_7",
@@ -75,10 +105,71 @@
       "minStock": 10,
       "status": "Habis",
       "location": "Gudang Utama DSTech - Rak C2",
-      "description": "Adaptor outdoor khusus kamera dan sensor barrier gate"
+      "description": "Adaptor outdoor khusus kamera dan sensor barrier gate",
+      "hasConversion": false,
+      "subUnit": "Pcs",
+      "conversionRatio": 1,
+      "subStockTotal": 0,
+      "conversionLabel": "1 Pcs = 1 Pcs"
+    },
+    {
+      "id": "dstech_mat_8",
+      "name": "Kabel Drop Core FO 1 Core 3 Seling (1000m)",
+      "category": "Kabel & Jaringan",
+      "stock": 1,
+      "unit": "Roll",
+      "minStock": 1,
+      "status": "Menipis",
+      "location": "Gudang Utama DSTech - Rak B2",
+      "description": "Kabel fiber optik outdoor anti-tarik untuk backbone jaringan (1 Roll = 1000 Meter)",
+      "hasConversion": true,
+      "subUnit": "Meter",
+      "conversionRatio": 1000,
+      "subStockTotal": 1000,
+      "conversionLabel": "1 Roll = 1000 Meter"
+    },
+    {
+      "id": "dstech_mat_9",
+      "name": "Klem Kabel No. 8 & Fisher S6",
+      "category": "Aksesoris & Konektor",
+      "stock": 4,
+      "unit": "Dus",
+      "minStock": 2,
+      "status": "Aman",
+      "location": "Gudang Utama DSTech - Kotak A3",
+      "description": "Klem paku beton kabel UTP dan fisher baut dinding (1 Dus isi 100 Pcs)",
+      "hasConversion": true,
+      "subUnit": "Pcs",
+      "conversionRatio": 100,
+      "subStockTotal": 400,
+      "conversionLabel": "1 Dus = 100 Pcs"
     }
   ],
   "requests": [
+    {
+      "id": "dstech_req_1792375014572",
+      "items": [
+        {
+          "materialId": "dstech_mat_1",
+          "materialName": "Kabel UTP Cat6 Belden Original (305m)",
+          "qty": 50,
+          "unit": "Meter",
+          "selectedUnit": "Meter",
+          "equivalentQty": 0.16,
+          "equivalentUnit": "Roll",
+          "conversionLabel": "1 Roll = 305 Meter"
+        }
+      ],
+      "materialId": "dstech_mat_1",
+      "materialName": "Kabel UTP Cat6 Belden Original (305m)",
+      "qty": 50,
+      "unit": "Meter",
+      "taskTitle": "Instalasi CCTV (4 Titik) - PT. Krakatau Posco Energy",
+      "requestedBy": "Ikhsan Maulidi",
+      "date": "2026-10-19",
+      "status": "Menunggu Approval",
+      "notes": "Uji coba konversi 50 meter kabel LAN untuk proyek aktif"
+    },
     {
       "id": "dstech_req_1792369228065",
       "items": [
@@ -86,13 +177,21 @@
           "materialId": "dstech_mat_1",
           "materialName": "Kabel UTP Cat6 Belden Original (305m)",
           "qty": 1,
-          "unit": "Roll"
+          "unit": "Roll",
+          "selectedUnit": "Roll",
+          "equivalentQty": 305,
+          "equivalentUnit": "Meter",
+          "conversionLabel": "1 Roll = 305 Meter"
         },
         {
           "materialId": "dstech_mat_2",
           "materialName": "Konektor RJ45 Cat6 Commscope Gold Plated",
           "qty": 10,
-          "unit": "Pcs"
+          "unit": "Pcs",
+          "selectedUnit": "Pcs",
+          "equivalentQty": 0.2,
+          "equivalentUnit": "Dus",
+          "conversionLabel": "1 Dus = 50 Pcs"
         }
       ],
       "materialId": "dstech_mat_1",
@@ -112,13 +211,21 @@
           "materialId": "dstech_mat_1",
           "materialName": "Kabel UTP Cat6 Belden Original (305m)",
           "qty": 1,
-          "unit": "Roll"
+          "unit": "Roll",
+          "selectedUnit": "Roll",
+          "equivalentQty": 305,
+          "equivalentUnit": "Meter",
+          "conversionLabel": "1 Roll = 305 Meter"
         },
         {
           "materialId": "dstech_mat_2",
           "materialName": "Konektor RJ45 Cat6 Commscope Gold Plated",
           "qty": 25,
-          "unit": "Pcs"
+          "unit": "Pcs",
+          "selectedUnit": "Pcs",
+          "equivalentQty": 0.5,
+          "equivalentUnit": "Dus",
+          "conversionLabel": "1 Dus = 50 Pcs"
         }
       ],
       "materialId": "dstech_mat_1",
