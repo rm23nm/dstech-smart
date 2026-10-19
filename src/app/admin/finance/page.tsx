@@ -36,6 +36,13 @@ import {
   RefreshCw,
   Wallet,
   Scale,
+  Users,
+  Truck,
+  Edit3,
+  Trash2,
+  Mail,
+  Landmark,
+  UserPlus,
 } from "lucide-react";
 
 interface SaleItem {
@@ -176,6 +183,40 @@ interface ExpenseItem {
   notes: string;
 }
 
+interface ClientItem {
+  id: string;
+  name: string;
+  category: string;
+  pic: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  npwp: string;
+  status: "VIP" | "Aktif" | "Prospek";
+  totalInvoiced: number;
+  totalPaid: number;
+  unpaidReceivable: number;
+  notes: string;
+}
+
+interface SupplierItem {
+  id: string;
+  name: string;
+  category: string;
+  pic: string;
+  phone: string;
+  email: string;
+  address: string;
+  city: string;
+  bankAccount: string;
+  paymentTerms: string;
+  status: "Mitra Utama" | "Mitra Aktif" | "Mitra Lokal" | string;
+  totalPurchases: number;
+  unpaidPayable: number;
+  notes: string;
+}
+
 interface FinanceSummary {
   totalSalesRevenue: number;
   totalSalesPaid: number;
@@ -192,11 +233,13 @@ interface FinanceSummary {
   totalPurchasesCount: number;
   totalWarehouseCount: number;
   totalBranchCount: number;
+  totalClientsCount?: number;
+  totalSuppliersCount?: number;
 }
 
 export default function AdminFinanceERPPage() {
   const [activeTab, setActiveTab] = useState<
-    "sales" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses"
+    "sales" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses" | "clients" | "suppliers"
   >("sales");
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -211,6 +254,8 @@ export default function AdminFinanceERPPage() {
   const [warehouses, setWarehouses] = useState<WarehouseItem[]>([]);
   const [branches, setBranches] = useState<BranchItem[]>([]);
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
+  const [clients, setClients] = useState<ClientItem[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
   const [summary, setSummary] = useState<FinanceSummary>({
     totalSalesRevenue: 0,
     totalSalesPaid: 0,
@@ -227,17 +272,55 @@ export default function AdminFinanceERPPage() {
     totalPurchasesCount: 0,
     totalWarehouseCount: 0,
     totalBranchCount: 0,
+    totalClientsCount: 0,
+    totalSuppliersCount: 0,
   });
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("Semua");
+  const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
+  const [clientCategoryFilter, setClientCategoryFilter] = useState<string>("Semua");
+  const [supplierSearchQuery, setSupplierSearchQuery] = useState<string>("");
 
   // Modal States
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState<boolean>(false);
   const [isNewPoModalOpen, setIsNewPoModalOpen] = useState<boolean>(false);
   const [isNewCashModalOpen, setIsNewCashModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<SaleInvoice | null>(null);
+
+  // Master Client Modal State
+  const [isClientModalOpen, setIsClientModalOpen] = useState<boolean>(false);
+  const [editingClient, setEditingClient] = useState<ClientItem | null>(null);
+  const [clientForm, setClientForm] = useState({
+    name: "",
+    category: "B2B Industri",
+    pic: "",
+    phone: "",
+    email: "",
+    address: "",
+    city: "Cilegon",
+    npwp: "",
+    status: "Aktif" as "VIP" | "Aktif" | "Prospek",
+    notes: "",
+  });
+
+  // Master Supplier Modal State
+  const [isSupplierModalOpen, setIsSupplierModalOpen] = useState<boolean>(false);
+  const [editingSupplier, setEditingSupplier] = useState<SupplierItem | null>(null);
+  const [supplierForm, setSupplierForm] = useState({
+    name: "",
+    category: "CCTV, NVR & Security Hardware",
+    pic: "",
+    phone: "",
+    email: "",
+    address: "",
+    city: "Cilegon",
+    bankAccount: "",
+    paymentTerms: "Net 30 Hari",
+    status: "Mitra Aktif",
+    notes: "",
+  });
 
   // New Sale Form State
   const [saleForm, setSaleForm] = useState({
@@ -310,6 +393,8 @@ export default function AdminFinanceERPPage() {
           setWarehouses(d.data.warehouses || []);
           setBranches(d.data.branches || []);
           setExpenses(d.data.expenses || []);
+          setClients(d.data.clients || []);
+          setSuppliers(d.data.suppliers || []);
           if (d.data.summary) setSummary(d.data.summary);
         }
       }
@@ -458,6 +543,297 @@ export default function AdminFinanceERPPage() {
         fetchFinanceData();
       } else {
         showToast("Gagal mencatat transaksi kas");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  // Handler PO Dynamic Items
+  const handleAddPoItem = () => {
+    setPoForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { id: String(Date.now()), productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
+      ],
+    }));
+  };
+
+  const handleRemovePoItem = (idx: number) => {
+    if (poForm.items.length <= 1) return;
+    setPoForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== idx),
+    }));
+  };
+
+  const handlePoItemChange = (idx: number, field: string, val: any) => {
+    setPoForm((prev) => {
+      const updated = [...prev.items];
+      const item = { ...updated[idx], [field]: val };
+      if (field === "qty" || field === "price") {
+        item.total = Number(item.qty || 0) * Number(item.price || 0);
+      }
+      updated[idx] = item;
+      return { ...prev, items: updated };
+    });
+  };
+
+  const calculatePoTotals = () => {
+    const subtotal = poForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+    const taxAmount = (subtotal * 11) / 100; // PPN 11%
+    const grandTotal = subtotal + taxAmount;
+    return { subtotal, taxAmount, grandTotal };
+  };
+
+  const handleCreatePoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { subtotal, taxAmount, grandTotal } = calculatePoTotals();
+
+    if (poForm.items.some((it) => !it.productName || it.price <= 0)) {
+      showToast("Mohon isi nama barang dan harga satuan valid untuk semua baris item PO!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "purchase",
+          payload: {
+            supplierName: poForm.supplierName,
+            supplierContact: poForm.supplierContact,
+            date: poForm.date,
+            expectedDelivery: poForm.expectedDelivery,
+            paymentStatus: poForm.paymentStatus,
+            items: poForm.items,
+            subtotal,
+            taxAmount,
+            grandTotal,
+            status: "Dalam Pengiriman",
+            warehouseId: "dstech_wh_1",
+            notes: poForm.notes,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        showToast("Purchase Order (PO) baru berhasil diterbitkan!");
+        setIsNewPoModalOpen(false);
+        setPoForm({
+          supplierName: "",
+          supplierContact: "",
+          date: new Date().toISOString().split("T")[0],
+          expectedDelivery: new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0],
+          paymentStatus: "Hutang Usaha",
+          items: [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
+          notes: "",
+        });
+        fetchFinanceData();
+      } else {
+        showToast("Gagal menerbitkan Purchase Order");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  // Client Master Handlers
+  const handleOpenAddClient = () => {
+    setEditingClient(null);
+    setClientForm({
+      name: "",
+      category: "B2B Industri",
+      pic: "",
+      phone: "",
+      email: "",
+      address: "",
+      city: "Cilegon",
+      npwp: "",
+      status: "Aktif",
+      notes: "",
+    });
+    setIsClientModalOpen(true);
+  };
+
+  const handleOpenEditClient = (c: ClientItem) => {
+    setEditingClient(c);
+    setClientForm({
+      name: c.name,
+      category: c.category,
+      pic: c.pic,
+      phone: c.phone,
+      email: c.email,
+      address: c.address,
+      city: c.city,
+      npwp: c.npwp,
+      status: c.status,
+      notes: c.notes,
+    });
+    setIsClientModalOpen(true);
+  };
+
+  const handleSaveClientSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clientForm.name.trim()) {
+      showToast("Nama Klien wajib diisi!");
+      return;
+    }
+
+    try {
+      if (editingClient) {
+        const res = await fetch("/api/finance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "client",
+            id: editingClient.id,
+            updates: clientForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Data klien ${clientForm.name} berhasil diperbarui!`);
+          setIsClientModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal memperbarui data klien");
+        }
+      } else {
+        const res = await fetch("/api/finance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "client",
+            payload: clientForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Klien baru ${clientForm.name} berhasil ditambahkan!`);
+          setIsClientModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal menambahkan klien");
+        }
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  const handleDeleteClient = async (client: ClientItem) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus klien "${client.name}" dari direktori?`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=client&id=${client.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        showToast(`Klien ${client.name} berhasil dihapus`);
+        fetchFinanceData();
+      } else {
+        showToast("Gagal menghapus klien");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  // Supplier Master Handlers
+  const handleOpenAddSupplier = () => {
+    setEditingSupplier(null);
+    setSupplierForm({
+      name: "",
+      category: "CCTV, NVR & Security Hardware",
+      pic: "",
+      phone: "",
+      email: "",
+      address: "",
+      city: "Cilegon",
+      bankAccount: "",
+      paymentTerms: "Net 30 Hari",
+      status: "Mitra Aktif",
+      notes: "",
+    });
+    setIsSupplierModalOpen(true);
+  };
+
+  const handleOpenEditSupplier = (s: SupplierItem) => {
+    setEditingSupplier(s);
+    setSupplierForm({
+      name: s.name,
+      category: s.category,
+      pic: s.pic,
+      phone: s.phone,
+      email: s.email,
+      address: s.address,
+      city: s.city,
+      bankAccount: s.bankAccount,
+      paymentTerms: s.paymentTerms,
+      status: s.status,
+      notes: s.notes,
+    });
+    setIsSupplierModalOpen(true);
+  };
+
+  const handleSaveSupplierSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supplierForm.name.trim()) {
+      showToast("Nama Supplier wajib diisi!");
+      return;
+    }
+
+    try {
+      if (editingSupplier) {
+        const res = await fetch("/api/finance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "supplier",
+            id: editingSupplier.id,
+            updates: supplierForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Data supplier ${supplierForm.name} berhasil diperbarui!`);
+          setIsSupplierModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal memperbarui data supplier");
+        }
+      } else {
+        const res = await fetch("/api/finance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "supplier",
+            payload: supplierForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Supplier baru ${supplierForm.name} berhasil ditambahkan!`);
+          setIsSupplierModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal menambahkan supplier");
+        }
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  const handleDeleteSupplier = async (supplier: SupplierItem) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus supplier "${supplier.name}" dari direktori?`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=supplier&id=${supplier.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        showToast(`Supplier ${supplier.name} berhasil dihapus`);
+        fetchFinanceData();
+      } else {
+        showToast("Gagal menghapus supplier");
       }
     } catch {
       showToast("Terjadi kesalahan jaringan");
@@ -704,6 +1080,36 @@ export default function AdminFinanceERPPage() {
             <span>Gudang & Cabang</span>
             <span className="px-1.5 py-0.5 rounded-full bg-sky-500/20 text-[10px]">
               {warehouses.length} GD / {branches.length} BR
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("clients")}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "clients"
+                ? "bg-slate-900 text-white shadow-md"
+                : "bg-blue-50 text-dstech-blue hover:bg-blue-100"
+            }`}
+          >
+            <Users className="w-4 h-4 text-dstech-blue" />
+            <span>Daftar Klien</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-blue-500/20 text-[10px] font-black">
+              {clients.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("suppliers")}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "suppliers"
+                ? "bg-slate-900 text-white shadow-md"
+                : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+            }`}
+          >
+            <Truck className="w-4 h-4 text-amber-600" />
+            <span>Daftar Supplier</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-[10px] font-black">
+              {suppliers.length}
             </span>
           </button>
         </div>
@@ -1240,6 +1646,309 @@ export default function AdminFinanceERPPage() {
             </div>
           </div>
         )}
+
+        {/* TAB 7: MASTER DATA DAFTAR KLIEN (CUSTOMERS) */}
+        {activeTab === "clients" && (
+          <div className="space-y-4">
+            {/* Header & Filter Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Cari nama klien, instansi, kontak PIC, atau kota..."
+                    value={clientSearchQuery}
+                    onChange={(e) => setClientSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none bg-white"
+                  />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+                  <select
+                    value={clientCategoryFilter}
+                    onChange={(e) => setClientCategoryFilter(e.target.value)}
+                    className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-700 focus:outline-none"
+                  >
+                    <option value="Semua">Semua Kategori</option>
+                    <option value="B2B Industri">B2B Industri</option>
+                    <option value="Komersial & Hospitality">Komersial & Hospitality</option>
+                    <option value="Instansi Pemerintah">Instansi Pemerintah</option>
+                    <option value="Residensial & Real Estate">Residensial & Real Estate</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={handleOpenAddClient}
+                className="px-4 py-2.5 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>+ Tambah Klien Baru</span>
+              </button>
+            </div>
+
+            {/* Quick KPI Summary Bar for Clients */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-blue-50/60 border border-blue-100">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-dstech-blue">Total Klien Terdaftar</p>
+                <p className="text-lg font-black text-slate-900 mt-0.5">{clients.length} Rekanan</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-emerald-600">Klien VIP & Prioritas</p>
+                <p className="text-lg font-black text-emerald-700 mt-0.5">
+                  {clients.filter((c) => c.status === "VIP").length} Mitra VIP
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-purple-600">Total Akumulasi Faktur</p>
+                <p className="text-lg font-black text-purple-700 mt-0.5">
+                  {formatRupiah(clients.reduce((acc, curr) => acc + (curr.totalInvoiced || 0), 0))}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-red-600">Piutang Klien Berjalan</p>
+                <p className="text-lg font-black text-red-700 mt-0.5">
+                  {formatRupiah(clients.reduce((acc, curr) => acc + (curr.unpaidReceivable || 0), 0))}
+                </p>
+              </div>
+            </div>
+
+            {/* Directory Table */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full text-left text-xs bg-white">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                  <tr>
+                    <th className="p-3">ID Klien</th>
+                    <th className="p-3">Nama Perusahaan / Klien</th>
+                    <th className="p-3">Kategori</th>
+                    <th className="p-3">Kontak & PIC</th>
+                    <th className="p-3">Lokasi & NPWP</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {clients
+                    .filter((c) => {
+                      const matchQuery =
+                        c.name.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                        c.pic.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                        c.city.toLowerCase().includes(clientSearchQuery.toLowerCase()) ||
+                        c.phone.toLowerCase().includes(clientSearchQuery.toLowerCase());
+                      const matchCat =
+                        clientCategoryFilter === "Semua" || c.category === clientCategoryFilter;
+                      return matchQuery && matchCat;
+                    })
+                    .map((cli) => (
+                      <tr key={cli.id} className="hover:bg-blue-50/30 transition-colors">
+                        <td className="p-3 font-mono font-bold text-slate-400 whitespace-nowrap">
+                          {cli.id}
+                        </td>
+                        <td className="p-3">
+                          <p className="font-black text-slate-900 text-xs">{cli.name}</p>
+                          <p className="text-[11px] text-slate-500 line-clamp-1">{cli.address}</p>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold text-[10px]">
+                            {cli.category}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <p className="font-bold text-slate-800">{cli.pic}</p>
+                          <div className="flex flex-col gap-0.5 text-[10px] text-slate-500 mt-0.5">
+                            <span className="flex items-center gap-1">
+                              <Phone className="w-3 h-3 text-emerald-600" />
+                              {cli.phone}
+                            </span>
+                            {cli.email && cli.email !== "-" && (
+                              <span className="flex items-center gap-1 text-slate-400">
+                                <Mail className="w-3 h-3 text-blue-500" />
+                                {cli.email}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <p className="font-bold text-slate-700 flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-red-500" />
+                            {cli.city}
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">NPWP: {cli.npwp}</p>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                              cli.status === "VIP"
+                                ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                : cli.status === "Aktif"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {cli.status}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenEditClient(cli)}
+                              className="p-1.5 rounded-lg bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all cursor-pointer"
+                              title="Edit Klien"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClient(cli)}
+                              className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all cursor-pointer"
+                              title="Hapus Klien"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 8: MASTER DATA DAFTAR SUPPLIER (VENDORS / PEMASOK) */}
+        {activeTab === "suppliers" && (
+          <div className="space-y-4">
+            {/* Header & Filter Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="Cari nama supplier, kategori suplai, kontak PIC sales, atau kota..."
+                  value={supplierSearchQuery}
+                  onChange={(e) => setSupplierSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none bg-white"
+                />
+              </div>
+
+              <button
+                onClick={handleOpenAddSupplier}
+                className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Tambah Supplier Baru</span>
+              </button>
+            </div>
+
+            {/* Quick KPI Summary Bar for Suppliers */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-amber-800">Total Supplier Mitra</p>
+                <p className="text-lg font-black text-slate-900 mt-0.5">{suppliers.length} Vendor</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-amber-900">Total Pembelian PO</p>
+                <p className="text-lg font-black text-amber-950 mt-0.5">
+                  {formatRupiah(suppliers.reduce((acc, curr) => acc + (curr.totalPurchases || 0), 0))}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-red-600">Hutang PO Belum Lunas</p>
+                <p className="text-lg font-black text-red-700 mt-0.5">
+                  {formatRupiah(suppliers.reduce((acc, curr) => acc + (curr.unpaidPayable || 0), 0))}
+                </p>
+              </div>
+            </div>
+
+            {/* Directory Table */}
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full text-left text-xs bg-white">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                  <tr>
+                    <th className="p-3">ID Supplier</th>
+                    <th className="p-3">Nama Distributor / Vendor</th>
+                    <th className="p-3">Kategori Suplai</th>
+                    <th className="p-3">Kontak Sales & Rekening Transfer</th>
+                    <th className="p-3">Termin (TOP)</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {suppliers
+                    .filter((s) => {
+                      return (
+                        s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase()) ||
+                        s.category.toLowerCase().includes(supplierSearchQuery.toLowerCase()) ||
+                        s.pic.toLowerCase().includes(supplierSearchQuery.toLowerCase()) ||
+                        s.city.toLowerCase().includes(supplierSearchQuery.toLowerCase())
+                      );
+                    })
+                    .map((sup) => (
+                      <tr key={sup.id} className="hover:bg-amber-50/30 transition-colors">
+                        <td className="p-3 font-mono font-bold text-slate-400 whitespace-nowrap">
+                          {sup.id}
+                        </td>
+                        <td className="p-3">
+                          <p className="font-black text-slate-900 text-xs">{sup.name}</p>
+                          <p className="text-[11px] text-slate-500 line-clamp-1">{sup.address}</p>
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 font-bold text-[10px] border border-amber-200">
+                            {sup.category}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <p className="font-bold text-slate-800">{sup.pic}</p>
+                          <p className="text-[10px] text-slate-500">{sup.phone}</p>
+                          <p className="text-[10px] text-blue-700 font-medium mt-0.5 bg-blue-50/60 p-1 rounded inline-block">
+                            <Landmark className="w-3 h-3 inline mr-1 text-dstech-blue" />
+                            {sup.bankAccount}
+                          </p>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span className="px-2 py-1 rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-700">
+                            {sup.paymentTerms}
+                          </span>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                              sup.status === "Mitra Utama"
+                                ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                : sup.status.includes("Aktif")
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {sup.status}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => handleOpenEditSupplier(sup)}
+                              className="p-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white transition-all cursor-pointer"
+                              title="Edit Supplier"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSupplier(sup)}
+                              className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all cursor-pointer"
+                              title="Hapus Supplier"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* MODAL 1: BUAT FAKTUR PENJUALAN BARU */}
@@ -1268,6 +1977,41 @@ export default function AdminFinanceERPPage() {
             </div>
 
             <form onSubmit={handleCreateSaleSubmit} className="space-y-4 text-xs">
+              {/* Quick Select Client from Master Data */}
+              <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-dstech-blue flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>Pilih dari Master Data Klien DSTech:</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-medium">Auto-fill Nama, No. WhatsApp & Alamat</span>
+                </div>
+                <select
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const found = clients.find((c) => c.id === val);
+                    if (found) {
+                      setSaleForm((prev) => ({
+                        ...prev,
+                        customerName: found.name,
+                        customerPhone: found.phone,
+                        customerAddress: `${found.address}, ${found.city}`,
+                      }));
+                    }
+                  }}
+                  defaultValue=""
+                  className="w-full p-2.5 rounded-xl bg-white border border-blue-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-dstech-blue focus:outline-none"
+                >
+                  <option value="">-- Pilih dari Direktori Klien (atau ketik manual di bawah) --</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.category}) — {c.city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Nama Klien / Pelanggan:</label>
@@ -1801,6 +2545,609 @@ export default function AdminFinanceERPPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: MASTER DATA - TAMBAH / EDIT KLIEN */}
+      {isClientModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsClientModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-dstech-blue">
+                  Master Data Klien & Pelanggan
+                </span>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">
+                  {editingClient ? "Edit Data Klien Rekanan" : "Tambah Klien Rekanan Baru"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsClientModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveClientSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Nama Perusahaan / Instansi / Individu:
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: PT. Krakatau Posco Energy"
+                  value={clientForm.name}
+                  onChange={(e) => setClientForm({ ...clientForm, name: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kategori Klien:</label>
+                  <select
+                    value={clientForm.category}
+                    onChange={(e) => setClientForm({ ...clientForm, category: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
+                  >
+                    <option value="B2B Industri">B2B Industri Pabrik</option>
+                    <option value="Komersial & Hospitality">Komersial & Hospitality</option>
+                    <option value="Instansi Pemerintah">Instansi Pemerintah / BUMN</option>
+                    <option value="Residensial & Real Estate">Residensial & Real Estate</option>
+                    <option value="Perorangan / Rumah Tinggal">Perorangan / Rumah Tinggal</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Status Klien:</label>
+                  <select
+                    value={clientForm.status}
+                    onChange={(e) =>
+                      setClientForm({ ...clientForm, status: e.target.value as "VIP" | "Aktif" | "Prospek" })
+                    }
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    <option value="Aktif">Aktif</option>
+                    <option value="VIP">VIP Prioritas</option>
+                    <option value="Prospek">Prospek Penawaran</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nama PIC / Kontak Person:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Bpk. Bambang (Procurement)"
+                    value={clientForm.pic}
+                    onChange={(e) => setClientForm({ ...clientForm, pic: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">No. WhatsApp / Telepon:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: 0812-9876-5432"
+                    value={clientForm.phone}
+                    onChange={(e) => setClientForm({ ...clientForm, phone: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Email Klien:</label>
+                  <input
+                    type="email"
+                    placeholder="procurement@perusahaan.com"
+                    value={clientForm.email}
+                    onChange={(e) => setClientForm({ ...clientForm, email: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">NPWP Perusahaan:</label>
+                  <input
+                    type="text"
+                    placeholder="01.234.567.8-417.000"
+                    value={clientForm.npwp}
+                    onChange={(e) => setClientForm({ ...clientForm, npwp: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="font-bold text-slate-700 block mb-1">Alamat Kantor / Pabrik:</label>
+                  <input
+                    type="text"
+                    placeholder="Jl. Raya Kawasan Industri..."
+                    value={clientForm.address}
+                    onChange={(e) => setClientForm({ ...clientForm, address: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kota / Wilayah:</label>
+                  <input
+                    type="text"
+                    placeholder="Cilegon"
+                    value={clientForm.city}
+                    onChange={(e) => setClientForm({ ...clientForm, city: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Catatan Tambahan / Spesifikasi Klien:</label>
+                <textarea
+                  rows={2}
+                  placeholder="Keterangan sistem keamanan yang digunakan, proyek berjalan..."
+                  value={clientForm.notes}
+                  onChange={(e) => setClientForm({ ...clientForm, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsClientModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{editingClient ? "Simpan Perubahan" : "Simpan Klien Baru"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: MASTER DATA - TAMBAH / EDIT SUPPLIER */}
+      {isSupplierModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsSupplierModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-700">
+                  Master Data Supplier & Vendor
+                </span>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">
+                  {editingSupplier ? "Edit Data Supplier / Vendor" : "Tambah Supplier / Vendor Baru"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsSupplierModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveSupplierSubmit} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Nama Perusahaan Distributor / Vendor:
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: PT. Hikvision Indonesia Mega Distributor"
+                  value={supplierForm.name}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Kategori Barang Pasokan:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: CCTV, NVR & Security Hardware"
+                  value={supplierForm.category}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, category: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nama Sales / PIC Vendor:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Ibu Dewi (Key Account)"
+                    value={supplierForm.pic}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, pic: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">No. WhatsApp / Telepon:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: 021-5839-2000"
+                    value={supplierForm.phone}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, phone: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Termin Pembayaran (TOP):</label>
+                  <select
+                    value={supplierForm.paymentTerms}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, paymentTerms: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
+                  >
+                    <option value="Net 30 Hari">Net 30 Hari (Tempo 30 Hari)</option>
+                    <option value="Net 14 Hari">Net 14 Hari (Tempo 14 Hari)</option>
+                    <option value="COD (Cash on Delivery)">COD (Cash on Delivery)</option>
+                    <option value="CBD (Cash Before Delivery)">CBD (Cash Before Delivery)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Status Kemitraan:</label>
+                  <select
+                    value={supplierForm.status}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, status: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    <option value="Mitra Utama">Mitra Utama</option>
+                    <option value="Mitra Aktif">Mitra Aktif</option>
+                    <option value="Mitra Lokal Cilegon">Mitra Lokal Cilegon</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Rekening Bank Pembayaran PO (Transfer):
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Bank BCA: 541-098-7766 a/n PT Hikvision Distributor"
+                  value={supplierForm.bankAccount}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, bankAccount: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-mono text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="font-bold text-slate-700 block mb-1">Alamat Kantor / Gudang Vendor:</label>
+                  <input
+                    type="text"
+                    placeholder="Kawasan Pergudangan / Jl. Raya..."
+                    value={supplierForm.address}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, address: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kota Asal:</label>
+                  <input
+                    type="text"
+                    placeholder="Jakarta / Serang"
+                    value={supplierForm.city}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, city: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Catatan Tambahan Vendor:</label>
+                <textarea
+                  rows={2}
+                  placeholder="Ketentuan klaim garansi RMA, diskon volume, dll..."
+                  value={supplierForm.notes}
+                  onChange={(e) => setSupplierForm({ ...supplierForm, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsSupplierModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{editingSupplier ? "Simpan Perubahan" : "Simpan Supplier Baru"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: BUAT PURCHASE ORDER (PO) BARU */}
+      {isNewPoModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsNewPoModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-700">
+                  Formulir Pengadaan & Pembelian
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">
+                  Terbitkan Purchase Order (PO) Baru
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsNewPoModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreatePoSubmit} className="space-y-4 text-xs">
+              {/* Quick Select Supplier from Master Data */}
+              <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-amber-800 flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Pilih dari Master Data Supplier Mitra:</span>
+                  </label>
+                  <span className="text-[10px] text-amber-600 font-medium">Auto-fill Nama & Kontak Sales</span>
+                </div>
+                <select
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (!val) return;
+                    const found = suppliers.find((s) => s.id === val);
+                    if (found) {
+                      setPoForm((prev) => ({
+                        ...prev,
+                        supplierName: found.name,
+                        supplierContact: `${found.pic} (${found.phone})`,
+                      }));
+                    }
+                  }}
+                  defaultValue=""
+                  className="w-full p-2.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                >
+                  <option value="">-- Pilih dari Direktori Supplier (atau ketik manual di bawah) --</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.category}) — {s.city}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nama Supplier / Vendor:</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nama distributor / toko..."
+                    value={poForm.supplierName}
+                    onChange={(e) => setPoForm({ ...poForm, supplierName: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kontak Sales Vendor:</label>
+                  <input
+                    type="text"
+                    placeholder="PIC / No Telp sales..."
+                    value={poForm.supplierContact}
+                    onChange={(e) => setPoForm({ ...poForm, supplierContact: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Tanggal Pesan:</label>
+                  <input
+                    type="date"
+                    required
+                    value={poForm.date}
+                    onChange={(e) => setPoForm({ ...poForm, date: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Estimasi Pengiriman Tiba:</label>
+                  <input
+                    type="date"
+                    required
+                    value={poForm.expectedDelivery}
+                    onChange={(e) => setPoForm({ ...poForm, expectedDelivery: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-medium"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Status Pembayaran:</label>
+                  <select
+                    value={poForm.paymentStatus}
+                    onChange={(e) => setPoForm({ ...poForm, paymentStatus: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
+                  >
+                    <option value="Hutang Usaha">Hutang Usaha (Jatuh Tempo 30 Hari)</option>
+                    <option value="Lunas">Lunas (Transfer Cash)</option>
+                    <option value="Uang Muka 50%">Uang Muka (DP 50%)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Items Table Repeater */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <label className="font-black text-slate-800 uppercase tracking-wider text-[11px]">
+                    Daftar Barang yang Dipesan ({poForm.items.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAddPoItem}
+                    className="text-amber-700 font-bold text-xs hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Tambah Baris Barang</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {poForm.items.map((it, idx) => (
+                    <div
+                      key={it.id}
+                      className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
+                    >
+                      <div className="col-span-5">
+                        <input
+                          type="text"
+                          required
+                          placeholder="Nama Barang / Sparepart..."
+                          value={it.productName}
+                          onChange={(e) => handlePoItemChange(idx, "productName", e.target.value)}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          min={1}
+                          required
+                          placeholder="Qty"
+                          value={it.qty}
+                          onChange={(e) => handlePoItemChange(idx, "qty", Number(e.target.value))}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="text"
+                          placeholder="Satuan"
+                          value={it.unit}
+                          onChange={(e) => handlePoItemChange(idx, "unit", e.target.value)}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-medium text-xs"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <input
+                          type="number"
+                          min={0}
+                          required
+                          placeholder="Harga Satuan (Rp)"
+                          value={it.price}
+                          onChange={(e) => handlePoItemChange(idx, "price", Number(e.target.value))}
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                        />
+                      </div>
+                      <div className="col-span-1 text-center">
+                        {poForm.items.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePoItem(idx)}
+                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Calculations Box */}
+              {(() => {
+                const { subtotal, taxAmount, grandTotal } = calculatePoTotals();
+                return (
+                  <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>Subtotal Belanja:</span>
+                      <span className="font-bold">{formatRupiah(subtotal)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span>PPN Masukan (11%):</span>
+                      <span className="font-bold">{formatRupiah(taxAmount)}</span>
+                    </div>
+                    <div className="border-t border-white/20 pt-2 flex items-center justify-between text-base font-black">
+                      <span className="text-amber-400">TOTAL BELANJA PO:</span>
+                      <span className="text-xl text-emerald-400">{formatRupiah(grandTotal)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Catatan PO / Petunjuk Pengiriman:</label>
+                <textarea
+                  rows={2}
+                  placeholder="Kirim ke Gudang Utama Cilegon, instruksi ekspedisi..."
+                  value={poForm.notes}
+                  onChange={(e) => setPoForm({ ...poForm, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsNewPoModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-2"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Terbitkan Purchase Order</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

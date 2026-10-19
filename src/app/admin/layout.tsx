@@ -41,6 +41,8 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Laporan Laba Rugi (P&L)", category: "Keuangan", url: "/admin/finance", desc: "Laporan pendapatan kotor, HPP / beban pokok, dan laba bersih operasional" },
   { title: "Buku Arus Kas (Cash Flow)", category: "Keuangan", url: "/admin/finance", desc: "Mutasi kas masuk dan keluar Bank Mandiri, BCA, dan Kas Tunai / Petty Cash" },
   { title: "Multi-Gudang & Cabang", category: "Keuangan", url: "/admin/finance", desc: "Valuasi stok antar gudang utama Cilegon, Serang, dan transit proyek" },
+  { title: "Daftar Klien & Pelanggan (Customers)", category: "Keuangan", url: "/admin/finance", desc: "Direktori klien B2B industri, komersial, instansi, PIC, kontak WhatsApp, dan piutang" },
+  { title: "Daftar Supplier & Vendor (Vendors)", category: "Keuangan", url: "/admin/finance", desc: "Direktori vendor CCTV, kabel, biometrik, PIC sales, rekening bank transfer PO, dan hutang" },
   { title: "Manajemen Produk (CRUD)", category: "Produk", url: "/admin/products", desc: "Tambah, edit, hapus inventori CCTV & Smart Home" },
   { title: "Kategori & Sub-Kategori", category: "Produk", url: "/admin/categories", desc: "Kelola klasifikasi kategori dan sub-kategori produk" },
   { title: "Portofolio Proyek", category: "Navigasi", url: "/admin/portfolios", desc: "Kelola dokumentasi proyek selesai, foto & video instalasi" },

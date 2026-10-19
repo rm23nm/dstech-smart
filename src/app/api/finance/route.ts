@@ -22,6 +22,8 @@ function readFinanceData() {
     warehouses: [],
     branches: [],
     expenses: [],
+    clients: [],
+    suppliers: [],
   };
 }
 
@@ -43,6 +45,8 @@ export async function GET() {
   const purchases = data.purchases || [];
   const expenses = data.expenses || [];
   const cashFlow = data.cash_flow || [];
+  const clients = data.clients || [];
+  const suppliers = data.suppliers || [];
 
   const totalSalesRevenue = sales.reduce((acc: number, curr: any) => acc + (Number(curr.grandTotal) || 0), 0);
   const totalSalesPaid = sales.reduce((acc: number, curr: any) => acc + (Number(curr.paidAmount) || 0), 0);
@@ -78,6 +82,8 @@ export async function GET() {
     totalPurchasesCount: purchases.length,
     totalWarehouseCount: (data.warehouses || []).length,
     totalBranchCount: (data.branches || []).length,
+    totalClientsCount: clients.length,
+    totalSuppliersCount: suppliers.length,
   };
 
   return NextResponse.json({
@@ -97,6 +103,64 @@ export async function POST(request: Request) {
 
     if (!payload) {
       return NextResponse.json({ success: false, error: "Payload data wajib disertakan" }, { status: 400 });
+    }
+
+    if (actionType === "client") {
+      const newClient = {
+        id: `dstech_cli_${Date.now()}`,
+        name: payload.name || "Klien Baru",
+        category: payload.category || "B2B Industri",
+        pic: payload.pic || "-",
+        phone: payload.phone || "-",
+        email: payload.email || "-",
+        address: payload.address || "-",
+        city: payload.city || "Cilegon",
+        npwp: payload.npwp || "-",
+        status: payload.status || "Aktif",
+        totalInvoiced: Number(payload.totalInvoiced) || 0,
+        totalPaid: Number(payload.totalPaid) || 0,
+        unpaidReceivable: Number(payload.unpaidReceivable) || 0,
+        notes: payload.notes || "-",
+      };
+
+      if (!data.clients) data.clients = [];
+      data.clients.unshift(newClient);
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Klien ${newClient.name} berhasil ditambahkan`,
+        data: newClient,
+      });
+    }
+
+    if (actionType === "supplier") {
+      const newSupplier = {
+        id: `dstech_sup_${Date.now()}`,
+        name: payload.name || "Supplier Baru",
+        category: payload.category || "CCTV, NVR & Security Hardware",
+        pic: payload.pic || "-",
+        phone: payload.phone || "-",
+        email: payload.email || "-",
+        address: payload.address || "-",
+        city: payload.city || "Cilegon",
+        bankAccount: payload.bankAccount || "-",
+        paymentTerms: payload.paymentTerms || "Net 30 Hari",
+        status: payload.status || "Mitra Aktif",
+        totalPurchases: Number(payload.totalPurchases) || 0,
+        unpaidPayable: Number(payload.unpaidPayable) || 0,
+        notes: payload.notes || "-",
+      };
+
+      if (!data.suppliers) data.suppliers = [];
+      data.suppliers.unshift(newSupplier);
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Supplier ${newSupplier.name} berhasil ditambahkan`,
+        data: newSupplier,
+      });
     }
 
     if (actionType === "sale") {
@@ -304,6 +368,44 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "ID dan data pembaruan wajib disertakan" }, { status: 400 });
     }
 
+    if (actionType === "client") {
+      const index = (data.clients || []).findIndex((c: any) => c.id === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Klien tidak ditemukan" }, { status: 404 });
+      }
+
+      data.clients[index] = {
+        ...data.clients[index],
+        ...updates,
+      };
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Klien ${data.clients[index].name} berhasil diperbarui`,
+        data: data.clients[index],
+      });
+    }
+
+    if (actionType === "supplier") {
+      const index = (data.suppliers || []).findIndex((s: any) => s.id === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Supplier tidak ditemukan" }, { status: 404 });
+      }
+
+      data.suppliers[index] = {
+        ...data.suppliers[index],
+        ...updates,
+      };
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Supplier ${data.suppliers[index].name} berhasil diperbarui`,
+        data: data.suppliers[index],
+      });
+    }
+
     if (actionType === "sale") {
       const index = (data.sales || []).findIndex((s: any) => s.id === id);
       if (index === -1) {
@@ -354,5 +456,44 @@ export async function PUT(request: Request) {
   } catch (err) {
     console.error("Error updating finance record:", err);
     return NextResponse.json({ success: false, error: "Gagal memperbarui data keuangan" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const actionType = url.searchParams.get("actionType");
+    const id = url.searchParams.get("id");
+
+    if (!actionType || !id) {
+      return NextResponse.json({ success: false, error: "actionType dan id wajib disertakan" }, { status: 400 });
+    }
+
+    const data = readFinanceData();
+
+    if (actionType === "client") {
+      const initialLen = (data.clients || []).length;
+      data.clients = (data.clients || []).filter((c: any) => c.id !== id);
+      if (data.clients.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Klien tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Klien berhasil dihapus" });
+    }
+
+    if (actionType === "supplier") {
+      const initialLen = (data.suppliers || []).length;
+      data.suppliers = (data.suppliers || []).filter((s: any) => s.id !== id);
+      if (data.suppliers.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Supplier tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Supplier berhasil dihapus" });
+    }
+
+    return NextResponse.json({ success: false, error: "Tipe aksi DELETE tidak dikenali" }, { status: 400 });
+  } catch (err) {
+    console.error("Error deleting finance record:", err);
+    return NextResponse.json({ success: false, error: "Gagal menghapus data" }, { status: 500 });
   }
 }
