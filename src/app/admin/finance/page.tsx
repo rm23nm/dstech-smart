@@ -149,6 +149,8 @@ interface FinanceSettings {
   letterheadUrl: string;
   letterheadEnabled: boolean;
   watermarkOpacity: number;
+  letterheadPaddingTop?: number;
+  letterheadPaddingBottom?: number;
   signerName?: string;
   signerTitle?: string;
   masterSignatureUrl?: string;
@@ -562,6 +564,8 @@ export default function AdminFinanceERPPage() {
     letterheadUrl: "/kop_surat_dstech.jpg",
     letterheadEnabled: true,
     watermarkOpacity: 0.15,
+    letterheadPaddingTop: 135,
+    letterheadPaddingBottom: 110,
     signerName: "H. Agus Supriyadi, S.T., M.Kom.",
     signerTitle: "Direktur Keuangan & Operasional",
     masterSignatureUrl: "",
@@ -600,6 +604,8 @@ export default function AdminFinanceERPPage() {
     letterheadUrl: "/kop_surat_dstech.jpg",
     letterheadEnabled: true,
     watermarkOpacity: 0.15,
+    letterheadPaddingTop: 135,
+    letterheadPaddingBottom: 110,
     signerName: "H. Agus Supriyadi, S.T., M.Kom.",
     signerTitle: "Direktur Keuangan & Operasional",
     masterSignatureUrl: "",
@@ -1496,6 +1502,8 @@ export default function AdminFinanceERPPage() {
   const handleOpenSettingsModal = () => {
     setTempSettings({
       ...financeSettings,
+      letterheadPaddingTop: financeSettings.letterheadPaddingTop || 135,
+      letterheadPaddingBottom: financeSettings.letterheadPaddingBottom || 110,
       signerName: financeSettings.signerName !== undefined ? financeSettings.signerName : "H. Agus Supriyadi, S.T., M.Kom.",
       signerTitle: financeSettings.signerTitle !== undefined ? financeSettings.signerTitle : "Direktur Keuangan & Operasional",
     });
@@ -1529,6 +1537,8 @@ export default function AdminFinanceERPPage() {
     try {
       const sanitizedSettings = {
         ...tempSettings,
+        letterheadPaddingTop: tempSettings.letterheadPaddingTop || 135,
+        letterheadPaddingBottom: tempSettings.letterheadPaddingBottom || 110,
         signerName: tempSettings.signerName?.trim() || "H. Agus Supriyadi, S.T., M.Kom.",
         signerTitle: tempSettings.signerTitle?.trim() || "Direktur Keuangan & Operasional",
       };
@@ -5545,7 +5555,13 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* FAKTUR CONTENT CONTAINER (Siap Cetak & Watermarked) */}
-            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-8 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+            <div
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              style={{
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+              }}
+            >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
@@ -6466,7 +6482,13 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* SPH OFFICIAL LETTER CONTAINER (A4 Standard Print Layout) */}
-            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-10 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+            <div
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              style={{
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+              }}
+            >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
@@ -8273,7 +8295,13 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* PO OFFICIAL PRINT CONTAINER (A4 Standard Print Layout) */}
-            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-10 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+            <div
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              style={{
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+              }}
+            >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
@@ -9595,7 +9623,13 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
-            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-10 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+            <div
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              style={{
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+              }}
+            >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
@@ -9868,7 +9902,13 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
-            <div className="relative rounded-2xl border border-slate-300 bg-white p-6 sm:p-10 space-y-6 text-slate-800 overflow-hidden shadow-sm">
+            <div
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm"
+              style={{
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 135) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+              }}
+            >
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
@@ -11037,6 +11077,106 @@ export default function AdminFinanceERPPage() {
                     className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] cursor-pointer"
                   >
                     Nonaktifkan Kop
+                  </button>
+                </div>
+              </div>
+
+              {/* Pengaturan Jarak Margin Lembar Dokumen (Header & Footer) */}
+              <div className="pt-2 border-t border-slate-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-800 text-xs">Jarak Margin Lembar Kop (Header & Footer):</h4>
+                  <span className="text-[10px] text-slate-500 font-medium">Mencegah teks tertimpa desain kop</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <label className="font-bold text-slate-700">Jarak Turun Header Atas:</label>
+                      <span className="font-mono font-bold text-dstech-blue">
+                        {tempSettings.letterheadPaddingTop || 135}px
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="24"
+                      max="240"
+                      step="5"
+                      value={tempSettings.letterheadPaddingTop || 135}
+                      onChange={(e) =>
+                        setTempSettings({ ...tempSettings, letterheadPaddingTop: parseInt(e.target.value) || 135 })
+                      }
+                      className="w-full cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] text-slate-400">
+                      <span>Rapat (24px)</span>
+                      <span>Standar (135px)</span>
+                      <span>Luas (240px)</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-1">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <label className="font-bold text-slate-700">Jarak Naik Footer Bawah:</label>
+                      <span className="font-mono font-bold text-emerald-600">
+                        {tempSettings.letterheadPaddingBottom || 110}px
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="24"
+                      max="220"
+                      step="5"
+                      value={tempSettings.letterheadPaddingBottom || 110}
+                      onChange={(e) =>
+                        setTempSettings({ ...tempSettings, letterheadPaddingBottom: parseInt(e.target.value) || 110 })
+                      }
+                      className="w-full cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[9px] text-slate-400">
+                      <span>Rapat (24px)</span>
+                      <span>Standar (110px)</span>
+                      <span>Luas (220px)</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTempSettings((prev) => ({
+                        ...prev,
+                        letterheadPaddingTop: 135,
+                        letterheadPaddingBottom: 110,
+                      }))
+                    }
+                    className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] cursor-pointer"
+                  >
+                    Preset DSTech Resmi (Header 135px, Footer 110px)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTempSettings((prev) => ({
+                        ...prev,
+                        letterheadPaddingTop: 80,
+                        letterheadPaddingBottom: 60,
+                      }))
+                    }
+                    className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
+                  >
+                    Preset Banner Ramping (80px / 60px)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTempSettings((prev) => ({
+                        ...prev,
+                        letterheadPaddingTop: 160,
+                        letterheadPaddingBottom: 130,
+                      }))
+                    }
+                    className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
+                  >
+                    Preset Banner Luas (160px / 130px)
                   </button>
                 </div>
               </div>
