@@ -117,6 +117,22 @@ interface Announcement {
   urgent: boolean;
 }
 
+interface KmsGuideItem {
+  id: string;
+  title: string;
+  category: "sop" | "k3" | "firmware" | "kontak" | "troubleshooting";
+  categoryLabel?: string;
+  summary: string;
+  content: string;
+  downloadUrl?: string;
+  fileSize?: string;
+  contactName?: string;
+  contactPhone?: string;
+  contactRole?: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
 export default function EmployeeDashboard() {
   const router = useRouter();
 
@@ -132,6 +148,7 @@ export default function EmployeeDashboard() {
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
   const [overtimeLogs, setOvertimeLogs] = useState<OvertimeLog[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [kmsList, setKmsList] = useState<KmsGuideItem[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({
     totalHours: 168,
     overtimeHours: 14,
@@ -207,7 +224,7 @@ export default function EmployeeDashboard() {
   });
 
   const [isKmsModalOpen, setIsKmsModalOpen] = useState<boolean>(false);
-  const [kmsTab, setKmsTab] = useState<"sop" | "k3" | "firmware" | "kontak">("sop");
+  const [kmsTab, setKmsTab] = useState<"sop" | "k3" | "firmware" | "kontak" | "troubleshooting">("sop");
 
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState<boolean>(false);
 
@@ -236,11 +253,12 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [resTasks, resInv, resAtt, resAnn] = await Promise.all([
+        const [resTasks, resInv, resAtt, resAnn, resKms] = await Promise.all([
           fetch("/api/employee/tasks"),
           fetch("/api/employee/inventory"),
           fetch("/api/employee/attendance"),
           fetch("/api/employee/announcements"),
+          fetch("/api/kms"),
         ]);
 
         if (resTasks.ok) {
@@ -261,6 +279,10 @@ export default function EmployeeDashboard() {
         if (resAnn.ok) {
           const d = await resAnn.json();
           if (d.data) setAnnouncements(d.data);
+        }
+        if (resKms && resKms.ok) {
+          const d = await resKms.json();
+          if (d.data && Array.isArray(d.data)) setKmsList(d.data);
         }
       } catch (err) {
         console.warn("Using offline fallback data for employee portal:", err);
@@ -2268,155 +2290,181 @@ export default function EmployeeDashboard() {
             <div className="flex gap-2 border-b border-slate-100 pb-2 overflow-x-auto">
               <button
                 onClick={() => setKmsTab("sop")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                  kmsTab === "sop" ? "bg-dstech-blue text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  kmsTab === "sop" ? "bg-dstech-blue text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 SOP Instalasi Lapangan
               </button>
               <button
                 onClick={() => setKmsTab("k3")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                  kmsTab === "k3" ? "bg-dstech-blue text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  kmsTab === "k3" ? "bg-dstech-blue text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 Standar K3 Teknisi
               </button>
               <button
                 onClick={() => setKmsTab("firmware")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                  kmsTab === "firmware" ? "bg-dstech-blue text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  kmsTab === "firmware" ? "bg-dstech-blue text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 Firmware DVR / NVR
               </button>
               <button
                 onClick={() => setKmsTab("kontak")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                  kmsTab === "kontak" ? "bg-dstech-blue text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  kmsTab === "kontak" ? "bg-dstech-blue text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
                 Kontak PIC Lapangan
               </button>
+              <button
+                onClick={() => setKmsTab("troubleshooting")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+                  kmsTab === "troubleshooting" ? "bg-dstech-blue text-white shadow-sm" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                Troubleshooting
+              </button>
             </div>
 
-            {/* KMS Content Area */}
+            {/* KMS Content Area (Dynamic from API / kmsList) */}
             <div className="flex-1 overflow-y-auto pr-2 space-y-4 text-xs leading-relaxed text-slate-600">
-              {kmsTab === "sop" && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
-                    <h4 className="font-black text-slate-900 text-sm flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-dstech-blue" /> SOP-DST-01: Standar Pemasangan IP Camera
-                    </h4>
-                    <p>
-                      1. Pastikan jalur penarikan kabel UTP di luar gedung (outdoor) wajib dimasukkan dalam pipa konduit PVC/galvanis 20mm untuk menghindari paparan panas langsung dan gigitan hama.
-                    </p>
-                    <p>
-                      2. Gunakan urutan susunan pin kabel standar <strong>TIA/EIA 568B</strong> (Putih Orange, Orange, Putih Hijau, Biru, Putih Biru, Hijau, Putih Coklat, Coklat).
-                    </p>
-                    <p>
-                      3. Berikan waterproof junction box di setiap pangkal bracket kamera untuk melindungi sambungan jack DC dan konektor RJ45 dari air hujan.
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
-                    <h4 className="font-black text-slate-900 text-sm flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-dstech-blue" /> SOP-DST-02: Konfigurasi Subnetting & Port Forwarding
-                    </h4>
-                    <p>
-                      - Alokasi IP Kamera DSTech: Segment <code>192.168.10.x</code> atau VLAN khusus security.
-                    </p>
-                    <p>
-                      - Hindari pemakaian IP default pabrik (192.168.1.64) untuk keamanan cyber klien.
-                    </p>
-                    <p>
-                      - Wajib mengaktifkan HTTPS dan enkripsi password kompleks minimal 8 karakter kombinasi huruf besar, angka, dan simbol.
-                    </p>
-                  </div>
+              {kmsList.filter((k) => k.category === kmsTab).length === 0 ? (
+                <div className="text-center py-12 text-slate-400 space-y-2">
+                  <BookOpen className="w-8 h-8 mx-auto text-slate-300" />
+                  <p className="font-bold text-xs">Belum ada dokumen panduan di kategori ini.</p>
+                  <p className="text-[11px]">Admin dapat memperbarui data KMS melalui Portal Admin &gt; KMS Teknisi.</p>
                 </div>
-              )}
+              ) : (
+                kmsList
+                  .filter((k) => k.category === kmsTab)
+                  .map((item) => {
+                    if (kmsTab === "sop") {
+                      return (
+                        <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-black text-slate-900 text-sm flex items-center gap-2">
+                              <FileText className="w-4 h-4 text-dstech-blue shrink-0" /> {item.title}
+                            </h4>
+                            <span className="text-[10px] text-slate-400 font-semibold">{item.updatedAt}</span>
+                          </div>
+                          {item.summary && item.summary !== item.title && (
+                            <p className="text-[11px] text-slate-500 font-medium italic">{item.summary}</p>
+                          )}
+                          <div className="whitespace-pre-line text-slate-700 leading-relaxed font-medium pt-1">
+                            {item.content}
+                          </div>
+                        </div>
+                      );
+                    }
 
-              {kmsTab === "k3" && (
-                <div className="space-y-4">
-                  <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-950 space-y-2">
-                    <h4 className="font-black text-red-900 text-sm flex items-center gap-2">
-                      <HardHat className="w-5 h-5 text-red-600" /> Pedoman Keselamatan Kerja Area Industri (K3)
-                    </h4>
-                    <p>
-                      1. <strong>Alat Pelindung Diri (APD) Wajib:</strong> Safety Helmet dengan tali dagu, Safety Shoes dengan steel toe, Rompi reflektor high-visibility, dan Kacamata safety saat pemboran.
-                    </p>
-                    <p>
-                      2. <strong>Bekerja di Ketinggian &gt; 1.8 Meter:</strong> Wajib mengenakan Full Body Harness dengan shock absorber dan dikaitkan pada lifeline/struktur kokoh.
-                    </p>
-                    <p>
-                      3. Dilarang menggunakan tangga bambu atau tangga tanpa karet anti-slip di area pabrik dan lantai licin.
-                    </p>
-                  </div>
-                </div>
-              )}
+                    if (kmsTab === "k3") {
+                      return (
+                        <div key={item.id} className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-950 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-black text-red-900 text-sm flex items-center gap-2">
+                              <HardHat className="w-5 h-5 text-red-600 shrink-0" /> {item.title}
+                            </h4>
+                            <span className="text-[10px] text-red-600/70 font-semibold">{item.updatedAt}</span>
+                          </div>
+                          {item.summary && item.summary !== item.title && (
+                            <p className="text-[11px] text-red-800 font-medium italic">{item.summary}</p>
+                          )}
+                          <div className="whitespace-pre-line leading-relaxed font-medium text-red-950 pt-1">
+                            {item.content}
+                          </div>
+                        </div>
+                      );
+                    }
 
-              {kmsTab === "firmware" && (
-                <div className="space-y-3">
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <p className="font-black text-slate-900 text-sm">Firmware Hikvision NVR DS-7608NI-K2</p>
-                      <p className="text-[11px] text-slate-400">Versi v4.61.025 (Build 2026) — Size: 48 MB</p>
-                    </div>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        showToast("Memulai unduhan file firmware resmi...");
-                      }}
-                      className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Unduh
-                    </a>
-                  </div>
+                    if (kmsTab === "firmware") {
+                      return (
+                        <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-3">
+                          <div>
+                            <p className="font-black text-slate-900 text-sm">{item.title}</p>
+                            <p className="text-[11px] text-slate-400">
+                              {item.summary || "File firmware / utilitas teknisi resmi"}
+                              {item.fileSize ? ` — Size: ${item.fileSize}` : ""}
+                            </p>
+                          </div>
+                          <a
+                            href={item.downloadUrl || "#"}
+                            onClick={(e) => {
+                              if (!item.downloadUrl || item.downloadUrl === "#") {
+                                e.preventDefault();
+                                showToast("Memulai unduhan file firmware resmi...");
+                              }
+                            }}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shrink-0"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Unduh
+                          </a>
+                        </div>
+                      );
+                    }
 
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between">
-                    <div>
-                      <p className="font-black text-slate-900 text-sm">Firmware Dahua XVR 5108HS-4KL-I3</p>
-                      <p className="text-[11px] text-slate-400">Versi v4.001 (Build 2026) — Size: 52 MB</p>
-                    </div>
-                    <a
-                      href="#"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        showToast("Memulai unduhan file firmware Dahua...");
-                      }}
-                      className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Unduh
-                    </a>
-                  </div>
-                </div>
-              )}
+                    if (kmsTab === "kontak") {
+                      return (
+                        <div key={item.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider">{item.title}</p>
+                            <p className="font-black text-slate-900 text-sm">{item.contactName || item.title}</p>
+                            <p className="text-slate-600 font-medium text-xs">{item.contactRole || item.summary}</p>
+                            <p className="text-[11px] text-dstech-blue font-bold flex items-center gap-1.5 pt-0.5">
+                              <PhoneCall className="w-3 h-3" /> {item.contactPhone || "Kontak Kantor DSTech"}
+                            </p>
+                          </div>
+                          {item.contactPhone && (
+                            <a
+                              href={`https://wa.me/${item.contactPhone.replace(/\D/g, "")}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold text-xs flex items-center gap-1.5 shrink-0"
+                            >
+                              <PhoneCall className="w-3.5 h-3.5" /> WhatsApp PIC
+                            </a>
+                          )}
+                        </div>
+                      );
+                    }
 
-              {kmsTab === "kontak" && (
-                <div className="space-y-3">
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                    <p className="font-black text-slate-900 text-sm">Supervisor Operasional Lapangan</p>
-                    <p className="text-slate-600 font-bold">Ahmad Rizky Pratama</p>
-                    <p className="text-[11px] text-slate-400">WhatsApp / Telepon: +62 822-5949-4242</p>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-1">
-                    <p className="font-black text-slate-900 text-sm">Technical Support Lead DSTech</p>
-                    <p className="text-slate-600 font-bold">Rahmat Hidayat, S.T.</p>
-                    <p className="text-[11px] text-slate-400">Email: support@dstechsmart.com</p>
-                  </div>
-                </div>
+                    if (kmsTab === "troubleshooting") {
+                      return (
+                        <div key={item.id} className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 text-amber-950 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-black text-amber-950 text-sm flex items-center gap-2">
+                              <Wrench className="w-4 h-4 text-amber-700 shrink-0" /> {item.title}
+                            </h4>
+                            <span className="text-[10px] text-amber-700 font-semibold">{item.updatedAt}</span>
+                          </div>
+                          {item.summary && item.summary !== item.title && (
+                            <p className="text-[11px] text-amber-800 font-semibold italic">{item.summary}</p>
+                          )}
+                          <div className="whitespace-pre-line leading-relaxed font-medium text-amber-900 pt-1">
+                            {item.content}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })
               )}
             </div>
 
             {/* Footer */}
             <div className="flex items-center justify-between pt-4 border-t border-slate-100">
               <span className="text-[11px] text-slate-400 font-medium">
-                Pusat Dokumentasi Resmi PT. DSTech Smart Perkasa
+                Pusat Dokumentasi Resmi PT. DSTech Smart Perkasa ({kmsList.length} Dokumen Aktif)
               </span>
               <button
                 onClick={() => setIsKmsModalOpen(false)}
-                className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs"
+                className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer"
               >
                 Tutup KMS
               </button>

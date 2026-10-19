@@ -21,6 +21,7 @@ import {
   FolderTree,
   FolderKanban,
   FileDown,
+  BookOpen,
 } from "lucide-react";
 
 interface SearchResult {
@@ -35,13 +36,16 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Manajemen Produk (CRUD)", category: "Produk", url: "/admin/products", desc: "Tambah, edit, hapus inventori CCTV & Smart Home" },
   { title: "Kategori & Sub-Kategori", category: "Produk", url: "/admin/categories", desc: "Kelola klasifikasi kategori dan sub-kategori produk" },
   { title: "Portofolio Proyek", category: "Navigasi", url: "/admin/portfolios", desc: "Kelola dokumentasi proyek selesai, foto & video instalasi" },
+  { title: "Materi Promosi & Katalog", category: "Navigasi", url: "/admin/promotions", desc: "Kelola e-katalog produk dan brosur unduhan mitra" },
+  { title: "KMS Teknisi (SOP & K3)", category: "Navigasi", url: "/admin/kms", desc: "Kelola SOP instalasi CCTV, standar K3, firmware NVR & kontak PIC" },
+  { title: "SOP Pemasangan IP Camera", category: "Navigasi", url: "/admin/kms", desc: "Dokumen standar SOP teknisi lapangan" },
+  { title: "Standar Keselamatan Kerja K3", category: "Navigasi", url: "/admin/kms", desc: "Pedoman APD dan keselamatan kerja ketinggian" },
   { title: "CCTV Hikvision 4CH", category: "Produk", url: "/admin/products", desc: "Paket CCTV Security 4 Channel HD" },
   { title: "Smart Doorlock X-100", category: "Produk", url: "/admin/products", desc: "Doorlock biometrik RFID & Fingerprint" },
   { title: "Running Text LED Red Outdoor", category: "Produk", url: "/admin/products", desc: "Display running text outdoor WiFi" },
   { title: "Fingerprint ZKTeco", category: "Produk", url: "/admin/products", desc: "Mesin absensi sidik jari & RFID" },
   { title: "User Management", category: "User", url: "/admin/users", desc: "Kelola akun Superadmin, Admin, Teknisi, & Klien" },
   { title: "Daftar Akun Karyawan & Teknisi", category: "User", url: "/admin/users", desc: "Manajemen hak akses staf operasional" },
-  { title: "Materi Promosi & Katalog", category: "Navigasi", url: "/admin/promotions", desc: "Kelola e-katalog produk dan brosur unduhan mitra" },
   { title: "Affiliate Network & Komisi", category: "Mitra", url: "/admin/partners", desc: "Daftar agen referral dan persetujuan komisi" },
   { title: "Ahmad Rizky Pratama (Gold Agent)", category: "Mitra", url: "/admin/partners", desc: "Mitra referral wilayah Cilegon" },
   { title: "Siti Sarah Nuraini (Platinum)", category: "Mitra", url: "/admin/partners", desc: "Mitra referral wilayah Serang" },
@@ -142,6 +146,12 @@ export default function AdminLayout({
       href: "/admin/promotions",
       icon: FileDown,
       active: pathname.startsWith("/admin/promotions"),
+    },
+    {
+      label: "KMS Teknisi (SOP & K3)",
+      href: "/admin/kms",
+      icon: BookOpen,
+      active: pathname.startsWith("/admin/kms"),
     },
     {
       label: "User Management",

@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, Package, Image as ImageIcon, Users, LogOut, Bell, Shield, FolderTree, Menu, X, ExternalLink, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { LayoutDashboard, Package, Image as ImageIcon, Users, LogOut, Bell, Shield, FolderTree, Menu, X, ExternalLink, ArrowRight, CheckCircle2, BookOpen } from 'lucide-react'
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -27,6 +27,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
     { label: 'Affiliate Network', href: '/admin/partners', icon: Users, exact: false },
     { label: 'Manajemen Portfolio', href: '/superadmin/portfolios', icon: ImageIcon, exact: false },
     { label: 'Materi Promosi & Katalog', href: '/admin/promotions', icon: Package, exact: false },
+    { label: 'KMS Teknisi (SOP & K3)', href: '/superadmin/kms', icon: BookOpen, exact: false },
     { label: 'Site Settings', href: '/admin/settings', icon: Shield, exact: false },
   ]
 
