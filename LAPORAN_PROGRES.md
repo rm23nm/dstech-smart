@@ -1047,17 +1047,54 @@
 
 ---
 
-### 41. Antrian Pekerjaan: Modul Retur Barang (Penjualan & Pembelian) - Edit, Approval Tanda Tangan, Hapus, dan Lembar Cetak
+### 41. Selesai: Modul Retur Barang (Penjualan & Pembelian) - Tambah Baru, Edit, Approval Tanda Tangan, Hapus, dan Lembar Cetak Berita Acara
 - **Permintaan Pengguna**:
-  *"retur barang juga sama"* (menanggapi fungsionalitas retur penjualan dan retur pembelian ke supplier).
+  *"retur barang juga sama"* (menanggapi fungsionalitas retur penjualan dari klien dan retur pembelian ke supplier).
 - **Status**:
-  **Dalam Antrian** (akan dikerjakan setelah Task 40 selesai).
+  **Selesai (Completed & Deployed)**
 - **Tujuan**:
-  Menyediakan fungsionalitas lengkap untuk Retur Penjualan (Customer Return / RMA) dan Retur Pembelian (Vendor Return / RMA):
-  1. Edit Data Retur Barang (kuantitas retur, alasan kerusakan, status penggantian/refund).
-  2. Approval & Otorisasi Tanda Tangan Digital Pemeriksaan QC / Gudang.
-  3. Hapus Transaksi Retur dengan dialog konfirmasi.
-  4. Cetak Formulir Tanda Terima / Berita Acara Retur Barang Resmi DSTech.
+  Menyediakan fungsionalitas manajemen retur barang terpadu untuk Retur Penjualan (Customer Return / RMA dari Klien) dan Retur Pembelian (Vendor Return / RMA ke Supplier):
+  1. Tambah Transaksi Retur Baru (Retur Penjualan & Retur Pembelian).
+  2. Edit Data Retur (kuantitas retur, nominal refund/kredit, alasan kerusakan/cacat, status solusi klaim).
+  3. Approval & Otorisasi Tanda Tangan Digital Pemeriksaan QC / Kepala Gudang / Direktur (Canvas Signature Pad, Master Signature, Upload Gambar, stempel resmi, dan kode verifikasi sistem `DST-APP-...`).
+  4. Hapus Transaksi Retur dengan dialog konfirmasi aman.
+  5. Lembar Cetak Resmi Berita Acara Serah Terima Retur Barang (BAST Retur / RMA Form A4) ber-Kop Surat DSTech dan dual signatures.
+- **Rincian Langkah Pengerjaan yang Telah Diselesaikan**:
+  1. [x] **Backend API (`/api/finance/route.ts`)**:
+     - Menambahkan handler `actionType: "approve_document"` untuk `documentType === "return_sales"` dan `documentType === "return_purchase"` (menyimpan signer, stempel, tanggal pengesahan, dan kode barcode verifikasi `DST-APP-...`).
+     - Menambahkan handler `PUT` untuk `actionType === "return_sales"` dan `actionType === "return_purchase"` (update produk, qty, nominal, alasan, solusi, status, dan penanggung jawab).
+     - Menambahkan handler `DELETE` untuk `actionType === "return_sales"` dan `actionType === "return_purchase"` (penghapusan aman berdasarkan ID atau nomor retur).
+  2. [x] **Model Data & State Frontend (`/admin/finance/page.tsx`)**:
+     - Memperluas interface `SalesReturn` dan `PurchaseReturn` dengan atribut approval (`approvalStatus`, `approvedBy`, `approvedTitle`, `approvedAt`, `verificationCode`, `signatureImage`, `approvalNotes`, `notes`).
+     - Menambahkan state modal & form:
+       - Retur Penjualan: `isNewReturnSaleModalOpen`, `isEditReturnSaleModalOpen`, `editingReturnSale`, `returnSaleForm`, `selectedReturnSaleForApproval`, `isApprovalReturnSaleModalOpen`, `selectedReturnSaleForPrint`.
+       - Retur Pembelian: `isNewReturnPurchaseModalOpen`, `isEditReturnPurchaseModalOpen`, `editingReturnPurchase`, `returnPurchaseForm`, `selectedReturnPurchaseForApproval`, `isApprovalReturnPurchaseModalOpen`, `selectedReturnPurchaseForPrint`.
+  3. [x] **Handler Fungsionalitas Retur (`/admin/finance/page.tsx`)**:
+     - Handler Tambah Retur: `handleOpenAddReturnSale`, `handleSelectInvoiceForReturnSale`, `handleCreateReturnSaleSubmit` dan `handleOpenAddReturnPurchase`, `handleSelectPoForReturnPurchase`, `handleCreateReturnPurchaseSubmit`.
+     - Handler Edit Retur: `handleOpenEditReturnSale`, `handleSaveEditReturnSale`, `handleOpenEditReturnPurchase`, `handleSaveEditReturnPurchase`.
+     - Handler Approval Retur: `handleOpenApprovalReturnSale`, `handleApproveReturnSale`, `handleOpenApprovalReturnPurchase`, `handleApproveReturnPurchase`.
+     - Handler Hapus Retur: `handleDeleteReturnSale` dan `handleDeleteReturnPurchase` dengan konfirmasi `confirm()` dan toast feedback.
+     - Handler Cetak Retur: `handleOpenPrintReturnSale` dan `handleOpenPrintReturnPurchase`.
+  4. [x] **Antarmuka Tab Retur Barang (`activeTab === "returns"`)**:
+     - Menambahkan top summary cards statistik total nominal retur penjualan, retur pembelian, dan dokumen sah digital.
+     - Menambahkan tombol aksi utama: `+ Catat Retur` pada seksi Klien dan `+ Catat Retur` pada seksi Supplier.
+     - Menambahkan badge status Otorisasi QC/Gudang (`Disetujui & Sah` vs `Pending QC / Pending Logistik`).
+     - Menambahkan tombol aksi icon-only pada tiap item retur: 🖨️ Cetak BAST Retur, ✍️ Approval QC/Gudang, ✏️ Edit Data Retur, 🗑️ Hapus Retur.
+  5. [x] **Modal Interaktif Formulir & Approval Retur**:
+     - Modal Tambah & Edit Retur Penjualan (auto-fill dari pilihan invoice penjualan, nama barang, qty, nominal refund, alasan, opsi solusi tukar unit/servis/refund).
+     - Modal Tambah & Edit Retur Pembelian (auto-fill dari pilihan PO pembelian, nama vendor, nama barang, qty, nominal kredit nota, alasan cacat pabrik/QC, klaim garansi vendor).
+     - Modal Approval Tanda Tangan Digital Pemeriksaan QC/Gudang dengan 3 mode (Gores Layar sentuh/mouse, Master Signature DSTech, Upload berkas).
+  6. [x] **Lembar Cetak Dokumen Resmi Berita Acara Retur Barang (BAST Retur A4)**:
+     - Menggunakan background Kop Surat resmi PT DSTech Smart Perkasa (`letterheadUrl`) & watermark slider.
+     - Nomor Berita Acara resmi: `BAST-RET-YYYYMM-XXXX`.
+     - Data pihak penyerah dan penerima barang, rincian teknis unit yang diretur, hasil pemeriksaan QC fisik/kelistrikan, dan klausul tindak lanjut garansi.
+     - Kolom dual tanda tangan: Pengirim/Pelanggan/Vendor di kiri, dan Pemeriksa QC & Kepala Gudang DSTech di kanan lengkap stempel bulat digital dan barcode verifikasi sistem `DST-APP-...`.
+  7. [x] **Validasi, Pengujian, Sinkronisasi GitHub, dan Deployment Live VPS**:
+     - Kompilasi TypeScript `npx tsc --noEmit` lolos 0 error.
+     - Uji fungsionalitas via script lokal dan browser automation subagent.
+     - Push commit ke GitHub `rm23nm/dstech-smart` commit `4c0c400` via `push_with_native_git.js`.
+     - Deploy ke VPS `157.66.34.199:11587`, kompilasi build produksi Next.js (43 static routes lolos 100%), dan restart PM2 `dstech-main` (PID 3637913, online).
+     - Verifikasi live API `https://dstechsmart.com/api/finance` mengembalikan data `returns_sales` dan `returns_purchase` dengan status 200 OK.
 
 ---
 
