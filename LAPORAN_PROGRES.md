@@ -38,6 +38,9 @@
 - **2026-10-19**: Manajemen Multi-Gudang & Cabang (CRUD Titik Gudang & Kantor Cabang) serta Fitur Unggah Gambar Kustom Kop Surat & Background Watermark Faktur Resmi. Menambahkan tombol aksi Tambah, Edit, dan Hapus pada Titik Gudang dan Kantor Cabang dengan modal formulir interaktif lengkap (kode gudang, alamat, PIC, valuasi stok), memperbaiki API `PUT /api/finance` settings handler agar singleton settings tersimpan sukses tanpa error ID, serta menambahkan input file unggah kop surat (PNG/JPG) dengan pembacaan DataURL dan pratinjau A4 live.
 - **2026-10-19**: Penyelarasan Total Akun Rekening Bank Resmi Perusahaan di Seluruh Transaksi & Sistem ERP Keuangan. Menghilangkan seluruh hardcode teks rekening bank lama (`Bank BCA DSTech` dan `Bank Mandiri PT DSTech Smart Perkasa`) pada backend API `/api/finance` dan frontend `/admin/finance`. Mengikat inisialisasi state dan pilihan transaksi (Catat Arus Kas, Pelunasan Faktur, Buat Faktur, dan Edit Faktur) secara 100% dinamis terhadap rekening bank aktif di `data.bank_accounts`. Menambahkan tombol pintas 'Atur Rekening Resmi' pada seluruh modal transaksi serta menambahkan Filter Rekening Bank / Kas Tunai dinamis pada Tab Buku Arus Kas beserta badge visual akun yang seragam. Lolos kompilasi `tsc` (0 error), dipush ke GitHub, dan dideploy ke server VPS live.
 - **2026-10-19**: Sistem Manajemen Pengadaan & Purchase Order (PO) Supplier Terpadu (Pencarian & Filter Status Real-time, Modal Edit PO Lengkap Repeater Barang & Auto-Kalkulasi PPN 11%, Otorisasi Approval & Tanda Tangan Digital Resmi via Canvas Pad / Master / Upload Berkas Gambar dengan Stempel Bulat & Barcode Verifikasi Sistem `DST-APP-...`, Fungsionalitas Hapus PO dengan Konfirmasi Aman, serta Format Cetak Lembar Purchase Order A4 Ber-Kop Surat Resmi DSTech). Menambahkan kolom 'Otorisasi & Approval' dan tombol aksi icon-only (Cetak, Approval, Edit, Hapus) pada tabel PO di portal keuangan (`/admin/finance`), memperbarui backend API (`/api/finance`) untuk PUT update kalkulasi total & DELETE purchase order, mengintegrasikan auto-fill Master Supplier (`dstech_suppliers`) pada modal edit PO, menyediakan pratinjau lembar cetak standar korporat ber-kop surat resmi PT DSTech Smart Perkasa lengkap syarat & ketentuan pengadaan dan dual signature acceptance. Divalidasi `npx tsc --noEmit` (0 error), diuji dengan browser subagent, disinkronkan ke GitHub `rm23nm/dstech-smart` commit `b7ae80f`, dan dideploy sukses ke server live VPS PM2 `dstech-main` (PID 3625729).
+- **2026-10-19**: Modul Retur Barang (Penjualan Klien & Pembelian Supplier) Terpadu. Menambahkan fungsionalitas Tambah Baru, Edit Data Retur, Otorisasi Approval & Tanda Tangan Digital Pemeriksaan QC/Gudang (Canvas Pad, Master Signature, Upload Berkas Gambar, Stempel Bulat Resmi, dan Barcode Verifikasi Sistem `DST-APP-...`), Hapus Dokumen Retur dengan Konfirmasi Aman, serta Lembar Cetak Resmi Berita Acara Serah Terima Retur Barang (BAST Retur / RMA Form A4) ber-Kop Surat Resmi DSTech dan Dual Signatures. Divalidasi `tsc` 0 error, dipush ke GitHub commit `4c0c400`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
+- **2026-10-19**: Perbaikan Bug Controlled Input Nama Direktur Penandatangan & Jabatan Dokumen Legalitas (`/admin/finance`). Mengatasi masalah reset otomatis saat pengguna menghapus karakter dengan mengganti fallback string `||` menjadi `?? ""` dan menambahkan atribut `placeholder`. Memperbaiki handler modal & penyimpanan sanitasi sehingga pengguna dapat mengosongkan, mengedit, atau mengganti nama penandatangan dengan nama baru tanpa membal kembali ke string default. Lolos verifikasi kompilasi `tsc` 0 error, pengujian visual browser subagent, commit GitHub `1d3e700`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
+- **2026-10-19**: Penyesuaian Jarak Margin Header & Footer Lembar Cetak Dokumen Ber-Kop Surat (`/admin/finance`). Mengatur jarak padding atas (`paddingTop: 135px`) dan padding bawah (`paddingBottom: 110px`) secara dinamis pada seluruh 5 kontainer dokumen resmi (Faktur Penjualan, Surat Penawaran Harga SPH, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) agar teks judul/isi header tidak menimpa banner grafis atas kop surat dan blok tanda tangan direksi/verifikasi naik aman di atas banner grafis footer. Menambahkan kontrol slider interaktif dan 3 tombol preset di Modal Pengaturan Kop Surat sehingga margin dapat disesuaikan fleksibel sesuai variasi desain kop surat yang diunggah. Lolos validasi TypeScript `tsc` (0 error), diuji via browser subagent, dipush ke GitHub commit `57de659`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
 **Status**: Selesai
@@ -1098,7 +1101,81 @@
 
 ---
 
-### 42. Catatan Penting
+### 42. Selesai: Perbaikan Input Nama Direktur Penandatangan & Jabatan Dokumen Legalitas (Reset Otomatis Saat Dihapus)
+- **Permintaan Pengguna**:
+  *"kenapa nama direktur penandatangan setiap dihapus kembali seperti semuala"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Investigasi & Analisis Penyebab Masalah (Root Cause)**:
+  - Pada komponen `dstech-smart/src/app/admin/finance/page.tsx`, modal "Pengaturan Dokumen & Legalitas" (Tab Pengaturan Kop & Tanda Tangan):
+    - Baris 11043: `value={tempSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom."}`
+    - Baris 11052: `value={tempSettings.signerTitle || "Direktur Keuangan & Operasional"}`
+  - Ketika pengguna menekan tombol Backspace atau menghapus seluruh teks, `e.target.value` bernilai string kosong `""`.
+  - Di JavaScript, string kosong `""` bersifat falsy. Evaluasi ekspresi `"" || "H. Agus Supriyadi, S.T., M.Kom."` selalu menghasilkan nilai fallback string default.
+  - Akibatnya, React langsung merender ulang nilai hardcoded tersebut ke dalam input setiap kali karakter terakhir dihapus, membuat pengguna tidak bisa mengosongkan atau mengetik nama direktur baru dari awal.
+- **Rincian Langkah Pengerjaan yang Telah Diselesaikan**:
+  1. [x] **Pemeriksaan Laporan & Pembuatan File Backup**:
+     - Memastikan seluruh tugas sebelumnya telah selesai.
+     - Membuat cadangan `_backup/LAPORAN_PROGRES.md.bak40` dan `_backup/admin_finance_page.tsx.bak12`.
+  2. [x] **Perbaikan Binding Input Controlled Component**:
+     - Mengubah binding `value` pada input nama direktur menjadi `value={tempSettings.signerName ?? ""}` dan menambahkan atribut `placeholder="Contoh: H. Agus Supriyadi, S.T., M.Kom."`.
+     - Mengubah binding `value` pada input jabatan menjadi `value={tempSettings.signerTitle ?? ""}` dan menambahkan atribut `placeholder="Contoh: Direktur Keuangan & Operasional"`.
+  3. [x] **Penyelarasan Handler Modal & Penyimpanan Pengaturan**:
+     - Memastikan `handleOpenSettingsModal` mengisi nilai awal dari `financeSettings.signerName` dan `financeSettings.signerTitle` secara aman.
+     - Memastikan `handleSaveSettings` menyimpan nama direktur baru ke database/backend API `/api/finance` (`actionType: "settings"`), dan memberikan fallback aman ke default hanya saat disimpan jika input sengaja dibiarkan kosong total.
+  4. [x] **Validasi Kompilasi & Type Checking**:
+     - Menjalankan `npx tsc --noEmit` berhasil lolos 0 error.
+  5. [x] **Pengujian Lokal Interaktif**:
+     - Pengujian via browser automation subagent: mengosongkan input `Nama Direktur Penandatangan:` berhasil bersih total tanpa membal ke default, placeholder tampil presisi, dan pengetikan nama baru dapat dilakukan dengan lancar.
+  6. [x] **Sinkronisasi Kode ke GitHub**:
+     - Commit dan push ke repository remote `rm23nm/dstech-smart` commit `1d3e700` menggunakan `push_with_native_git.js`.
+  7. [x] **Deployment ke Server Live VPS**:
+     - Deployment sukses ke server VPS (157.66.34.199:11587), rebuild produksi Next.js (43 static routes lolos 100%), dan restart PM2 `dstech-main` (PID 3642410 online).
+  8. [x] **Penyelesaian Laporan & Respon Pengguna**:
+     - Memperbarui status checklist menjadi [x] Selesai.
+
+---
+
+### 43. Selesai: Penyesuaian Jarak Margin Header & Footer pada Lembar Cetak Dokumen Ber-Kop Surat (Turunkan Header & Naikkan Footer)
+- **Permintaan Pengguna**:
+  *"karena kita sudah memakai nama PT pada lembaran halaman Upload file kop surat, sebaiknya agar tidak tertimpa maka diturukan sedikit tulsannya pada headher, kemudian pada foother naikkan"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Investigasi & Analisis Masalah**:
+  - Pada lembar cetak dokumen (Faktur Penjualan, SPH Penawaran Harga, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian), gambar kop surat (`letterheadUrl`) yang diunggah pengguna telah memiliki banner grafis header di bagian atas (berisi logo, nama PT. DSTech Smart Perkasa, dan legalitas) serta banner grafis footer di bagian bawah.
+  - Karena padding kontainer cetak sebelumnya seragam `p-6 sm:p-8` (hanya ~24-32px), teks judul dokumen dan rincian header menimpa langsung banner grafis atas kop surat.
+  - Demikian juga pada bagian footer: kotak tanda tangan direksi, klausul catatan, dan barcode verifikasi sistem terlalu mepet ke bawah sehingga menimpa banner grafis footer kop surat.
+- **Rincian Langkah Pengerjaan yang Telah Diselesaikan**:
+  1. [x] **Pemeriksaan Riwayat & Pembuatan Backup**:
+     - Memastikan Task 42 selesai dan dideploy.
+     - Membuat cadangan `_backup/LAPORAN_PROGRES.md.bak41` dan `_backup/admin_finance_page.tsx.bak13`.
+  2. [x] **Penambahan Konfigurasi Spacing Kop Surat Dinamis**:
+     - Menambahkan atribut opsional `letterheadPaddingTop` (default `135px`) dan `letterheadPaddingBottom` (default `110px`) pada interface `FinanceSettings`.
+     - Menyediakan kontrol slider interaktif di Modal Pengaturan Kop Surat ("Jarak Atas Header" dan "Jarak Bawah Footer") lengkap 3 tombol preset ("Preset DSTech Resmi (Header 135px, Footer 110px)", "Preset Banner Ramping (80px / 60px)", "Preset Banner Luas (160px / 130px)") agar pengguna dapat menyesuaikan margin kapan saja sesuai desain file kop yang diunggah.
+  3. [x] **Penerapan Jarak Margin pada Kontainer 5 Template Cetak Dokumen**:
+     - Terapkan padding dinamis `paddingTop: (letterheadEnabled ? letterheadPaddingTop || 135 : 24) + 'px'` dan `paddingBottom: (letterheadEnabled ? letterheadPaddingBottom || 110 : 24) + 'px'` pada seluruh 5 kontainer dokumen:
+       1. Faktur Penjualan (`selectedInvoiceForPrint`)
+       2. Surat Penawaran Harga (`selectedQuotationForPrint`)
+       3. Purchase Order (`selectedPoForPrint`)
+       4. Berita Acara Retur Penjualan (`selectedReturnSaleForPrint`)
+       5. Berita Acara Retur Pembelian (`selectedReturnPurchaseForPrint`)
+  4. [x] **Penyelarasan Teks Header Dokumen saat Kop Aktif**:
+     - Teks header (nama PT, alamat, nomor faktur/SPH/PO/BAST) turun 135px secara proporsional sehingga berada tepat di bawah banner grafis atas kop surat tanpa tumpang tindih.
+     - Kotak tanda tangan direksi dan pihak penerima/vendor naik 110px dari dasar lembar sehingga berada tepat di atas banner grafis footer kop surat.
+  5. [x] **Validasi Kompilasi TypeScript**:
+     - Menjalankan `npx tsc --noEmit` dan lolos 0 error.
+  6. [x] **Pengujian Visual Browser**:
+     - Memverifikasi lembar cetak dokumen Faktur Penjualan menggunakan browser automation subagent: tangkapan layar mengonfirmasi teks header turun rapi di bawah banner grafis atas dan footer tanda tangan naik aman di atas banner grafis footer.
+  7. [x] **Sinkronisasi Kode ke GitHub Remote**:
+     - Commit dan push ke `rm23nm/dstech-smart` commit `57de659` via `push_with_native_git.js`.
+  8. [x] **Deployment ke Server Live VPS**:
+     - Deployment sukses ke server VPS (157.66.34.199:11587), rebuild produksi Next.js (43 static routes lolos 100%), dan restart PM2 `dstech-main` (PID 3646154 online).
+  9. [x] **Penyelesaian Laporan & Notifikasi Pengguna**:
+     - Memperbarui Laporan Progres dan menyampaikan konfirmasi kepada pengguna.
+
+---
+
+### 44. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
