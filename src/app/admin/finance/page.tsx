@@ -1494,7 +1494,11 @@ export default function AdminFinanceERPPage() {
 
   // Handler Pengaturan Kop Surat
   const handleOpenSettingsModal = () => {
-    setTempSettings({ ...financeSettings });
+    setTempSettings({
+      ...financeSettings,
+      signerName: financeSettings.signerName !== undefined ? financeSettings.signerName : "H. Agus Supriyadi, S.T., M.Kom.",
+      signerTitle: financeSettings.signerTitle !== undefined ? financeSettings.signerTitle : "Direktur Keuangan & Operasional",
+    });
     setIsSettingsModalOpen(true);
   };
 
@@ -1523,17 +1527,22 @@ export default function AdminFinanceERPPage() {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const sanitizedSettings = {
+        ...tempSettings,
+        signerName: tempSettings.signerName?.trim() || "H. Agus Supriyadi, S.T., M.Kom.",
+        signerTitle: tempSettings.signerTitle?.trim() || "Direktur Keuangan & Operasional",
+      };
       const res = await fetch("/api/finance", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           actionType: "settings",
-          updates: tempSettings,
+          updates: sanitizedSettings,
         }),
       });
       const d = await res.json();
       if (d.success) {
-        setFinanceSettings({ ...tempSettings });
+        setFinanceSettings({ ...sanitizedSettings });
         showToast("Pengaturan kop surat & background dokumen berhasil disimpan!");
         setIsSettingsModalOpen(false);
         fetchFinanceData();
@@ -11040,7 +11049,8 @@ export default function AdminFinanceERPPage() {
                     <label className="font-bold text-slate-700 block mb-1">Nama Direktur Penandatangan:</label>
                     <input
                       type="text"
-                      value={tempSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom."}
+                      value={tempSettings.signerName ?? ""}
+                      placeholder="Contoh: H. Agus Supriyadi, S.T., M.Kom."
                       onChange={(e) => setTempSettings({ ...tempSettings, signerName: e.target.value })}
                       className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold"
                     />
@@ -11049,7 +11059,8 @@ export default function AdminFinanceERPPage() {
                     <label className="font-bold text-slate-700 block mb-1">Jabatan Resmi:</label>
                     <input
                       type="text"
-                      value={tempSettings.signerTitle || "Direktur Keuangan & Operasional"}
+                      value={tempSettings.signerTitle ?? ""}
+                      placeholder="Contoh: Direktur Keuangan & Operasional"
                       onChange={(e) => setTempSettings({ ...tempSettings, signerTitle: e.target.value })}
                       className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold"
                     />
