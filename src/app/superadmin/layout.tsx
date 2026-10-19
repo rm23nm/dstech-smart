@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { LayoutDashboard, Package, Image as ImageIcon, Users, LogOut, Bell, Shield, FolderTree, Menu, X, ExternalLink, ArrowRight, CheckCircle2, BookOpen } from 'lucide-react'
+import { LayoutDashboard, Package, Image as ImageIcon, Users, LogOut, Bell, Shield, FolderTree, Menu, X, ExternalLink, ArrowRight, CheckCircle2, BookOpen, Scale } from 'lucide-react'
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -21,6 +21,7 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
 
   const navItems = [
     { label: 'Dashboard', href: '/superadmin', icon: LayoutDashboard, exact: true },
+    { label: 'Keuangan & ERP', href: '/superadmin/finance', icon: Scale, exact: false },
     { label: 'Produk & Komisi', href: '/superadmin/products', icon: Package, exact: false },
     { label: 'Kategori & Sub-Kategori', href: '/superadmin/categories', icon: FolderTree, exact: false },
     { label: 'User Management', href: '/admin/users', icon: Users, exact: false },

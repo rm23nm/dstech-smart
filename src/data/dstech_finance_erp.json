@@ -1,0 +1,449 @@
+{
+  "sales": [
+    {
+      "id": "dstech_inv_1792361001",
+      "invoiceNumber": "INV-DSTECH-202610-001",
+      "customerName": "PT. Krakatau Posco Energy",
+      "customerPhone": "0812-9876-5432",
+      "customerAddress": "Kawasan Industri Krakatau Kav. E3, Cilegon - Banten",
+      "date": "2026-10-18",
+      "dueDate": "2026-11-18",
+      "items": [
+        {
+          "id": "item_1",
+          "productName": "Paket CCTV IP 4MP DarkFighter (4 Kamera + NVR 8CH)",
+          "qty": 1,
+          "unit": "Paket",
+          "price": 14500000,
+          "total": 14500000
+        },
+        {
+          "id": "item_2",
+          "productName": "Kabel UTP Cat6 Belden Original (305m)",
+          "qty": 1,
+          "unit": "Roll",
+          "price": 2400000,
+          "total": 2400000
+        },
+        {
+          "id": "item_3",
+          "productName": "Jasa Instalasi, Setting NVR & Cloud Monitoring",
+          "qty": 4,
+          "unit": "Titik",
+          "price": 350000,
+          "total": 1400000
+        }
+      ],
+      "subtotal": 18300000,
+      "discount": 500000,
+      "taxRate": 11,
+      "taxAmount": 1958000,
+      "grandTotal": 19758000,
+      "paymentMethod": "Transfer Bank Mandiri",
+      "paymentStatus": "Lunas",
+      "paidAmount": 19758000,
+      "remainingAmount": 0,
+      "warehouseId": "dstech_wh_1",
+      "branchId": "dstech_branch_1",
+      "salesPerson": "DSTech Commercial Team",
+      "notes": "Proyek pengadaan & instalasi CCTV area Boiler Krakatau Posco"
+    },
+    {
+      "id": "dstech_inv_1792361002",
+      "invoiceNumber": "INV-DSTECH-202610-002",
+      "customerName": "RS Kurnia Cilegon",
+      "customerPhone": "0813-8889-1122",
+      "customerAddress": "Jl. Jombang Masjid No. 4, Cilegon - Banten",
+      "date": "2026-10-17",
+      "dueDate": "2026-11-01",
+      "items": [
+        {
+          "id": "item_1",
+          "productName": "Access Control Smart Doorlock X-100 RFID & Fingerprint",
+          "qty": 2,
+          "unit": "Unit",
+          "price": 3200000,
+          "total": 6400000
+        },
+        {
+          "id": "item_2",
+          "productName": "Power Supply Jaring 12V 10A + Box Fan",
+          "qty": 1,
+          "unit": "Unit",
+          "price": 450000,
+          "total": 450000
+        },
+        {
+          "id": "item_3",
+          "productName": "Jasa Setting & Integrasi Emergency Exit",
+          "qty": 2,
+          "unit": "Pintu",
+          "price": 500000,
+          "total": 1000000
+        }
+      ],
+      "subtotal": 7850000,
+      "discount": 0,
+      "taxRate": 11,
+      "taxAmount": 863500,
+      "grandTotal": 8713500,
+      "paymentMethod": "Transfer Bank Mandiri (Tempo 14 Hari)",
+      "paymentStatus": "Belum Lunas",
+      "paidAmount": 4000000,
+      "remainingAmount": 4713500,
+      "warehouseId": "dstech_wh_1",
+      "branchId": "dstech_branch_1",
+      "salesPerson": "DSTech Commercial Team",
+      "notes": "Peremajaan access control pintu ruang rawat inap Lt. 3"
+    },
+    {
+      "id": "dstech_inv_1792361003",
+      "invoiceNumber": "INV-DSTECH-202610-003",
+      "customerName": "Perumahan Metro Royal Cilegon (Paguyuban Warga)",
+      "customerPhone": "0877-6543-2109",
+      "customerAddress": "Gerbang Utama Metro Royal, Cilegon",
+      "date": "2026-10-15",
+      "dueDate": "2026-10-25",
+      "items": [
+        {
+          "id": "item_1",
+          "productName": "Smart Barrier Gate Otomatis High Speed (Palang 3m)",
+          "qty": 2,
+          "unit": "Set",
+          "price": 18500000,
+          "total": 37000000
+        },
+        {
+          "id": "item_2",
+          "productName": "RFID Long Range Reader UHF 12m + 200 Kartu Akses",
+          "qty": 2,
+          "unit": "Set",
+          "price": 4500000,
+          "total": 9000000
+        }
+      ],
+      "subtotal": 46000000,
+      "discount": 1000000,
+      "taxRate": 11,
+      "taxAmount": 4950000,
+      "grandTotal": 49950000,
+      "paymentMethod": "Transfer Bank BCA",
+      "paymentStatus": "Lunas",
+      "paidAmount": 49950000,
+      "remainingAmount": 0,
+      "warehouseId": "dstech_wh_1",
+      "branchId": "dstech_branch_1",
+      "salesPerson": "DSTech Commercial Team",
+      "notes": "Pengadaan gerbang otomatis cluster barat dan timur"
+    }
+  ],
+  "purchases": [
+    {
+      "id": "dstech_po_1792362001",
+      "poNumber": "PO-DSTECH-202610-001",
+      "supplierName": "PT. Hikvision Indonesia Mega Distributor",
+      "supplierContact": "021-5839-2000 (Ibu Dewi)",
+      "date": "2026-10-12",
+      "expectedDelivery": "2026-10-15",
+      "items": [
+        {
+          "id": "po_item_1",
+          "productName": "Kamera IP Hikvision 4MP DarkFighter (DS-2CD2043G2-I)",
+          "qty": 8,
+          "unit": "Unit",
+          "price": 1150000,
+          "total": 9200000
+        },
+        {
+          "id": "po_item_2",
+          "productName": "NVR Hikvision 8 Channel 4K PoE 8 Port",
+          "qty": 2,
+          "unit": "Unit",
+          "price": 2750000,
+          "total": 5500000
+        },
+        {
+          "id": "po_item_3",
+          "productName": "Harddisk Seagate SkyHawk 4TB Surveillance Grade",
+          "qty": 4,
+          "unit": "Pcs",
+          "price": 1400000,
+          "total": 5600000
+        }
+      ],
+      "subtotal": 20300000,
+      "taxAmount": 2233000,
+      "grandTotal": 22533000,
+      "status": "Diterima & Lunas",
+      "paymentStatus": "Lunas",
+      "warehouseId": "dstech_wh_1",
+      "notes": "Pengadaan stok kamera IP dan storage untuk stok aman proyek"
+    },
+    {
+      "id": "dstech_po_1792362002",
+      "poNumber": "PO-DSTECH-202610-002",
+      "supplierName": "PT. Belden Cable Nusantara Jaya",
+      "supplierContact": "021-2988-1100 (Pak Hendra)",
+      "date": "2026-10-14",
+      "expectedDelivery": "2026-10-16",
+      "items": [
+        {
+          "id": "po_item_1",
+          "productName": "Kabel UTP Cat6 Belden Original 305m (Abu-abu)",
+          "qty": 6,
+          "unit": "Roll",
+          "price": 1750000,
+          "total": 10500000
+        },
+        {
+          "id": "po_item_2",
+          "productName": "Konektor RJ45 Cat6 Commscope Gold Plated (Box 50 Pcs)",
+          "qty": 5,
+          "unit": "Dus",
+          "price": 280000,
+          "total": 1400000
+        }
+      ],
+      "subtotal": 11900000,
+      "taxAmount": 1309000,
+      "grandTotal": 13209000,
+      "status": "Diterima & Lunas",
+      "paymentStatus": "Lunas",
+      "warehouseId": "dstech_wh_1",
+      "notes": "Stok kabel roll dan konektor LAN gudang utama"
+    },
+    {
+      "id": "dstech_po_1792362003",
+      "poNumber": "PO-DSTECH-202610-003",
+      "supplierName": "PT. ZKTeco Biometrics Banten Mandiri",
+      "supplierContact": "0811-9988-7711 (Sales Support)",
+      "date": "2026-10-18",
+      "expectedDelivery": "2026-10-22",
+      "items": [
+        {
+          "id": "po_item_1",
+          "productName": "Mesin Absensi Sidik Jari & RFID ZKTeco MB460",
+          "qty": 3,
+          "unit": "Unit",
+          "price": 1850000,
+          "total": 5550000
+        }
+      ],
+      "subtotal": 5550000,
+      "taxAmount": 610500,
+      "grandTotal": 6160500,
+      "status": "Dalam Pengiriman",
+      "paymentStatus": "Hutang Usaha (Jatuh Tempo 30 Hari)",
+      "warehouseId": "dstech_wh_2",
+      "notes": "Pesanan mesin absensi kantor cabang Serang"
+    }
+  ],
+  "returns_sales": [
+    {
+      "id": "dstech_ret_sales_1",
+      "returnNumber": "RET-S-202610-001",
+      "invoiceNumber": "INV-DSTECH-202610-002",
+      "customerName": "RS Kurnia Cilegon",
+      "date": "2026-10-18",
+      "productName": "Konektor RJ45 Cat6 Commscope Gold Plated",
+      "qty": 5,
+      "unit": "Pcs",
+      "price": 10000,
+      "totalRefund": 50000,
+      "reason": "Salah spesifikasi tipe konektor saat perakitan teknisi",
+      "resolution": "Ganti Barang Baru (Pass-Through)",
+      "status": "Selesai Diganti",
+      "handledBy": "Ikhsan Maulidi (Teknisi Senior)"
+    }
+  ],
+  "returns_purchase": [
+    {
+      "id": "dstech_ret_purch_1",
+      "returnNumber": "RET-P-202610-001",
+      "poNumber": "PO-DSTECH-202610-001",
+      "supplierName": "PT. Hikvision Indonesia Mega Distributor",
+      "date": "2026-10-16",
+      "productName": "Kamera IP Hikvision 4MP DarkFighter (DS-2CD2043G2-I)",
+      "qty": 1,
+      "unit": "Unit",
+      "price": 1150000,
+      "totalCredit": 1150000,
+      "reason": "Port RJ45 PoE longgar dari pabrikan (Cacat QC)",
+      "resolution": "Klaim Garansi Tukar Baru",
+      "status": "Dalam Proses RMA Vendor",
+      "handledBy": "Hendra (Gudang DSTech)"
+    }
+  ],
+  "cash_flow": [
+    {
+      "id": "dstech_cash_1",
+      "date": "2026-10-18",
+      "type": "IN",
+      "category": "Pelunasan Penjualan",
+      "amount": 19758000,
+      "account": "Bank Mandiri PT DSTech Smart Perkasa",
+      "reference": "INV-DSTECH-202610-001",
+      "description": "Pembayaran lunas CCTV Krakatau Posco",
+      "balanceAfter": 74850000
+    },
+    {
+      "id": "dstech_cash_2",
+      "date": "2026-10-17",
+      "type": "IN",
+      "category": "Uang Muka Penjualan",
+      "amount": 4000000,
+      "account": "Bank Mandiri PT DSTech Smart Perkasa",
+      "reference": "INV-DSTECH-202610-002",
+      "description": "Uang muka access control RS Kurnia Cilegon",
+      "balanceAfter": 55092000
+    },
+    {
+      "id": "dstech_cash_3",
+      "date": "2026-10-15",
+      "type": "IN",
+      "category": "Pelunasan Penjualan",
+      "amount": 49950000,
+      "account": "Bank BCA DSTech",
+      "reference": "INV-DSTECH-202610-003",
+      "description": "Pembayaran lunas barrier gate Metro Royal",
+      "balanceAfter": 51092000
+    },
+    {
+      "id": "dstech_cash_4",
+      "date": "2026-10-15",
+      "type": "OUT",
+      "category": "Pembelian Stok Gudang",
+      "amount": 22533000,
+      "account": "Bank Mandiri PT DSTech Smart Perkasa",
+      "reference": "PO-DSTECH-202610-001",
+      "description": "Pelunasan PO kamera IP & NVR ke PT Hikvision Indonesia",
+      "balanceAfter": 1142000
+    },
+    {
+      "id": "dstech_cash_5",
+      "date": "2026-10-14",
+      "type": "OUT",
+      "category": "Pembelian Stok Gudang",
+      "amount": 13209000,
+      "account": "Bank Mandiri PT DSTech Smart Perkasa",
+      "reference": "PO-DSTECH-202610-002",
+      "description": "Pelunasan PO kabel UTP Belden 6 roll",
+      "balanceAfter": 23675000
+    },
+    {
+      "id": "dstech_cash_6",
+      "date": "2026-10-10",
+      "type": "OUT",
+      "category": "Beban Operasional Kantor & BBM",
+      "amount": 3500000,
+      "account": "Kas Kecil (Petty Cash)",
+      "reference": "EXP-DSTECH-202610-01",
+      "description": "Biaya BBM mobil operasional, tol, dan konsumsi teknisi instalasi",
+      "balanceAfter": 36884000
+    }
+  ],
+  "warehouses": [
+    {
+      "id": "dstech_wh_1",
+      "code": "GD-CLG-01",
+      "name": "Gudang Utama DSTech - Cilegon",
+      "type": "Gudang Pusat",
+      "address": "Perum BCA Blok DB No. 19, Cilegon - Banten",
+      "pic": "Hendra Prasetyo",
+      "phone": "0812-3344-5566",
+      "totalItemTypes": 24,
+      "totalValuation": 145000000,
+      "status": "Aktif Utama"
+    },
+    {
+      "id": "dstech_wh_2",
+      "code": "GD-SRG-02",
+      "name": "Gudang Transit Serang",
+      "type": "Gudang Transit",
+      "address": "Jl. Raya Serang - Pandeglang Km 3, Serang",
+      "pic": "Budi Santoso",
+      "phone": "0877-2211-3344",
+      "totalItemTypes": 12,
+      "totalValuation": 48000000,
+      "status": "Aktif Transit"
+    },
+    {
+      "id": "dstech_wh_3",
+      "code": "GD-MOB-01",
+      "name": "Mobil Operasional Tim 1 (Unit Keliling)",
+      "type": "Unit Mobile",
+      "address": "Wilayah Cilegon - Anyer - Merak",
+      "pic": "Ikhsan Maulidi",
+      "phone": "0822-5949-4242",
+      "totalItemTypes": 8,
+      "totalValuation": 12500000,
+      "status": "Aktif Bergerak"
+    }
+  ],
+  "branches": [
+    {
+      "id": "dstech_branch_1",
+      "code": "BR-01",
+      "name": "Kantor Pusat DSTech Smart Perkasa Cilegon",
+      "city": "Kota Cilegon",
+      "address": "Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon",
+      "head": "Direktur Operasional",
+      "phone": "0822-5949-4242",
+      "status": "Kantor Pusat"
+    },
+    {
+      "id": "dstech_branch_2",
+      "code": "BR-02",
+      "name": "Kantor Cabang Pelayanan & Penjualan Serang",
+      "city": "Kota Serang",
+      "address": "Ruko Serang Trade Center Blok B-08, Serang",
+      "head": "Branch Manager Serang",
+      "phone": "0878-1122-3344",
+      "status": "Kantor Cabang"
+    },
+    {
+      "id": "dstech_branch_3",
+      "code": "BR-03",
+      "name": "Perwakilan Proyek Tangerang & Banten Timur",
+      "city": "Kota Tangerang",
+      "address": "Kawasan Komersial BSD City Sektor 7, Tangerang",
+      "head": "Project Representative",
+      "phone": "0819-0099-8877",
+      "status": "Perwakilan Proyek"
+    }
+  ],
+  "expenses": [
+    {
+      "id": "dstech_exp_1",
+      "date": "2026-10-18",
+      "category": "Gaji & Insentif Lapangan",
+      "amount": 9500000,
+      "recipient": "Tim Teknisi & Staf Lapangan",
+      "notes": "Gaji teknisi mingguan dan uang saku dinas luar Krakatau Posco"
+    },
+    {
+      "id": "dstech_exp_2",
+      "date": "2026-10-14",
+      "category": "Transport, BBM & Tol",
+      "amount": 1850000,
+      "recipient": "SPBU Pertamina & E-Toll Banten",
+      "notes": "Operasional mobil unit instalasi"
+    },
+    {
+      "id": "dstech_exp_3",
+      "date": "2026-10-12",
+      "category": "Listrik, Internet & Komunikasi Workshop",
+      "amount": 1650000,
+      "recipient": "PLN & Telkom IndiHome Cilegon",
+      "notes": "Tagihan listrik bulanan dan fiber internet server workshop"
+    },
+    {
+      "id": "dstech_exp_4",
+      "date": "2026-10-08",
+      "category": "Peralatan Safety K3 & Alat Bantu Kerja",
+      "amount": 2100000,
+      "recipient": "Toko Safety Glodok Serang",
+      "notes": "Pengadaan helm K3, safety belt harness & multimeter digital"
+    }
+  ]
+}

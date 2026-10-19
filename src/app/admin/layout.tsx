@@ -22,17 +22,25 @@ import {
   FolderKanban,
   FileDown,
   BookOpen,
+  Scale,
 } from "lucide-react";
 
 interface SearchResult {
   title: string;
-  category: "Navigasi" | "Produk" | "Mitra" | "User" | "Pengaturan";
+  category: "Navigasi" | "Produk" | "Mitra" | "User" | "Pengaturan" | "Keuangan";
   url: string;
   desc: string;
 }
 
 const SEARCH_CATALOG: SearchResult[] = [
   { title: "Dashboard Overview", category: "Navigasi", url: "/admin", desc: "Ringkasan metrik omset, stok, dan partner" },
+  { title: "Keuangan & ERP Dashboard", category: "Keuangan", url: "/admin/finance", desc: "Ringkasan finansial, omset penjualan, pembelian PO, laba rugi, dan arus kas" },
+  { title: "Faktur & Penjualan", category: "Keuangan", url: "/admin/finance", desc: "Kelola faktur penjualan, status pelunasan, PPN, dan cetak invoice resmi" },
+  { title: "Pembelian & Purchase Order (PO)", category: "Keuangan", url: "/admin/finance", desc: "Kelola pesanan pembelian material ke supplier dan status hutang" },
+  { title: "Retur Penjualan & Pembelian", category: "Keuangan", url: "/admin/finance", desc: "Kelola klaim retur barang garansi pelanggan dan retur supplier" },
+  { title: "Laporan Laba Rugi (P&L)", category: "Keuangan", url: "/admin/finance", desc: "Laporan pendapatan kotor, HPP / beban pokok, dan laba bersih operasional" },
+  { title: "Buku Arus Kas (Cash Flow)", category: "Keuangan", url: "/admin/finance", desc: "Mutasi kas masuk dan keluar Bank Mandiri, BCA, dan Kas Tunai / Petty Cash" },
+  { title: "Multi-Gudang & Cabang", category: "Keuangan", url: "/admin/finance", desc: "Valuasi stok antar gudang utama Cilegon, Serang, dan transit proyek" },
   { title: "Manajemen Produk (CRUD)", category: "Produk", url: "/admin/products", desc: "Tambah, edit, hapus inventori CCTV & Smart Home" },
   { title: "Kategori & Sub-Kategori", category: "Produk", url: "/admin/categories", desc: "Kelola klasifikasi kategori dan sub-kategori produk" },
   { title: "Portofolio Proyek", category: "Navigasi", url: "/admin/portfolios", desc: "Kelola dokumentasi proyek selesai, foto & video instalasi" },
@@ -122,6 +130,12 @@ export default function AdminLayout({
       href: "/admin",
       icon: LayoutDashboard,
       active: pathname === "/admin",
+    },
+    {
+      label: "Keuangan & ERP",
+      href: "/admin/finance",
+      icon: Scale,
+      active: pathname.startsWith("/admin/finance"),
     },
     {
       label: "Product Management",

@@ -1,5 +1,18 @@
 import React from "react";
-import { TrendingUp, Package, Users, DollarSign, ArrowUpRight } from "lucide-react";
+import {
+  TrendingUp,
+  Package,
+  Users,
+  DollarSign,
+  ArrowUpRight,
+  Scale,
+  Receipt,
+  ShoppingCart,
+  Wallet,
+  Building2,
+  ArrowRight,
+  RotateCcw,
+} from "lucide-react";
 
 export default function AdminDashboard() {
   return (
@@ -25,6 +38,107 @@ export default function AdminDashboard() {
              <h3 className="text-3xl font-black text-slate-900">{stat.val}</h3>
           </div>
         ))}
+      </div>
+
+      {/* Finance & ERP Quick Command Center */}
+      <div className="p-8 sm:p-10 rounded-[48px] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white border border-slate-800 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 pb-8 border-b border-white/10">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-black uppercase tracking-wider mb-3">
+              <Scale className="w-3.5 h-3.5 text-cyan-400" />
+              <span>ERP & Manajemen Keuangan Terintegrasi</span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              Sistem Penjualan, Pembelian & Laporan Keuangan
+            </h3>
+            <p className="text-slate-400 text-sm mt-1 max-w-2xl font-medium">
+              Pantau faktur invoice resmi, PO supplier, retur barang, laba rugi, kas bank Mandiri & BCA, serta valuasi multi-gudang langsung dari satu dashboard eksekutif.
+            </p>
+          </div>
+          <a
+            href="/admin/finance"
+            className="inline-flex items-center gap-2.5 px-6 py-4 rounded-2xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-cyan-500/20 active:scale-95 shrink-0"
+          >
+            <span>Buka Dashboard Keuangan</span>
+            <ArrowRight className="w-4 h-4" />
+          </a>
+        </div>
+
+        {/* Financial ERP Modules Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 pt-8 relative z-10">
+          {[
+            {
+              title: "Faktur Penjualan",
+              desc: "Invoice & Piutang",
+              href: "/admin/finance",
+              icon: Receipt,
+              color: "text-emerald-400",
+              bg: "bg-emerald-500/10 border-emerald-500/20",
+            },
+            {
+              title: "Pembelian (PO)",
+              desc: "Supplier & Hutang",
+              href: "/admin/finance",
+              icon: ShoppingCart,
+              color: "text-blue-400",
+              bg: "bg-blue-500/10 border-blue-500/20",
+            },
+            {
+              title: "Retur Barang",
+              desc: "Pelanggan & Vendor",
+              href: "/admin/finance",
+              icon: RotateCcw,
+              color: "text-amber-400",
+              bg: "bg-amber-500/10 border-amber-500/20",
+            },
+            {
+              title: "Laba Rugi (P&L)",
+              desc: "Omset & Laba Bersih",
+              href: "/admin/finance",
+              icon: Scale,
+              color: "text-purple-400",
+              bg: "bg-purple-500/10 border-purple-500/20",
+            },
+            {
+              title: "Buku Arus Kas",
+              desc: "Mandiri, BCA, Tunai",
+              href: "/admin/finance",
+              icon: Wallet,
+              color: "text-cyan-400",
+              bg: "bg-cyan-500/10 border-cyan-500/20",
+            },
+            {
+              title: "Gudang & Cabang",
+              desc: "Valuasi Stok Logistik",
+              href: "/admin/finance",
+              icon: Building2,
+              color: "text-rose-400",
+              bg: "bg-rose-500/10 border-rose-500/20",
+            },
+          ].map((item, idx) => {
+            const Icon = item.icon;
+            return (
+              <a
+                key={idx}
+                href={item.href}
+                className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all flex flex-col justify-between group"
+              >
+                <div className={`w-10 h-10 rounded-xl ${item.bg} border flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                  <Icon className={`w-5 h-5 ${item.color}`} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors leading-tight">
+                    {item.title}
+                  </h4>
+                  <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                    {item.desc}
+                  </p>
+                </div>
+              </a>
+            );
+          })}
+        </div>
       </div>
 
       {/* Main Content Sections */}
