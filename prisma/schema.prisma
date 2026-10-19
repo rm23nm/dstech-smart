@@ -24,6 +24,8 @@ model User {
   commissions   Commission[] @relation("AffiliateCommissions")
   referrals     Referral[]
   subscriptions Subscription[]
+
+  @@map("dstech_users")
 }
 
 enum Role {
@@ -44,6 +46,8 @@ model Product {
 
   commissions     Commission[]
   subscriptions   Subscription[]
+
+  @@map("dstech_products")
 }
 
 enum CommType {
@@ -63,6 +67,8 @@ model Subscription {
 
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
+
+  @@map("dstech_subscriptions")
 }
 
 enum SubStatus {
@@ -83,6 +89,8 @@ model Referral {
   updatedAt   DateTime @updatedAt
 
   commissions Commission[]
+
+  @@map("dstech_referrals")
 }
 
 enum RefStatus {
@@ -104,6 +112,8 @@ model Commission {
   status      CommStatus @default(PENDING)
   createdAt   DateTime   @default(now())
   paidAt      DateTime?
+
+  @@map("dstech_commissions")
 }
 
 enum CommStatus {
@@ -120,4 +130,6 @@ model Portfolio {
   imageUrl    String
   link        String?
   createdAt   DateTime @default(now())
+
+  @@map("dstech_portfolios")
 }
