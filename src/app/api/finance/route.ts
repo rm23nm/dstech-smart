@@ -37,6 +37,37 @@ function writeFinanceData(data: any) {
   }
 }
 
+function getDefaultBankAccountLabel(data: any): string {
+  const accounts = data.bank_accounts || [];
+  const defaultAcc =
+    accounts.find((b: any) => b.isDefault && b.status === "Aktif") ||
+    accounts.find((b: any) => b.status === "Aktif") ||
+    accounts[0];
+  if (defaultAcc) {
+    return `${defaultAcc.bankName} - ${defaultAcc.accountNumber} (${defaultAcc.accountHolder})`;
+  }
+  return "Kas Tunai Operasional";
+}
+
+function formatAccountFromPaymentMethod(method: string, data: any): string {
+  if (!method) return getDefaultBankAccountLabel(data);
+  const m = String(method).trim();
+  if (m.includes("Tunai") || m.includes("Kas Langsung")) return "Kas Tunai Operasional";
+  if (m.includes("Kas Kecil") || m.includes("Petty Cash")) return "Kas Kecil (Petty Cash Kantor)";
+
+  const accounts = data.bank_accounts || [];
+  for (const b of accounts) {
+    if (m.includes(b.bankName) || (b.accountNumber && m.includes(b.accountNumber))) {
+      return `${b.bankName} - ${b.accountNumber} (${b.accountHolder})`;
+    }
+  }
+
+  if (m.startsWith("Transfer ")) {
+    return m.replace(/^Transfer\s+/i, "");
+  }
+  return m;
+}
+
 export async function GET() {
   const data = readFinanceData();
 
@@ -249,7 +280,7 @@ export async function POST(request: Request) {
         taxRate: Number(payload.taxRate) || 11,
         taxAmount: Number(payload.taxAmount) || 0,
         grandTotal,
-        paymentMethod: payload.paymentMethod || "Transfer Bank Mandiri PT DSTech Smart Perkasa",
+        paymentMethod: payload.paymentMethod || `Transfer ${getDefaultBankAccountLabel(data)}`,
         paymentStatus: payload.paymentStatus || paymentStatus,
         paidAmount,
         remainingAmount,
@@ -278,7 +309,7 @@ export async function POST(request: Request) {
           type: "IN",
           category: cashCategory,
           amount: paidAmount,
-          account: newSale.paymentMethod.includes("BCA") ? "Bank BCA DSTech" : "Bank Mandiri PT DSTech Smart Perkasa",
+          account: formatAccountFromPaymentMethod(newSale.paymentMethod, data),
           reference: newSale.invoiceNumber,
           description: `Penerimaan ${isDp ? "DP" : "faktur"} penjualan ${newSale.invoiceNumber} - ${newSale.customerName}`,
           balanceAfter: 0,
@@ -431,7 +462,7 @@ export async function POST(request: Request) {
         type: "IN",
         category: cashCategory,
         amount: amountToPay,
-        account: paymentMethod || invoice.paymentMethod || "Bank Mandiri PT DSTech Smart Perkasa",
+        account: formatAccountFromPaymentMethod(paymentMethod || invoice.paymentMethod, data),
         reference: invoice.invoiceNumber,
         description: `Penerimaan ${invoice.invoiceType === "DP" ? "DP / Termin" : "Pelunasan"} ${invoice.invoiceNumber} - ${invoice.customerName} (${notes || "Pembayaran Masuk"})`,
         balanceAfter: 0,
@@ -543,7 +574,7 @@ export async function POST(request: Request) {
         type: payload.type === "OUT" ? "OUT" : "IN",
         category: payload.category || "Operasional",
         amount: Number(payload.amount) || 0,
-        account: payload.account || "Bank Mandiri PT DSTech Smart Perkasa",
+        account: payload.account || getDefaultBankAccountLabel(data),
         reference: payload.reference || `TRX-${Date.now().toString().slice(-6)}`,
         description: payload.description || "-",
         balanceAfter: 0,
@@ -667,7 +698,7 @@ export async function POST(request: Request) {
         taxRate: sph.taxRate,
         taxAmount: sph.taxAmount,
         grandTotal: grandTotal,
-        paymentMethod: "Transfer Bank Mandiri",
+        paymentMethod: `Transfer ${getDefaultBankAccountLabel(data)}`,
         paymentStatus: isDp ? "Menunggu DP" : "Belum Lunas",
         paidAmount: 0,
         remainingAmount: grandTotal,
@@ -1031,6 +1062,9 @@ export async function DELETE(request: Request) {
       data.bank_accounts = (data.bank_accounts || []).filter((b: any) => b.id !== id);
       if (data.bank_accounts.length === initialLen) {
         return NextResponse.json({ success: false, error: "Rekening tidak ditemukan" }, { status: 404 });
+      }
+      if (data.bank_accounts.length > 0 && !data.bank_accounts.some((b: any) => b.isDefault)) {
+        data.bank_accounts[0].isDefault = true;
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Rekening bank berhasil dihapus" });

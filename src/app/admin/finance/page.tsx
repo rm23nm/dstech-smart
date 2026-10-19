@@ -375,6 +375,7 @@ export default function AdminFinanceERPPage() {
   const [isNewPoModalOpen, setIsNewPoModalOpen] = useState<boolean>(false);
   const [isNewCashModalOpen, setIsNewCashModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<SaleInvoice | null>(null);
+  const [cashAccountFilter, setCashAccountFilter] = useState<string>("ALL");
 
   // Bank Accounts & Settings States
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([
@@ -398,6 +399,16 @@ export default function AdminFinanceERPPage() {
     },
   ]);
 
+  const getDefaultBankAccLabel = () => {
+    const def = bankAccounts.find((b) => b.isDefault && b.status === "Aktif") || bankAccounts.find((b) => b.status === "Aktif") || bankAccounts[0];
+    return def ? `${def.bankName} - ${def.accountNumber} (${def.accountHolder})` : "Kas Tunai Operasional";
+  };
+
+  const getDefaultTransferLabel = () => {
+    const def = bankAccounts.find((b) => b.isDefault && b.status === "Aktif") || bankAccounts.find((b) => b.status === "Aktif") || bankAccounts[0];
+    return def ? `Transfer ${def.bankName} (${def.accountNumber} - ${def.accountHolder})` : "Transfer Bank Resmi DSTech";
+  };
+
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings>({
     letterheadUrl: "/kop_surat_dstech.jpg",
     letterheadEnabled: true,
@@ -413,7 +424,7 @@ export default function AdminFinanceERPPage() {
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<SaleInvoice | null>(null);
   const [paymentForm, setPaymentForm] = useState({
     amount: 0,
-    paymentMethod: "Bank Mandiri PT DSTech Smart Perkasa",
+    paymentMethod: "",
     paymentDate: new Date().toISOString().split("T")[0],
     notes: "",
   });
@@ -599,7 +610,7 @@ export default function AdminFinanceERPPage() {
     type: "IN" as "IN" | "OUT",
     category: "Penerimaan Penjualan",
     amount: 0,
-    account: "Bank Mandiri PT DSTech Smart Perkasa",
+    account: "",
     reference: "",
     description: "",
     recordAsExpense: false,
@@ -665,7 +676,17 @@ export default function AdminFinanceERPPage() {
           setExpenses(d.data.expenses || []);
           setClients(d.data.clients || []);
           setSuppliers(d.data.suppliers || []);
-          if (d.data.bank_accounts) setBankAccounts(d.data.bank_accounts);
+          if (d.data.bank_accounts && d.data.bank_accounts.length > 0) {
+            setBankAccounts(d.data.bank_accounts);
+            const def = d.data.bank_accounts.find((b: any) => b.isDefault && b.status === "Aktif") || d.data.bank_accounts.find((b: any) => b.status === "Aktif") || d.data.bank_accounts[0];
+            if (def) {
+              const accLabel = `${def.bankName} - ${def.accountNumber} (${def.accountHolder})`;
+              const transferLabel = `Transfer ${def.bankName} (${def.accountNumber} - ${def.accountHolder})`;
+              setCashForm((prev) => (!prev.account ? { ...prev, account: accLabel } : prev));
+              setSaleForm((prev) => (!prev.paymentMethod || prev.paymentMethod.includes("Bank Mandiri PT DSTech") ? { ...prev, paymentMethod: transferLabel } : prev));
+              setPaymentForm((prev) => (!prev.paymentMethod ? { ...prev, paymentMethod: accLabel } : prev));
+            }
+          }
           if (d.data.settings) {
             setFinanceSettings(d.data.settings);
             setTempSettings(d.data.settings);
@@ -1030,7 +1051,7 @@ export default function AdminFinanceERPPage() {
           customerAddress: "",
           date: new Date().toISOString().split("T")[0],
           dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
-          paymentMethod: "Transfer Bank Mandiri PT DSTech Smart Perkasa",
+          paymentMethod: getDefaultTransferLabel(),
           invoiceType: "Standar",
           dpPercentage: 50,
           dpAmount: 0,
@@ -1057,10 +1078,7 @@ export default function AdminFinanceERPPage() {
     if (invoice.invoiceType === "DP" && (Number(invoice.dpPaidAmount) || 0) < (Number(invoice.dpAmount) || 0)) {
       defaultAmount = Math.max(0, (Number(invoice.dpAmount) || 0) - (Number(invoice.dpPaidAmount) || 0));
     }
-    const defaultAcc =
-      bankAccounts.find((b) => b.isDefault)?.bankName
-        ? `${bankAccounts.find((b) => b.isDefault)?.bankName} PT DSTech Smart Perkasa`
-        : "Bank Mandiri PT DSTech Smart Perkasa";
+    const defaultAcc = getDefaultBankAccLabel();
 
     setPaymentForm({
       amount: defaultAmount,
@@ -1528,7 +1546,7 @@ export default function AdminFinanceERPPage() {
           type: "IN",
           category: "Penerimaan Penjualan",
           amount: 0,
-          account: "Bank Mandiri PT DSTech Smart Perkasa",
+          account: getDefaultBankAccLabel(),
           reference: "",
           description: "",
           recordAsExpense: false,
@@ -1541,6 +1559,21 @@ export default function AdminFinanceERPPage() {
     } catch {
       showToast("Terjadi kesalahan jaringan");
     }
+  };
+
+  const handleOpenNewCashModal = (type: "IN" | "OUT" = "IN") => {
+    setCashForm({
+      date: new Date().toISOString().split("T")[0],
+      type,
+      category: type === "IN" ? "Penerimaan Penjualan" : "Biaya Operasional Lainnya",
+      amount: 0,
+      account: getDefaultBankAccLabel(),
+      reference: "",
+      description: "",
+      recordAsExpense: false,
+      recipient: "",
+    });
+    setIsNewCashModalOpen(true);
   };
 
   // Handler PO Dynamic Items
@@ -3088,8 +3121,8 @@ export default function AdminFinanceERPPage() {
         {/* TAB 5: BUKU ARUS KAS (CASH FLOW) */}
         {activeTab === "cash_flow" && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
                   <p className="text-[10px] font-bold text-emerald-700 uppercase">Kas Masuk (IN)</p>
                   <p className="text-sm font-black text-emerald-800">{formatRupiah(summary.totalCashIn)}</p>
@@ -3100,13 +3133,43 @@ export default function AdminFinanceERPPage() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setIsNewCashModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Catat Transaksi Kas</span>
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Filter Akun:</span>
+                  <select
+                    value={cashAccountFilter}
+                    onChange={(e) => setCashAccountFilter(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+                  >
+                    <option value="ALL">Semua Rekening & Kas ({cashFlow.length})</option>
+                    {bankAccounts.map((b) => (
+                      <option key={b.id} value={b.bankName}>
+                        {b.bankName} - {b.accountNumber}
+                      </option>
+                    ))}
+                    <option value="TUNAI">Kas Tunai / Petty Cash</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsBankAccountsModalOpen(true)}
+                  className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-dstech-blue font-bold text-xs flex items-center gap-1.5 border border-blue-200 cursor-pointer transition-colors"
+                  title="Kelola Rekening Bank Resmi"
+                >
+                  <Landmark className="w-3.5 h-3.5" />
+                  <span>Rekening Bank ({bankAccounts.length})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleOpenNewCashModal("IN")}
+                  className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Catat Transaksi Kas</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -3122,42 +3185,63 @@ export default function AdminFinanceERPPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {cashFlow.map((cash) => (
-                    <tr key={cash.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="p-3 font-medium text-slate-500 whitespace-nowrap">{cash.date}</td>
-                      <td className="p-3 whitespace-nowrap">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 w-fit ${
-                            cash.type === "IN"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-red-100 text-red-800"
+                  {cashFlow
+                    .filter((cash) => {
+                      if (cashAccountFilter === "ALL") return true;
+                      if (cashAccountFilter === "TUNAI") {
+                        return (
+                          cash.account.toLowerCase().includes("tunai") ||
+                          cash.account.toLowerCase().includes("kas kecil") ||
+                          cash.account.toLowerCase().includes("petty")
+                        );
+                      }
+                      return cash.account.toLowerCase().includes(cashAccountFilter.toLowerCase());
+                    })
+                    .map((cash) => (
+                      <tr key={cash.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="p-3 font-medium text-slate-500 whitespace-nowrap">{cash.date}</td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 w-fit ${
+                              cash.type === "IN"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {cash.type === "IN" ? (
+                              <ArrowDownRight className="w-3 h-3 text-emerald-600" />
+                            ) : (
+                              <ArrowUpRight className="w-3 h-3 text-red-600" />
+                            )}
+                            <span>{cash.type === "IN" ? "Masuk" : "Keluar"}</span>
+                          </span>
+                        </td>
+                        <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{cash.category}</td>
+                        <td className="p-3 text-slate-600">
+                          <p className="font-medium text-slate-900">{cash.description}</p>
+                          {cash.reference && (
+                            <p className="text-[10px] font-mono text-slate-400">Ref: {cash.reference}</p>
+                          )}
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/60">
+                            {cash.account.toLowerCase().includes("tunai") || cash.account.toLowerCase().includes("petty") ? (
+                              <Wallet className="w-3 h-3 text-amber-600 shrink-0" />
+                            ) : (
+                              <Landmark className="w-3 h-3 text-dstech-blue shrink-0" />
+                            )}
+                            <span>{cash.account}</span>
+                          </span>
+                        </td>
+                        <td
+                          className={`p-3 text-right font-black whitespace-nowrap ${
+                            cash.type === "IN" ? "text-emerald-600" : "text-red-600"
                           }`}
                         >
-                          {cash.type === "IN" ? (
-                            <ArrowDownRight className="w-3 h-3 text-emerald-600" />
-                          ) : (
-                            <ArrowUpRight className="w-3 h-3 text-red-600" />
-                          )}
-                          <span>{cash.type === "IN" ? "Masuk" : "Keluar"}</span>
-                        </span>
-                      </td>
-                      <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{cash.category}</td>
-                      <td className="p-3 text-slate-600">
-                        <p className="font-medium text-slate-900">{cash.description}</p>
-                        {cash.reference && (
-                          <p className="text-[10px] font-mono text-slate-400">Ref: {cash.reference}</p>
-                        )}
-                      </td>
-                      <td className="p-3 text-slate-600 font-medium whitespace-nowrap">{cash.account}</td>
-                      <td
-                        className={`p-3 text-right font-black whitespace-nowrap ${
-                          cash.type === "IN" ? "text-emerald-600" : "text-red-600"
-                        }`}
-                      >
-                        {cash.type === "IN" ? "+" : "-"} {formatRupiah(cash.amount)}
-                      </td>
-                    </tr>
-                  ))}
+                          {cash.type === "IN" ? "+" : "-"} {formatRupiah(cash.amount)}
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
@@ -3726,17 +3810,28 @@ export default function AdminFinanceERPPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Metode Pembayaran:</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-700 block">Metode Pembayaran:</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsBankAccountsModalOpen(true)}
+                      className="text-[10px] text-dstech-blue hover:underline font-bold cursor-pointer"
+                    >
+                      ⚙️ Rekening
+                    </button>
+                  </div>
                   <select
-                    value={saleForm.paymentMethod}
+                    value={saleForm.paymentMethod || getDefaultTransferLabel()}
                     onChange={(e) => setSaleForm({ ...saleForm, paymentMethod: e.target.value })}
                     className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white"
                   >
-                    {bankAccounts.map((b) => (
-                      <option key={b.id} value={`Transfer ${b.bankName} (${b.accountNumber} - ${b.accountHolder})`}>
-                        Transfer {b.bankName} ({b.accountNumber} - {b.accountHolder})
-                      </option>
-                    ))}
+                    {bankAccounts
+                      .filter((b) => b.status === "Aktif")
+                      .map((b) => (
+                        <option key={b.id} value={`Transfer ${b.bankName} (${b.accountNumber} - ${b.accountHolder})`}>
+                          Transfer {b.bankName} ({b.accountNumber} - {b.accountHolder}) {b.isDefault ? "★ (Utama)" : ""}
+                        </option>
+                      ))}
                     <option value="Tunai / Kas Langsung">Tunai / Kas Langsung</option>
                     <option value="Tempo 14 Hari">Tempo 14 Hari</option>
                     <option value="Tempo 30 Hari">Tempo 30 Hari</option>
@@ -4131,19 +4226,33 @@ export default function AdminFinanceERPPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Rekening Akun Kas / Bank:</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700 block">Rekening Akun Kas / Bank:</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsNewCashModalOpen(false);
+                      setIsBankAccountsModalOpen(true);
+                    }}
+                    className="text-[10px] text-dstech-blue hover:underline font-bold cursor-pointer"
+                  >
+                    ⚙️ Atur Rekening Resmi
+                  </button>
+                </div>
                 <select
-                  value={cashForm.account}
+                  value={cashForm.account || getDefaultBankAccLabel()}
                   onChange={(e) => setCashForm({ ...cashForm, account: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
                 >
-                  {bankAccounts.map((b) => (
-                    <option key={b.id} value={`${b.bankName} - ${b.accountNumber} (${b.accountHolder})`}>
-                      {b.bankName} - {b.accountNumber} ({b.accountHolder})
-                    </option>
-                  ))}
-                  <option value="Kas Kecil (Petty Cash Kantor)">Kas Kecil (Petty Cash Kantor)</option>
+                  {bankAccounts
+                    .filter((b) => b.status === "Aktif")
+                    .map((b) => (
+                      <option key={b.id} value={`${b.bankName} - ${b.accountNumber} (${b.accountHolder})`}>
+                        {b.bankName} - {b.accountNumber} ({b.accountHolder}) {b.isDefault ? "★ (Rekening Utama)" : ""}
+                      </option>
+                    ))}
                   <option value="Kas Tunai Operasional">Kas Tunai Operasional</option>
+                  <option value="Kas Kecil (Petty Cash Kantor)">Kas Kecil (Petty Cash Kantor)</option>
                 </select>
               </div>
 
@@ -6505,20 +6614,33 @@ export default function AdminFinanceERPPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Rekening Bank Tujuan Penerimaan:</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700 block">Rekening Bank Tujuan Penerimaan:</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPayInvoiceModalOpen(false);
+                      setIsBankAccountsModalOpen(true);
+                    }}
+                    className="text-[10px] text-dstech-blue hover:underline font-bold cursor-pointer"
+                  >
+                    ⚙️ Atur Rekening
+                  </button>
+                </div>
                 <select
-                  value={paymentForm.paymentMethod}
+                  value={paymentForm.paymentMethod || getDefaultBankAccLabel()}
                   onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white"
                 >
                   {bankAccounts
                     .filter((b) => b.status === "Aktif")
                     .map((acc) => (
-                      <option key={acc.id} value={`${acc.bankName} PT DSTech Smart Perkasa`}>
-                        {acc.bankName} - {acc.accountNumber} ({acc.accountHolder})
+                      <option key={acc.id} value={`${acc.bankName} - ${acc.accountNumber} (${acc.accountHolder})`}>
+                        {acc.bankName} - {acc.accountNumber} ({acc.accountHolder}) {acc.isDefault ? "★ (Utama)" : ""}
                       </option>
                     ))}
-                  <option value="Kas Tunai DSTech (Petty Cash)">Kas Tunai DSTech (Cash Kantor)</option>
+                  <option value="Kas Tunai Operasional">Kas Tunai Operasional</option>
+                  <option value="Kas Kecil (Petty Cash Kantor)">Kas Kecil (Petty Cash Kantor)</option>
                 </select>
               </div>
 
@@ -6614,17 +6736,28 @@ export default function AdminFinanceERPPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">Metode & Rekening Pembayaran:</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-700 block">Metode & Rekening Pembayaran:</label>
+                    <button
+                      type="button"
+                      onClick={() => setIsBankAccountsModalOpen(true)}
+                      className="text-[10px] text-dstech-blue hover:underline font-bold cursor-pointer"
+                    >
+                      ⚙️ Rekening
+                    </button>
+                  </div>
                   <select
                     value={editingSale.paymentMethod}
                     onChange={(e) => setEditingSale({ ...editingSale, paymentMethod: e.target.value })}
                     className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white"
                   >
-                    {bankAccounts.map((b) => (
-                      <option key={b.id} value={`Transfer ${b.bankName} (${b.accountNumber} - ${b.accountHolder})`}>
-                        Transfer {b.bankName} ({b.accountNumber} - {b.accountHolder})
-                      </option>
-                    ))}
+                    {bankAccounts
+                      .filter((b) => b.status === "Aktif")
+                      .map((b) => (
+                        <option key={b.id} value={`Transfer ${b.bankName} (${b.accountNumber} - ${b.accountHolder})`}>
+                          Transfer {b.bankName} ({b.accountNumber} - {b.accountHolder}) {b.isDefault ? "★ (Utama)" : ""}
+                        </option>
+                      ))}
                     <option value="Tunai / Kas Langsung">Tunai / Kas Langsung</option>
                     <option value="Tempo 14 Hari">Tempo 14 Hari</option>
                     <option value="Tempo 30 Hari">Tempo 30 Hari</option>
