@@ -151,6 +151,7 @@ interface FinanceSettings {
   watermarkOpacity: number;
   letterheadPaddingTop?: number;
   letterheadPaddingBottom?: number;
+  letterheadFitMode?: "fill" | "cover" | "contain";
   signerName?: string;
   signerTitle?: string;
   masterSignatureUrl?: string;
@@ -566,6 +567,7 @@ export default function AdminFinanceERPPage() {
     watermarkOpacity: 0.15,
     letterheadPaddingTop: 135,
     letterheadPaddingBottom: 110,
+    letterheadFitMode: "fill",
     signerName: "H. Agus Supriyadi, S.T., M.Kom.",
     signerTitle: "Direktur Keuangan & Operasional",
     masterSignatureUrl: "",
@@ -606,6 +608,7 @@ export default function AdminFinanceERPPage() {
     watermarkOpacity: 0.15,
     letterheadPaddingTop: 135,
     letterheadPaddingBottom: 110,
+    letterheadFitMode: "fill",
     signerName: "H. Agus Supriyadi, S.T., M.Kom.",
     signerTitle: "Direktur Keuangan & Operasional",
     masterSignatureUrl: "",
@@ -1504,6 +1507,7 @@ export default function AdminFinanceERPPage() {
       ...financeSettings,
       letterheadPaddingTop: financeSettings.letterheadPaddingTop || 135,
       letterheadPaddingBottom: financeSettings.letterheadPaddingBottom || 110,
+      letterheadFitMode: financeSettings.letterheadFitMode || "fill",
       signerName: financeSettings.signerName !== undefined ? financeSettings.signerName : "H. Agus Supriyadi, S.T., M.Kom.",
       signerTitle: financeSettings.signerTitle !== undefined ? financeSettings.signerTitle : "Direktur Keuangan & Operasional",
     });
@@ -1539,6 +1543,7 @@ export default function AdminFinanceERPPage() {
         ...tempSettings,
         letterheadPaddingTop: tempSettings.letterheadPaddingTop || 135,
         letterheadPaddingBottom: tempSettings.letterheadPaddingBottom || 110,
+        letterheadFitMode: tempSettings.letterheadFitMode || "fill",
         signerName: tempSettings.signerName?.trim() || "H. Agus Supriyadi, S.T., M.Kom.",
         signerTitle: tempSettings.signerTitle?.trim() || "Direktur Keuangan & Operasional",
       };
@@ -5565,9 +5570,16 @@ export default function AdminFinanceERPPage() {
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
                   style={{
                     backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    backgroundSize:
+                      financeSettings.letterheadFitMode === "cover"
+                        ? "cover"
+                        : financeSettings.letterheadFitMode === "contain"
+                        ? "contain"
+                        : "100% 100%",
+                    backgroundPosition: "top center",
                     opacity: financeSettings.watermarkOpacity || 0.15,
                   }}
                 />
@@ -6492,9 +6504,16 @@ export default function AdminFinanceERPPage() {
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
                   style={{
                     backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    backgroundSize:
+                      financeSettings.letterheadFitMode === "cover"
+                        ? "cover"
+                        : financeSettings.letterheadFitMode === "contain"
+                        ? "contain"
+                        : "100% 100%",
+                    backgroundPosition: "top center",
                     opacity: financeSettings.watermarkOpacity || 0.15,
                   }}
                 />
@@ -8305,9 +8324,16 @@ export default function AdminFinanceERPPage() {
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
                   style={{
                     backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    backgroundSize:
+                      financeSettings.letterheadFitMode === "cover"
+                        ? "cover"
+                        : financeSettings.letterheadFitMode === "contain"
+                        ? "contain"
+                        : "100% 100%",
+                    backgroundPosition: "top center",
                     opacity: financeSettings.watermarkOpacity || 0.15,
                   }}
                 />
@@ -9633,9 +9659,16 @@ export default function AdminFinanceERPPage() {
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
                   style={{
                     backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    backgroundSize:
+                      financeSettings.letterheadFitMode === "cover"
+                        ? "cover"
+                        : financeSettings.letterheadFitMode === "contain"
+                        ? "contain"
+                        : "100% 100%",
+                    backgroundPosition: "top center",
                     opacity: financeSettings.watermarkOpacity || 0.15,
                   }}
                 />
@@ -9912,9 +9945,16 @@ export default function AdminFinanceERPPage() {
               {/* Background Kop Surat Resmi DSTech */}
               {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
                 <div
-                  className="absolute inset-0 pointer-events-none z-0 bg-cover bg-no-repeat bg-top"
+                  className="absolute inset-0 pointer-events-none z-0 bg-no-repeat"
                   style={{
                     backgroundImage: `url('${financeSettings.letterheadUrl}')`,
+                    backgroundSize:
+                      financeSettings.letterheadFitMode === "cover"
+                        ? "cover"
+                        : financeSettings.letterheadFitMode === "contain"
+                        ? "contain"
+                        : "100% 100%",
+                    backgroundPosition: "top center",
                     opacity: financeSettings.watermarkOpacity || 0.15,
                   }}
                 />
@@ -11077,6 +11117,54 @@ export default function AdminFinanceERPPage() {
                     className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] cursor-pointer"
                   >
                     Nonaktifkan Kop
+                  </button>
+                </div>
+              </div>
+
+              {/* Mode Skala Background Kop Surat */}
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-700 block">Mode Skala Background Kop Surat:</label>
+                  <span className="text-[10px] text-slate-500 font-medium">Mencegah terpotong samping kiri/kanan</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTempSettings({ ...tempSettings, letterheadFitMode: "fill" })}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer transition ${
+                      (!tempSettings.letterheadFitMode || tempSettings.letterheadFitMode === "fill")
+                        ? "border-dstech-blue bg-blue-50/80 text-dstech-blue font-bold shadow-sm"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">Pas 100% Lembar</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">Utuh kiri & kanan (Bebas terpotong)</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTempSettings({ ...tempSettings, letterheadFitMode: "contain" })}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer transition ${
+                      tempSettings.letterheadFitMode === "contain"
+                        ? "border-dstech-blue bg-blue-50/80 text-dstech-blue font-bold shadow-sm"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">Contain Tengah</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">Rasio asli di tengah lembar</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTempSettings({ ...tempSettings, letterheadFitMode: "cover" })}
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer transition ${
+                      tempSettings.letterheadFitMode === "cover"
+                        ? "border-dstech-blue bg-blue-50/80 text-dstech-blue font-bold shadow-sm"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <div className="text-[11px] font-bold">Cover Proporsional</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">Isi tinggi (potong samping)</div>
                   </button>
                 </div>
               </div>

@@ -41,6 +41,7 @@
 - **2026-10-19**: Modul Retur Barang (Penjualan Klien & Pembelian Supplier) Terpadu. Menambahkan fungsionalitas Tambah Baru, Edit Data Retur, Otorisasi Approval & Tanda Tangan Digital Pemeriksaan QC/Gudang (Canvas Pad, Master Signature, Upload Berkas Gambar, Stempel Bulat Resmi, dan Barcode Verifikasi Sistem `DST-APP-...`), Hapus Dokumen Retur dengan Konfirmasi Aman, serta Lembar Cetak Resmi Berita Acara Serah Terima Retur Barang (BAST Retur / RMA Form A4) ber-Kop Surat Resmi DSTech dan Dual Signatures. Divalidasi `tsc` 0 error, dipush ke GitHub commit `4c0c400`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-19**: Perbaikan Bug Controlled Input Nama Direktur Penandatangan & Jabatan Dokumen Legalitas (`/admin/finance`). Mengatasi masalah reset otomatis saat pengguna menghapus karakter dengan mengganti fallback string `||` menjadi `?? ""` dan menambahkan atribut `placeholder`. Memperbaiki handler modal & penyimpanan sanitasi sehingga pengguna dapat mengosongkan, mengedit, atau mengganti nama penandatangan dengan nama baru tanpa membal kembali ke string default. Lolos verifikasi kompilasi `tsc` 0 error, pengujian visual browser subagent, commit GitHub `1d3e700`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-19**: Penyesuaian Jarak Margin Header & Footer Lembar Cetak Dokumen Ber-Kop Surat (`/admin/finance`). Mengatur jarak padding atas (`paddingTop: 135px`) dan padding bawah (`paddingBottom: 110px`) secara dinamis pada seluruh 5 kontainer dokumen resmi (Faktur Penjualan, Surat Penawaran Harga SPH, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) agar teks judul/isi header tidak menimpa banner grafis atas kop surat dan blok tanda tangan direksi/verifikasi naik aman di atas banner grafis footer. Menambahkan kontrol slider interaktif dan 3 tombol preset di Modal Pengaturan Kop Surat sehingga margin dapat disesuaikan fleksibel sesuai variasi desain kop surat yang diunggah. Lolos validasi TypeScript `tsc` (0 error), diuji via browser subagent, dipush ke GitHub commit `57de659`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
+- **2026-10-19**: Perbaikan Background Kop Surat Terpotong di Samping Kiri dan Kanan pada Seluruh Lembar Cetak Dokumen Keuangan (`/admin/finance`). Mengatasi masalah terpotongnya logo DSP di sisi kiri dan teks legalitas NIB & NPWP di sisi kanan yang disebabkan oleh sifat `bg-cover` pada kontainer dokumen yang memiliki tinggi lebih panjang dari rasio asli kop surat. Memperbarui styling background gambar pada seluruh 5 template cetak resmi (Faktur Penjualan, SPH Quotation, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) menggunakan properti dinamis `backgroundSize: "100% 100%"` (mode Fill Bebas Terpotong) sehingga lebar gambar pas 100% dari tepi kiri ke tepi kanan tanpa clipping. Menambahkan atribut `letterheadFitMode` pada interface `FinanceSettings`, menambahkan kontrol pemilihan mode skala background kop surat (Pas 100% Lembar, Contain Proporsional, Cover Tinggi Penuh) pada Modal Pengaturan Dokumen & Legalitas, serta menguji tampilan visual via browser automation testing. Lolos validasi TypeScript `tsc` (0 error), disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
 **Status**: Selesai
@@ -1175,7 +1176,48 @@
 
 ---
 
-### 44. Catatan Penting
+### 44. Perbaikan Background Kop Surat Terpotong di Samping Kiri dan Kanan pada Lembar Cetak Dokumen
+- **Permintaan Pengguna**:
+  *"untuk kop belakangnya kepotong samping kiri dan kanan"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Investigasi & Analisis Akar Masalah**:
+  - Pada elemen background kop surat lembar cetak dokumen, class yang digunakan sebelumnya adalah `bg-cover bg-no-repeat bg-top`.
+  - Sifat CSS `background-size: cover` akan memaksa gambar membesar secara proporsional hingga memenuhi seluruh tinggi dan lebar kontainer.
+  - Karena tinggi kontainer dokumen cetak (yang memuat tabel barang dan rincian transaksi) lebih panjang/tinggi dibandingkan rasio aspek asli gambar kop surat A4 (724 x 1024), gambar diperbesar mengikuti tinggi kontainer. Akibatnya, bagian samping kiri dan kanan gambar terpotong (`overflow: hidden`).
+  - Efeknya: Logo DSP di sebelah kiri dan teks NIB & NPWP di sebelah kanan terpotong (tidak terlihat utuh).
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Pemeriksaan Riwayat & Pembuatan Backup**:
+     - Memastikan Task 43 selesai dan dideploy.
+     - Membuat cadangan `_backup/LAPORAN_PROGRES.md.bak42` dan `_backup/admin_finance_page.tsx.bak14`.
+  2. [x] **Perbaikan Skala Gambar Background Kop Surat**:
+     - Mengubah properti CSS background pada seluruh 5 template dokumen dari `bg-cover` menjadi `backgroundSize: "100% 100%"` (mode Fill Bebas Terpotong).
+     - Dengan `backgroundSize: "100% 100%"`, lebar gambar kop surat akan selalu pas 100% dari tepi kiri ke tepi kanan lembar kertas tanpa pernah terpotong sedikitpun, sehingga logo di kiri dan NIB/NPWP di kanan tampil utuh sempurna.
+  3. [x] **Penambahan Opsi Mode Skala Kop Surat pada Settings**:
+     - Menambahkan atribut opsional `letterheadFitMode` pada interface `FinanceSettings` dengan pilihan:
+       - `fill` ("Pas Penuh Lembar A4 (100% 100%)" — Rekomendasi Bebas Terpotong)
+       - `cover` ("Cover Proporsional (Tinggi Penuh)")
+       - `contain` ("Contain Proporsional (Tengah)")
+  4. [x] **Penerapan pada Seluruh 5 Format Dokumen**:
+     - Faktur Penjualan (`selectedInvoiceForPrint`)
+     - Surat Penawaran Harga (`selectedQuotationForPrint`)
+     - Purchase Order (`selectedPoForPrint`)
+     - Berita Acara Retur Penjualan (`selectedReturnSaleForPrint`)
+     - Berita Acara Retur Pembelian (`selectedReturnPurchaseForPrint`)
+  5. [x] **Validasi Kompilasi TypeScript**:
+     - Jalankan `npx tsc --noEmit` untuk memastikan 0 error.
+  6. [x] **Pengujian Visual Browser**:
+     - Buka pratinjau Faktur Penjualan di browser dan verifikasi bahwa logo DSP di kiri dan teks NIB/NPWP di kanan tidak lagi terpotong.
+  7. [x] **Sinkronisasi Kode ke GitHub**:
+     - Commit dan push ke repository remote `rm23nm/dstech-smart` via `push_with_native_git.js`.
+  8. [x] **Deployment ke Server Live VPS**:
+     - Rebuild Next.js produksi dan restart PM2 `dstech-main` pada server 157.66.34.199.
+  9. [x] **Penyelesaian Laporan & Notifikasi Pengguna**:
+     - Update laporan menjadi [x] Selesai dan laporkan kepada pengguna.
+
+---
+
+### 45. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
