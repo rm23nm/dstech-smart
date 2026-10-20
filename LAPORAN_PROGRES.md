@@ -48,6 +48,8 @@
 - **2026-10-20**: Penyelarasan Dimensi Margin Kop Surat Canva & Kompensasi Margin Cetak A4 (`letterheadFitMode: "bleed"`). Mengatasi masalah perbedaan margin antara desain Canva dengan kanvas cetak A4 fisik akibat margin putih bawaan dari fitur batas cetak Canva (*safe zone print margins*) serta margin default browser Chrome. Menambahkan mode skala baru `bleed` ("Full Bleed Canva") yang mengkompensasi margin putih bawaan dengan men-zoom gambar secara proporsional (`transform: scale(1.07)` / offset `-3.5%`) dan `overflow: hidden` sehingga banner merah/biru atas & bawah menempel pas di ujung kertas A4 tanpa celah. Mengoptimalkan CSS `@media print` dengan batas pasti A4 (`min-height: 296mm; max-width: 210mm; box-sizing: border-box; overflow: hidden;`) untuk mencegah dokumen terpotong ke halaman 2, menambahkan tombol preset cepat dan kontrol mode skala di modal Pengaturan Kop Surat, serta memasang banner tips visual cetak A4 pada seluruh 5 modal dokumen resmi.
 - **2026-10-20**: Pemadatan & Perapihan Blok Tanda Tangan Dokumen Cetak Resmi (Faktur, SPH, PO, dan Retur). Merapatkan jarak vertikal blok tanda tangan resmi pada seluruh 5 template dokumen cetak resmi (Faktur Penjualan, SPH Quotation, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) dari tinggi awal `h-48` / `h-52` (192-208px) menjadi `h-36` (144px), memperkecil padding kontainer dari `pt-6` ke `pt-3` dan jarak antar kolom dari `gap-6` / `gap-8` ke `gap-4`. Menyesuaikan area tanda tangan digital & stempel resmi ke skala kompak (`h-11`, stempel `w-12 h-12`, gambar tanda tangan `max-h-11`) serta mempersempit jarak antara nama organisasi di atas dengan nama penandatangan di bawah (`pt-1` border-t). Menghasilkan penghematan ruang vertikal hingga 65px sehingga dokumen dengan banyak baris item barang tetap muat rapi dalam 1 lembar A4 tanpa terpotong ke bawah.
 - **2026-10-20**: Pembenahan Tuntas Masalah Kop Surat Terpotong Saat Cetak (Print Stylesheet Isolation, Layout Padding Reset, & Vertical Geometry Tuning). Mengatasi masalah kop surat yang masih terpotong (baik di bagian footer banner yang terbelah ke halaman 2 maupun bagian banner atas). Melakukan isolasi cetak penuh pada `.print-modal-backdrop` dengan `position: fixed !important; inset: 0 !important; z-index: 999999 !important;` untuk menembus/mengabaikan padding 40px bawaan layout admin (`AdminLayout`), mengunci lembar dokumen tepat pada batas fisik A4 (`max-height: 296mm; height: 296mm; overflow: hidden; page-break-after: avoid;`), menyempurnakan geometri skala mode `bleed` (offset presisi -1% sesuai margin asli Canva 12px) dan mode `fill` (100% utuh tanpa potong), serta merapatkan jarak spasi vertikal antar seksi dokumen (`space-y-4 print:space-y-2.5`, padding atas 80px, padding bawah 75px) di seluruh 5 template resmi agar seluruh kop dan isi faktur selalu tampil pas 1 halaman penuh.
+- **2026-10-20**: Fitur Lengkap Penagihan Pelunasan (Faktur Pelunasan Sisa Kontrak Pasca DP / BAST). Menyediakan alur resmi penagihan pelunasan sisa kontrak proyek yang sebelumnya belum tersedia setelah faktur DP terbentuk. Menambahkan pemilih mode dokumen cetak (`printBillingStage`: "DP" | "Pelunasan" | "Full") pada faktur penjualan, sehingga admin dapat mencetak lembar resmi "FAKTUR PENAGIHAN PELUNASAN KONTRAK" lengkap dengan banner pelunasan pasca BAST, rincian potongan uang muka DP yang telah diterima lunas, sisa tagihan jatuh tempo, instruksi transfer, dan otorisasi tanda tangan. Menambahkan tombol aksi cepat "Tagih Pelunasan" pada tabel penjualan serta menyempurnakan form terima pembayaran pelunasan.
+
 
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
@@ -1420,7 +1422,40 @@
 
 ---
 
-### 51. Catatan Penting
+### 51. Tugas: Fitur Lengkap Penagihan Pelunasan (Faktur Pelunasan Sisa Kontrak Pasca DP / BAST)
+- **Permintaan Pengguna**:
+  *"setelah terbentuk faktur DP sebelumnya dikonvert, kalau untuk melanjutkan penagihan pelunasan bagai mana? sebab tidak ada"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Investigasi Mendalam & Analisis Kebutuhan**:
+  1. **Ketiadaan Opsi Penagihan Pelunasan**:
+     - Pada alur bisnis proyek (CCTV, Barrier Gate, Smart Home, dsb.), penagihan dilakukan bertahap (Tahap 1: Uang Muka / DP 50%, Tahap 2: Pelunasan sisa 50% setelah serah terima pekerjaan/BAST).
+     - Setelah SPH dikonversi ke faktur bertipe DP, sistem sebelumnya hanya mencetak judul *"FAKTUR PENGAJUAN UANG MUKA (DP 50%)"* dan memuat banner nominal DP. Belum ada opsi dokumen cetak resmi untuk menagih sisa pelunasan ke klien.
+  2. **Ketiadaan Tombol Aksi Cepat "Tagih Pelunasan" di Tabel Penjualan**:
+     - Pada tabel daftar faktur, belum ada tombol khusus untuk mencetak penagihan pelunasan saat status faktur berada pada *"DP Lunas (Sisa Pelunasan)"* atau masih memiliki sisa piutang.
+  3. **Penyempurnaan Form Pembayaran Pelunasan**:
+     - Form pembayaran harus secara cerdas mendeteksi bahwa DP telah diterima, sehingga judul form otomatis berganti menjadi *"Penerimaan Pembayaran Pelunasan Sisa Kontrak"* dengan nominal otomatis terisi sisa piutang kontrak.
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Penambahan Mode Dokumen Cetak Penagihan (DP vs Pelunasan vs Kontrak Utuh)**:
+     - Menambahkan state switch `printBillingStage` ("DP" | "Pelunasan" | "Full") pada modal cetak faktur penjualan resmi.
+     - Mode "Pelunasan" menampilkan judul resmi: `FAKTUR PENAGIHAN PELUNASAN KONTRAK`, banner pelunasan emerald `Penagihan Pelunasan (Sisa Kontrak Pasca BAST)`, rincian pengurangan DP yang telah lunas (`- Uang Muka DP Lunas: Rp XX`), dan jumlah sisa pelunasan jatuh tempo (`Rp YY`).
+     - Mode "DP" tetap menampilkan format pengajuan uang muka awal.
+     - Mode "Full" menampilkan rekapitulasi total kontrak penuh.
+  2. [x] **Tombol Cepat "Tagih Pelunasan" di Tabel Penjualan**:
+     - Menambahkan tombol aksi cepat `Tagih Pelunasan` (ikon Receipt/FileText) pada baris faktur bertipe DP yang memiliki sisa piutang / DP lunas.
+     - Mengklik tombol ini otomatis membuka modal cetak faktur langsung pada mode `Pelunasan`.
+  3. [x] **Opsi Pembayaran Pelunasan yang Terintegrasi**:
+     - Modal `Terima Pembayaran` menyesuaikan judul dan deskripsi otomatis menjadi `Penerimaan Pembayaran Pelunasan Sisa Kontrak` ketika DP telah lunas, dengan nominal otomatis terisi sisa piutang kontrak.
+  4. [x] **Validasi TypeScript & Browser Testing**:
+     - Menjalankan `npx tsc --noEmit` (lolos 0 error) dan menguji tampilan di browser via browser subagent (diverifikasi tombol tabel, pergantian tahap, dan tampilan kalkulasi faktur berfungsi 100%).
+  5. [x] **Sinkronisasi Kode ke GitHub**:
+     - Push commit ke repository `rm23nm/dstech-smart` via `push_with_native_git.js`.
+  6. [x] **Deployment ke Server Live VPS**:
+     - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi, dan restart PM2 `dstech-main`.
+
+---
+
+### 52. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

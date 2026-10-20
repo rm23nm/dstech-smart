@@ -437,6 +437,19 @@ export default function AdminFinanceERPPage() {
   const [selectedPoForPrint, setSelectedPoForPrint] = useState<PurchaseOrder | null>(null);
   const [isNewCashModalOpen, setIsNewCashModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<SaleInvoice | null>(null);
+  const [printBillingStage, setPrintBillingStage] = useState<"DP" | "Pelunasan" | "Full">("DP");
+
+  const handleOpenPrintInvoice = (invoice: SaleInvoice, stage?: "DP" | "Pelunasan" | "Full") => {
+    if (stage) {
+      setPrintBillingStage(stage);
+    } else if (invoice.invoiceType === "DP") {
+      const isDpPaid = (Number(invoice.dpPaidAmount) || 0) >= (Number(invoice.dpAmount) || 0) || invoice.paymentStatus?.includes("DP Lunas");
+      setPrintBillingStage(isDpPaid && invoice.remainingAmount > 0 ? "Pelunasan" : "DP");
+    } else {
+      setPrintBillingStage("Full");
+    }
+    setSelectedInvoiceForPrint(invoice);
+  };
   const [cashAccountFilter, setCashAccountFilter] = useState<string>("ALL");
 
   // Retur Penjualan (Customer Returns) States
@@ -1243,8 +1256,10 @@ export default function AdminFinanceERPPage() {
   const handleOpenPayInvoice = (invoice: SaleInvoice) => {
     setSelectedInvoiceForPayment(invoice);
     let defaultAmount = invoice.remainingAmount;
+    let isDpPaymentPhase = false;
     if (invoice.invoiceType === "DP" && (Number(invoice.dpPaidAmount) || 0) < (Number(invoice.dpAmount) || 0)) {
       defaultAmount = Math.max(0, (Number(invoice.dpAmount) || 0) - (Number(invoice.dpPaidAmount) || 0));
+      isDpPaymentPhase = true;
     }
     const defaultAcc = getDefaultBankAccLabel();
 
@@ -1252,7 +1267,11 @@ export default function AdminFinanceERPPage() {
       amount: defaultAmount,
       paymentMethod: defaultAcc,
       paymentDate: new Date().toISOString().split("T")[0],
-      notes: invoice.invoiceType === "DP" ? "Penerimaan Pembayaran Uang Muka (DP)" : "Penerimaan Pelunasan Faktur",
+      notes: invoice.invoiceType === "DP"
+        ? isDpPaymentPhase
+          ? `Penerimaan Uang Muka (DP ${invoice.dpPercentage || 50}%) Faktur ${invoice.invoiceNumber}`
+          : `Penerimaan Pelunasan Sisa Kontrak Faktur ${invoice.invoiceNumber}`
+        : `Penerimaan Pembayaran Faktur ${invoice.invoiceNumber}`,
     });
     setIsPayInvoiceModalOpen(true);
   };
@@ -3347,7 +3366,13 @@ export default function AdminFinanceERPPage() {
                             {sale.remainingAmount > 0 ? (
                               <button
                                 onClick={() => handleOpenPayInvoice(sale)}
-                                title="Terima Pembayaran / Bayar DP"
+                                title={
+                                  sale.invoiceType === "DP"
+                                    ? ((Number(sale.dpPaidAmount) || 0) >= (Number(sale.dpAmount) || 0)
+                                        ? "Terima Pembayaran Pelunasan Sisa Kontrak"
+                                        : `Terima Pembayaran DP (${sale.dpPercentage || 50}%)`)
+                                    : "Terima Pembayaran Faktur"
+                                }
                                 className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
                               >
                                 <CreditCard className="w-4 h-4" />
@@ -3362,9 +3387,21 @@ export default function AdminFinanceERPPage() {
                               </button>
                             )}
 
+                            {/* Tombol Khusus Tagih Pelunasan untuk Faktur DP */}
+                            {sale.invoiceType === "DP" && sale.remainingAmount > 0 && (
+                              <button
+                                onClick={() => handleOpenPrintInvoice(sale, "Pelunasan")}
+                                title="Cetak Faktur Penagihan Pelunasan (Sisa Kontrak Pasca BAST)"
+                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                              >
+                                <Receipt className="w-3.5 h-3.5" />
+                                <span className="hidden xl:inline">Tagih Pelunasan</span>
+                              </button>
+                            )}
+
                             {/* Cetak Faktur Resmi Kop DSTech */}
                             <button
-                              onClick={() => setSelectedInvoiceForPrint(sale)}
+                              onClick={() => handleOpenPrintInvoice(sale)}
                               title="Cetak Faktur Resmi Kop DSTech"
                               className="p-2 rounded-xl bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
                             >
@@ -5580,6 +5617,52 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
+            {/* Mode Penagihan jika Faktur DP (DP vs Pelunasan vs Kontrak Utuh) */}
+            {selectedInvoiceForPrint.invoiceType === "DP" && (
+              <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs print:hidden">
+                <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                  <Receipt className="w-4 h-4 text-dstech-blue" />
+                  <span>Pilih Lembar Tagihan:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPrintBillingStage("DP")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      printBillingStage === "DP"
+                        ? "bg-amber-500 text-slate-950 shadow-sm ring-2 ring-amber-300"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <span>📄 Tahap 1: Pengajuan DP ({selectedInvoiceForPrint.dpPercentage || 50}%)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintBillingStage("Pelunasan")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      printBillingStage === "Pelunasan"
+                        ? "bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-300"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>🧾 Tahap 2: Penagihan Pelunasan (Sisa Kontrak)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintBillingStage("Full")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      printBillingStage === "Full"
+                        ? "bg-slate-900 text-white shadow-sm ring-2 ring-slate-400"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <span>📋 Kontrak Utuh</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Tips Cetak Pas Penuh Kertas A4 */}
             <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 print:hidden">
               <span className="text-base leading-none">💡</span>
@@ -5648,14 +5731,31 @@ export default function AdminFinanceERPPage() {
                   </div>
 
                   <div className="text-left sm:text-right space-y-1">
-                    <span className="px-3 py-1 rounded-md bg-slate-900 text-white font-black text-xs uppercase tracking-wider inline-block">
+                    <span
+                      className={`px-3 py-1 rounded-md text-white font-black text-xs uppercase tracking-wider inline-block ${
+                        selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Pelunasan"
+                          ? "bg-emerald-700"
+                          : selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "DP"
+                          ? "bg-amber-600"
+                          : "bg-slate-900"
+                      }`}
+                    >
                       {selectedInvoiceForPrint.invoiceType === "DP"
-                        ? `FAKTUR PENGAJUAN UANG MUKA (DP ${selectedInvoiceForPrint.dpPercentage || 50}%)`
+                        ? printBillingStage === "Pelunasan"
+                          ? "FAKTUR PENAGIHAN PELUNASAN KONTRAK"
+                          : printBillingStage === "DP"
+                          ? `FAKTUR PENGAJUAN UANG MUKA (DP ${selectedInvoiceForPrint.dpPercentage || 50}%)`
+                          : "FAKTUR KONTRAK PENJUALAN"
                         : "FAKTUR PENJUALAN"}
                     </span>
                     <p className="font-mono font-black text-sm text-dstech-blue">
                       {selectedInvoiceForPrint.invoiceNumber}
                     </p>
+                    {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Pelunasan" && (
+                      <p className="text-[10px] font-bold text-emerald-700">
+                        Penagihan Sisa Kontrak Pasca BAST
+                      </p>
+                    )}
                     <p className="text-[11px] text-slate-500 font-medium">
                       Tanggal: {selectedInvoiceForPrint.date}
                     </p>
@@ -5665,8 +5765,30 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
 
-                {/* Banner Rincian Pengajuan DP (Khusus Faktur DP) */}
-                {selectedInvoiceForPrint.invoiceType === "DP" && (
+                {/* Banner Rincian Penagihan Sesuai Mode (DP vs Pelunasan vs Kontrak Utuh) */}
+                {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Pelunasan" && (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-300 text-xs text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div>
+                      <span className="font-black flex items-center gap-1.5 text-emerald-900">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        Penagihan Pelunasan Kontrak Pekerjaan (Pasca BAST)
+                      </span>
+                      <p className="text-[11px] text-emerald-800 mt-0.5">
+                        Uang Muka (DP {selectedInvoiceForPrint.dpPercentage || 50}%) sebesar {formatRupiah(selectedInvoiceForPrint.dpAmount || 0)} telah diterima LUNAS. Lembar ini adalah penagihan sisa pelunasan pekerjaan setelah penyelesaian Berita Acara Serah Terima (BAST).
+                      </p>
+                    </div>
+                    <div className="sm:text-right whitespace-nowrap bg-white/90 p-2 rounded-xl border border-emerald-200">
+                      <span className="text-[9px] text-emerald-700 block uppercase font-bold tracking-wider">
+                        Jumlah Tagihan Pelunasan:
+                      </span>
+                      <span className="text-base font-black font-mono text-emerald-900">
+                        {formatRupiah(selectedInvoiceForPrint.remainingAmount || Math.max(0, selectedInvoiceForPrint.grandTotal - (selectedInvoiceForPrint.dpAmount || 0)))}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "DP" && (
                   <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
                     <div>
                       <span className="font-black flex items-center gap-1.5 text-amber-900">
@@ -5684,6 +5806,28 @@ export default function AdminFinanceERPPage() {
                       </span>
                       <span className="text-base font-black font-mono text-amber-900">
                         {formatRupiah(selectedInvoiceForPrint.dpAmount || 0)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Full" && (
+                  <div className="p-3.5 rounded-2xl bg-blue-50/90 border border-blue-300 text-xs text-blue-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                    <div>
+                      <span className="font-black flex items-center gap-1.5 text-dstech-blue">
+                        <Layers className="w-4 h-4 text-dstech-blue" />
+                        Faktur Tagihan Total Kontrak Resmi
+                      </span>
+                      <p className="text-[11px] text-blue-800 mt-0.5">
+                        Rekapitulasi tagihan nilai kontrak keseluruhan pekerjaan & pengadaan barang PT. DSTech Smart Perkasa.
+                      </p>
+                    </div>
+                    <div className="sm:text-right whitespace-nowrap bg-white/90 p-2 rounded-xl border border-blue-200">
+                      <span className="text-[9px] text-blue-700 block uppercase font-bold tracking-wider">
+                        Total Nilai Kontrak:
+                      </span>
+                      <span className="text-base font-black font-mono text-dstech-blue">
+                        {formatRupiah(selectedInvoiceForPrint.grandTotal)}
                       </span>
                     </div>
                   </div>
@@ -5793,15 +5937,40 @@ export default function AdminFinanceERPPage() {
 
                     {/* Breakdown DP jika faktur bertipe DP */}
                     {selectedInvoiceForPrint.invoiceType === "DP" && (
-                      <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 space-y-1 text-[11px] my-1">
-                        <div className="flex items-center justify-between text-amber-900 font-bold">
-                          <span>Tagihan Uang Muka ({selectedInvoiceForPrint.dpPercentage}%):</span>
-                          <span>{formatRupiah(selectedInvoiceForPrint.dpAmount || 0)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-slate-500">
-                          <span>Sisa Pelunasan Pasca BAST:</span>
-                          <span>{formatRupiah(Math.max(0, selectedInvoiceForPrint.grandTotal - (selectedInvoiceForPrint.dpAmount || 0)))}</span>
-                        </div>
+                      <div className={`p-2.5 rounded-xl border space-y-1 text-[11px] my-1 ${
+                        printBillingStage === "Pelunasan"
+                          ? "bg-emerald-50/90 border-emerald-200"
+                          : "bg-amber-50 border-amber-200"
+                      }`}>
+                        {printBillingStage === "Pelunasan" ? (
+                          <>
+                            <div className="flex items-center justify-between text-slate-700">
+                              <span>Total Nilai Kontrak:</span>
+                              <span className="font-bold">{formatRupiah(selectedInvoiceForPrint.grandTotal)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-emerald-800 font-semibold">
+                              <span>Uang Muka (DP {selectedInvoiceForPrint.dpPercentage}%) Diterima:</span>
+                              <span>- {formatRupiah(selectedInvoiceForPrint.dpAmount || 0)} (Lunas)</span>
+                            </div>
+                            <div className="border-t border-emerald-200 pt-1 flex items-center justify-between text-xs font-black text-emerald-950">
+                              <span>SISA TAGIHAN PELUNASAN:</span>
+                              <span className="text-sm font-mono text-emerald-700 font-black">
+                                {formatRupiah(selectedInvoiceForPrint.remainingAmount || Math.max(0, selectedInvoiceForPrint.grandTotal - (selectedInvoiceForPrint.dpAmount || 0)))}
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center justify-between text-amber-900 font-bold">
+                              <span>Tagihan Uang Muka ({selectedInvoiceForPrint.dpPercentage}%):</span>
+                              <span>{formatRupiah(selectedInvoiceForPrint.dpAmount || 0)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-slate-500">
+                              <span>Sisa Pelunasan Pasca BAST:</span>
+                              <span>{formatRupiah(Math.max(0, selectedInvoiceForPrint.grandTotal - (selectedInvoiceForPrint.dpAmount || 0)))}</span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
 
@@ -10335,9 +10504,22 @@ export default function AdminFinanceERPPage() {
                 </span>
               </div>
               {selectedInvoiceForPayment.invoiceType === "DP" && (
-                <div className="flex items-center justify-between text-amber-800 font-bold bg-amber-50 p-2 rounded-xl border border-amber-200">
-                  <span>Tagihan Uang Muka (DP {selectedInvoiceForPayment.dpPercentage || 50}%):</span>
-                  <span className="font-mono">{formatRupiah(selectedInvoiceForPayment.dpAmount || 0)}</span>
+                <div className={`p-2 rounded-xl border flex items-center justify-between font-bold text-xs ${
+                  (Number(selectedInvoiceForPayment.dpPaidAmount) || 0) >= (Number(selectedInvoiceForPayment.dpAmount) || 0)
+                    ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                    : "bg-amber-50 text-amber-900 border-amber-200"
+                }`}>
+                  <span>
+                    {(Number(selectedInvoiceForPayment.dpPaidAmount) || 0) >= (Number(selectedInvoiceForPayment.dpAmount) || 0)
+                      ? `Uang Muka (DP ${selectedInvoiceForPayment.dpPercentage || 50}%):`
+                      : `Tagihan Uang Muka (DP ${selectedInvoiceForPayment.dpPercentage || 50}%):`}
+                  </span>
+                  <span className="font-mono">
+                    {formatRupiah(selectedInvoiceForPayment.dpAmount || 0)}
+                    {(Number(selectedInvoiceForPayment.dpPaidAmount) || 0) >= (Number(selectedInvoiceForPayment.dpAmount) || 0) && (
+                      <span className="ml-1.5 text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full uppercase">Lunas DP</span>
+                    )}
+                  </span>
                 </div>
               )}
               <div className="flex items-center justify-between text-slate-600">
