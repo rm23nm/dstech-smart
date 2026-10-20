@@ -565,8 +565,8 @@ export default function AdminFinanceERPPage() {
     letterheadUrl: "/kop_surat_dstech.jpg",
     letterheadEnabled: true,
     watermarkOpacity: 0.15,
-    letterheadPaddingTop: 90,
-    letterheadPaddingBottom: 110,
+    letterheadPaddingTop: 80,
+    letterheadPaddingBottom: 75,
     letterheadFitMode: "fill",
     signerName: "H. Agus Supriyadi, S.T., M.Kom.",
     signerTitle: "Direktur Keuangan & Operasional",
@@ -606,8 +606,8 @@ export default function AdminFinanceERPPage() {
     letterheadUrl: "/kop_surat_dstech.jpg",
     letterheadEnabled: true,
     watermarkOpacity: 0.15,
-    letterheadPaddingTop: 90,
-    letterheadPaddingBottom: 110,
+    letterheadPaddingTop: 80,
+    letterheadPaddingBottom: 75,
     letterheadFitMode: "fill",
     signerName: "H. Agus Supriyadi, S.T., M.Kom.",
     signerTitle: "Direktur Keuangan & Operasional",
@@ -847,11 +847,13 @@ export default function AdminFinanceERPPage() {
           }
           if (d.data.settings) {
             const rawTop = d.data.settings.letterheadPaddingTop;
-            const normalizedTop = (!rawTop || rawTop === 135) ? 90 : rawTop;
+            const normalizedTop = (!rawTop || rawTop === 135 || rawTop === 90) ? 80 : rawTop;
+            const rawBottom = d.data.settings.letterheadPaddingBottom;
+            const normalizedBottom = (!rawBottom || rawBottom === 110) ? 75 : rawBottom;
             const mergedSettings: FinanceSettings = {
               ...d.data.settings,
               letterheadPaddingTop: normalizedTop,
-              letterheadPaddingBottom: d.data.settings.letterheadPaddingBottom || 110,
+              letterheadPaddingBottom: normalizedBottom,
               letterheadFitMode: d.data.settings.letterheadFitMode || "fill",
             };
             setFinanceSettings(mergedSettings);
@@ -1513,8 +1515,8 @@ export default function AdminFinanceERPPage() {
   const handleOpenSettingsModal = () => {
     setTempSettings({
       ...financeSettings,
-      letterheadPaddingTop: financeSettings.letterheadPaddingTop || 90,
-      letterheadPaddingBottom: financeSettings.letterheadPaddingBottom || 110,
+      letterheadPaddingTop: financeSettings.letterheadPaddingTop || 80,
+      letterheadPaddingBottom: financeSettings.letterheadPaddingBottom || 75,
       letterheadFitMode: financeSettings.letterheadFitMode || "fill",
       signerName: financeSettings.signerName !== undefined ? financeSettings.signerName : "H. Agus Supriyadi, S.T., M.Kom.",
       signerTitle: financeSettings.signerTitle !== undefined ? financeSettings.signerTitle : "Direktur Keuangan & Operasional",
@@ -1549,8 +1551,8 @@ export default function AdminFinanceERPPage() {
     try {
       const sanitizedSettings = {
         ...tempSettings,
-        letterheadPaddingTop: tempSettings.letterheadPaddingTop || 90,
-        letterheadPaddingBottom: tempSettings.letterheadPaddingBottom || 110,
+        letterheadPaddingTop: tempSettings.letterheadPaddingTop || 80,
+        letterheadPaddingBottom: tempSettings.letterheadPaddingBottom || 75,
         letterheadFitMode: tempSettings.letterheadFitMode || "fill",
         signerName: tempSettings.signerName?.trim() || "H. Agus Supriyadi, S.T., M.Kom.",
         signerTitle: tempSettings.signerTitle?.trim() || "Direktur Keuangan & Operasional",
@@ -5591,10 +5593,10 @@ export default function AdminFinanceERPPage() {
 
             {/* FAKTUR CONTENT CONTAINER (Siap Cetak & Watermarked) */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
-                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
               }}
             >
               {/* Background Kop Surat Resmi DSTech */}
@@ -5613,10 +5615,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
-                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
-                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -5624,7 +5626,7 @@ export default function AdminFinanceERPPage() {
                 />
               )}
 
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-4 print:space-y-2.5">
                 {/* Kop Surat Perusahaan */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
                   <div className="space-y-1">
@@ -6545,10 +6547,10 @@ export default function AdminFinanceERPPage() {
 
             {/* SPH OFFICIAL LETTER CONTAINER (A4 Standard Print Layout) */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
-                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
               }}
             >
               {/* Background Kop Surat Resmi DSTech */}
@@ -6567,10 +6569,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
-                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
-                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -6578,7 +6580,7 @@ export default function AdminFinanceERPPage() {
                 />
               )}
 
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-4 print:space-y-2.5">
                 {/* Kop Surat Perusahaan DSTech */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
                   <div className="space-y-1">
@@ -8385,10 +8387,10 @@ export default function AdminFinanceERPPage() {
 
             {/* PO OFFICIAL PRINT CONTAINER (A4 Standard Print Layout) */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
-                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
               }}
             >
               {/* Background Kop Surat Resmi DSTech */}
@@ -8407,10 +8409,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
-                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
-                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -8418,7 +8420,7 @@ export default function AdminFinanceERPPage() {
                 />
               )}
 
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-4 print:space-y-2.5">
                 {/* Kop Surat Perusahaan DSTech */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
                   <div className="space-y-1">
@@ -9740,10 +9742,10 @@ export default function AdminFinanceERPPage() {
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
-                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
               }}
             >
               {/* Background Kop Surat Resmi DSTech */}
@@ -9762,10 +9764,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
-                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
-                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -9773,7 +9775,7 @@ export default function AdminFinanceERPPage() {
                 />
               )}
 
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-4 print:space-y-2.5">
                 {/* Kop Surat Perusahaan */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
                   <div className="space-y-1">
@@ -10046,10 +10048,10 @@ export default function AdminFinanceERPPage() {
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-6 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
-                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 90) : 24}px`,
-                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 110) : 24}px`,
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
               }}
             >
               {/* Background Kop Surat Resmi DSTech */}
@@ -10068,10 +10070,10 @@ export default function AdminFinanceERPPage() {
                         ? "contain"
                         : "fill",
                     objectPosition: "top center",
-                    width: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    height: financeSettings.letterheadFitMode === "bleed" ? "107%" : "100%",
-                    top: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
-                    left: financeSettings.letterheadFitMode === "bleed" ? "-3.5%" : "0",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
                     opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -10079,7 +10081,7 @@ export default function AdminFinanceERPPage() {
                 />
               )}
 
-              <div className="relative z-10 space-y-6">
+              <div className="relative z-10 space-y-4 print:space-y-2.5">
                 {/* Kop Surat Perusahaan */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
                   <div className="space-y-1">
@@ -11342,7 +11344,7 @@ export default function AdminFinanceERPPage() {
                     <div className="flex items-center justify-between text-[11px]">
                       <label className="font-bold text-slate-700">Jarak Turun Header Atas:</label>
                       <span className="font-mono font-bold text-dstech-blue">
-                        {tempSettings.letterheadPaddingTop || 90}px
+                        {tempSettings.letterheadPaddingTop || 80}px
                       </span>
                     </div>
                     <input
@@ -11350,15 +11352,15 @@ export default function AdminFinanceERPPage() {
                       min="24"
                       max="240"
                       step="5"
-                      value={tempSettings.letterheadPaddingTop || 90}
+                      value={tempSettings.letterheadPaddingTop || 80}
                       onChange={(e) =>
-                        setTempSettings({ ...tempSettings, letterheadPaddingTop: parseInt(e.target.value) || 90 })
+                        setTempSettings({ ...tempSettings, letterheadPaddingTop: parseInt(e.target.value) || 80 })
                       }
                       className="w-full cursor-pointer"
                     />
                     <div className="flex justify-between text-[9px] text-slate-400">
                       <span>Rapat (24px)</span>
-                      <span>Standar (90px)</span>
+                      <span>Standar (80px)</span>
                       <span>Luas (240px)</span>
                     </div>
                   </div>
@@ -11367,7 +11369,7 @@ export default function AdminFinanceERPPage() {
                     <div className="flex items-center justify-between text-[11px]">
                       <label className="font-bold text-slate-700">Jarak Naik Footer Bawah:</label>
                       <span className="font-mono font-bold text-emerald-600">
-                        {tempSettings.letterheadPaddingBottom || 110}px
+                        {tempSettings.letterheadPaddingBottom || 75}px
                       </span>
                     </div>
                     <input
@@ -11375,15 +11377,15 @@ export default function AdminFinanceERPPage() {
                       min="24"
                       max="220"
                       step="5"
-                      value={tempSettings.letterheadPaddingBottom || 110}
+                      value={tempSettings.letterheadPaddingBottom || 75}
                       onChange={(e) =>
-                        setTempSettings({ ...tempSettings, letterheadPaddingBottom: parseInt(e.target.value) || 110 })
+                        setTempSettings({ ...tempSettings, letterheadPaddingBottom: parseInt(e.target.value) || 75 })
                       }
                       className="w-full cursor-pointer"
                     />
                     <div className="flex justify-between text-[9px] text-slate-400">
                       <span>Rapat (24px)</span>
-                      <span>Standar (110px)</span>
+                      <span>Standar (75px)</span>
                       <span>Luas (220px)</span>
                     </div>
                   </div>
@@ -11394,13 +11396,13 @@ export default function AdminFinanceERPPage() {
                     onClick={() =>
                       setTempSettings((prev) => ({
                         ...prev,
-                        letterheadPaddingTop: 90,
-                        letterheadPaddingBottom: 110,
+                        letterheadPaddingTop: 80,
+                        letterheadPaddingBottom: 75,
                       }))
                     }
                     className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] cursor-pointer"
                   >
-                    Preset DSTech Resmi (Header 90px, Footer 110px)
+                    Preset DSTech Resmi (Header 80px, Footer 75px)
                   </button>
                   <button
                     type="button"

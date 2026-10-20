@@ -47,6 +47,8 @@
 - **2026-10-20**: Perbaikan Lembar Cetak Dokumen Keuangan (Kop Surat Hilang Saat Diprint & Tampilan Margin A4 Pas Penuh). Mengatasi masalah latar belakang kop surat (header banner, watermark 2026, dan footer banner) yang hilang/blank saat dokumen dicetak atau diekspor ke PDF, serta menghilangkan tampilan modal dialog card yang melayang dengan bingkai abu-abu tebal di tengah kertas cetak. Mengganti implementasi CSS `backgroundImage` pada tag `<div>` menjadi elemen tag HTML `<img>` murni (`.print-letterhead-img`) dengan `objectFit: "fill"` dan `print:opacity-100` pada seluruh 5 template cetak resmi (Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, dan Retur Pembelian) sehingga browser (Chrome/Edge/Opera) selalu mencetak elemen kop secara utuh dan tajam tanpa terpengaruh opsi "Background graphics". Menambahkan aturan `@media print` khusus standar A4 di `globals.css` (`@page { size: A4 portrait; margin: 0; }`), mereset backdrop dan border modal saat print, menerapkan padding tepi dokumen aman (`padding-left: 16mm; padding-right: 16mm; paddingTop: 90px; paddingBottom: 110px;`), menyembunyikan dashboard utama saat modal cetak aktif (`print:hidden`), serta mengupgrade slider opasitas kop hingga 100% dan menyediakan preset 'Kop Utuh / Nyata (100%)' di modal pengaturan. Divalidasi `tsc --noEmit` (0 error), diuji visual di browser, disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-20**: Penyelarasan Dimensi Margin Kop Surat Canva & Kompensasi Margin Cetak A4 (`letterheadFitMode: "bleed"`). Mengatasi masalah perbedaan margin antara desain Canva dengan kanvas cetak A4 fisik akibat margin putih bawaan dari fitur batas cetak Canva (*safe zone print margins*) serta margin default browser Chrome. Menambahkan mode skala baru `bleed` ("Full Bleed Canva") yang mengkompensasi margin putih bawaan dengan men-zoom gambar secara proporsional (`transform: scale(1.07)` / offset `-3.5%`) dan `overflow: hidden` sehingga banner merah/biru atas & bawah menempel pas di ujung kertas A4 tanpa celah. Mengoptimalkan CSS `@media print` dengan batas pasti A4 (`min-height: 296mm; max-width: 210mm; box-sizing: border-box; overflow: hidden;`) untuk mencegah dokumen terpotong ke halaman 2, menambahkan tombol preset cepat dan kontrol mode skala di modal Pengaturan Kop Surat, serta memasang banner tips visual cetak A4 pada seluruh 5 modal dokumen resmi.
 - **2026-10-20**: Pemadatan & Perapihan Blok Tanda Tangan Dokumen Cetak Resmi (Faktur, SPH, PO, dan Retur). Merapatkan jarak vertikal blok tanda tangan resmi pada seluruh 5 template dokumen cetak resmi (Faktur Penjualan, SPH Quotation, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) dari tinggi awal `h-48` / `h-52` (192-208px) menjadi `h-36` (144px), memperkecil padding kontainer dari `pt-6` ke `pt-3` dan jarak antar kolom dari `gap-6` / `gap-8` ke `gap-4`. Menyesuaikan area tanda tangan digital & stempel resmi ke skala kompak (`h-11`, stempel `w-12 h-12`, gambar tanda tangan `max-h-11`) serta mempersempit jarak antara nama organisasi di atas dengan nama penandatangan di bawah (`pt-1` border-t). Menghasilkan penghematan ruang vertikal hingga 65px sehingga dokumen dengan banyak baris item barang tetap muat rapi dalam 1 lembar A4 tanpa terpotong ke bawah.
+- **2026-10-20**: Pembenahan Tuntas Masalah Kop Surat Terpotong Saat Cetak (Print Stylesheet Isolation, Layout Padding Reset, & Vertical Geometry Tuning). Mengatasi masalah kop surat yang masih terpotong (baik di bagian footer banner yang terbelah ke halaman 2 maupun bagian banner atas). Melakukan isolasi cetak penuh pada `.print-modal-backdrop` dengan `position: fixed !important; inset: 0 !important; z-index: 999999 !important;` untuk menembus/mengabaikan padding 40px bawaan layout admin (`AdminLayout`), mengunci lembar dokumen tepat pada batas fisik A4 (`max-height: 296mm; height: 296mm; overflow: hidden; page-break-after: avoid;`), menyempurnakan geometri skala mode `bleed` (offset presisi -1% sesuai margin asli Canva 12px) dan mode `fill` (100% utuh tanpa potong), serta merapatkan jarak spasi vertikal antar seksi dokumen (`space-y-4 print:space-y-2.5`, padding atas 80px, padding bawah 75px) di seluruh 5 template resmi agar seluruh kop dan isi faktur selalu tampil pas 1 halaman penuh.
+
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
 **Status**: Selesai
@@ -1382,7 +1384,43 @@
 
 ---
 
-### 50. Catatan Penting
+### 50. Tugas: Pembenahan Tuntas Masalah Kop Surat Terpotong Saat Cetak (Print Stylesheet Isolation, Layout Padding Reset, & Vertical Geometry Tuning)
+- **Permintaan Pengguna**:
+  *"kop surat masih kepotong"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Investigasi Mendalam & Analisis Akar Masalah**:
+  1. **Interferensi Padding Layout Admin (`AdminLayout`)**:
+     - Modal cetak berada di dalam hierarki `<main><div className="p-6 sm:p-10 flex-1">{children}</div></main>`.
+     - Saat print, `.print-modal-backdrop` sebelumnya diset `position: static !important`. Akibatnya, dokumen tetap terbungkus dalam `p-10` (padding 40px) dari layout dashboard admin. Hal ini mendorong seluruh lembar A4 ke bawah sejauh 40px dan ke kanan 40px.
+     - Dorongan 40px ke bawah ini membuat total tinggi dokumen melampaui lembar kertas fisik A4 (297mm), sehingga browser membelah dokumen menjadi 2 halaman dan memotong banner footer kop surat di dasar halaman 1.
+  2. **Tinggi Dokumen Melebihi Printable Area A4 (`min-height: 296mm`)**:
+     - Aturan `min-height: 296mm !important` tanpa batas atas yang pasti membuat setiap margin printer (misal margin default Chrome 10mm atau hardware printer 4mm) langsung menyebabkan overflow halaman kedua.
+  3. **Offset Mode Bleed Sebelumnya Terlalu Agresif**:
+     - Pengukuran piksel canvas menunjukkan bahwa padding putih bawaan file `kop_surat_dstech.jpg` dari Canva hanya berjarak **12 piksel (~1.07%)** di bagian atas dan **12 piksel (~1.5%)** di sisi kiri.
+     - Penggunaan offset `-3.5%` (39 piksel) pada mode bleed sebelumnya memotong 27 piksel bagian atas teks banner merah "PT. DSTECH SMART PERKASA" dan logo DSP di kiri.
+  4. **Kepadatan Vertikal Konten Dokumen (`space-y-6`)**:
+     - Dokumen memiliki 6 seksi yang dipisahkan oleh `space-y-6` (24px) ditambah `paddingTop: 90px` dan `paddingBottom: 110px`. Jarak antar seksi yang terlalu renggang ini memperbesar risiko teks terpotong saat item bertambah banyak.
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Isolasi Penuh Stylesheet Cetak (`globals.css`)**:
+     - Mengubah `.print-modal-backdrop` menjadi `position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100vw !important; height: 100vh !important; margin: 0 !important; padding: 0 !important; background: #ffffff !important; z-index: 999999 !important; display: flex !important; justify-content: center !important; align-items: flex-start !important;` untuk menembus/mengabaikan seluruh padding container parent (`p-10`).
+     - Mengunci `.print-document-sheet` pada tinggi presisi A4 (`width: 100% !important; max-width: 210mm !important; height: 296mm !important; max-height: 296mm !important; overflow: hidden !important; page-break-after: avoid !important; break-inside: avoid !important;`).
+  2. [x] **Penyempurnaan Geometri Skala Kop Surat**:
+     - Menetapkan mode `fill` (default) dengan `inset: 0; width: 100%; height: 100%; object-fit: fill;` agar seluruh elemen kop (logo, header banner, watermark, footer) tampil 100% utuh tanpa ada yang terpotong.
+     - Menyesuaikan mode `bleed` dengan offset proporsional yang aman (`top: -1%; left: -1.2%; width: 102.4%; height: 102%;`) sesuai margin asli file Canva (12px), sehingga tidak lagi memotong teks banner kop surat.
+  3. [x] **Optimalisasi Spasi Vertikal pada 5 Template Dokumen Cetak**:
+     - Mengubah container spasi dari `space-y-6` menjadi `space-y-4 print:space-y-2.5` di 5 dokumen cetak resmi (Faktur Penjualan, SPH Quotation, PO Supplier, Retur Penjualan, Retur Pembelian).
+     - Menyesuaikan nilai default `letterheadPaddingTop: 80` dan `letterheadPaddingBottom: 75` agar banner atas dan bawah bebas tertimpa teks namun tetap hemat ruang vertikal.
+  4. [x] **Validasi TypeScript & Browser Testing**:
+     - Menjalankan `npx tsc --noEmit` (lolos 0 error) dan menguji cetak visual melalui browser subagent (diverifikasi kop header dan footer utuh).
+  5. [x] **Sinkronisasi Kode ke GitHub**:
+     - Push commit ke `rm23nm/dstech-smart` via `push_with_native_git.js`.
+  6. [x] **Deployment ke Server Live VPS**:
+     - Menjalankan script deploy VPS, build Next.js produksi, dan restart PM2 `dstech-main`.
+
+---
+
+### 51. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
