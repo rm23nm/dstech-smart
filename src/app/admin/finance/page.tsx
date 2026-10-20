@@ -51,6 +51,10 @@ import {
   Tag,
   Percent,
   MessageSquare,
+  MessageCircle,
+  Copy,
+  ExternalLink,
+  Share2,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -472,6 +476,7 @@ export default function AdminFinanceERPPage() {
   const [isNewCashModalOpen, setIsNewCashModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<SaleInvoice | null>(null);
   const [printBillingStage, setPrintBillingStage] = useState<"DP" | "Pelunasan" | "Full">("DP");
+  const [printTwoPage, setPrintTwoPage] = useState<boolean>(true);
 
   const handleOpenPrintInvoice = (invoice: SaleInvoice, stage?: "DP" | "Pelunasan" | "Full") => {
     if (stage) {
@@ -999,6 +1004,238 @@ export default function AdminFinanceERPPage() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Share & Send Document Modal State (WhatsApp & Email)
+  const [sendDocModal, setSendDocModal] = useState<{
+    isOpen: boolean;
+    docType: "SPH" | "Invoice" | "PO" | "Return" | "Receipt" | "DeliveryOrder";
+    docTitle: string;
+    docNumber: string;
+    recipientName: string;
+    recipientOrg?: string;
+    recipientPhone: string;
+    recipientEmail?: string;
+    date: string;
+    dueDate?: string;
+    subject: string;
+    grandTotal: number;
+    subtotal?: number;
+    discount?: number;
+    discountLabel?: string;
+    paymentStatus?: string;
+    paymentMethod?: string;
+    approvalStatus?: string;
+    notes?: string;
+  }>({
+    isOpen: false,
+    docType: "SPH",
+    docTitle: "Surat Penawaran Harga (SPH)",
+    docNumber: "",
+    recipientName: "",
+    recipientOrg: "",
+    recipientPhone: "",
+    recipientEmail: "",
+    date: "",
+    dueDate: "",
+    subject: "",
+    grandTotal: 0,
+    subtotal: 0,
+    discount: 0,
+    discountLabel: "",
+    paymentStatus: "",
+    paymentMethod: "",
+    approvalStatus: "",
+    notes: "",
+  });
+  const [sendTab, setSendTab] = useState<"whatsapp" | "email">("whatsapp");
+  const [customPhoneInput, setCustomPhoneInput] = useState<string>("");
+  const [customEmailInput, setCustomEmailInput] = useState<string>("");
+
+  const normalizeWhatsAppNumber = (phone: string): string => {
+    if (!phone) return "";
+    let clean = phone.replace(/[^0-9]/g, "");
+    if (clean.startsWith("0")) {
+      clean = "62" + clean.slice(1);
+    } else if (clean.startsWith("8")) {
+      clean = "62" + clean;
+    }
+    return clean;
+  };
+
+  const handleOpenSendDocModal = (params: {
+    docType: "SPH" | "Invoice" | "PO" | "Return" | "Receipt" | "DeliveryOrder";
+    docTitle: string;
+    docNumber: string;
+    recipientName: string;
+    recipientOrg?: string;
+    recipientPhone?: string;
+    recipientEmail?: string;
+    date: string;
+    dueDate?: string;
+    subject: string;
+    grandTotal: number;
+    subtotal?: number;
+    discount?: number;
+    discountLabel?: string;
+    paymentStatus?: string;
+    paymentMethod?: string;
+    approvalStatus?: string;
+    notes?: string;
+    initialTab?: "whatsapp" | "email";
+  }) => {
+    setSendDocModal({
+      isOpen: true,
+      docType: params.docType,
+      docTitle: params.docTitle,
+      docNumber: params.docNumber,
+      recipientName: params.recipientName,
+      recipientOrg: params.recipientOrg || "",
+      recipientPhone: params.recipientPhone || "",
+      recipientEmail: params.recipientEmail || "",
+      date: params.date,
+      dueDate: params.dueDate || "",
+      subject: params.subject,
+      grandTotal: params.grandTotal,
+      subtotal: params.subtotal || 0,
+      discount: params.discount || 0,
+      discountLabel: params.discountLabel || "",
+      paymentStatus: params.paymentStatus || "",
+      paymentMethod: params.paymentMethod || "",
+      approvalStatus: params.approvalStatus || "",
+      notes: params.notes || "",
+    });
+    setCustomPhoneInput(params.recipientPhone || "");
+    setCustomEmailInput(params.recipientEmail || "");
+    setSendTab(params.initialTab || "whatsapp");
+  };
+
+  const generateDocShareContent = (doc: typeof sendDocModal) => {
+    const companyName = "PT. DSTech Smart Perkasa";
+    const portalUrl = "https://dstechsmart.com";
+
+    // Format WA Text
+    let waText = `*Yth. ${doc.recipientName || "Bapak/Ibu"}*\n`;
+    if (doc.recipientOrg && doc.recipientOrg !== doc.recipientName) {
+      waText += `*${doc.recipientOrg}*\n\n`;
+    } else {
+      waText += `\n`;
+    }
+    waText += `Dengan hormat,\nBerikut kami sampaikan dokumen resmi *${doc.docTitle}* dari *${companyName}*:\n\n`;
+    waText += `📋 *Dokumen:* ${doc.docTitle}\n`;
+    waText += `🔢 *Nomor:* ${doc.docNumber}\n`;
+    waText += `📅 *Tanggal:* ${doc.date}\n`;
+    if (doc.dueDate) {
+      waText += `⏳ *Jatuh Tempo / Berlaku:* ${doc.dueDate}\n`;
+    }
+    if (doc.subject) {
+      waText += `💼 *Perihal:* ${doc.subject}\n`;
+    }
+    if (doc.grandTotal > 0) {
+      waText += `💰 *Nilai Total:* ${formatRupiah(doc.grandTotal)}\n`;
+    }
+    if (doc.discount && doc.discount > 0) {
+      waText += `🏷️ *${doc.discountLabel || "Diskon Negosiasi"}:* -${formatRupiah(doc.discount)}\n`;
+    }
+    if (doc.paymentStatus) {
+      waText += `📊 *Status Pembayaran:* ${doc.paymentStatus}\n`;
+    }
+    if (doc.approvalStatus) {
+      waText += `🛡️ *Status Legalitas:* ${doc.approvalStatus}\n`;
+    }
+    if (doc.docType === "Invoice") {
+      waText += `\n💳 *Rekening Resmi Pembayaran Transfer:*\n`;
+      const defaultBank = bankAccounts.find((b) => b.isDefault) || bankAccounts[0];
+      if (defaultBank) {
+        waText += `• ${defaultBank.bankName}: ${defaultBank.accountNumber} a/n ${defaultBank.accountHolder} (${defaultBank.branch})\n`;
+      }
+    }
+
+    waText += `\nDokumen resmi ber-kop surat dan tanda tangan sah dapat dilihat/diunduh melalui portal resmi kami:\n🌐 ${portalUrl}\n\n`;
+    waText += `Apabila ada pertanyaan lebih lanjut atau konfirmasi teknis, silakan hubungi tim kami melalui pesan ini.\n\n`;
+    waText += `Terima kasih atas kepercayaan dan kerjasamanya.\n\n`;
+    waText += `_Salam hangat,_\n*${companyName}*\n_Security System & IT Infrastructure Solutions_`;
+
+    // Format Email
+    const emailSubject = `[${companyName}] ${doc.docTitle} - No: ${doc.docNumber} - ${doc.recipientName}`;
+    let emailBody = `Kepada Yth.\n${doc.recipientName}\n${doc.recipientOrg || ""}\n\n`;
+    emailBody += `Dengan hormat,\n\nBersama dengan surat pengantar ini, kami dari PT. DSTech Smart Perkasa bermaksud menyampaikan dokumen ${doc.docTitle} dengan rincian sebagai berikut:\n\n`;
+    emailBody += `• Dokumen: ${doc.docTitle}\n`;
+    emailBody += `• Nomor Dokumen: ${doc.docNumber}\n`;
+    emailBody += `• Tanggal: ${doc.date}\n`;
+    if (doc.dueDate) emailBody += `• Batas Waktu / Berlaku s/d: ${doc.dueDate}\n`;
+    if (doc.subject) emailBody += `• Perihal: ${doc.subject}\n`;
+    if (doc.grandTotal > 0) emailBody += `• Total Nilai: ${formatRupiah(doc.grandTotal)}\n`;
+    if (doc.paymentStatus) emailBody += `• Status Pembayaran: ${doc.paymentStatus}\n`;
+    if (doc.approvalStatus) emailBody += `• Pengesahan Direksi: ${doc.approvalStatus}\n`;
+
+    if (doc.docType === "Invoice") {
+      emailBody += `\nInstruksi Pembayaran Transfer Rekening Perusahaan:\n`;
+      bankAccounts.filter((b) => b.status === "Aktif").forEach((acc) => {
+        emailBody += `- Bank: ${acc.bankName} | No. Rek: ${acc.accountNumber} | a/n: ${acc.accountHolder} (${acc.branch})\n`;
+      });
+    }
+
+    emailBody += `\nDokumen lengkap telah disahkan secara digital oleh Direksi PT. DSTech Smart Perkasa.\n`;
+    emailBody += `Demikian dokumen ini kami sampaikan. Atas perhatian dan kerja samanya, kami ucapkan terima kasih.\n\n`;
+    emailBody += `Hormat kami,\nPT. DSTech Smart Perkasa\nDivisi Commercial & Finance\nWebsite: https://dstechsmart.com`;
+
+    return { waText, emailSubject, emailBody };
+  };
+
+  const handleSendWhatsApp = (targetPhone?: string) => {
+    const phone = targetPhone || customPhoneInput || sendDocModal.recipientPhone;
+    const cleanPhone = normalizeWhatsAppNumber(phone);
+    if (!cleanPhone) {
+      showToast("Nomor WhatsApp belum diisi atau tidak valid!");
+      return;
+    }
+    const { waText } = generateDocShareContent(sendDocModal);
+    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(waText)}`;
+    window.open(waUrl, "_blank");
+    showToast(`Membuka WhatsApp untuk ${sendDocModal.recipientName}...`);
+  };
+
+  const handleSendEmail = (targetEmail?: string) => {
+    const email = targetEmail || customEmailInput || sendDocModal.recipientEmail;
+    const { emailSubject, emailBody } = generateDocShareContent(sendDocModal);
+    const mailtoUrl = `mailto:${email || ""}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    window.location.href = mailtoUrl;
+    showToast(`Membuka aplikasi Email untuk ${sendDocModal.recipientName}...`);
+  };
+
+  const handleCopyContent = (text: string, label?: string) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast(`✅ ${label || "Teks"} berhasil disalin ke clipboard!`);
+      }).catch(() => {
+        // Fallback untuk browser lama
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        showToast(`✅ ${label || "Teks"} berhasil disalin!`);
+      });
+    } else {
+      // Fallback tanpa Clipboard API
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+        showToast(`✅ ${label || "Teks"} berhasil disalin!`);
+      } catch {
+        showToast("❌ Gagal menyalin. Silakan salin manual (Ctrl+A lalu Ctrl+C).");
+      }
+      document.body.removeChild(ta);
+    }
   };
 
   const formatRupiah = (num: number) => {
@@ -3918,6 +4155,62 @@ export default function AdminFinanceERPPage() {
                               <Printer className="w-4 h-4" />
                             </button>
 
+                            {/* Kirim Faktur via WhatsApp */}
+                            <button
+                              onClick={() =>
+                                handleOpenSendDocModal({
+                                  docType: "Invoice",
+                                  docTitle: sale.invoiceType === "DP" ? `Faktur Uang Muka (DP ${sale.dpPercentage}%)` : "Faktur Penjualan (Sale Invoice)",
+                                  docNumber: sale.invoiceNumber,
+                                  recipientName: sale.customerName,
+                                  recipientPhone: sale.customerPhone,
+                                  date: sale.date,
+                                  dueDate: sale.dueDate,
+                                  subject: sale.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${sale.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
+                                  grandTotal: sale.invoiceType === "DP" ? (sale.dpAmount || sale.grandTotal) : sale.grandTotal,
+                                  subtotal: sale.subtotal,
+                                  discount: sale.discount,
+                                  discountLabel: sale.discountLabel,
+                                  paymentStatus: sale.paymentStatus,
+                                  paymentMethod: sale.paymentMethod,
+                                  approvalStatus: sale.approvalStatus,
+                                  initialTab: "whatsapp",
+                                })
+                              }
+                              title="Kirim Faktur via WhatsApp ke Klien"
+                              className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </button>
+
+                            {/* Kirim Faktur via Email */}
+                            <button
+                              onClick={() =>
+                                handleOpenSendDocModal({
+                                  docType: "Invoice",
+                                  docTitle: sale.invoiceType === "DP" ? `Faktur Uang Muka (DP ${sale.dpPercentage}%)` : "Faktur Penjualan (Sale Invoice)",
+                                  docNumber: sale.invoiceNumber,
+                                  recipientName: sale.customerName,
+                                  recipientPhone: sale.customerPhone,
+                                  date: sale.date,
+                                  dueDate: sale.dueDate,
+                                  subject: sale.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${sale.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
+                                  grandTotal: sale.invoiceType === "DP" ? (sale.dpAmount || sale.grandTotal) : sale.grandTotal,
+                                  subtotal: sale.subtotal,
+                                  discount: sale.discount,
+                                  discountLabel: sale.discountLabel,
+                                  paymentStatus: sale.paymentStatus,
+                                  paymentMethod: sale.paymentMethod,
+                                  approvalStatus: sale.approvalStatus,
+                                  initialTab: "email",
+                                })
+                              }
+                              title="Kirim Faktur via Email ke Klien"
+                              className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Mail className="w-4 h-4" />
+                            </button>
+
                             {/* Edit Faktur */}
                             <button
                               onClick={() => handleOpenEditSale(sale)}
@@ -4181,6 +4474,60 @@ export default function AdminFinanceERPPage() {
                               <Printer className="w-4 h-4" />
                             </button>
 
+                            {/* Kirim SPH via WhatsApp */}
+                            <button
+                              onClick={() =>
+                                handleOpenSendDocModal({
+                                  docType: "SPH",
+                                  docTitle: "Surat Penawaran Harga (SPH)",
+                                  docNumber: sph.quotationNumber,
+                                  recipientName: sph.customerName,
+                                  recipientOrg: sph.customerOrg,
+                                  recipientPhone: sph.customerPhone,
+                                  date: sph.date,
+                                  dueDate: sph.validUntil,
+                                  subject: sph.subject,
+                                  grandTotal: sph.grandTotal,
+                                  subtotal: sph.subtotal,
+                                  discount: sph.discount,
+                                  discountLabel: sph.discountLabel,
+                                  approvalStatus: sph.approvalStatus,
+                                  initialTab: "whatsapp",
+                                })
+                              }
+                              title="Kirim SPH via WhatsApp ke Klien"
+                              className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </button>
+
+                            {/* Kirim SPH via Email */}
+                            <button
+                              onClick={() =>
+                                handleOpenSendDocModal({
+                                  docType: "SPH",
+                                  docTitle: "Surat Penawaran Harga (SPH)",
+                                  docNumber: sph.quotationNumber,
+                                  recipientName: sph.customerName,
+                                  recipientOrg: sph.customerOrg,
+                                  recipientPhone: sph.customerPhone,
+                                  date: sph.date,
+                                  dueDate: sph.validUntil,
+                                  subject: sph.subject,
+                                  grandTotal: sph.grandTotal,
+                                  subtotal: sph.subtotal,
+                                  discount: sph.discount,
+                                  discountLabel: sph.discountLabel,
+                                  approvalStatus: sph.approvalStatus,
+                                  initialTab: "email",
+                                })
+                              }
+                              title="Kirim SPH via Email ke Klien"
+                              className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Mail className="w-4 h-4" />
+                            </button>
+
                             {/* Konversi ke Faktur Penjualan (1-Klik) */}
                             {sph.status !== "Terkonversi Faktur" && (
                               <button
@@ -4373,6 +4720,56 @@ export default function AdminFinanceERPPage() {
                               className="p-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
                             >
                               <Printer className="w-4 h-4" />
+                            </button>
+
+                            {/* Kirim PO via WhatsApp */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenSendDocModal({
+                                  docType: "PO",
+                                  docTitle: "Purchase Order (PO Pengadaan Material)",
+                                  docNumber: po.poNumber,
+                                  recipientName: po.supplierName,
+                                  recipientPhone: po.supplierContact,
+                                  date: po.date,
+                                  dueDate: po.expectedDelivery,
+                                  subject: po.notes || "Pesanan Pengadaan Perangkat & Material Logistik",
+                                  grandTotal: po.grandTotal,
+                                  paymentStatus: po.paymentStatus,
+                                  approvalStatus: po.approvalStatus,
+                                  initialTab: "whatsapp",
+                                })
+                              }
+                              title="Kirim PO via WhatsApp ke Supplier"
+                              className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </button>
+
+                            {/* Kirim PO via Email */}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenSendDocModal({
+                                  docType: "PO",
+                                  docTitle: "Purchase Order (PO Pengadaan Material)",
+                                  docNumber: po.poNumber,
+                                  recipientName: po.supplierName,
+                                  recipientPhone: po.supplierContact,
+                                  date: po.date,
+                                  dueDate: po.expectedDelivery,
+                                  subject: po.notes || "Pesanan Pengadaan Perangkat & Material Logistik",
+                                  grandTotal: po.grandTotal,
+                                  paymentStatus: po.paymentStatus,
+                                  approvalStatus: po.approvalStatus,
+                                  initialTab: "email",
+                                })
+                              }
+                              title="Kirim PO via Email ke Supplier"
+                              className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Mail className="w-4 h-4" />
                             </button>
 
                             {/* Approval PO */}
@@ -6344,6 +6741,21 @@ export default function AdminFinanceERPPage() {
                   <span>Rekening</span>
                 </button>
 
+                {/* Toggle Mode 2 Halaman */}
+                <button
+                  type="button"
+                  onClick={() => setPrintTwoPage((v) => !v)}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border transition-all ${
+                    printTwoPage
+                      ? "bg-purple-600 text-white border-purple-500 ring-2 ring-purple-300"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}
+                  title="Mode cetak 2 halaman: Halaman 1 ringkasan + TandaTangan, Halaman 2 lampiran rincian item lengkap"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>{printTwoPage ? "✓ 2 Halaman" : "1 Halaman"}</span>
+                </button>
+
                 <button
                   onClick={() => window.print()}
                   className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
@@ -6445,7 +6857,9 @@ export default function AdminFinanceERPPage() {
 
             {/* FAKTUR CONTENT CONTAINER (Siap Cetak & Watermarked) */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              className={`relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet ${
+                printTwoPage ? "print-page-break" : "print-single-sheet"
+              }`}
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
@@ -6631,33 +7045,41 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
 
-                {/* Tabel Item Faktur */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-wider">
-                      <tr>
-                        <th className="p-2.5">No</th>
-                        <th className="p-2.5">Deskripsi Produk / Layanan</th>
-                        <th className="p-2.5 text-center">Qty</th>
-                        <th className="p-2.5 text-center">Satuan</th>
-                        <th className="p-2.5 text-right">Harga Satuan</th>
-                        <th className="p-2.5 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white/70">
-                      {selectedInvoiceForPrint.items.map((it, idx) => (
-                        <tr key={idx}>
-                          <td className="p-2.5 font-bold text-slate-500">{idx + 1}</td>
-                          <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
-                          <td className="p-2.5 text-center font-bold">{it.qty}</td>
-                          <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
-                          <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
-                          <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
+                {/* Tabel Item Faktur — tampil di halaman 1 jika mode 1 halaman, disembunyikan jika mode 2 halaman */}
+                {!printTwoPage ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-wider">
+                        <tr>
+                          <th className="p-2.5">No</th>
+                          <th className="p-2.5">Deskripsi Produk / Layanan</th>
+                          <th className="p-2.5 text-center">Qty</th>
+                          <th className="p-2.5 text-center">Satuan</th>
+                          <th className="p-2.5 text-right">Harga Satuan</th>
+                          <th className="p-2.5 text-right">Total</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 bg-white/70">
+                        {selectedInvoiceForPrint.items.map((it, idx) => (
+                          <tr key={idx}>
+                            <td className="p-2.5 font-bold text-slate-500">{idx + 1}</td>
+                            <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
+                            <td className="p-2.5 text-center font-bold">{it.qty}</td>
+                            <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
+                            <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
+                            <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  /* Mode 2 Halaman: ganti tabel dengan referensi ke lampiran */
+                  <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs text-purple-900 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-purple-500 shrink-0" />
+                    <span className="font-bold">Rincian item barang/layanan tersedia pada <strong>Lampiran Halaman 2</strong> dokumen ini.</span>
+                  </div>
+                )}
 
                 {/* Rincian Perhitungan & Instruksi Rekening */}
                 <div className="flex flex-col sm:flex-row justify-between gap-4 pt-3 border-t border-slate-200 text-xs">
@@ -6801,7 +7223,7 @@ export default function AdminFinanceERPPage() {
                       {selectedInvoiceForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi PT DSTech */}
-                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-dstech-blue/50 flex flex-col items-center justify-center text-[6px] text-dstech-blue font-bold uppercase rotate-[-12deg] pointer-events-none bg-blue-50/40">
+                          <div className="print-stamp-circle absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-dstech-blue/50 flex flex-col items-center justify-center text-[6px] text-dstech-blue font-bold uppercase rotate-[-12deg] pointer-events-none bg-blue-50/40">
                             <span className="font-black text-[5.5px]">PT. DSTECH</span>
                             <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
                             <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">DIGITAL SIGN</span>
@@ -6812,7 +7234,7 @@ export default function AdminFinanceERPPage() {
                             <img
                               src={selectedInvoiceForPrint.signatureImage}
                               alt="Tanda Tangan Digital"
-                              className="max-h-11 max-w-[130px] object-contain relative z-10"
+                              className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
@@ -6857,6 +7279,149 @@ export default function AdminFinanceERPPage() {
                 </div>
               </div>
             </div>
+
+            {/* HALAMAN 2: LAMPIRAN RINCIAN ITEM FAKTUR PENJUALAN */}
+            {printTwoPage && (
+              <div
+                className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet mt-6 print:mt-0"
+                style={{
+                  paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                  paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
+                }}
+              >
+                {/* Background Kop Surat Resmi DSTech */}
+                {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                  <img
+                    src={financeSettings.letterheadUrl}
+                    alt="Kop Surat Resmi"
+                    className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                      financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                    }`}
+                    style={{
+                      objectFit:
+                        financeSettings.letterheadFitMode === "cover"
+                          ? "cover"
+                          : financeSettings.letterheadFitMode === "contain"
+                          ? "contain"
+                          : "fill",
+                      objectPosition: "top center",
+                      width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                      height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                      top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                      left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
+                      opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                      WebkitPrintColorAdjust: "exact",
+                      printColorAdjust: "exact",
+                    }}
+                  />
+                )}
+
+                <div className="relative z-10 space-y-4 print:space-y-3">
+                  {/* Header Lampiran Faktur */}
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-slate-900 pb-3">
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-widest text-dstech-blue block">
+                        LAMPIRAN RINCIAN ITEM FAKTUR
+                      </span>
+                      <h4 className="text-base sm:text-lg font-black text-slate-900">
+                        Rincian Barang & Material Tagihan Penjualan
+                      </h4>
+                      <p className="text-[11px] text-slate-600 font-bold">
+                        PT. DSTECH SMART PERKASA
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right text-xs space-y-0.5">
+                      <p className="font-mono font-black text-dstech-blue">
+                        Faktur No: {selectedInvoiceForPrint.invoiceNumber}
+                      </p>
+                      <p className="text-slate-500 text-[11px]">
+                        Tanggal: {selectedInvoiceForPrint.date}
+                      </p>
+                      <p className="text-slate-700 font-bold text-[11px]">
+                        Klien: {selectedInvoiceForPrint.customerName}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tabel Rincian Item Faktur */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border border-slate-200">
+                      <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-wider">
+                        <tr>
+                          <th className="p-2.5 text-center w-8">No</th>
+                          <th className="p-2.5">Deskripsi Produk / Layanan</th>
+                          <th className="p-2.5 text-center">Qty</th>
+                          <th className="p-2.5 text-center">Satuan</th>
+                          <th className="p-2.5 text-right">Harga Satuan</th>
+                          <th className="p-2.5 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 bg-white/70">
+                        {selectedInvoiceForPrint.items.map((it, idx) => (
+                          <tr key={idx}>
+                            <td className="p-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
+                            <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
+                            <td className="p-2.5 text-center font-bold">{it.qty}</td>
+                            <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
+                            <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
+                            <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Rekapitulasi Total Lampiran */}
+                  <div className="flex justify-end pt-2 text-xs">
+                    <div className="w-full sm:w-80 space-y-1.5 bg-slate-50/90 p-3 rounded-xl border border-slate-200">
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span>Subtotal Tagihan:</span>
+                        <span className="font-bold text-slate-900">{formatRupiah(selectedInvoiceForPrint.subtotal)}</span>
+                      </div>
+                      {selectedInvoiceForPrint.discount > 0 && (
+                        <div className="flex items-center justify-between text-red-600">
+                          <span>Diskon:</span>
+                          <span className="font-bold">- {formatRupiah(selectedInvoiceForPrint.discount)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span>PPN ({selectedInvoiceForPrint.taxRate}%):</span>
+                        <span className="font-bold text-slate-900">{formatRupiah(selectedInvoiceForPrint.taxAmount)}</span>
+                      </div>
+                      <div className="border-t-2 border-slate-900 pt-1.5 flex items-center justify-between text-xs font-black text-slate-900">
+                        <span className="uppercase">Total Tagihan:</span>
+                        <span className="text-sm text-dstech-blue">{formatRupiah(selectedInvoiceForPrint.grandTotal)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Catatan Lampiran */}
+                  <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-150 text-[11px] text-slate-700 space-y-1">
+                    <p className="font-bold text-dstech-blue">Catatan Lampiran Faktur:</p>
+                    <p className="text-[10px] text-slate-600 leading-relaxed">
+                      • Lampiran ini merupakan rincian item barang/jasa resmi yang menjadi satu kesatuan dokumen dengan Faktur Tagihan Nomor {selectedInvoiceForPrint.invoiceNumber}.<br />
+                      • Seluruh unit barang bergaransi resmi PT. DSTech Smart Perkasa sesuai kesepakatan surat kontrak/perjanjian kerja sama.
+                    </p>
+                  </div>
+
+                  {/* Paraf Pengesahan Lampiran */}
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
+                    <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Paraf Penerima / Klien</p>
+                      <div className="h-10 flex items-center justify-center text-slate-300 text-[9px] italic">
+                        ( .................................................. )
+                      </div>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Paraf PT. DSTech Smart Perkasa</p>
+                      <div className="h-10 flex items-center justify-center font-serif italic text-xs font-bold text-slate-800">
+                        {selectedInvoiceForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -7719,6 +8284,49 @@ export default function AdminFinanceERPPage() {
                 </button>
 
                 <button
+                  type="button"
+                  onClick={() =>
+                    handleOpenSendDocModal({
+                      docType: "SPH",
+                      docTitle: "Surat Penawaran Harga (SPH)",
+                      docNumber: selectedQuotationForPrint.quotationNumber,
+                      recipientName: selectedQuotationForPrint.customerName,
+                      recipientOrg: selectedQuotationForPrint.customerOrg,
+                      recipientPhone: selectedQuotationForPrint.customerPhone,
+                      date: selectedQuotationForPrint.date,
+                      dueDate: selectedQuotationForPrint.validUntil,
+                      subject: selectedQuotationForPrint.subject,
+                      grandTotal: selectedQuotationForPrint.grandTotal,
+                      subtotal: selectedQuotationForPrint.subtotal,
+                      discount: selectedQuotationForPrint.discount,
+                      discountLabel: selectedQuotationForPrint.discountLabel,
+                      approvalStatus: selectedQuotationForPrint.approvalStatus,
+                      initialTab: "whatsapp",
+                    })
+                  }
+                  title="Kirim Penawaran via WhatsApp atau Email"
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Kirim WA / Email</span>
+                </button>
+
+                {/* Toggle Mode 2 Halaman SPH */}
+                <button
+                  type="button"
+                  onClick={() => setPrintTwoPage((v) => !v)}
+                  className={`px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border transition-all ${
+                    printTwoPage
+                      ? "bg-purple-600 text-white border-purple-500 ring-2 ring-purple-300"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}
+                  title="Mode cetak 2 halaman: Halaman 1 Surat Resmi & Ringkasan Nilai + TTD Lengkap, Halaman 2 Lampiran Rincian Item Penawaran"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>{printTwoPage ? "✓ 2 Halaman (Lampiran)" : "1 Halaman"}</span>
+                </button>
+
+                <button
                   onClick={() => window.print()}
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
                 >
@@ -7740,14 +8348,16 @@ export default function AdminFinanceERPPage() {
               <div className="space-y-0.5">
                 <p className="font-bold">Tips Cetak Pas Penuh Kertas A4 (Full Bleed):</p>
                 <p className="text-[11px] text-amber-800">
-                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4 dan tidak terbagi 2 halaman.
+                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4.
                 </p>
               </div>
             </div>
 
             {/* SPH OFFICIAL LETTER CONTAINER (A4 Standard Print Layout) */}
             <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              className={`relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet ${
+                printTwoPage ? "print-page-break" : "print-single-sheet"
+              }`}
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
@@ -7870,41 +8480,58 @@ export default function AdminFinanceERPPage() {
                   </p>
                 </div>
 
-                {/* Tabel Item Penawaran & Spesifikasi */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border border-slate-200">
-                    <thead className="bg-indigo-950 text-white uppercase text-[10px] font-black tracking-wider">
-                      <tr>
-                        <th className="p-2.5 text-center w-8">No</th>
-                        <th className="p-2.5">Deskripsi Produk / Jasa & Spesifikasi Teknis</th>
-                        <th className="p-2.5 text-center">Qty</th>
-                        <th className="p-2.5 text-center">Satuan</th>
-                        <th className="p-2.5 text-right">Harga Satuan (Rp)</th>
-                        {selectedQuotationForPrint.items.some((it) => (it.discount || 0) > 0) && (
-                          <th className="p-2.5 text-right">Diskon</th>
-                        )}
-                        <th className="p-2.5 text-right">Total (Rp)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white/70">
-                      {selectedQuotationForPrint.items.map((it, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50">
-                          <td className="p-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
-                          <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
-                          <td className="p-2.5 text-center font-bold">{it.qty}</td>
-                          <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
-                          <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
-                          {selectedQuotationForPrint.items.some((item) => (item.discount || 0) > 0) && (
-                            <td className="p-2.5 text-right text-red-600 font-bold">
-                              {it.discount ? `- ${formatRupiah(it.discount)}` : "-"}
-                            </td>
+                {/* Tabel Item Penawaran — Tampil di halaman 1 jika mode 1 halaman, bila mode 2 halaman digantikan referensi ke Lampiran Halaman 2 */}
+                {!printTwoPage ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border border-slate-200">
+                      <thead className="bg-indigo-950 text-white uppercase text-[10px] font-black tracking-wider">
+                        <tr>
+                          <th className="p-2.5 text-center w-8">No</th>
+                          <th className="p-2.5">Deskripsi Produk / Jasa & Spesifikasi Teknis</th>
+                          <th className="p-2.5 text-center">Qty</th>
+                          <th className="p-2.5 text-center">Satuan</th>
+                          <th className="p-2.5 text-right">Harga Satuan (Rp)</th>
+                          {selectedQuotationForPrint.items.some((it) => (it.discount || 0) > 0) && (
+                            <th className="p-2.5 text-right">Diskon</th>
                           )}
-                          <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
+                          <th className="p-2.5 text-right">Total (Rp)</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 bg-white/70">
+                        {selectedQuotationForPrint.items.map((it, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="p-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
+                            <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
+                            <td className="p-2.5 text-center font-bold">{it.qty}</td>
+                            <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
+                            <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
+                            {selectedQuotationForPrint.items.some((item) => (item.discount || 0) > 0) && (
+                              <td className="p-2.5 text-right text-red-600 font-bold">
+                                {it.discount ? `- ${formatRupiah(it.discount)}` : "-"}
+                              </td>
+                            )}
+                            <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-3.5 rounded-xl bg-purple-50/80 border border-purple-200 text-xs text-purple-950 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <Layers className="w-5 h-5 text-purple-600 shrink-0" />
+                      <div>
+                        <p className="font-bold text-slate-900">Rincian Perangkat, Material & Jasa Teknis:</p>
+                        <p className="text-[11px] text-purple-800">
+                          Rincian spesifikasi teknis lengkap, kuantiti, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> surat penawaran ini ({selectedQuotationForPrint.items.length} item penawaran).
+                        </p>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-lg bg-purple-200/80 text-purple-900 font-mono font-black text-[10px] shrink-0">
+                      {selectedQuotationForPrint.items.length} ITEM
+                    </span>
+                  </div>
+                )}
 
                 {/* Rincian Perhitungan & Terbilang */}
                 <div className="flex flex-col sm:flex-row justify-between gap-4 pt-2 text-xs">
@@ -8017,7 +8644,7 @@ export default function AdminFinanceERPPage() {
                       {selectedQuotationForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi PT DSTech */}
-                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[6px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
+                          <div className="print-stamp-circle absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[6px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
                             <span className="font-black text-[5.5px]">PT. DSTECH</span>
                             <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
                             <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL SPH</span>
@@ -8028,7 +8655,7 @@ export default function AdminFinanceERPPage() {
                             <img
                               src={selectedQuotationForPrint.signatureImage}
                               alt="Tanda Tangan Digital"
-                              className="max-h-11 max-w-[130px] object-contain relative z-10"
+                              className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
@@ -8071,6 +8698,158 @@ export default function AdminFinanceERPPage() {
                 </div>
               </div>
             </div>
+
+            {/* HALAMAN 2: LAMPIRAN RINCIAN ITEM & SPESIFIKASI TEKNIS PENAWARAN (SPH) */}
+            {printTwoPage && (
+              <div
+                className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-3 text-slate-800 overflow-hidden shadow-sm print-document-sheet mt-6 print:mt-0"
+                style={{
+                  paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                  paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
+                }}
+              >
+                {/* Background Kop Surat Resmi DSTech */}
+                {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                  <img
+                    src={financeSettings.letterheadUrl}
+                    alt="Kop Surat Resmi"
+                    className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                      financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                    }`}
+                    style={{
+                      objectFit:
+                        financeSettings.letterheadFitMode === "cover"
+                          ? "cover"
+                          : financeSettings.letterheadFitMode === "contain"
+                          ? "contain"
+                          : "fill",
+                      objectPosition: "top center",
+                      width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                      height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                      top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                      left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
+                      opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                      WebkitPrintColorAdjust: "exact",
+                      printColorAdjust: "exact",
+                    }}
+                  />
+                )}
+
+                <div className="relative z-10 space-y-4 print:space-y-3">
+                  {/* Header Lampiran SPH */}
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-indigo-900 pb-3">
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-widest text-indigo-600 block">
+                        LAMPIRAN SURAT PENAWARAN HARGA (SPH)
+                      </span>
+                      <h4 className="text-base sm:text-lg font-black text-slate-900">
+                        Rincian Item Perangkat, Material & Jasa Instalasi
+                      </h4>
+                      <p className="text-[11px] text-slate-600 font-bold">
+                        PT. DSTECH SMART PERKASA
+                      </p>
+                    </div>
+                    <div className="text-left sm:text-right text-xs space-y-0.5">
+                      <p className="font-mono font-black text-indigo-700">
+                        Lampiran No: {selectedQuotationForPrint.quotationNumber}
+                      </p>
+                      <p className="text-slate-500 text-[11px]">
+                        Tanggal: {selectedQuotationForPrint.date}
+                      </p>
+                      <p className="text-slate-700 font-bold text-[11px]">
+                        Klien: {selectedQuotationForPrint.customerOrg || selectedQuotationForPrint.customerName}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Tabel Lengkap Rincian Item Penawaran */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border border-slate-200">
+                      <thead className="bg-indigo-950 text-white uppercase text-[10px] font-black tracking-wider">
+                        <tr>
+                          <th className="p-2.5 text-center w-8">No</th>
+                          <th className="p-2.5">Deskripsi Produk / Jasa & Spesifikasi Teknis</th>
+                          <th className="p-2.5 text-center">Qty</th>
+                          <th className="p-2.5 text-center">Satuan</th>
+                          <th className="p-2.5 text-right">Harga Satuan (Rp)</th>
+                          {selectedQuotationForPrint.items.some((it) => (it.discount || 0) > 0) && (
+                            <th className="p-2.5 text-right">Diskon</th>
+                          )}
+                          <th className="p-2.5 text-right">Total (Rp)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 bg-white/70">
+                        {selectedQuotationForPrint.items.map((it, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="p-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
+                            <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
+                            <td className="p-2.5 text-center font-bold">{it.qty}</td>
+                            <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
+                            <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
+                            {selectedQuotationForPrint.items.some((item) => (item.discount || 0) > 0) && (
+                              <td className="p-2.5 text-right text-red-600 font-bold">
+                                {it.discount ? `- ${formatRupiah(it.discount)}` : "-"}
+                              </td>
+                            )}
+                            <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Rekapitulasi Total Lampiran */}
+                  <div className="flex justify-end pt-2 text-xs">
+                    <div className="w-full sm:w-80 space-y-1.5 bg-slate-50/90 p-3 rounded-xl border border-slate-200">
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span>Subtotal Barang & Jasa:</span>
+                        <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.subtotal)}</span>
+                      </div>
+                      {selectedQuotationForPrint.discount > 0 && (
+                        <div className="flex items-center justify-between text-red-600">
+                          <span>Diskon Negosiasi:</span>
+                          <span className="font-bold">- {formatRupiah(selectedQuotationForPrint.discount)}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-slate-600">
+                        <span>PPN ({selectedQuotationForPrint.taxRate}%):</span>
+                        <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.taxAmount)}</span>
+                      </div>
+                      <div className="border-t-2 border-indigo-950 pt-1.5 flex items-center justify-between text-xs font-black text-slate-900">
+                        <span className="text-indigo-900 uppercase">Total Penawaran:</span>
+                        <span className="text-sm text-emerald-600">{formatRupiah(selectedQuotationForPrint.grandTotal)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Catatan Garansi & Spek Teknis */}
+                  <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-150 text-[11px] text-slate-700 space-y-1">
+                    <p className="font-bold text-indigo-950">Catatan Lampiran & Ketentuan Teknis:</p>
+                    <p className="text-[10px] text-slate-600 leading-relaxed">
+                      • Seluruh unit perangkat hardware baru dan bergaransi resmi distributor/pabrikan selama 1 (satu) tahun.<br />
+                      • Biaya instalasi teknis sudah termasuk penarikan kabel, crimping/konektor, pemasangan bracket, pengujian operasional, dan garansi instalasi 30 hari kalender.<br />
+                      • Lampiran rincian ini merupakan dokumen sah yang tidak terpisahkan dari Surat Penawaran Harga Nomor {selectedQuotationForPrint.quotationNumber}.
+                    </p>
+                  </div>
+
+                  {/* Paraf Pengesahan Lampiran */}
+                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
+                    <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Paraf Pemesan / Klien</p>
+                      <div className="h-10 flex items-center justify-center text-slate-300 text-[9px] italic">
+                        ( .................................................. )
+                      </div>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Paraf PT. DSTech Smart Perkasa</p>
+                      <div className="h-10 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
+                        {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -9808,7 +10587,7 @@ export default function AdminFinanceERPPage() {
                       {selectedPoForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi PT DSTech */}
-                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[6px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
+                          <div className="print-stamp-circle absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[6px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
                             <span className="font-black text-[5.5px]">PT. DSTECH</span>
                             <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
                             <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL PO</span>
@@ -9819,7 +10598,7 @@ export default function AdminFinanceERPPage() {
                             <img
                               src={selectedPoForPrint.signatureImage}
                               alt="Tanda Tangan Digital"
-                              className="max-h-11 max-w-[130px] object-contain relative z-10"
+                              className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
@@ -11142,7 +11921,7 @@ export default function AdminFinanceERPPage() {
                       {selectedReturnSaleForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi DSTech */}
-                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-red-500/50 flex flex-col items-center justify-center text-[6px] text-red-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-red-50/40">
+                          <div className="print-stamp-circle absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-red-500/50 flex flex-col items-center justify-center text-[6px] text-red-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-red-50/40">
                             <span className="font-black text-[5.5px]">PT. DSTECH</span>
                             <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
                             <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">QC APPROVED</span>
@@ -11152,7 +11931,7 @@ export default function AdminFinanceERPPage() {
                             <img
                               src={selectedReturnSaleForPrint.signatureImage}
                               alt="Tanda Tangan QC"
-                              className="max-h-11 max-w-[130px] object-contain relative z-10"
+                              className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
@@ -11429,7 +12208,7 @@ export default function AdminFinanceERPPage() {
                       {selectedReturnPurchaseForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
                           {/* Stempel Bulat Digital Resmi DSTech */}
-                          <div className="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[6px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
+                          <div className="print-stamp-circle absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[6px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
                             <span className="font-black text-[5.5px]">PT. DSTECH</span>
                             <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
                             <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">RMA OFFICIAL</span>
@@ -11439,7 +12218,7 @@ export default function AdminFinanceERPPage() {
                             <img
                               src={selectedReturnPurchaseForPrint.signatureImage}
                               alt="Tanda Tangan Logistik"
-                              className="max-h-11 max-w-[130px] object-contain relative z-10"
+                              className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
@@ -11901,7 +12680,7 @@ export default function AdminFinanceERPPage() {
                       {bastConfig.includeDspSignature ? (
                         <>
                           {/* Stempel Bulat Digital Resmi DSTech */}
-                          <div className="absolute right-4 w-12 h-12 rounded-full border-2 border-dashed border-red-600/60 flex flex-col items-center justify-center text-[6px] text-red-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-red-50/40">
+                          <div className="print-stamp-circle absolute right-4 w-12 h-12 rounded-full border-2 border-dashed border-red-600/60 flex flex-col items-center justify-center text-[6px] text-red-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-red-50/40">
                             <span className="font-black text-[5.5px]">PT. DSTECH</span>
                             <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
                             <span className="text-[4px] text-dstech-blue font-mono font-black mt-0.5">OFFICIAL BAST</span>
@@ -11911,7 +12690,7 @@ export default function AdminFinanceERPPage() {
                             <img
                               src={financeSettings.masterSignatureUrl}
                               alt="Tanda Tangan DSP"
-                              className="max-h-11 max-w-[130px] object-contain relative z-10"
+                              className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
@@ -14022,6 +14801,229 @@ export default function AdminFinanceERPPage() {
                 <Trash2 className="w-4 h-4" />
                 <span>{isResetting ? "Membersihkan Data..." : "Konfirmasi Bersihkan dari Nol"}</span>
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KIRIM DOKUMEN (WHATSAPP & EMAIL) */}
+      {sendDocModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto space-y-4">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-sm">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900">
+                    Kirim {sendDocModal.docTitle}
+                  </h3>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    Nomor: <span className="font-bold text-slate-700">{sendDocModal.docNumber}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSendDocModal((prev) => ({ ...prev, isOpen: false }))}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Info Dokumen Ringkas */}
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="text-[10px] text-slate-400 block">Penerima / Klien / Vendor:</span>
+                <span className="font-bold text-slate-800">{sendDocModal.recipientName}</span>
+                {sendDocModal.recipientOrg && sendDocModal.recipientOrg !== sendDocModal.recipientName && (
+                  <span className="text-[10px] text-slate-500 block">{sendDocModal.recipientOrg}</span>
+                )}
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block">Nilai Dokumen:</span>
+                <span className="font-black text-emerald-600 text-sm">
+                  {sendDocModal.grandTotal > 0 ? formatRupiah(sendDocModal.grandTotal) : "-"}
+                </span>
+                {sendDocModal.discount && sendDocModal.discount > 0 ? (
+                  <span className="text-[9px] text-red-500 block">
+                    {sendDocModal.discountLabel || "Diskon"}: -{formatRupiah(sendDocModal.discount)}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Tab Selector: WhatsApp vs Email */}
+            <div className="flex rounded-2xl p-1 bg-slate-100 border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => setSendTab("whatsapp")}
+                className={`flex-1 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                  sendTab === "whatsapp"
+                    ? "bg-emerald-600 text-white shadow-md"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>Kirim via WhatsApp</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSendTab("email")}
+                className={`flex-1 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all ${
+                  sendTab === "email"
+                    ? "bg-blue-600 text-white shadow-md"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Mail className="w-4 h-4" />
+                <span>Kirim via Email</span>
+              </button>
+            </div>
+
+            {/* Konten Tab WhatsApp */}
+            {sendTab === "whatsapp" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Nomor WhatsApp Penerima:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customPhoneInput}
+                      onChange={(e) => setCustomPhoneInput(e.target.value)}
+                      placeholder="Contoh: 0812-3456-7890 atau 6281234567890"
+                      className="flex-1 px-3 py-2 rounded-xl border border-slate-300 font-mono font-bold text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSendWhatsApp(customPhoneInput)}
+                      className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Kirim Sekarang</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    * Awalan 08 otomatis dikonversi ke format internasional 628 WhatsApp.
+                  </p>
+                </div>
+
+                {/* Pratinjau Pesan WA */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-700">
+                      Pratinjau Pesan WhatsApp:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const { waText } = generateDocShareContent(sendDocModal);
+                        handleCopyContent(waText, "Pesan WhatsApp");
+                      }}
+                      className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1 cursor-pointer bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Salin Pesan</span>
+                    </button>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-emerald-950/90 text-emerald-100 font-mono text-[11px] whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto border border-emerald-900 shadow-inner select-all">
+                    {generateDocShareContent(sendDocModal).waText}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Konten Tab Email */}
+            {sendTab === "email" && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Alamat Email Penerima:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={customEmailInput}
+                      onChange={(e) => setCustomEmailInput(e.target.value)}
+                      placeholder="Contoh: procurement@klien.co.id"
+                      className="flex-1 px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleSendEmail(customEmailInput)}
+                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>Buka Mailto</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Subjek Email:
+                  </label>
+                  <div className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800">
+                    {generateDocShareContent(sendDocModal).emailSubject}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[11px] font-bold text-slate-700">
+                      Isi Surat Pengantar:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const { emailBody } = generateDocShareContent(sendDocModal);
+                        handleCopyContent(emailBody, "Isi Email");
+                      }}
+                      className="text-[10px] font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 cursor-pointer bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Salin Body Email</span>
+                    </button>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-slate-900 text-slate-200 font-sans text-xs whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto border border-slate-800 shadow-inner select-all">
+                    {generateDocShareContent(sendDocModal).emailBody}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Footer Modal */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setSendDocModal((prev) => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs cursor-pointer"
+              >
+                Tutup
+              </button>
+              {sendTab === "whatsapp" ? (
+                <button
+                  type="button"
+                  onClick={() => handleSendWhatsApp(customPhoneInput)}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Buka WhatsApp Web / App</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSendEmail(customEmailInput)}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>Kirim via Email Client</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
