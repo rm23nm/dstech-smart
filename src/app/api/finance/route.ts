@@ -285,12 +285,80 @@ export async function POST(request: Request) {
       const paidAmount = Number(payload.paidAmount) || 0;
       const remainingAmount = Math.max(0, grandTotal - paidAmount);
       const isDp = payload.invoiceType === "DP";
+      const isTermin = payload.invoiceType === "Termin";
       const dpAmount = Number(payload.dpAmount) || 0;
       const dpPercentage = Number(payload.dpPercentage) || (grandTotal > 0 ? Math.round((dpAmount / grandTotal) * 100) : 0);
+
+      let processedTermins: any[] = [];
+      if (isTermin) {
+        if (Array.isArray(payload.termins) && payload.termins.length > 0) {
+          processedTermins = payload.termins.map((t: any, idx: number) => {
+            const pct = Number(t.percentage) || 0;
+            const amt = Number(t.amount) || Math.round(grandTotal * (pct / 100));
+            return {
+              id: t.id || `t_${idx + 1}`,
+              name: t.name || `Termin ${idx + 1}`,
+              percentage: pct,
+              amount: amt,
+              dueDate: t.dueDate || payload.dueDate || new Date(Date.now() + (idx + 1) * 14 * 86400000).toISOString().split("T")[0],
+              condition: t.condition || (idx === 0 ? "Uang Muka / SPK" : idx === payload.termins.length - 1 ? "BAST & Pelunasan" : `Progres Pekerjaan Tahap ${idx + 1}`),
+              status: t.status || (idx === 0 ? "Ditagihkan" : "Belum Ditagih"),
+              paidAmount: Number(t.paidAmount) || 0,
+              paidDate: t.paidDate || "",
+              paymentMethod: t.paymentMethod || "",
+              notes: t.notes || "",
+            };
+          });
+        } else {
+          // Default 3 Termin: 30% - 40% - 30%
+          processedTermins = [
+            {
+              id: "t_1",
+              name: "Termin 1 (Uang Muka)",
+              percentage: 30,
+              amount: Math.round(grandTotal * 0.3),
+              dueDate: payload.dueDate || new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+              condition: "Penandatanganan Kontrak / Surat Perintah Kerja (SPK)",
+              status: "Ditagihkan",
+              paidAmount: 0,
+              paidDate: "",
+            },
+            {
+              id: "t_2",
+              name: "Termin 2 (Material & Progres 50%)",
+              percentage: 40,
+              amount: Math.round(grandTotal * 0.4),
+              dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+              condition: "Material Tiba di Lokasi & Progres Penarikan Kabel 50%",
+              status: "Belum Ditagih",
+              paidAmount: 0,
+              paidDate: "",
+            },
+            {
+              id: "t_3",
+              name: "Termin 3 (Pelunasan 100%)",
+              percentage: 30,
+              amount: grandTotal - Math.round(grandTotal * 0.3) - Math.round(grandTotal * 0.4),
+              dueDate: new Date(Date.now() + 45 * 86400000).toISOString().split("T")[0],
+              condition: "Pekerjaan Selesai, Uji Fungsi & Penandatanganan BAST",
+              status: "Belum Ditagih",
+              paidAmount: 0,
+              paidDate: "",
+            },
+          ];
+        }
+      }
 
       let paymentStatus = "Belum Lunas";
       if (remainingAmount === 0) {
         paymentStatus = "Lunas";
+      } else if (isTermin) {
+        const lunasTermins = processedTermins.filter((t) => t.status === "Lunas").length;
+        if (lunasTermins > 0) {
+          paymentStatus = `Termin ${lunasTermins}/${processedTermins.length} Lunas`;
+        } else {
+          paymentStatus = "Ditagihkan Termin 1";
+        }
       } else if (isDp) {
         if (paidAmount >= dpAmount && dpAmount > 0) {
           paymentStatus = "DP Lunas (Sisa Pelunasan)";
@@ -311,7 +379,7 @@ export async function POST(request: Request) {
         customerAddress: payload.customerAddress || "-",
         date: payload.date || new Date().toISOString().split("T")[0],
         dueDate: payload.dueDate || new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
-        invoiceType: isDp ? "DP" : "Standard",
+        invoiceType: isTermin ? "Termin" : isDp ? "DP" : "Standar",
         dpPercentage: isDp ? dpPercentage : 0,
         dpAmount: isDp ? dpAmount : 0,
         dpStatus: isDp
@@ -323,6 +391,8 @@ export async function POST(request: Request) {
           : "Bukan DP",
         dpPaidAmount: isDp ? Math.min(paidAmount, dpAmount) : 0,
         dpNotes: payload.dpNotes || (isDp ? `Pengajuan Uang Muka (DP ${dpPercentage}%) pelaksanaan pekerjaan` : "-"),
+        termins: processedTermins,
+        activeTerminId: isTermin ? (processedTermins.find((t) => t.status === "Ditagihkan")?.id || processedTermins[0]?.id || "") : "",
         items: payload.items || [],
         subtotal: Number(payload.subtotal) || 0,
         discount: Number(payload.discount) || 0,
@@ -523,7 +593,7 @@ export async function POST(request: Request) {
     }
 
     if (actionType === "record_payment") {
-      const { invoiceId, paymentAmount, paymentMethod, paymentDate, notes } = payload;
+      const { invoiceId, paymentAmount, paymentMethod, paymentDate, notes, terminId } = payload;
       const sales = data.sales || [];
       const invoiceIndex = sales.findIndex((s: any) => s.id === invoiceId || s.invoiceNumber === invoiceId);
 
@@ -540,9 +610,42 @@ export async function POST(request: Request) {
       const newPaidAmount = (Number(invoice.paidAmount) || 0) + amountToPay;
       const newRemaining = Math.max(0, (Number(invoice.grandTotal) || 0) - newPaidAmount);
 
+      let targetTerminName = "";
+      if (invoice.invoiceType === "Termin" && Array.isArray(invoice.termins)) {
+        const targetT = terminId
+          ? invoice.termins.find((t: any) => t.id === terminId)
+          : invoice.termins.find((t: any) => t.status === "Ditagihkan") || invoice.termins.find((t: any) => t.status !== "Lunas");
+
+        if (targetT) {
+          targetTerminName = targetT.name;
+          targetT.paidAmount = (Number(targetT.paidAmount) || 0) + amountToPay;
+          if (targetT.paidAmount >= targetT.amount) {
+            targetT.status = "Lunas";
+            targetT.paidDate = paymentDate || new Date().toISOString().split("T")[0];
+            targetT.paymentMethod = paymentMethod || invoice.paymentMethod;
+
+            // Aktifkan termin berikutnya yang berstatus "Belum Ditagih"
+            const nextUnbilled = invoice.termins.find((t: any) => t.status === "Belum Ditagih");
+            if (nextUnbilled) {
+              nextUnbilled.status = "Ditagihkan";
+              invoice.activeTerminId = nextUnbilled.id;
+            } else {
+              invoice.activeTerminId = targetT.id;
+            }
+          }
+        }
+      }
+
       let newPaymentStatus = "Sebagian";
       if (newRemaining === 0) {
         newPaymentStatus = "Lunas";
+      } else if (invoice.invoiceType === "Termin" && Array.isArray(invoice.termins)) {
+        const lunasCount = invoice.termins.filter((t: any) => t.status === "Lunas").length;
+        if (lunasCount > 0) {
+          newPaymentStatus = `Termin ${lunasCount}/${invoice.termins.length} Lunas`;
+        } else {
+          newPaymentStatus = targetTerminName ? `Sebagian (${targetTerminName})` : "Sebagian Termin";
+        }
       } else if (invoice.invoiceType === "DP") {
         if (newPaidAmount >= (Number(invoice.dpAmount) || 0)) {
           newPaymentStatus = "DP Lunas (Sisa Pelunasan)";
@@ -561,7 +664,12 @@ export async function POST(request: Request) {
       // Catat ke Arus Kas
       if (!data.cash_flow) data.cash_flow = [];
       const isDpPayment = invoice.invoiceType === "DP" && newPaidAmount <= (Number(invoice.dpAmount) || 0);
-      const cashCategory = isDpPayment ? "Uang Muka Penjualan" : "Pelunasan Penjualan";
+      const isTerminPayment = invoice.invoiceType === "Termin";
+      const cashCategory = isDpPayment
+        ? "Uang Muka Penjualan"
+        : isTerminPayment
+        ? "Pembayaran Termin Penjualan"
+        : "Pelunasan Penjualan";
 
       data.cash_flow.unshift({
         id: `dstech_cash_${Date.now()}`,
@@ -571,7 +679,7 @@ export async function POST(request: Request) {
         amount: amountToPay,
         account: formatAccountFromPaymentMethod(paymentMethod || invoice.paymentMethod, data),
         reference: invoice.invoiceNumber,
-        description: `Penerimaan ${invoice.invoiceType === "DP" ? "DP / Termin" : "Pelunasan"} ${invoice.invoiceNumber} - ${invoice.customerName} (${notes || "Pembayaran Masuk"})`,
+        description: `Penerimaan ${isTerminPayment ? targetTerminName || "Termin" : isDpPayment ? "DP" : "Pelunasan"} ${invoice.invoiceNumber} - ${invoice.customerName} (${notes || "Pembayaran Masuk"})`,
         balanceAfter: 0,
       });
 
@@ -788,7 +896,7 @@ export async function POST(request: Request) {
     }
 
     if (actionType === "convert_quotation_to_sale") {
-      const { quotationId, invoiceType, dpPercentage, dpNotes } = payload;
+      const { quotationId, invoiceType, dpPercentage, dpNotes, termins } = payload;
       const quotations = data.quotations || [];
       const qIndex = quotations.findIndex((q: any) => q.id === quotationId || q.quotationNumber === quotationId);
 
@@ -801,9 +909,67 @@ export async function POST(request: Request) {
       const newInvoiceNumber = `INV-DSTECH-${yearMonth}-${String((data.sales?.length || 0) + 1).padStart(3, "0")}`;
 
       const grandTotal = Number(sph.grandTotal) || 0;
-      const isDp = invoiceType === "DP" || (Number(dpPercentage) > 0);
-      const dpPct = isDp ? (Number(dpPercentage) || 50) : 0;
+      const isTermin = invoiceType === "Termin";
+      const isDp = !isTermin && (invoiceType === "DP" || Number(dpPercentage) > 0);
+      const dpPct = isDp ? Number(dpPercentage) || 50 : 0;
       const dpAmount = isDp ? Math.round((grandTotal * dpPct) / 100) : 0;
+
+      let processedTermins: any[] = [];
+      if (isTermin) {
+        if (Array.isArray(termins) && termins.length > 0) {
+          processedTermins = termins.map((t: any, idx: number) => {
+            const pct = Number(t.percentage) || 0;
+            const amt = Number(t.amount) || Math.round(grandTotal * (pct / 100));
+            return {
+              id: t.id || `t_${idx + 1}`,
+              name: t.name || `Termin ${idx + 1}`,
+              percentage: pct,
+              amount: amt,
+              dueDate: t.dueDate || new Date(Date.now() + (idx + 1) * 14 * 86400000).toISOString().split("T")[0],
+              condition: t.condition || (idx === 0 ? "Uang Muka / SPK" : idx === termins.length - 1 ? "BAST & Pelunasan" : `Progres Pekerjaan Tahap ${idx + 1}`),
+              status: t.status || (idx === 0 ? "Ditagihkan" : "Belum Ditagih"),
+              paidAmount: 0,
+              paidDate: "",
+            };
+          });
+        } else {
+          processedTermins = [
+            {
+              id: "t_1",
+              name: "Termin 1 (Uang Muka)",
+              percentage: 30,
+              amount: Math.round(grandTotal * 0.3),
+              dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+              condition: "Penandatanganan Kontrak / Surat Perintah Kerja (SPK)",
+              status: "Ditagihkan",
+              paidAmount: 0,
+              paidDate: "",
+            },
+            {
+              id: "t_2",
+              name: "Termin 2 (Material & Progres 50%)",
+              percentage: 40,
+              amount: Math.round(grandTotal * 0.4),
+              dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+              condition: "Material Tiba di Lokasi & Progres Penarikan Kabel 50%",
+              status: "Belum Ditagih",
+              paidAmount: 0,
+              paidDate: "",
+            },
+            {
+              id: "t_3",
+              name: "Termin 3 (Pelunasan 100%)",
+              percentage: 30,
+              amount: grandTotal - Math.round(grandTotal * 0.3) - Math.round(grandTotal * 0.4),
+              dueDate: new Date(Date.now() + 45 * 86400000).toISOString().split("T")[0],
+              condition: "Pekerjaan Selesai, Uji Fungsi & Penandatanganan BAST",
+              status: "Belum Ditagih",
+              paidAmount: 0,
+              paidDate: "",
+            },
+          ];
+        }
+      }
 
       const newSale = {
         id: `dstech_inv_${Date.now()}`,
@@ -813,12 +979,14 @@ export async function POST(request: Request) {
         customerAddress: sph.customerAddress,
         date: new Date().toISOString().split("T")[0],
         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-        invoiceType: isDp ? "DP" : "Standard",
+        invoiceType: isTermin ? "Termin" : isDp ? "DP" : "Standar",
         dpPercentage: dpPct,
         dpAmount: dpAmount,
         dpStatus: isDp ? "Menunggu Pembayaran DP" : "Bukan DP",
         dpPaidAmount: 0,
-        dpNotes: dpNotes || `Pengajuan DP ${dpPct}% dari penawaran ${sph.quotationNumber}`,
+        dpNotes: dpNotes || (isDp ? `Pengajuan DP ${dpPct}% dari penawaran ${sph.quotationNumber}` : "-"),
+        termins: processedTermins,
+        activeTerminId: isTermin ? (processedTermins.find((t) => t.status === "Ditagihkan")?.id || processedTermins[0]?.id || "") : "",
         items: sph.items || [],
         subtotal: sph.subtotal,
         discount: sph.discount,
@@ -830,7 +998,7 @@ export async function POST(request: Request) {
         taxAmount: sph.taxAmount,
         grandTotal: grandTotal,
         paymentMethod: `Transfer ${getDefaultBankAccountLabel(data)}`,
-        paymentStatus: isDp ? "Menunggu DP" : "Belum Lunas",
+        paymentStatus: isTermin ? "Ditagihkan Termin 1" : isDp ? "Menunggu DP" : "Belum Lunas",
         paidAmount: 0,
         remainingAmount: grandTotal,
         warehouseId: "dstech_wh_1",
@@ -1007,6 +1175,13 @@ export async function PUT(request: Request) {
 
       if (currentRemaining === 0) {
         data.sales[index].paymentStatus = "Lunas";
+      } else if (data.sales[index].invoiceType === "Termin" && Array.isArray(data.sales[index].termins)) {
+        const lunasCount = data.sales[index].termins.filter((t: any) => t.status === "Lunas").length;
+        if (lunasCount > 0) {
+          data.sales[index].paymentStatus = `Termin ${lunasCount}/${data.sales[index].termins.length} Lunas`;
+        } else {
+          data.sales[index].paymentStatus = "Ditagihkan Termin 1";
+        }
       } else if (data.sales[index].invoiceType === "DP") {
         if (currentPaid >= currentDp && currentDp > 0) {
           data.sales[index].paymentStatus = "DP Lunas (Sisa Pelunasan)";

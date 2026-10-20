@@ -86,6 +86,20 @@ interface SaleItem {
   total: number;
 }
 
+export interface InvoiceTermin {
+  id: string;
+  name: string;
+  percentage: number;
+  amount: number;
+  dueDate: string;
+  condition: string;
+  status: "Belum Ditagih" | "Ditagihkan" | "Lunas";
+  paidAmount?: number;
+  paidDate?: string;
+  paymentMethod?: string;
+  notes?: string;
+}
+
 interface SaleInvoice {
   id: string;
   invoiceNumber: string;
@@ -108,12 +122,14 @@ interface SaleInvoice {
   paymentStatus: string;
   paidAmount: number;
   remainingAmount: number;
-  invoiceType?: "Standar" | "DP";
+  invoiceType?: "Standar" | "DP" | "Termin";
   dpPercentage?: number;
   dpAmount?: number;
   dpStatus?: string;
   dpPaidAmount?: number;
   dpNotes?: string;
+  termins?: InvoiceTermin[];
+  activeTerminId?: string;
   warehouseId: string;
   branchId: string;
   salesPerson: string;
@@ -478,17 +494,28 @@ export default function AdminFinanceERPPage() {
   const [selectedPoForPrint, setSelectedPoForPrint] = useState<PurchaseOrder | null>(null);
   const [isNewCashModalOpen, setIsNewCashModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForPrint, setSelectedInvoiceForPrint] = useState<SaleInvoice | null>(null);
-  const [printBillingStage, setPrintBillingStage] = useState<"DP" | "Pelunasan" | "Full">("DP");
+  const [printBillingStage, setPrintBillingStage] = useState<"DP" | "Pelunasan" | "Full" | "Termin">("DP");
+  const [selectedPrintTerminId, setSelectedPrintTerminId] = useState<string | null>(null);
   const [printTwoPage, setPrintTwoPage] = useState<boolean>(true);
 
-  const handleOpenPrintInvoice = (invoice: SaleInvoice, stage?: "DP" | "Pelunasan" | "Full") => {
+  const handleOpenPrintInvoice = (invoice: SaleInvoice, stage?: "DP" | "Pelunasan" | "Full" | "Termin", terminId?: string) => {
     if (stage) {
       setPrintBillingStage(stage);
+      if (terminId) setSelectedPrintTerminId(terminId);
+    } else if (invoice.invoiceType === "Termin") {
+      setPrintBillingStage("Termin");
+      const activeTermin = invoice.termins?.find(t => t.id === invoice.activeTerminId) 
+        || invoice.termins?.find(t => t.status === "Ditagihkan") 
+        || invoice.termins?.find(t => t.status !== "Lunas") 
+        || invoice.termins?.[0];
+      setSelectedPrintTerminId(terminId || activeTermin?.id || invoice.termins?.[0]?.id || null);
     } else if (invoice.invoiceType === "DP") {
       const isDpPaid = (Number(invoice.dpPaidAmount) || 0) >= (Number(invoice.dpAmount) || 0) || invoice.paymentStatus?.includes("DP Lunas");
       setPrintBillingStage(isDpPaid && invoice.remainingAmount > 0 ? "Pelunasan" : "DP");
+      setSelectedPrintTerminId(null);
     } else {
       setPrintBillingStage("Full");
+      setSelectedPrintTerminId(null);
     }
     setSelectedInvoiceForPrint(invoice);
   };
@@ -747,11 +774,18 @@ export default function AdminFinanceERPPage() {
   // Terima Pembayaran Modal State
   const [isPayInvoiceModalOpen, setIsPayInvoiceModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForPayment, setSelectedInvoiceForPayment] = useState<SaleInvoice | null>(null);
-  const [paymentForm, setPaymentForm] = useState({
+  const [paymentForm, setPaymentForm] = useState<{
+    amount: number;
+    paymentMethod: string;
+    paymentDate: string;
+    notes: string;
+    terminId?: string;
+  }>({
     amount: 0,
     paymentMethod: "",
     paymentDate: new Date().toISOString().split("T")[0],
     notes: "",
+    terminId: "",
   });
 
   // Edit Sale Modal State
@@ -880,10 +914,152 @@ export default function AdminFinanceERPPage() {
   const [selectedQuotationForPrint, setSelectedQuotationForPrint] = useState<Quotation | null>(null);
   const [selectedQuotationForConvert, setSelectedQuotationForConvert] = useState<Quotation | null>(null);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState<boolean>(false);
-  const [convertForm, setConvertForm] = useState({
-    invoiceType: "Standar" as "Standar" | "DP",
+  const getDefaultTermins = (grandTotal: number = 0, baseDueDate?: string): InvoiceTermin[] => {
+    const baseDate = baseDueDate ? new Date(baseDueDate) : new Date();
+    const t1Due = new Date(baseDate.getTime() + 14 * 86400000).toISOString().split("T")[0];
+    const t2Due = new Date(baseDate.getTime() + 30 * 86400000).toISOString().split("T")[0];
+    const t3Due = new Date(baseDate.getTime() + 45 * 86400000).toISOString().split("T")[0];
+
+    const amt1 = Math.round(grandTotal * 0.3);
+    const amt2 = Math.round(grandTotal * 0.4);
+    const amt3 = Math.max(0, grandTotal - amt1 - amt2);
+
+    return [
+      {
+        id: "t_1",
+        name: "Termin 1 (Uang Muka 30%)",
+        percentage: 30,
+        amount: amt1,
+        dueDate: t1Due,
+        condition: "Penandatanganan Kontrak / Surat Perintah Kerja (SPK)",
+        status: "Ditagihkan",
+        paidAmount: 0,
+        paidDate: "",
+      },
+      {
+        id: "t_2",
+        name: "Termin 2 (Material & Progres 50%)",
+        percentage: 40,
+        amount: amt2,
+        dueDate: t2Due,
+        condition: "Material Tiba di Lokasi & Progres Penarikan Kabel 50%",
+        status: "Belum Ditagih",
+        paidAmount: 0,
+        paidDate: "",
+      },
+      {
+        id: "t_3",
+        name: "Termin 3 (Pelunasan BAST 100%)",
+        percentage: 30,
+        amount: amt3,
+        dueDate: t3Due,
+        condition: "Pekerjaan Selesai, Uji Fungsi & Penandatanganan BAST",
+        status: "Belum Ditagih",
+        paidAmount: 0,
+        paidDate: "",
+      },
+    ];
+  };
+
+  const getPresetTermins = (preset: "3_tahap" | "4_tahap" | "50_30_20", grandTotal: number = 0, baseDueDate?: string): InvoiceTermin[] => {
+    const baseDate = baseDueDate ? new Date(baseDueDate) : new Date();
+    if (preset === "4_tahap") {
+      const a1 = Math.round(grandTotal * 0.4);
+      const a2 = Math.round(grandTotal * 0.3);
+      const a3 = Math.round(grandTotal * 0.2);
+      const a4 = Math.max(0, grandTotal - a1 - a2 - a3);
+      return [
+        {
+          id: "t_1",
+          name: "Termin 1 (Uang Muka SPK 40%)",
+          percentage: 40,
+          amount: a1,
+          dueDate: new Date(baseDate.getTime() + 14 * 86400000).toISOString().split("T")[0],
+          condition: "Penandatanganan Kontrak & SPK",
+          status: "Ditagihkan",
+          paidAmount: 0,
+        },
+        {
+          id: "t_2",
+          name: "Termin 2 (Instalasi & Perangkat 30%)",
+          percentage: 30,
+          amount: a2,
+          dueDate: new Date(baseDate.getTime() + 30 * 86400000).toISOString().split("T")[0],
+          condition: "Perangkat Utama Terpasang (Progres 70%)",
+          status: "Belum Ditagih",
+          paidAmount: 0,
+        },
+        {
+          id: "t_3",
+          name: "Termin 3 (Commissioning & BAST 20%)",
+          percentage: 20,
+          amount: a3,
+          dueDate: new Date(baseDate.getTime() + 45 * 86400000).toISOString().split("T")[0],
+          condition: "Uji Fungsi & Serah Terima Pekerjaan BAST 100%",
+          status: "Belum Ditagih",
+          paidAmount: 0,
+        },
+        {
+          id: "t_4",
+          name: "Termin 4 (Masa Pemeliharaan / Retensi 10%)",
+          percentage: 10,
+          amount: a4,
+          dueDate: new Date(baseDate.getTime() + 90 * 86400000).toISOString().split("T")[0],
+          condition: "Masa Pemeliharaan / Retensi Garansi 3 Bulan",
+          status: "Belum Ditagih",
+          paidAmount: 0,
+        },
+      ];
+    } else if (preset === "50_30_20") {
+      const a1 = Math.round(grandTotal * 0.5);
+      const a2 = Math.round(grandTotal * 0.3);
+      const a3 = Math.max(0, grandTotal - a1 - a2);
+      return [
+        {
+          id: "t_1",
+          name: "Termin 1 (Uang Muka 50%)",
+          percentage: 50,
+          amount: a1,
+          dueDate: new Date(baseDate.getTime() + 14 * 86400000).toISOString().split("T")[0],
+          condition: "Penandatanganan Kontrak / Surat Perintah Kerja (SPK)",
+          status: "Ditagihkan",
+          paidAmount: 0,
+        },
+        {
+          id: "t_2",
+          name: "Termin 2 (Progres Fisik 30%)",
+          percentage: 30,
+          amount: a2,
+          dueDate: new Date(baseDate.getTime() + 30 * 86400000).toISOString().split("T")[0],
+          condition: "Pemasangan Fisik Selesai & Pengujian Sistem",
+          status: "Belum Ditagih",
+          paidAmount: 0,
+        },
+        {
+          id: "t_3",
+          name: "Termin 3 (Pelunasan BAST 20%)",
+          percentage: 20,
+          amount: a3,
+          dueDate: new Date(baseDate.getTime() + 45 * 86400000).toISOString().split("T")[0],
+          condition: "Penandatanganan BAST 100%",
+          status: "Belum Ditagih",
+          paidAmount: 0,
+        },
+      ];
+    }
+    return getDefaultTermins(grandTotal, baseDueDate);
+  };
+
+  const [convertForm, setConvertForm] = useState<{
+    invoiceType: "Standar" | "DP" | "Termin";
+    dpPercentage: number;
+    dpNotes: string;
+    termins: InvoiceTermin[];
+  }>({
+    invoiceType: "Standar",
     dpPercentage: 50,
     dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Proyek",
+    termins: [],
   });
 
   const [quotationForm, setQuotationForm] = useState<{
@@ -942,10 +1118,11 @@ export default function AdminFinanceERPPage() {
     date: string;
     dueDate: string;
     paymentMethod: string;
-    invoiceType: "Standar" | "DP";
+    invoiceType: "Standar" | "DP" | "Termin";
     dpPercentage: number;
     dpAmount: number;
     dpNotes: string;
+    termins: InvoiceTermin[];
     items: SaleItem[];
     discount: number;
     discountType: "fixed" | "percent";
@@ -963,10 +1140,11 @@ export default function AdminFinanceERPPage() {
     date: new Date().toISOString().split("T")[0],
     dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
     paymentMethod: "Transfer Bank Mandiri PT DSTech Smart Perkasa",
-    invoiceType: "Standar" as "Standar" | "DP",
+    invoiceType: "Standar",
     dpPercentage: 50,
     dpAmount: 0,
     dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Instalasi & Pengadaan",
+    termins: [],
     items: [
       { id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
     ],
@@ -1887,12 +2065,21 @@ export default function AdminFinanceERPPage() {
       invoiceType: "DP",
       dpPercentage: 50,
       dpNotes: `Pengajuan Uang Muka (DP 50%) atas SPH ${q.quotationNumber} - ${q.subject}`,
+      termins: getDefaultTermins(q.grandTotal),
     });
     setIsConvertModalOpen(true);
   };
 
   const handleExecuteConvertQuotation = async () => {
     if (!selectedQuotationForConvert) return;
+    if (convertForm.invoiceType === "Termin") {
+      const termins = convertForm.termins.length > 0 ? convertForm.termins : getDefaultTermins(selectedQuotationForConvert.grandTotal);
+      const totalPct = termins.reduce((acc, t) => acc + (Number(t.percentage) || 0), 0);
+      if (totalPct !== 100) {
+        showToast(`Total bobot termin harus tepat 100%! (Saat ini: ${totalPct}%)`);
+        return;
+      }
+    }
     try {
       const res = await fetch("/api/finance", {
         method: "POST",
@@ -1904,6 +2091,7 @@ export default function AdminFinanceERPPage() {
             invoiceType: convertForm.invoiceType,
             dpPercentage: convertForm.invoiceType === "DP" ? convertForm.dpPercentage : 0,
             dpNotes: convertForm.dpNotes,
+            termins: convertForm.invoiceType === "Termin" ? (convertForm.termins.length > 0 ? convertForm.termins : getDefaultTermins(selectedQuotationForConvert.grandTotal)) : [],
           },
         }),
       });
@@ -1950,6 +2138,18 @@ export default function AdminFinanceERPPage() {
       return;
     }
 
+    let finalTermins = saleForm.termins;
+    if (saleForm.invoiceType === "Termin") {
+      if (!finalTermins || finalTermins.length === 0) {
+        finalTermins = getDefaultTermins(grandTotal, saleForm.dueDate);
+      }
+      const totalPct = finalTermins.reduce((acc, t) => acc + (Number(t.percentage) || 0), 0);
+      if (totalPct !== 100) {
+        showToast(`Total bobot persentase termin harus tepat 100%! (Saat ini: ${totalPct}%)`);
+        return;
+      }
+    }
+
     try {
       const res = await fetch("/api/finance", {
         method: "POST",
@@ -1969,6 +2169,7 @@ export default function AdminFinanceERPPage() {
             dpPercentage: saleForm.invoiceType === "DP" ? Number(saleForm.dpPercentage) : 0,
             dpAmount: saleForm.invoiceType === "DP" ? dpAmount : 0,
             dpNotes: saleForm.invoiceType === "DP" ? saleForm.dpNotes : "-",
+            termins: saleForm.invoiceType === "Termin" ? finalTermins : [],
             items: saleForm.items,
             subtotal,
             discount: discountVal,
@@ -2000,6 +2201,7 @@ export default function AdminFinanceERPPage() {
           dpPercentage: 50,
           dpAmount: 0,
           dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Instalasi & Pengadaan",
+          termins: [],
           items: [{ id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
           discount: 0,
           discountType: "fixed",
@@ -2019,25 +2221,43 @@ export default function AdminFinanceERPPage() {
   };
 
   // Handler Terima Pembayaran
-  const handleOpenPayInvoice = (invoice: SaleInvoice) => {
+  const handleOpenPayInvoice = (invoice: SaleInvoice, specificTerminId?: string) => {
     setSelectedInvoiceForPayment(invoice);
     let defaultAmount = invoice.remainingAmount;
     let isDpPaymentPhase = false;
-    if (invoice.invoiceType === "DP" && (Number(invoice.dpPaidAmount) || 0) < (Number(invoice.dpAmount) || 0)) {
+    let selectedTerminId = "";
+    let payNotes = `Penerimaan Pembayaran Faktur ${invoice.invoiceNumber}`;
+
+    if (invoice.invoiceType === "Termin" && Array.isArray(invoice.termins) && invoice.termins.length > 0) {
+      const targetT = specificTerminId
+        ? invoice.termins.find((t) => t.id === specificTerminId)
+        : invoice.termins.find((t) => t.id === invoice.activeTerminId && t.status !== "Lunas")
+        || invoice.termins.find((t) => t.status === "Ditagihkan")
+        || invoice.termins.find((t) => t.status !== "Lunas")
+        || invoice.termins[0];
+
+      if (targetT) {
+        selectedTerminId = targetT.id;
+        const remainingTermin = Math.max(0, targetT.amount - (Number(targetT.paidAmount) || 0));
+        defaultAmount = remainingTermin > 0 ? remainingTermin : targetT.amount;
+        payNotes = `Penerimaan Pembayaran ${targetT.name} Faktur ${invoice.invoiceNumber}`;
+      }
+    } else if (invoice.invoiceType === "DP" && (Number(invoice.dpPaidAmount) || 0) < (Number(invoice.dpAmount) || 0)) {
       defaultAmount = Math.max(0, (Number(invoice.dpAmount) || 0) - (Number(invoice.dpPaidAmount) || 0));
       isDpPaymentPhase = true;
+      payNotes = `Penerimaan Uang Muka (DP ${invoice.dpPercentage || 50}%) Faktur ${invoice.invoiceNumber}`;
+    } else if (invoice.invoiceType === "DP") {
+      payNotes = `Penerimaan Pelunasan Sisa Kontrak Faktur ${invoice.invoiceNumber}`;
     }
+
     const defaultAcc = getDefaultBankAccLabel();
 
     setPaymentForm({
       amount: defaultAmount,
       paymentMethod: defaultAcc,
       paymentDate: new Date().toISOString().split("T")[0],
-      notes: invoice.invoiceType === "DP"
-        ? isDpPaymentPhase
-          ? `Penerimaan Uang Muka (DP ${invoice.dpPercentage || 50}%) Faktur ${invoice.invoiceNumber}`
-          : `Penerimaan Pelunasan Sisa Kontrak Faktur ${invoice.invoiceNumber}`
-        : `Penerimaan Pembayaran Faktur ${invoice.invoiceNumber}`,
+      notes: payNotes,
+      terminId: selectedTerminId,
     });
     setIsPayInvoiceModalOpen(true);
   };
@@ -2061,6 +2281,7 @@ export default function AdminFinanceERPPage() {
             paymentMethod: paymentForm.paymentMethod,
             paymentDate: paymentForm.paymentDate,
             notes: paymentForm.notes,
+            terminId: paymentForm.terminId || undefined,
           },
         }),
       });
@@ -2160,6 +2381,15 @@ export default function AdminFinanceERPPage() {
       return;
     }
 
+    if (editingSale.invoiceType === "Termin") {
+      const termins = editingSale.termins || [];
+      const totalPct = termins.reduce((acc, t) => acc + (Number(t.percentage) || 0), 0);
+      if (termins.length > 0 && totalPct !== 100) {
+        showToast(`Total akumulasi persentase termin harus tepat 100%! (Saat ini: ${totalPct}%)`);
+        return;
+      }
+    }
+
     try {
       const res = await fetch("/api/finance", {
         method: "PUT",
@@ -2179,6 +2409,8 @@ export default function AdminFinanceERPPage() {
             dpPercentage: editingSale.dpPercentage,
             dpAmount: editingSale.dpAmount,
             dpNotes: editingSale.dpNotes,
+            termins: editingSale.invoiceType === "Termin" ? editingSale.termins || [] : [],
+            activeTerminId: editingSale.activeTerminId,
             items: editingSale.items,
             subtotal: editingSale.subtotal,
             discount: Number(editingSale.discount || 0),
@@ -4135,11 +4367,17 @@ export default function AdminFinanceERPPage() {
                     .map((sale) => (
                       <tr key={sale.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="p-3 font-black text-slate-900 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <span className="font-mono text-dstech-blue">{sale.invoiceNumber}</span>
                             {sale.invoiceType === "DP" && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800 uppercase tracking-wider">
                                 DP {sale.dpPercentage || 50}%
+                              </span>
+                            )}
+                            {sale.invoiceType === "Termin" && (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-100 text-purple-800 uppercase tracking-wider inline-flex items-center gap-1">
+                                <Layers className="w-2.5 h-2.5 text-purple-700" />
+                                Termin ({sale.termins?.length || 3} Tahap)
                               </span>
                             )}
                           </div>
@@ -4168,6 +4406,14 @@ export default function AdminFinanceERPPage() {
                               Tagihan DP: {formatRupiah(sale.dpAmount || 0)}
                             </p>
                           )}
+                          {sale.invoiceType === "Termin" && (
+                            <div className="text-[10px] text-purple-700 font-bold mt-0.5">
+                              <span>Tagihan Aktif: {formatRupiah(sale.termins?.find((t) => t.id === sale.activeTerminId)?.amount || sale.termins?.[0]?.amount || 0)}</span>
+                              <span className="block text-[9px] text-slate-500 font-medium truncate max-w-[150px]">
+                                {sale.termins?.find((t) => t.id === sale.activeTerminId)?.name || "Termin Berjalan"}
+                              </span>
+                            </div>
+                          )}
                           {sale.remainingAmount > 0 ? (
                             <p className="text-[10px] text-red-600 font-bold">
                               Sisa Piutang: {formatRupiah(sale.remainingAmount)}
@@ -4186,6 +4432,8 @@ export default function AdminFinanceERPPage() {
                                   ? "bg-blue-100 text-dstech-blue"
                                   : sale.paymentStatus?.includes("DP")
                                   ? "bg-amber-100 text-amber-800"
+                                  : sale.paymentStatus?.includes("Termin")
+                                  ? "bg-purple-100 text-purple-800"
                                   : "bg-rose-100 text-rose-800"
                               }`}
                             >
@@ -4223,12 +4471,14 @@ export default function AdminFinanceERPPage() {
                               <PenTool className="w-4 h-4" />
                             </button>
 
-                            {/* Terima Pembayaran / Bayar DP */}
+                            {/* Terima Pembayaran / Bayar DP / Bayar Termin */}
                             {sale.remainingAmount > 0 ? (
                               <button
                                 onClick={() => handleOpenPayInvoice(sale)}
                                 title={
-                                  sale.invoiceType === "DP"
+                                  sale.invoiceType === "Termin"
+                                    ? `Terima Pembayaran Termin (${sale.termins?.find((t) => t.id === sale.activeTerminId)?.name || "Aktif"})`
+                                    : sale.invoiceType === "DP"
                                     ? ((Number(sale.dpPaidAmount) || 0) >= (Number(sale.dpAmount) || 0)
                                         ? "Terima Pembayaran Pelunasan Sisa Kontrak"
                                         : `Terima Pembayaran DP (${sale.dpPercentage || 50}%)`)
@@ -4257,6 +4507,18 @@ export default function AdminFinanceERPPage() {
                               >
                                 <Receipt className="w-3.5 h-3.5" />
                                 <span className="hidden xl:inline">Tagih Pelunasan</span>
+                              </button>
+                            )}
+
+                            {/* Tombol Khusus Tagih Termin untuk Faktur Termin */}
+                            {sale.invoiceType === "Termin" && sale.remainingAmount > 0 && (
+                              <button
+                                onClick={() => handleOpenPrintInvoice(sale, "Termin")}
+                                title="Cetak Faktur Penagihan Termin Berjalan"
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                              >
+                                <Layers className="w-3.5 h-3.5" />
+                                <span className="hidden xl:inline">Tagih Termin</span>
                               </button>
                             )}
 
@@ -6670,7 +6932,7 @@ export default function AdminFinanceERPPage() {
                               saleForm.invoiceType === "Standar" ? "bg-dstech-blue text-white" : "text-slate-400"
                             }`}
                           >
-                            Standar
+                            Standar (100%)
                           </button>
                           <button
                             type="button"
@@ -6679,10 +6941,235 @@ export default function AdminFinanceERPPage() {
                               saleForm.invoiceType === "DP" ? "bg-amber-500 text-slate-900" : "text-slate-400"
                             }`}
                           >
-                            Pengajuan DP
+                            DP (2 Tahap)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSaleForm({
+                                ...saleForm,
+                                invoiceType: "Termin",
+                                termins: saleForm.termins.length > 0 ? saleForm.termins : getDefaultTermins(grandTotal, saleForm.dueDate),
+                              })
+                            }
+                            className={`px-2.5 py-1 text-[10px] font-black rounded cursor-pointer flex items-center gap-1 ${
+                              saleForm.invoiceType === "Termin" ? "bg-purple-600 text-white shadow-sm" : "text-slate-400"
+                            }`}
+                          >
+                            <Layers className="w-3 h-3" />
+                            Multi-Termin
                           </button>
                         </div>
                       </div>
+
+                      {/* Panel Multi-Termin Bertahap */}
+                      {saleForm.invoiceType === "Termin" && (
+                        <div className="p-3 rounded-2xl bg-slate-800/95 border border-purple-500/50 space-y-3 text-xs">
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/80 pb-2">
+                            <div>
+                              <span className="text-[11px] font-black text-purple-300 flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5 text-purple-400" />
+                                Pengaturan Multi-Termin (Milestone Progressive Billing)
+                              </span>
+                              <p className="text-[10px] text-slate-400">
+                                Atur tahapan termin, persentase bobot, dan syarat pencairan progres.
+                              </p>
+                            </div>
+
+                            {/* Preset Termin Cepat */}
+                            <div className="flex flex-wrap items-center gap-1">
+                              <span className="text-[9px] text-slate-400 font-bold mr-1">Preset:</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSaleForm({
+                                    ...saleForm,
+                                    termins: getPresetTermins("3_tahap", grandTotal, saleForm.dueDate),
+                                  })
+                                }
+                                className="px-2 py-0.5 rounded bg-slate-900 border border-purple-500/30 text-purple-200 text-[10px] font-bold hover:bg-purple-900/50 cursor-pointer"
+                              >
+                                3 Tahap (30-40-30)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSaleForm({
+                                    ...saleForm,
+                                    termins: getPresetTermins("4_tahap", grandTotal, saleForm.dueDate),
+                                  })
+                                }
+                                className="px-2 py-0.5 rounded bg-slate-900 border border-purple-500/30 text-purple-200 text-[10px] font-bold hover:bg-purple-900/50 cursor-pointer"
+                              >
+                                4 Tahap (40-30-20-10)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setSaleForm({
+                                    ...saleForm,
+                                    termins: getPresetTermins("50_30_20", grandTotal, saleForm.dueDate),
+                                  })
+                                }
+                                className="px-2 py-0.5 rounded bg-slate-900 border border-purple-500/30 text-purple-200 text-[10px] font-bold hover:bg-purple-900/50 cursor-pointer"
+                              >
+                                3 Tahap (50-30-20)
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Repeater Baris Termin */}
+                          <div className="space-y-2">
+                            {(saleForm.termins.length > 0 ? saleForm.termins : getDefaultTermins(grandTotal, saleForm.dueDate)).map(
+                              (t, idx, arr) => (
+                                <div
+                                  key={t.id || idx}
+                                  className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700 space-y-2"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                                      <span className="w-5 h-5 rounded-full bg-purple-950 text-purple-300 font-bold text-[10px] flex items-center justify-center shrink-0 border border-purple-800">
+                                        {idx + 1}
+                                      </span>
+                                      <input
+                                        type="text"
+                                        value={t.name}
+                                        onChange={(e) => {
+                                          const nextTermins = [...arr];
+                                          nextTermins[idx] = { ...t, name: e.target.value };
+                                          setSaleForm({ ...saleForm, termins: nextTermins });
+                                        }}
+                                        placeholder={`Contoh: Termin ${idx + 1}`}
+                                        className="w-full p-1.5 rounded bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                                      />
+                                    </div>
+
+                                    {/* Bobot % & Nominal */}
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-1">
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={100}
+                                          value={t.percentage}
+                                          onChange={(e) => {
+                                            const pct = Number(e.target.value) || 0;
+                                            const nextTermins = [...arr];
+                                            nextTermins[idx] = {
+                                              ...t,
+                                              percentage: pct,
+                                              amount: Math.round(grandTotal * (pct / 100)),
+                                            };
+                                            setSaleForm({ ...saleForm, termins: nextTermins });
+                                          }}
+                                          className="w-14 p-1.5 rounded bg-slate-800 border border-slate-700 text-amber-300 font-mono font-black text-xs text-center"
+                                        />
+                                        <span className="text-[10px] text-slate-400 font-bold">%</span>
+                                      </div>
+
+                                      <div className="w-28 p-1.5 rounded bg-slate-800 border border-slate-700 text-emerald-400 font-mono font-bold text-[11px] text-right truncate">
+                                        {formatRupiah(t.amount || Math.round(grandTotal * ((t.percentage || 0) / 100)))}
+                                      </div>
+
+                                      {/* Tombol Hapus Termin */}
+                                      {arr.length > 2 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const nextTermins = arr.filter((_, i) => i !== idx);
+                                            setSaleForm({ ...saleForm, termins: nextTermins });
+                                          }}
+                                          className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                                          title="Hapus Termin Ini"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                                    <div>
+                                      <label className="text-slate-400 block mb-0.5">Syarat Pencairan / Progres:</label>
+                                      <input
+                                        type="text"
+                                        value={t.condition}
+                                        onChange={(e) => {
+                                          const nextTermins = [...arr];
+                                          nextTermins[idx] = { ...t, condition: e.target.value };
+                                          setSaleForm({ ...saleForm, termins: nextTermins });
+                                        }}
+                                        placeholder="Contoh: Penandatanganan SPK / Material 50% / BAST..."
+                                        className="w-full p-1.5 rounded bg-slate-800 border border-slate-700 text-slate-200 text-xs"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-slate-400 block mb-0.5">Jatuh Tempo Termin:</label>
+                                      <input
+                                        type="date"
+                                        value={t.dueDate}
+                                        onChange={(e) => {
+                                          const nextTermins = [...arr];
+                                          nextTermins[idx] = { ...t, dueDate: e.target.value };
+                                          setSaleForm({ ...saleForm, termins: nextTermins });
+                                        }}
+                                        className="w-full p-1.5 rounded bg-slate-800 border border-slate-700 text-slate-200 text-xs font-mono"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            )}
+                          </div>
+
+                          {/* Footer Repeater: Tambah Termin & Total Bobot */}
+                          {(() => {
+                            const curTermins = saleForm.termins.length > 0 ? saleForm.termins : getDefaultTermins(grandTotal, saleForm.dueDate);
+                            const totalPct = curTermins.reduce((acc, t) => acc + (Number(t.percentage) || 0), 0);
+                            const is100 = totalPct === 100;
+                            return (
+                              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-700 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const nextIdx = curTermins.length + 1;
+                                    const sisaPct = Math.max(0, 100 - totalPct);
+                                    const newT: InvoiceTermin = {
+                                      id: `t_${Date.now()}`,
+                                      name: `Termin ${nextIdx} (Tahap Progres)`,
+                                      percentage: sisaPct > 0 ? sisaPct : 10,
+                                      amount: Math.round(grandTotal * ((sisaPct > 0 ? sisaPct : 10) / 100)),
+                                      dueDate: new Date(Date.now() + nextIdx * 14 * 86400000).toISOString().split("T")[0],
+                                      condition: "Progres Pelaksanaan Tambahan",
+                                      status: "Belum Ditagih",
+                                      paidAmount: 0,
+                                      paidDate: "",
+                                    };
+                                    setSaleForm({ ...saleForm, termins: [...curTermins, newT] });
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg bg-slate-900 border border-purple-500/40 text-purple-300 font-bold hover:bg-purple-900/30 text-[11px] flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>+ Tambah Tahapan Termin</span>
+                                </button>
+
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-400 text-[11px]">Akumulasi Bobot:</span>
+                                  <span
+                                    className={`font-mono font-black text-xs px-2 py-0.5 rounded ${
+                                      is100
+                                        ? "bg-emerald-900/80 text-emerald-300 border border-emerald-600"
+                                        : "bg-red-900/80 text-red-300 border border-red-600"
+                                    }`}
+                                  >
+                                    {totalPct}% {is100 ? "✓ Pas 100%" : "⚠️ Wajib 100%"}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
 
                       {saleForm.invoiceType === "DP" && (
                         <div className="p-2.5 rounded-xl bg-slate-800/90 border border-amber-500/40 space-y-2 text-xs">
@@ -7035,6 +7522,73 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
+            {/* Mode Penagihan jika Faktur Termin (Multi-Termin Bertahap) */}
+            {selectedInvoiceForPrint.invoiceType === "Termin" && Array.isArray(selectedInvoiceForPrint.termins) && selectedInvoiceForPrint.termins.length > 0 && (
+              <div className="p-2.5 rounded-2xl bg-purple-50 border border-purple-200 flex flex-wrap items-center justify-between gap-2 text-xs print:hidden">
+                <div className="flex items-center gap-1.5 font-bold text-purple-900">
+                  <Layers className="w-4 h-4 text-purple-700" />
+                  <span>Pilih Lembar Tagihan Termin:</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {selectedInvoiceForPrint.termins.map((t, idx) => {
+                    const isSelected = (selectedPrintTerminId || selectedInvoiceForPrint.activeTerminId || selectedInvoiceForPrint.termins?.[0]?.id) === t.id;
+                    return (
+                      <button
+                        key={t.id || idx}
+                        type="button"
+                        onClick={() => setSelectedPrintTerminId(t.id)}
+                        className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                          isSelected
+                            ? "bg-purple-700 text-white shadow-sm ring-2 ring-purple-300"
+                            : "bg-white text-purple-900 hover:bg-purple-100 border border-purple-200"
+                        }`}
+                      >
+                        <span>📄 {t.name} ({t.percentage}%)</span>
+                        {t.status === "Lunas" && <span className="text-[9px] bg-emerald-500 text-white px-1 rounded-full">✓</span>}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPrintTerminId("ALL")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      selectedPrintTerminId === "ALL"
+                        ? "bg-slate-900 text-white shadow-sm ring-2 ring-slate-400"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <span>📑 Rekapitulasi Lengkap</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = selectedInvoiceForPrint;
+                      setSelectedInvoiceForPrint(null);
+                      handleOpenBastModal(s);
+                    }}
+                    title="Buka Dokumen Berita Acara Serah Terima (BAST)"
+                    className="px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 shadow-sm"
+                  >
+                    <ClipboardCheck className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>📄 Cetak BAST Proyek</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = selectedInvoiceForPrint;
+                      setSelectedInvoiceForPrint(null);
+                      handleOpenDeliveryModal(s);
+                    }}
+                    title="Buka Dokumen Surat Jalan Pengiriman Material"
+                    className="px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 shadow-sm"
+                  >
+                    <Truck className="w-3.5 h-3.5 text-amber-600" />
+                    <span>🚚 Cetak Surat Jalan</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Mode Penagihan jika Faktur DP (DP vs Pelunasan vs Kontrak Utuh) */}
             {selectedInvoiceForPrint.invoiceType === "DP" && (
               <div className="p-2.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs print:hidden">
@@ -7153,174 +7707,280 @@ export default function AdminFinanceERPPage() {
                 />
               )}
 
-              <div className="relative z-10 space-y-4 print:space-y-2.5">
-                {/* Kop Surat Perusahaan */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
-                        PT. DSTECH SMART PERKASA
-                      </span>
-                    </div>
-                    <p className="text-[11px] font-bold text-slate-600">
-                      Solusi Security System, CCTV, Access Control, IoT & IT Infrastructure
-                    </p>
-                    <p className="text-[10px] text-slate-500 leading-relaxed max-w-md">
-                      Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
-                      <br />
-                      <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>
-                      <br />
-                      WhatsApp CS: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
-                    </p>
-                  </div>
+              {/* Data Termin Aktif yang Sedang Dicetak */}
+              {(() => {
+                const isTerminMode = selectedInvoiceForPrint.invoiceType === "Termin" && Array.isArray(selectedInvoiceForPrint.termins) && selectedInvoiceForPrint.termins.length > 0;
+                const activePrintTermin = isTerminMode && selectedPrintTerminId !== "ALL"
+                  ? selectedInvoiceForPrint.termins?.find((t) => t.id === (selectedPrintTerminId || selectedInvoiceForPrint.activeTerminId || selectedInvoiceForPrint.termins?.[0]?.id))
+                  : null;
 
-                  <div className="text-left sm:text-right space-y-1">
-                    <span
-                      className={`px-3 py-1 rounded-md text-white font-black text-xs uppercase tracking-wider inline-block ${
-                        selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Pelunasan"
-                          ? "bg-emerald-700"
-                          : selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "DP"
-                          ? "bg-amber-600"
-                          : "bg-slate-900"
-                      }`}
-                    >
-                      {selectedInvoiceForPrint.invoiceType === "DP"
-                        ? printBillingStage === "Pelunasan"
-                          ? "FAKTUR PENAGIHAN PELUNASAN KONTRAK"
-                          : printBillingStage === "DP"
-                          ? `FAKTUR PENGAJUAN UANG MUKA (DP ${selectedInvoiceForPrint.dpPercentage || 50}%)`
-                          : "FAKTUR KONTRAK PENJUALAN"
-                        : "FAKTUR PENJUALAN"}
-                    </span>
-                    <p className="font-mono font-black text-sm text-dstech-blue">
-                      {selectedInvoiceForPrint.invoiceNumber}
-                    </p>
-                    {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Pelunasan" && (
-                      <p className="text-[10px] font-bold text-emerald-700">
-                        Penagihan Sisa Kontrak Pasca BAST
-                      </p>
+                return (
+                  <div className="relative z-10 space-y-4 print:space-y-2.5">
+                    {/* Kop Surat Perusahaan */}
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
+                            PT. DSTECH SMART PERKASA
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-600">
+                          Solusi Security System, CCTV, Access Control, IoT & IT Infrastructure
+                        </p>
+                        <p className="text-[10px] text-slate-500 leading-relaxed max-w-md">
+                          Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
+                          <br />
+                          <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>
+                          <br />
+                          WhatsApp CS: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
+                        </p>
+                      </div>
+
+                      <div className="text-left sm:text-right space-y-1">
+                        <span
+                          className={`px-3 py-1 rounded-md text-white font-black text-xs uppercase tracking-wider inline-block ${
+                            isTerminMode
+                              ? "bg-purple-700"
+                              : selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Pelunasan"
+                              ? "bg-emerald-700"
+                              : selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "DP"
+                              ? "bg-amber-600"
+                              : "bg-slate-900"
+                          }`}
+                        >
+                          {isTerminMode
+                            ? activePrintTermin
+                              ? `FAKTUR PENAGIHAN ${activePrintTermin.name.toUpperCase()}`
+                              : "FAKTUR PENAGIHAN MULTI-TERMIN"
+                            : selectedInvoiceForPrint.invoiceType === "DP"
+                            ? printBillingStage === "Pelunasan"
+                              ? "FAKTUR PENAGIHAN PELUNASAN KONTRAK"
+                              : printBillingStage === "DP"
+                              ? `FAKTUR PENGAJUAN UANG MUKA (DP ${selectedInvoiceForPrint.dpPercentage || 50}%)`
+                              : "FAKTUR KONTRAK PENJUALAN"
+                            : "FAKTUR PENJUALAN"}
+                        </span>
+                        <p className="font-mono font-black text-sm text-dstech-blue">
+                          {selectedInvoiceForPrint.invoiceNumber}
+                        </p>
+                        {isTerminMode && activePrintTermin && (
+                          <p className="text-[10px] font-bold text-purple-700">
+                            Milestone Billing ({activePrintTermin.percentage}% dari Kontrak)
+                          </p>
+                        )}
+                        {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Pelunasan" && (
+                          <p className="text-[10px] font-bold text-emerald-700">
+                            Penagihan Sisa Kontrak Pasca BAST
+                          </p>
+                        )}
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Tanggal: {selectedInvoiceForPrint.date}
+                        </p>
+                        <p className="text-[11px] text-slate-500 font-medium">
+                          Jatuh Tempo: {activePrintTermin?.dueDate || selectedInvoiceForPrint.dueDate}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Banner Termin Berjalan jika Faktur Multi-Termin */}
+                    {isTerminMode && activePrintTermin && (
+                      <div className="p-3.5 rounded-2xl bg-purple-50/90 border border-purple-300 text-xs text-purple-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div>
+                          <span className="font-black flex items-center gap-1.5 text-purple-900">
+                            <Layers className="w-4 h-4 text-purple-700" />
+                            Penagihan Berjalan: {activePrintTermin.name} ({activePrintTermin.percentage}%)
+                          </span>
+                          <p className="text-[11px] text-purple-800 mt-0.5">
+                            Syarat Pencairan Progres: <strong>{activePrintTermin.condition || "Sesuai milestone kesepakatan kontrak kerja"}</strong>. Jatuh tempo: <strong>{activePrintTermin.dueDate}</strong>.
+                          </p>
+                        </div>
+                        <div className="sm:text-right whitespace-nowrap bg-white/90 p-2 rounded-xl border border-purple-200">
+                          <span className="text-[9px] text-purple-700 block uppercase font-bold tracking-wider">
+                            Jumlah Tagihan Termin Ini:
+                          </span>
+                          <span className="text-base font-black font-mono text-purple-900">
+                            {formatRupiah(activePrintTermin.amount)}
+                          </span>
+                        </div>
+                      </div>
                     )}
-                    <p className="text-[11px] text-slate-500 font-medium">
-                      Tanggal: {selectedInvoiceForPrint.date}
-                    </p>
-                    <p className="text-[11px] text-slate-500 font-medium">
-                      Jatuh Tempo: {selectedInvoiceForPrint.dueDate}
-                    </p>
-                  </div>
-                </div>
 
-                {/* Banner Rincian Penagihan Sesuai Mode (DP vs Pelunasan vs Kontrak Utuh) */}
-                {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Pelunasan" && (
-                  <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-300 text-xs text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                    <div>
-                      <span className="font-black flex items-center gap-1.5 text-emerald-900">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        Penagihan Pelunasan Kontrak Pekerjaan (Pasca BAST)
-                      </span>
-                      <p className="text-[11px] text-emerald-800 mt-0.5">
-                        Uang Muka (DP {selectedInvoiceForPrint.dpPercentage || 50}%) sebesar {formatRupiah(selectedInvoiceForPrint.dpAmount || 0)} telah diterima LUNAS. Lembar ini adalah penagihan sisa pelunasan pekerjaan setelah penyelesaian Berita Acara Serah Terima (BAST).
-                      </p>
-                    </div>
-                    <div className="sm:text-right whitespace-nowrap bg-white/90 p-2 rounded-xl border border-emerald-200">
-                      <span className="text-[9px] text-emerald-700 block uppercase font-bold tracking-wider">
-                        Jumlah Tagihan Pelunasan:
-                      </span>
-                      <span className="text-base font-black font-mono text-emerald-900">
-                        {formatRupiah(selectedInvoiceForPrint.remainingAmount || Math.max(0, selectedInvoiceForPrint.grandTotal - (selectedInvoiceForPrint.dpAmount || 0)))}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                    {/* Banner Rincian Penagihan Sesuai Mode (DP vs Pelunasan vs Kontrak Utuh) */}
+                    {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Pelunasan" && (
+                      <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-300 text-xs text-emerald-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div>
+                          <span className="font-black flex items-center gap-1.5 text-emerald-900">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            Penagihan Pelunasan Kontrak Pekerjaan (Pasca BAST)
+                          </span>
+                          <p className="text-[11px] text-emerald-800 mt-0.5">
+                            Uang Muka (DP {selectedInvoiceForPrint.dpPercentage || 50}%) sebesar {formatRupiah(selectedInvoiceForPrint.dpAmount || 0)} telah diterima LUNAS. Lembar ini adalah penagihan sisa pelunasan pekerjaan setelah penyelesaian Berita Acara Serah Terima (BAST).
+                          </p>
+                        </div>
+                        <div className="sm:text-right whitespace-nowrap bg-white/90 p-2 rounded-xl border border-emerald-200">
+                          <span className="text-[9px] text-emerald-700 block uppercase font-bold tracking-wider">
+                            Jumlah Tagihan Pelunasan:
+                          </span>
+                          <span className="text-base font-black font-mono text-emerald-900">
+                            {formatRupiah(selectedInvoiceForPrint.remainingAmount || Math.max(0, selectedInvoiceForPrint.grandTotal - (selectedInvoiceForPrint.dpAmount || 0)))}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
-                {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "DP" && (
-                  <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                    <div>
-                      <span className="font-black flex items-center gap-1.5 text-amber-900">
-                        <Sparkles className="w-4 h-4 text-amber-600" />
-                        Pengajuan Uang Muka (Down Payment {selectedInvoiceForPrint.dpPercentage || 50}%)
-                      </span>
-                      <p className="text-[11px] text-amber-800 mt-0.5">
-                        {selectedInvoiceForPrint.dpNotes ||
-                          "Uang muka pelaksanaan pekerjaan/proyek. Sisa pelunasan dibayarkan setelah Berita Acara Serah Terima (BAST)."}
-                      </p>
-                    </div>
-                    <div className="sm:text-right whitespace-nowrap bg-white/80 p-2 rounded-xl border border-amber-200">
-                      <span className="text-[9px] text-amber-700 block uppercase font-bold tracking-wider">
-                        Jumlah Tagihan DP:
-                      </span>
-                      <span className="text-base font-black font-mono text-amber-900">
-                        {formatRupiah(selectedInvoiceForPrint.dpAmount || 0)}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                    {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "DP" && (
+                      <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-300 text-xs text-amber-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div>
+                          <span className="font-black flex items-center gap-1.5 text-amber-900">
+                            <Sparkles className="w-4 h-4 text-amber-600" />
+                            Pengajuan Uang Muka (Down Payment {selectedInvoiceForPrint.dpPercentage || 50}%)
+                          </span>
+                          <p className="text-[11px] text-amber-800 mt-0.5">
+                            {selectedInvoiceForPrint.dpNotes ||
+                              "Uang muka pelaksanaan pekerjaan/proyek. Sisa pelunasan dibayarkan setelah Berita Acara Serah Terima (BAST)."}
+                          </p>
+                        </div>
+                        <div className="sm:text-right whitespace-nowrap bg-white/80 p-2 rounded-xl border border-amber-200">
+                          <span className="text-[9px] text-amber-700 block uppercase font-bold tracking-wider">
+                            Jumlah Tagihan DP:
+                          </span>
+                          <span className="text-base font-black font-mono text-amber-900">
+                            {formatRupiah(selectedInvoiceForPrint.dpAmount || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
-                {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Full" && (
-                  <div className="p-3.5 rounded-2xl bg-blue-50/90 border border-blue-300 text-xs text-blue-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                    <div>
-                      <span className="font-black flex items-center gap-1.5 text-dstech-blue">
-                        <Layers className="w-4 h-4 text-dstech-blue" />
-                        Faktur Tagihan Total Kontrak Resmi
-                      </span>
-                      <p className="text-[11px] text-blue-800 mt-0.5">
-                        Rekapitulasi tagihan nilai kontrak keseluruhan pekerjaan & pengadaan barang PT. DSTech Smart Perkasa.
-                      </p>
-                    </div>
-                    <div className="sm:text-right whitespace-nowrap bg-white/90 p-2 rounded-xl border border-blue-200">
-                      <span className="text-[9px] text-blue-700 block uppercase font-bold tracking-wider">
-                        Total Nilai Kontrak:
-                      </span>
-                      <span className="text-base font-black font-mono text-dstech-blue">
-                        {formatRupiah(selectedInvoiceForPrint.grandTotal)}
-                      </span>
-                    </div>
-                  </div>
-                )}
+                    {selectedInvoiceForPrint.invoiceType === "DP" && printBillingStage === "Full" && (
+                      <div className="p-3.5 rounded-2xl bg-blue-50/90 border border-blue-300 text-xs text-blue-950 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div>
+                          <span className="font-black flex items-center gap-1.5 text-dstech-blue">
+                            <Layers className="w-4 h-4 text-dstech-blue" />
+                            Faktur Tagihan Total Kontrak Resmi
+                          </span>
+                          <p className="text-[11px] text-blue-800 mt-0.5">
+                            Rekapitulasi tagihan nilai kontrak keseluruhan pekerjaan & pengadaan barang PT. DSTech Smart Perkasa.
+                          </p>
+                        </div>
+                        <div className="sm:text-right whitespace-nowrap bg-white/90 p-2 rounded-xl border border-blue-200">
+                          <span className="text-[9px] text-blue-700 block uppercase font-bold tracking-wider">
+                            Total Nilai Kontrak:
+                          </span>
+                          <span className="text-base font-black font-mono text-dstech-blue">
+                            {formatRupiah(selectedInvoiceForPrint.grandTotal)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
-                {/* Data Klien */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-50/90 p-4 rounded-xl border border-slate-200">
-                  <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tagihan Kepada:</p>
-                    <p className="font-black text-slate-900 text-sm mt-0.5">
-                      {selectedInvoiceForPrint.customerName}
-                    </p>
-                    <p className="text-slate-600 mt-0.5">{selectedInvoiceForPrint.customerPhone}</p>
-                    <p className="text-slate-500">{selectedInvoiceForPrint.customerAddress}</p>
-                  </div>
-                  <div className="sm:text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Status Pembayaran:</p>
-                    <span
-                      className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-black uppercase ${
-                        selectedInvoiceForPrint.paymentStatus === "Lunas"
-                          ? "bg-green-100 text-green-800"
-                          : selectedInvoiceForPrint.paymentStatus?.includes("DP")
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-rose-100 text-rose-800"
-                      }`}
-                    >
-                      {selectedInvoiceForPrint.paymentStatus}
-                    </span>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Metode: {selectedInvoiceForPrint.paymentMethod}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Referensi Resmi ke Lampiran Halaman 2 (Detail Item & Spesifikasi Dipisahkan ke Halaman 2) */}
-                <div className="p-3.5 rounded-2xl bg-purple-50/90 border border-purple-300 text-xs text-purple-950 flex items-center justify-between gap-3 shadow-xs">
-                  <div className="flex items-center gap-2.5">
-                    <Layers className="w-5 h-5 text-purple-600 shrink-0" />
-                    <div>
-                      <p className="font-black text-slate-900">Rincian Deskripsi Item Produk & Jasa Instalasi:</p>
-                      <p className="text-[11px] text-purple-800">
-                        Rincian lengkap deskripsi produk, volume kuantiti, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> dokumen ini ({selectedInvoiceForPrint.items.length} item tagihan).
-                      </p>
+                    {/* Data Klien */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-50/90 p-4 rounded-xl border border-slate-200">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Tagihan Kepada:</p>
+                        <p className="font-black text-slate-900 text-sm mt-0.5">
+                          {selectedInvoiceForPrint.customerName}
+                        </p>
+                        <p className="text-slate-600 mt-0.5">{selectedInvoiceForPrint.customerPhone}</p>
+                        <p className="text-slate-500">{selectedInvoiceForPrint.customerAddress}</p>
+                      </div>
+                      <div className="sm:text-right">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Status Pembayaran:</p>
+                        <span
+                          className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-black uppercase ${
+                            selectedInvoiceForPrint.paymentStatus === "Lunas"
+                              ? "bg-green-100 text-green-800"
+                              : selectedInvoiceForPrint.paymentStatus?.includes("DP")
+                              ? "bg-amber-100 text-amber-800"
+                              : selectedInvoiceForPrint.paymentStatus?.includes("Termin")
+                              ? "bg-purple-100 text-purple-800"
+                              : "bg-rose-100 text-rose-800"
+                          }`}
+                        >
+                          {selectedInvoiceForPrint.paymentStatus}
+                        </span>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          Metode: {selectedInvoiceForPrint.paymentMethod}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-purple-200/90 text-purple-900 font-mono font-black text-[10px] shrink-0">
-                    {selectedInvoiceForPrint.items.length} ITEM
-                  </span>
-                </div>
+
+                    {/* TABEL REKAPITULASI SELURUH TERMIN KONTRAK (Milestone Billing Summary) */}
+                    {isTerminMode && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <p className="font-black text-xs text-slate-900 flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-purple-700" />
+                            Rekapitulasi Tahapan Termin & Milestone Kontrak Pekerjaan:
+                          </p>
+                          <span className="text-[10px] font-bold text-slate-500">
+                            Total Kontrak: {formatRupiah(selectedInvoiceForPrint.grandTotal)}
+                          </span>
+                        </div>
+                        <div className="overflow-x-auto border border-slate-300 rounded-xl bg-white/90">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-900 text-white uppercase text-[9px] font-black">
+                              <tr>
+                                <th className="p-2 text-center w-8">No</th>
+                                <th className="p-2">Tahapan Termin & Syarat Progres</th>
+                                <th className="p-2 text-center w-14">Bobot</th>
+                                <th className="p-2 text-center w-24">Jatuh Tempo</th>
+                                <th className="p-2 text-right w-32">Nominal Tagihan</th>
+                                <th className="p-2 text-center w-28">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200 text-[11px]">
+                              {selectedInvoiceForPrint.termins?.map((t, idx) => {
+                                const isCurrent = activePrintTermin?.id === t.id;
+                                return (
+                                  <tr
+                                    key={t.id || idx}
+                                    className={isCurrent ? "bg-purple-100/70 font-bold" : "hover:bg-slate-50"}
+                                  >
+                                    <td className="p-2 text-center font-bold text-slate-600">{idx + 1}</td>
+                                    <td className="p-2">
+                                      <p className="font-bold text-slate-900">{t.name}</p>
+                                      <p className="text-[10px] text-slate-500">{t.condition || "-"}</p>
+                                    </td>
+                                    <td className="p-2 text-center font-mono font-bold text-purple-900">{t.percentage}%</td>
+                                    <td className="p-2 text-center font-mono text-[10px] text-slate-600">{t.dueDate}</td>
+                                    <td className="p-2 text-right font-mono font-black text-slate-900">{formatRupiah(t.amount)}</td>
+                                    <td className="p-2 text-center">
+                                      <span
+                                        className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                                          t.status === "Lunas"
+                                            ? "bg-emerald-100 text-emerald-800"
+                                            : isCurrent || t.status === "Ditagihkan"
+                                            ? "bg-purple-200 text-purple-900 border border-purple-400"
+                                            : "bg-slate-100 text-slate-500"
+                                        }`}
+                                      >
+                                        {t.status === "Lunas" ? "✓ Lunas" : isCurrent ? "⚡ Ditagihkan" : t.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Referensi Resmi ke Lampiran Halaman 2 (Detail Item & Spesifikasi Dipisahkan ke Halaman 2) */}
+                    <div className="p-3.5 rounded-2xl bg-purple-50/90 border border-purple-300 text-xs text-purple-950 flex items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center gap-2.5">
+                        <Layers className="w-5 h-5 text-purple-600 shrink-0" />
+                        <div>
+                          <p className="font-black text-slate-900">Rincian Deskripsi Item Produk & Jasa Instalasi:</p>
+                          <p className="text-[11px] text-purple-800">
+                            Rincian lengkap deskripsi produk, volume kuantiti, dan spesifikasi teknis tercantum pada <strong>Lampiran Halaman 2</strong> dokumen ini ({selectedInvoiceForPrint.items.length} item tagihan).
+                          </p>
+                        </div>
+                      </div>
+                      <span className="px-2.5 py-1 rounded-lg bg-purple-200/90 text-purple-900 font-mono font-black text-[10px] shrink-0">
+                        {selectedInvoiceForPrint.items.length} ITEM
+                      </span>
+                    </div>
 
                 {/* Rincian Perhitungan & Instruksi Rekening */}
                 <div className="flex flex-col sm:flex-row justify-between gap-4 pt-3 border-t border-slate-200 text-xs">
@@ -7519,7 +8179,9 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            );
+          })()}
+        </div>
 
             {/* HALAMAN 2: LAMPIRAN RINCIAN ITEM FAKTUR PENJUALAN */}
             <div
@@ -8376,34 +9038,243 @@ export default function AdminFinanceERPPage() {
             <div className="space-y-3 text-xs">
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Skema Penerbitan Faktur:</label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setConvertForm({ ...convertForm, invoiceType: "Standar" })}
-                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
                       convertForm.invoiceType === "Standar"
                         ? "border-dstech-blue bg-blue-50 text-dstech-blue ring-2 ring-blue-500/20"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <p className="font-black text-xs">Faktur Penuh (100%)</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Penagihan total sekaligus</p>
+                    <p className="font-black text-xs">Penuh 100%</p>
+                    <p className="text-[9px] text-slate-500 mt-0.5">Sekaligus</p>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setConvertForm({ ...convertForm, invoiceType: "DP" })}
-                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
                       convertForm.invoiceType === "DP"
                         ? "border-amber-500 bg-amber-50 text-amber-800 ring-2 ring-amber-500/20"
                         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <p className="font-black text-xs">Faktur Uang Muka (DP)</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Penagihan termin proyek</p>
+                    <p className="font-black text-xs">Uang Muka (DP)</p>
+                    <p className="text-[9px] text-slate-500 mt-0.5">2 Tahap</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setConvertForm({
+                        ...convertForm,
+                        invoiceType: "Termin",
+                        termins:
+                          convertForm.termins.length > 0
+                            ? convertForm.termins
+                            : getDefaultTermins(selectedQuotationForConvert.grandTotal),
+                      })
+                    }
+                    className={`p-2.5 rounded-xl border text-left cursor-pointer transition-all ${
+                      convertForm.invoiceType === "Termin"
+                        ? "border-purple-600 bg-purple-50 text-purple-800 ring-2 ring-purple-500/20"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="font-black text-xs flex items-center gap-1">
+                      <Layers className="w-3 h-3 text-purple-600" />
+                      Multi-Termin
+                    </p>
+                    <p className="text-[9px] text-slate-500 mt-0.5">Milestone</p>
                   </button>
                 </div>
               </div>
+
+              {/* Panel Multi-Termin pada Konversi SPH */}
+              {convertForm.invoiceType === "Termin" && (
+                <div className="p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-purple-200/80 pb-2">
+                    <span className="font-black text-purple-900 text-xs flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5 text-purple-600" />
+                      Skema Tahapan Termin (Nilai Kontrak: {formatRupiah(selectedQuotationForConvert.grandTotal)})
+                    </span>
+
+                    {/* Preset Termin Cepat */}
+                    <div className="flex flex-wrap items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setConvertForm({
+                            ...convertForm,
+                            termins: getPresetTermins("3_tahap", selectedQuotationForConvert.grandTotal),
+                          })
+                        }
+                        className="px-2 py-0.5 rounded bg-white border border-purple-300 text-purple-800 text-[9px] font-bold hover:bg-purple-100 cursor-pointer"
+                      >
+                        3 Tahap (30-40-30)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setConvertForm({
+                            ...convertForm,
+                            termins: getPresetTermins("4_tahap", selectedQuotationForConvert.grandTotal),
+                          })
+                        }
+                        className="px-2 py-0.5 rounded bg-white border border-purple-300 text-purple-800 text-[9px] font-bold hover:bg-purple-100 cursor-pointer"
+                      >
+                        4 Tahap (40-30-20-10)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setConvertForm({
+                            ...convertForm,
+                            termins: getPresetTermins("50_30_20", selectedQuotationForConvert.grandTotal),
+                          })
+                        }
+                        className="px-2 py-0.5 rounded bg-white border border-purple-300 text-purple-800 text-[9px] font-bold hover:bg-purple-100 cursor-pointer"
+                      >
+                        3 Tahap (50-30-20)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Repeater Termin Konversi */}
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {(convertForm.termins.length > 0
+                      ? convertForm.termins
+                      : getDefaultTermins(selectedQuotationForConvert.grandTotal)
+                    ).map((t, idx, arr) => (
+                      <div key={t.id || idx} className="p-2.5 rounded-xl bg-white border border-purple-200/90 space-y-1.5 shadow-2xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 flex-1">
+                            <span className="w-4 h-4 rounded-full bg-purple-100 text-purple-800 font-bold text-[9px] flex items-center justify-center shrink-0">
+                              {idx + 1}
+                            </span>
+                            <input
+                              type="text"
+                              value={t.name}
+                              onChange={(e) => {
+                                const nextT = [...arr];
+                                nextT[idx] = { ...t, name: e.target.value };
+                                setConvertForm({ ...convertForm, termins: nextT });
+                              }}
+                              className="w-full p-1 rounded border border-slate-200 text-xs font-bold text-slate-800"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <input
+                              type="number"
+                              min={1}
+                              max={100}
+                              value={t.percentage}
+                              onChange={(e) => {
+                                const pct = Number(e.target.value) || 0;
+                                const nextT = [...arr];
+                                nextT[idx] = {
+                                  ...t,
+                                  percentage: pct,
+                                  amount: Math.round(selectedQuotationForConvert.grandTotal * (pct / 100)),
+                                };
+                                setConvertForm({ ...convertForm, termins: nextT });
+                              }}
+                              className="w-12 p-1 rounded border border-purple-300 font-mono font-bold text-xs text-center text-purple-900"
+                            />
+                            <span className="text-[10px] text-slate-500 font-bold">%</span>
+                            <span className="font-mono font-black text-[11px] text-emerald-700 w-24 text-right truncate">
+                              {formatRupiah(t.amount || Math.round(selectedQuotationForConvert.grandTotal * ((t.percentage || 0) / 100)))}
+                            </span>
+                            {arr.length > 2 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setConvertForm({ ...convertForm, termins: arr.filter((_, i) => i !== idx) });
+                                }}
+                                className="text-red-500 hover:text-red-700 p-0.5 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-[10px]">
+                          <input
+                            type="text"
+                            value={t.condition}
+                            onChange={(e) => {
+                              const nextT = [...arr];
+                              nextT[idx] = { ...t, condition: e.target.value };
+                              setConvertForm({ ...convertForm, termins: nextT });
+                            }}
+                            placeholder="Syarat pencairan progres..."
+                            className="w-full p-1 rounded border border-slate-200 text-slate-700 text-[10px]"
+                          />
+                          <input
+                            type="date"
+                            value={t.dueDate}
+                            onChange={(e) => {
+                              const nextT = [...arr];
+                              nextT[idx] = { ...t, dueDate: e.target.value };
+                              setConvertForm({ ...convertForm, termins: nextT });
+                            }}
+                            className="w-full p-1 rounded border border-slate-200 text-slate-700 text-[10px] font-mono"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Footer Repeater Termin */}
+                  {(() => {
+                    const curT =
+                      convertForm.termins.length > 0
+                        ? convertForm.termins
+                        : getDefaultTermins(selectedQuotationForConvert.grandTotal);
+                    const totalPct = curT.reduce((acc, t) => acc + (Number(t.percentage) || 0), 0);
+                    const is100 = totalPct === 100;
+                    return (
+                      <div className="flex items-center justify-between pt-1 border-t border-purple-200 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextIdx = curT.length + 1;
+                            const sisa = Math.max(0, 100 - totalPct);
+                            const newT: InvoiceTermin = {
+                              id: `t_${Date.now()}`,
+                              name: `Termin ${nextIdx} (Tahap Progres)`,
+                              percentage: sisa > 0 ? sisa : 10,
+                              amount: Math.round(selectedQuotationForConvert.grandTotal * ((sisa > 0 ? sisa : 10) / 100)),
+                              dueDate: new Date(Date.now() + nextIdx * 14 * 86400000).toISOString().split("T")[0],
+                              condition: "Progres Pelaksanaan Pekerjaan",
+                              status: "Belum Ditagih",
+                              paidAmount: 0,
+                              paidDate: "",
+                            };
+                            setConvertForm({ ...convertForm, termins: [...curT, newT] });
+                          }}
+                          className="text-[11px] font-bold text-purple-700 hover:text-purple-900 cursor-pointer flex items-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Tambah Termin</span>
+                        </button>
+
+                        <span
+                          className={`font-mono font-black text-xs px-2 py-0.5 rounded ${
+                            is100 ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          Total Bobot: {totalPct}% {is100 ? "✓ 100%" : "⚠️ Harus 100%"}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
               {convertForm.invoiceType === "DP" && (
                 <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 space-y-2.5">
@@ -13439,6 +14310,37 @@ export default function AdminFinanceERPPage() {
                   </span>
                 </div>
               )}
+              {selectedInvoiceForPayment.invoiceType === "Termin" && Array.isArray(selectedInvoiceForPayment.termins) && (
+                <div className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/70 space-y-1.5">
+                  <div className="flex items-center justify-between font-bold text-xs text-purple-950">
+                    <span className="flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5 text-purple-700" />
+                      Status Tahapan Termin:
+                    </span>
+                    <span className="text-[10px] text-purple-700">{selectedInvoiceForPayment.termins.length} Tahap Terjadwal</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 pt-1">
+                    {selectedInvoiceForPayment.termins.map((t, idx) => (
+                      <div
+                        key={t.id || idx}
+                        className={`p-1.5 rounded-lg border text-[10px] ${
+                          t.status === "Lunas"
+                            ? "bg-emerald-100/80 border-emerald-300 text-emerald-900"
+                            : t.id === selectedInvoiceForPayment.activeTerminId || t.status === "Ditagihkan"
+                            ? "bg-purple-100 border-purple-400 text-purple-900 font-bold"
+                            : "bg-white border-slate-200 text-slate-600"
+                        }`}
+                      >
+                        <p className="font-bold truncate">{t.name}</p>
+                        <p className="font-mono">{formatRupiah(t.amount)} ({t.percentage}%)</p>
+                        <span className="inline-block mt-0.5 font-bold uppercase text-[8px]">
+                          {t.status === "Lunas" ? "✓ Lunas" : t.status === "Ditagihkan" ? "⚡ Ditagihkan" : "⏳ Belum Ditagih"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between text-slate-600">
                 <span>Sudah Pernah Dibayar:</span>
                 <span className="font-bold text-emerald-600 font-mono">
@@ -13452,6 +14354,48 @@ export default function AdminFinanceERPPage() {
             </div>
 
             <form onSubmit={handleRecordPaymentSubmit} className="space-y-3.5 text-xs">
+              {/* Pemilihan Termin Spesifik jika Faktur Termin */}
+              {selectedInvoiceForPayment.invoiceType === "Termin" && Array.isArray(selectedInvoiceForPayment.termins) && selectedInvoiceForPayment.termins.length > 0 && (
+                <div className="p-3 rounded-2xl bg-purple-50/90 border border-purple-300 space-y-1.5">
+                  <label className="font-bold text-purple-950 block text-xs flex items-center gap-1.5">
+                    <Layers className="w-4 h-4 text-purple-700" />
+                    <span>Pilih Termin Yang Diterima / Dilunasi:</span>
+                  </label>
+                  <select
+                    value={paymentForm.terminId || ""}
+                    onChange={(e) => {
+                      const tId = e.target.value;
+                      const targetT = selectedInvoiceForPayment.termins?.find((t) => t.id === tId);
+                      if (targetT) {
+                        const remT = Math.max(0, targetT.amount - (Number(targetT.paidAmount) || 0));
+                        setPaymentForm({
+                          ...paymentForm,
+                          terminId: tId,
+                          amount: remT > 0 ? remT : targetT.amount,
+                          notes: `Penerimaan Pembayaran ${targetT.name} Faktur ${selectedInvoiceForPayment.invoiceNumber}`,
+                        });
+                      } else {
+                        setPaymentForm({
+                          ...paymentForm,
+                          terminId: "",
+                          amount: selectedInvoiceForPayment.remainingAmount,
+                        });
+                      }
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-purple-300 font-bold bg-white text-xs text-purple-950"
+                  >
+                    {selectedInvoiceForPayment.termins.map((t, idx) => {
+                      const rem = Math.max(0, t.amount - (Number(t.paidAmount) || 0));
+                      return (
+                        <option key={t.id || idx} value={t.id}>
+                          {t.name} ({t.percentage}%) — {formatRupiah(t.amount)} [{t.status}{rem < t.amount && rem > 0 ? ` - Sisa ${formatRupiah(rem)}` : ""}]
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="font-bold text-slate-700">Nominal Pembayaran Masuk (Rp):</label>
