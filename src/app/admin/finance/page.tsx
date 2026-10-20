@@ -59,6 +59,12 @@ import {
   XCircle,
   Ban,
   BarChart3,
+  Paperclip,
+  FolderArchive,
+  UploadCloud,
+  Eye,
+  FileCheck2,
+  HardDrive,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -98,6 +104,17 @@ export interface InvoiceTermin {
   paidAmount?: number;
   paidDate?: string;
   paymentMethod?: string;
+  notes?: string;
+}
+
+export interface DocumentAttachment {
+  id: string;
+  name: string;
+  url: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+  category?: string;
   notes?: string;
 }
 
@@ -142,6 +159,7 @@ interface SaleInvoice {
   verificationCode?: string;
   signatureImage?: string;
   approvalNotes?: string;
+  attachments?: DocumentAttachment[];
 }
 
 interface QuotationItem {
@@ -190,6 +208,7 @@ interface Quotation {
   signatureImage?: string;
   approvalNotes?: string;
   notes?: string;
+  attachments?: DocumentAttachment[];
 }
 
 interface BankAccount {
@@ -246,6 +265,7 @@ interface PurchaseOrder {
   verificationCode?: string;
   signatureImage?: string;
   approvalNotes?: string;
+  attachments?: DocumentAttachment[];
 }
 
 interface SalesReturn {
@@ -273,6 +293,7 @@ interface SalesReturn {
   verificationCode?: string;
   signatureImage?: string;
   approvalNotes?: string;
+  attachments?: DocumentAttachment[];
 }
 
 interface PurchaseReturn {
@@ -300,6 +321,7 @@ interface PurchaseReturn {
   verificationCode?: string;
   signatureImage?: string;
   approvalNotes?: string;
+  attachments?: DocumentAttachment[];
 }
 
 interface CashTransaction {
@@ -312,6 +334,8 @@ interface CashTransaction {
   reference: string;
   description: string;
   balanceAfter: number;
+  receiptUrl?: string;
+  attachments?: DocumentAttachment[];
 }
 
 interface WarehouseItem {
@@ -350,6 +374,8 @@ interface ExpenseItem {
   amount: number;
   recipient: string;
   notes: string;
+  receiptUrl?: string;
+  attachments?: DocumentAttachment[];
 }
 
 interface ClientItem {
@@ -1242,7 +1268,39 @@ export default function AdminFinanceERPPage() {
     description: "",
     recordAsExpense: false,
     recipient: "",
+    receiptUrl: "",
+    receiptName: "",
+    receiptSize: 0,
+    receiptCompressedSize: 0,
   });
+  const [isCompressingReceipt, setIsCompressingReceipt] = useState<boolean>(false);
+  const [receiptCompressionRatio, setReceiptCompressionRatio] = useState<string>("");
+
+  // Universal Document Archive Modal State
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState<boolean>(false);
+  const [archiveTarget, setArchiveTarget] = useState<{
+    targetType: "quotation" | "sale" | "purchase" | "return_sales" | "return_purchase" | "cash_flow" | "expense";
+    id: string;
+    number: string;
+    title: string;
+    party: string;
+    attachments: DocumentAttachment[];
+  } | null>(null);
+  const [archiveCategory, setArchiveCategory] = useState<string>("Nota / Bukti Transaksi");
+  const [archiveNotes, setArchiveNotes] = useState<string>("");
+  const [isUploadingArchive, setIsUploadingArchive] = useState<boolean>(false);
+  const [archiveCompressStatus, setArchiveCompressStatus] = useState<string>("");
+
+  // Lightbox Preview Receipt / Document Attachment
+  const [previewAttachment, setPreviewAttachment] = useState<{
+    name: string;
+    url: string;
+    category?: string;
+    uploadedAt?: string;
+    size?: number;
+    type?: string;
+  } | null>(null);
+  const [previewZoom, setPreviewZoom] = useState<number>(1);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -1515,6 +1573,311 @@ export default function AdminFinanceERPPage() {
     if (nilai < 1000000000) return angkaTerbilang(Math.floor(nilai / 1000000)) + " Juta " + angkaTerbilang(nilai % 1000000);
     if (nilai < 1000000000000) return angkaTerbilang(Math.floor(nilai / 1000000000)) + " Milyar " + angkaTerbilang(nilai % 1000000000);
     return "";
+  };
+
+  // Helper Format Ukuran Berkas
+  const formatBytes = (bytes: number): string => {
+    if (!bytes || bytes <= 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  };
+
+  // Helper Kompresi Berkas Gambar Klien (Client-Side Compression)
+  // Menjaga kualitas visual teks/angka nota namun memangkas ukuran hingga 90-98%
+  const compressImageFile = async (
+    file: File,
+    maxWidth = 1280,
+    maxHeight = 1600,
+    quality = 0.75
+  ): Promise<{ file: File; originalSize: number; compressedSize: number }> => {
+    const originalSize = file.size;
+    if (!file.type.startsWith("image/")) {
+      return { file, originalSize, compressedSize: originalSize };
+    }
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = document.createElement("img");
+        img.src = e.target?.result as string;
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxWidth || height > maxHeight) {
+            if (width / maxWidth > height / maxHeight) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            return resolve({ file, originalSize, compressedSize: originalSize });
+          }
+
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                return resolve({ file, originalSize, compressedSize: originalSize });
+              }
+              const cleanName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+              const compressedFile = new File([blob], cleanName, {
+                type: "image/jpeg",
+                lastModified: Date.now(),
+              });
+              resolve({
+                file: compressedFile,
+                originalSize,
+                compressedSize: compressedFile.size,
+              });
+            },
+            "image/jpeg",
+            quality
+          );
+        };
+        img.onerror = () => resolve({ file, originalSize, compressedSize: originalSize });
+      };
+      reader.onerror = () => resolve({ file, originalSize, compressedSize: originalSize });
+    });
+  };
+
+  // Upload handler saat user memilih nota di modal Arus Kas
+  const handleReceiptFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsCompressingReceipt(true);
+      setReceiptCompressionRatio("Mengompres nota berkas...");
+      
+      const { file: fileToUpload, originalSize, compressedSize } = await compressImageFile(file);
+      const ratio = originalSize > compressedSize ? Math.round((1 - compressedSize / originalSize) * 100) : 0;
+      
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("docType", "archive");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setCashForm((prev) => ({
+          ...prev,
+          receiptUrl: data.url,
+          receiptName: file.name,
+          receiptSize: originalSize,
+          receiptCompressedSize: compressedSize,
+        }));
+        setReceiptCompressionRatio(
+          ratio > 0
+            ? `✓ Kompresi Cerdas: ${formatBytes(originalSize)} ➔ ${formatBytes(compressedSize)} (Hemat ${ratio}%)`
+            : `✓ Terunggah: ${formatBytes(compressedSize)}`
+        );
+        showToast("✓ Nota berhasil diunggah & dikompresi ringan!");
+      } else {
+        showToast("Gagal mengunggah nota.");
+      }
+    } catch (err) {
+      console.error("Error compressing receipt:", err);
+      showToast("Gagal memproses nota.");
+    } finally {
+      setIsCompressingReceipt(false);
+    }
+  };
+
+  // Universal Archive: Upload berkas ke dokumen target
+  const handleUploadArchiveSubmit = async (file: File) => {
+    if (!archiveTarget) return;
+    try {
+      setIsUploadingArchive(true);
+      setArchiveCompressStatus("Sedang mengompres berkas...");
+      const { file: fileToUpload, originalSize, compressedSize } = await compressImageFile(file);
+      const ratio = originalSize > compressedSize ? Math.round((1 - compressedSize / originalSize) * 100) : 0;
+      
+      setArchiveCompressStatus(
+        ratio > 0
+          ? `Mengunggah: ${formatBytes(originalSize)} ➔ ${formatBytes(compressedSize)} (Hemat ${ratio}%)...`
+          : "Mengunggah berkas ke server..."
+      );
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("docType", "archive");
+
+      const uploadRes = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        showToast("Gagal mengunggah berkas ke server");
+        return;
+      }
+
+      const uploadData = await uploadRes.json();
+      const newAttachment: DocumentAttachment = {
+        id: `att_${Date.now()}`,
+        name: file.name,
+        url: uploadData.url,
+        size: compressedSize,
+        type: fileToUpload.type,
+        uploadedAt: new Date().toISOString(),
+        category: archiveCategory,
+        notes: archiveNotes,
+      };
+
+      const updatedAttachments = [newAttachment, ...(archiveTarget.attachments || [])];
+
+      // Kirim pembaruan ke API
+      const apiRes = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "update_attachments",
+          payload: {
+            targetType: archiveTarget.targetType,
+            targetId: archiveTarget.id,
+            attachments: updatedAttachments,
+          },
+        }),
+      });
+
+      if (apiRes.ok) {
+        setArchiveTarget((prev) => (prev ? { ...prev, attachments: updatedAttachments } : null));
+        setArchiveNotes("");
+        setArchiveCompressStatus("");
+        showToast(`✓ Berkas ${file.name} berhasil disimpan ke arsip!`);
+        fetchFinanceData();
+      } else {
+        showToast("Gagal menyimpan metadata arsip ke sistem.");
+      }
+    } catch (err) {
+      console.error("Error in handleUploadArchiveSubmit:", err);
+      showToast("Terjadi kesalahan saat memproses arsip.");
+    } finally {
+      setIsUploadingArchive(false);
+      setArchiveCompressStatus("");
+    }
+  };
+
+  // Universal Archive: Hapus berkas dari dokumen target
+  const handleDeleteArchiveItem = async (attachmentId: string) => {
+    if (!archiveTarget) return;
+    if (!confirm("Apakah Anda yakin ingin menghapus berkas arsip ini dari dokumen?")) return;
+
+    try {
+      const updatedAttachments = (archiveTarget.attachments || []).filter((a) => a.id !== attachmentId);
+
+      const apiRes = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "update_attachments",
+          payload: {
+            targetType: archiveTarget.targetType,
+            targetId: archiveTarget.id,
+            attachments: updatedAttachments,
+          },
+        }),
+      });
+
+      if (apiRes.ok) {
+        setArchiveTarget((prev) => (prev ? { ...prev, attachments: updatedAttachments } : null));
+        showToast("✓ Berkas berhasil dihapus dari arsip!");
+        fetchFinanceData();
+      } else {
+        showToast("Gagal menghapus berkas arsip.");
+      }
+    } catch (err) {
+      console.error("Error in handleDeleteArchiveItem:", err);
+      showToast("Terjadi kesalahan.");
+    }
+  };
+
+  // Helper untuk membuka Modal Arsip Universal dari baris tabel manapun
+  const openArchiveModal = (
+    targetType: "quotation" | "sale" | "purchase" | "return_sales" | "return_purchase" | "cash_flow" | "expense",
+    item: any
+  ) => {
+    let number = "";
+    let title = "";
+    let party = "";
+
+    if (targetType === "sale") {
+      number = item.invoiceNumber;
+      title = "Faktur Penjualan";
+      party = item.customerName;
+    } else if (targetType === "quotation") {
+      number = item.quotationNumber;
+      title = "Surat Penawaran Harga (SPH)";
+      party = item.customerOrg || item.customerName;
+    } else if (targetType === "purchase") {
+      number = item.poNumber;
+      title = "Purchase Order (PO)";
+      party = item.supplierName;
+    } else if (targetType === "return_sales") {
+      number = item.returnNumber;
+      title = "Retur Penjualan Klien";
+      party = item.customerName;
+    } else if (targetType === "return_purchase") {
+      number = item.returnNumber;
+      title = "Retur Pembelian Supplier";
+      party = item.supplierName;
+    } else if (targetType === "cash_flow") {
+      number = item.reference || item.id;
+      title = `Transaksi Kas ${item.type === "IN" ? "Masuk" : "Keluar"}`;
+      party = item.category;
+    }
+
+    setArchiveTarget({
+      targetType,
+      id: item.id,
+      number,
+      title,
+      party,
+      attachments: Array.isArray(item.attachments)
+        ? item.attachments
+        : item.receiptUrl
+        ? [
+            {
+              id: "att_init",
+              name: "Nota Transaksi Kas",
+              url: item.receiptUrl,
+              size: 0,
+              type: "image/jpeg",
+              uploadedAt: item.date || new Date().toISOString(),
+              category: "Nota / Bukti Transaksi",
+            },
+          ]
+        : [],
+    });
+    setArchiveCategory(
+      targetType === "cash_flow"
+        ? "Nota / Bukti Transaksi"
+        : targetType === "sale"
+        ? "PO Resmi Klien"
+        : targetType === "purchase"
+        ? "Invoice Asli Supplier"
+        : targetType === "quotation"
+        ? "Surat Permintaan Klien"
+        : "Dokumen Pendukung"
+    );
+    setIsArchiveModalOpen(true);
   };
 
   const fetchFinanceData = async () => {
@@ -2905,7 +3268,12 @@ export default function AdminFinanceERPPage() {
           description: "",
           recordAsExpense: false,
           recipient: "",
+          receiptUrl: "",
+          receiptName: "",
+          receiptSize: 0,
+          receiptCompressedSize: 0,
         });
+        setReceiptCompressionRatio("");
         fetchFinanceData();
       } else {
         showToast("Gagal mencatat transaksi kas");
@@ -2926,7 +3294,12 @@ export default function AdminFinanceERPPage() {
       description: "",
       recordAsExpense: false,
       recipient: "",
+      receiptUrl: "",
+      receiptName: "",
+      receiptSize: 0,
+      receiptCompressedSize: 0,
     });
+    setReceiptCompressionRatio("");
     setIsNewCashModalOpen(true);
   };
 
@@ -4668,6 +5041,23 @@ export default function AdminFinanceERPPage() {
                               <Mail className="w-4 h-4" />
                             </button>
 
+                            {/* Kelola Arsip Lampiran Berkas Faktur */}
+                            <button
+                              type="button"
+                              onClick={() => openArchiveModal("sale", sale)}
+                              title="Kelola Arsip & Lampiran Berkas Faktur (SPK, PO Klien, Bukti Transfer, BAST)"
+                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
+                                sale.attachments && sale.attachments.length > 0
+                                  ? "bg-purple-100 text-purple-800 hover:bg-purple-700 hover:text-white ring-1 ring-purple-300"
+                                  : "bg-slate-100 text-slate-600 hover:bg-slate-700 hover:text-white"
+                              }`}
+                            >
+                              <FolderArchive className="w-4 h-4" />
+                              {sale.attachments && sale.attachments.length > 0 && (
+                                <span className="text-[10px] font-black">{sale.attachments.length}</span>
+                              )}
+                            </button>
+
                             {/* Edit Faktur */}
                             <button
                               onClick={() => handleOpenEditSale(sale)}
@@ -5145,6 +5535,23 @@ export default function AdminFinanceERPPage() {
                                 <PenTool className="w-4 h-4" />
                               </button>
 
+                              {/* Kelola Arsip Lampiran Berkas SPH */}
+                              <button
+                                type="button"
+                                onClick={() => openArchiveModal("quotation", sph)}
+                                title="Kelola Arsip & Lampiran Berkas SPH (Surat Permintaan, RAB, Desain Teknis)"
+                                className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
+                                  sph.attachments && sph.attachments.length > 0
+                                    ? "bg-purple-100 text-purple-800 hover:bg-purple-700 hover:text-white ring-1 ring-purple-300"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-700 hover:text-white"
+                                }`}
+                              >
+                                <FolderArchive className="w-4 h-4" />
+                                {sph.attachments && sph.attachments.length > 0 && (
+                                  <span className="text-[10px] font-black">{sph.attachments.length}</span>
+                                )}
+                              </button>
+
                               {/* Edit SPH */}
                               <button
                                 onClick={() => handleOpenEditQuotation(sph)}
@@ -5383,6 +5790,23 @@ export default function AdminFinanceERPPage() {
                               }`}
                             >
                               <PenTool className="w-4 h-4" />
+                            </button>
+
+                            {/* Kelola Arsip Lampiran Berkas PO */}
+                            <button
+                              type="button"
+                              onClick={() => openArchiveModal("purchase", po)}
+                              title="Kelola Arsip & Lampiran Berkas PO (Invoice Asli Supplier, Surat Jalan, Resi, Garansi)"
+                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
+                                po.attachments && po.attachments.length > 0
+                                  ? "bg-purple-100 text-purple-800 hover:bg-purple-700 hover:text-white ring-1 ring-purple-300"
+                                  : "bg-slate-100 text-slate-600 hover:bg-slate-700 hover:text-white"
+                              }`}
+                            >
+                              <FolderArchive className="w-4 h-4" />
+                              {po.attachments && po.attachments.length > 0 && (
+                                <span className="text-[10px] font-black">{po.attachments.length}</span>
+                              )}
                             </button>
 
                             {/* Edit PO */}
@@ -6011,9 +6435,29 @@ export default function AdminFinanceERPPage() {
                         <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{cash.category}</td>
                         <td className="p-3 text-slate-600">
                           <p className="font-medium text-slate-900">{cash.description}</p>
-                          {cash.reference && (
-                            <p className="text-[10px] font-mono text-slate-400">Ref: {cash.reference}</p>
-                          )}
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            {cash.reference && (
+                              <span className="text-[10px] font-mono text-slate-400">Ref: {cash.reference}</span>
+                            )}
+                            {(cash.receiptUrl || (cash.attachments && cash.attachments.length > 0)) && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPreviewAttachment({
+                                    name: `Nota Transaksi - ${cash.description}`,
+                                    url: cash.receiptUrl || cash.attachments?.[0]?.url || "",
+                                    category: "Nota / Bukti Transaksi",
+                                    uploadedAt: cash.date,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 text-[10px] font-bold cursor-pointer transition-colors shadow-2xs"
+                                title="Klik untuk lihat foto nota / struk"
+                              >
+                                <Paperclip className="w-2.5 h-2.5" />
+                                <span>📸 Bukti Nota</span>
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/60">
@@ -6033,14 +6477,31 @@ export default function AdminFinanceERPPage() {
                           {cash.type === "IN" ? "+" : "-"} {formatRupiah(cash.amount)}
                         </td>
                         <td className="p-3 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteCashFlow(cash.id, cash.description)}
-                            className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer"
-                            title="Hapus Transaksi Kas"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openArchiveModal("cash_flow", cash)}
+                              className={`p-1.5 rounded-lg border transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-bold ${
+                                (cash.attachments && cash.attachments.length > 0) || cash.receiptUrl
+                                  ? "bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100"
+                                  : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+                              }`}
+                              title="Kelola Arsip & Lampiran Berkas"
+                            >
+                              <FolderArchive className="w-3.5 h-3.5" />
+                              {((cash.attachments?.length || 0) > 0 || cash.receiptUrl) && (
+                                <span className="text-[10px]">{cash.attachments?.length || 1}</span>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCashFlow(cash.id, cash.description)}
+                              className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer"
+                              title="Hapus Transaksi Kas"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -7521,6 +7982,108 @@ export default function AdminFinanceERPPage() {
                   onChange={(e) => setCashForm({ ...cashForm, description: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-slate-200"
                 />
+              </div>
+
+              {/* Fitur Upload Nota / Bukti Pengeluaran Terkompresi */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="font-bold text-slate-700 flex items-center justify-between mb-1.5">
+                  <span className="flex items-center gap-1.5">
+                    <Paperclip className="w-3.5 h-3.5 text-purple-600" />
+                    Upload Nota / Bukti Struk (Otomatis Dikompres):
+                  </span>
+                  {cashForm.receiptUrl && (
+                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                      <CheckCheck className="w-3 h-3" /> Siap Disimpan
+                    </span>
+                  )}
+                </label>
+
+                {!cashForm.receiptUrl ? (
+                  <div className="border-2 border-dashed border-purple-200 hover:border-purple-400 bg-purple-50/40 rounded-2xl p-3 text-center transition-all">
+                    <input
+                      type="file"
+                      id="cash-receipt-upload"
+                      accept="image/*,application/pdf"
+                      onChange={handleReceiptFileChange}
+                      disabled={isCompressingReceipt}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="cash-receipt-upload"
+                      className="flex flex-col items-center justify-center cursor-pointer space-y-1"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shadow-xs">
+                        {isCompressingReceipt ? (
+                          <RefreshCw className="w-4 h-4 animate-spin text-purple-600" />
+                        ) : (
+                          <UploadCloud className="w-4 h-4 text-purple-600" />
+                        )}
+                      </div>
+                      <span className="font-bold text-xs text-purple-900">
+                        {isCompressingReceipt ? "Sedang Mengompres Berkas..." : "Klik untuk Pilih Foto Nota / Struk"}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        Otomatis dikompres &lt;100 KB agar sangat hemat penyimpanan server
+                      </span>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="p-2.5 rounded-2xl bg-purple-50 border border-purple-200 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {cashForm.receiptUrl.endsWith(".pdf") ? (
+                        <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center font-bold text-xs shrink-0">
+                          PDF
+                        </div>
+                      ) : (
+                        <img
+                          src={cashForm.receiptUrl}
+                          alt="Thumbnail Nota"
+                          className="w-10 h-10 rounded-xl object-cover border border-purple-300 shadow-xs shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-xs text-slate-900 truncate">
+                          {cashForm.receiptName || "Nota_Pengeluaran.jpg"}
+                        </p>
+                        <p className="text-[10px] text-emerald-600 font-bold truncate">
+                          {receiptCompressionRatio || "Ukuran berkas telah terkompresi hemat"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreviewAttachment({
+                            name: cashForm.receiptName || "Nota Transaksi Kas",
+                            url: cashForm.receiptUrl,
+                            category: "Nota Transaksi Kas",
+                          })
+                        }
+                        className="p-1.5 rounded-lg bg-white text-purple-700 hover:bg-purple-100 shadow-xs cursor-pointer"
+                        title="Lihat Pratinjau Nota"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCashForm((prev) => ({
+                            ...prev,
+                            receiptUrl: "",
+                            receiptName: "",
+                            receiptSize: 0,
+                            receiptCompressedSize: 0,
+                          }))
+                        }
+                        className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer"
+                        title="Hapus Nota"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
@@ -16696,6 +17259,363 @@ export default function AdminFinanceERPPage() {
                   <Mail className="w-4 h-4" />
                   <span>Kirim via Email Client</span>
                 </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL UNIVERSAL: KELOLA ARSIP & LAMPIRAN BERKAS DOKUMEN */}
+      {isArchiveModalOpen && archiveTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsArchiveModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal Arsip */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center shadow-xs">
+                  <FolderArchive className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                      {archiveTarget.title}
+                    </span>
+                    <span className="font-mono font-bold text-xs text-slate-500">
+                      {archiveTarget.number}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-black text-slate-900 mt-0.5">
+                    Arsip & Lampiran Dokumen: {archiveTarget.party}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsArchiveModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Kotak Upload Berkas Baru dengan Kompresi Otomatis */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                  <UploadCloud className="w-4 h-4 text-purple-600" />
+                  Unggah Berkas Baru (Kompresi Ringan Otomatis):
+                </span>
+                <span className="text-[10px] text-purple-700 font-bold bg-purple-100/70 px-2 py-0.5 rounded-full">
+                  ⚡ Auto-Compress &lt;100 KB
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Kategori Lampiran:</label>
+                  <select
+                    value={archiveCategory}
+                    onChange={(e) => setArchiveCategory(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800"
+                  >
+                    {archiveTarget.targetType === "sale" ? (
+                      <>
+                        <option value="PO Resmi Klien">PO Resmi Klien (Surat Pesanan)</option>
+                        <option value="Surat Perjanjian Kontrak (SPK)">Surat Perjanjian Kontrak (SPK)</option>
+                        <option value="Bukti Transfer Bank / DP">Bukti Transfer Bank / DP</option>
+                        <option value="BAST Tertandatangan">BAST Tertandatangan</option>
+                        <option value="Surat Jalan Tertandatangan">Surat Jalan Tertandatangan</option>
+                        <option value="Dokumen Teknis & Gambar">Dokumen Teknis & Gambar</option>
+                        <option value="Dokumen Lainnya">Dokumen Lainnya</option>
+                      </>
+                    ) : archiveTarget.targetType === "quotation" ? (
+                      <>
+                        <option value="Surat Permintaan Penawaran">Surat Permintaan Penawaran Klien</option>
+                        <option value="RAB / BoQ Klien">RAB / BoQ Spesifikasi Klien</option>
+                        <option value="Desain Teknis & Layout">Desain Teknis & Layout Lapangan</option>
+                        <option value="Brosur / Datasheet Khusus">Brosur / Datasheet Khusus</option>
+                        <option value="Dokumen Lainnya">Dokumen Lainnya</option>
+                      </>
+                    ) : archiveTarget.targetType === "purchase" ? (
+                      <>
+                        <option value="Invoice Asli Supplier">Invoice Asli dari Supplier</option>
+                        <option value="Surat Jalan & Tanda Terima">Surat Jalan & Tanda Terima Gudang</option>
+                        <option value="Resi Pengiriman Ekspedisi">Resi Pengiriman Ekspedisi</option>
+                        <option value="Bukti Bayar PO">Bukti Bayar / Transfer ke Supplier</option>
+                        <option value="Kartu Garansi Pabrik">Kartu Garansi Pabrik</option>
+                        <option value="Dokumen Lainnya">Dokumen Lainnya</option>
+                      </>
+                    ) : archiveTarget.targetType === "cash_flow" ? (
+                      <>
+                        <option value="Nota / Bukti Transaksi">Nota / Struk Asli Pembelian</option>
+                        <option value="Kuitansi Pembayaran">Kuitansi Pembayaran Sah</option>
+                        <option value="Faktur Pajak">Faktur Pajak</option>
+                        <option value="Bukti Transfer Kas">Bukti Transfer Kas / ATM</option>
+                        <option value="Dokumen Lainnya">Dokumen Lainnya</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Foto Kerusakan Fisik">Foto Kerusakan Fisik Barang</option>
+                        <option value="Tanda Terima RMA Vendor">Tanda Terima RMA Vendor</option>
+                        <option value="Surat Keluhan Klien">Surat Keluhan / Komplain Klien</option>
+                        <option value="Dokumen Lainnya">Dokumen Lainnya</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Keterangan Singkat (Opsional):</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Nota pembelian kabel di toko elektro..."
+                    value={archiveNotes}
+                    onChange={(e) => setArchiveNotes(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+              </div>
+
+              {/* Input File & Dropzone */}
+              <div className="relative border-2 border-dashed border-purple-200 hover:border-purple-400 bg-purple-50/30 rounded-2xl p-4 text-center transition-all">
+                <input
+                  type="file"
+                  id="universal-archive-input"
+                  accept="image/*,application/pdf"
+                  disabled={isUploadingArchive}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUploadArchiveSubmit(f);
+                    e.target.value = "";
+                  }}
+                  className="hidden"
+                />
+                <label
+                  htmlFor="universal-archive-input"
+                  className="flex flex-col items-center justify-center cursor-pointer space-y-1.5"
+                >
+                  <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center shadow-xs">
+                    {isUploadingArchive ? (
+                      <RefreshCw className="w-5 h-5 animate-spin text-purple-600" />
+                    ) : (
+                      <Paperclip className="w-5 h-5 text-purple-600" />
+                    )}
+                  </div>
+                  <span className="font-bold text-xs text-purple-900">
+                    {isUploadingArchive
+                      ? archiveCompressStatus || "Sedang memproses & mengompres berkas..."
+                      : "Klik untuk Pilih Foto / Dokumen PDF"}
+                  </span>
+                  <span className="text-[10px] text-slate-500">
+                    Mendukung JPG, PNG, WEBP, PDF • Gambar otomatis dikompresi ringan tanpa mengurangi keterbacaan teks
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Daftar Berkas Arsip yang Tersimpan */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-purple-600" />
+                  Berkas Terlampir ({archiveTarget.attachments?.length || 0}):
+                </h4>
+              </div>
+
+              {!archiveTarget.attachments || archiveTarget.attachments.length === 0 ? (
+                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200/80 text-center space-y-1">
+                  <p className="text-xs font-bold text-slate-600">Belum ada berkas arsip yang dilampirkan.</p>
+                  <p className="text-[10px] text-slate-400">
+                    Silakan unggah foto nota, PO klien, BAST, atau dokumen pendukung di atas.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {archiveTarget.attachments.map((att) => {
+                    const isPdf = att.url?.toLowerCase().endsWith(".pdf") || att.type?.includes("pdf");
+                    return (
+                      <div
+                        key={att.id}
+                        className="p-3 rounded-2xl bg-white border border-slate-200 hover:border-purple-300 transition-all flex items-center justify-between gap-3 shadow-2xs"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {isPdf ? (
+                            <div className="w-11 h-11 rounded-xl bg-red-100 text-red-600 font-black text-xs flex items-center justify-center shrink-0 border border-red-200">
+                              PDF
+                            </div>
+                          ) : (
+                            <img
+                              src={att.url}
+                              alt={att.name}
+                              onClick={() => setPreviewAttachment(att)}
+                              className="w-11 h-11 rounded-xl object-cover border border-purple-200 cursor-pointer hover:opacity-80 shrink-0"
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-xs text-slate-900 truncate max-w-[240px]">
+                                {att.name}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase bg-purple-100 text-purple-800">
+                                {att.category || "Dokumen"}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-0.5">
+                              {att.uploadedAt ? new Date(att.uploadedAt).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}
+                              {att.size ? ` • ${formatBytes(att.size)}` : ""}
+                              {att.notes ? ` • ${att.notes}` : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Aksi Berkas */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isPdf) {
+                                window.open(att.url, "_blank");
+                              } else {
+                                setPreviewAttachment(att);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors cursor-pointer"
+                            title="Pratinjau Berkas"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <a
+                            href={att.url}
+                            download={att.name}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors cursor-pointer"
+                            title="Unduh Berkas"
+                          >
+                            <Download className="w-4 h-4" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteArchiveItem(att.id)}
+                            className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors cursor-pointer"
+                            title="Hapus Berkas dari Arsip"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal */}
+            <div className="flex items-center justify-end pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsArchiveModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs cursor-pointer hover:bg-slate-800 transition-all shadow-md"
+              >
+                Selesai & Tutup Arsip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LIGHTBOX PREVIEW BUKTI NOTA / DOKUMEN FOTO UKURAN PENUH */}
+      {previewAttachment && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fadeIn"
+          onClick={() => {
+            setPreviewAttachment(null);
+            setPreviewZoom(1);
+          }}
+        >
+          <div
+            className="max-w-4xl w-full max-h-[92vh] flex flex-col items-center justify-center relative space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Toolbar Lightbox */}
+            <div className="w-full flex items-center justify-between text-white px-2">
+              <div className="min-w-0">
+                <p className="font-bold text-sm truncate">{previewAttachment.name}</p>
+                <p className="text-[10px] text-slate-300">
+                  {previewAttachment.category || "Lampiran Dokumen"}
+                  {previewAttachment.uploadedAt ? ` • ${new Date(previewAttachment.uploadedAt).toLocaleDateString("id-ID")}` : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoom((z) => Math.max(0.5, z - 0.25))}
+                  className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer"
+                  title="Zoom Out"
+                >
+                  - Zoom
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoom(1)}
+                  className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer font-mono"
+                  title="Reset Zoom"
+                >
+                  {Math.round(previewZoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewZoom((z) => Math.min(3, z + 0.25))}
+                  className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold cursor-pointer"
+                  title="Zoom In"
+                >
+                  + Zoom
+                </button>
+                <a
+                  href={previewAttachment.url}
+                  download={previewAttachment.name}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white cursor-pointer"
+                  title="Unduh / Buka di Tab Baru"
+                >
+                  <Download className="w-4 h-4" />
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewAttachment(null);
+                    setPreviewZoom(1);
+                  }}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer"
+                  title="Tutup"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Gambar Pratinjau */}
+            <div className="w-full max-h-[80vh] overflow-auto flex items-center justify-center rounded-2xl bg-black/40 p-2">
+              {previewAttachment.url?.toLowerCase().endsWith(".pdf") ? (
+                <iframe
+                  src={previewAttachment.url}
+                  title={previewAttachment.name}
+                  className="w-full h-[75vh] rounded-xl bg-white"
+                />
+              ) : (
+                <img
+                  src={previewAttachment.url}
+                  alt={previewAttachment.name}
+                  style={{ transform: `scale(${previewZoom})`, transition: "transform 0.15s ease-out" }}
+                  className="max-h-[75vh] max-w-full object-contain rounded-xl shadow-2xl"
+                />
               )}
             </div>
           </div>

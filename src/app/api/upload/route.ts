@@ -17,16 +17,26 @@ export async function POST(request: Request) {
 
     if (!file) {
       return NextResponse.json(
-        { success: false, message: "Tidak ada file gambar yang diunggah." },
+        { success: false, message: "Tidak ada file berkas yang diunggah." },
         { status: 400 }
       );
     }
 
-    // Validate mime type
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg", "image/svg+xml", "image/gif"];
+    const docType = (formData.get("docType") as string) || "image";
+
+    // Validate mime type (Gambar & Dokumen PDF)
+    const validTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+      "image/jpg",
+      "image/svg+xml",
+      "image/gif",
+      "application/pdf",
+    ];
     if (!validTypes.includes(file.type)) {
       return NextResponse.json(
-        { success: false, message: "Format file tidak didukung. Harap upload gambar (JPG, PNG, WEBP, SVG)." },
+        { success: false, message: "Format file tidak didukung. Harap upload gambar (JPG, PNG, WEBP) atau dokumen PDF." },
         { status: 400 }
       );
     }
@@ -47,13 +57,15 @@ export async function POST(request: Request) {
     }
 
     // Generate safe filename with mandatory dstech_ prefix
-    const ext = path.extname(file.name) || ".png";
+    const ext = path.extname(file.name) || (file.type === "application/pdf" ? ".pdf" : ".jpg");
     const cleanExt = ext.startsWith(".") ? ext : `.${ext}`;
     const safeBaseName = file.name
       .replace(cleanExt, "")
       .replace(/[^a-zA-Z0-9_-]/g, "_")
       .substring(0, 30);
-    const fileName = `dstech_img_${Date.now()}_${safeBaseName}${cleanExt}`;
+
+    const prefix = file.type === "application/pdf" || docType === "archive" || docType === "document" ? "dstech_doc" : "dstech_img";
+    const fileName = `${prefix}_${Date.now()}_${safeBaseName}${cleanExt}`;
     const filePath = path.join(uploadDir, fileName);
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -63,9 +75,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Gambar berhasil diunggah.",
+      message: "Berkas berhasil diunggah.",
       url: publicUrl,
       fileName: fileName,
+      originalName: file.name,
+      size: file.size,
+      type: file.type,
     });
   } catch (error) {
     console.error("Error uploading file:", error);

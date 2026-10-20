@@ -416,6 +416,7 @@ export async function POST(request: Request) {
         approvedAt: payload.approvedAt || "",
         verificationCode: payload.verificationCode || "",
         signatureImage: payload.signatureImage || "",
+        attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
       };
 
       if (!data.sales) data.sales = [];
@@ -727,6 +728,7 @@ export async function POST(request: Request) {
         approvedTitle: payload.approvedTitle || "",
         approvedAt: payload.approvedAt || "",
         verificationCode: payload.verificationCode || "",
+        attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
       };
 
       if (!data.purchases) data.purchases = [];
@@ -756,6 +758,7 @@ export async function POST(request: Request) {
         resolution: payload.resolution || "Ganti Barang Baru",
         status: payload.status || "Sedang Diproses",
         handledBy: payload.handledBy || "DSTech QC & Logistik",
+        attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
       };
 
       if (!data.returns_sales) data.returns_sales = [];
@@ -785,6 +788,7 @@ export async function POST(request: Request) {
         resolution: payload.resolution || "Klaim Garansi Tukar Baru",
         status: payload.status || "Dalam Proses RMA Vendor",
         handledBy: payload.handledBy || "DSTech Gudang",
+        attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
       };
 
       if (!data.returns_purchase) data.returns_purchase = [];
@@ -799,6 +803,22 @@ export async function POST(request: Request) {
     }
 
     if (actionType === "cash_flow") {
+      const attachments = Array.isArray(payload.attachments)
+        ? payload.attachments
+        : payload.receiptUrl
+        ? [
+            {
+              id: `att_${Date.now()}`,
+              name: "Nota Bukti Transaksi",
+              url: payload.receiptUrl,
+              size: payload.receiptSize || 0,
+              type: "image/jpeg",
+              uploadedAt: new Date().toISOString(),
+              category: "Nota Transaksi Kas",
+            },
+          ]
+        : [];
+
       const newCash = {
         id: `dstech_cash_${Date.now()}`,
         date: payload.date || new Date().toISOString().split("T")[0],
@@ -809,6 +829,8 @@ export async function POST(request: Request) {
         reference: payload.reference || `TRX-${Date.now().toString().slice(-6)}`,
         description: payload.description || "-",
         balanceAfter: 0,
+        receiptUrl: payload.receiptUrl || (attachments.length > 0 ? attachments[0].url : ""),
+        attachments: attachments,
       };
 
       if (!data.cash_flow) data.cash_flow = [];
@@ -824,6 +846,8 @@ export async function POST(request: Request) {
           amount: newCash.amount,
           recipient: payload.recipient || "-",
           notes: newCash.description,
+          receiptUrl: newCash.receiptUrl,
+          attachments: attachments,
         });
       }
 
@@ -833,6 +857,39 @@ export async function POST(request: Request) {
         message: `Transaksi kas ${newCash.type === "IN" ? "masuk" : "keluar"} berhasil dibukukan`,
         data: newCash,
       });
+    }
+
+    if (actionType === "update_attachments") {
+      const { targetType, targetId, attachments } = payload;
+      if (!targetType || !targetId) {
+        return NextResponse.json({ success: false, error: "targetType dan targetId wajib disertakan" }, { status: 400 });
+      }
+
+      let listKey = "";
+      if (targetType === "quotation") listKey = "quotations";
+      else if (targetType === "sale") listKey = "sales";
+      else if (targetType === "purchase") listKey = "purchases";
+      else if (targetType === "return_sales") listKey = "returns_sales";
+      else if (targetType === "return_purchase") listKey = "returns_purchase";
+      else if (targetType === "cash_flow") listKey = "cash_flow";
+      else if (targetType === "expense") listKey = "expenses";
+
+      if (listKey && data[listKey]) {
+        const item = data[listKey].find((x: any) => x.id === targetId || (x.invoiceNumber && x.invoiceNumber === targetId) || (x.quotationNumber && x.quotationNumber === targetId) || (x.poNumber && x.poNumber === targetId));
+        if (item) {
+          item.attachments = Array.isArray(attachments) ? attachments : [];
+          if (item.attachments.length > 0 && (targetType === "cash_flow" || targetType === "expense")) {
+            item.receiptUrl = item.attachments[0].url;
+          }
+          writeFinanceData(data);
+          return NextResponse.json({
+            success: true,
+            message: "Arsip lampiran berkas berhasil diperbarui.",
+            data: item.attachments,
+          });
+        }
+      }
+      return NextResponse.json({ success: false, error: "Dokumen target tidak ditemukan." }, { status: 404 });
     }
 
     if (actionType === "quotation") {
@@ -882,6 +939,7 @@ export async function POST(request: Request) {
         approvedAt: payload.approvedAt || "",
         verificationCode: payload.verificationCode || "",
         notes: payload.notes || "-",
+        attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
       };
 
       if (!data.quotations) data.quotations = [];
