@@ -507,6 +507,65 @@ export default function AdminFinanceERPPage() {
     setSelectedSaleForBast(sale);
     setIsBastModalOpen(true);
   };
+
+  // Surat Jalan Pengiriman Material (Delivery Order / Dispatch Note) States
+  const [selectedSaleForDelivery, setSelectedSaleForDelivery] = useState<SaleInvoice | null>(null);
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState<boolean>(false);
+  const [isDeliveryConfigExpanded, setIsDeliveryConfigExpanded] = useState<boolean>(false);
+  const [deliveryConfig, setDeliveryConfig] = useState<{
+    doNumber: string;
+    doDate: string;
+    originWarehouse: string;
+    destinationAddress: string;
+    vehicleNumber: string;
+    driverName: string;
+    driverPhone: string;
+    receivedByName: string;
+    receivedByPhone: string;
+    receivedByTitle: string;
+    notes: string;
+    includeDspStamp: boolean;
+  }>({
+    doNumber: "",
+    doDate: new Date().toISOString().split("T")[0],
+    originWarehouse: "Gudang Utama DSTech Cilegon (Pusat Logistik)",
+    destinationAddress: "",
+    vehicleNumber: "A 8899 DS (Gran Max Blind Van)",
+    driverName: "Dedi Setiawan",
+    driverPhone: "0812-3456-7890",
+    receivedByName: "",
+    receivedByPhone: "",
+    receivedByTitle: "PIC Lapangan / Penanggung Jawab",
+    notes: "Seluruh barang dan material telah diperiksa dalam kondisi baru, tersegel, dan utuh saat diberangkatkan dari gudang. Harap periksa fisik barang saat penerimaan di lokasi proyek.",
+    includeDspStamp: true,
+  });
+
+  const handleOpenDeliveryModal = (sale: SaleInvoice) => {
+    const invClean = sale.invoiceNumber ? sale.invoiceNumber.replace(/^INV-/, "") : "001";
+    const romanMonths = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+    const romanMonth = romanMonths[new Date().getMonth()] || "X";
+    const currentYear = new Date().getFullYear();
+
+    const whObj = warehouses.find((w) => w.id === sale.warehouseId);
+    const whName = whObj ? `${whObj.name} (${whObj.city})` : "Gudang Utama DSTech Cilegon (Pusat Logistik)";
+
+    setDeliveryConfig({
+      doNumber: `SJ/DSP/${romanMonth}/${currentYear}/${invClean}`,
+      doDate: new Date().toISOString().split("T")[0],
+      originWarehouse: whName,
+      destinationAddress: sale.customerAddress || "Lokasi Proyek Klien",
+      vehicleNumber: "A 8899 DS (Gran Max Blind Van)",
+      driverName: "Dedi Setiawan",
+      driverPhone: "0812-3456-7890",
+      receivedByName: sale.customerName || "Bapak/Ibu Pimpinan",
+      receivedByPhone: sale.customerPhone || "-",
+      receivedByTitle: "PIC Lapangan / Mandor Proyek",
+      notes: "Seluruh material telah dihitung dan diperiksa dalam kondisi baru, lengkap, dan tersegel baik dari gudang PT. DSTech Smart Perkasa. Harap periksa fisik barang saat serah terima di lokasi proyek.",
+      includeDspStamp: true,
+    });
+    setSelectedSaleForDelivery(sale);
+    setIsDeliveryModalOpen(true);
+  };
   const [cashAccountFilter, setCashAccountFilter] = useState<string>("ALL");
 
   // Retur Penjualan (Customer Returns) States
@@ -2955,7 +3014,8 @@ export default function AdminFinanceERPPage() {
     selectedPoForPrint ||
     selectedReturnSaleForPrint ||
     selectedReturnPurchaseForPrint ||
-    isBastModalOpen
+    isBastModalOpen ||
+    isDeliveryModalOpen
   );
 
   return (
@@ -3465,6 +3525,16 @@ export default function AdminFinanceERPPage() {
                             >
                               <ClipboardCheck className="w-3.5 h-3.5" />
                               <span className="hidden xl:inline">BAST</span>
+                            </button>
+
+                            {/* Tombol Cetak Surat Jalan Pengiriman Material */}
+                            <button
+                              onClick={() => handleOpenDeliveryModal(sale)}
+                              title="Cetak Surat Jalan Material & Tanda Terima Barang (Delivery Order)"
+                              className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              <span className="hidden xl:inline">Surat Jalan</span>
                             </button>
 
                             {/* Cetak Faktur Resmi Kop DSTech */}
@@ -5739,6 +5809,19 @@ export default function AdminFinanceERPPage() {
                   >
                     <ClipboardCheck className="w-3.5 h-3.5 text-purple-600" />
                     <span>📄 Cetak BAST Proyek</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = selectedInvoiceForPrint;
+                      setSelectedInvoiceForPrint(null);
+                      handleOpenDeliveryModal(s);
+                    }}
+                    title="Buka Dokumen Surat Jalan Pengiriman Material"
+                    className="px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 shadow-sm"
+                  >
+                    <Truck className="w-3.5 h-3.5 text-amber-600" />
+                    <span>🚚 Cetak Surat Jalan</span>
                   </button>
                 </div>
               </div>
@@ -10601,6 +10684,20 @@ export default function AdminFinanceERPPage() {
                 )}
 
                 <button
+                  type="button"
+                  onClick={() => {
+                    const s = selectedSaleForBast;
+                    setIsBastModalOpen(false);
+                    handleOpenDeliveryModal(s);
+                  }}
+                  title="Buka Lembar Surat Jalan Pengiriman Material"
+                  className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border border-amber-200"
+                >
+                  <Truck className="w-3.5 h-3.5 text-amber-600" />
+                  <span>Surat Jalan</span>
+                </button>
+
+                <button
                   onClick={() => window.print()}
                   className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
                 >
@@ -10984,6 +11081,456 @@ export default function AdminFinanceERPPage() {
                       </p>
                       <p className="text-[9px] text-slate-500 mt-0.5">
                         {bastConfig.receivedByTitle}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CETAK LEMBAR SURAT JALAN PENGIRIMAN MATERIAL (DELIVERY ORDER) (A4 FORMAT) */}
+      {isDeliveryModalOpen && selectedSaleForDelivery && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
+          onClick={() => setIsDeliveryModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Action Bar (Top) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Truck className="w-4 h-4 text-amber-600" />
+                Surat Jalan Pengiriman Material Proyek (Delivery Order) — Dokumen Resmi A4
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeliveryConfigExpanded(!isDeliveryConfigExpanded)}
+                  className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border border-amber-200"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>{isDeliveryConfigExpanded ? "Tutup Form Edit" : "Edit Surat Jalan"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenSettingsModal}
+                  title="Ganti Background Kop Surat"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-red-600" />
+                  <span>Kop Surat</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = selectedSaleForDelivery;
+                    setIsDeliveryModalOpen(false);
+                    handleOpenBastModal(s);
+                  }}
+                  title="Beralih ke Lembar Berita Acara Serah Terima (BAST)"
+                  className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border border-purple-200"
+                >
+                  <ClipboardCheck className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Cetak BAST</span>
+                </button>
+
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak SJ / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setIsDeliveryModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Form Kustomisasi Surat Jalan Interaktif */}
+            {isDeliveryConfigExpanded && (
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-3 text-xs print:hidden animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <p className="font-black text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                    Penyesuaian Data Surat Jalan &amp; Ekspedisi:
+                  </p>
+                  <span className="text-[10px] text-slate-500">Perubahan langsung ter-update di lembar cetak di bawah</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Nomor Surat Jalan</label>
+                    <input
+                      type="text"
+                      value={deliveryConfig.doNumber}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, doNumber: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Tanggal Pengiriman</label>
+                    <input
+                      type="date"
+                      value={deliveryConfig.doDate}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, doDate: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Gudang Asal Logistik</label>
+                    <input
+                      type="text"
+                      value={deliveryConfig.originWarehouse}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, originWarehouse: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Armada / No. Polisi</label>
+                    <input
+                      type="text"
+                      value={deliveryConfig.vehicleNumber}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, vehicleNumber: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Nama Driver / Pengantar</label>
+                    <input
+                      type="text"
+                      value={deliveryConfig.driverName}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, driverName: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Kontak Telepon Driver</label>
+                    <input
+                      type="text"
+                      value={deliveryConfig.driverPhone}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, driverPhone: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Penerima Lapangan (Klien)</label>
+                    <input
+                      type="text"
+                      value={deliveryConfig.receivedByName}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, receivedByName: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Jabatan Penerima</label>
+                    <input
+                      type="text"
+                      value={deliveryConfig.receivedByTitle}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, receivedByTitle: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Alamat Tujuan Pengiriman</label>
+                    <input
+                      type="text"
+                      value={deliveryConfig.destinationAddress}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, destinationAddress: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Instruksi Khusus / Catatan</label>
+                    <input
+                      type="text"
+                      value={deliveryConfig.notes}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, notes: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
+                  <input
+                    type="checkbox"
+                    id="includeDspStampDo"
+                    checked={deliveryConfig.includeDspStamp}
+                    onChange={(e) => setDeliveryConfig({ ...deliveryConfig, includeDspStamp: e.target.checked })}
+                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                  />
+                  <label htmlFor="includeDspStampDo" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                    Bubuhkan Stempel Resmi QC &amp; Logistik Gudang PT. DSTech Smart Perkasa
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Tips Cetak Pas Penuh Kertas A4 */}
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 print:hidden">
+              <span className="text-base leading-none">💡</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Tips Cetak Pas Penuh Kertas A4 (Full Bleed):</p>
+                <p className="text-[11px] text-amber-800">
+                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4 dan tidak terbagi 2 halaman.
+                </p>
+              </div>
+            </div>
+
+            {/* A4 OFFICIAL PRINT CONTAINER */}
+            <div
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-3.5 print:space-y-2 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              style={{
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
+              }}
+            >
+              {/* Background Kop Surat Resmi DSTech */}
+              {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                <img
+                  src={financeSettings.letterheadUrl}
+                  alt="Kop Surat Resmi"
+                  className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                    financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                  }`}
+                  style={{
+                    objectFit:
+                      financeSettings.letterheadFitMode === "cover"
+                        ? "cover"
+                        : financeSettings.letterheadFitMode === "contain"
+                        ? "contain"
+                        : "fill",
+                    objectPosition: "top center",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
+                    opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                    WebkitPrintColorAdjust: "exact",
+                    printColorAdjust: "exact",
+                  }}
+                />
+              )}
+
+              <div className="relative z-10 space-y-3 print:space-y-2">
+                {/* Kop Surat Perusahaan */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-slate-900 pb-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-dstech-blue flex items-center justify-center text-white font-black text-base shadow">
+                        DSP
+                      </div>
+                      <div>
+                        <h2 className="font-black text-slate-900 text-sm tracking-tight leading-none uppercase">
+                          PT. DSTECH SMART PERKASA
+                        </h2>
+                        <p className="text-[10px] text-dstech-blue font-bold tracking-wider mt-0.5">
+                          DIVISI LOGISTIK &amp; RANTAI PASOK MATERIAL PROYEK
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[9.5px] text-slate-600 max-w-sm leading-tight mt-1">
+                      Jl. KH Wasyid No. 88, Jombang Masjid, Cilegon - Banten 42411
+                      <br />
+                      NIB: 1205240058291 | NPWP: 40.231.890.1-417.000
+                    </p>
+                  </div>
+                  <div className="sm:text-right space-y-0.5">
+                    <span className="inline-block px-3 py-1 rounded-md bg-amber-600 text-white font-black text-[10px] tracking-wider uppercase shadow-sm">
+                      SURAT JALAN MATERIAL (DELIVERY ORDER)
+                    </span>
+                    <p className="text-[10px] text-slate-500 font-mono font-bold mt-1">
+                      No: <span className="text-slate-900">{deliveryConfig.doNumber}</span>
+                    </p>
+                    <p className="text-[9.5px] text-slate-500">
+                      Ref Faktur: <span className="font-mono font-bold text-slate-800">{selectedSaleForDelivery.invoiceNumber}</span>
+                    </p>
+                    <p className="text-[9.5px] text-slate-500">
+                      Tanggal Kirim: <span className="font-bold text-slate-800">{deliveryConfig.doDate}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Grid Informasi Pengiriman (Asal Gudang vs Tujuan Proyek) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] bg-slate-50/90 p-2.5 rounded-xl border border-slate-200">
+                  <div className="space-y-0.5 border-r border-slate-200 pr-2">
+                    <p className="font-black text-amber-900 uppercase tracking-wider text-[9.5px]">
+                      ASAL LOGISTIK / GUDANG PENGIRIM:
+                    </p>
+                    <p className="font-bold text-slate-900 text-[11px]">{deliveryConfig.originWarehouse}</p>
+                    <p className="text-slate-600">Armada / No. Polisi: <span className="font-mono font-bold text-slate-800">{deliveryConfig.vehicleNumber}</span></p>
+                    <p className="text-slate-600">Driver / Ekspedisi: <span className="font-semibold text-slate-800">{deliveryConfig.driverName} ({deliveryConfig.driverPhone})</span></p>
+                  </div>
+                  <div className="space-y-0.5 pl-1">
+                    <p className="font-black text-amber-900 uppercase tracking-wider text-[9.5px]">
+                      TUJUAN PENGIRIMAN &amp; KLIEN PENERIMA:
+                    </p>
+                    <p className="font-bold text-slate-900 text-[11px]">{selectedSaleForDelivery.customerName}</p>
+                    <p className="text-slate-600">PIC Lapangan: <span className="font-semibold text-slate-800">{deliveryConfig.receivedByName} ({deliveryConfig.receivedByTitle})</span></p>
+                    <p className="text-slate-600">Alamat Proyek: <span className="font-semibold text-slate-800">{deliveryConfig.destinationAddress}</span></p>
+                  </div>
+                </div>
+
+                {/* Paragraf Pengantar */}
+                <div className="text-[10px] text-slate-700 leading-tight">
+                  <p>
+                    Bersama ini kami kirimkan material dan unit perangkat dengan rincian di bawah ini untuk pelaksanaan pekerjaan proyek. Mohon diperiksa kuantitas dan keutuhan fisik barang saat serah terima di lokasi:
+                  </p>
+                </div>
+
+                {/* Tabel Spesifikasi Material Pengiriman */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden">
+                  <table className="w-full text-[10px] text-left">
+                    <thead className="bg-slate-900 text-white font-bold">
+                      <tr>
+                        <th className="p-2 text-center w-8">No</th>
+                        <th className="p-2">Deskripsi Barang &amp; Material Kiriman</th>
+                        <th className="p-2 text-center w-20">Volume / Qty</th>
+                        <th className="p-2 text-center w-28">Kondisi Keluar Gudang</th>
+                        <th className="p-2 text-center w-28">Tanda Terima Fisik</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {selectedSaleForDelivery.items && selectedSaleForDelivery.items.length > 0 ? (
+                        selectedSaleForDelivery.items.map((item, idx) => (
+                          <tr key={item.id || idx}>
+                            <td className="p-2 text-center font-bold text-slate-600">{idx + 1}</td>
+                            <td className="p-2">
+                              <p className="font-bold text-slate-900">{item.productName}</p>
+                              <p className="text-[9px] text-slate-500">Kondisi baru, kemasan tersegel pabrik</p>
+                            </td>
+                            <td className="p-2 text-center font-bold text-slate-800">
+                              {item.qty} {item.unit || "Unit"}
+                            </td>
+                            <td className="p-2 text-center">
+                              <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[9px] border border-emerald-300">
+                                ✓ Baik, Segel &amp; Utuh
+                              </span>
+                            </td>
+                            <td className="p-2 text-center">
+                              <span className="inline-block px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 font-bold text-[9px] border border-blue-200">
+                                Sesuai Pesanan
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="p-2 text-center font-bold">1</td>
+                          <td className="p-2">
+                            <p className="font-bold text-slate-900">Material Pengadaan Proyek</p>
+                            <p className="text-[9px] text-slate-500">Perangkat keras dan perlengkapan instalasi</p>
+                          </td>
+                          <td className="p-2 text-center font-bold">1 Paket</td>
+                          <td className="p-2 text-center">
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[9px] border border-emerald-300">
+                              ✓ Baik, Segel &amp; Utuh
+                            </span>
+                          </td>
+                          <td className="p-2 text-center">
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 font-bold text-[9px] border border-blue-200">
+                              Sesuai Pesanan
+                            </span>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Catatan & Ketentuan Penerimaan */}
+                <div className="p-2 rounded-xl bg-amber-50/60 border border-amber-200 text-[9.5px] space-y-0.5">
+                  <p className="font-bold text-amber-950 uppercase tracking-tight">Catatan &amp; Ketentuan Penerimaan Material:</p>
+                  <p className="text-slate-700 leading-tight">
+                    {deliveryConfig.notes}
+                  </p>
+                </div>
+
+                {/* Tiga (3) Blok Pengesahan Tanda Tangan */}
+                <div className="pt-2 border-t border-slate-300 grid grid-cols-3 gap-3 text-center">
+                  {/* Blok 1: Logistik Gudang DSTech */}
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      YANG MENYERAHKAN,
+                    </p>
+                    <p className="text-[10px] font-black text-slate-900">Gudang &amp; Logistik DSTech</p>
+
+                    <div className="h-11 relative flex items-center justify-center">
+                      {deliveryConfig.includeDspStamp ? (
+                        <>
+                          <div className="w-12 h-12 rounded-full border-2 border-dashed border-amber-600/70 flex flex-col items-center justify-center text-[5.5px] text-amber-900 font-bold uppercase rotate-[-10deg] pointer-events-none bg-amber-50/50">
+                            <span className="font-black text-[5px]">PT. DSTECH</span>
+                            <span className="text-[4px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[4px] text-emerald-700 font-mono font-black mt-0.5">DISPATCHED</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="font-serif italic text-xs text-slate-400 select-none">
+                          ( Stempel Gudang )
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-1 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-[10px]">
+                        ( Bagian Logistik Gudang )
+                      </p>
+                      <p className="text-[8.5px] text-slate-500 mt-0.5">
+                        QC &amp; Logistik Pengeluaran
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Blok 2: Driver / Ekspedisi */}
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      YANG MEMBAWA / EKSPEDISI,
+                    </p>
+                    <p className="text-[10px] font-black text-slate-900">Driver / Teknisi Pengantar</p>
+
+                    <div className="h-11 flex items-center justify-center">
+                      <div className="font-serif italic text-xs text-slate-400 select-none">
+                        ( Tanda Tangan Supir )
+                      </div>
+                    </div>
+
+                    <div className="pt-1 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-[10px]">
+                        ( {deliveryConfig.driverName} )
+                      </p>
+                      <p className="text-[8.5px] text-slate-500 mt-0.5">
+                        {deliveryConfig.vehicleNumber}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Blok 3: Penerima Lapangan Klien */}
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      YANG MENERIMA DI LOKASI,
+                    </p>
+                    <p className="text-[10px] font-black text-slate-900">{selectedSaleForDelivery.customerName}</p>
+
+                    <div className="h-11 flex items-center justify-center">
+                      <div className="font-serif italic text-xs text-slate-400 select-none">
+                        ( Tanda Tangan &amp; Stempel Penerima )
+                      </div>
+                    </div>
+
+                    <div className="pt-1 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-[10px]">
+                        ( {deliveryConfig.receivedByName} )
+                      </p>
+                      <p className="text-[8.5px] text-slate-500 mt-0.5">
+                        {deliveryConfig.receivedByTitle}
                       </p>
                     </div>
                   </div>

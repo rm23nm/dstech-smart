@@ -50,6 +50,7 @@
 - **2026-10-20**: Pembenahan Tuntas Masalah Kop Surat Terpotong Saat Cetak (Print Stylesheet Isolation, Layout Padding Reset, & Vertical Geometry Tuning). Mengatasi masalah kop surat yang masih terpotong (baik di bagian footer banner yang terbelah ke halaman 2 maupun bagian banner atas). Melakukan isolasi cetak penuh pada `.print-modal-backdrop` dengan `position: fixed !important; inset: 0 !important; z-index: 999999 !important;` untuk menembus/mengabaikan padding 40px bawaan layout admin (`AdminLayout`), mengunci lembar dokumen tepat pada batas fisik A4 (`max-height: 296mm; height: 296mm; overflow: hidden; page-break-after: avoid;`), menyempurnakan geometri skala mode `bleed` (offset presisi -1% sesuai margin asli Canva 12px) dan mode `fill` (100% utuh tanpa potong), serta merapatkan jarak spasi vertikal antar seksi dokumen (`space-y-4 print:space-y-2.5`, padding atas 80px, padding bawah 75px) di seluruh 5 template resmi agar seluruh kop dan isi faktur selalu tampil pas 1 halaman penuh.
 - **2026-10-20**: Fitur Lengkap Penagihan Pelunasan (Faktur Pelunasan Sisa Kontrak Pasca DP / BAST). Menyediakan alur resmi penagihan pelunasan sisa kontrak proyek yang sebelumnya belum tersedia setelah faktur DP terbentuk. Menambahkan pemilih mode dokumen cetak (`printBillingStage`: "DP" | "Pelunasan" | "Full") pada faktur penjualan, sehingga admin dapat mencetak lembar resmi "FAKTUR PENAGIHAN PELUNASAN KONTRAK" lengkap dengan banner pelunasan pasca BAST, rincian potongan uang muka DP yang telah diterima lunas, sisa tagihan jatuh tempo, instruksi transfer, dan otorisasi tanda tangan. Menambahkan tombol aksi cepat "Tagih Pelunasan" pada tabel penjualan serta menyempurnakan form terima pembayaran pelunasan.
 - **2026-10-20**: Pembuatan Fitur & Template Cetak Berita Acara Serah Terima Pekerjaan & Pengadaan Barang (BAST Proyek Resmi A4). Menyediakan modul dan dokumen resmi BAST sebagai bukti sah bahwa pekerjaan/barang telah selesai dipasang, diuji (commissioning test), dan diserahterimakan dalam kondisi 100% baik kepada klien. Menjadi dokumen prasyarat hukum penagihan faktur pelunasan kontrak pasca DP. Dilengkapi form kustomisasi pihak penyerah/penerima, masa garansi hardware & pemeliharaan, klausul serah terima, rincian barang teruji, tanda tangan dual-pihak (DSP & Klien), serta tombol akses cepat di tabel penjualan dan modal faktur.
+- **2026-10-20**: Pembuatan Fitur & Template Cetak Surat Jalan Pengiriman Material Proyek & Tanda Terima Barang Lapangan (Delivery Order / Material Dispatch Note A4). Menyediakan modul dan dokumen resmi surat jalan sebagai bukti legal pengeluaran material/perangkat dari gudang DSTech ke lokasi proyek klien. Dilengkapi nomor surat jalan otomatis (SJ/DSP/...), informasi gudang asal, alamat tujuan proyek, nomor polisi armada ekspedisi, nama driver/teknisi pengantar, nomor telepon, tabel rincian material kiriman & kondisi fisik saat keluar gudang, serta 3 (tiga) blok pengesahan tanda tangan resmi (Logistik Gudang DSTech, Driver/Ekspedisi, dan Klien Penerima di Lapangan). Terintegrasi dengan tombol aksi cepat di tabel penjualan, modal faktur, dan modal BAST.
 
 
 
@@ -1501,21 +1502,42 @@
 
 ---
 
-### 53. Antrian Tugas: Pembuatan Surat Jalan Pengiriman Material Proyek & Lembar Tanda Terima Barang (Delivery Order / Material Dispatch)
+### 53. Tugas: Pembuatan Surat Jalan Pengiriman Material Proyek & Lembar Tanda Terima Barang (Delivery Order / Material Dispatch Note A4)
 - **Permintaan Pengguna**:
   *"kemudian kita juga butuh surat jalan material dan tanda serah terimanya"*
 - **Status**:
-  **Dalam Antrian (Queued - Prioritas Berikutnya)**
+  **Selesai (Completed & Deployed)**
 - **Analisis Kebutuhan**:
   1. Dokumen **Surat Jalan Material (Delivery Order / Bukti Ekspedisi Lapangan)** diperlukan saat tim logistik/teknisi mengirim material dan perangkat (kamera, NVR, kabel roll, switch PoE, barrier gate, tiang, dll.) dari gudang DSTech ke lokasi proyek klien.
   2. Memuat:
-     - No. Surat Jalan (`SJ/DSP/...`), Tanggal Pengiriman, No. Kendaraan / Supir / Kurir, Gudang Asal, Lokasi Tujuan Proyek.
-     - Tabel Rincian Material: Nama Barang, Spesifikasi, Qty Dikirim, Satuan, Keterangan Kondisi Saat Keluar Gudang.
+     - No. Surat Jalan (`SJ/DSP/...`), Tanggal Pengiriman, No. Kendaraan / Armada Ekspedisi, Gudang Asal Pengiriman, Alamat Tujuan Proyek.
+     - Tabel Rincian Material: Nama Barang, Spesifikasi, Qty Dikirim, Satuan, Keterangan Kondisi Fisik Saat Keluar Gudang ("Baik, Segel & Utuh").
      - Tiga Blok Pengesahan Tanda Tangan:
        - **Yang Menyerahkan (Logistik/Gudang DSTech)**
-       - **Yang Membawa / Ekspedisi (Driver/Teknisi Lapangan)**
+       - **Yang Membawa / Ekspedisi (Driver/Teknisi Lapangan DSTech)**
        - **Yang Menerima di Lapangan (Klien/Mandor/Security Penerima)**
   3. Dokumen tanda serah terima material di lokasi sebagai bukti sah barang fisik telah tiba sebelum pekerjaan instalasi/BAST dilakukan.
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **State & Helper Surat Jalan di `admin/finance/page.tsx`**:
+     - Menyiapkan state `selectedSaleForDelivery: SaleInvoice | null`, `isDeliveryModalOpen: boolean`, `isDeliveryConfigExpanded: boolean`, dan `deliveryConfig` (nomor surat jalan otomatis, tanggal pengiriman, gudang asal, alamat tujuan, nomor polisi armada, nama supir/teknisi pengantar, nomor telepon, nama penerima lapangan, nomor telepon penerima, jabatan, catatan pengiriman, toggle stempel logistik).
+     - Menambahkan helper `handleOpenDeliveryModal(sale: SaleInvoice)` untuk inisialisasi data.
+  2. [x] **Integrasi dengan `isAnyPrintModalOpen`**:
+     - Menyertakan `isDeliveryModalOpen` agar elemen dashboard admin otomatis disembunyikan saat cetak surat jalan.
+  3. [x] **Pemasangan Tombol Aksi di UI**:
+     - Menambahkan tombol aksi `Surat Jalan` (ikon `Truck`) di kolom aksi Tabel Penjualan & Tagihan Invoice.
+     - Menambahkan tombol pintas `🚚 Cetak Surat Jalan` pada modal pratinjau Faktur Penjualan dan modal BAST.
+  4. [x] **Modal Kustomisasi & Template Lembar Cetak Surat Jalan A4**:
+     - Membangun modal cetak A4 standar DSTech dengan Kop Surat resmi (`letterheadEnabled`, mode `fill`/`bleed`, padding presisi tanpa terpotong).
+     - Header informasi pengiriman lengkap (gudang asal, tujuan, nomor polisi kendaraan, driver).
+     - Tabel daftar material kiriman beserta kuantitas dan kondisi fisik.
+     - Tiga kolom tanda tangan pengesahan resmi (Gudang Logistik, Driver Pengantar, Penerima Lapangan).
+  5. [x] **Validasi TypeScript & Browser Testing**:
+     - Menjalankan `npx tsc --noEmit` memastikan 0 error.
+     - Menguji tampilan dan alur tombol Surat Jalan di browser via `browser_subagent` (diverifikasi tombol Surat Jalan membuka modal A4 lengkap dengan kop surat, info armada, tabel material, form edit interaktif, dan 3 kolom tanda tangan).
+  6. [x] **Sinkronisasi Kode ke GitHub**:
+     - Push commit ke `rm23nm/dstech-smart` via `push_with_native_git.js`.
+  7. [x] **Deployment ke Server Live VPS**:
+     - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi, dan restart PM2 `dstech-main`.
 
 ---
 
