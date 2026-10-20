@@ -73,6 +73,7 @@ function readFinanceData() {
     expenses: [],
     clients: [],
     suppliers: [],
+    projects: [],
   };
 }
 
@@ -421,6 +422,8 @@ export async function POST(request: Request) {
         signatureImage: payload.signatureImage || "",
         attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
         businessEntity: payload.businessEntity || "PT",
+        projectId: payload.projectId || "",
+        projectName: payload.projectName || "",
       };
 
       if (!data.sales) data.sales = [];
@@ -735,6 +738,9 @@ export async function POST(request: Request) {
         approvedAt: payload.approvedAt || "",
         verificationCode: payload.verificationCode || "",
         attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+        businessEntity: payload.businessEntity || "PT",
+        projectId: payload.projectId || "",
+        projectName: payload.projectName || "",
       };
 
       if (!data.purchases) data.purchases = [];
@@ -838,6 +844,8 @@ export async function POST(request: Request) {
         receiptUrl: payload.receiptUrl || (attachments.length > 0 ? attachments[0].url : ""),
         attachments: attachments,
         businessEntity: payload.businessEntity || "PT",
+        projectId: payload.projectId || "",
+        projectName: payload.projectName || "",
       };
 
       if (!data.cash_flow) data.cash_flow = [];
@@ -950,6 +958,8 @@ export async function POST(request: Request) {
         notes: payload.notes || "-",
         attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
         businessEntity: payload.businessEntity || "PT",
+        projectId: payload.projectId || "",
+        projectName: payload.projectName || "",
       };
 
       if (!data.quotations) data.quotations = [];
@@ -1081,6 +1091,8 @@ export async function POST(request: Request) {
         approvedAt: sph.approvedAt || "",
         verificationCode: sph.verificationCode || "",
         businessEntity: (sph as any).businessEntity || "PT",
+        projectId: (sph as any).projectId || payload.projectId || "",
+        projectName: (sph as any).projectName || payload.projectName || "",
       };
 
       if (!data.sales) data.sales = [];

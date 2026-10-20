@@ -9,6 +9,8 @@ import {
   CreditCard,
   Receipt,
   ShoppingCart,
+  ShoppingBag,
+  PieChart,
   RotateCcw,
   Warehouse,
   Building2,
@@ -546,6 +548,8 @@ export default function AdminFinanceERPPage() {
     notes: string;
     items: PurchaseItem[];
     businessEntity: "PT" | "NON_PT";
+    projectId?: string;
+    projectName?: string;
   }>({
     id: "",
     poNumber: "",
@@ -559,6 +563,8 @@ export default function AdminFinanceERPPage() {
     notes: "",
     items: [],
     businessEntity: "PT",
+    projectId: "",
+    projectName: "",
   });
   const [selectedPoForApproval, setSelectedPoForApproval] = useState<PurchaseOrder | null>(null);
   const [isApprovalPoModalOpen, setIsApprovalPoModalOpen] = useState<boolean>(false);
@@ -1036,12 +1042,16 @@ export default function AdminFinanceERPPage() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState<boolean>(false);
   const [editingProject, setEditingProject] = useState<ProjectItem | null>(null);
   const [selectedProjectForDetail, setSelectedProjectForDetail] = useState<ProjectItem | null>(null);
+  const [projectDossierTab, setProjectDossierTab] = useState<"summary" | "sales" | "purchases" | "cash">("summary");
   const [projectFilterStatus, setProjectFilterStatus] = useState<string>("ALL");
   const [projectForm, setProjectForm] = useState<{
     projectCode: string;
     projectName: string;
+    clientId?: string;
     clientName: string;
     businessEntity: "PT" | "NON_PT";
+    quotationId?: string;
+    quotationNumber?: string;
     contractValue: number;
     startDate: string;
     targetEndDate: string;
@@ -1051,8 +1061,11 @@ export default function AdminFinanceERPPage() {
   }>({
     projectCode: "",
     projectName: "",
+    clientId: "",
     clientName: "",
     businessEntity: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
+    quotationId: "",
+    quotationNumber: "",
     contractValue: 0,
     startDate: new Date().toISOString().split("T")[0],
     targetEndDate: "",
@@ -1276,6 +1289,8 @@ export default function AdminFinanceERPPage() {
     terms: string;
     notes: string;
     businessEntity: "PT" | "NON_PT";
+    projectId?: string;
+    projectName?: string;
   }>({
     clientId: "",
     branchId: "dstech_branch_1",
@@ -1300,6 +1315,8 @@ export default function AdminFinanceERPPage() {
     terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
     notes: "",
     businessEntity: "PT",
+    projectId: "",
+    projectName: "",
   });
 
   // New Sale Form State
@@ -1326,6 +1343,8 @@ export default function AdminFinanceERPPage() {
     paidAmount: number;
     notes: string;
     businessEntity: "PT" | "NON_PT";
+    projectId?: string;
+    projectName?: string;
   }>({
     branchId: "dstech_branch_1",
     warehouseId: "dstech_wh_1",
@@ -1351,6 +1370,8 @@ export default function AdminFinanceERPPage() {
     paidAmount: 0,
     notes: "",
     businessEntity: "PT",
+    projectId: "",
+    projectName: "",
   });
 
   // New PO Form State
@@ -1363,6 +1384,8 @@ export default function AdminFinanceERPPage() {
     items: { id: string; productName: string; qty: number; unit: string; price: number; total: number }[];
     notes: string;
     businessEntity: "PT" | "NON_PT";
+    projectId?: string;
+    projectName?: string;
   }>({
     supplierName: "",
     supplierContact: "",
@@ -1374,6 +1397,8 @@ export default function AdminFinanceERPPage() {
     ],
     notes: "",
     businessEntity: "PT",
+    projectId: "",
+    projectName: "",
   });
 
   // New Cash Transaction Form
@@ -1392,6 +1417,8 @@ export default function AdminFinanceERPPage() {
     receiptSize: number;
     receiptCompressedSize: number;
     businessEntity: "PT" | "NON_PT";
+    projectId?: string;
+    projectName?: string;
   }>({
     date: new Date().toISOString().split("T")[0],
     type: "IN",
@@ -1407,6 +1434,8 @@ export default function AdminFinanceERPPage() {
     receiptSize: 0,
     receiptCompressedSize: 0,
     businessEntity: "PT",
+    projectId: "",
+    projectName: "",
   });
   const [isCompressingReceipt, setIsCompressingReceipt] = useState<boolean>(false);
   const [receiptCompressionRatio, setReceiptCompressionRatio] = useState<string>("");
@@ -1719,13 +1748,13 @@ export default function AdminFinanceERPPage() {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
   };
 
-  // Helper Kompresi Berkas Gambar Klien (Client-Side Compression)
-  // Menjaga kualitas visual teks/angka nota namun memangkas ukuran hingga 90-98%
+  // Helper Kompresi Berkas Gambar Klien (Client-Side Compression Target < 50 KB)
+  // Menjaga kualitas visual teks/angka nota namun memangkas ukuran hingga < 50 KB (30-48 KB)
   const compressImageFile = async (
     file: File,
-    maxWidth = 1280,
-    maxHeight = 1600,
-    quality = 0.75
+    maxTargetSizeKb = 48,
+    initialMaxWidth = 1000,
+    initialMaxHeight = 1400
   ): Promise<{ file: File; originalSize: number; compressedSize: number }> => {
     const originalSize = file.size;
     if (!file.type.startsWith("image/")) {
@@ -1738,49 +1767,73 @@ export default function AdminFinanceERPPage() {
       reader.onload = (e) => {
         const img = document.createElement("img");
         img.src = e.target?.result as string;
-        img.onload = () => {
-          let { width, height } = img;
-          if (width > maxWidth || height > maxHeight) {
-            if (width / maxWidth > height / maxHeight) {
-              height = Math.round((height * maxWidth) / width);
-              width = maxWidth;
+        img.onload = async () => {
+          let curWidth = img.width;
+          let curHeight = img.height;
+
+          // Resize awal proporsional agar tidak berlebihan namun tetap tajam untuk teks
+          if (curWidth > initialMaxWidth || curHeight > initialMaxHeight) {
+            if (curWidth / initialMaxWidth > curHeight / initialMaxHeight) {
+              curHeight = Math.round((curHeight * initialMaxWidth) / curWidth);
+              curWidth = initialMaxWidth;
             } else {
-              width = Math.round((width * maxHeight) / height);
-              height = maxHeight;
+              curWidth = Math.round((curWidth * initialMaxHeight) / curHeight);
+              curHeight = initialMaxHeight;
             }
           }
 
           const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
           const ctx = canvas.getContext("2d");
           if (!ctx) {
             return resolve({ file, originalSize, compressedSize: originalSize });
           }
 
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
+          const maxSizeBytes = maxTargetSizeKb * 1024;
+          const qualities = [0.72, 0.60, 0.50, 0.40, 0.32, 0.25];
+          let bestBlob: Blob | null = null;
 
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                return resolve({ file, originalSize, compressedSize: originalSize });
+          // Iterasi kompresi dinamis sampai ukuran < 50 KB
+          for (let step = 0; step < qualities.length; step++) {
+            const scale = step > 2 ? 0.85 : 1.0;
+            const w = Math.round(curWidth * (step > 3 ? 0.75 : scale));
+            const h = Math.round(curHeight * (step > 3 ? 0.75 : scale));
+
+            canvas.width = w;
+            canvas.height = h;
+
+            // Fill background putih solid untuk teks dokumen
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+
+            const q = qualities[step];
+            const blob: Blob | null = await new Promise((res) => {
+              canvas.toBlob((b) => res(b), "image/jpeg", q);
+            });
+
+            if (blob) {
+              bestBlob = blob;
+              if (blob.size <= maxSizeBytes) {
+                break;
               }
-              const cleanName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
-              const compressedFile = new File([blob], cleanName, {
-                type: "image/jpeg",
-                lastModified: Date.now(),
-              });
-              resolve({
-                file: compressedFile,
-                originalSize,
-                compressedSize: compressedFile.size,
-              });
-            },
-            "image/jpeg",
-            quality
-          );
+            }
+          }
+
+          if (!bestBlob) {
+            return resolve({ file, originalSize, compressedSize: originalSize });
+          }
+
+          const cleanName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+          const compressedFile = new File([bestBlob], cleanName, {
+            type: "image/jpeg",
+            lastModified: Date.now(),
+          });
+
+          resolve({
+            file: compressedFile,
+            originalSize,
+            compressedSize: compressedFile.size,
+          });
         };
         img.onerror = () => resolve({ file, originalSize, compressedSize: originalSize });
       };
@@ -2361,6 +2414,8 @@ export default function AdminFinanceERPPage() {
             terms: quotationForm.terms,
             notes: quotationForm.notes,
             businessEntity: quotationForm.businessEntity || "PT",
+            projectId: quotationForm.projectId || "",
+            projectName: quotationForm.projectName || "",
             status: "Terkirim",
           },
         }),
@@ -2428,6 +2483,8 @@ export default function AdminFinanceERPPage() {
       terms: q.terms,
       notes: q.notes || "",
       businessEntity: q.businessEntity || "PT",
+      projectId: q.projectId || "",
+      projectName: q.projectName || "",
     });
     setIsEditQuotationModalOpen(true);
   };
@@ -2469,6 +2526,8 @@ export default function AdminFinanceERPPage() {
             grandTotal,
             terms: quotationForm.terms,
             notes: quotationForm.notes,
+            projectId: quotationForm.projectId || "",
+            projectName: quotationForm.projectName || "",
           },
         }),
       });
@@ -2752,6 +2811,8 @@ export default function AdminFinanceERPPage() {
             paidAmount: Number(saleForm.paidAmount),
             notes: saleForm.notes,
             businessEntity: saleForm.businessEntity || "PT",
+            projectId: saleForm.projectId || "",
+            projectName: saleForm.projectName || "",
           },
         }),
       });
@@ -2782,6 +2843,8 @@ export default function AdminFinanceERPPage() {
           paidAmount: 0,
           notes: "",
           businessEntity: "PT",
+          projectId: "",
+          projectName: "",
         });
         fetchFinanceData();
       } else {
@@ -2992,6 +3055,8 @@ export default function AdminFinanceERPPage() {
             paidAmount: Number(editingSale.paidAmount || 0),
             paymentMethod: editingSale.paymentMethod,
             notes: editingSale.notes,
+            projectId: editingSale.projectId || "",
+            projectName: editingSale.projectName || "",
           },
         }),
       });
@@ -3424,6 +3489,8 @@ export default function AdminFinanceERPPage() {
           receiptSize: 0,
           receiptCompressedSize: 0,
           businessEntity: activeEnt,
+          projectId: "",
+          projectName: "",
         });
         setReceiptCompressionRatio("");
         fetchFinanceData();
@@ -3452,6 +3519,8 @@ export default function AdminFinanceERPPage() {
       receiptSize: 0,
       receiptCompressedSize: 0,
       businessEntity: activeEnt,
+      projectId: "",
+      projectName: "",
     });
     setReceiptCompressionRatio("");
     setIsNewCashModalOpen(true);
@@ -3524,6 +3593,8 @@ export default function AdminFinanceERPPage() {
             warehouseId: "dstech_wh_1",
             notes: poForm.notes,
             businessEntity: poForm.businessEntity || "PT",
+            projectId: poForm.projectId || "",
+            projectName: poForm.projectName || "",
           },
         }),
       });
@@ -3540,6 +3611,8 @@ export default function AdminFinanceERPPage() {
           items: [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
           notes: "",
           businessEntity: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
+          projectId: "",
+          projectName: "",
         });
         fetchFinanceData();
       } else {
@@ -3569,6 +3642,8 @@ export default function AdminFinanceERPPage() {
           ? po.items.map((it) => ({ ...it }))
           : [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
       businessEntity: po.businessEntity || "PT",
+      projectId: po.projectId || "",
+      projectName: po.projectName || "",
     });
     setIsEditPoModalOpen(true);
   };
@@ -3641,6 +3716,8 @@ export default function AdminFinanceERPPage() {
             taxAmount,
             grandTotal,
             businessEntity: editPoForm.businessEntity || "PT",
+            projectId: editPoForm.projectId || "",
+            projectName: editPoForm.projectName || "",
           },
         }),
       });
@@ -4381,8 +4458,11 @@ export default function AdminFinanceERPPage() {
     setProjectForm({
       projectCode: `PRJ-${new Date().getFullYear()}-${String(projects.length + 1).padStart(3, "0")}`,
       projectName: "",
+      clientId: "",
       clientName: "",
       businessEntity: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
+      quotationId: "",
+      quotationNumber: "",
       contractValue: 0,
       startDate: new Date().toISOString().split("T")[0],
       targetEndDate: "",
@@ -4398,8 +4478,11 @@ export default function AdminFinanceERPPage() {
     setProjectForm({
       projectCode: prj.projectCode,
       projectName: prj.projectName,
+      clientId: prj.clientId || "",
       clientName: prj.clientName || "",
       businessEntity: prj.businessEntity || "PT",
+      quotationId: prj.quotationId || "",
+      quotationNumber: prj.quotationNumber || "",
       contractValue: prj.contractValue || 0,
       startDate: prj.startDate || new Date().toISOString().split("T")[0],
       targetEndDate: prj.targetEndDate || "",
@@ -4408,6 +4491,27 @@ export default function AdminFinanceERPPage() {
       picProject: prj.picProject || "",
     });
     setIsProjectModalOpen(true);
+  };
+
+  const handleConvertQuotationToProject = (sph: Quotation) => {
+    setEditingProject(null);
+    setProjectForm({
+      projectCode: `PRJ-${new Date().getFullYear()}-${String(projects.length + 1).padStart(3, "0")}`,
+      projectName: sph.subject || `Proyek Instalasi ${sph.customerName}`,
+      clientId: sph.clientId || "",
+      clientName: sph.customerName,
+      businessEntity: sph.businessEntity || "PT",
+      quotationId: sph.id,
+      quotationNumber: sph.quotationNumber,
+      contractValue: sph.grandTotal || 0,
+      startDate: new Date().toISOString().split("T")[0],
+      targetEndDate: sph.validUntil || "",
+      status: "In Progress",
+      description: `Konversi otomatis dari SPH Disetujui: ${sph.quotationNumber} - ${sph.subject}`,
+      picProject: sph.approvedBy || "DSTech Engineer",
+    });
+    setIsProjectModalOpen(true);
+    showToast(`SPH ${sph.quotationNumber} siap didaftarkan sebagai Master Proyek baru!`);
   };
 
   const handleSaveProjectSubmit = async (e: React.FormEvent) => {
@@ -5889,6 +5993,15 @@ export default function AdminFinanceERPPage() {
                                   <ArrowRight className="w-4 h-4" />
                                 </button>
                               )}
+
+                              {/* Konversi ke Master Proyek Baru */}
+                              <button
+                                onClick={() => handleConvertQuotationToProject(sph)}
+                                title="Daftarkan SPH ini sebagai Master Proyek Baru"
+                                className="p-2 rounded-xl bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Briefcase className="w-4 h-4" />
+                              </button>
 
                               {/* Tombol Aksi Status: Tandai Expired */}
                               {classification !== "deal" && classification !== "expired" && (
@@ -7592,6 +7705,14 @@ export default function AdminFinanceERPPage() {
                         </span>
                         <div className="flex items-center gap-1.5">
                           <button
+                            onClick={() => setSelectedProjectForDetail(prj)}
+                            className="px-2 py-1 rounded-lg bg-purple-50 text-purple-700 font-bold hover:bg-purple-600 hover:text-white transition-all cursor-pointer flex items-center gap-1 text-[11px]"
+                            title="Buka Dossier & Analisis Finansial Proyek"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Dossier</span>
+                          </button>
+                          <button
                             onClick={() => handleOpenEditProject(prj)}
                             className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-all cursor-pointer"
                             title="Edit Proyek"
@@ -7762,6 +7883,44 @@ export default function AdminFinanceERPPage() {
                       {c.name} ({c.category}) — {c.city}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              {/* Selector Proyek Terkait (Opsional) */}
+              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Alokasikan Pendapatan ke Proyek (Opsional):</span>
+                  </label>
+                  <span className="text-[10px] text-purple-600 font-medium">
+                    {saleForm.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
+                  </span>
+                </div>
+                <select
+                  value={saleForm.projectId || ""}
+                  onChange={(e) => {
+                    const prjId = e.target.value;
+                    const prj = projects.find((p) => p.id === prjId);
+                    setSaleForm((prev) => ({
+                      ...prev,
+                      projectId: prjId,
+                      projectName: prj ? prj.projectName : "",
+                      customerName: !prev.customerName && prj?.clientName ? prj.clientName : prev.customerName,
+                      customerPhone: !prev.customerPhone && prj?.clientPhone ? prj.clientPhone : prev.customerPhone,
+                      customerAddress: !prev.customerAddress && prj?.clientAddress ? prj.clientAddress : prev.customerAddress,
+                    }));
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Bukan Penjualan Proyek Khusus (Penjualan / Ritel Umum) --</option>
+                  {projects
+                    .filter((p) => (saleForm.businessEntity || "PT") === (p.businessEntity || "PT"))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -8708,6 +8867,41 @@ export default function AdminFinanceERPPage() {
                 </select>
               </div>
 
+              {/* Selector Proyek Terkait pada Arus Kas */}
+              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Alokasi Biaya / Pemasukan Proyek:</span>
+                  </label>
+                  <span className="text-[10px] text-purple-600 font-medium">
+                    {cashForm.projectId ? "✓ Beban Proyek" : "Opsional"}
+                  </span>
+                </div>
+                <select
+                  value={cashForm.projectId || ""}
+                  onChange={(e) => {
+                    const prjId = e.target.value;
+                    const prj = projects.find((p) => p.id === prjId);
+                    setCashForm((prev) => ({
+                      ...prev,
+                      projectId: prjId,
+                      projectName: prj ? prj.projectName : "",
+                    }));
+                  }}
+                  className="w-full p-2 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Bukan Transaksi Proyek Spesifik (Umum / Kantor) --</option>
+                  {projects
+                    .filter((p) => (cashForm.businessEntity || "PT") === (p.businessEntity || "PT"))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="font-bold text-slate-700 block">
@@ -8800,7 +8994,7 @@ export default function AdminFinanceERPPage() {
                         {isCompressingReceipt ? "Sedang Mengompres Berkas..." : "Klik untuk Pilih Foto Nota / Struk"}
                       </span>
                       <span className="text-[10px] text-slate-500">
-                        Otomatis dikompres &lt;100 KB agar sangat hemat penyimpanan server
+                        Otomatis dikompres &lt;50 KB (30-48 KB) agar sangat hemat penyimpanan server
                       </span>
                     </label>
                   </div>
@@ -9926,6 +10120,42 @@ export default function AdminFinanceERPPage() {
                 </select>
               </div>
 
+              {/* Selector Proyek Terkait (Opsional) */}
+              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Tautkan ke Master Proyek (Opsional):</span>
+                  </label>
+                  <span className="text-[10px] text-purple-600 font-medium">
+                    {quotationForm.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
+                  </span>
+                </div>
+                <select
+                  value={quotationForm.projectId || ""}
+                  onChange={(e) => {
+                    const prjId = e.target.value;
+                    const prj = projects.find((p) => p.id === prjId);
+                    setQuotationForm((prev) => ({
+                      ...prev,
+                      projectId: prjId,
+                      projectName: prj ? prj.projectName : "",
+                      customerName: !prev.customerName && prj?.clientName ? prj.clientName : prev.customerName,
+                    }));
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Tidak Terkait Proyek Spesifik (Penawaran Bebas / Mandiri) --</option>
+                  {projects
+                    .filter((p) => (quotationForm.businessEntity || "PT") === (p.businessEntity || "PT"))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
               {/* Branch & Warehouse Selection for Quotation */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-indigo-50/40 rounded-2xl border border-indigo-100">
                 <div>
@@ -10928,6 +11158,16 @@ export default function AdminFinanceERPPage() {
                 >
                   <ArrowRight className="w-3.5 h-3.5 text-emerald-600" />
                   <span>Konversi ke Faktur</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleConvertQuotationToProject(selectedQuotationForPrint)}
+                  title="Jadikan Proyek Baru di Master Proyek"
+                  className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Jadikan Proyek Baru</span>
                 </button>
 
                 <button
@@ -12034,6 +12274,540 @@ export default function AdminFinanceERPPage() {
         </div>
       )}
 
+      {/* MODAL DOSSIER FINANSIAL PROYEK (DETAIL & P&L BREAKDOWN) */}
+      {selectedProjectForDetail && (
+        (() => {
+          const prj = selectedProjectForDetail;
+          const prjSales = sales.filter((s) => s.projectId === prj.id);
+          const totalSalesInvoiced = prjSales.reduce((acc, s) => acc + (s.grandTotal || 0), 0);
+          const totalSalesPaid = prjSales.reduce((acc, s) => acc + (s.paidAmount || 0), 0);
+          const totalSalesOutstanding = Math.max(0, totalSalesInvoiced - totalSalesPaid);
+
+          const prjPurchases = purchases.filter(
+            (po) => po.projectId === prj.id || (po.notes && po.notes.includes(prj.projectCode))
+          );
+          const totalPurchaseCost = prjPurchases.reduce((acc, po) => acc + (po.grandTotal || 0), 0);
+
+          const prjCashOut = cashFlow.filter((c) => c.type === "OUT" && c.projectId === prj.id);
+          const totalCashFieldCost = prjCashOut.reduce((acc, c) => acc + (c.amount || 0), 0);
+
+          const prjCashIn = cashFlow.filter((c) => c.type === "IN" && c.projectId === prj.id);
+
+          const totalExpense = totalPurchaseCost + totalCashFieldCost;
+          const netProfit = totalSalesInvoiced - totalExpense;
+          const profitMargin = totalSalesInvoiced > 0 ? ((netProfit / totalSalesInvoiced) * 100).toFixed(1) : "0";
+
+          const linkedQuotation = quotations.find(
+            (q) => q.id === prj.quotationId || (prj.quotationNumber && q.quotationNumber === prj.quotationNumber)
+          );
+
+          return (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+              onClick={() => setSelectedProjectForDetail(null)}
+            >
+              <div
+                className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header Modal */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+                  <div className="flex items-start gap-3">
+                    <div className="p-3 rounded-2xl bg-purple-100 text-purple-700 shadow-sm">
+                      <Briefcase className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs font-black px-2.5 py-0.5 rounded-full bg-slate-900 text-white">
+                          {prj.projectCode}
+                        </span>
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                            prj.businessEntity === "NON_PT"
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                              : "bg-indigo-100 text-indigo-800 border border-indigo-300"
+                          }`}
+                        >
+                          {prj.businessEntity === "NON_PT" ? "🏬 DSTech Non-PT" : "🏢 PT. DSTech Smart"}
+                        </span>
+                        <span
+                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
+                            prj.status === "In Progress"
+                              ? "bg-amber-50 text-amber-800 border-amber-300"
+                              : prj.status === "Completed"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                              : prj.status === "Planning"
+                              ? "bg-blue-50 text-blue-800 border-blue-300"
+                              : "bg-slate-100 text-slate-700 border-slate-300"
+                          }`}
+                        >
+                          {prj.status}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-black text-slate-900 mt-1">{prj.projectName}</h3>
+                      <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                        <span>👤 Klien: <strong className="text-slate-700">{prj.clientName || "-"}</strong></span>
+                        {prj.picProject && (
+                          <>
+                            <span>•</span>
+                            <span>👷 PIC: <strong className="text-slate-700">{prj.picProject}</strong></span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditProject(prj)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Edit Master</span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedProjectForDetail(null)}
+                      className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* KPI Summary Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block">Nilai Kontrak / SPH</span>
+                    <span className="text-base font-black text-slate-900 block mt-0.5">
+                      {formatRupiah(prj.contractValue || 0)}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-0.5">
+                      SPH: {prj.quotationNumber || (linkedQuotation ? linkedQuotation.quotationNumber : "Mandiri")}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                    <span className="text-[10px] font-bold text-emerald-700 uppercase block">Total Faktur Penjualan</span>
+                    <span className="text-base font-black text-emerald-800 block mt-0.5">
+                      {formatRupiah(totalSalesInvoiced)}
+                    </span>
+                    <span className="text-[10px] text-emerald-600 font-medium block mt-0.5">
+                      Terbayar: {formatRupiah(totalSalesPaid)}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200">
+                    <span className="text-[10px] font-bold text-amber-800 uppercase block">Total Pengeluaran Proyek</span>
+                    <span className="text-base font-black text-amber-900 block mt-0.5">
+                      {formatRupiah(totalExpense)}
+                    </span>
+                    <span className="text-[10px] text-amber-700 font-medium block mt-0.5">
+                      PO: {formatRupiah(totalPurchaseCost)} | Kas: {formatRupiah(totalCashFieldCost)}
+                    </span>
+                  </div>
+
+                  <div
+                    className={`p-3.5 rounded-2xl border ${
+                      netProfit >= 0 ? "bg-purple-50 border-purple-200" : "bg-rose-50 border-rose-200"
+                    }`}
+                  >
+                    <span
+                      className={`text-[10px] font-bold uppercase block ${
+                        netProfit >= 0 ? "text-purple-700" : "text-rose-700"
+                      }`}
+                    >
+                      Laba Bersih ({profitMargin}%)
+                    </span>
+                    <span
+                      className={`text-base font-black block mt-0.5 ${
+                        netProfit >= 0 ? "text-purple-900" : "text-rose-900"
+                      }`}
+                    >
+                      {formatRupiah(netProfit)}
+                    </span>
+                    <span
+                      className={`text-[10px] font-medium block mt-0.5 ${
+                        netProfit >= 0 ? "text-purple-600" : "text-rose-600"
+                      }`}
+                    >
+                      {netProfit >= 0 ? "Profit Menguntungkan" : "Defisit / Perlu Evaluasi"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Sub Tab Navigation */}
+                <div className="flex items-center gap-1.5 border-b border-slate-200 pb-2 overflow-x-auto">
+                  <button
+                    type="button"
+                    onClick={() => setProjectDossierTab("summary")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      projectDossierTab === "summary"
+                        ? "bg-purple-600 text-white shadow"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <PieChart className="w-3.5 h-3.5" />
+                    <span>P&L & Ringkasan Proyek</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProjectDossierTab("sales")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      projectDossierTab === "sales"
+                        ? "bg-emerald-600 text-white shadow"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Faktur Penjualan ({prjSales.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProjectDossierTab("purchases")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      projectDossierTab === "purchases"
+                        ? "bg-amber-600 text-white shadow"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <ShoppingBag className="w-3.5 h-3.5" />
+                    <span>PO Belanja Material ({prjPurchases.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProjectDossierTab("cash")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      projectDossierTab === "cash"
+                        ? "bg-indigo-600 text-white shadow"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Kas & Lapangan ({prjCashOut.length})</span>
+                  </button>
+                </div>
+
+                {/* Tab Content: Summary */}
+                {projectDossierTab === "summary" && (
+                  <div className="space-y-4 text-xs">
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                      <h4 className="font-black text-slate-800 text-sm flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4 text-purple-600" />
+                        <span>Informasi & Deskripsi Pekerjaan</span>
+                      </h4>
+                      <p className="text-slate-600 leading-relaxed">
+                        {prj.description || "Tidak ada rincian catatan deskripsi proyek."}
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-slate-600">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Tanggal Mulai:</span>
+                          <span className="font-bold">{prj.startDate || "-"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Target Selesai:</span>
+                          <span className="font-bold">{prj.targetEndDate || "-"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Piutang Klien:</span>
+                          <span className="font-bold text-amber-600">{formatRupiah(totalSalesOutstanding)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">SPH Terhubung:</span>
+                          {linkedQuotation ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedQuotationForPrint(linkedQuotation);
+                              }}
+                              className="font-bold text-purple-700 underline cursor-pointer"
+                            >
+                              {linkedQuotation.quotationNumber}
+                            </button>
+                          ) : (
+                            <span className="font-medium text-slate-400">-</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Kalkulasi Keuangan Proyek */}
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3">
+                      <h4 className="font-black text-slate-800 text-sm">Rincian Komponen Laba Rugi Proyek</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">1. Realisasi Pendapatan (Faktur Terbit)</span>
+                          <span className="font-black text-emerald-600 text-sm">{formatRupiah(totalSalesInvoiced)}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">2. Beban Material / Hardware (PO Supplier)</span>
+                          <span className="font-black text-rose-600 text-sm">- {formatRupiah(totalPurchaseCost)}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">3. Beban Operasional Lapangan (BBM, Teknisi, dll)</span>
+                          <span className="font-black text-rose-600 text-sm">- {formatRupiah(totalCashFieldCost)}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 bg-purple-50 px-3 rounded-xl font-black text-sm text-purple-950">
+                          <span>Estimasi Laba Bersih Proyek:</span>
+                          <span className={netProfit >= 0 ? "text-purple-700 font-black text-base" : "text-rose-600 font-black text-base"}>
+                            {formatRupiah(netProfit)} ({profitMargin}%)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tab Content: Sales */}
+                {projectDossierTab === "sales" && (
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-black text-slate-800">Daftar Faktur Penjualan Proyek Ini</h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSaleForm((prev) => ({
+                            ...prev,
+                            projectId: prj.id,
+                            projectName: prj.projectName,
+                            businessEntity: prj.businessEntity || "PT",
+                            customerName: prj.clientName || prev.customerName,
+                          }));
+                          setIsNewSaleModalOpen(true);
+                        }}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Terbitkan Faktur Proyek</span>
+                      </button>
+                    </div>
+
+                    {prjSales.length === 0 ? (
+                      <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <p className="font-bold text-slate-600">Belum Ada Faktur Penjualan Terbit</p>
+                        <p className="text-slate-400 text-[11px] mt-0.5">
+                          Klik tombol di atas untuk menerbitkan faktur uang muka (DP) atau pelunasan.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="w-full text-left">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[11px] uppercase font-bold">
+                            <tr>
+                              <th className="p-2.5">No Faktur</th>
+                              <th className="p-2.5">Tanggal</th>
+                              <th className="p-2.5 text-right">Total Tagihan</th>
+                              <th className="p-2.5 text-right">Terbayar</th>
+                              <th className="p-2.5 text-center">Status</th>
+                              <th className="p-2.5 text-center">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium">
+                            {prjSales.map((s) => (
+                              <tr key={s.id} className="hover:bg-slate-50">
+                                <td className="p-2.5 font-bold text-slate-900">{s.invoiceNumber}</td>
+                                <td className="p-2.5 text-slate-500">{s.date}</td>
+                                <td className="p-2.5 text-right font-black text-slate-900">{formatRupiah(s.grandTotal)}</td>
+                                <td className="p-2.5 text-right font-bold text-emerald-600">{formatRupiah(s.paidAmount || 0)}</td>
+                                <td className="p-2.5 text-center">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                      s.paymentStatus === "Lunas"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : s.paymentStatus === "DP Sebagian"
+                                        ? "bg-amber-100 text-amber-800"
+                                        : "bg-rose-100 text-rose-800"
+                                    }`}
+                                  >
+                                    {s.paymentStatus || "Belum Bayar"}
+                                  </span>
+                                </td>
+                                <td className="p-2.5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedInvoiceForPrint(s);
+                                    }}
+                                    className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                                    title="Lihat Faktur"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab Content: Purchases */}
+                {projectDossierTab === "purchases" && (
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-black text-slate-800">Daftar PO Belanja Material & Perlengkapan</h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPoForm((prev) => ({
+                            ...prev,
+                            projectId: prj.id,
+                            projectName: prj.projectName,
+                            businessEntity: prj.businessEntity || "PT",
+                            notes: `Belanja Material Proyek: [${prj.projectCode}] ${prj.projectName}`,
+                          }));
+                          setIsNewPoModalOpen(true);
+                        }}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Buat PO Proyek</span>
+                      </button>
+                    </div>
+
+                    {prjPurchases.length === 0 ? (
+                      <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <p className="font-bold text-slate-600">Belum Ada PO Material untuk Proyek Ini</p>
+                        <p className="text-slate-400 text-[11px] mt-0.5">
+                          Klik tombol di atas untuk membuat PO pengadaan material proyek ke vendor/distributor.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="w-full text-left">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[11px] uppercase font-bold">
+                            <tr>
+                              <th className="p-2.5">No PO</th>
+                              <th className="p-2.5">Vendor / Supplier</th>
+                              <th className="p-2.5">Tanggal</th>
+                              <th className="p-2.5 text-right">Nilai Belanja</th>
+                              <th className="p-2.5 text-center">Status</th>
+                              <th className="p-2.5 text-center">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium">
+                            {prjPurchases.map((po) => (
+                              <tr key={po.id} className="hover:bg-slate-50">
+                                <td className="p-2.5 font-bold text-slate-900">{po.poNumber}</td>
+                                <td className="p-2.5 text-slate-700 font-medium">{po.supplierName}</td>
+                                <td className="p-2.5 text-slate-500">{po.date}</td>
+                                <td className="p-2.5 text-right font-black text-slate-900">{formatRupiah(po.grandTotal)}</td>
+                                <td className="p-2.5 text-center">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                      po.status === "Approved" || po.status === "Selesai"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : "bg-blue-100 text-blue-800"
+                                    }`}
+                                  >
+                                    {po.status || "Pending"}
+                                  </span>
+                                </td>
+                                <td className="p-2.5 text-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedPoForPrint(po);
+                                    }}
+                                    className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
+                                    title="Lihat PO"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tab Content: Cash */}
+                {projectDossierTab === "cash" && (
+                  <div className="space-y-3 text-xs">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-black text-slate-800">Biaya Kas Operasional & Lapangan</h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCashForm((prev) => ({
+                            ...prev,
+                            projectId: prj.id,
+                            projectName: prj.projectName,
+                            businessEntity: prj.businessEntity || "PT",
+                            type: "OUT",
+                            category: "Transport, BBM & Tol",
+                            description: `Biaya Lapangan Proyek [${prj.projectCode}]: `,
+                          }));
+                          setIsNewCashModalOpen(true);
+                        }}
+                        className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Catat Kas Lapangan</span>
+                      </button>
+                    </div>
+
+                    {prjCashOut.length === 0 ? (
+                      <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <CreditCard className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                        <p className="font-bold text-slate-600">Belum Ada Biaya Kas Lapangan</p>
+                        <p className="text-slate-400 text-[11px] mt-0.5">
+                          Gunakan tombol di atas untuk mencatat pengeluaran kas lapangan seperti BBM, konsumsi, atau sewa alat.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table className="w-full text-left">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[11px] uppercase font-bold">
+                            <tr>
+                              <th className="p-2.5">Tanggal</th>
+                              <th className="p-2.5">Kategori</th>
+                              <th className="p-2.5">Deskripsi</th>
+                              <th className="p-2.5">Akun Kas</th>
+                              <th className="p-2.5 text-right">Nominal</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium">
+                            {prjCashOut.map((c) => (
+                              <tr key={c.id} className="hover:bg-slate-50">
+                                <td className="p-2.5 text-slate-500 whitespace-nowrap">{c.date}</td>
+                                <td className="p-2.5 font-bold text-slate-800">{c.category}</td>
+                                <td className="p-2.5 text-slate-600 max-w-xs truncate">{c.description}</td>
+                                <td className="p-2.5 text-[11px] text-slate-500 truncate max-w-[150px]">{c.account}</td>
+                                <td className="p-2.5 text-right font-black text-rose-700">
+                                  - {formatRupiah(c.amount)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Footer Modal */}
+                <div className="flex items-center justify-end pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProjectForDetail(null)}
+                    className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold cursor-pointer transition-colors shadow-xs"
+                  >
+                    Tutup Dossier
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()
+      )}
+
       {/* MODAL MASTER DATA: TAMBAH / EDIT TITIK GUDANG */}
       {isWarehouseModalOpen && (
         <div
@@ -12478,6 +13252,41 @@ export default function AdminFinanceERPPage() {
                 </select>
               </div>
 
+              {/* Selector Proyek Terkait pada PO (Beban Material Proyek) */}
+              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Beban Biaya Material Proyek (Opsional):</span>
+                  </label>
+                  <span className="text-[10px] text-purple-600 font-medium">
+                    {poForm.projectId ? "✓ Beban Proyek" : "Opsional"}
+                  </span>
+                </div>
+                <select
+                  value={poForm.projectId || ""}
+                  onChange={(e) => {
+                    const prjId = e.target.value;
+                    const prj = projects.find((p) => p.id === prjId);
+                    setPoForm((prev) => ({
+                      ...prev,
+                      projectId: prjId,
+                      projectName: prj ? prj.projectName : "",
+                    }));
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Bukan Belanja Proyek Spesifik (Stok Rutin / Operasional Gudang) --</option>
+                  {projects
+                    .filter((p) => (poForm.businessEntity || "PT") === (p.businessEntity || "PT"))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Nama Supplier / Vendor:</label>
@@ -12768,6 +13577,41 @@ export default function AdminFinanceERPPage() {
                       {s.name} ({s.category}) — {s.city}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              {/* Selector Proyek Terkait pada Edit PO */}
+              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Beban Biaya Material Proyek:</span>
+                  </label>
+                  <span className="text-[10px] text-purple-600 font-medium">
+                    {editPoForm.projectId ? "✓ Beban Proyek" : "Opsional"}
+                  </span>
+                </div>
+                <select
+                  value={editPoForm.projectId || ""}
+                  onChange={(e) => {
+                    const prjId = e.target.value;
+                    const prj = projects.find((p) => p.id === prjId);
+                    setEditPoForm((prev) => ({
+                      ...prev,
+                      projectId: prjId,
+                      projectName: prj ? prj.projectName : "",
+                    }));
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Bukan Belanja Proyek Spesifik (Stok Rutin / Operasional Gudang) --</option>
+                  {projects
+                    .filter((p) => (editPoForm.businessEntity || "PT") === (p.businessEntity || "PT"))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -16910,6 +17754,41 @@ export default function AdminFinanceERPPage() {
                 </div>
               </div>
 
+              {/* Selector Proyek Terkait pada Edit Faktur */}
+              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Tautkan ke Master Proyek:</span>
+                  </label>
+                  <span className="text-[10px] text-purple-600 font-medium">
+                    {editingSale.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
+                  </span>
+                </div>
+                <select
+                  value={editingSale.projectId || ""}
+                  onChange={(e) => {
+                    const prjId = e.target.value;
+                    const prj = projects.find((p) => p.id === prjId);
+                    setEditingSale({
+                      ...editingSale,
+                      projectId: prjId,
+                      projectName: prj ? prj.projectName : "",
+                    });
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
+                >
+                  <option value="">-- Bukan Penjualan Proyek Khusus (Penjualan / Ritel Umum) --</option>
+                  {projects
+                    .filter((p) => (editingSale.businessEntity || "PT") === (p.businessEntity || "PT"))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Alamat Pemasangan / Proyek:</label>
                 <input
@@ -18692,7 +19571,7 @@ export default function AdminFinanceERPPage() {
                       : "Klik untuk Pilih Foto / Dokumen PDF"}
                   </span>
                   <span className="text-[10px] text-slate-500">
-                    Mendukung JPG, PNG, WEBP, PDF • Gambar otomatis dikompresi ringan tanpa mengurangi keterbacaan teks
+                    Mendukung JPG, PNG, WEBP, PDF • Gambar otomatis dikompresi ringan &lt;50 KB tanpa mengurangi keterbacaan teks
                   </span>
                 </label>
               </div>
