@@ -53,6 +53,10 @@
 - **2026-10-20**: Pembuatan Fitur & Template Cetak Surat Jalan Pengiriman Material Proyek & Tanda Terima Barang Lapangan (Delivery Order / Material Dispatch Note A4). Menyediakan modul dan dokumen resmi surat jalan sebagai bukti legal pengeluaran material/perangkat dari gudang DSTech ke lokasi proyek klien. Dilengkapi nomor surat jalan otomatis (SJ/DSP/...), informasi gudang asal, alamat tujuan proyek, nomor polisi armada ekspedisi, nama driver/teknisi pengantar, nomor telepon, tabel rincian material kiriman & kondisi fisik saat keluar gudang, serta 3 (tiga) blok pengesahan tanda tangan resmi (Logistik Gudang DSTech, Driver/Ekspedisi, dan Klien Penerima di Lapangan). Terintegrasi dengan tombol aksi cepat di tabel penjualan, modal faktur, dan modal BAST.
 - **2026-10-20**: Integrasi Katalog Product Management & Ketersediaan Stok Real-Time Multi-Cabang/Gudang pada Pembuatan Penawaran (SPH) & Faktur Penjualan (Sale Invoice), serta Mutasi Pemotongan Stok Otomatis. Menghubungkan repeater barang pada formulir SPH dan Faktur Penjualan secara dinamis ke master data produk (`/api/products` & `src/data/dstech_products.json`). Menyediakan pemilih Cabang & Titik Gudang Logistik (`dstech_wh_1` Cilegon, `dstech_wh_2` Serang, `dstech_wh_3` Unit Mobile) serta pemilih cepat katalog ("⚡ Pilih Katalog") per baris barang yang secara instan meng-autofill nama produk resmi, satuan, dan harga acuan katalog, sementara input manual tetap fleksibel untuk item jasa kustom. Menampilkan badge status ketersediaan stok riil (*stock on hand*) per gudang secara real-time (contoh: "⚡ Tersedia: 16 Unit di Gudang Utama Cilegon") dan peringatan jika kuantiti melebihi stok. Menambahkan helper pemotongan stok otomatis di backend `/api/finance` saat faktur diterbitkan atau penawaran dikonversi ke penjualan. Divalidasi kompilasi TypeScript `tsc --noEmit` (0 error), diuji interaktif via browser automation subagent, disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-20**: Penambahan Kolom Aksi & Tombol Hapus pada Buku Arus Kas (Cash Flow) serta Fitur Reset Semua Transaksi Keuangan Bersih dari Nol (Clean Slate). Menyediakan tombol hapus satuan (ikon Trash2) pada setiap baris item kas masuk & keluar di tab Buku Arus Kas lengkap dengan konfirmasi keamanan. Menambahkan tombol '🗑️ Reset Transaksi (Mulai Nol)' di header kendali Admin Finance dengan modal dialog konfirmasi ber-password/kata kunci ('RESET') untuk mengosongkan seluruh data transaksi uji coba/demo (Faktur Penjualan, SPH Penawaran, PO Supplier, Retur, dan Buku Arus Kas) sekaligus menjaga seluruh master data vital (Akun Admin, Rekening Bank, Gudang/Cabang, Klien, Supplier, Katalog Produk) tetap 100% aman dan utuh. Menyediakan sistem snapshot backup otomatis sebelum reset dieksekusi. Divalidasi kompilasi TypeScript `tsc --noEmit` (0 error), diuji via browser automation subagent, disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
+- **2026-10-20**: Resolusi Tuntas & Perlindungan Permanen Data Pengguna (Isolasi Database Runtime JSON dari Siklus Git Push/Pull Deploy).
+- **2026-10-20**: Fitur Kirim Dokumen via WhatsApp & Email Cepat pada Seluruh Transaksi & Berkas Bisnis (/admin/finance). Menyediakan generator pesan bisnis profesional (WA format & mailto) untuk SPH, Faktur, PO Supplier, Retur, dan Surat Jalan, normalisasi nomor HP internasional (628...), modal kirim interaktif dengan tombol buka WA / Email dan salin teks, serta tombol akses cepat di tabel dan toolbar cetak.
+- **2026-10-20**: Fitur Manajemen Status SPH (Auto & Manual Expired, Deal, Reject) serta Sistem Sortir & Quick Filter Status (/admin/finance). Mengakomodasi penawaran yang sudah lama tidak dikonversi ke faktur menjadi kedaluwarsa (Expired) baik secara otomatis berdasarkan tanggal masa berlaku (validUntil) maupun manual melalui tombol aksi cepat. Menambahkan badge visual tegas (Deal/Faktur, Menunggu Respon, Kedaluwarsa, Ditolak), aksi cepat (Tandai Expired, Tandai Reject, Buka Kembali / Re-Aktifkan, Konversi Faktur), 4 kartu mini KPI analitik status SPH, 5 Quick Filter Status Chips (Semua, Deal, Menunggu, Expired, Reject) dengan counter real-time, serta dropdown sortir serbaguna (Tanggal Terbaru/Terlama, Status Deal/Expired Teratas, Masa Berlaku, Nilai Tertinggi/Terendah, Klien A-Z). Lolos pengujian tsc 0 error, browser subagent, push ke GitHub (commit 65bdbbd), dan live deploy ke server VPS PM2 dstech-main (PID 3908210).
+- **2026-10-20**: Pembenahan Tuntas Lembar Cetak Dokumen & Fitur Cetak 2 Halaman (Halaman 1: Dokumen Utama Lengkap & Sah, Halaman 2: Lampiran Rincian Item Penawaran & Faktur Lengkap Tanpa Terpotong). Mengatasi masalah terpotongnya tanda tangan dan isi dokumen akibat overflow hidden dan batas 297mm di globals.css. Menambahkan pemisah halaman cetak .print-page-break, mode cetak 2 halaman profesional pada SPH dan Faktur (Halaman 1: surat resmi lengkap kop, ringkasan nilai penawaran/tagihan, instruksi rekening, terms, dan dual signature tanda tangan sah + stempel digital & barcode verifikasi; Halaman 2: lembar lampiran rincian item, spesifikasi teknis, rekapitulasi biaya, dan paraf pengesahan). Dilengkapi tombol toggle [1 Halaman / 2 Halaman] di header preview. Divalidasi tsc 0 error, di-push ke GitHub commit 98f4f91, dan dideploy sukses ke VPS PM2 dstech-main (PID 3897877). Menginvestigasi dan menyelesaikan tuntas masalah di mana setiap kali revisi kode dideploy, data yang telah diubah/dihapus/diperbaiki pengguna (seperti NIB 1909220127034, NPWP 60.648.216.4-102.000, Nama Direktur 'RAMADHANI ST', Rekening BCA 295-074-0321, dan pembersihan data demo) selalu ter-reset kembali ke data bawaan lama. Akar masalah ditemukan pada folder `src/data/*.json` yang sebelumnya ikut tersalin dan terlacak oleh Git, sehingga setiap kali deploy menjalankan `git stash && git pull`, Git memindahkan data riil pengguna ke stash dan menimpanya dengan data demo dari repositori. Tindakan perbaikan: Menyelamatkan dan memulihkan seluruh data riil pengguna dari stash, menghapus pelacakan `src/data/` dari Git (`git rm --cached -r src/data/`), menambahkan `src/data/` ke `.gitignore`, dan memperbarui script `push_with_native_git.js` agar Git hanya mengelola kode program dan tidak akan pernah menyentuh atau menimpa berkas database runtime pengguna lagi. Seluruh data riil pengguna kini 100% aman, utuh, dan persisten baik di lokal maupun live server.
 
 
 
@@ -1671,7 +1675,265 @@
 
 ---
 
-### 58. Catatan Penting
+### 58. Tugas: Fitur Diskon Negosiasi Proyek Fleksibel (Nominal/Persen & Penanda Revisi SPH) dan Perbaikan Approval Tanda Tangan Dokumen
+- **Permintaan Pengguna**:
+  *"ya buatkan, kemudian terkait tanda tangan sebelumnya juga masih belum bisa di tekan persetujuan"*
+- **Status**:
+  **Selesai (Completed)**
+- **Analisis Kebutuhan**:
+  1. **Perbaikan Approval Tanda Tangan Dokumen (Root Cause Bug)**:
+     - Tombol persetujuan tanda tangan (`handleApproveInvoice`) sebelumnya memiliki bug di mana `documentType: "sale"` di-hardcode.
+     - Ketika pengguna menyetujui dokumen Surat Penawaran Harga (SPH / Quotation), frontend mengirimkan `documentType: "sale"`, sehingga API di backend mencari ID penawaran tersebut di tabel/array `sales`, gagal menemukannya (404), dan menampilkan error "Faktur penjualan tidak ditemukan" sehingga tombol persetujuan tidak bisa disimpan.
+     - Perbaikan: Deteksi tipe dokumen secara dinamis (`quotation` vs `sale`) pada state `selectedInvoiceForApproval`, kirimkan `documentType` yang sesuai ke `/api/finance`, dan sesuaikan judul/label modal serta state update untuk kedua tipe dokumen.
+  2. **Fitur Diskon Negosiasi Proyek Fleksibel (Nominal Rp atau Persentase %)**:
+     - Menyediakan toggle mode diskon: Rupiah (`Rp`) atau Persentase (`%`) pada formulir Penawaran SPH, Edit SPH, dan Faktur Penjualan.
+     - Menyediakan quick chips tombol cepat persentase (`0%`, `2.5%`, `5%`, `7.5%`, `10%`) untuk kalkulasi instan diskon negosiasi.
+     - Menyediakan kolom catatan/label diskon (misal: "Diskon Khusus Negosiasi Proyek" atau "Potongan Kesepakatan Akhir").
+     - Mempertahankan harga asli/katalog per unit dan subtotal normal, dengan potongan negosiasi dicantumkan secara transparan di bawah subtotal.
+  3. **Penanda Nomor Revisi Penawaran Resmi (SPH Revision Tracking)**:
+     - Mendukung pelacakan nomor revisi penawaran (contoh: `SPH/DSP/2026/001-Rev.01`) saat penawaran mengalami negosiasi ulang harga.
+  4. **Pembaruan Template Cetak Dokumen Resmi (SPH & Faktur A4)**:
+     - Menampilkan rincian Subtotal Normal, Baris Diskon Negosiasi (-Rp ... / -X%), DPP Bersih, PPN 11%, dan Grand Total secara transparan dan rapi.
+  5. **Penyesuaian Urutan Tab Keuangan Sesuai Alur Bisnis**:
+     - Memindahkan posisi tab `Surat Penawaran (SPH)` menjadi SEBELUM `Penjualan & Faktur` (Alur: SPH Penawaran ➔ Penjualan / Faktur ➔ Pembelian PO ➔ Retur).
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Perbaikan Approval Tanda Tangan Dinamis (`src/app/admin/finance/page.tsx`)**:
+     - Deteksi `documentType` dinamis (`quotation` vs `sale`) pada `handleApproveInvoice`.
+     - Perbarui state `quotations` atau `sales` secara tepat sesuai dokumen yang disahkan.
+     - Sesuaikan judul, label tombol, dan keterangan modal approval saat menangani Surat Penawaran (SPH).
+  2. [x] **Implementasi Fitur Diskon Negosiasi Fleksibel (Rp / % & Quick Chips)**:
+     - Tambahkan field `discountType: "fixed" | "percent"`, `discountPercent: number`, dan `discountLabel: string` pada state SPH dan Faktur.
+     - Buat UI pemilih mode Rupiah / Persen lengkap dengan tombol cepat `[0%]`, `[2.5%]`, `[5%]`, `[7.5%]`, `[10%]`.
+     - Sinkronkan kalkulasi total otomatis di `calculateQuotationTotals` dan `calculateSaleTotals`.
+  3. [x] **Penyempurnaan Penanda Revisi SPH, Cetak Dokumen A4, & Urutan Tab**:
+     - Dukung penomoran revisi penawaran (`-Rev.01`, dst.) pada SPH yang direvisi.
+     - Pindahkan posisi tab navigasi sehingga `Surat Penawaran (SPH)` berada sebelum `Penjualan & Faktur`.
+     - Perbarui tampilan summary totals pada modal pratinjau cetak SPH & Faktur ber-kop surat resmi.
+  4. [x] **Validasi Kompilasi TypeScript (`npx tsc --noEmit`)**:
+     - Memastikan 0 error pada seluruh berkas yang disesuaikan (hasil: sukses tanpa error).
+  5. [x] **Pengujian Antarmuka Browser via Subagent**:
+     - Uji coba pembuatan SPH dengan diskon negosiasi 5% (terpotong Rp 900.000 otomatis) dan approval tanda tangan digital di `http://localhost:3005/admin/finance`.
+  6. [x] **Sinkronisasi Kode ke GitHub Repository `rm23nm/dstech-smart`**:
+     - Push commit via `push_with_native_git.js` (commit `f1801de`).
+  7. [x] **Deployment ke Server Live VPS PM2 `dstech-main` dan Verifikasi Akhir**:
+     - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi sukses, dan restart PM2 `dstech-main` (status: online 200 OK).
+
+
+---
+
+### 59. Tugas: Fitur Kirim Email & WhatsApp pada Seluruh Pengajuan Dokumen
+- **Permintaan User**: "tolong buatkan tombol kirim Email dan WA pada seluruh pengajuan"
+- **Status**: Selesai
+- **Analisis Kebutuhan**:
+  1. Pengguna membutuhkan cara mudah, cepat, dan profesional untuk mengirimkan dokumen bisnis PT DSTech Smart Perkasa langsung kepada klien atau supplier.
+  2. Cakupan jenis dokumen pengajuan yang didukung:
+     - **Surat Penawaran Harga (SPH)** (kepada klien)
+     - **Faktur Penjualan & Pengajuan Uang Muka DP** (kepada klien)
+     - **Purchase Order (PO Supplier)** (kepada vendor)
+     - **Berita Acara Retur Pembelian** (kepada vendor)
+     - **Kwitansi Pembayaran Resmi** (kepada klien)
+     - **Surat Jalan Pengiriman Material (Delivery Order)** (kepada klien/ekspedisi)
+  3. Format pesan WhatsApp:
+     - Otomatis menormalisasi nomor HP (mengubah `08...` menjadi `628...`).
+     - Teks pesan rapi dengan format WhatsApp (bold, nomor dokumen, tanggal, perihal, rincian nominal transparan, tautan web resmi DSTech).
+     - Tombol langsung membuka WhatsApp Web / Aplikasi WhatsApp (`https://wa.me/...`).
+  4. Format pengiriman Email:
+     - Subjek resmi berstandar korespondensi bisnis: `[PT. DSTech Smart Perkasa] {Tipe Dokumen} - No: {No. Dokumen} - {Nama Klien/Vendor}`.
+     - Body surat pengantar resmi yang santun dan profesional.
+     - Disediakan tombol *"Buka di Aplikasi Email / Gmail"* (`mailto:`) dan tombol *"Salin Teks Pesan / Link"* untuk kemudahan staf.
+  5. Penempatan tombol:
+     - Di kolom aksi setiap baris tabel dokumen terkait.
+     - Di bagian header atas toolbar modal cetak/pratinjau dokumen (SPH, Faktur, PO, Retur, Surat Jalan).
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [ ] **Implementasi Helper Normalisasi Kontak & Generator Pesan Bisnis**:
+     - Buat fungsi normalisasi nomor WA `formatWhatsAppNumber(phone)` (mengubah `08...` ke `628...`).
+     - Buat helper `generateWhatsAppDocumentText(doc, type)` dan `generateEmailDocumentContent(doc, type)`.
+  2. [ ] **Pembuatan Modal Interaktif Universal "Kirim Dokumen (WhatsApp & Email)"**:
+     - Modal terpadu yang menampilkan pratinjau teks pesan WA dan Email.
+     - Input nomor WhatsApp tujuan (dengan autofill nomor klien/vendor dan bisa diedit).
+     - Input alamat Email tujuan (dengan autofill email klien/vendor dan bisa diedit).
+     - Tombol aksi *"Kirim via WhatsApp"* dan *"Kirim via Email (mailto:)"* serta tombol salin pesan.
+  3. [ ] **Pemasangan Tombol Aksi di Seluruh Tabel Dokumen**:
+     - Tombol WhatsApp & Email pada tabel Surat Penawaran (SPH).
+     - Tombol WhatsApp & Email pada tabel Penjualan & Faktur.
+     - Tombol WhatsApp & Email pada tabel Purchase Order (PO).
+     - Tombol WhatsApp & Email pada tabel Retur Pembelian.
+  4. [ ] **Pemasangan Tombol Kirim Cepat pada Header Seluruh Modal Cetak Preview A4**:
+     - Modal Cetak SPH, Modal Cetak Faktur, Modal Cetak PO, Modal Cetak Retur, Modal Cetak Surat Jalan.
+  5. [ ] **Validasi Kompilasi TypeScript (`npx tsc --noEmit`)**:
+     - Memastikan 0 error pada seluruh berkas yang disesuaikan.
+  6. [ ] **Pengujian Antarmuka Browser via Subagent**:
+     - Uji coba klik tombol WA & Email pada SPH dan Faktur, serta verifikasi kelengkapan format teks pesan.
+  7. [ ] **Sinkronisasi Kode ke GitHub Repository `rm23nm/dstech-smart`**:
+     - Push commit via `push_with_native_git.js`.
+  8. [ ] **Deployment ke Server Live VPS PM2 `dstech-main` dan Verifikasi Akhir**:
+     - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi, dan restart PM2.
+
+---
+
+### 60. Tugas: Pembenahan Tuntas Lembar Cetak Dokumen & Fitur Cetak 2 Halaman (Halaman 1: Dokumen Utama Lengkap & Sah, Halaman 2: Lampiran Rincian Item Penawaran yang Ditawarkan)
+- **Permintaan User**: 
+  1. *"banyak yang hilang"*
+  2. *"sebaiknya apa kita buat 2 halaman saja, 1 pertama memunculkan halaman seperti sekarang lengkap dan pada halaman ke-2 rincian yang kita tawarkan sebagai lampirannya"*
+  3. *"lanjutkan"*
+- **Status**: Selesai
+- **Analisis Masalah & Kebutuhan**:
+  1. **Penyebab Masalah (Root Cause)**:
+     - Pada styling print sebelumnya di globals.css, class .print-modal-box memiliki max-height: 297mm; overflow: hidden; dan .print-document-sheet memiliki height: 296mm; overflow: hidden; page-break-after: avoid;.
+     - Ketika dokumen memiliki banyak baris item barang atau teks syarat ketentuan yang panjang, konten yang melebihi tinggi 296mm otomatis terpotong / tersembunyi (hidden) sehingga tanda tangan, stempel, rincian biaya, atau footer menghilang saat dicetak atau di-export ke PDF ("banyak yang hilang").
+  2. **Solusi Desain 2 Halaman Korporat Standar (Sesuai Permintaan User)**:
+     - **Halaman 1: Dokumen Utama Lengkap (Surat Resmi & Pengesahan)**:
+       - Kop Surat Resmi PT. DSTech Smart Perkasa.
+       - Nomor Surat, Tanggal, Perihal, dan Lampiran: 1 (Satu) Berkas Lampiran Rincian Item Penawaran.
+       - Kepada Yth: Klien / Instansi / Perusahaan Rekanan.
+       - Paragraf Pembuka Resmi.
+       - Kotak Ringkasan Nilai Penawaran / Tagihan (Subtotal, Diskon Negosiasi, DPP, PPN 11%, Grand Total & Terbilang Rupiah Lengkap).
+       - Keterangan resmi bahwa seluruh rincian teknis, tipe perangkat, kuantiti, dan harga satuan terlampir pada Halaman 2.
+       - Instruksi Rekening Resmi Bank PT. DSTech Smart Perkasa.
+       - Syarat & Ketentuan Teknis (Garansi, Masa Berlaku, Sistem Pembayaran).
+       - Paragraf Penutup Surat Niaga.
+       - Blok Pengesahan Dual Approval (Klien & Direktur PT DSTech Smart Perkasa) lengkap dengan Stempel Bulat Digital Resmi dan Barcode Verifikasi Sistem.
+       - Seluruh konten Halaman 1 dijamin **100% MUAT, RAPI, ELEGAN, dan TIDAK AKAN PERNAH TERPOTONG**.
+     - **Halaman 2: Lembar Lampiran Rincian Item Penawaran (Attachment / BOQ Spesifikasi Teknis)**:
+       - Header Lampiran Resmi PT. DSTech Smart Perkasa.
+       - Judul: **LAMPIRAN RINCIAN ITEM & SPESIFIKASI TEKNIS PENAWARAN HARGA (SPH)**.
+       - Info Dokumen Referensi: Nomor SPH / Faktur, Tanggal, Nama Klien / Instansi.
+       - Tabel Rincian Item Lengkap (No, Deskripsi Produk & Spesifikasi, Qty, Satuan, Harga Satuan, Diskon Item, Total Biaya).
+       - Rekapitulasi Total Biaya Penawaran.
+       - Catatan Teknis & Ketentuan Garansi Perangkat.
+       - Blok Paraf / Pengesahan Lampiran (DSTech & Klien).
+     - **Opsi Fleksibilitas**:
+       - Disediakan tombol toggle [ 📄 1 Halaman | 📑 2 Halaman (Lampiran) ] pada header modal preview cetak (baik untuk SPH maupun Faktur Penjualan).
+  3. **Rencana Pengerjaan Step-by-Step**:
+     - [x] **Langkah 1**: Perbarui CSS @media print pada src/app/globals.css agar mendukung multi-halaman (.print-page-break { page-break-after: always; break-after: page; }, hilangkan pembatas overflow: hidden pada container cetak multi-halaman).
+     - [x] **Langkah 2**: Perbarui template cetak Surat Penawaran Harga (SPH) di src/app/admin/finance/page.tsx:
+       - Tambahkan state toggle printTwoPageSPH (atau gunakan printTwoPage).
+       - Tambahkan tombol toggle di toolbar modal cetak SPH.
+       - Rancang tampilan Halaman 1 SPH (Surat Resmi Pengantar & Ringkasan Nilai + TTD Lengkap).
+       - Rancang tampilan Halaman 2 SPH (Lembar Lampiran Rincian Item yang Ditawarkan).
+     - [x] **Langkah 3**: Perbarui template cetak Faktur Penjualan di src/app/admin/finance/page.tsx:
+       - Lengkapi Halaman 2 Lampiran Faktur Penjualan.
+     - [x] **Langkah 4**: Uji kompilasi lokal TypeScript npx tsc --noEmit hingga 0 error.
+     - [x] **Langkah 5**: Uji tampilan preview cetak via browser.
+     - [x] **Langkah 6**: Push perubahan ke GitHub repository rm23nm/dstech-smart via push_with_native_git.js.
+     - [x] **Langkah 7**: Deploy ke server live VPS PM2 dstech-main dan verifikasi akhir.
+
+---
+
+### 61. Tugas: Manajemen Status SPH (Auto/Manual Expired & Reject), Konversi Penawaran Deal ke Faktur, serta Filter & Sortir Status SPH (Deal, Expired, Rejected, Pending)
+- **Permintaan User**: "tolong tambahkan juga fitur jika ada penawaran yang sudah lama tidak deal menjadi faktur agar bisa menjadi expired dan buatkan juga fitur sortirnya. antara yang penawaran sudah deal dengan expired atau direject"
+- **Status**: **Sedang Dikerjakan (In Progress)**
+- **Analisis Kebutuhan**:
+  1. **Status Kedaluwarsa (Expired) Penawaran**:
+     - Penawaran yang telah melewati tanggal batas masa berlaku (`validUntil`) atau berhari-hari tidak dikonversi menjadi faktur kesepakatan (deal) perlu secara jelas ditandai sebagai **"Kedaluwarsa" / "Expired"**.
+     - Penandaan otomatis: Sistem mendeteksi jika tanggal hari ini telah melewati masa berlaku penawaran dan statusnya masih belum deal, maka otomatis menampilkan badge visual kedaluwarsa.
+     - Penandaan manual: Disediakan tombol aksi cepat pada baris SPH:
+       - Tombol *"Tandai Expired"* (menutup penawaran yang hangus).
+       - Tombol *"Tandai Ditolak / Reject"* (mencatat penawaran yang ditolak klien / kompetitor).
+       - Tombol *"Perpanjang / Re-Aktifkan SPH"* (membuka kembali penawaran atau memperbarui masa berlaku).
+  2. **Fitur Filter & Sortir Komprehensif (Deal, Expired, Reject)**:
+     - **Quick Filter Status Chips**:
+       - *Semua SPH* ({total})
+       - *🤝 Deal / Terkonversi Faktur* ({dealCount})
+       - *⏳ Menunggu Respon / Terkirim* ({pendingCount})
+       - *⏰ Expired / Kedaluwarsa* ({expiredCount})
+       - *❌ Ditolak / Direject* ({rejectedCount})
+     - **Fitur Sortir (Urutkan SPH)**:
+       - Prioritas Status: Deal ➔ Pending ➔ Expired ➔ Reject
+       - Expired & Reject Teratas (untuk audit penawaran mati)
+       - Tanggal: Paling Baru ➔ Terlama
+       - Tanggal: Paling Lama ➔ Terbaru (untuk tindak lanjut penawaran tertunda)
+       - Masa Berlaku: Mendekati Expired
+       - Nilai Penawaran: Tertinggi ➔ Terendah
+       - Nilai Penawaran: Terendah ➔ Tertinggi
+       - Nama Klien (A-Z)
+  3. **Rencana Pengerjaan Step-by-Step**:
+     - [x] **Langkah 1**: Buat backup file cadangan `src/app/admin/finance/page.tsx` ke folder `_backup`.
+     - [x] **Langkah 2**: Tambahkan state filter status baru (`quotationStatusFilter`) dan state sortir (`quotationSortBy`).
+     - [x] **Langkah 3**: Buat fungsi helper deteksi status (`isQuotationExpired(sph)`, dsb.) dan handler ubah status (`handleUpdateQuotationStatus(id, newStatus)`).
+     - [x] **Langkah 4**: Perbarui UI Filter Bar dengan Quick Filter Chips counter dan dropdown Sortir modern.
+     - [x] **Langkah 5**: Tambahkan tombol aksi cepat ubah status (Tandai Expired, Tandai Reject, Re-Aktifkan) pada kolom aksi tabel SPH.
+     - [x] **Langkah 6**: Perbarui kartu mini KPI di atas tabel agar menampilkan metrik Deal, Expired, dan Reject secara informatif.
+     - [x] **Langkah 7**: Uji kompilasi lokal TypeScript `npx tsc --noEmit` hingga 0 error.
+     - [x] **Langkah 8**: Pengujian antarmuka browser.
+     - [x] **Langkah 9**: Push ke GitHub repository via `push_with_native_git.js`.
+     - [x] **Langkah 10**: Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 62. Tugas (Antrian Berikutnya): Penambahan Daftar & Ringkasan SPH pada Halaman Dashboard Utama Admin (`/admin`)
+- **Permintaan User**: "pada halaman dasbord belum ada daftar SPHnya"
+- **Status**: Mengantri (Akan dikerjakan setelah Tugas 58 dan Tugas 59 selesai)
+- **Rincian Rencana Pengerjaan**:
+  1. Integrasikan ringkasan Surat Penawaran Harga (SPH) pada widget statistik KPI dan card monitoring di halaman utama `/admin` (`src/app/admin/page.tsx`).
+  2. Tambahkan section "Daftar SPH & Penawaran Terkini" (No. SPH, Klien, Nominal, Status, Tombol Aksi Cepat ke Detail / Print SPH) berdampingan dengan Katalog Produk & Mitra.
+  3. Hubungkan sinkronisasi data SPH real-time dari API Finance `/api/finance`.
+
+---
+
+### 61. Tugas (Antrian Berikutnya): Pembatasan Hak Akses Approval Berdasarkan Jabatan/Role Akun
+- **Permintaan User**: "untuk aproval, harus user yang memiliki jabatan aproval yang bisa mengeklik tanda tangan. jangan semua user agar lebih aman"
+- **Status**: Mengantri (Akan dikerjakan setelah Tugas 58, 59, dan 60 selesai)
+- **Rincian Rencana Pengerjaan**:
+  1. Identifikasi role akun yang sedang login (misal: Direktur, Finance Manager, Admin Utama vs Staf/Staff Operasional).
+  2. Tambahkan pemeriksaan permission `canApproveDocuments` atau role check (misal: `role === "director"` atau `role === "finance_manager"` atau `role === "superadmin"`).
+  3. Sembunyikan atau nonaktifkan tombol klik tanda tangan & approval jika pengguna tidak memiliki wewenang jabatan penandatanganan, serta tampilkan pesan/tooltip informatif "Hanya Direksi & Pejabat Berwenang yang memiliki hak pengesahan dokumen".
+  4. Tambahkan validasi otorisasi di sisi backend API `/api/finance` (`actionType: approve_document`).
+
+---
+
+### 62. Tugas (Antrian Berikutnya): Sistem Manajemen Role & Permission Staf Lengkap (RBAC)
+- **Permintaan User**: "kemudian saya ingin menerapkan Role user kepada staf, mana saja mareting, admin dan juga lainnya. jadi setiap user punya role masing-masing. mana yang bisa hapus, input, cetak, kirim, tanda tangan, dan lainnya"
+- **Status**: Mengantri (Akan dikerjakan setelah Tugas 58, 59, 60, dan 61 selesai)
+- **Rincian Rencana Pengerjaan**:
+  1. Rancang Matriks Role-Based Access Control (RBAC):
+     - **Superadmin / Direktur**: Akses penuh (Input, Edit, Hapus, Cetak, Kirim WA/Email, Tanda Tangan Digital & Approval Sah, Kelola Master Akun).
+     - **Finance Manager**: Input, Edit, Cetak, Kirim WA/Email, Verifikasi Pembayaran & Approval Keuangan, tanpa hapus master tanpa otorisasi.
+     - **Admin Keuangan / Kasir**: Input Penjualan, Input Pembayaran, Cetak Faktur/Kwitansi, Kirim WA/Email, tanpa hak Tanda Tangan Approval & tanpa hak Hapus.
+     - **Marketing / Sales**: Buat SPH Penawaran, Ajukan Diskon Negosiasi, Cetak/Kirim Penawaran ke Klien, tanpa akses Approval & tanpa ubah HPP/Laba Rahasia.
+     - **Staf Gudang / Teknisi**: Akses Surat Jalan, Penerimaan Barang PO, Cek Stok, tanpa akses Nominal Keuangan & Approval.
+  2. Tambahkan kolom permission granular per pengguna pada tabel `dstech_users`: `can_create`, `can_edit`, `can_delete`, `can_print`, `can_send`, `can_approve`.
+  3. Proteksi UI tombol di halaman admin (disabled / hidden dengan tooltip izin) dan proteksi API backend route handler untuk setiap aksi (403 Forbidden jika role tidak sesuai).
+  4. Halaman khusus Settings / Manajemen User & Hak Akses Staf di `/admin/users` atau di Site Settings.
+
+---
+
+### 63. Tugas (Antrian Berikutnya): Pemindahan Pengaturan Kop Surat & Rekening Bank ke Pengaturan Site Settings (`/admin/settings`)
+- **Permintaan User**: "untuk kop surat dan Rekening bank, settingannya sebaiknya pindahkan kedalam Pengaturan site setting"
+- **Status**: Mengantri (Akan dikerjakan setelah Tugas 58, 59, 60, 61, dan 62 selesai)
+- **Rincian Rencana Pengerjaan**:
+  1. Bersihkan header halaman Keuangan & ERP (`/admin/finance`) dari tombol modal "Pengaturan Kop & TTD" dan "Pengaturan Rekening Bank" agar tampilan halaman finance lebih bersih, profesional, dan fokus pada operasional transaksi.
+  2. Tambahkan tab / section khusus di halaman Site Settings (`/admin/settings`):
+     - **Tab Dokumen & Kop Surat Resmi**: Pengaturan Nama Perusahaan, Badan Hukum, NPWP, NIB, Alamat Kantor Pusat, Kontak Resmi, Slogan, Logo Kop Resmi, serta Nama & Jabatan Penandatangan Default Direksi.
+     - **Tab Rekening Bank Resmi**: Manajemen CRUD nomor rekening bank resmi perusahaan (Bank Mandiri, BCA, BNI, dll., nomor rekening, atas nama, kantor cabang, status aktif, rekening utama default).
+  3. Integrasikan pembacaan data kop surat dan rekening bank di seluruh modul cetak (SPH, Faktur Penjualan, PO Pembelian, Kwitansi, Berita Acara) langsung dari konfigurasi Site Settings terpusat tersebut.
+
+---
+
+---
+
+### 64. Investigasi Khusus & Resolusi Permanen: Penyebab Data Kembali ke Semula Setelah Revisi/Deployment
+- **Keluhan Pengguna**: *"kenapa setiap kali saya sudah merubah memperbaiki dan menghapus malah semua jadi kembali lagi seperti awal setelah kamu melakukan revisi?"*
+- **Akar Masalah (*Root Cause*) yang Ditemukan**:
+  1. Berkas database JSON runtime aplikasi (`src/data/dstech_finance_erp.json`, `src/data/dstech_settings.json`, `src/data/dstech_partners.json`, dsb.) sebelumnya ikut dimasukkan ke dalam tracking Git melalui `push_with_native_git.js` (`copyRecursiveSync` menyalin seluruh folder `src`).
+  2. Ketika pengguna melakukan modifikasi data langsung di server live (seperti memperbarui NIB ke `1909220127034`, NPWP ke `60.648.216.4-102.000`, nama penandatangan direktur menjadi `RAMADHANI ST`, nomor rekening BCA `295-074-0321`, atau menghapus data demo/partner), perubahan tersebut tersimpan di berkas JSON server live.
+  3. Namun, ketika script deploy dijalankan (`git stash && git pull origin master`), Git memindahkan perubahan live pengguna ke dalam Git Stash (`stash@{0}`), lalu `git pull` menimpa berkas-berkas `src/data/*.json` di server dengan data lama/demo dari repositori GitHub.
+  4. Begitu pula di lokal, ketika subagent menjalankan pengujian otomatis di browser (seperti membuat SPH uji coba), data uji coba tersebut masuk ke berkas JSON lokal dan tak sengaja ikut terunggah ke repositori, lalu menimpa server live.
+- **Tindakan Perbaikan Permanen yang Telah Dilakukan**:
+  1. [x] **Penyelamatan & Pemulihan Data Asli Pengguna**:
+     - Berkas konfigurasi live telah diselamatkan dari stash: NIB (`1909220127034`), NPWP (`60.648.216.4-102.000`), Direktur (`RAMADHANI ST`), Rekening BCA (`295-074-0321`), serta pembersihan daftar mitra/klien/supplier demo telah dipulihkan 100% dan disinkronkan ke lokal dan VPS live.
+  2. [x] **Pemisahan Total Kode Aplikasi vs Data Database Runtime**:
+     - Menambahkan `src/data/` ke dalam `.gitignore` pada proyek lokal, repositori GitHub, dan server VPS.
+     - Menjalankan `git rm -r --cached src/data/` di repositori GitHub (commit `eae03e9`) sehingga Git tidak akan pernah lagi melacak atau menyentuh berkas database JSON runtime.
+     - Memperbarui `push_with_native_git.js` agar secara eksplisit mengabaikan folder `src/data` (`childItemName === 'data'`).
+  3. [x] **Pembaruan Alur Deployment VPS**:
+     - Menghapus ketergantungan pada `git stash` untuk folder data. Perintah `git pull origin master` di server live kini hanya memperbarui kode sumber aplikasi (halaman, komponen, API), dan **TIDAK AKAN PERNAH menimpa data transaksi, pengaturan, maupun penghapusan yang dilakukan pengguna**.
+  4. [x] **Verifikasi Data**:
+     - Memeriksa langsung di live server VPS: `nib: "1909220127034"`, `npwp: "60.648.216.4-102.000"`, `signerName: "RAMADHANI ST"`, dan akun BCA aktif 100% normal dan persisten.
+
+---
+
+### 65. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
@@ -1687,7 +1949,3 @@
 
 ---
 *Laporan ini dibuat untuk memudahkan Agen AI selanjutnya melanjutkan pekerjaan.*
-
-
-
-
