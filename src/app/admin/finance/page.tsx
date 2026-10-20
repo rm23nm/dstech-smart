@@ -512,6 +512,7 @@ export default function AdminFinanceERPPage() {
     warehouseId: string;
     notes: string;
     items: PurchaseItem[];
+    businessEntity: "PT" | "NON_PT";
   }>({
     id: "",
     poNumber: "",
@@ -524,6 +525,7 @@ export default function AdminFinanceERPPage() {
     warehouseId: "dstech_wh_1",
     notes: "",
     items: [],
+    businessEntity: "PT",
   });
   const [selectedPoForApproval, setSelectedPoForApproval] = useState<PurchaseOrder | null>(null);
   const [isApprovalPoModalOpen, setIsApprovalPoModalOpen] = useState<boolean>(false);
@@ -772,25 +774,45 @@ export default function AdminFinanceERPPage() {
       branch: "KCP Cilegon City Square",
       isDefault: true,
       status: "Aktif",
+      entityType: "PT",
     },
     {
       id: "dstech_bank_2",
       bankName: "Bank BCA",
-      accountNumber: "295-888-9900",
-      accountHolder: "PT. DSTech Smart Perkasa",
+      accountNumber: "541-098-7766",
+      accountHolder: "H. Agus Supriyadi",
       branch: "KCU Cilegon",
       isDefault: false,
       status: "Aktif",
+      entityType: "NON_PT",
     },
   ]);
 
-  const getDefaultBankAccLabel = () => {
-    const def = bankAccounts.find((b) => b.isDefault && b.status === "Aktif") || bankAccounts.find((b) => b.status === "Aktif") || bankAccounts[0];
+  const [bankAccountFilter, setBankAccountFilter] = useState<"ALL" | "PT" | "NON_PT">("ALL");
+
+  const getDefaultBankAccLabel = (targetEntity?: "PT" | "NON_PT" | "ALL") => {
+    const ent = targetEntity || (selectedEntity === "NON_PT" ? "NON_PT" : "PT");
+    const matched = bankAccounts.filter(
+      (b) => b.status === "Aktif" && (ent === "ALL" || (b.entityType || "PT") === ent || b.entityType === "ALL")
+    );
+    const def =
+      matched.find((b) => b.isDefault) ||
+      matched[0] ||
+      bankAccounts.find((b) => b.status === "Aktif") ||
+      bankAccounts[0];
     return def ? `${def.bankName} - ${def.accountNumber} (${def.accountHolder})` : "Kas Tunai Operasional";
   };
 
-  const getDefaultTransferLabel = () => {
-    const def = bankAccounts.find((b) => b.isDefault && b.status === "Aktif") || bankAccounts.find((b) => b.status === "Aktif") || bankAccounts[0];
+  const getDefaultTransferLabel = (targetEntity?: "PT" | "NON_PT" | "ALL") => {
+    const ent = targetEntity || (selectedEntity === "NON_PT" ? "NON_PT" : "PT");
+    const matched = bankAccounts.filter(
+      (b) => b.status === "Aktif" && (ent === "ALL" || (b.entityType || "PT") === ent || b.entityType === "ALL")
+    );
+    const def =
+      matched.find((b) => b.isDefault) ||
+      matched[0] ||
+      bankAccounts.find((b) => b.status === "Aktif") ||
+      bankAccounts[0];
     return def ? `Transfer ${def.bankName} (${def.accountNumber} - ${def.accountHolder})` : "Transfer Bank Resmi DSTech";
   };
 
@@ -830,14 +852,24 @@ export default function AdminFinanceERPPage() {
 
   // Bank Account Settings Modal State
   const [isBankAccountsModalOpen, setIsBankAccountsModalOpen] = useState<boolean>(false);
+  const [bankAccountFilterEntity, setBankAccountFilterEntity] = useState<"ALL" | "PT" | "NON_PT">("ALL");
   const [editingBankAccount, setEditingBankAccount] = useState<BankAccount | null>(null);
-  const [bankAccountForm, setBankAccountForm] = useState({
+  const [bankAccountForm, setBankAccountForm] = useState<{
+    bankName: string;
+    accountNumber: string;
+    accountHolder: string;
+    branch: string;
+    isDefault: boolean;
+    status: string;
+    entityType: "PT" | "NON_PT" | "ALL";
+  }>({
     bankName: "Bank Mandiri",
     accountNumber: "",
     accountHolder: "PT. DSTech Smart Perkasa",
     branch: "Cilegon",
     isDefault: false,
     status: "Aktif",
+    entityType: "PT",
   });
 
   // Letterhead Settings Modal State
@@ -1260,7 +1292,16 @@ export default function AdminFinanceERPPage() {
   });
 
   // New PO Form State
-  const [poForm, setPoForm] = useState({
+  const [poForm, setPoForm] = useState<{
+    supplierName: string;
+    supplierContact: string;
+    date: string;
+    expectedDelivery: string;
+    paymentStatus: string;
+    items: { id: string; productName: string; qty: number; unit: string; price: number; total: number }[];
+    notes: string;
+    businessEntity: "PT" | "NON_PT";
+  }>({
     supplierName: "",
     supplierContact: "",
     date: new Date().toISOString().split("T")[0],
@@ -1270,12 +1311,28 @@ export default function AdminFinanceERPPage() {
       { id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
     ],
     notes: "",
+    businessEntity: "PT",
   });
 
   // New Cash Transaction Form
-  const [cashForm, setCashForm] = useState({
+  const [cashForm, setCashForm] = useState<{
+    date: string;
+    type: "IN" | "OUT";
+    category: string;
+    amount: number;
+    account: string;
+    reference: string;
+    description: string;
+    recordAsExpense: boolean;
+    recipient: string;
+    receiptUrl: string;
+    receiptName: string;
+    receiptSize: number;
+    receiptCompressedSize: number;
+    businessEntity: "PT" | "NON_PT";
+  }>({
     date: new Date().toISOString().split("T")[0],
-    type: "IN" as "IN" | "OUT",
+    type: "IN",
     category: "Penerimaan Penjualan",
     amount: 0,
     account: "",
@@ -1287,6 +1344,7 @@ export default function AdminFinanceERPPage() {
     receiptName: "",
     receiptSize: 0,
     receiptCompressedSize: 0,
+    businessEntity: "PT",
   });
   const [isCompressingReceipt, setIsCompressingReceipt] = useState<boolean>(false);
   const [receiptCompressionRatio, setReceiptCompressionRatio] = useState<string>("");
@@ -2982,6 +3040,7 @@ export default function AdminFinanceERPPage() {
             branch: "Cilegon",
             isDefault: false,
             status: "Aktif",
+            entityType: "PT",
           });
           fetchFinanceData();
         }
@@ -3004,6 +3063,7 @@ export default function AdminFinanceERPPage() {
             branch: "Cilegon",
             isDefault: false,
             status: "Aktif",
+            entityType: "PT",
           });
           fetchFinanceData();
         }
@@ -3285,12 +3345,13 @@ export default function AdminFinanceERPPage() {
       if (res.ok) {
         showToast("Transaksi kas berhasil dibukukan!");
         setIsNewCashModalOpen(false);
+        const activeEnt = selectedEntity === "NON_PT" ? "NON_PT" : "PT";
         setCashForm({
           date: new Date().toISOString().split("T")[0],
           type: "IN",
           category: "Penerimaan Penjualan",
           amount: 0,
-          account: getDefaultBankAccLabel(),
+          account: getDefaultBankAccLabel(activeEnt),
           reference: "",
           description: "",
           recordAsExpense: false,
@@ -3299,6 +3360,7 @@ export default function AdminFinanceERPPage() {
           receiptName: "",
           receiptSize: 0,
           receiptCompressedSize: 0,
+          businessEntity: activeEnt,
         });
         setReceiptCompressionRatio("");
         fetchFinanceData();
@@ -3311,12 +3373,13 @@ export default function AdminFinanceERPPage() {
   };
 
   const handleOpenNewCashModal = (type: "IN" | "OUT" = "IN") => {
+    const activeEnt = selectedEntity === "NON_PT" ? "NON_PT" : "PT";
     setCashForm({
       date: new Date().toISOString().split("T")[0],
       type,
       category: type === "IN" ? "Penerimaan Penjualan" : "Biaya Operasional Lainnya",
       amount: 0,
-      account: getDefaultBankAccLabel(),
+      account: getDefaultBankAccLabel(activeEnt),
       reference: "",
       description: "",
       recordAsExpense: false,
@@ -3325,6 +3388,7 @@ export default function AdminFinanceERPPage() {
       receiptName: "",
       receiptSize: 0,
       receiptCompressedSize: 0,
+      businessEntity: activeEnt,
     });
     setReceiptCompressionRatio("");
     setIsNewCashModalOpen(true);
@@ -3396,6 +3460,7 @@ export default function AdminFinanceERPPage() {
             status: "Dalam Pengiriman",
             warehouseId: "dstech_wh_1",
             notes: poForm.notes,
+            businessEntity: poForm.businessEntity || "PT",
           },
         }),
       });
@@ -3411,6 +3476,7 @@ export default function AdminFinanceERPPage() {
           paymentStatus: "Hutang Usaha",
           items: [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
           notes: "",
+          businessEntity: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
         });
         fetchFinanceData();
       } else {
@@ -3439,6 +3505,7 @@ export default function AdminFinanceERPPage() {
         po.items && po.items.length > 0
           ? po.items.map((it) => ({ ...it }))
           : [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
+      businessEntity: po.businessEntity || "PT",
     });
     setIsEditPoModalOpen(true);
   };
@@ -3510,6 +3577,7 @@ export default function AdminFinanceERPPage() {
             subtotal,
             taxAmount,
             grandTotal,
+            businessEntity: editPoForm.businessEntity || "PT",
           },
         }),
       });
@@ -4493,6 +4561,15 @@ export default function AdminFinanceERPPage() {
     };
   }, [summary, sales, purchases, cashFlow, selectedEntity]);
 
+  const scopedCounts = useMemo(() => {
+    return {
+      sales: sales.filter((s) => selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity).length,
+      quotations: quotations.filter((q) => selectedEntity === "ALL" || (q.businessEntity || "PT") === selectedEntity).length,
+      purchases: purchases.filter((p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity).length,
+      cashFlow: cashFlow.filter((c) => selectedEntity === "ALL" || (c.businessEntity || "PT") === selectedEntity).length,
+    };
+  }, [sales, quotations, purchases, cashFlow, selectedEntity]);
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -4725,7 +4802,7 @@ export default function AdminFinanceERPPage() {
             <FileText className="w-4 h-4 text-indigo-600" />
             <span>Surat Penawaran (SPH)</span>
             <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-[10px]">
-              {quotations.length}
+              {scopedCounts.quotations}
             </span>
           </button>
 
@@ -4740,7 +4817,7 @@ export default function AdminFinanceERPPage() {
             <Receipt className="w-4 h-4 text-dstech-blue" />
             <span>Penjualan & Faktur</span>
             <span className="px-1.5 py-0.5 rounded-full bg-blue-500/20 text-[10px]">
-              {sales.length}
+              {scopedCounts.sales}
             </span>
           </button>
 
@@ -4755,7 +4832,7 @@ export default function AdminFinanceERPPage() {
             <ShoppingCart className="w-4 h-4 text-amber-500" />
             <span>Pembelian & PO</span>
             <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-[10px]">
-              {purchases.length}
+              {scopedCounts.purchases}
             </span>
           </button>
 
@@ -4797,7 +4874,7 @@ export default function AdminFinanceERPPage() {
             <Wallet className="w-4 h-4 text-purple-500" />
             <span>Buku Arus Kas</span>
             <span className="px-1.5 py-0.5 rounded-full bg-purple-500/20 text-[10px]">
-              {cashFlow.length}
+              {scopedCounts.cashFlow}
             </span>
           </button>
 
@@ -6398,7 +6475,9 @@ export default function AdminFinanceERPPage() {
                   <h3 className="text-lg font-black tracking-wide">
                     Laporan Laba Rugi Komprehensif (Income Statement)
                   </h3>
-                  <p className="text-xs text-slate-400">Periode: Berjalan Oktober 2026 • PT. DSTech Smart Perkasa</p>
+                  <p className="text-xs text-slate-400">
+                    Periode: Berjalan Oktober 2026 • {selectedEntity === "NON_PT" ? "DSTech Smart (Non-PT)" : selectedEntity === "PT" ? "PT. DSTech Smart Perkasa" : "Konsolidasi Seluruh Entitas"}
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
                   <button
@@ -6408,7 +6487,7 @@ export default function AdminFinanceERPPage() {
                       setTimeout(() => {
                         handleDownloadPdf(
                           "#print-pnl-sheet",
-                          "LAPORAN_LABA_RUGI_DSTECH_OKTOBER_2026.pdf"
+                          `LAPORAN_LABA_RUGI_${selectedEntity === "NON_PT" ? "NON_PT" : "PT"}_OKTOBER_2026.pdf`
                         );
                       }, 500);
                     }}
@@ -6436,12 +6515,12 @@ export default function AdminFinanceERPPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm font-black text-blue-400 border-b border-white/10 pb-1">
                     <span>1. PENDAPATAN OPERASIONAL</span>
-                    <span>{formatRupiah(summary.totalSalesRevenue)}</span>
+                    <span>{formatRupiah(displaySummary.totalSalesRevenue)}</span>
                   </div>
                   <div className="pl-4 space-y-1 text-slate-300">
                     <div className="flex items-center justify-between">
                       <span>• Penjualan Perangkat CCTV, Access Control, IoT & Jaringan</span>
-                      <span>{formatRupiah(summary.totalSalesRevenue)}</span>
+                      <span>{formatRupiah(displaySummary.totalSalesRevenue)}</span>
                     </div>
                   </div>
                 </div>
@@ -6450,12 +6529,12 @@ export default function AdminFinanceERPPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm font-black text-amber-400 border-b border-white/10 pb-1">
                     <span>2. HARGA POKOK PENJUALAN (HPP & BELANJA STOK)</span>
-                    <span>({formatRupiah(summary.totalPurchasesCost)})</span>
+                    <span>({formatRupiah(displaySummary.totalPurchasesCost)})</span>
                   </div>
                   <div className="pl-4 space-y-1 text-slate-300">
                     <div className="flex items-center justify-between">
                       <span>• Pembelian Stok Kamera IP, NVR, Storage & Kabel Belden</span>
-                      <span>({formatRupiah(summary.totalPurchasesCost)})</span>
+                      <span>({formatRupiah(displaySummary.totalPurchasesCost)})</span>
                     </div>
                   </div>
                 </div>
@@ -6463,14 +6542,14 @@ export default function AdminFinanceERPPage() {
                 {/* LABA KOTOR */}
                 <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between text-sm font-black text-white">
                   <span>LABA KOTOR (GROSS PROFIT)</span>
-                  <span className="text-emerald-400">{formatRupiah(summary.grossProfit)}</span>
+                  <span className="text-emerald-400">{formatRupiah(displaySummary.grossProfit)}</span>
                 </div>
 
                 {/* 3. Beban Operasional */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm font-black text-red-400 border-b border-white/10 pb-1">
                     <span>3. BEBAN OPERASIONAL & UMUM</span>
-                    <span>({formatRupiah(summary.totalOperatingExpenses)})</span>
+                    <span>({formatRupiah(displaySummary.totalOperatingExpenses)})</span>
                   </div>
                   <div className="pl-4 space-y-1.5 text-slate-300">
                     {expenses.map((exp) => (
@@ -6485,10 +6564,12 @@ export default function AdminFinanceERPPage() {
                 {/* LABA BERSIH */}
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 to-emerald-900 border border-emerald-500/40 flex items-center justify-between text-base font-black text-white shadow-xl">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-emerald-400" />
-                    <span>LABA BERSIH BERJALAN (NET PROFIT)</span>
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    <span>LABA BERSIH USAHA (NET OPERATING PROFIT)</span>
                   </div>
-                  <span className="text-xl text-emerald-300">{formatRupiah(summary.netProfit)}</span>
+                  <span className="text-xl font-black text-emerald-400">
+                    {formatRupiah(displaySummary.netProfit)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -6502,11 +6583,17 @@ export default function AdminFinanceERPPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
                   <p className="text-[10px] font-bold text-emerald-700 uppercase">Kas Masuk (IN)</p>
-                  <p className="text-sm font-black text-emerald-800">{formatRupiah(summary.totalCashIn)}</p>
+                  <p className="text-sm font-black text-emerald-800">{formatRupiah(displaySummary.totalCashIn)}</p>
                 </div>
                 <div className="p-3 rounded-2xl bg-red-50 border border-red-200">
                   <p className="text-[10px] font-bold text-red-700 uppercase">Kas Keluar (OUT)</p>
-                  <p className="text-sm font-black text-red-800">{formatRupiah(summary.totalCashOut)}</p>
+                  <p className="text-sm font-black text-red-800">{formatRupiah(displaySummary.totalCashOut)}</p>
+                </div>
+                <div className={`p-3 rounded-2xl border ${displaySummary.currentCashBalance >= 0 ? "bg-blue-50 border-blue-200" : "bg-rose-50 border-rose-200"}`}>
+                  <p className="text-[10px] font-bold text-slate-600 uppercase">Saldo Kas Berjalan</p>
+                  <p className={`text-sm font-black ${displaySummary.currentCashBalance >= 0 ? "text-blue-900" : "text-rose-700"}`}>
+                    {formatRupiah(displaySummary.currentCashBalance)}
+                  </p>
                 </div>
               </div>
 
@@ -6518,12 +6605,14 @@ export default function AdminFinanceERPPage() {
                     onChange={(e) => setCashAccountFilter(e.target.value)}
                     className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
                   >
-                    <option value="ALL">Semua Rekening & Kas ({cashFlow.length})</option>
-                    {bankAccounts.map((b) => (
-                      <option key={b.id} value={b.bankName}>
-                        {b.bankName} - {b.accountNumber}
-                      </option>
-                    ))}
+                    <option value="ALL">Semua Rekening & Kas ({scopedCounts.cashFlow})</option>
+                    {bankAccounts
+                      .filter((b) => selectedEntity === "ALL" || (b.entityType || "PT") === selectedEntity || b.entityType === "ALL")
+                      .map((b) => (
+                        <option key={b.id} value={b.bankName}>
+                          {b.bankName} - {b.accountNumber} ({b.accountHolder})
+                        </option>
+                      ))}
                     <option value="TUNAI">Kas Tunai / Petty Cash</option>
                   </select>
                 </div>
@@ -6596,7 +6685,20 @@ export default function AdminFinanceERPPage() {
                             <span>{cash.type === "IN" ? "Masuk" : "Keluar"}</span>
                           </span>
                         </td>
-                        <td className="p-3 font-bold text-slate-800 whitespace-nowrap">{cash.category}</td>
+                        <td className="p-3 font-bold text-slate-800 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            {(cash.businessEntity || "PT") === "PT" ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                🏢 PT
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                🏬 Non-PT
+                              </span>
+                            )}
+                            <span>{cash.category}</span>
+                          </div>
+                        </td>
                         <td className="p-3 text-slate-600">
                           <p className="font-medium text-slate-900">{cash.description}</p>
                           <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -8118,6 +8220,58 @@ export default function AdminFinanceERPPage() {
             </div>
 
             <form onSubmit={handleCreateCashSubmit} className="space-y-3 text-xs">
+              {/* Selector Entitas Pembukuan */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Entitas Usaha / Pembukuan: <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCashForm({
+                        ...cashForm,
+                        businessEntity: "PT",
+                        account: getDefaultBankAccLabel("PT"),
+                      });
+                    }}
+                    className={`p-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                      (cashForm.businessEntity || "PT") === "PT"
+                        ? "bg-indigo-50 border-indigo-400 text-indigo-900 shadow-xs ring-1 ring-indigo-400"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="text-base">🏢</span>
+                    <div>
+                      <div className="font-black text-[11px]">PT. DSTech Smart</div>
+                      <div className="text-[9px] text-slate-500 font-normal">Badan Hukum Resmi</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCashForm({
+                        ...cashForm,
+                        businessEntity: "NON_PT",
+                        account: getDefaultBankAccLabel("NON_PT"),
+                      });
+                    }}
+                    className={`p-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                      cashForm.businessEntity === "NON_PT"
+                        ? "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs ring-1 ring-emerald-400"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="text-base">🏬</span>
+                    <div>
+                      <div className="font-black text-[11px]">DSTech Non-PT</div>
+                      <div className="text-[9px] text-slate-500 font-normal">Usaha Mandiri/Pribadi</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Arah Transaksi:</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -8179,7 +8333,9 @@ export default function AdminFinanceERPPage() {
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="font-bold text-slate-700 block">Rekening Akun Kas / Bank:</label>
+                  <label className="font-bold text-slate-700 block">
+                    Rekening Akun Kas / Bank ({cashForm.businessEntity === "NON_PT" ? "Khusus Non-PT" : "Khusus PT"}):
+                  </label>
                   <button
                     type="button"
                     onClick={() => {
@@ -8188,23 +8344,31 @@ export default function AdminFinanceERPPage() {
                     }}
                     className="text-[10px] text-dstech-blue hover:underline font-bold cursor-pointer"
                   >
-                    ⚙️ Atur Rekening Resmi
+                    ⚙️ Atur Rekening
                   </button>
                 </div>
                 <select
-                  value={cashForm.account || getDefaultBankAccLabel()}
+                  value={cashForm.account || getDefaultBankAccLabel(cashForm.businessEntity)}
                   onChange={(e) => setCashForm({ ...cashForm, account: e.target.value })}
                   className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium"
                 >
                   {bankAccounts
-                    .filter((b) => b.status === "Aktif")
+                    .filter(
+                      (b) =>
+                        b.status === "Aktif" &&
+                        ((b.entityType || "PT") === (cashForm.businessEntity || "PT") || b.entityType === "ALL")
+                    )
                     .map((b) => (
                       <option key={b.id} value={`${b.bankName} - ${b.accountNumber} (${b.accountHolder})`}>
-                        {b.bankName} - {b.accountNumber} ({b.accountHolder}) {b.isDefault ? "★ (Rekening Utama)" : ""}
+                        {b.bankName} - {b.accountNumber} ({b.accountHolder}) {b.isDefault ? "★ (Utama)" : ""}
                       </option>
                     ))}
-                  <option value="Kas Tunai Operasional">Kas Tunai Operasional</option>
-                  <option value="Kas Kecil (Petty Cash Kantor)">Kas Kecil (Petty Cash Kantor)</option>
+                  <option value={`Kas Tunai Operasional (${cashForm.businessEntity === "NON_PT" ? "Non-PT" : "PT"})`}>
+                    Kas Tunai Operasional ({cashForm.businessEntity === "NON_PT" ? "Non-PT" : "PT"})
+                  </option>
+                  <option value={`Kas Kecil (Petty Cash ${cashForm.businessEntity === "NON_PT" ? "Non-PT" : "PT"})`}>
+                    Kas Kecil (Petty Cash {cashForm.businessEntity === "NON_PT" ? "Non-PT" : "PT"})
+                  </option>
                 </select>
               </div>
 
@@ -11669,6 +11833,46 @@ export default function AdminFinanceERPPage() {
             </div>
 
             <form onSubmit={handleCreatePoSubmit} className="space-y-4 text-xs">
+              {/* Selector Entitas Bisnis PO */}
+              <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-1.5">
+                <label className="font-black text-slate-800 block text-xs">
+                  Entitas Pemesan / Pengadaan: <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPoForm((prev) => ({ ...prev, businessEntity: "PT" }))}
+                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                      (poForm.businessEntity || "PT") === "PT"
+                        ? "bg-indigo-50 border-indigo-400 text-indigo-900 shadow-xs ring-1 ring-indigo-400"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="text-base">🏢</span>
+                    <div>
+                      <div className="font-black text-[11px]">PT. DSTech Smart Perkasa</div>
+                      <div className="text-[9px] text-slate-500 font-normal">PO Badan Hukum Resmi</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPoForm((prev) => ({ ...prev, businessEntity: "NON_PT" }))}
+                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                      poForm.businessEntity === "NON_PT"
+                        ? "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs ring-1 ring-emerald-400"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="text-base">🏬</span>
+                    <div>
+                      <div className="font-black text-[11px]">DSTech Smart (Non-PT)</div>
+                      <div className="text-[9px] text-slate-500 font-normal">Pengadaan Usaha Mandiri</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* Quick Select Supplier from Master Data */}
               <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/80 space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -11922,6 +12126,46 @@ export default function AdminFinanceERPPage() {
             </div>
 
             <form onSubmit={handleSaveEditPo} className="space-y-4 text-xs">
+              {/* Selector Entitas Bisnis Edit PO */}
+              <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-1.5">
+                <label className="font-black text-slate-800 block text-xs">
+                  Entitas Pemesan / Pengadaan: <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditPoForm((prev) => ({ ...prev, businessEntity: "PT" }))}
+                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                      (editPoForm.businessEntity || "PT") === "PT"
+                        ? "bg-indigo-50 border-indigo-400 text-indigo-900 shadow-xs ring-1 ring-indigo-400"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="text-base">🏢</span>
+                    <div>
+                      <div className="font-black text-[11px]">PT. DSTech Smart Perkasa</div>
+                      <div className="text-[9px] text-slate-500 font-normal">PO Badan Hukum Resmi</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditPoForm((prev) => ({ ...prev, businessEntity: "NON_PT" }))}
+                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                      editPoForm.businessEntity === "NON_PT"
+                        ? "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs ring-1 ring-emerald-400"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span className="text-base">🏬</span>
+                    <div>
+                      <div className="font-black text-[11px]">DSTech Smart (Non-PT)</div>
+                      <div className="text-[9px] text-slate-500 font-normal">Pengadaan Usaha Mandiri</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* Quick Select Supplier from Master Data */}
               <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/80 space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -14465,7 +14709,7 @@ export default function AdminFinanceERPPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
               <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <BarChart3 className="w-4 h-4 text-emerald-600" />
-                Laporan Laba Rugi Komprehensif Resmi — PT. DSTech Smart Perkasa
+                Laporan Laba Rugi Komprehensif Resmi — {selectedEntity === "NON_PT" ? "DSTech Smart (Non-PT)" : selectedEntity === "PT" ? "PT. DSTech Smart Perkasa" : "Konsolidasi Seluruh Entitas"}
               </span>
               <div className="flex flex-wrap items-center gap-2">
                 <button
@@ -14483,7 +14727,7 @@ export default function AdminFinanceERPPage() {
                   onClick={() =>
                     handleDownloadPdf(
                       "#print-pnl-sheet",
-                      "LAPORAN_LABA_RUGI_DSTECH_OKTOBER_2026.pdf"
+                      `LAPORAN_LABA_RUGI_${selectedEntity === "NON_PT" ? "NON_PT" : "PT"}_OKTOBER_2026.pdf`
                     )
                   }
                   disabled={isDownloadingPdf}
@@ -14497,7 +14741,7 @@ export default function AdminFinanceERPPage() {
                 <button
                   onClick={() => {
                     const originalTitle = document.title;
-                    document.title = "LAPORAN_LABA_RUGI_DSTECH_OKTOBER_2026";
+                    document.title = `LAPORAN_LABA_RUGI_${selectedEntity === "NON_PT" ? "NON_PT" : "PT"}_OKTOBER_2026`;
                     window.print();
                     setTimeout(() => {
                       document.title = originalTitle;
@@ -14574,7 +14818,9 @@ export default function AdminFinanceERPPage() {
                         DS
                       </div>
                       <div>
-                        <h1 className="text-base font-black tracking-tight text-slate-900">PT. DSTECH SMART PERKASA</h1>
+                        <h1 className="text-base font-black tracking-tight text-slate-900">
+                          {selectedEntity === "NON_PT" ? "DSTECH SMART" : "PT. DSTECH SMART PERKASA"}
+                        </h1>
                         <p className="text-[11px] text-slate-600">Enterprise Security, Access Control & IoT Smart Solutions</p>
                         <p className="text-[10px] text-slate-500">Jl. Raya Cilegon No. 88, Banten • finance@dstechsmart.com</p>
                       </div>
@@ -14596,7 +14842,7 @@ export default function AdminFinanceERPPage() {
                     PERIODE BERJALAN OKTOBER 2026
                   </h2>
                   <p className="text-[11px] text-slate-500">
-                    Buku Besar Keuangan PT. DSTech Smart Perkasa • Mata Uang: Indonesian Rupiah (IDR)
+                    Buku Besar Keuangan {selectedEntity === "NON_PT" ? "DSTech Smart (Usaha Mandiri Non-PT)" : "PT. DSTech Smart Perkasa"} • Mata Uang: Indonesian Rupiah (IDR)
                   </p>
                 </div>
 
@@ -14613,39 +14859,39 @@ export default function AdminFinanceERPPage() {
                       {/* 1. Pendapatan */}
                       <tr className="bg-blue-50/50 font-bold text-blue-900">
                         <td className="p-2.5">1. PENDAPATAN OPERASIONAL USAHA</td>
-                        <td className="p-2.5 text-right text-blue-900 font-black">{formatRupiah(summary.totalSalesRevenue)}</td>
+                        <td className="p-2.5 text-right text-blue-900 font-black">{formatRupiah(displaySummary.totalSalesRevenue)}</td>
                       </tr>
                       <tr className="text-slate-600 text-[11px]">
                         <td className="p-2 pl-6">• Pendapatan Penjualan Perangkat CCTV, Access Control, IoT & Jaringan</td>
-                        <td className="p-2 text-right">{formatRupiah(summary.totalSalesRevenue)}</td>
+                        <td className="p-2 text-right">{formatRupiah(displaySummary.totalSalesRevenue)}</td>
                       </tr>
 
                       {/* 2. HPP */}
                       <tr className="bg-amber-50/50 font-bold text-amber-900">
                         <td className="p-2.5">2. HARGA POKOK PENJUALAN (HPP / COGS)</td>
-                        <td className="p-2.5 text-right text-amber-900 font-black">({formatRupiah(summary.totalPurchasesCost)})</td>
+                        <td className="p-2.5 text-right text-amber-900 font-black">({formatRupiah(displaySummary.totalPurchasesCost)})</td>
                       </tr>
                       <tr className="text-slate-600 text-[11px]">
                         <td className="p-2 pl-6">• Pembelian Barang Dagang & Komponen Proyek dari Supplier Resmi</td>
-                        <td className="p-2 text-right">({formatRupiah(summary.totalPurchasesCost)})</td>
+                        <td className="p-2 text-right">({formatRupiah(displaySummary.totalPurchasesCost)})</td>
                       </tr>
 
                       {/* LABA KOTOR */}
                       <tr className="bg-slate-100 font-black text-slate-900 border-t border-b border-slate-300">
                         <td className="p-2.5 uppercase tracking-wide">LABA KOTOR (GROSS PROFIT)</td>
-                        <td className={`p-2.5 text-right text-sm ${summary.grossProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                          {formatRupiah(summary.grossProfit)}
+                        <td className={`p-2.5 text-right text-sm ${displaySummary.grossProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                          {formatRupiah(displaySummary.grossProfit)}
                         </td>
                       </tr>
 
                       {/* 3. Beban Operasional */}
                       <tr className="bg-rose-50/50 font-bold text-rose-900">
                         <td className="p-2.5">3. BEBAN OPERASIONAL (OPERATIONAL EXPENSES)</td>
-                        <td className="p-2.5 text-right text-rose-900 font-black">({formatRupiah(summary.totalOperatingExpenses)})</td>
+                        <td className="p-2.5 text-right text-rose-900 font-black">({formatRupiah(displaySummary.totalOperatingExpenses)})</td>
                       </tr>
                       <tr className="text-slate-600 text-[11px]">
                         <td className="p-2 pl-6">• Beban Operasional, Gaji Teknisi, Utilitas Kantor & Transportasi</td>
-                        <td className="p-2 text-right">({formatRupiah(summary.totalOperatingExpenses)})</td>
+                        <td className="p-2 text-right">({formatRupiah(displaySummary.totalOperatingExpenses)})</td>
                       </tr>
 
                       {/* LABA BERSIH OPERASIONAL */}
@@ -14653,8 +14899,8 @@ export default function AdminFinanceERPPage() {
                         <td className="p-3 uppercase tracking-wide">
                           LABA BERSIH USAHA (NET OPERATING PROFIT)
                         </td>
-                        <td className={`p-3 text-right text-base ${summary.netProfit >= 0 ? "text-emerald-700 font-black" : "text-rose-600 font-black"}`}>
-                          {formatRupiah(summary.netProfit)}
+                        <td className={`p-3 text-right text-base ${displaySummary.netProfit >= 0 ? "text-emerald-700 font-black" : "text-rose-600 font-black"}`}>
+                          {formatRupiah(displaySummary.netProfit)}
                         </td>
                       </tr>
                     </tbody>
@@ -14666,19 +14912,19 @@ export default function AdminFinanceERPPage() {
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-500 uppercase font-bold">Gross Margin</p>
                     <p className="text-xs font-black text-slate-800">
-                      {summary.totalSalesRevenue > 0 ? ((summary.grossProfit / summary.totalSalesRevenue) * 100).toFixed(1) : 0}%
+                      {displaySummary.totalSalesRevenue > 0 ? ((displaySummary.grossProfit / displaySummary.totalSalesRevenue) * 100).toFixed(1) : 0}%
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-500 uppercase font-bold">Net Profit Margin</p>
                     <p className="text-xs font-black text-emerald-600">
-                      {summary.totalSalesRevenue > 0 ? ((summary.netProfit / summary.totalSalesRevenue) * 100).toFixed(1) : 0}%
+                      {displaySummary.totalSalesRevenue > 0 ? ((displaySummary.netProfit / displaySummary.totalSalesRevenue) * 100).toFixed(1) : 0}%
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-500 uppercase font-bold">Status Keuangan</p>
-                    <p className={`text-xs font-black ${summary.netProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                      {summary.netProfit >= 0 ? "SURPLUS LABA" : "DEFISIT"}
+                    <p className={`text-xs font-black ${displaySummary.netProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                      {displaySummary.netProfit >= 0 ? "SURPLUS LABA" : "DEFISIT"}
                     </p>
                   </div>
                 </div>
@@ -16439,62 +16685,123 @@ export default function AdminFinanceERPPage() {
               </button>
             </div>
 
+            {/* Filter Tab Entitas Rekening */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl w-fit border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setBankAccountFilterEntity("ALL")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${bankAccountFilterEntity === "ALL" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  🌐 Semua ({bankAccounts.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBankAccountFilterEntity("PT")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${bankAccountFilterEntity === "PT" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  🏢 Khusus PT ({bankAccounts.filter((a) => (a.entityType || "PT") === "PT").length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBankAccountFilterEntity("NON_PT")}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${bankAccountFilterEntity === "NON_PT" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  🏬 Khusus Non-PT ({bankAccounts.filter((a) => a.entityType === "NON_PT").length})
+                </button>
+              </div>
+
+              <span className="text-[11px] text-slate-500 font-medium">
+                Pemisahan rekening otomatis memastikan invoice PT dan Non-PT tidak tertukar rekening tujuan.
+              </span>
+            </div>
+
             {/* List Rekening Aktif */}
             <div className="space-y-2">
               <h4 className="font-black text-xs text-slate-700 uppercase tracking-wider">
-                Daftar Rekening Resmi ({bankAccounts.length})
+                Daftar Rekening Terdaftar ({bankAccounts.filter((acc) => {
+                  if (bankAccountFilterEntity === "ALL") return true;
+                  return (acc.entityType || "PT") === bankAccountFilterEntity || acc.entityType === "ALL";
+                }).length})
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {bankAccounts.map((acc) => (
-                  <div
-                    key={acc.id}
-                    className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 relative"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-black text-xs text-dstech-blue">{acc.bankName}</span>
-                      {acc.isDefault ? (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800">
-                          Utama (Default)
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 font-medium">{acc.status}</span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-mono font-bold text-sm text-slate-900">{acc.accountNumber}</p>
-                      <p className="text-[11px] text-slate-600 font-medium">a/n {acc.accountHolder}</p>
-                      <p className="text-[10px] text-slate-400">Cabang: {acc.branch}</p>
-                    </div>
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingBankAccount(acc);
-                          setBankAccountForm({
-                            bankName: acc.bankName,
-                            accountNumber: acc.accountNumber,
-                            accountHolder: acc.accountHolder,
-                            branch: acc.branch,
-                            isDefault: Boolean(acc.isDefault),
-                            status: acc.status,
-                          });
-                        }}
-                        className="text-[11px] text-amber-600 hover:text-amber-700 font-bold cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                      {bankAccounts.length > 1 && (
+                {bankAccounts
+                  .filter((acc) => {
+                    if (bankAccountFilterEntity === "ALL") return true;
+                    return (acc.entityType || "PT") === bankAccountFilterEntity || acc.entityType === "ALL";
+                  })
+                  .map((acc) => (
+                    <div
+                      key={acc.id}
+                      className={`p-3.5 rounded-2xl border space-y-2 relative transition-all ${
+                        (acc.entityType || "PT") === "PT"
+                          ? "bg-indigo-50/40 border-indigo-200/80"
+                          : acc.entityType === "NON_PT"
+                          ? "bg-emerald-50/40 border-emerald-200/80"
+                          : "bg-slate-50 border-slate-200/80"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1 flex-wrap">
+                        <span className="font-black text-xs text-dstech-blue">{acc.bankName}</span>
+                        <div className="flex items-center gap-1">
+                          {(acc.entityType || "PT") === "PT" ? (
+                            <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200">
+                              🏢 Khusus PT
+                            </span>
+                          ) : acc.entityType === "NON_PT" ? (
+                            <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              🏬 Khusus Non-PT / Pribadi
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-slate-200 text-slate-700">
+                              🌐 Semua Entitas
+                            </span>
+                          )}
+                          {acc.isDefault ? (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-200">
+                              Utama
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-medium">{acc.status}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-mono font-bold text-sm text-slate-900">{acc.accountNumber}</p>
+                        <p className="text-[11px] text-slate-600 font-medium">a/n {acc.accountHolder}</p>
+                        <p className="text-[10px] text-slate-400">Cabang: {acc.branch || "-"}</p>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60">
                         <button
                           type="button"
-                          onClick={() => handleDeleteBankAccount(acc.id, acc.bankName)}
-                          className="text-[11px] text-rose-600 hover:text-rose-700 font-bold cursor-pointer"
+                          onClick={() => {
+                            setEditingBankAccount(acc);
+                            setBankAccountForm({
+                              bankName: acc.bankName,
+                              accountNumber: acc.accountNumber,
+                              accountHolder: acc.accountHolder,
+                              branch: acc.branch,
+                              isDefault: Boolean(acc.isDefault),
+                              status: acc.status,
+                              entityType: acc.entityType || "PT",
+                            });
+                          }}
+                          className="text-[11px] text-amber-600 hover:text-amber-700 font-bold cursor-pointer"
                         >
-                          Hapus
+                          Edit
                         </button>
-                      )}
+                        {bankAccounts.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBankAccount(acc.id, acc.bankName)}
+                            className="text-[11px] text-rose-600 hover:text-rose-700 font-bold cursor-pointer"
+                          >
+                            Hapus
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
@@ -16507,6 +16814,70 @@ export default function AdminFinanceERPPage() {
                 <Plus className="w-4 h-4" />
                 <span>{editingBankAccount ? "Edit Rekening Bank" : "Tambah Rekening Baru"}</span>
               </h4>
+
+              {/* Selector Entitas Rekening */}
+              <div className="p-3 bg-white rounded-xl border border-blue-200/70 space-y-1.5">
+                <label className="font-black text-slate-800 block text-xs">
+                  Peruntukan Entitas Rekening: <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      bankAccountForm.entityType === "PT"
+                        ? "bg-indigo-50 border-indigo-400 text-indigo-900 font-bold shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bankEntityType"
+                      checked={bankAccountForm.entityType === "PT"}
+                      onChange={() =>
+                        setBankAccountForm((prev) => ({
+                          ...prev,
+                          entityType: "PT",
+                          accountHolder: prev.accountHolder === "H. Agus Supriyadi" ? "PT. DSTech Smart Perkasa" : prev.accountHolder,
+                        }))
+                      }
+                      className="text-indigo-600"
+                    />
+                    <div>
+                      <div className="font-bold text-xs flex items-center gap-1">
+                        <span>🏢 PT. DSTech Smart Perkasa</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500">Khusus invoice & arus kas berbadan hukum PT</div>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                      bankAccountForm.entityType === "NON_PT"
+                        ? "bg-emerald-50 border-emerald-400 text-emerald-900 font-bold shadow-xs"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bankEntityType"
+                      checked={bankAccountForm.entityType === "NON_PT"}
+                      onChange={() =>
+                        setBankAccountForm((prev) => ({
+                          ...prev,
+                          entityType: "NON_PT",
+                          accountHolder: prev.accountHolder === "PT. DSTech Smart Perkasa" ? "H. Agus Supriyadi" : prev.accountHolder,
+                        }))
+                      }
+                      className="text-emerald-600"
+                    />
+                    <div>
+                      <div className="font-bold text-xs flex items-center gap-1">
+                        <span>🏬 DSTech Smart (Non-PT / Pribadi)</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500">Khusus transaksi perorangan/usaha mandiri</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -16544,7 +16915,7 @@ export default function AdminFinanceERPPage() {
                   <input
                     type="text"
                     required
-                    placeholder="PT. DSTech Smart Perkasa"
+                    placeholder={bankAccountForm.entityType === "PT" ? "PT. DSTech Smart Perkasa" : "H. Agus Supriyadi"}
                     value={bankAccountForm.accountHolder}
                     onChange={(e) => setBankAccountForm({ ...bankAccountForm, accountHolder: e.target.value })}
                     className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold"
@@ -16586,6 +16957,7 @@ export default function AdminFinanceERPPage() {
                           branch: "Cilegon",
                           isDefault: false,
                           status: "Aktif",
+                          entityType: "PT",
                         });
                       }}
                       className="px-3 py-1.5 rounded-xl text-slate-500 hover:bg-slate-200 font-bold"

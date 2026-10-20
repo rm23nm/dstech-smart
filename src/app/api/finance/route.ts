@@ -439,6 +439,7 @@ export async function POST(request: Request) {
           reference: newSale.invoiceNumber,
           description: `Penerimaan ${isDp ? "DP" : "faktur"} penjualan ${newSale.invoiceNumber} - ${newSale.customerName}`,
           balanceAfter: 0,
+          businessEntity: newSale.businessEntity || "PT",
         });
       }
 
@@ -685,6 +686,7 @@ export async function POST(request: Request) {
         reference: invoice.invoiceNumber,
         description: `Penerimaan ${isTerminPayment ? targetTerminName || "Termin" : isDpPayment ? "DP" : "Pelunasan"} ${invoice.invoiceNumber} - ${invoice.customerName} (${notes || "Pembayaran Masuk"})`,
         balanceAfter: 0,
+        businessEntity: invoice.businessEntity || "PT",
       });
 
       writeFinanceData(data);
