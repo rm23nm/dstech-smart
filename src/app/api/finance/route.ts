@@ -277,7 +277,9 @@ export async function POST(request: Request) {
     }
 
     if (actionType === "sale") {
-      const newInvoiceNumber = `INV-DSTECH-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(
+      const isNonPt = payload.businessEntity === "NON_PT";
+      const prefixInv = isNonPt ? "INV-DTS" : "INV-DSTECH";
+      const newInvoiceNumber = `${prefixInv}-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(
         (data.sales?.length || 0) + 1
       ).padStart(3, "0")}`;
 
@@ -417,6 +419,7 @@ export async function POST(request: Request) {
         verificationCode: payload.verificationCode || "",
         signatureImage: payload.signatureImage || "",
         attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+        businessEntity: payload.businessEntity || "PT",
       };
 
       if (!data.sales) data.sales = [];
@@ -831,6 +834,7 @@ export async function POST(request: Request) {
         balanceAfter: 0,
         receiptUrl: payload.receiptUrl || (attachments.length > 0 ? attachments[0].url : ""),
         attachments: attachments,
+        businessEntity: payload.businessEntity || "PT",
       };
 
       if (!data.cash_flow) data.cash_flow = [];
@@ -894,13 +898,15 @@ export async function POST(request: Request) {
 
     if (actionType === "quotation") {
       const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
-      const newSphNumber = `SPH-DSTECH-${yearMonth}-${String((data.quotations?.length || 0) + 1).padStart(3, "0")}`;
+      const isNonPt = payload.businessEntity === "NON_PT";
+      const prefixSph = isNonPt ? "SPH-DTS" : "SPH-DSTECH";
+      const newSphNumber = `${prefixSph}-${yearMonth}-${String((data.quotations?.length || 0) + 1).padStart(3, "0")}`;
 
       const items = Array.isArray(payload.items) ? payload.items : [];
       const subtotal = items.reduce((acc: number, curr: any) => acc + (Number(curr.total) || 0), 0);
       const discount = Number(payload.discount) || 0;
       const afterDiscount = Math.max(0, subtotal - discount);
-      const taxRate = Number(payload.taxRate) || 0;
+      const taxRate = isNonPt ? 0 : Number(payload.taxRate) || 0;
       const taxAmount = taxRate > 0 ? Math.round((afterDiscount * taxRate) / 100) : 0;
       const grandTotal = afterDiscount + taxAmount;
 
@@ -940,6 +946,7 @@ export async function POST(request: Request) {
         verificationCode: payload.verificationCode || "",
         notes: payload.notes || "-",
         attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+        businessEntity: payload.businessEntity || "PT",
       };
 
       if (!data.quotations) data.quotations = [];
@@ -963,8 +970,10 @@ export async function POST(request: Request) {
       }
 
       const sph = quotations[qIndex];
+      const isNonPt = (sph as any).businessEntity === "NON_PT";
+      const prefixInv = isNonPt ? "INV-DTS" : "INV-DSTECH";
       const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
-      const newInvoiceNumber = `INV-DSTECH-${yearMonth}-${String((data.sales?.length || 0) + 1).padStart(3, "0")}`;
+      const newInvoiceNumber = `${prefixInv}-${yearMonth}-${String((data.sales?.length || 0) + 1).padStart(3, "0")}`;
 
       const grandTotal = Number(sph.grandTotal) || 0;
       const isTermin = invoiceType === "Termin";
@@ -1068,6 +1077,7 @@ export async function POST(request: Request) {
         approvedTitle: sph.approvedTitle || "",
         approvedAt: sph.approvedAt || "",
         verificationCode: sph.verificationCode || "",
+        businessEntity: (sph as any).businessEntity || "PT",
       };
 
       if (!data.sales) data.sales = [];

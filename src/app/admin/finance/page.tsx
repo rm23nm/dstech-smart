@@ -43,6 +43,7 @@ import {
   Trash2,
   Mail,
   Landmark,
+  UserCheck,
   UserPlus,
   PenTool,
   CheckCheck,
@@ -160,6 +161,7 @@ interface SaleInvoice {
   signatureImage?: string;
   approvalNotes?: string;
   attachments?: DocumentAttachment[];
+  businessEntity?: "PT" | "NON_PT";
 }
 
 interface QuotationItem {
@@ -209,6 +211,7 @@ interface Quotation {
   approvalNotes?: string;
   notes?: string;
   attachments?: DocumentAttachment[];
+  businessEntity?: "PT" | "NON_PT";
 }
 
 interface BankAccount {
@@ -219,6 +222,7 @@ interface BankAccount {
   branch: string;
   isDefault?: boolean;
   status: string;
+  entityType?: "PT" | "NON_PT" | "ALL";
 }
 
 interface FinanceSettings {
@@ -266,6 +270,7 @@ interface PurchaseOrder {
   signatureImage?: string;
   approvalNotes?: string;
   attachments?: DocumentAttachment[];
+  businessEntity?: "PT" | "NON_PT";
 }
 
 interface SalesReturn {
@@ -294,6 +299,7 @@ interface SalesReturn {
   signatureImage?: string;
   approvalNotes?: string;
   attachments?: DocumentAttachment[];
+  businessEntity?: "PT" | "NON_PT";
 }
 
 interface PurchaseReturn {
@@ -322,6 +328,7 @@ interface PurchaseReturn {
   signatureImage?: string;
   approvalNotes?: string;
   attachments?: DocumentAttachment[];
+  businessEntity?: "PT" | "NON_PT";
 }
 
 interface CashTransaction {
@@ -336,6 +343,7 @@ interface CashTransaction {
   balanceAfter: number;
   receiptUrl?: string;
   attachments?: DocumentAttachment[];
+  businessEntity?: "PT" | "NON_PT";
 }
 
 interface WarehouseItem {
@@ -478,6 +486,7 @@ export default function AdminFinanceERPPage() {
   });
 
   // Filter & Search states
+  const [selectedEntity, setSelectedEntity] = useState<"ALL" | "PT" | "NON_PT">("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("Semua");
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
@@ -1142,11 +1151,13 @@ export default function AdminFinanceERPPage() {
     dpPercentage: number;
     dpNotes: string;
     termins: InvoiceTermin[];
+    businessEntity?: "PT" | "NON_PT";
   }>({
     invoiceType: "Standar",
     dpPercentage: 50,
     dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Proyek",
     termins: [],
+    businessEntity: "PT",
   });
 
   const [quotationForm, setQuotationForm] = useState<{
@@ -1170,6 +1181,7 @@ export default function AdminFinanceERPPage() {
     taxRate: number;
     terms: string;
     notes: string;
+    businessEntity: "PT" | "NON_PT";
   }>({
     clientId: "",
     branchId: "dstech_branch_1",
@@ -1193,6 +1205,7 @@ export default function AdminFinanceERPPage() {
     taxRate: 11,
     terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
     notes: "",
+    businessEntity: "PT",
   });
 
   // New Sale Form State
@@ -1218,6 +1231,7 @@ export default function AdminFinanceERPPage() {
     taxRate: number;
     paidAmount: number;
     notes: string;
+    businessEntity: "PT" | "NON_PT";
   }>({
     branchId: "dstech_branch_1",
     warehouseId: "dstech_wh_1",
@@ -1242,6 +1256,7 @@ export default function AdminFinanceERPPage() {
     taxRate: 11,
     paidAmount: 0,
     notes: "",
+    businessEntity: "PT",
   });
 
   // New PO Form State
@@ -2161,7 +2176,8 @@ export default function AdminFinanceERPPage() {
         ? Math.round((subtotal * (Number(quotationForm.discountPercent) || 0)) / 100)
         : Number(quotationForm.discount || 0);
     const afterDiscount = Math.max(0, subtotal - discountVal);
-    const taxAmount = (afterDiscount * Number(quotationForm.taxRate || 0)) / 100;
+    const isNonPt = quotationForm.businessEntity === "NON_PT";
+    const taxAmount = isNonPt ? 0 : (afterDiscount * Number(quotationForm.taxRate || 0)) / 100;
     const grandTotal = afterDiscount + taxAmount;
     return { subtotal, discountVal, afterDiscount, taxAmount, grandTotal };
   };
@@ -2223,6 +2239,7 @@ export default function AdminFinanceERPPage() {
             grandTotal,
             terms: quotationForm.terms,
             notes: quotationForm.notes,
+            businessEntity: quotationForm.businessEntity || "PT",
             status: "Terkirim",
           },
         }),
@@ -2255,6 +2272,7 @@ export default function AdminFinanceERPPage() {
           taxRate: 11,
           terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
           notes: "",
+          businessEntity: "PT",
         });
         fetchFinanceData();
       } else {
@@ -2288,6 +2306,7 @@ export default function AdminFinanceERPPage() {
       taxRate: q.taxRate || 0,
       terms: q.terms,
       notes: q.notes || "",
+      businessEntity: q.businessEntity || "PT",
     });
     setIsEditQuotationModalOpen(true);
   };
@@ -2431,6 +2450,9 @@ export default function AdminFinanceERPPage() {
   const filteredAndSortedQuotations = useMemo(() => {
     return quotations
       .filter((sph) => {
+        const matchEntity = selectedEntity === "ALL" || (sph.businessEntity || "PT") === selectedEntity;
+        if (!matchEntity) return false;
+
         const query = quotationSearchQuery.toLowerCase();
         const matchQuery =
           sph.quotationNumber.toLowerCase().includes(query) ||
@@ -2481,7 +2503,7 @@ export default function AdminFinanceERPPage() {
         }
         return 0;
       });
-  }, [quotations, quotationSearchQuery, quotationStatusFilter, quotationSortBy]);
+  }, [quotations, quotationSearchQuery, quotationStatusFilter, quotationSortBy, selectedEntity]);
 
   const handleOpenConvertQuotation = (q: Quotation) => {
     setSelectedQuotationForConvert(q);
@@ -2490,6 +2512,7 @@ export default function AdminFinanceERPPage() {
       dpPercentage: 50,
       dpNotes: `Pengajuan Uang Muka (DP 50%) atas SPH ${q.quotationNumber} - ${q.subject}`,
       termins: getDefaultTermins(q.grandTotal),
+      businessEntity: q.businessEntity || "PT",
     });
     setIsConvertModalOpen(true);
   };
@@ -2516,6 +2539,7 @@ export default function AdminFinanceERPPage() {
             dpPercentage: convertForm.invoiceType === "DP" ? convertForm.dpPercentage : 0,
             dpNotes: convertForm.dpNotes,
             termins: convertForm.invoiceType === "Termin" ? (convertForm.termins.length > 0 ? convertForm.termins : getDefaultTermins(selectedQuotationForConvert.grandTotal)) : [],
+            businessEntity: convertForm.businessEntity || selectedQuotationForConvert.businessEntity || "PT",
           },
         }),
       });
@@ -2542,7 +2566,8 @@ export default function AdminFinanceERPPage() {
         ? Math.round((subtotal * (Number(saleForm.discountPercent) || 0)) / 100)
         : Number(saleForm.discount || 0);
     const afterDiscount = Math.max(0, subtotal - discountVal);
-    const taxAmount = (afterDiscount * Number(saleForm.taxRate || 0)) / 100;
+    const isNonPt = saleForm.businessEntity === "NON_PT";
+    const taxAmount = isNonPt ? 0 : (afterDiscount * Number(saleForm.taxRate || 0)) / 100;
     const grandTotal = afterDiscount + taxAmount;
     const dpAmount =
       saleForm.invoiceType === "DP"
@@ -2605,6 +2630,7 @@ export default function AdminFinanceERPPage() {
             grandTotal,
             paidAmount: Number(saleForm.paidAmount),
             notes: saleForm.notes,
+            businessEntity: saleForm.businessEntity || "PT",
           },
         }),
       });
@@ -2634,6 +2660,7 @@ export default function AdminFinanceERPPage() {
           taxRate: 11,
           paidAmount: 0,
           notes: "",
+          businessEntity: "PT",
         });
         fetchFinanceData();
       } else {
@@ -4427,6 +4454,45 @@ export default function AdminFinanceERPPage() {
     isDeliveryModalOpen
   );
 
+  const displaySummary = useMemo(() => {
+    if (selectedEntity === "ALL") return summary;
+    const scopedSales = sales.filter((s) => (s.businessEntity || "PT") === selectedEntity);
+    const scopedPurchases = purchases.filter((p) => (p.businessEntity || "PT") === selectedEntity);
+    const scopedCash = cashFlow.filter((c) => (c.businessEntity || "PT") === selectedEntity);
+
+    const totalSalesRevenue = scopedSales.reduce((sum, s) => sum + (s.grandTotal || 0), 0);
+    const totalSalesPaid = scopedSales.reduce((sum, s) => sum + (s.paidAmount || 0), 0);
+    const totalAccountsReceivable = scopedSales.reduce((sum, s) => sum + (s.remainingAmount || 0), 0);
+    const totalPurchasesCost = scopedPurchases.reduce((sum, p) => sum + (p.grandTotal || 0), 0);
+    const totalAccountsPayable = scopedPurchases.reduce(
+      (sum, p) => sum + (p.paymentStatus === "Hutang Usaha" ? p.grandTotal : 0),
+      0
+    );
+
+    const grossProfit = totalSalesRevenue - totalPurchasesCost;
+    const netProfit = grossProfit - (summary.totalOperatingExpenses || 0);
+
+    const totalCashIn = scopedCash.filter((c) => c.type === "IN").reduce((sum, c) => sum + (c.amount || 0), 0);
+    const totalCashOut = scopedCash.filter((c) => c.type === "OUT").reduce((sum, c) => sum + (c.amount || 0), 0);
+    const currentCashBalance = totalCashIn - totalCashOut;
+
+    return {
+      ...summary,
+      totalSalesRevenue,
+      totalSalesPaid,
+      totalAccountsReceivable,
+      totalPurchasesCost,
+      totalAccountsPayable,
+      grossProfit,
+      netProfit,
+      currentCashBalance,
+      totalCashIn,
+      totalCashOut,
+      totalSalesCount: scopedSales.length,
+      totalPurchasesCount: scopedPurchases.length,
+    };
+  }, [summary, sales, purchases, cashFlow, selectedEntity]);
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -4490,6 +4556,69 @@ export default function AdminFinanceERPPage() {
         </div>
       </div>
 
+      {/* ENTITY SELECTOR BAR (PT vs Non-PT / Personal DSTech Smart) */}
+      <div className="bg-white p-3 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="p-2.5 rounded-2xl bg-slate-900 text-white flex-shrink-0">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-xs font-black text-slate-800 flex items-center gap-2">
+              <span>Profil Entitas & Rekening Pembukuan:</span>
+              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold ${
+                selectedEntity === "PT" ? "bg-blue-100 text-blue-800 border border-blue-200" :
+                selectedEntity === "NON_PT" ? "bg-emerald-100 text-emerald-800 border border-emerald-200" :
+                "bg-purple-100 text-purple-800 border border-purple-200"
+              }`}>
+                {selectedEntity === "PT" ? "🏢 PT. DSTech Smart Perkasa (PKP / PPN 11%)" :
+                 selectedEntity === "NON_PT" ? "🏬 DSTech Smart (Non-PT / Non-PPN 0%)" :
+                 "🌐 Konsolidasi Keseluruhan (All Entity)"}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {selectedEntity === "PT" ? "Faktur & SPH resmi berbadan hukum PT (PPN 11%, NIB, NPWP PT & Rekening Bank PT)" :
+               selectedEntity === "NON_PT" ? "Faktur & SPH atas nama usaha DSTech Smart bebas PPN (Non-PKP 0% & Rekening Pribadi)" :
+               "Menampilkan ringkasan dan seluruh transaksi gabungan PT. DSTech Smart Perkasa dan DSTech Smart"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 w-full md:w-auto">
+          <button
+            onClick={() => setSelectedEntity("ALL")}
+            className={`flex-1 md:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              selectedEntity === "ALL"
+                ? "bg-white text-purple-700 shadow-sm font-black"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <span>🌐 Semua Entitas</span>
+          </button>
+          <button
+            onClick={() => setSelectedEntity("PT")}
+            className={`flex-1 md:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              selectedEntity === "PT"
+                ? "bg-dstech-blue text-white shadow-sm font-black"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5" />
+            <span>PT. DSTech Smart Perkasa</span>
+          </button>
+          <button
+            onClick={() => setSelectedEntity("NON_PT")}
+            className={`flex-1 md:flex-initial px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              selectedEntity === "NON_PT"
+                ? "bg-emerald-600 text-white shadow-sm font-black"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>DSTech Smart (Non-PT)</span>
+          </button>
+        </div>
+      </div>
+
       {/* KPI METRICS SUITE */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {/* Metric 1: Total Omset */}
@@ -4501,9 +4630,9 @@ export default function AdminFinanceERPPage() {
             </div>
           </div>
           <h3 className="text-base sm:text-lg font-black text-slate-900 truncate">
-            {formatRupiah(summary.totalSalesRevenue)}
+            {formatRupiah(displaySummary.totalSalesRevenue)}
           </h3>
-          <p className="text-[10px] text-slate-500 font-semibold">{summary.totalSalesCount} Faktur Penjualan</p>
+          <p className="text-[10px] text-slate-500 font-semibold">{displaySummary.totalSalesCount} Faktur Penjualan</p>
         </div>
 
         {/* Metric 2: Total Belanja HPP */}
@@ -4515,9 +4644,9 @@ export default function AdminFinanceERPPage() {
             </div>
           </div>
           <h3 className="text-base sm:text-lg font-black text-slate-900 truncate">
-            {formatRupiah(summary.totalPurchasesCost)}
+            {formatRupiah(displaySummary.totalPurchasesCost)}
           </h3>
-          <p className="text-[10px] text-slate-500 font-semibold">{summary.totalPurchasesCount} PO Supplier</p>
+          <p className="text-[10px] text-slate-500 font-semibold">{displaySummary.totalPurchasesCount} PO Supplier</p>
         </div>
 
         {/* Metric 3: Laba Bersih */}
@@ -4529,12 +4658,12 @@ export default function AdminFinanceERPPage() {
             </div>
           </div>
           <h3 className="text-base sm:text-lg font-black text-emerald-600 truncate">
-            {formatRupiah(summary.netProfit)}
+            {formatRupiah(displaySummary.netProfit)}
           </h3>
           <p className="text-[10px] text-emerald-700 font-semibold">
             Margin:{" "}
-            {summary.totalSalesRevenue > 0
-              ? `${Math.round((summary.netProfit / summary.totalSalesRevenue) * 100)}%`
+            {displaySummary.totalSalesRevenue > 0
+              ? `${Math.round((displaySummary.netProfit / displaySummary.totalSalesRevenue) * 100)}%`
               : "0%"}
           </p>
         </div>
@@ -4548,7 +4677,7 @@ export default function AdminFinanceERPPage() {
             </div>
           </div>
           <h3 className="text-base sm:text-lg font-black text-purple-700 truncate">
-            {formatRupiah(summary.currentCashBalance)}
+            {formatRupiah(displaySummary.currentCashBalance)}
           </h3>
           <p className="text-[10px] text-slate-500 font-semibold">Kas Berjalan</p>
         </div>
@@ -4562,7 +4691,7 @@ export default function AdminFinanceERPPage() {
             </div>
           </div>
           <h3 className="text-base sm:text-lg font-black text-sky-700 truncate">
-            {formatRupiah(summary.totalAccountsReceivable)}
+            {formatRupiah(displaySummary.totalAccountsReceivable)}
           </h3>
           <p className="text-[10px] text-slate-500 font-semibold">Belum Tertagih</p>
         </div>
@@ -4576,7 +4705,7 @@ export default function AdminFinanceERPPage() {
             </div>
           </div>
           <h3 className="text-base sm:text-lg font-black text-red-700 truncate">
-            {formatRupiah(summary.totalAccountsPayable)}
+            {formatRupiah(displaySummary.totalAccountsPayable)}
           </h3>
           <p className="text-[10px] text-slate-500 font-semibold">Jatuh Tempo PO</p>
         </div>
@@ -4792,6 +4921,8 @@ export default function AdminFinanceERPPage() {
                 <tbody className="divide-y divide-slate-100">
                   {sales
                     .filter((s) => {
+                      const matchEntity = selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity;
+                      if (!matchEntity) return false;
                       const matchQuery =
                         s.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                         s.customerName.toLowerCase().includes(searchQuery.toLowerCase());
@@ -4803,6 +4934,15 @@ export default function AdminFinanceERPPage() {
                         <td className="p-3 font-black text-slate-900 whitespace-nowrap">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="font-mono text-dstech-blue">{sale.invoiceNumber}</span>
+                            {(sale.businessEntity || "PT") === "NON_PT" ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wider inline-flex items-center gap-1" title="Entitas Non-PT (Bebas PPN)">
+                                🏬 DSTech Smart
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-100 text-blue-800 uppercase tracking-wider inline-flex items-center gap-1" title="Entitas Badan Hukum PT (PPN 11%)">
+                                🏢 PT
+                              </span>
+                            )}
                             {sale.invoiceType === "DP" && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800 uppercase tracking-wider">
                                 DP {sale.dpPercentage || 50}%
@@ -5303,6 +5443,15 @@ export default function AdminFinanceERPPage() {
                               <span className="font-mono font-black text-indigo-700 block text-xs">
                                 {sph.quotationNumber}
                               </span>
+                              {(sph.businessEntity || "PT") === "NON_PT" ? (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wider inline-flex items-center gap-1" title="Entitas Non-PT (Bebas PPN)">
+                                  🏬 DSTech Smart
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-100 text-blue-800 uppercase tracking-wider inline-flex items-center gap-1" title="Entitas Badan Hukum PT (PPN 11%)">
+                                  🏢 PT
+                                </span>
+                              )}
                               {Boolean(sph.revision && sph.revision > 0) && (
                                 <span className="text-[9px] font-black font-mono px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
                                   Rev. 0{sph.revision}
@@ -5637,6 +5786,8 @@ export default function AdminFinanceERPPage() {
                 <tbody className="divide-y divide-slate-100">
                   {purchases
                     .filter((po) => {
+                      const matchEntity = selectedEntity === "ALL" || (po.businessEntity || "PT") === selectedEntity;
+                      if (!matchEntity) return false;
                       const q = poSearchQuery.toLowerCase();
                       const matchQuery =
                         !poSearchQuery ||
@@ -5651,7 +5802,18 @@ export default function AdminFinanceERPPage() {
                     .map((po) => (
                       <tr key={po.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="p-3 font-mono font-black text-amber-700 whitespace-nowrap">
-                          {po.poNumber}
+                          <div className="flex flex-col gap-1">
+                            <span>{po.poNumber}</span>
+                            {(po.businessEntity || "PT") === "NON_PT" ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wider w-fit">
+                                🏬 DSTech Smart
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-100 text-blue-800 uppercase tracking-wider w-fit">
+                                🏢 PT
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="p-3 font-bold text-slate-900">
                           <p>{po.supplierName}</p>
@@ -6403,6 +6565,8 @@ export default function AdminFinanceERPPage() {
                 <tbody className="divide-y divide-slate-100">
                   {cashFlow
                     .filter((cash) => {
+                      const matchEntity = selectedEntity === "ALL" || (cash.businessEntity || "PT") === selectedEntity;
+                      if (!matchEntity) return false;
                       if (cashAccountFilter === "ALL") return true;
                       if (cashAccountFilter === "TUNAI") {
                         return (
@@ -7015,6 +7179,78 @@ export default function AdminFinanceERPPage() {
             </div>
 
             <form onSubmit={handleCreateSaleSubmit} className="space-y-4 text-xs">
+              {/* Profil Entitas & Badan Usaha (PT vs DSTech Smart Non-PT) */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <label className="text-[11px] font-black text-slate-800 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-dstech-blue" />
+                    Pilih Badan Usaha / Profil Faktur:
+                  </span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    saleForm.businessEntity === "NON_PT" 
+                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
+                      : "bg-blue-100 text-blue-800 border border-blue-200"
+                  }`}>
+                    {saleForm.businessEntity === "NON_PT" ? "Non-PKP / 0% PPN (Bebas PPN)" : "PKP / PPN 11% Resmi PT"}
+                  </span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label
+                    onClick={() => {
+                      setSaleForm((prev) => ({
+                        ...prev,
+                        businessEntity: "PT",
+                        taxRate: prev.taxRate === 0 ? 11 : prev.taxRate,
+                      }));
+                    }}
+                    className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                      saleForm.businessEntity !== "NON_PT"
+                        ? "bg-blue-50/80 border-blue-300 ring-2 ring-blue-500/20"
+                        : "bg-white border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sale-entity"
+                      checked={saleForm.businessEntity !== "NON_PT"}
+                      onChange={() => {}}
+                      className="mt-0.5 text-dstech-blue"
+                    />
+                    <div>
+                      <p className="font-black text-xs text-slate-900">PT. DSTech Smart Perkasa</p>
+                      <p className="text-[10px] text-slate-500">Kop resmi PT, NIB & NPWP, PPN 11%, Rekening Bank PT</p>
+                    </div>
+                  </label>
+
+                  <label
+                    onClick={() => {
+                      setSaleForm((prev) => ({
+                        ...prev,
+                        businessEntity: "NON_PT",
+                        taxRate: 0,
+                      }));
+                    }}
+                    className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                      saleForm.businessEntity === "NON_PT"
+                        ? "bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20"
+                        : "bg-white border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sale-entity"
+                      checked={saleForm.businessEntity === "NON_PT"}
+                      onChange={() => {}}
+                      className="mt-0.5 text-emerald-600"
+                    />
+                    <div>
+                      <p className="font-black text-xs text-slate-900">DSTech Smart (Usaha Mandiri)</p>
+                      <p className="text-[10px] text-slate-500">Kop DSTech Smart, Bebas PPN (0%), Rekening Pribadi</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               {/* Quick Select Client from Master Data */}
               <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200/80 space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -8394,7 +8630,7 @@ export default function AdminFinanceERPPage() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
-                            PT. DSTECH SMART PERKASA
+                            {selectedInvoiceForPrint.businessEntity === "NON_PT" ? "DSTECH SMART" : "PT. DSTECH SMART PERKASA"}
                           </span>
                         </div>
                         <p className="text-[11px] font-bold text-slate-600">
@@ -8403,7 +8639,13 @@ export default function AdminFinanceERPPage() {
                         <p className="text-[10px] text-slate-500 leading-relaxed max-w-md">
                           Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
                           <br />
-                          <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>
+                          {selectedInvoiceForPrint.businessEntity === "NON_PT" ? (
+                            <span>Usaha Mandiri Non-PKP (Bebas PPN 0%)</span>
+                          ) : (
+                            <>
+                              <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>
+                            </>
+                          )}
                           <br />
                           WhatsApp CS: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
                         </p>
@@ -8786,20 +9028,26 @@ export default function AdminFinanceERPPage() {
                     </div>
                   </div>
 
-                  {/* Sisi Kanan: Pengirim / PT. DSTech Smart Perkasa */}
+                  {/* Sisi Kanan: Pengirim / Entitas Penerbit */}
                   <div className="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
                     <div>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
-                      <p className="text-xs font-black text-dstech-blue mt-0.5">PT. DSTech Smart Perkasa</p>
+                      <p className="text-xs font-black text-dstech-blue mt-0.5">
+                        {selectedInvoiceForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                      </p>
                     </div>
 
                     <div className="h-11 relative flex items-center justify-center">
                       {selectedInvoiceForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
-                          {/* Stempel Bulat Digital Resmi PT DSTech */}
+                          {/* Stempel Bulat Digital Resmi */}
                           <div className="print-stamp-circle absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-dstech-blue/50 flex flex-col items-center justify-center text-[6px] text-dstech-blue font-bold uppercase rotate-[-12deg] pointer-events-none bg-blue-50/40">
-                            <span className="font-black text-[5.5px]">PT. DSTECH</span>
-                            <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="font-black text-[5.5px]">
+                              {selectedInvoiceForPrint.businessEntity === "NON_PT" ? "DSTECH" : "PT. DSTECH"}
+                            </span>
+                            <span className="text-[4.5px] tracking-tight">
+                              {selectedInvoiceForPrint.businessEntity === "NON_PT" ? "SMART SERVICES" : "SMART PERKASA"}
+                            </span>
                             <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">DIGITAL SIGN</span>
                           </div>
 
@@ -8988,7 +9236,9 @@ export default function AdminFinanceERPPage() {
                       </div>
                     </div>
                     <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">Paraf PT. DSTech Smart Perkasa</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">
+                        Paraf {selectedInvoiceForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                      </p>
                       <div className="h-10 flex items-center justify-center font-serif italic text-xs font-bold text-slate-800">
                         {selectedInvoiceForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
                       </div>
@@ -9040,6 +9290,78 @@ export default function AdminFinanceERPPage() {
               onSubmit={isEditQuotationModalOpen ? handleSaveEditQuotationSubmit : handleCreateQuotationSubmit}
               className="space-y-4 text-xs"
             >
+              {/* Profil Entitas & Badan Usaha (PT vs DSTech Smart Non-PT) */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <label className="text-[11px] font-black text-slate-800 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                    Pilih Badan Usaha / Profil Penerbit SPH:
+                  </span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    quotationForm.businessEntity === "NON_PT" 
+                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
+                      : "bg-blue-100 text-blue-800 border border-blue-200"
+                  }`}>
+                    {quotationForm.businessEntity === "NON_PT" ? "Non-PKP / 0% PPN (Bebas PPN)" : "PKP / PPN 11% Resmi PT"}
+                  </span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label
+                    onClick={() => {
+                      setQuotationForm((prev) => ({
+                        ...prev,
+                        businessEntity: "PT",
+                        taxRate: prev.taxRate === 0 ? 11 : prev.taxRate,
+                      }));
+                    }}
+                    className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                      quotationForm.businessEntity !== "NON_PT"
+                        ? "bg-blue-50/80 border-blue-300 ring-2 ring-blue-500/20"
+                        : "bg-white border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sph-entity"
+                      checked={quotationForm.businessEntity !== "NON_PT"}
+                      onChange={() => {}}
+                      className="mt-0.5 text-indigo-600"
+                    />
+                    <div>
+                      <p className="font-black text-xs text-slate-900">PT. DSTech Smart Perkasa</p>
+                      <p className="text-[10px] text-slate-500">Kop resmi PT, NIB & NPWP, PPN 11%, Rekening Bank PT</p>
+                    </div>
+                  </label>
+
+                  <label
+                    onClick={() => {
+                      setQuotationForm((prev) => ({
+                        ...prev,
+                        businessEntity: "NON_PT",
+                        taxRate: 0,
+                      }));
+                    }}
+                    className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                      quotationForm.businessEntity === "NON_PT"
+                        ? "bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20"
+                        : "bg-white border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sph-entity"
+                      checked={quotationForm.businessEntity === "NON_PT"}
+                      onChange={() => {}}
+                      className="mt-0.5 text-emerald-600"
+                    />
+                    <div>
+                      <p className="font-black text-xs text-slate-900">DSTech Smart (Usaha Mandiri)</p>
+                      <p className="text-[10px] text-slate-500">Kop DSTech Smart, Bebas PPN (0%), Rekening Pribadi</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               {/* Quick Select Client from Master Data */}
               <div className="p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-200/80 space-y-2">
                 <div className="flex items-center justify-between">
@@ -10193,7 +10515,7 @@ export default function AdminFinanceERPPage() {
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="text-xl sm:text-2xl font-black text-dstech-red tracking-tight">
-                        PT. DSTECH SMART PERKASA
+                        {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTECH SMART" : "PT. DSTECH SMART PERKASA"}
                       </span>
                     </div>
                     <p className="text-[11px] font-bold text-slate-600">
@@ -10202,7 +10524,13 @@ export default function AdminFinanceERPPage() {
                     <p className="text-[10px] text-slate-500 leading-relaxed max-w-md">
                       Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
                       <br />
-                      <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>
+                      {selectedQuotationForPrint.businessEntity === "NON_PT" ? (
+                        <span>Usaha Mandiri Non-PKP (Bebas PPN 0%)</span>
+                      ) : (
+                        <>
+                          <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>
+                        </>
+                      )}
                       <br />
                       WhatsApp: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
                     </p>
@@ -10393,20 +10721,26 @@ export default function AdminFinanceERPPage() {
                     </div>
                   </div>
 
-                  {/* Sisi Kanan: Hormat Kami PT. DSTech Smart Perkasa */}
+                  {/* Sisi Kanan: Hormat Kami */}
                   <div className="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
                     <div>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
-                      <p className="text-xs font-black text-indigo-700 mt-0.5">PT. DSTech Smart Perkasa</p>
+                      <p className="text-xs font-black text-indigo-700 mt-0.5">
+                        {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                      </p>
                     </div>
 
                     <div className="h-11 relative flex items-center justify-center">
                       {selectedQuotationForPrint.approvalStatus === "Disetujui & Sah" ? (
                         <>
-                          {/* Stempel Bulat Digital Resmi PT DSTech */}
+                          {/* Stempel Bulat Digital Resmi */}
                           <div className="print-stamp-circle absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[6px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
-                            <span className="font-black text-[5.5px]">PT. DSTECH</span>
-                            <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="font-black text-[5.5px]">
+                              {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTECH" : "PT. DSTECH"}
+                            </span>
+                            <span className="text-[4.5px] tracking-tight">
+                              {selectedQuotationForPrint.businessEntity === "NON_PT" ? "SMART SERVICES" : "SMART PERKASA"}
+                            </span>
                             <span className="text-[4px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL SPH</span>
                           </div>
 
@@ -10600,7 +10934,9 @@ export default function AdminFinanceERPPage() {
                       </div>
                     </div>
                     <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">Paraf PT. DSTech Smart Perkasa</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">
+                        Paraf {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                      </p>
                       <div className="h-10 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
                         {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
                       </div>
