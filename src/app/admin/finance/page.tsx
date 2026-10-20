@@ -46,6 +46,7 @@ import {
   PenTool,
   CheckCheck,
   Eraser,
+  ClipboardCheck,
 } from "lucide-react";
 
 interface SaleItem {
@@ -449,6 +450,62 @@ export default function AdminFinanceERPPage() {
       setPrintBillingStage("Full");
     }
     setSelectedInvoiceForPrint(invoice);
+  };
+
+  // BAST (Berita Acara Serah Terima Pekerjaan Proyek) States
+  const [selectedSaleForBast, setSelectedSaleForBast] = useState<SaleInvoice | null>(null);
+  const [isBastModalOpen, setIsBastModalOpen] = useState<boolean>(false);
+  const [isBastConfigExpanded, setIsBastConfigExpanded] = useState<boolean>(false);
+  const [bastConfig, setBastConfig] = useState<{
+    bastNumber: string;
+    bastDate: string;
+    projectLocation: string;
+    projectName: string;
+    handedByName: string;
+    handedByTitle: string;
+    receivedByName: string;
+    receivedByTitle: string;
+    warrantyHardware: string;
+    warrantyMaintenance: string;
+    notes: string;
+    includeDspSignature: boolean;
+  }>({
+    bastNumber: "",
+    bastDate: new Date().toISOString().split("T")[0],
+    projectLocation: "",
+    projectName: "Pengadaan & Instalasi Sistem Keamanan & IT Infrastructure",
+    handedByName: "Ahmad Romadhoni",
+    handedByTitle: "Direktur PT. DSTech Smart Perkasa",
+    receivedByName: "",
+    receivedByTitle: "Penanggung Jawab / Klien",
+    warrantyHardware: "2 (dua) tahun garansi resmi unit pabrikan",
+    warrantyMaintenance: "6 (enam) bulan pemeliharaan teknis PT. DSTech Smart Perkasa",
+    notes: "Seluruh perangkat dan instalasi telah melalui tahapan uji fungsi (commissioning test) bersama dan dinyatakan dalam kondisi 100% lengkap, baik, dan beroperasi normal.",
+    includeDspSignature: true,
+  });
+
+  const handleOpenBastModal = (sale: SaleInvoice) => {
+    const invClean = sale.invoiceNumber ? sale.invoiceNumber.replace(/^INV-/, "") : "001";
+    const romanMonths = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+    const romanMonth = romanMonths[new Date().getMonth()] || "X";
+    const currentYear = new Date().getFullYear();
+
+    setBastConfig({
+      bastNumber: `BAST/DSP/${romanMonth}/${currentYear}/${invClean}`,
+      bastDate: new Date().toISOString().split("T")[0],
+      projectLocation: sale.customerAddress || "Lokasi Proyek Klien",
+      projectName: `Pengadaan & Instalasi - ${sale.customerName || "Proyek Klien"}`,
+      handedByName: financeSettings.signerName || "Ahmad Romadhoni",
+      handedByTitle: financeSettings.signerTitle || "Direktur PT. DSTech Smart Perkasa",
+      receivedByName: sale.customerName || "Bapak/Ibu Pimpinan",
+      receivedByTitle: "Penanggung Jawab / Klien",
+      warrantyHardware: "2 (dua) tahun garansi resmi unit pabrikan",
+      warrantyMaintenance: "6 (enam) bulan pemeliharaan teknis PT. DSTech Smart Perkasa",
+      notes: "Seluruh perangkat dan instalasi telah melalui tahapan uji fungsi (commissioning test) bersama dan dinyatakan dalam kondisi 100% lengkap, baik, dan beroperasi normal.",
+      includeDspSignature: true,
+    });
+    setSelectedSaleForBast(sale);
+    setIsBastModalOpen(true);
   };
   const [cashAccountFilter, setCashAccountFilter] = useState<string>("ALL");
 
@@ -2897,7 +2954,8 @@ export default function AdminFinanceERPPage() {
     selectedQuotationForPrint ||
     selectedPoForPrint ||
     selectedReturnSaleForPrint ||
-    selectedReturnPurchaseForPrint
+    selectedReturnPurchaseForPrint ||
+    isBastModalOpen
   );
 
   return (
@@ -3398,6 +3456,16 @@ export default function AdminFinanceERPPage() {
                                 <span className="hidden xl:inline">Tagih Pelunasan</span>
                               </button>
                             )}
+
+                            {/* Tombol Cetak Berita Acara Serah Terima (BAST) */}
+                            <button
+                              onClick={() => handleOpenBastModal(sale)}
+                              title="Cetak Berita Acara Serah Terima Pekerjaan (BAST)"
+                              className="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                            >
+                              <ClipboardCheck className="w-3.5 h-3.5" />
+                              <span className="hidden xl:inline">BAST</span>
+                            </button>
 
                             {/* Cetak Faktur Resmi Kop DSTech */}
                             <button
@@ -5658,6 +5726,19 @@ export default function AdminFinanceERPPage() {
                     }`}
                   >
                     <span>📋 Kontrak Utuh</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = selectedInvoiceForPrint;
+                      setSelectedInvoiceForPrint(null);
+                      handleOpenBastModal(s);
+                    }}
+                    title="Buka Dokumen Berita Acara Serah Terima (BAST)"
+                    className="px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 shadow-sm"
+                  >
+                    <ClipboardCheck className="w-3.5 h-3.5 text-purple-600" />
+                    <span>📄 Cetak BAST Proyek</span>
                   </button>
                 </div>
               </div>
@@ -10466,6 +10547,453 @@ export default function AdminFinanceERPPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL CETAK LEMBAR BERITA ACARA SERAH TERIMA PEKERJAAN (BAST) (A4 FORMAT) */}
+      {isBastModalOpen && selectedSaleForBast && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
+          onClick={() => setIsBastModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Action Bar (Top) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <ClipboardCheck className="w-4 h-4 text-purple-600" />
+                Berita Acara Serah Terima Pekerjaan (BAST Proyek) — Dokumen Resmi A4
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBastConfigExpanded(!isBastConfigExpanded)}
+                  className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border border-purple-200"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>{isBastConfigExpanded ? "Tutup Form Edit" : "Edit Data BAST"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenSettingsModal}
+                  title="Ganti Background Kop Surat"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-red-600" />
+                  <span>Kop Surat</span>
+                </button>
+
+                {selectedSaleForBast.invoiceType === "DP" && selectedSaleForBast.remainingAmount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = selectedSaleForBast;
+                      setIsBastModalOpen(false);
+                      handleOpenPrintInvoice(s, "Pelunasan");
+                    }}
+                    title="Lanjut Buka Lembar Tagihan Pelunasan Kontrak"
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <Receipt className="w-3.5 h-3.5" />
+                    <span>Lanjut Tagih Pelunasan</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak BAST / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setIsBastModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Form Kustomisasi BAST Interaktif */}
+            {isBastConfigExpanded && (
+              <div className="p-4 rounded-2xl bg-slate-50 border border-purple-200 space-y-3 text-xs print:hidden animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <p className="font-black text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                    Penyesuaian Data Lembar Berita Acara (BAST):
+                  </p>
+                  <span className="text-[10px] text-slate-500">Perubahan langsung ter-update di lembar cetak di bawah</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Nomor BAST</label>
+                    <input
+                      type="text"
+                      value={bastConfig.bastNumber}
+                      onChange={(e) => setBastConfig({ ...bastConfig, bastNumber: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Tanggal BAST</label>
+                    <input
+                      type="date"
+                      value={bastConfig.bastDate}
+                      onChange={(e) => setBastConfig({ ...bastConfig, bastDate: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Nama Proyek / Pekerjaan</label>
+                    <input
+                      type="text"
+                      value={bastConfig.projectName}
+                      onChange={(e) => setBastConfig({ ...bastConfig, projectName: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Lokasi Proyek / Pekerjaan</label>
+                    <input
+                      type="text"
+                      value={bastConfig.projectLocation}
+                      onChange={(e) => setBastConfig({ ...bastConfig, projectLocation: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Yang Menyerahkan (DSTech)</label>
+                    <input
+                      type="text"
+                      value={bastConfig.handedByName}
+                      onChange={(e) => setBastConfig({ ...bastConfig, handedByName: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Jabatan Penyerah (DSTech)</label>
+                    <input
+                      type="text"
+                      value={bastConfig.handedByTitle}
+                      onChange={(e) => setBastConfig({ ...bastConfig, handedByTitle: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Yang Menerima (Klien / PIC)</label>
+                    <input
+                      type="text"
+                      value={bastConfig.receivedByName}
+                      onChange={(e) => setBastConfig({ ...bastConfig, receivedByName: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Jabatan Penerima (Klien)</label>
+                    <input
+                      type="text"
+                      value={bastConfig.receivedByTitle}
+                      onChange={(e) => setBastConfig({ ...bastConfig, receivedByTitle: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Garansi Unit Hardware</label>
+                    <input
+                      type="text"
+                      value={bastConfig.warrantyHardware}
+                      onChange={(e) => setBastConfig({ ...bastConfig, warrantyHardware: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Garansi Pemeliharaan Teknis</label>
+                    <input
+                      type="text"
+                      value={bastConfig.warrantyMaintenance}
+                      onChange={(e) => setBastConfig({ ...bastConfig, warrantyMaintenance: e.target.value })}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
+                  <input
+                    type="checkbox"
+                    id="includeDspSigBast"
+                    checked={bastConfig.includeDspSignature}
+                    onChange={(e) => setBastConfig({ ...bastConfig, includeDspSignature: e.target.checked })}
+                    className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                  />
+                  <label htmlFor="includeDspSigBast" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                    Bubuhkan Tanda Tangan &amp; Stempel Resmi PT. DSTech Smart Perkasa
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Tips Cetak Pas Penuh Kertas A4 */}
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 print:hidden">
+              <span className="text-base leading-none">💡</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Tips Cetak Pas Penuh Kertas A4 (Full Bleed):</p>
+                <p className="text-[11px] text-amber-800">
+                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4 dan tidak terbagi 2 halaman.
+                </p>
+              </div>
+            </div>
+
+            {/* A4 OFFICIAL PRINT CONTAINER */}
+            <div
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-3.5 print:space-y-2 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              style={{
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
+              }}
+            >
+              {/* Background Kop Surat Resmi DSTech */}
+              {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                <img
+                  src={financeSettings.letterheadUrl}
+                  alt="Kop Surat Resmi"
+                  className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                    financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                  }`}
+                  style={{
+                    objectFit:
+                      financeSettings.letterheadFitMode === "cover"
+                        ? "cover"
+                        : financeSettings.letterheadFitMode === "contain"
+                        ? "contain"
+                        : "fill",
+                    objectPosition: "top center",
+                    width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                    height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                    top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                    left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
+                    opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                    WebkitPrintColorAdjust: "exact",
+                    printColorAdjust: "exact",
+                  }}
+                />
+              )}
+
+              <div className="relative z-10 space-y-3 print:space-y-2">
+                {/* Kop Surat Perusahaan */}
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-slate-900 pb-3">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-dstech-blue flex items-center justify-center text-white font-black text-base shadow">
+                        DSP
+                      </div>
+                      <div>
+                        <h2 className="font-black text-slate-900 text-sm tracking-tight leading-none uppercase">
+                          PT. DSTECH SMART PERKASA
+                        </h2>
+                        <p className="text-[10px] text-dstech-blue font-bold tracking-wider mt-0.5">
+                          SOLUSI SECURITY SYSTEM &amp; IT INFRASTRUCTURE
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[9.5px] text-slate-600 max-w-sm leading-tight mt-1">
+                      Jl. KH Wasyid No. 88, Jombang Masjid, Cilegon - Banten 42411
+                      <br />
+                      NIB: 1205240058291 | NPWP: 40.231.890.1-417.000
+                    </p>
+                  </div>
+                  <div className="sm:text-right space-y-0.5">
+                    <span className="inline-block px-3 py-1 rounded-md bg-purple-700 text-white font-black text-[10px] tracking-wider uppercase shadow-sm">
+                      BERITA ACARA SERAH TERIMA (BAST)
+                    </span>
+                    <p className="text-[10px] text-slate-500 font-mono font-bold mt-1">
+                      No: <span className="text-slate-900">{bastConfig.bastNumber}</span>
+                    </p>
+                    <p className="text-[9.5px] text-slate-500">
+                      Ref Faktur: <span className="font-mono font-bold text-slate-800">{selectedSaleForBast.invoiceNumber}</span>
+                    </p>
+                    <p className="text-[9.5px] text-slate-500">
+                      Tanggal: <span className="font-bold text-slate-800">{bastConfig.bastDate}</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Paragraf Pembuka & Dasar Kesepakatan */}
+                <div className="text-[10.5px] text-slate-700 leading-relaxed space-y-1">
+                  <p>
+                    Pada hari ini, <strong className="text-slate-900">{bastConfig.bastDate}</strong>, bertempat di{" "}
+                    <strong className="text-slate-900">{bastConfig.projectLocation}</strong>, kami yang bertanda tangan di bawah ini:
+                  </p>
+                </div>
+
+                {/* Identitas Dua Belah Pihak (Grid 2 Kolom Kompak) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] bg-slate-50/90 p-2.5 rounded-xl border border-slate-200">
+                  <div className="space-y-0.5 border-r border-slate-200 pr-2">
+                    <p className="font-black text-purple-900 uppercase tracking-wider text-[9.5px]">
+                      PIHAK I (YANG MENYERAHKAN):
+                    </p>
+                    <p className="font-bold text-slate-900 text-[11px]">{bastConfig.handedByName}</p>
+                    <p className="text-slate-600">{bastConfig.handedByTitle}</p>
+                    <p className="text-slate-600 font-semibold">PT. DSTech Smart Perkasa — Cilegon, Banten</p>
+                  </div>
+                  <div className="space-y-0.5 pl-1">
+                    <p className="font-black text-purple-900 uppercase tracking-wider text-[9.5px]">
+                      PIHAK II (YANG MENERIMA):
+                    </p>
+                    <p className="font-bold text-slate-900 text-[11px]">{bastConfig.receivedByName}</p>
+                    <p className="text-slate-600">{bastConfig.receivedByTitle}</p>
+                    <p className="text-slate-600 font-semibold">{selectedSaleForBast.customerName} ({bastConfig.projectLocation})</p>
+                  </div>
+                </div>
+
+                {/* Klausul Pernyataan Uji Fungsi */}
+                <div className="text-[10px] text-slate-700 leading-tight">
+                  <p>
+                    Kedua belah pihak sepakat bahwa <strong>PIHAK PERTAMA</strong> telah menyelesaikan pekerjaan pengadaan, instalasi, dan uji fungsi (<em>Commissioning Test</em>), serta <strong>PIHAK KEDUA</strong> telah memeriksa dan menerima hasil pekerjaan/perangkat berikut dalam kondisi <strong>100% LENGKAP, BAIK, DAN BERFUNGSI NORMAL</strong>:
+                  </p>
+                </div>
+
+                {/* Tabel Spesifikasi Unit / Lingkup Pekerjaan */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden">
+                  <table className="w-full text-[10px] text-left">
+                    <thead className="bg-slate-900 text-white font-bold">
+                      <tr>
+                        <th className="p-2 text-center w-8">No</th>
+                        <th className="p-2">Deskripsi Barang &amp; Ruang Lingkup Pekerjaan</th>
+                        <th className="p-2 text-center w-20">Volume / Qty</th>
+                        <th className="p-2 text-center w-28">Status Uji Fungsi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {selectedSaleForBast.items && selectedSaleForBast.items.length > 0 ? (
+                        selectedSaleForBast.items.map((item, idx) => (
+                          <tr key={item.id || idx}>
+                            <td className="p-2 text-center font-bold text-slate-600">{idx + 1}</td>
+                            <td className="p-2">
+                              <p className="font-bold text-slate-900">{item.productName}</p>
+                              <p className="text-[9px] text-slate-500">Pemasangan terpasang rapi, terkonfigurasi, &amp; lolos uji operasional</p>
+                            </td>
+                            <td className="p-2 text-center font-bold text-slate-800">
+                              {item.qty} {item.unit || "Unit"}
+                            </td>
+                            <td className="p-2 text-center">
+                              <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[9px] border border-emerald-300">
+                                ✓ Baik &amp; Teruji 100%
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td className="p-2 text-center font-bold">1</td>
+                          <td className="p-2">
+                            <p className="font-bold text-slate-900">{bastConfig.projectName}</p>
+                            <p className="text-[9px] text-slate-500">Seluruh unit perangkat keras dan instalasi teknis terkait</p>
+                          </td>
+                          <td className="p-2 text-center font-bold">1 Paket</td>
+                          <td className="p-2 text-center">
+                            <span className="inline-block px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[9px] border border-emerald-300">
+                              ✓ Baik &amp; Teruji 100%
+                            </span>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Ketentuan Garansi & Hak Penagihan Pelunasan */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[9.5px] p-2 rounded-xl bg-purple-50/60 border border-purple-200">
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-purple-950 uppercase tracking-tight">Ketentuan Layanan Purna Jual &amp; Garansi:</p>
+                    <p className="text-slate-700">• Garansi Perangkat: <span className="font-semibold text-slate-900">{bastConfig.warrantyHardware}</span></p>
+                    <p className="text-slate-700">• Garansi Pemeliharaan: <span className="font-semibold text-slate-900">{bastConfig.warrantyMaintenance}</span></p>
+                  </div>
+                  <div className="space-y-0.5 sm:border-l sm:border-purple-200 sm:pl-2">
+                    <p className="font-bold text-purple-950 uppercase tracking-tight">Klausul Penagihan Pelunasan Kontrak:</p>
+                    <p className="text-slate-700">
+                      Dengan ditandatanganinya Berita Acara ini, pekerjaan dinyatakan rampung dan sah, sehingga proses penagihan pelunasan sisa kontrak dapat diterbitkan oleh PIHAK PERTAMA.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Blok Tanda Tangan Dual Signature (DSTech & Klien) */}
+                <div className="pt-2 border-t border-slate-300 grid grid-cols-2 gap-4">
+                  {/* Pihak I: DSTech */}
+                  <div className="text-center space-y-1">
+                    <p className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">
+                      PIHAK I (YANG MENYERAHKAN),
+                    </p>
+                    <p className="text-[11px] font-black text-slate-900">PT. DSTech Smart Perkasa</p>
+
+                    <div className="h-11 relative flex items-center justify-center">
+                      {bastConfig.includeDspSignature ? (
+                        <>
+                          {/* Stempel Bulat Digital Resmi DSTech */}
+                          <div className="absolute right-4 w-12 h-12 rounded-full border-2 border-dashed border-red-600/60 flex flex-col items-center justify-center text-[6px] text-red-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-red-50/40">
+                            <span className="font-black text-[5.5px]">PT. DSTECH</span>
+                            <span className="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                            <span className="text-[4px] text-dstech-blue font-mono font-black mt-0.5">OFFICIAL BAST</span>
+                          </div>
+
+                          {financeSettings.masterSignatureUrl ? (
+                            <img
+                              src={financeSettings.masterSignatureUrl}
+                              alt="Tanda Tangan DSP"
+                              className="max-h-11 max-w-[130px] object-contain relative z-10"
+                            />
+                          ) : (
+                            <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
+                              {bastConfig.handedByName}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="font-serif italic text-sm text-slate-400 select-none">
+                          ( Tanda Tangan &amp; Stempel Basah )
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-1 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-[11px]">
+                        ( {bastConfig.handedByName} )
+                      </p>
+                      <p className="text-[9px] text-slate-500 mt-0.5">
+                        {bastConfig.handedByTitle}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Pihak II: Klien / Instansi */}
+                  <div className="text-center space-y-1">
+                    <p className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">
+                      PIHAK II (YANG MENERIMA),
+                    </p>
+                    <p className="text-[11px] font-black text-slate-900">{selectedSaleForBast.customerName}</p>
+
+                    <div className="h-11 flex items-center justify-center">
+                      <div className="font-serif italic text-sm text-slate-400 select-none">
+                        ( Tanda Tangan &amp; Materai / Stempel Klien )
+                      </div>
+                    </div>
+
+                    <div className="pt-1 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-[11px]">
+                        ( {bastConfig.receivedByName} )
+                      </p>
+                      <p className="text-[9px] text-slate-500 mt-0.5">
+                        {bastConfig.receivedByTitle}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isPayInvoiceModalOpen && selectedInvoiceForPayment && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"

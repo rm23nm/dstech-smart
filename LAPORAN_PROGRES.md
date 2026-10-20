@@ -49,6 +49,7 @@
 - **2026-10-20**: Pemadatan & Perapihan Blok Tanda Tangan Dokumen Cetak Resmi (Faktur, SPH, PO, dan Retur). Merapatkan jarak vertikal blok tanda tangan resmi pada seluruh 5 template dokumen cetak resmi (Faktur Penjualan, SPH Quotation, Purchase Order Supplier, BAST Retur Penjualan, dan BAST Retur Pembelian) dari tinggi awal `h-48` / `h-52` (192-208px) menjadi `h-36` (144px), memperkecil padding kontainer dari `pt-6` ke `pt-3` dan jarak antar kolom dari `gap-6` / `gap-8` ke `gap-4`. Menyesuaikan area tanda tangan digital & stempel resmi ke skala kompak (`h-11`, stempel `w-12 h-12`, gambar tanda tangan `max-h-11`) serta mempersempit jarak antara nama organisasi di atas dengan nama penandatangan di bawah (`pt-1` border-t). Menghasilkan penghematan ruang vertikal hingga 65px sehingga dokumen dengan banyak baris item barang tetap muat rapi dalam 1 lembar A4 tanpa terpotong ke bawah.
 - **2026-10-20**: Pembenahan Tuntas Masalah Kop Surat Terpotong Saat Cetak (Print Stylesheet Isolation, Layout Padding Reset, & Vertical Geometry Tuning). Mengatasi masalah kop surat yang masih terpotong (baik di bagian footer banner yang terbelah ke halaman 2 maupun bagian banner atas). Melakukan isolasi cetak penuh pada `.print-modal-backdrop` dengan `position: fixed !important; inset: 0 !important; z-index: 999999 !important;` untuk menembus/mengabaikan padding 40px bawaan layout admin (`AdminLayout`), mengunci lembar dokumen tepat pada batas fisik A4 (`max-height: 296mm; height: 296mm; overflow: hidden; page-break-after: avoid;`), menyempurnakan geometri skala mode `bleed` (offset presisi -1% sesuai margin asli Canva 12px) dan mode `fill` (100% utuh tanpa potong), serta merapatkan jarak spasi vertikal antar seksi dokumen (`space-y-4 print:space-y-2.5`, padding atas 80px, padding bawah 75px) di seluruh 5 template resmi agar seluruh kop dan isi faktur selalu tampil pas 1 halaman penuh.
 - **2026-10-20**: Fitur Lengkap Penagihan Pelunasan (Faktur Pelunasan Sisa Kontrak Pasca DP / BAST). Menyediakan alur resmi penagihan pelunasan sisa kontrak proyek yang sebelumnya belum tersedia setelah faktur DP terbentuk. Menambahkan pemilih mode dokumen cetak (`printBillingStage`: "DP" | "Pelunasan" | "Full") pada faktur penjualan, sehingga admin dapat mencetak lembar resmi "FAKTUR PENAGIHAN PELUNASAN KONTRAK" lengkap dengan banner pelunasan pasca BAST, rincian potongan uang muka DP yang telah diterima lunas, sisa tagihan jatuh tempo, instruksi transfer, dan otorisasi tanda tangan. Menambahkan tombol aksi cepat "Tagih Pelunasan" pada tabel penjualan serta menyempurnakan form terima pembayaran pelunasan.
+- **2026-10-20**: Pembuatan Fitur & Template Cetak Berita Acara Serah Terima Pekerjaan & Pengadaan Barang (BAST Proyek Resmi A4). Menyediakan modul dan dokumen resmi BAST sebagai bukti sah bahwa pekerjaan/barang telah selesai dipasang, diuji (commissioning test), dan diserahterimakan dalam kondisi 100% baik kepada klien. Menjadi dokumen prasyarat hukum penagihan faktur pelunasan kontrak pasca DP. Dilengkapi form kustomisasi pihak penyerah/penerima, masa garansi hardware & pemeliharaan, klausul serah terima, rincian barang teruji, tanda tangan dual-pihak (DSP & Klien), serta tombol akses cepat di tabel penjualan dan modal faktur.
 
 
 
@@ -1455,7 +1456,86 @@
 
 ---
 
-### 52. Catatan Penting
+---
+
+### 52. Tugas: Pembuatan Fitur & Template Cetak Berita Acara Serah Terima Pekerjaan & Pengadaan Barang (BAST Proyek Resmi A4)
+- **Permintaan Pengguna**:
+  *"terkait dengan Berita Acara serah terima bisa dibuatkan"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Investigasi Mendalam & Analisis Kebutuhan**:
+  1. **Urgensi Dokumen BAST dalam Siklus Kontrak Proyek**:
+     - Pada klausul kontrak DSTech: *"Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST)."*
+     - BAST adalah bukti hukum bahwa seluruh pengadaan perangkat keras (CCTV, Barrier Gate, Smart Home, IT Infrastructure) dan jasa instalasi telah selesai dikerjakan, diuji coba (commissioning test), dan diserahterimakan kepada pihak klien dalam keadaan 100% berfungsi baik.
+     - Tanpa BAST yang sah dan ditandatangani oleh kedua belah pihak, klien instansi/korporat tidak dapat mencairkan pembayaran pelunasan sisa kontrak.
+  2. **Komponen Dokumen BAST Resmi Standar DSTech**:
+     - **Nomor Dokumen & Tanggal**: Nomor BAST terstruktur (`BAST/DSP/X/2026/...`) dan tanggal serah terima.
+     - **Referensi Proyek / Kontrak**: Mengaitkan langsung ke Nomor Faktur Penjualan (`INV-...`), No SPH, nama proyek, dan lokasi instalasi.
+     - **Identitas Kedua Belah Pihak**:
+       - *PIHAK PERTAMA (Yang Menyerahkan)*: PT. DSTech Smart Perkasa (Nama PIC & Jabatan).
+       - *PIHAK KEDUA (Yang Menerima)*: Klien / Instansi Pemesan (Nama PIC Klien & Jabatan).
+     - **Pernyataan Kesepakatan Serah Terima**: Pasal kesepakatan bahwa pekerjaan telah selesai 100%, telah diuji bersama, dan diterima tanpa cacat.
+     - **Tabel Daftar Perangkat & Ruang Lingkup yang Diserahkan**: Daftar produk/pekerjaan dari rincian faktur dengan kolom status kelayakan ("Baik & Berfungsi Normal 100%").
+     - **Ketentuan Garansi & Purna Jual**: Menegaskan masa garansi produk (1-2 tahun) dan pemeliharaan teknis (3-6 bulan).
+     - **Pengesahan Legalitas (Dual Tanda Tangan)**: Kolom tanda tangan Pihak Pertama (DSTech dengan stempel & tanda tangan digital/basah) dan Pihak Kedua (Klien).
+  3. **Aksesibilitas & User Experience**:
+     - Menambahkan tombol aksi khusus **"BAST"** (ikon ClipboardCheck) pada tabel penjualan.
+     - Menambahkan tombol pintasan **"📄 Cetak BAST"** pada modal pratinjau faktur agar alur penagihan pelunasan saling terhubung.
+     - Modal kustomisasi BAST interaktif untuk mengubah nama PIC, jabatan, lokasi, dan tanggal sebelum dicetak.
+     - Mengikuti standar cetak A4 presisi (`.print-modal-backdrop` dan `.print-document-sheet` isolasi penuh, kompatibel dengan kop surat resmi).
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **State & Helper BAST di `admin/finance/page.tsx`**:
+     - Menyiapkan state `selectedSaleForBast: SaleInvoice | null`, `isBastModalOpen: boolean`, dan konfigurasi formulir `bastConfig` (nomor BAST, tanggal, lokasi proyek, PIC penyerah, PIC penerima, garansi hardware, garansi servis, opsi stempel/tanda tangan).
+  2. [x] **Modal Kustomisasi & Template Lembar Cetak BAST A4**:
+     - Membangun modal pratinjau dan template cetak A4 standar DSTech dengan Kop Surat resmi (`letterheadEnabled`), header judul BAST tebal, identitas pihak 1 & 2, klausul serah terima, tabel item barang dengan status fungsi 100%, kotak ketentuan garansi, dan tanda tangan berdampingan.
+  3. [x] **Integrasi Tombol Aksi di Tabel Penjualan & Modal Faktur**:
+     - Menambahkan tombol `BAST` di kolom aksi tabel penjualan.
+     - Menambahkan tombol pintas `Cetak BAST Pekerjaan` di bilah atas modal pratinjau faktur.
+  4. [x] **Validasi TypeScript & Browser Testing**:
+     - Menjalankan `npx tsc --noEmit` memastikan 0 error.
+     - Menguji tampilan dan interaksi modal BAST di browser via `browser_subagent` (diverifikasi tombol BAST membuka modal dengan kop surat, nomor BAST otomatis, tabel barang teruji, dan blok tanda tangan DSTech & Klien).
+  5. [x] **Sinkronisasi Kode ke GitHub**:
+     - Push commit ke `rm23nm/dstech-smart` via `push_with_native_git.js`.
+  6. [x] **Deployment ke Server Live VPS**:
+     - Deploy ke VPS `157.66.34.199:11587`, build produksi Next.js, dan restart PM2 `dstech-main`.
+
+---
+
+### 53. Antrian Tugas: Pembuatan Surat Jalan Pengiriman Material Proyek & Lembar Tanda Terima Barang (Delivery Order / Material Dispatch)
+- **Permintaan Pengguna**:
+  *"kemudian kita juga butuh surat jalan material dan tanda serah terimanya"*
+- **Status**:
+  **Dalam Antrian (Queued - Prioritas Berikutnya)**
+- **Analisis Kebutuhan**:
+  1. Dokumen **Surat Jalan Material (Delivery Order / Bukti Ekspedisi Lapangan)** diperlukan saat tim logistik/teknisi mengirim material dan perangkat (kamera, NVR, kabel roll, switch PoE, barrier gate, tiang, dll.) dari gudang DSTech ke lokasi proyek klien.
+  2. Memuat:
+     - No. Surat Jalan (`SJ/DSP/...`), Tanggal Pengiriman, No. Kendaraan / Supir / Kurir, Gudang Asal, Lokasi Tujuan Proyek.
+     - Tabel Rincian Material: Nama Barang, Spesifikasi, Qty Dikirim, Satuan, Keterangan Kondisi Saat Keluar Gudang.
+     - Tiga Blok Pengesahan Tanda Tangan:
+       - **Yang Menyerahkan (Logistik/Gudang DSTech)**
+       - **Yang Membawa / Ekspedisi (Driver/Teknisi Lapangan)**
+       - **Yang Menerima di Lapangan (Klien/Mandor/Security Penerima)**
+  3. Dokumen tanda serah terima material di lokasi sebagai bukti sah barang fisik telah tiba sebelum pekerjaan instalasi/BAST dilakukan.
+
+---
+
+### 54. Antrian Tugas: Integrasi Katalog Product Management & Ketersediaan Stok Cabang/Gudang pada Pembuatan Penawaran (SPH) & Faktur Penjualan
+- **Permintaan Pengguna**:
+  *"pada pembuatan penawaran dan faktur, sepertinya belum terhubung dengan product-product management. kemudian untuk ketersedian stock barangnya juga pada cabang masih belum terhubung"*
+- **Status**:
+  **Dalam Antrian (Queued - Setelah Task 53)**
+- **Analisis Kebutuhan**:
+  1. **Integrasi Dropdown / Autocomplete Produk dari Modul Product Management (`/admin/products` / `dstech_products`)**:
+     - Saat admin menambah baris item barang pada pembuatan Surat Penawaran Harga (SPH) atau Faktur Penjualan, sistem saat ini masih mengandalkan input teks manual bebas.
+     - Perlu dihubungkan langsung ke katalog produk DSTech (`/api/products`), sehingga saat mengetik nama barang muncul autocomplete/dropdown pilihan produk lengkap dengan harga katalog resmi (MSRP/harga jual acuan), kategori, dan satuan.
+  2. **Pengecekan Ketersediaan Stok Real-Time per Cabang / Titik Gudang**:
+     - Ketika cabang/gudang dipilih (misal: Gudang Cilegon, Gudang Serang, atau Cabang Jakarta), sistem menampilkan sisa ketersediaan stok (*stock on hand*) produk tersebut di titik gudang/cabang terpilih.
+     - Memberikan indikator stok (misal: "Stok Tersedia: 12 Unit di Gudang Cilegon") dan peringatan jika kuantiti yang ditawarkan/dijual melebihi stok yang ada di cabang terkait.
+     - Menghubungkan mutasi pengurangan stok otomatis saat faktur penjualan diterbitkan dari cabang tersebut.
+
+---
+
+### 55. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
