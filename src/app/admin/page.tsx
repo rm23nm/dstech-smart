@@ -18,6 +18,11 @@ import {
   Plus,
   ShieldCheck,
   FolderOpen,
+  FileText,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  XCircle,
 } from "lucide-react";
 
 interface ProductItem {
@@ -37,6 +42,21 @@ interface PartnerItem {
   status?: string;
 }
 
+interface QuotationDashboardItem {
+  id: string;
+  quotationNumber: string;
+  customerName: string;
+  customerOrg?: string;
+  customerPhone?: string;
+  subject: string;
+  date: string;
+  validUntil: string;
+  grandTotal: number;
+  status: string;
+  approvalStatus?: string;
+  convertedInvoiceId?: string;
+}
+
 export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [revenue, setRevenue] = useState<number>(0);
@@ -45,6 +65,14 @@ export default function AdminDashboard() {
   const [growthPercent, setGrowthPercent] = useState<number>(0);
   const [recentProducts, setRecentProducts] = useState<ProductItem[]>([]);
   const [newestPartners, setNewestPartners] = useState<PartnerItem[]>([]);
+
+  // SPH / Quotations States
+  const [quotationsCount, setQuotationsCount] = useState<number>(0);
+  const [quotationsDealCount, setQuotationsDealCount] = useState<number>(0);
+  const [quotationsPendingCount, setQuotationsPendingCount] = useState<number>(0);
+  const [quotationsExpiredCount, setQuotationsExpiredCount] = useState<number>(0);
+  const [quotationsTotalValue, setQuotationsTotalValue] = useState<number>(0);
+  const [recentQuotations, setRecentQuotations] = useState<QuotationDashboardItem[]>([]);
 
   const formatCurrency = (val: number) => {
     if (!val || val === 0) return "Rp 0";
@@ -72,7 +100,7 @@ export default function AdminDashboard() {
         fetch("/api/partners").then((r) => r.json()),
       ]);
 
-      // 1. Finance & Revenue
+      // 1. Finance & Revenue + SPH
       if (resFinance.status === "fulfilled" && resFinance.value?.success) {
         const finData = resFinance.value.data || {};
         const sales = finData.sales || [];
@@ -84,9 +112,46 @@ export default function AdminDashboard() {
         setRevenue(totalRev);
         // Jika ada transaksi, hitung estimasi growth, jika 0 maka 0%
         setGrowthPercent(totalRev > 0 ? 5.2 : 0);
+
+        // Data SPH / Quotations
+        const quots: QuotationDashboardItem[] = finData.quotations || [];
+        setQuotationsCount(quots.length);
+
+        const todayStr = new Date().toISOString().split("T")[0];
+        let deal = 0;
+        let pending = 0;
+        let expired = 0;
+        let totalVal = 0;
+
+        for (const q of quots) {
+          totalVal += Number(q.grandTotal) || 0;
+          const isDeal =
+            q.status === "Terkonversi Faktur" ||
+            q.status === "Disetujui Klien" ||
+            Boolean(q.convertedInvoiceId);
+          const isExpired =
+            q.status === "Kedaluwarsa" ||
+            (!isDeal && q.status !== "Ditolak" && q.validUntil && q.validUntil < todayStr);
+
+          if (isDeal) deal++;
+          else if (isExpired) expired++;
+          else if (q.status !== "Ditolak") pending++;
+        }
+
+        setQuotationsDealCount(deal);
+        setQuotationsPendingCount(pending);
+        setQuotationsExpiredCount(expired);
+        setQuotationsTotalValue(totalVal);
+        setRecentQuotations(quots.slice(0, 5));
       } else {
         setRevenue(0);
         setGrowthPercent(0);
+        setQuotationsCount(0);
+        setQuotationsDealCount(0);
+        setQuotationsPendingCount(0);
+        setQuotationsExpiredCount(0);
+        setQuotationsTotalValue(0);
+        setRecentQuotations([]);
       }
 
       // 2. Products
@@ -238,12 +303,20 @@ export default function AdminDashboard() {
         </div>
 
         {/* Financial ERP Modules Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 pt-8 relative z-10">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3.5 pt-8 relative z-10">
           {[
+            {
+              title: "Surat Penawaran",
+              desc: "SPH & Prospek",
+              href: "/admin/finance?tab=quotations",
+              icon: FileText,
+              color: "text-indigo-400",
+              bg: "bg-indigo-500/10 border-indigo-500/20",
+            },
             {
               title: "Faktur Penjualan",
               desc: "Invoice & Piutang",
-              href: "/admin/finance",
+              href: "/admin/finance?tab=sales",
               icon: Receipt,
               color: "text-emerald-400",
               bg: "bg-emerald-500/10 border-emerald-500/20",
@@ -251,7 +324,7 @@ export default function AdminDashboard() {
             {
               title: "Pembelian (PO)",
               desc: "Supplier & Hutang",
-              href: "/admin/finance",
+              href: "/admin/finance?tab=purchases",
               icon: ShoppingCart,
               color: "text-blue-400",
               bg: "bg-blue-500/10 border-blue-500/20",
@@ -259,7 +332,7 @@ export default function AdminDashboard() {
             {
               title: "Retur Barang",
               desc: "Pelanggan & Vendor",
-              href: "/admin/finance",
+              href: "/admin/finance?tab=returns",
               icon: RotateCcw,
               color: "text-amber-400",
               bg: "bg-amber-500/10 border-amber-500/20",
@@ -267,7 +340,7 @@ export default function AdminDashboard() {
             {
               title: "Laba Rugi (P&L)",
               desc: "Omset & Laba Bersih",
-              href: "/admin/finance",
+              href: "/admin/finance?tab=pl_report",
               icon: Scale,
               color: "text-purple-400",
               bg: "bg-purple-500/10 border-purple-500/20",
@@ -275,7 +348,7 @@ export default function AdminDashboard() {
             {
               title: "Buku Arus Kas",
               desc: "Mandiri, BCA, Tunai",
-              href: "/admin/finance",
+              href: "/admin/finance?tab=cash_flow",
               icon: Wallet,
               color: "text-cyan-400",
               bg: "bg-cyan-500/10 border-cyan-500/20",
@@ -283,7 +356,7 @@ export default function AdminDashboard() {
             {
               title: "Gudang & Cabang",
               desc: "Valuasi Stok Logistik",
-              href: "/admin/finance",
+              href: "/admin/finance?tab=warehouses",
               icon: Building2,
               color: "text-rose-400",
               bg: "bg-rose-500/10 border-rose-500/20",
@@ -312,6 +385,210 @@ export default function AdminDashboard() {
               </a>
             );
           })}
+        </div>
+      </div>
+
+      {/* SPH & Quotations Executive Command Center */}
+      <div className="p-8 sm:p-10 rounded-[48px] bg-white border border-slate-100 shadow-sm space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase tracking-wider mb-2">
+              <FileText className="w-3.5 h-3.5 text-indigo-600" />
+              <span>Pipeline Penawaran & Prospek Klien</span>
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+              Daftar Surat Penawaran Harga (SPH) Terkini
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Monitoring proposal penawaran, status persetujuan klien, masa berlaku (expired), dan konversi menjadi faktur resmi.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            <a
+              href="/admin/finance?tab=quotations"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-md shadow-indigo-600/20 active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Buat SPH Baru</span>
+            </a>
+            <a
+              href="/admin/finance?tab=quotations"
+              className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all"
+            >
+              <span>Kelola Semua SPH</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+
+        {/* Mini KPI Cards for SPH */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="p-5 rounded-3xl bg-indigo-50/60 border border-indigo-100 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Total SPH Terbit</p>
+              <h4 className="text-2xl font-black text-slate-900 mt-1">{quotationsCount} Surat</h4>
+              <p className="text-[11px] font-bold text-indigo-600 mt-0.5">{formatCurrency(quotationsTotalValue)}</p>
+            </div>
+            <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
+              <FileText className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-emerald-50/60 border border-emerald-100 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Deal / Jadi Faktur</p>
+              <h4 className="text-2xl font-black text-slate-900 mt-1">{quotationsDealCount} SPH</h4>
+              <p className="text-[11px] font-bold text-emerald-600 mt-0.5">Disepakati Klien</p>
+            </div>
+            <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-amber-50/60 border border-amber-100 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Menunggu Respon</p>
+              <h4 className="text-2xl font-black text-slate-900 mt-1">{quotationsPendingCount} SPH</h4>
+              <p className="text-[11px] font-bold text-amber-700 mt-0.5">Proses Negosiasi</p>
+            </div>
+            <div className="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md">
+              <Clock className="w-5 h-5" />
+            </div>
+          </div>
+
+          <div className="p-5 rounded-3xl bg-slate-100/80 border border-slate-200 flex items-center justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-wider text-slate-700">Expired & Reject</p>
+              <h4 className="text-2xl font-black text-slate-900 mt-1">{quotationsExpiredCount} SPH</h4>
+              <p className="text-[11px] font-bold text-slate-500 mt-0.5">Lewat Tempo / Hangus</p>
+            </div>
+            <div className="w-11 h-11 rounded-2xl bg-slate-700 text-white flex items-center justify-center shadow-md">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+            </div>
+          </div>
+        </div>
+
+        {/* Table of Recent SPH */}
+        <div className="overflow-x-auto rounded-3xl border border-slate-100">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] border-b border-slate-100">
+              <tr>
+                <th className="p-4">No. SPH & Tanggal</th>
+                <th className="p-4">Klien & Instansi</th>
+                <th className="p-4">Perihal Penawaran</th>
+                <th className="p-4">Total Penawaran</th>
+                <th className="p-4">Masa Berlaku</th>
+                <th className="p-4">Status</th>
+                <th className="p-4 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {recentQuotations.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-slate-400">
+                    <FileText className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                    <p className="font-bold text-slate-600">Belum ada Surat Penawaran yang diterbitkan</p>
+                    <a
+                      href="/admin/finance?tab=quotations"
+                      className="inline-flex items-center gap-1.5 mt-2 text-indigo-600 font-bold hover:underline"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Buat Surat Penawaran Pertama</span>
+                    </a>
+                  </td>
+                </tr>
+              ) : (
+                recentQuotations.map((sph) => {
+                  const todayStr = new Date().toISOString().split("T")[0];
+                  const isDeal =
+                    sph.status === "Terkonversi Faktur" ||
+                    sph.status === "Disetujui Klien" ||
+                    Boolean(sph.convertedInvoiceId);
+                  const isExpired =
+                    sph.status === "Kedaluwarsa" ||
+                    (!isDeal && sph.status !== "Ditolak" && sph.validUntil && sph.validUntil < todayStr);
+                  const isRejected = sph.status === "Ditolak";
+
+                  return (
+                    <tr key={sph.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-4">
+                        <span className="font-mono font-black text-indigo-700 block">
+                          {sph.quotationNumber}
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-medium">
+                          {sph.date}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <p className="font-bold text-slate-900 line-clamp-1">
+                          {sph.customerName}
+                        </p>
+                        {sph.customerOrg && (
+                          <p className="text-[10px] text-slate-400 line-clamp-1">{sph.customerOrg}</p>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <span className="text-slate-700 font-medium line-clamp-1 max-w-[240px]" title={sph.subject}>
+                          {sph.subject}
+                        </span>
+                      </td>
+                      <td className="p-4 font-black font-mono text-slate-900 whitespace-nowrap">
+                        {new Intl.NumberFormat("id-ID", {
+                          style: "currency",
+                          currency: "IDR",
+                          maximumFractionDigits: 0,
+                        }).format(sph.grandTotal || 0)}
+                      </td>
+                      <td className="p-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[11px] font-semibold ${
+                            isExpired ? "text-red-600 font-bold" : "text-slate-600"
+                          }`}
+                        >
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          s/d {sph.validUntil || "-"}
+                        </span>
+                      </td>
+                      <td className="p-4 whitespace-nowrap">
+                        {isDeal ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Deal (Faktur)
+                          </span>
+                        ) : isExpired ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 border border-slate-300">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            Expired
+                          </span>
+                        ) : isRejected ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-800 border border-red-200">
+                            <XCircle className="w-3 h-3 text-red-600" />
+                            Ditolak
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            Menunggu
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-right whitespace-nowrap">
+                        <a
+                          href="/admin/finance?tab=quotations"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700 text-xs font-bold transition-all shadow-2xs"
+                          title="Lihat detail dan cetak SPH di Manajemen Keuangan"
+                        >
+                          <span>Buka SPH</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </a>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

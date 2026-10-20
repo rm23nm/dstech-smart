@@ -1341,6 +1341,18 @@ export default function AdminFinanceERPPage() {
 
   useEffect(() => {
     fetchFinanceData();
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (
+        tab &&
+        ["sales", "quotations", "purchases", "returns", "pl_report", "cash_flow", "warehouses", "clients", "suppliers"].includes(
+          tab
+        )
+      ) {
+        setActiveTab(tab as any);
+      }
+    }
   }, []);
 
   // Helper Informasi Ketersediaan Stok Real-time per Cabang / Gudang
