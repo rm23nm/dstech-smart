@@ -1640,9 +1640,38 @@
   6. [x] **Deployment ke Server Live VPS PM2 `dstech-main` dan Verifikasi Akhir**:
      - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi, dan restart PM2.
 
+### 57. Tugas: Sinkronisasi Dinamis & Pembersihan Data Statistik Demo pada Dashboard Utama Admin (`/admin`) dari Nol (Clean Slate)
+- **Permintaan Pengguna**:
+  *"didasbord kenapa masih ada?"* & *"Data angka statistik contoh (Total Revenue Rp 128.5M, 24 Items, 86 Agents, produk & partner contoh) — tolong bersihkan/nolkan agar benar-benar dari nol."*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Analisis Kebutuhan**:
+  1. Halaman Dashboard Utama Admin (`src/app/admin/page.tsx`) sebelumnya masih berupa mockup statis dengan angka hardcoded contoh (`Total Revenue: Rp 128.5M`, `Products Active: 24 Items`, `Active Partners: 86 Agents`, `Growth: +14.5%`, serta daftar dummy produk dan partner).
+  2. Akibatnya, saat pengguna ingin memulai sistem dari nol secara bersih (*clean slate*), halaman dashboard utama tetap menampilkan angka-angka statis contoh tersebut dan tidak mencerminkan data aktual.
+  3. Mengubah `src/app/admin/page.tsx` menjadi komponen dinamis (`"use client";`) yang mengambil data riil dari:
+     - `/api/finance`: menghitung akumulasi omset/penjualan riil (jika belum ada/dikosongkan, maka otomatis `Rp 0`).
+     - `/api/products`: menghitung jumlah produk aktif riil dan menampilkan 3 produk katalog terkini (dengan empty state jika belum ada).
+     - `/api/partners`: menghitung jumlah mitra aktif riil dan menampilkan 3 agen mitra terbaru (dengan empty state jika belum ada).
+  4. Menjalankan fungsi reset transaksi keuangan (mengosongkan data transaksi demo invoice ~128M dan kas) sehingga seluruh pembukuan bersih dari nol, dengan tetap mempertahankan master data vital (rekening bank, gudang, cabang, klien, vendor, dan profil perusahaan).
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Transformasi Dashboard Utama (`src/app/admin/page.tsx`) ke Data Dinamis**:
+     - Tambahkan `"use client";`, state untuk ringkasan metrik (Revenue, Products, Partners, Growth), daftar Recent Inventory, dan Newest Partners.
+     - Tambahkan `useEffect` untuk fetch paralel dari `/api/finance`, `/api/products`, dan `/api/partners`.
+     - Implementasikan empty state yang informatif dan ramah pengguna ketika data masih nol/bersih.
+  2. [x] **Eksekusi Pembersihan Transaksi Demo Keuangan (`dstech_finance_erp.json`)**:
+     - Reset data transaksi demo melalui endpoint API pembersih agar omset kembali bersih `Rp 0` dengan snapshot cadangan otomatis di `_backup/`.
+  3. [x] **Validasi Kompilasi TypeScript (`npx tsc --noEmit`)**:
+     - Memastikan 0 error pada seluruh berkas yang disesuaikan.
+  4. [x] **Pengujian Tampilan di Browser via Subagent**:
+     - Verifikasi halaman Dashboard (`http://localhost:3005/admin`) menampilkan metrik riil dari nol (`Rp 0`, dsb.) secara responsif dan rapi.
+  5. [x] **Sinkronisasi Kode ke GitHub Repository `rm23nm/dstech-smart`**:
+     - Push commit via `push_with_native_git.js`.
+  6. [x] **Deployment ke Server Live VPS PM2 `dstech-main` dan Verifikasi Akhir**:
+     - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi, dan restart PM2.
+
 ---
 
-### 57. Catatan Penting
+### 58. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

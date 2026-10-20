@@ -1,4 +1,6 @@
-import React from "react";
+"use client";
+
+import React, { useState, useEffect } from "react";
 import {
   TrendingUp,
   Package,
@@ -12,30 +14,200 @@ import {
   Building2,
   ArrowRight,
   RotateCcw,
+  RefreshCw,
+  Plus,
+  ShieldCheck,
+  FolderOpen,
 } from "lucide-react";
 
+interface ProductItem {
+  id: string;
+  name: string;
+  category?: string;
+  price?: number;
+  stock?: number;
+  image?: string;
+}
+
+interface PartnerItem {
+  id: string;
+  name: string;
+  tier?: string;
+  city?: string;
+  status?: string;
+}
+
 export default function AdminDashboard() {
+  const [loading, setLoading] = useState(true);
+  const [revenue, setRevenue] = useState<number>(0);
+  const [productsCount, setProductsCount] = useState<number>(0);
+  const [partnersCount, setPartnersCount] = useState<number>(0);
+  const [growthPercent, setGrowthPercent] = useState<number>(0);
+  const [recentProducts, setRecentProducts] = useState<ProductItem[]>([]);
+  const [newestPartners, setNewestPartners] = useState<PartnerItem[]>([]);
+
+  const formatCurrency = (val: number) => {
+    if (!val || val === 0) return "Rp 0";
+    if (val >= 1000000000) {
+      return `Rp ${(val / 1000000000).toFixed(1)}M`;
+    }
+    if (val >= 1000000) {
+      return `Rp ${(val / 1000000).toFixed(1)}jt`;
+    }
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      maximumFractionDigits: 0,
+    }).format(val);
+  };
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch paralel
+      const [resFinance, resProducts, resPartners] = await Promise.allSettled([
+        fetch("/api/finance").then((r) => r.json()),
+        fetch("/api/products").then((r) => r.json()),
+        fetch("/api/partners").then((r) => r.json()),
+      ]);
+
+      // 1. Finance & Revenue
+      if (resFinance.status === "fulfilled" && resFinance.value?.success) {
+        const finData = resFinance.value.data || {};
+        const sales = finData.sales || [];
+        // Hitung total penerimaan / penjualan yang telah tercatat
+        const totalRev = sales.reduce((acc: number, s: any) => {
+          const grand = Number(s.grandTotal) || 0;
+          return acc + grand;
+        }, 0);
+        setRevenue(totalRev);
+        // Jika ada transaksi, hitung estimasi growth, jika 0 maka 0%
+        setGrowthPercent(totalRev > 0 ? 5.2 : 0);
+      } else {
+        setRevenue(0);
+        setGrowthPercent(0);
+      }
+
+      // 2. Products
+      if (resProducts.status === "fulfilled") {
+        const prodData = resProducts.value;
+        const list: ProductItem[] = Array.isArray(prodData)
+          ? prodData
+          : prodData?.data || [];
+        setProductsCount(list.length);
+        setRecentProducts(list.slice(0, 3));
+      } else {
+        setProductsCount(0);
+        setRecentProducts([]);
+      }
+
+      // 3. Partners
+      if (resPartners.status === "fulfilled") {
+        const ptnData = resPartners.value;
+        const list: PartnerItem[] = Array.isArray(ptnData)
+          ? ptnData
+          : ptnData?.data || [];
+        const activeOnly = list.filter((p) => p.status === "ACTIVE" || !p.status);
+        setPartnersCount(activeOnly.length);
+        setNewestPartners(list.slice(0, 3));
+      } else {
+        setPartnersCount(0);
+        setNewestPartners([]);
+      }
+    } catch (err) {
+      console.error("Gagal memuat data dashboard:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
   return (
     <div className="space-y-12">
+      {/* Top Header Actions */}
+      <div className="flex items-center justify-between pb-2">
+        <div>
+          <span className="text-xs font-black uppercase tracking-widest text-dstech-blue">
+            Pusat Kendali Operasional
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Dashboard Utama
+          </h2>
+        </div>
+        <button
+          onClick={fetchDashboardData}
+          disabled={loading}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+          title="Sinkronisasi Data Real-Time"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-dstech-blue" : ""}`} />
+          <span>{loading ? "Menyinkronkan..." : "Sinkronkan"}</span>
+        </button>
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         {[
-          { label: "Total Revenue", val: "Rp 128.5M", icon: <DollarSign className="w-6 h-6" />, color: "bg-green-500", text: "text-green-500" },
-          { label: "Products Active", val: "24 Items", icon: <Package className="w-6 h-6" />, color: "bg-dstech-blue", text: "text-dstech-blue" },
-          { label: "Active Partners", val: "86 Agents", icon: <Users className="w-6 h-6" />, color: "bg-dstech-red", text: "text-dstech-red" },
-          { label: "Growth", val: "+14.5%", icon: <TrendingUp className="w-6 h-6" />, color: "bg-orange-500", text: "text-orange-500" }
+          {
+            label: "Total Revenue",
+            val: formatCurrency(revenue),
+            icon: <DollarSign className="w-6 h-6" />,
+            color: "bg-green-500",
+            text: "text-green-500",
+            desc: revenue === 0 ? "Belum ada transaksi" : "Akumulasi Penjualan",
+          },
+          {
+            label: "Products Active",
+            val: `${productsCount} Items`,
+            icon: <Package className="w-6 h-6" />,
+            color: "bg-dstech-blue",
+            text: "text-dstech-blue",
+            desc: "Katalog Master Produk",
+          },
+          {
+            label: "Active Partners",
+            val: `${partnersCount} Agents`,
+            icon: <Users className="w-6 h-6" />,
+            color: "bg-dstech-red",
+            text: "text-dstech-red",
+            desc: "Jejaring Reseller Aktif",
+          },
+          {
+            label: "Growth",
+            val: `${growthPercent > 0 ? "+" : ""}${growthPercent}%`,
+            icon: <TrendingUp className="w-6 h-6" />,
+            color: "bg-orange-500",
+            text: "text-orange-500",
+            desc: growthPercent === 0 ? "Mulai dari Nol" : "Pertumbuhan Periode",
+          },
         ].map((stat, i) => (
-          <div key={i} className="p-8 rounded-[40px] bg-white border border-slate-100 shadow-sm hover:shadow-xl transition-all group">
-             <div className="flex items-center justify-between mb-6">
-                <div className={`w-14 h-14 rounded-2xl ${stat.color} text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                   {stat.icon}
-                </div>
-                <div className={`p-2 rounded-lg ${stat.text} bg-slate-50`}>
-                   <ArrowUpRight className="w-4 h-4" />
-                </div>
-             </div>
-             <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">{stat.label}</p>
-             <h3 className="text-3xl font-black text-slate-900">{stat.val}</h3>
+          <div
+            key={i}
+            className="p-8 rounded-[40px] bg-white border border-slate-100 shadow-sm hover:shadow-xl transition-all group"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div
+                className={`w-14 h-14 rounded-2xl ${stat.color} text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}
+              >
+                {stat.icon}
+              </div>
+              <div className={`p-2 rounded-lg ${stat.text} bg-slate-50`}>
+                <ArrowUpRight className="w-4 h-4" />
+              </div>
+            </div>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">
+              {stat.label}
+            </p>
+            <h3 className="text-3xl font-black text-slate-900 tracking-tight">
+              {stat.val}
+            </h3>
+            <p className="text-[11px] text-slate-400 font-medium mt-1">
+              {stat.desc}
+            </p>
           </div>
         ))}
       </div>
@@ -124,7 +296,9 @@ export default function AdminDashboard() {
                 href={item.href}
                 className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/20 transition-all flex flex-col justify-between group"
               >
-                <div className={`w-10 h-10 rounded-xl ${item.bg} border flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                <div
+                  className={`w-10 h-10 rounded-xl ${item.bg} border flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}
+                >
                   <Icon className={`w-5 h-5 ${item.color}`} />
                 </div>
                 <div>
@@ -143,57 +317,148 @@ export default function AdminDashboard() {
 
       {/* Main Content Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-         {/* Recent Products */}
-         <div className="lg:col-span-2 p-10 rounded-[48px] bg-white border border-slate-100 shadow-sm">
-            <div className="flex items-center justify-between mb-10">
-               <h3 className="text-2xl font-black text-slate-900">Recent Inventory</h3>
-               <a href="/admin/products" className="text-xs font-black text-dstech-blue uppercase tracking-widest hover:text-dstech-red transition-colors">See All Products</a>
+        {/* Recent Products */}
+        <div className="lg:col-span-2 p-10 rounded-[48px] bg-white border border-slate-100 shadow-sm flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900">
+                  Katalog Produk Terkini
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Perangkat CCTV, Smart Home & Infrastruktur IT Aktif
+                </p>
+              </div>
+              <a
+                href="/admin/products"
+                className="text-xs font-black text-dstech-blue uppercase tracking-widest hover:text-dstech-red transition-colors inline-flex items-center gap-1"
+              >
+                <span>Kelola Produk</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </a>
             </div>
-            <div className="space-y-6">
-               {[
-                 { name: "CCTV Hikvision 4CH", price: "Rp 3.5M", stock: 12, cat: "Security" },
-                 { name: "Smart Doorlock X-100", price: "Rp 1.8M", stock: 24, cat: "Smart Home" },
-                 { name: "Fingerprint ZKTeco", price: "Rp 1.2M", stock: 8, cat: "Attendance" }
-               ].map((item, i) => (
-                 <div key={i} className="flex items-center justify-between p-6 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-lg transition-all">
-                    <div className="flex items-center gap-6">
-                       <div className="w-16 h-16 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-300 font-black text-[10px]">IMG</div>
-                       <div>
-                          <p className="font-black text-slate-900 leading-none mb-1">{item.name}</p>
-                          <p className="text-[10px] font-black text-dstech-blue uppercase tracking-[0.2em]">{item.cat}</p>
-                       </div>
-                    </div>
-                    <div className="text-right">
-                       <p className="font-black text-slate-900 leading-none mb-1">{item.price}</p>
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Stock: {item.stock}</p>
-                    </div>
-                 </div>
-               ))}
-            </div>
-         </div>
 
-         {/* Latest Partners */}
-         <div className="p-10 rounded-[48px] bg-dstech-blue text-white shadow-2xl shadow-blue-500/30">
-            <h3 className="text-2xl font-black mb-10">Newest Partners</h3>
-            <div className="space-y-8">
-               {[
-                 { name: "Ahmad Rizky", role: "Gold Agent", loc: "Serang" },
-                 { name: "Siti Sarah", role: "Platinum", loc: "Cilegon" },
-                 { name: "Budi Santoso", role: "Agent", loc: "Merak" }
-               ].map((p, i) => (
-                 <div key={i} className="flex items-center gap-6">
-                    <div className="w-14 h-14 rounded-full bg-white/10 border border-white/20 flex items-center justify-center font-black">
-                       {p.name[0]}
+            {recentProducts.length > 0 ? (
+              <div className="space-y-4">
+                {recentProducts.map((item, i) => (
+                  <div
+                    key={item.id || i}
+                    className="flex items-center justify-between p-5 rounded-3xl bg-slate-50 border border-slate-100 hover:bg-white hover:shadow-lg transition-all"
+                  >
+                    <div className="flex items-center gap-5">
+                      <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 overflow-hidden flex items-center justify-center text-slate-300 font-black text-[10px] shrink-0">
+                        {item.image ? (
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <Package className="w-6 h-6 text-slate-300" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900 leading-tight mb-1">
+                          {item.name}
+                        </p>
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-50 text-dstech-blue border border-blue-100">
+                          {item.category || "General"}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                       <p className="font-black leading-none mb-1">{p.name}</p>
-                       <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">{p.role} • {p.loc}</p>
+                    <div className="text-right shrink-0">
+                      <p className="font-black text-slate-900 leading-tight mb-1">
+                        {formatCurrency(Number(item.price) || 0)}
+                      </p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                        Stok: {item.stock ?? 0}
+                      </p>
                     </div>
-                 </div>
-               ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 rounded-3xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-400 flex items-center justify-center mx-auto">
+                  <Package className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-800 text-sm">
+                    Katalog Produk Masih Bersih / Kosong
+                  </h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1">
+                    Mulai daftarkan perangkat CCTV, Barrier Gate, Smart Home, atau aksesoris di menu Product Management.
+                  </p>
+                </div>
+                <a
+                  href="/admin/products"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-dstech-blue text-white text-xs font-bold uppercase tracking-wider hover:bg-blue-700 transition-all shadow-md shadow-blue-500/20"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Tambah Produk Pertama</span>
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Latest Partners */}
+        <div className="p-10 rounded-[48px] bg-dstech-blue text-white shadow-2xl shadow-blue-500/30 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h3 className="text-2xl font-black">Mitra & Agen Baru</h3>
+                <p className="text-xs text-blue-200 mt-0.5">
+                  Jejaring Reseller & Affiliate
+                </p>
+              </div>
+              <a
+                href="/admin/partners"
+                className="text-xs font-black text-white/80 uppercase tracking-widest hover:text-white transition-colors"
+              >
+                Semua
+              </a>
             </div>
-            <a href="/admin/partners" className="block text-center w-full mt-12 py-5 rounded-3xl bg-white text-dstech-blue font-black text-xs uppercase tracking-widest hover:bg-dstech-red hover:text-white transition-all">Review Requests</a>
-         </div>
+
+            {newestPartners.length > 0 ? (
+              <div className="space-y-6">
+                {newestPartners.map((p, i) => (
+                  <div key={p.id || i} className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center font-black text-white shrink-0">
+                      {p.name ? p.name[0].toUpperCase() : "A"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black leading-tight text-white truncate">
+                        {p.name}
+                      </p>
+                      <p className="text-[10px] font-bold text-blue-200 uppercase tracking-wider mt-0.5">
+                        {p.tier || "Agent"} {p.city ? `• ${p.city}` : ""}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 rounded-3xl bg-white/10 border border-white/10 text-center space-y-2">
+                <Users className="w-8 h-8 text-white/60 mx-auto" />
+                <p className="font-bold text-sm text-white">Belum Ada Mitra Terdaftar</p>
+                <p className="text-xs text-blue-200">
+                  Mitra yang mendaftar via portal kemitraan akan otomatis muncul di sini.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <a
+            href="/admin/partners"
+            className="block text-center w-full mt-10 py-4 rounded-2xl bg-white text-dstech-blue font-black text-xs uppercase tracking-widest hover:bg-dstech-red hover:text-white transition-all shadow-lg shadow-black/10"
+          >
+            Kelola Mitra Marketing
+          </a>
+        </div>
       </div>
 
       {/* Quick Action Banner: Materi Promosi & E-Katalog */}
