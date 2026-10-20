@@ -58,6 +58,7 @@ import {
   ArrowUpDown,
   XCircle,
   Ban,
+  BarChart3,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -818,6 +819,66 @@ export default function AdminFinanceERPPage() {
     masterSignatureUrl: "",
     masterStampUrl: "",
   });
+
+  // Laporan Laba Rugi Print & PDF Modal State
+  const [isPnlPrintModalOpen, setIsPnlPrintModalOpen] = useState<boolean>(false);
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState<boolean>(false);
+
+  // Helper Universal Download PDF Document
+  const handleDownloadPdf = async (elementSelector: string, rawFilename: string) => {
+    setIsDownloadingPdf(true);
+    const sanitizedFilename = (rawFilename.endsWith(".pdf") ? rawFilename : `${rawFilename}.pdf`)
+      .replace(/[\/\\?%*:|"<>]/g, "-")
+      .replace(/\s+/g, "_");
+
+    try {
+      if (typeof window !== "undefined") {
+        const originalTitle = document.title;
+        document.title = sanitizedFilename.replace(/\.pdf$/i, "");
+
+        // 1. Cek atau muat html2pdf.js secara dinamis via CDN
+        if (!(window as any).html2pdf) {
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+            script.crossOrigin = "anonymous";
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("Gagal memuat html2pdf CDN"));
+            document.head.appendChild(script);
+          });
+        }
+
+        const element = document.querySelector(elementSelector);
+        if (element && (window as any).html2pdf) {
+          showToast(`Mengunduh berkas PDF: ${sanitizedFilename}...`);
+          const opt = {
+            margin: 0,
+            filename: sanitizedFilename,
+            image: { type: "jpeg", quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
+            jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+            pagebreak: { mode: ["css", "legacy"] },
+          };
+          await (window as any).html2pdf().set(opt).from(element).save();
+          showToast(`✓ Berkas ${sanitizedFilename} berhasil diunduh!`);
+          document.title = originalTitle;
+          setIsDownloadingPdf(false);
+          return;
+        }
+
+        // Fallback jika elemen tidak ditemukan: gunakan native print
+        window.print();
+        setTimeout(() => {
+          document.title = originalTitle;
+        }, 1500);
+      }
+    } catch (err) {
+      console.warn("Gagal ekspor langsung html2pdf, membuka dialog cetak/simpan PDF browser:", err);
+      window.print();
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
 
   // Reset Transactions Modal State (Clean Slate)
   const [isResetModalOpen, setIsResetModalOpen] = useState<boolean>(false);
@@ -5753,13 +5814,34 @@ export default function AdminFinanceERPPage() {
                   </h3>
                   <p className="text-xs text-slate-400">Periode: Berjalan Oktober 2026 • PT. DSTech Smart Perkasa</p>
                 </div>
-                <button
-                  onClick={() => window.print()}
-                  className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Cetak Laporan P&L</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPnlPrintModalOpen(true);
+                      setTimeout(() => {
+                        handleDownloadPdf(
+                          "#print-pnl-sheet",
+                          "LAPORAN_LABA_RUGI_DSTECH_OKTOBER_2026.pdf"
+                        );
+                      }, 500);
+                    }}
+                    disabled={isDownloadingPdf}
+                    title="Unduh Berkas PDF Laporan Laba Rugi Langsung"
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsPnlPrintModalOpen(true)}
+                    className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Pratinjau Cetak Resmi A4</span>
+                  </button>
+                </div>
               </div>
 
               {/* P&L Breakdown Table */}
@@ -7507,7 +7589,34 @@ export default function AdminFinanceERPPage() {
                 </div>
 
                 <button
-                  onClick={() => window.print()}
+                  type="button"
+                  onClick={() => {
+                    const activePrintTermin = selectedInvoiceForPrint.invoiceType === "Termin" && Array.isArray(selectedInvoiceForPrint.termins)
+                      ? selectedInvoiceForPrint.termins.find((t) => t.id === (selectedPrintTerminId || selectedInvoiceForPrint.activeTerminId || selectedInvoiceForPrint.termins?.[0]?.id))
+                      : null;
+                    const suffix = activePrintTermin ? `_${activePrintTermin.name}` : selectedInvoiceForPrint.invoiceType === "DP" ? `_${printBillingStage}` : "";
+                    handleDownloadPdf(
+                      "#print-invoice-full-wrapper",
+                      `FAKTUR_DSTECH_${selectedInvoiceForPrint.invoiceNumber}${suffix}_${selectedInvoiceForPrint.customerName}.pdf`
+                    );
+                  }}
+                  disabled={isDownloadingPdf}
+                  title="Unduh Berkas PDF Resmi Langsung"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `FAKTUR_DSTECH_${selectedInvoiceForPrint.invoiceNumber}_${selectedInvoiceForPrint.customerName}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
                   className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -7673,6 +7782,7 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* FAKTUR CONTENT CONTAINER (Siap Cetak & Watermarked) */}
+            <div id="print-invoice-full-wrapper" className="space-y-6 print:space-y-0">
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet print-page-break"
               style={{
@@ -8323,6 +8433,7 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
               </div>
+            </div>
             </div>
         </div>
       )}
@@ -9428,7 +9539,30 @@ export default function AdminFinanceERPPage() {
                 </div>
 
                 <button
-                  onClick={() => window.print()}
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-quotation-full-wrapper",
+                      `SPH_DSTECH_${selectedQuotationForPrint.quotationNumber}_${selectedQuotationForPrint.customerOrg || selectedQuotationForPrint.customerName}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  title="Unduh Berkas PDF Resmi Langsung"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `SPH_DSTECH_${selectedQuotationForPrint.quotationNumber}_${selectedQuotationForPrint.customerOrg || selectedQuotationForPrint.customerName}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -9455,6 +9589,7 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* SPH OFFICIAL LETTER CONTAINER (A4 Standard Print Layout) */}
+            <div id="print-quotation-full-wrapper" className="space-y-6 print:space-y-0">
             <div
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet print-page-break"
               style={{
@@ -9910,6 +10045,7 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
               </div>
+            </div>
             </div>
         </div>
       )}
@@ -11405,7 +11541,30 @@ export default function AdminFinanceERPPage() {
                 </button>
 
                 <button
-                  onClick={() => window.print()}
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-po-sheet",
+                      `PO_DSTECH_${selectedPoForPrint.poNumber}_${selectedPoForPrint.supplierName}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  title="Unduh Berkas PDF Resmi Langsung"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `PO_DSTECH_${selectedPoForPrint.poNumber}_${selectedPoForPrint.supplierName}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
                   className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -11433,6 +11592,7 @@ export default function AdminFinanceERPPage() {
 
             {/* PO OFFICIAL PRINT CONTAINER (A4 Standard Print Layout) */}
             <div
+              id="print-po-sheet"
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
@@ -12760,7 +12920,30 @@ export default function AdminFinanceERPPage() {
                 </button>
 
                 <button
-                  onClick={() => window.print()}
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-return-sale-sheet",
+                      `BAST_RETUR_DSTECH_${selectedReturnSaleForPrint.returnNumber}_${selectedReturnSaleForPrint.customerName}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  title="Unduh Berkas PDF Resmi Langsung"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `BAST_RETUR_DSTECH_${selectedReturnSaleForPrint.returnNumber}_${selectedReturnSaleForPrint.customerName}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
                   className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -12788,6 +12971,7 @@ export default function AdminFinanceERPPage() {
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
+              id="print-return-sale-sheet"
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
@@ -13066,7 +13250,30 @@ export default function AdminFinanceERPPage() {
                 </button>
 
                 <button
-                  onClick={() => window.print()}
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-return-purchase-sheet",
+                      `VENDOR_RMA_DSTECH_${selectedReturnPurchaseForPrint.returnNumber}_${selectedReturnPurchaseForPrint.supplierName}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  title="Unduh Berkas PDF Resmi Langsung"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `VENDOR_RMA_DSTECH_${selectedReturnPurchaseForPrint.returnNumber}_${selectedReturnPurchaseForPrint.supplierName}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
                   className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -13094,6 +13301,7 @@ export default function AdminFinanceERPPage() {
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
+              id="print-return-purchase-sheet"
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
@@ -13344,6 +13552,290 @@ export default function AdminFinanceERPPage() {
         </div>
       )}
 
+      {/* MODAL CETAK LAPORAN LABA RUGI KOMPREHENSIF (P&L REPORT) A4 FORMAT */}
+      {isPnlPrintModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
+          onClick={() => setIsPnlPrintModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Action Bar (Top) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <BarChart3 className="w-4 h-4 text-emerald-600" />
+                Laporan Laba Rugi Komprehensif Resmi — PT. DSTech Smart Perkasa
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenSettingsModal}
+                  title="Ganti Background Kop Surat"
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Kop Surat</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-pnl-sheet",
+                      "LAPORAN_LABA_RUGI_DSTECH_OKTOBER_2026.pdf"
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  title="Unduh Berkas PDF Laporan Langsung"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = "LAPORAN_LABA_RUGI_DSTECH_OKTOBER_2026";
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setIsPnlPrintModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Tips Cetak Pas Penuh Kertas A4 */}
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5 text-xs text-amber-900 print:hidden">
+              <span className="text-base leading-none">💡</span>
+              <div className="space-y-0.5">
+                <p className="font-bold">Tips Cetak Pas Penuh Kertas A4 (Full Bleed):</p>
+                <p className="text-[11px] text-amber-800">
+                  Pada dialog print browser (Ctrl+P), ubah <strong>Margins</strong> menjadi <strong>&quot;None&quot; (Tidak ada)</strong> dan centang <strong>Background graphics</strong> agar kop surat menempel presisi di ujung kertas A4.
+                </p>
+              </div>
+            </div>
+
+            {/* A4 OFFICIAL PRINT CONTAINER */}
+            <div
+              id="print-pnl-sheet"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+              style={{
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
+              }}
+            >
+              {/* Background Kop Surat Resmi DSTech */}
+              {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                <img
+                  src={financeSettings.letterheadUrl}
+                  alt="Kop Surat Resmi"
+                  className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                    financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                  }`}
+                  style={{
+                    objectFit:
+                      financeSettings.letterheadFitMode === "bleed" || financeSettings.letterheadFitMode === "fill"
+                        ? "fill"
+                        : financeSettings.letterheadFitMode === "contain"
+                        ? "contain"
+                        : "cover",
+                    opacity: (financeSettings.watermarkOpacity ?? 100) / 100,
+                  }}
+                />
+              )}
+
+              {/* Watermark Status Dokumen */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 select-none overflow-hidden">
+                <span className="text-7xl font-black text-slate-400/10 tracking-[0.25em] uppercase transform -rotate-25 scale-125 whitespace-nowrap">
+                  AUDITED FINANCIAL REPORT
+                </span>
+              </div>
+
+              {/* Konten Dokumen */}
+              <div className="relative z-10 space-y-4">
+                {/* Fallback Header jika Kop Surat dinonaktifkan */}
+                {(!financeSettings.letterheadEnabled || !financeSettings.letterheadUrl) && (
+                  <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-600 flex items-center justify-center text-white font-black text-xl shadow">
+                        DS
+                      </div>
+                      <div>
+                        <h1 className="text-base font-black tracking-tight text-slate-900">PT. DSTECH SMART PERKASA</h1>
+                        <p className="text-[11px] text-slate-600">Enterprise Security, Access Control & IoT Smart Solutions</p>
+                        <p className="text-[10px] text-slate-500">Jl. Raya Cilegon No. 88, Banten • finance@dstechsmart.com</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="px-2.5 py-1 rounded bg-slate-900 text-white font-mono font-bold text-[10px] uppercase">
+                        LAPORAN KEUANGAN RESMI
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Judul Laporan */}
+                <div className="text-center space-y-1 border-b border-slate-200 pb-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
+                    LAPORAN LABA RUGI KOMPREHENSIF (INCOME STATEMENT)
+                  </span>
+                  <h2 className="text-base font-black text-slate-900 tracking-tight mt-1">
+                    PERIODE BERJALAN OKTOBER 2026
+                  </h2>
+                  <p className="text-[11px] text-slate-500">
+                    Buku Besar Keuangan PT. DSTech Smart Perkasa • Mata Uang: Indonesian Rupiah (IDR)
+                  </p>
+                </div>
+
+                {/* Tabel P&L Resmi */}
+                <div className="border border-slate-300 rounded-xl overflow-hidden text-xs">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-900 text-white font-bold text-[10px] uppercase tracking-wider">
+                      <tr>
+                        <th className="p-2.5">Pos Keuangan & Klasifikasi Akun</th>
+                        <th className="p-2.5 text-right w-44">Jumlah Nominal (IDR)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {/* 1. Pendapatan */}
+                      <tr className="bg-blue-50/50 font-bold text-blue-900">
+                        <td className="p-2.5">1. PENDAPATAN OPERASIONAL USAHA</td>
+                        <td className="p-2.5 text-right text-blue-900 font-black">{formatRupiah(summary.totalSalesRevenue)}</td>
+                      </tr>
+                      <tr className="text-slate-600 text-[11px]">
+                        <td className="p-2 pl-6">• Pendapatan Penjualan Perangkat CCTV, Access Control, IoT & Jaringan</td>
+                        <td className="p-2 text-right">{formatRupiah(summary.totalSalesRevenue)}</td>
+                      </tr>
+
+                      {/* 2. HPP */}
+                      <tr className="bg-amber-50/50 font-bold text-amber-900">
+                        <td className="p-2.5">2. HARGA POKOK PENJUALAN (HPP / COGS)</td>
+                        <td className="p-2.5 text-right text-amber-900 font-black">({formatRupiah(summary.totalPurchasesCost)})</td>
+                      </tr>
+                      <tr className="text-slate-600 text-[11px]">
+                        <td className="p-2 pl-6">• Pembelian Barang Dagang & Komponen Proyek dari Supplier Resmi</td>
+                        <td className="p-2 text-right">({formatRupiah(summary.totalPurchasesCost)})</td>
+                      </tr>
+
+                      {/* LABA KOTOR */}
+                      <tr className="bg-slate-100 font-black text-slate-900 border-t border-b border-slate-300">
+                        <td className="p-2.5 uppercase tracking-wide">LABA KOTOR (GROSS PROFIT)</td>
+                        <td className={`p-2.5 text-right text-sm ${summary.grossProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                          {formatRupiah(summary.grossProfit)}
+                        </td>
+                      </tr>
+
+                      {/* 3. Beban Operasional */}
+                      <tr className="bg-rose-50/50 font-bold text-rose-900">
+                        <td className="p-2.5">3. BEBAN OPERASIONAL (OPERATIONAL EXPENSES)</td>
+                        <td className="p-2.5 text-right text-rose-900 font-black">({formatRupiah(summary.totalOperatingExpenses)})</td>
+                      </tr>
+                      <tr className="text-slate-600 text-[11px]">
+                        <td className="p-2 pl-6">• Beban Operasional, Gaji Teknisi, Utilitas Kantor & Transportasi</td>
+                        <td className="p-2 text-right">({formatRupiah(summary.totalOperatingExpenses)})</td>
+                      </tr>
+
+                      {/* LABA BERSIH OPERASIONAL */}
+                      <tr className="bg-emerald-50/80 font-black text-emerald-950 border-t-2 border-slate-900 text-sm">
+                        <td className="p-3 uppercase tracking-wide">
+                          LABA BERSIH USAHA (NET OPERATING PROFIT)
+                        </td>
+                        <td className={`p-3 text-right text-base ${summary.netProfit >= 0 ? "text-emerald-700 font-black" : "text-rose-600 font-black"}`}>
+                          {formatRupiah(summary.netProfit)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Ikhtisar Finansial */}
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">Gross Margin</p>
+                    <p className="text-xs font-black text-slate-800">
+                      {summary.totalSalesRevenue > 0 ? ((summary.grossProfit / summary.totalSalesRevenue) * 100).toFixed(1) : 0}%
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">Net Profit Margin</p>
+                    <p className="text-xs font-black text-emerald-600">
+                      {summary.totalSalesRevenue > 0 ? ((summary.netProfit / summary.totalSalesRevenue) * 100).toFixed(1) : 0}%
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                    <p className="text-[10px] text-slate-500 uppercase font-bold">Status Keuangan</p>
+                    <p className={`text-xs font-black ${summary.netProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                      {summary.netProfit >= 0 ? "SURPLUS LABA" : "DEFISIT"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Kolom Tanda Tangan Pengesahan Laporan */}
+                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-200">
+                  <div className="text-center space-y-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Dipersiapkan Oleh (Akuntan / Finance),
+                    </p>
+                    <p className="text-xs font-black text-slate-800">Finance & Accounting Department</p>
+                    <div className="h-12 flex items-center justify-center font-serif italic text-xs font-bold text-slate-700">
+                      Staff Keuangan DSTech
+                    </div>
+                    <div className="pt-1 border-t border-slate-300">
+                      <p className="font-bold text-slate-800 text-xs">
+                        ( Siti Rahmawati, S.Ak. )
+                      </p>
+                      <p className="text-[9px] text-slate-500">Staf Pembukuan & Verifikasi Kas</p>
+                    </div>
+                  </div>
+
+                  <div className="text-center space-y-1">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Disetujui & Disahkan Oleh (Direksi),
+                    </p>
+                    <p className="text-xs font-black text-slate-800">PT. DSTech Smart Perkasa</p>
+                    <div className="h-12 flex items-center justify-center">
+                      {financeSettings.masterSignatureUrl ? (
+                        <img
+                          src={financeSettings.masterSignatureUrl}
+                          alt="Signature"
+                          className="max-h-12 object-contain"
+                        />
+                      ) : (
+                        <div className="font-serif italic text-sm font-bold text-emerald-800">
+                          {financeSettings.signerName || "H. Agus Supriyadi, S.T."}
+                        </div>
+                      )}
+                    </div>
+                    <div className="pt-1 border-t border-slate-300">
+                      <p className="font-bold text-slate-900 text-xs">
+                        ( {financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom."} )
+                      </p>
+                      <p className="text-[9px] text-slate-500">
+                        {financeSettings.signerTitle || "Direktur Utama"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL CETAK LEMBAR BERITA ACARA SERAH TERIMA PEKERJAAN (BAST) (A4 FORMAT) */}
       {isBastModalOpen && selectedSaleForBast && (
         <div
@@ -13411,7 +13903,30 @@ export default function AdminFinanceERPPage() {
                 </button>
 
                 <button
-                  onClick={() => window.print()}
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-bast-sheet",
+                      `BAST_DSTECH_${bastConfig.bastNumber || selectedSaleForBast.invoiceNumber}_${selectedSaleForBast.customerName}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  title="Unduh Berkas PDF BAST Langsung"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `BAST_DSTECH_${bastConfig.bastNumber || selectedSaleForBast.invoiceNumber}_${selectedSaleForBast.customerName}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
                   className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -13556,6 +14071,7 @@ export default function AdminFinanceERPPage() {
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
+              id="print-bast-sheet"
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-3.5 print:space-y-2 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
@@ -13855,7 +14371,30 @@ export default function AdminFinanceERPPage() {
                 </button>
 
                 <button
-                  onClick={() => window.print()}
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-delivery-sheet",
+                      `SURAT_JALAN_DSTECH_${deliveryConfig.doNumber || selectedSaleForDelivery.invoiceNumber}_${selectedSaleForDelivery.customerName}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  title="Unduh Berkas PDF Surat Jalan Langsung"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `SURAT_JALAN_DSTECH_${deliveryConfig.doNumber || selectedSaleForDelivery.invoiceNumber}_${selectedSaleForDelivery.customerName}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
                   className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
@@ -14000,6 +14539,7 @@ export default function AdminFinanceERPPage() {
 
             {/* A4 OFFICIAL PRINT CONTAINER */}
             <div
+              id="print-delivery-sheet"
               className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-3.5 print:space-y-2 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
