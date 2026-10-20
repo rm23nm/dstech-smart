@@ -66,6 +66,8 @@ import {
   Eye,
   FileCheck2,
   HardDrive,
+  Briefcase,
+  FolderKanban,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -119,6 +121,28 @@ export interface DocumentAttachment {
   notes?: string;
 }
 
+export interface ProjectItem {
+  id: string;
+  projectCode: string;
+  projectName: string;
+  clientId?: string;
+  clientName: string;
+  clientPhone?: string;
+  clientAddress?: string;
+  businessEntity?: "PT" | "NON_PT";
+  quotationId?: string;
+  quotationNumber?: string;
+  contractValue: number;
+  budgetCost?: number;
+  status: "Planning" | "In Progress" | "Completed" | "On Hold" | string;
+  startDate: string;
+  targetEndDate?: string;
+  actualEndDate?: string;
+  picProject?: string;
+  description?: string;
+  createdAt?: string;
+}
+
 interface SaleInvoice {
   id: string;
   invoiceNumber: string;
@@ -162,6 +186,8 @@ interface SaleInvoice {
   approvalNotes?: string;
   attachments?: DocumentAttachment[];
   businessEntity?: "PT" | "NON_PT";
+  projectId?: string;
+  projectName?: string;
 }
 
 interface QuotationItem {
@@ -212,6 +238,8 @@ interface Quotation {
   notes?: string;
   attachments?: DocumentAttachment[];
   businessEntity?: "PT" | "NON_PT";
+  projectId?: string;
+  projectName?: string;
 }
 
 interface BankAccount {
@@ -271,6 +299,8 @@ interface PurchaseOrder {
   approvalNotes?: string;
   attachments?: DocumentAttachment[];
   businessEntity?: "PT" | "NON_PT";
+  projectId?: string;
+  projectName?: string;
 }
 
 interface SalesReturn {
@@ -344,6 +374,8 @@ interface CashTransaction {
   receiptUrl?: string;
   attachments?: DocumentAttachment[];
   businessEntity?: "PT" | "NON_PT";
+  projectId?: string;
+  projectName?: string;
 }
 
 interface WarehouseItem {
@@ -446,13 +478,14 @@ interface FinanceSummary {
 
 export default function AdminFinanceERPPage() {
   const [activeTab, setActiveTab] = useState<
-    "sales" | "quotations" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses" | "clients" | "suppliers"
+    "sales" | "quotations" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses" | "clients" | "suppliers" | "projects"
   >("sales");
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Data states
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [sales, setSales] = useState<SaleInvoice[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [purchases, setPurchases] = useState<PurchaseOrder[]>([]);
@@ -997,6 +1030,35 @@ export default function AdminFinanceERPPage() {
     paymentTerms: "Net 30 Hari",
     status: "Mitra Aktif",
     notes: "",
+  });
+
+  // Master Project Modal & Detail State
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState<boolean>(false);
+  const [editingProject, setEditingProject] = useState<ProjectItem | null>(null);
+  const [selectedProjectForDetail, setSelectedProjectForDetail] = useState<ProjectItem | null>(null);
+  const [projectFilterStatus, setProjectFilterStatus] = useState<string>("ALL");
+  const [projectForm, setProjectForm] = useState<{
+    projectCode: string;
+    projectName: string;
+    clientName: string;
+    businessEntity: "PT" | "NON_PT";
+    contractValue: number;
+    startDate: string;
+    targetEndDate: string;
+    status: "Planning" | "In Progress" | "Completed" | "On Hold" | "Cancelled";
+    description: string;
+    picProject: string;
+  }>({
+    projectCode: "",
+    projectName: "",
+    clientName: "",
+    businessEntity: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
+    contractValue: 0,
+    startDate: new Date().toISOString().split("T")[0],
+    targetEndDate: "",
+    status: "In Progress",
+    description: "",
+    picProject: "",
   });
 
   // Master Warehouse Modal State
@@ -1967,6 +2029,7 @@ export default function AdminFinanceERPPage() {
       if (res.ok) {
         const d = await res.json();
         if (d.data) {
+          setProjects(d.data.projects || []);
           setSales(d.data.sales || []);
           setQuotations(d.data.quotations || []);
           setPurchases(d.data.purchases || []);
@@ -2021,7 +2084,7 @@ export default function AdminFinanceERPPage() {
       const tab = params.get("tab");
       if (
         tab &&
-        ["sales", "quotations", "purchases", "returns", "pl_report", "cash_flow", "warehouses", "clients", "suppliers"].includes(
+        ["sales", "quotations", "purchases", "returns", "pl_report", "cash_flow", "warehouses", "clients", "suppliers", "projects"].includes(
           tab
         )
       ) {
@@ -4312,6 +4375,105 @@ export default function AdminFinanceERPPage() {
     }
   };
 
+  // Project Master Handlers
+  const handleOpenAddProject = () => {
+    setEditingProject(null);
+    setProjectForm({
+      projectCode: `PRJ-${new Date().getFullYear()}-${String(projects.length + 1).padStart(3, "0")}`,
+      projectName: "",
+      clientName: "",
+      businessEntity: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
+      contractValue: 0,
+      startDate: new Date().toISOString().split("T")[0],
+      targetEndDate: "",
+      status: "In Progress",
+      description: "",
+      picProject: "",
+    });
+    setIsProjectModalOpen(true);
+  };
+
+  const handleOpenEditProject = (prj: ProjectItem) => {
+    setEditingProject(prj);
+    setProjectForm({
+      projectCode: prj.projectCode,
+      projectName: prj.projectName,
+      clientName: prj.clientName || "",
+      businessEntity: prj.businessEntity || "PT",
+      contractValue: prj.contractValue || 0,
+      startDate: prj.startDate || new Date().toISOString().split("T")[0],
+      targetEndDate: prj.targetEndDate || "",
+      status: (prj.status as any) || "In Progress",
+      description: prj.description || "",
+      picProject: prj.picProject || "",
+    });
+    setIsProjectModalOpen(true);
+  };
+
+  const handleSaveProjectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!projectForm.projectName.trim()) {
+      showToast("Nama Proyek wajib diisi!");
+      return;
+    }
+
+    try {
+      if (editingProject) {
+        const res = await fetch("/api/finance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "project",
+            id: editingProject.id,
+            updates: projectForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Data proyek ${projectForm.projectName} berhasil diperbarui!`);
+          setIsProjectModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal memperbarui data proyek");
+        }
+      } else {
+        const res = await fetch("/api/finance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "project",
+            payload: projectForm,
+          }),
+        });
+        if (res.ok) {
+          showToast(`Proyek baru ${projectForm.projectName} berhasil ditambahkan!`);
+          setIsProjectModalOpen(false);
+          fetchFinanceData();
+        } else {
+          showToast("Gagal menambahkan proyek");
+        }
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  const handleDeleteProject = async (project: ProjectItem) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus proyek "${project.projectName}"?`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=project&id=${project.id}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        showToast(`Proyek ${project.projectName} berhasil dihapus`);
+        fetchFinanceData();
+      } else {
+        showToast("Gagal menghapus proyek");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
   // Warehouse Master Handlers
   const handleOpenAddWarehouse = () => {
     setEditingWarehouse(null);
@@ -4567,8 +4729,9 @@ export default function AdminFinanceERPPage() {
       quotations: quotations.filter((q) => selectedEntity === "ALL" || (q.businessEntity || "PT") === selectedEntity).length,
       purchases: purchases.filter((p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity).length,
       cashFlow: cashFlow.filter((c) => selectedEntity === "ALL" || (c.businessEntity || "PT") === selectedEntity).length,
+      projects: projects.filter((prj) => selectedEntity === "ALL" || (prj.businessEntity || "PT") === selectedEntity).length,
     };
-  }, [sales, quotations, purchases, cashFlow, selectedEntity]);
+  }, [sales, quotations, purchases, cashFlow, projects, selectedEntity]);
 
   return (
     <div className="space-y-6">
@@ -4920,6 +5083,21 @@ export default function AdminFinanceERPPage() {
             <span>Daftar Supplier</span>
             <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-[10px] font-black">
               {suppliers.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("projects")}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "projects"
+                ? "bg-slate-900 text-white shadow-md"
+                : "bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
+            }`}
+          >
+            <Briefcase className="w-4 h-4 text-indigo-600" />
+            <span>Manajemen Proyek</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-[10px] font-black">
+              {scopedCounts.projects}
             </span>
           </button>
         </div>
@@ -7251,6 +7429,205 @@ export default function AdminFinanceERPPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* TAB 9: MANAJEMEN PROYEK (PROJECTS) */}
+        {activeTab === "projects" && (
+          <div className="space-y-4">
+            {/* Header & Filter Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">Filter Status:</span>
+                {(["ALL", "In Progress", "Completed", "Planning", "On Hold"] as const).map((st) => (
+                  <button
+                    key={st}
+                    onClick={() => setProjectFilterStatus(st)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      projectFilterStatus === st
+                        ? "bg-slate-900 text-white shadow"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    {st === "ALL" ? "Semua Proyek" : st}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={handleOpenAddProject}
+                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Buat Proyek Baru</span>
+              </button>
+            </div>
+
+            {/* Quick KPI Summary Bar for Projects */}
+            {(() => {
+              const scopedProj = projects.filter(
+                (p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity
+              );
+              const totalContractVal = scopedProj.reduce((acc, curr) => acc + (curr.contractValue || 0), 0);
+              const activeCount = scopedProj.filter((p) => p.status === "In Progress").length;
+              const completedCount = scopedProj.filter((p) => p.status === "Completed").length;
+
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200/80">
+                  <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase">Total Proyek Terdaftar</p>
+                    <p className="text-xl font-black text-slate-900 mt-1">{scopedProj.length} <span className="text-xs font-bold text-slate-500">Proyek</span></p>
+                  </div>
+                  <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase">Sedang Berjalan (Aktif)</p>
+                    <p className="text-xl font-black text-indigo-700 mt-1">{activeCount} <span className="text-xs font-bold text-indigo-400">On Progress</span></p>
+                  </div>
+                  <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase">Proyek Selesai</p>
+                    <p className="text-xl font-black text-emerald-700 mt-1">{completedCount} <span className="text-xs font-bold text-emerald-400">Done</span></p>
+                  </div>
+                  <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
+                    <p className="text-[11px] font-bold text-slate-400 uppercase">Total Nilai Kontrak</p>
+                    <p className="text-xl font-black text-indigo-900 mt-1">{formatRupiah(totalContractVal)}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Project List Cards / Table */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {projects
+                .filter((p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity)
+                .filter((p) => projectFilterStatus === "ALL" || p.status === projectFilterStatus)
+                .map((prj) => {
+                  const prjSales = sales.filter((s) => s.projectId === prj.id || s.notes?.includes(prj.projectCode));
+                  const prjPurchases = purchases.filter((po) => po.notes?.includes(prj.projectCode) || po.supplierName?.includes(prj.projectCode));
+                  const prjRevenue = prjSales.reduce((sum, s) => sum + (s.grandTotal || 0), 0);
+                  const prjExpense = prjPurchases.reduce((sum, po) => sum + (po.grandTotal || 0), 0);
+                  const margin = prjRevenue - prjExpense;
+
+                  return (
+                    <div
+                      key={prj.id}
+                      className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 hover:shadow-md transition-all space-y-3 relative group"
+                    >
+                      <div className="flex items-start justify-between gap-2 border-b border-slate-100 pb-2.5">
+                        <div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[11px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200">
+                              {prj.projectCode}
+                            </span>
+                            <span
+                              className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${
+                                prj.businessEntity === "NON_PT"
+                                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                  : "bg-blue-50 text-blue-700 border-blue-200"
+                              }`}
+                            >
+                              {prj.businessEntity === "NON_PT" ? "🏬 DSTech Smart" : "🏢 PT. DSTech Smart"}
+                            </span>
+                          </div>
+                          <h4 className="text-sm font-black text-slate-800 mt-1 line-clamp-1">{prj.projectName}</h4>
+                          <p className="text-xs text-slate-500 font-semibold flex items-center gap-1 mt-0.5">
+                            <Users className="w-3 h-3 text-slate-400" />
+                            {prj.clientName || "Klien Umum"}
+                          </p>
+                        </div>
+
+                        <span
+                          className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase shrink-0 ${
+                            prj.status === "In Progress"
+                              ? "bg-amber-100 text-amber-800 border border-amber-300"
+                              : prj.status === "Completed"
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                              : prj.status === "Planning"
+                              ? "bg-blue-100 text-blue-800 border border-blue-300"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {prj.status}
+                        </span>
+                      </div>
+
+                      {prj.description && (
+                        <p className="text-xs text-slate-600 line-clamp-2 bg-slate-50 p-2 rounded-xl">
+                          {prj.description}
+                        </p>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">Nilai Kontrak:</span>
+                          <span className="font-black text-slate-900">{formatRupiah(prj.contractValue || 0)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase block">PIC Lapangan:</span>
+                          <span className="font-bold text-slate-700 truncate block">
+                            {prj.picProject || "-"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Financial Track for this Project */}
+                      <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-100 text-[11px] space-y-1">
+                        <div className="flex justify-between items-center text-slate-600">
+                          <span>Pendapatan / Faktur:</span>
+                          <span className="font-bold text-emerald-600">{formatRupiah(prjRevenue)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-slate-600">
+                          <span>Biaya Pembelian (PO):</span>
+                          <span className="font-bold text-amber-600">{formatRupiah(prjExpense)}</span>
+                        </div>
+                        <div className="flex justify-between items-center pt-1 border-t border-slate-200 font-black">
+                          <span>Margin Kasar:</span>
+                          <span className={margin >= 0 ? "text-emerald-700" : "text-red-700"}>
+                            {formatRupiah(margin)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <span className="text-[10px] text-slate-400">
+                          Mulai: {prj.startDate || "-"}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleOpenEditProject(prj)}
+                            className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-all cursor-pointer"
+                            title="Edit Proyek"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProject(prj)}
+                            className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all cursor-pointer"
+                            title="Hapus Proyek"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+
+            {projects.filter((p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity).length === 0 && (
+              <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-slate-200">
+                <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <h4 className="font-black text-slate-700">Belum Ada Proyek untuk Entitas Ini</h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Mulai catat proyek pengadaan, instalasi CCTV, atau pekerjaan jaringan untuk memonitor keuangan proyek.
+                </p>
+                <button
+                  onClick={handleOpenAddProject}
+                  className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black cursor-pointer hover:bg-indigo-700 transition-all inline-flex items-center gap-1.5 shadow"
+                >
+                  <Plus className="w-4 h-4" />
+                  + Buat Proyek Pertama
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -11456,6 +11833,200 @@ export default function AdminFinanceERPPage() {
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>{editingSupplier ? "Simpan Perubahan" : "Simpan Supplier Baru"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MASTER PROYEK (TAMBAH / EDIT PROYEK) */}
+      {isProjectModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsProjectModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-indigo-50 text-indigo-700">
+                  <Briefcase className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-800 text-sm">
+                    {editingProject ? "Edit Master Data Proyek" : "Buat Master Proyek Baru"}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Pengelompokan transaksi & analisis laba rugi per proyek
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsProjectModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProjectSubmit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Kode Proyek (ID):
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={projectForm.projectCode}
+                    onChange={(e) => setProjectForm({ ...projectForm, projectCode: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 uppercase font-mono font-bold"
+                    placeholder="Contoh: PRJ-2026-001"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Entitas Penanggung Jawab:
+                  </label>
+                  <select
+                    value={projectForm.businessEntity}
+                    onChange={(e) => setProjectForm({ ...projectForm, businessEntity: e.target.value as any })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white"
+                  >
+                    <option value="PT">🏢 PT. DSTech Smart Perkasa</option>
+                    <option value="NON_PT">🏬 DSTech Smart (Non-PT / Mandiri)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Nama Proyek / Pekerjaan:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={projectForm.projectName}
+                  onChange={(e) => setProjectForm({ ...projectForm, projectName: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-bold"
+                  placeholder="Misal: Instalasi 32 Titik CCTV Pabrik Cilegon"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Nama Klien / Customer:
+                  </label>
+                  <input
+                    type="text"
+                    value={projectForm.clientName}
+                    onChange={(e) => setProjectForm({ ...projectForm, clientName: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                    placeholder="Pilih atau tulis nama klien"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Status Proyek:
+                  </label>
+                  <select
+                    value={projectForm.status}
+                    onChange={(e) => setProjectForm({ ...projectForm, status: e.target.value as any })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white"
+                  >
+                    <option value="Planning">Planning (Persiapan)</option>
+                    <option value="In Progress">In Progress (Sedang Dikerjakan)</option>
+                    <option value="Completed">Completed (Selesai)</option>
+                    <option value="On Hold">On Hold (Ditunda)</option>
+                    <option value="Cancelled">Cancelled (Dibatalkan)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Nilai Total Kontrak (Rp):
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={projectForm.contractValue}
+                    onChange={(e) => setProjectForm({ ...projectForm, contractValue: parseFloat(e.target.value) || 0 })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-indigo-700"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    PIC Lapangan:
+                  </label>
+                  <input
+                    type="text"
+                    value={projectForm.picProject}
+                    onChange={(e) => setProjectForm({ ...projectForm, picProject: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                    placeholder="Nama PIC teknis lapangan"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Tanggal Mulai:
+                  </label>
+                  <input
+                    type="date"
+                    value={projectForm.startDate}
+                    onChange={(e) => setProjectForm({ ...projectForm, startDate: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Target Selesai:
+                  </label>
+                  <input
+                    type="date"
+                    value={projectForm.targetEndDate}
+                    onChange={(e) => setProjectForm({ ...projectForm, targetEndDate: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Deskripsi & Lingkup Pekerjaan:
+                </label>
+                <textarea
+                  rows={2}
+                  value={projectForm.description}
+                  onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200"
+                  placeholder="Catatan lingkup pekerjaan proyek..."
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsProjectModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{editingProject ? "Simpan Perubahan" : "Simpan Proyek Baru"}</span>
                 </button>
               </div>
             </form>

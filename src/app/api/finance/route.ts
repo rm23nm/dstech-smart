@@ -173,6 +173,7 @@ export async function GET() {
     totalQuotationsValue,
     totalQuotationsPending,
     totalQuotationsApproved,
+    totalProjectsCount: (data.projects || []).length,
   };
 
   return NextResponse.json({
@@ -1153,6 +1154,44 @@ export async function POST(request: Request) {
       });
     }
 
+    if (actionType === "project") {
+      const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
+      const isNonPt = payload.businessEntity === "NON_PT";
+      const prefixPrj = isNonPt ? "PRJ-DTS" : "PRJ-DSP";
+      const newPrjNumber = payload.projectCode || `${prefixPrj}-${yearMonth}-${String((data.projects?.length || 0) + 1).padStart(3, "0")}`;
+
+      const newProject = {
+        id: payload.id || `dstech_prj_${Date.now()}`,
+        projectCode: newPrjNumber,
+        projectName: payload.projectName || "Proyek Sistem Keamanan",
+        clientId: payload.clientId || "",
+        clientName: payload.clientName || payload.customerName || "Klien DSTech",
+        clientPhone: payload.clientPhone || "-",
+        clientAddress: payload.clientAddress || "-",
+        businessEntity: payload.businessEntity || "PT",
+        quotationId: payload.quotationId || "",
+        quotationNumber: payload.quotationNumber || "",
+        contractValue: Number(payload.contractValue) || 0,
+        budgetCost: Number(payload.budgetCost) || 0,
+        status: payload.status || "Planning", // Planning | In Progress | Completed | On Hold
+        startDate: payload.startDate || new Date().toISOString().split("T")[0],
+        targetEndDate: payload.targetEndDate || "",
+        actualEndDate: payload.actualEndDate || "",
+        picProject: payload.picProject || "Project Manager DSTech",
+        description: payload.description || "-",
+        createdAt: new Date().toISOString(),
+      };
+
+      if (!data.projects) data.projects = [];
+      data.projects.unshift(newProject);
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Proyek ${newProject.projectCode} (${newProject.projectName}) berhasil didaftarkan`,
+        data: newProject,
+      });
+    }
+
     return NextResponse.json({ success: false, error: "Tipe aksi (actionType) tidak dikenali" }, { status: 400 });
   } catch (err) {
     console.error("Error creating financial record:", err);
@@ -1437,6 +1476,25 @@ export async function PUT(request: Request) {
       });
     }
 
+    if (actionType === "project") {
+      const index = (data.projects || []).findIndex((p: any) => p.id === id || p.projectCode === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Proyek tidak ditemukan" }, { status: 404 });
+      }
+
+      data.projects[index] = {
+        ...data.projects[index],
+        ...updates,
+      };
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Proyek ${data.projects[index].projectCode} berhasil diperbarui`,
+        data: data.projects[index],
+      });
+    }
+
     return NextResponse.json({ success: false, error: "Tipe aksi tidak dikenali" }, { status: 400 });
   } catch (err) {
     console.error("Error updating finance record:", err);
@@ -1567,6 +1625,16 @@ export async function DELETE(request: Request) {
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Transaksi arus kas berhasil dihapus" });
+    }
+
+    if (actionType === "project") {
+      const initialLen = (data.projects || []).length;
+      data.projects = (data.projects || []).filter((p: any) => p.id !== id && p.projectCode !== id);
+      if (data.projects.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Proyek tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Proyek berhasil dihapus" });
     }
 
     if (actionType === "reset_transactions") {
