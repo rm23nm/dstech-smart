@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import {
   TrendingUp,
@@ -55,6 +55,9 @@ import {
   Copy,
   ExternalLink,
   Share2,
+  ArrowUpDown,
+  XCircle,
+  Ban,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -870,6 +873,7 @@ export default function AdminFinanceERPPage() {
   // Quotations States & Modals
   const [quotationSearchQuery, setQuotationSearchQuery] = useState<string>("");
   const [quotationStatusFilter, setQuotationStatusFilter] = useState<string>("Semua");
+  const [quotationSortBy, setQuotationSortBy] = useState<string>("date_desc");
   const [isNewQuotationModalOpen, setIsNewQuotationModalOpen] = useState<boolean>(false);
   const [isEditQuotationModalOpen, setIsEditQuotationModalOpen] = useState<boolean>(false);
   const [editingQuotation, setEditingQuotation] = useState<Quotation | null>(null);
@@ -1746,6 +1750,124 @@ export default function AdminFinanceERPPage() {
       showToast("Terjadi kesalahan jaringan saat menghapus penawaran");
     }
   };
+
+  const isQuotationExpired = (sph: Quotation): boolean => {
+    if (sph.status === "Kedaluwarsa") return true;
+    if (sph.status === "Terkonversi Faktur" || sph.status === "Disetujui Klien" || sph.status === "Ditolak" || Boolean(sph.convertedInvoiceId)) {
+      return false;
+    }
+    if (!sph.validUntil) return false;
+    const todayStr = new Date().toISOString().split("T")[0];
+    return sph.validUntil < todayStr;
+  };
+
+  const getQuotationClassification = (sph: Quotation): "deal" | "expired" | "rejected" | "pending" => {
+    if (sph.status === "Terkonversi Faktur" || sph.status === "Disetujui Klien" || Boolean(sph.convertedInvoiceId)) {
+      return "deal";
+    }
+    if (sph.status === "Ditolak") {
+      return "rejected";
+    }
+    if (sph.status === "Kedaluwarsa" || isQuotationExpired(sph)) {
+      return "expired";
+    }
+    return "pending";
+  };
+
+  const handleUpdateQuotationStatus = async (sph: Quotation, newStatus: string) => {
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "quotation",
+          id: sph.id,
+          updates: { status: newStatus },
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast(`Status SPH ${sph.quotationNumber} berhasil diubah: ${newStatus}`);
+        setQuotations((prev) =>
+          prev.map((q) => (q.id === sph.id ? { ...q, status: newStatus } : q))
+        );
+      } else {
+        showToast(result.error || "Gagal memperbarui status penawaran");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat memperbarui status penawaran");
+    }
+  };
+
+  const quotationCounts = useMemo(() => {
+    let deal = 0;
+    let pending = 0;
+    let expired = 0;
+    let rejected = 0;
+    for (const q of quotations) {
+      const c = getQuotationClassification(q);
+      if (c === "deal") deal++;
+      else if (c === "expired") expired++;
+      else if (c === "rejected") rejected++;
+      else pending++;
+    }
+    return { total: quotations.length, deal, pending, expired, rejected };
+  }, [quotations]);
+
+  const filteredAndSortedQuotations = useMemo(() => {
+    return quotations
+      .filter((sph) => {
+        const query = quotationSearchQuery.toLowerCase();
+        const matchQuery =
+          sph.quotationNumber.toLowerCase().includes(query) ||
+          sph.customerName.toLowerCase().includes(query) ||
+          (sph.customerOrg && sph.customerOrg.toLowerCase().includes(query)) ||
+          sph.subject.toLowerCase().includes(query);
+
+        if (!matchQuery) return false;
+
+        const classification = getQuotationClassification(sph);
+        if (quotationStatusFilter === "Semua") return true;
+        if (quotationStatusFilter === "deal") return classification === "deal";
+        if (quotationStatusFilter === "pending") return classification === "pending";
+        if (quotationStatusFilter === "expired") return classification === "expired";
+        if (quotationStatusFilter === "rejected") return classification === "rejected";
+        return sph.status === quotationStatusFilter;
+      })
+      .sort((a, b) => {
+        if (quotationSortBy === "date_desc") {
+          return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+        }
+        if (quotationSortBy === "date_asc") {
+          return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
+        }
+        if (quotationSortBy === "status_deal_first") {
+          const priority: Record<string, number> = { deal: 1, pending: 2, expired: 3, rejected: 4 };
+          const pA = priority[getQuotationClassification(a)] || 9;
+          const pB = priority[getQuotationClassification(b)] || 9;
+          return pA - pB;
+        }
+        if (quotationSortBy === "status_expired_first") {
+          const priority: Record<string, number> = { expired: 1, rejected: 2, pending: 3, deal: 4 };
+          const pA = priority[getQuotationClassification(a)] || 9;
+          const pB = priority[getQuotationClassification(b)] || 9;
+          return pA - pB;
+        }
+        if (quotationSortBy === "validity_asc") {
+          return (a.validUntil || "").localeCompare(b.validUntil || "");
+        }
+        if (quotationSortBy === "total_desc") {
+          return (Number(b.grandTotal) || 0) - (Number(a.grandTotal) || 0);
+        }
+        if (quotationSortBy === "total_asc") {
+          return (Number(a.grandTotal) || 0) - (Number(b.grandTotal) || 0);
+        }
+        if (quotationSortBy === "client_asc") {
+          return a.customerName.localeCompare(b.customerName);
+        }
+        return 0;
+      });
+  }, [quotations, quotationSearchQuery, quotationStatusFilter, quotationSortBy]);
 
   const handleOpenConvertQuotation = (q: Quotation) => {
     setSelectedQuotationForConvert(q);
@@ -4242,7 +4364,7 @@ export default function AdminFinanceERPPage() {
         {activeTab === "quotations" && (
           <div className="space-y-6">
             {/* Top Control Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
@@ -4250,27 +4372,34 @@ export default function AdminFinanceERPPage() {
                   placeholder="Cari nomor SPH (SPH-DSTECH-...), nama instansi klien, atau perihal pengadaan..."
                   value={quotationSearchQuery}
                   onChange={(e) => setQuotationSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none bg-white shadow-xs"
                 />
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={quotationStatusFilter}
-                  onChange={(e) => setQuotationStatusFilter(e.target.value)}
-                  className="p-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white focus:outline-none"
-                >
-                  <option value="Semua">Semua Status SPH</option>
-                  <option value="Terkirim">Terkirim</option>
-                  <option value="Disetujui Klien">Disetujui Klien</option>
-                  <option value="Terkonversi Faktur">Terkonversi Faktur</option>
-                  <option value="Draf">Draf</option>
-                  <option value="Ditolak">Ditolak</option>
-                </select>
+                {/* Dropdown Sortir SPH */}
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs shadow-xs">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Sortir:</span>
+                  <select
+                    value={quotationSortBy}
+                    onChange={(e) => setQuotationSortBy(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="date_desc">📅 Tanggal Terbaru</option>
+                    <option value="date_asc">📅 Tanggal Terlama</option>
+                    <option value="status_deal_first">🤝 Status: Deal Teratas</option>
+                    <option value="status_expired_first">⏰ Status: Expired & Reject Teratas</option>
+                    <option value="validity_asc">⏳ Masa Berlaku (Mendekati Expired)</option>
+                    <option value="total_desc">💰 Nilai Penawaran Tertinggi</option>
+                    <option value="total_asc">💰 Nilai Penawaran Terendah</option>
+                    <option value="client_asc">🏢 Nama Klien (A-Z)</option>
+                  </select>
+                </div>
 
                 <button
                   onClick={() => setIsNewQuotationModalOpen(true)}
-                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all"
+                  className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Buat Surat Penawaran (SPH)</span>
@@ -4283,7 +4412,7 @@ export default function AdminFinanceERPPage() {
               <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Total SPH Terbit</p>
-                  <h4 className="text-xl font-black text-slate-900 mt-1">{quotations.length} Surat</h4>
+                  <h4 className="text-xl font-black text-slate-900 mt-1">{quotationCounts.total} Surat</h4>
                   <p className="text-[10px] text-slate-500 mt-0.5">Penawaran Resmi</p>
                 </div>
                 <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
@@ -4293,42 +4422,126 @@ export default function AdminFinanceERPPage() {
 
               <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Total Nilai Penawaran</p>
-                  <h4 className="text-xl font-black text-slate-900 mt-1">
-                    {formatRupiah(quotations.reduce((acc, curr) => acc + (Number(curr.grandTotal) || 0), 0))}
-                  </h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Akumulasi Proposal</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Deal / Jadi Faktur</p>
+                  <h4 className="text-xl font-black text-slate-900 mt-1">{quotationCounts.deal} SPH</h4>
+                  <p className="text-[10px] text-emerald-600 font-bold mt-0.5">Proyek Disepakati</p>
                 </div>
                 <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md">
-                  <TrendingUp className="w-5 h-5" />
+                  <CheckCheck className="w-5 h-5" />
                 </div>
               </div>
 
               <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-100 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Disetujui Klien</p>
-                  <h4 className="text-xl font-black text-slate-900 mt-1">
-                    {quotations.filter((q) => q.status === "Disetujui Klien").length} SPH
-                  </h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Siap Pelaksanaan</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Menunggu Respon</p>
+                  <h4 className="text-xl font-black text-slate-900 mt-1">{quotationCounts.pending} SPH</h4>
+                  <p className="text-[10px] text-amber-700 font-bold mt-0.5">Sedang Negosiasi</p>
                 </div>
                 <div className="w-10 h-10 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-md">
-                  <CheckCheck className="w-5 h-5" />
+                  <Clock className="w-5 h-5" />
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-100 flex items-center justify-between">
+              <div className="p-4 rounded-2xl bg-slate-100/90 border border-slate-200 flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-blue-700">Telah Jadi Faktur</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-700">Expired & Reject</p>
                   <h4 className="text-xl font-black text-slate-900 mt-1">
-                    {quotations.filter((q) => q.status === "Terkonversi Faktur" || q.convertedInvoiceId).length} SPH
+                    {quotationCounts.expired + quotationCounts.rejected} SPH
                   </h4>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Terkonversi Proyek</p>
+                  <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                    {quotationCounts.expired} Expired • {quotationCounts.rejected} Ditolak
+                  </p>
                 </div>
-                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-md">
-                  <Receipt className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-2xl bg-slate-700 text-white flex items-center justify-center shadow-md">
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
                 </div>
               </div>
+            </div>
+
+            {/* Quick Filter Status Chips (Deal vs Pending vs Expired vs Reject) */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-b border-slate-100 pb-3">
+              <span className="text-xs font-black text-slate-400 uppercase tracking-wider mr-1">
+                Filter Status:
+              </span>
+
+              <button
+                type="button"
+                onClick={() => setQuotationStatusFilter("Semua")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                  quotationStatusFilter === "Semua"
+                    ? "bg-slate-900 text-white ring-2 ring-slate-400"
+                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                }`}
+              >
+                <span>Semua SPH</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 font-mono">
+                  {quotationCounts.total}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuotationStatusFilter("deal")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                  quotationStatusFilter === "deal"
+                    ? "bg-emerald-600 text-white ring-2 ring-emerald-300"
+                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                }`}
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>🤝 Deal / Faktur</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 font-mono font-bold">
+                  {quotationCounts.deal}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuotationStatusFilter("pending")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                  quotationStatusFilter === "pending"
+                    ? "bg-amber-500 text-slate-950 ring-2 ring-amber-300 font-black"
+                    : "bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200"
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>⏳ Menunggu Respon</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/30 font-mono font-bold">
+                  {quotationCounts.pending}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuotationStatusFilter("expired")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                  quotationStatusFilter === "expired"
+                    ? "bg-slate-700 text-white ring-2 ring-slate-400"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300"
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                <span>⏰ Expired / Kedaluwarsa</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 font-mono font-bold">
+                  {quotationCounts.expired}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setQuotationStatusFilter("rejected")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                  quotationStatusFilter === "rejected"
+                    ? "bg-red-600 text-white ring-2 ring-red-300"
+                    : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                }`}
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                <span>❌ Ditolak / Reject</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 font-mono font-bold">
+                  {quotationCounts.rejected}
+                </span>
+              </button>
             </div>
 
             {/* Quotations Table */}
@@ -4346,233 +4559,280 @@ export default function AdminFinanceERPPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {quotations
-                    .filter((sph) => {
-                      const matchQuery =
-                        sph.quotationNumber.toLowerCase().includes(quotationSearchQuery.toLowerCase()) ||
-                        sph.customerName.toLowerCase().includes(quotationSearchQuery.toLowerCase()) ||
-                        sph.subject.toLowerCase().includes(quotationSearchQuery.toLowerCase());
-                      const matchStatus =
-                        quotationStatusFilter === "Semua" || sph.status === quotationStatusFilter;
-                      return matchQuery && matchStatus;
-                    })
-                    .map((sph) => (
-                      <tr key={sph.id} className="hover:bg-slate-50/80 transition-colors">
-                        {/* No SPH & Perihal */}
-                        <td className="p-3">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono font-black text-indigo-700 block text-xs">
-                              {sph.quotationNumber}
+                  {filteredAndSortedQuotations.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-400">
+                        <FileText className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                        <p className="font-bold text-slate-600">Tidak ada Surat Penawaran yang sesuai filter</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Coba ubah kata kunci pencarian atau ganti filter status di atas.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAndSortedQuotations.map((sph) => {
+                      const classification = getQuotationClassification(sph);
+                      return (
+                        <tr key={sph.id} className="hover:bg-slate-50/80 transition-colors">
+                          {/* No SPH & Perihal */}
+                          <td className="p-3">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono font-black text-indigo-700 block text-xs">
+                                {sph.quotationNumber}
+                              </span>
+                              {Boolean(sph.revision && sph.revision > 0) && (
+                                <span className="text-[9px] font-black font-mono px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
+                                  Rev. 0{sph.revision}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-bold text-slate-800 line-clamp-1 mt-0.5 max-w-[220px]" title={sph.subject}>
+                              {sph.subject}
                             </span>
-                            {Boolean(sph.revision && sph.revision > 0) && (
-                              <span className="text-[9px] font-black font-mono px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
-                                Rev. 0{sph.revision}
+                            {sph.convertedInvoiceId && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mt-1">
+                                <Receipt className="w-3 h-3 text-emerald-600" />
+                                Faktur: {sph.convertedInvoiceId}
                               </span>
                             )}
-                          </div>
-                          <span className="text-[11px] font-bold text-slate-800 line-clamp-1 mt-0.5 max-w-[220px]" title={sph.subject}>
-                            {sph.subject}
-                          </span>
-                          {sph.convertedInvoiceId && (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mt-1">
-                              <Receipt className="w-3 h-3 text-emerald-600" />
-                              Faktur: {sph.convertedInvoiceId}
+                          </td>
+
+                          {/* Klien & Instansi */}
+                          <td className="p-3">
+                            <p className="font-bold text-slate-900 line-clamp-1">{sph.customerName}</p>
+                            <p className="text-[10px] text-slate-400">{sph.customerPhone || "-"}</p>
+                            <p className="text-[10px] text-slate-400 line-clamp-1 max-w-[180px]">{sph.customerAddress || "-"}</p>
+                          </td>
+
+                          {/* Tanggal & Tempo */}
+                          <td className="p-3 whitespace-nowrap">
+                            <p className="text-slate-800 font-medium">Terbit: {sph.date}</p>
+                            <p className={`text-[10px] font-semibold flex items-center gap-1 mt-0.5 ${
+                              classification === "expired" ? "text-red-600 font-black" : "text-amber-700"
+                            }`}>
+                              <Clock className="w-3 h-3 text-amber-500" />
+                              Berlaku s/d: {sph.validUntil} ({sph.validityDays || 14} hari)
+                            </p>
+                          </td>
+
+                          {/* Rincian Item */}
+                          <td className="p-3">
+                            <div className="space-y-0.5 max-w-[200px]">
+                              {sph.items.slice(0, 2).map((it, idx) => (
+                                <p key={idx} className="text-[11px] text-slate-600 truncate">
+                                  • {it.productName} ({it.qty} {it.unit})
+                                </p>
+                              ))}
+                              {sph.items.length > 2 && (
+                                <p className="text-[10px] font-bold text-indigo-600">
+                                  + {sph.items.length - 2} item perangkat lainnya...
+                                </p>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Total Penawaran */}
+                          <td className="p-3 whitespace-nowrap font-bold">
+                            <span className="text-sm font-black text-slate-900 block">
+                              {formatRupiah(sph.grandTotal)}
                             </span>
-                          )}
-                        </td>
-
-                        {/* Klien & Instansi */}
-                        <td className="p-3">
-                          <p className="font-bold text-slate-900 line-clamp-1">{sph.customerName}</p>
-                          <p className="text-[10px] text-slate-400">{sph.customerPhone || "-"}</p>
-                          <p className="text-[10px] text-slate-400 line-clamp-1 max-w-[180px]">{sph.customerAddress || "-"}</p>
-                        </td>
-
-                        {/* Tanggal & Tempo */}
-                        <td className="p-3 whitespace-nowrap">
-                          <p className="text-slate-800 font-medium">Terbit: {sph.date}</p>
-                          <p className="text-[10px] font-semibold text-amber-700 flex items-center gap-1 mt-0.5">
-                            <Clock className="w-3 h-3 text-amber-500" />
-                            Berlaku s/d: {sph.validUntil} ({sph.validityDays || 14} hari)
-                          </p>
-                        </td>
-
-                        {/* Rincian Item */}
-                        <td className="p-3">
-                          <div className="space-y-0.5 max-w-[200px]">
-                            {sph.items.slice(0, 2).map((it, idx) => (
-                              <p key={idx} className="text-[11px] text-slate-600 truncate">
-                                • {it.productName} ({it.qty} {it.unit})
-                              </p>
-                            ))}
-                            {sph.items.length > 2 && (
-                              <p className="text-[10px] font-bold text-indigo-600">
-                                + {sph.items.length - 2} item perangkat lainnya...
-                              </p>
+                            {sph.discount > 0 && (
+                              <span className="text-[10px] text-red-500 font-semibold block">
+                                {sph.discountLabel || "Diskon Nego"}: -{formatRupiah(sph.discount)}
+                                {sph.discountType === "percent" && sph.discountPercent ? ` (${sph.discountPercent}%)` : ""}
+                              </span>
                             )}
-                          </div>
-                        </td>
-
-                        {/* Total Penawaran */}
-                        <td className="p-3 whitespace-nowrap font-bold">
-                          <span className="text-sm font-black text-slate-900 block">
-                            {formatRupiah(sph.grandTotal)}
-                          </span>
-                          {sph.discount > 0 && (
-                            <span className="text-[10px] text-red-500 font-semibold block">
-                              {sph.discountLabel || "Diskon Nego"}: -{formatRupiah(sph.discount)}
-                              {sph.discountType === "percent" && sph.discountPercent ? ` (${sph.discountPercent}%)` : ""}
+                            <span className="text-[10px] text-slate-400 font-semibold">
+                              PPN {sph.taxRate || 0}%: {formatRupiah(sph.taxAmount || 0)}
                             </span>
-                          )}
-                          <span className="text-[10px] text-slate-400 font-semibold">
-                            PPN {sph.taxRate || 0}%: {formatRupiah(sph.taxAmount || 0)}
-                          </span>
-                        </td>
+                          </td>
 
-                        {/* Status SPH & Approval */}
-                        <td className="p-3 whitespace-nowrap space-y-1">
-                          <span
-                            className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                              sph.status === "Disetujui Klien"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : sph.status === "Terkonversi Faktur"
-                                ? "bg-blue-100 text-blue-800"
-                                : sph.status === "Terkirim"
-                                ? "bg-amber-100 text-amber-800"
-                                : sph.status === "Ditolak"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-slate-100 text-slate-700"
-                            }`}
-                          >
-                            {sph.status}
-                          </span>
-
-                          <div>
-                            {sph.approvalStatus === "Disetujui & Sah" ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
-                                <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                                Sah Digital
+                          {/* Status SPH & Approval */}
+                          <td className="p-3 whitespace-nowrap space-y-1">
+                            {classification === "deal" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                {sph.status === "Terkonversi Faktur" ? "Deal (Faktur)" : "Disetujui Klien"}
+                              </span>
+                            ) : classification === "expired" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-200 text-slate-800 border border-slate-300" title="Penawaran melewati batas waktu atau lama tidak deal">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                Kedaluwarsa (Expired)
+                              </span>
+                            ) : classification === "rejected" ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-100 text-red-800 border border-red-200">
+                                <XCircle className="w-3 h-3 text-red-600" />
+                                Ditolak (Reject)
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                                <Clock className="w-3 h-3 text-amber-500" />
-                                Menunggu Approval
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-200">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                {sph.status || "Terkirim"}
                               </span>
                             )}
-                          </div>
-                        </td>
 
-                        {/* Aksi */}
-                        <td className="p-3 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Cetak / Preview SPH */}
-                            <button
-                              onClick={() => setSelectedQuotationForPrint(sph)}
-                              title="Cetak & Pratinjau Surat Penawaran Kop DSTech"
-                              className="p-2 rounded-xl bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Printer className="w-4 h-4" />
-                            </button>
+                            <div>
+                              {sph.approvalStatus === "Disetujui & Sah" ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                                  <ShieldCheck className="w-3 h-3 text-indigo-600" />
+                                  Sah Digital
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                  <Clock className="w-3 h-3 text-amber-500" />
+                                  Menunggu Approval
+                                </span>
+                              )}
+                            </div>
+                          </td>
 
-                            {/* Kirim SPH via WhatsApp */}
-                            <button
-                              onClick={() =>
-                                handleOpenSendDocModal({
-                                  docType: "SPH",
-                                  docTitle: "Surat Penawaran Harga (SPH)",
-                                  docNumber: sph.quotationNumber,
-                                  recipientName: sph.customerName,
-                                  recipientOrg: sph.customerOrg,
-                                  recipientPhone: sph.customerPhone,
-                                  date: sph.date,
-                                  dueDate: sph.validUntil,
-                                  subject: sph.subject,
-                                  grandTotal: sph.grandTotal,
-                                  subtotal: sph.subtotal,
-                                  discount: sph.discount,
-                                  discountLabel: sph.discountLabel,
-                                  approvalStatus: sph.approvalStatus,
-                                  initialTab: "whatsapp",
-                                })
-                              }
-                              title="Kirim SPH via WhatsApp ke Klien"
-                              className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <MessageCircle className="w-4 h-4" />
-                            </button>
-
-                            {/* Kirim SPH via Email */}
-                            <button
-                              onClick={() =>
-                                handleOpenSendDocModal({
-                                  docType: "SPH",
-                                  docTitle: "Surat Penawaran Harga (SPH)",
-                                  docNumber: sph.quotationNumber,
-                                  recipientName: sph.customerName,
-                                  recipientOrg: sph.customerOrg,
-                                  recipientPhone: sph.customerPhone,
-                                  date: sph.date,
-                                  dueDate: sph.validUntil,
-                                  subject: sph.subject,
-                                  grandTotal: sph.grandTotal,
-                                  subtotal: sph.subtotal,
-                                  discount: sph.discount,
-                                  discountLabel: sph.discountLabel,
-                                  approvalStatus: sph.approvalStatus,
-                                  initialTab: "email",
-                                })
-                              }
-                              title="Kirim SPH via Email ke Klien"
-                              className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Mail className="w-4 h-4" />
-                            </button>
-
-                            {/* Konversi ke Faktur Penjualan (1-Klik) */}
-                            {sph.status !== "Terkonversi Faktur" && (
+                          {/* Aksi Cepat */}
+                          <td className="p-3 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Cetak / Preview SPH */}
                               <button
-                                onClick={() => handleOpenConvertQuotation(sph)}
-                                title="Konversi SPH ini Menjadi Faktur Penjualan Resmi"
+                                onClick={() => setSelectedQuotationForPrint(sph)}
+                                title="Cetak & Pratinjau Surat Penawaran Kop DSTech"
+                                className="p-2 rounded-xl bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Printer className="w-4 h-4" />
+                              </button>
+
+                              {/* Kirim SPH via WhatsApp */}
+                              <button
+                                onClick={() =>
+                                  handleOpenSendDocModal({
+                                    docType: "SPH",
+                                    docTitle: "Surat Penawaran Harga (SPH)",
+                                    docNumber: sph.quotationNumber,
+                                    recipientName: sph.customerName,
+                                    recipientOrg: sph.customerOrg,
+                                    recipientPhone: sph.customerPhone,
+                                    date: sph.date,
+                                    dueDate: sph.validUntil,
+                                    subject: sph.subject,
+                                    grandTotal: sph.grandTotal,
+                                    subtotal: sph.subtotal,
+                                    discount: sph.discount,
+                                    discountLabel: sph.discountLabel,
+                                    approvalStatus: sph.approvalStatus,
+                                    initialTab: "whatsapp",
+                                  })
+                                }
+                                title="Kirim SPH via WhatsApp ke Klien"
                                 className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
                               >
-                                <ArrowRight className="w-4 h-4" />
+                                <MessageCircle className="w-4 h-4" />
                               </button>
-                            )}
 
-                            {/* Approval Tanda Tangan Direktur */}
-                            <button
-                              onClick={() => handleOpenApprovalModal(sph as any)}
-                              title={sph.approvalStatus === "Disetujui & Sah" ? "Perbarui Tanda Tangan Digital SPH" : "Approval & Tanda Tangan Digital Direktur SPH"}
-                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
-                                sph.approvalStatus === "Disetujui & Sah"
-                                  ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-700 hover:text-white"
-                                  : "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white"
-                              }`}
-                            >
-                              <PenTool className="w-4 h-4" />
-                            </button>
+                              {/* Kirim SPH via Email */}
+                              <button
+                                onClick={() =>
+                                  handleOpenSendDocModal({
+                                    docType: "SPH",
+                                    docTitle: "Surat Penawaran Harga (SPH)",
+                                    docNumber: sph.quotationNumber,
+                                    recipientName: sph.customerName,
+                                    recipientOrg: sph.customerOrg,
+                                    recipientPhone: sph.customerPhone,
+                                    date: sph.date,
+                                    dueDate: sph.validUntil,
+                                    subject: sph.subject,
+                                    grandTotal: sph.grandTotal,
+                                    subtotal: sph.subtotal,
+                                    discount: sph.discount,
+                                    discountLabel: sph.discountLabel,
+                                    approvalStatus: sph.approvalStatus,
+                                    initialTab: "email",
+                                  })
+                                }
+                                title="Kirim SPH via Email ke Klien"
+                                className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Mail className="w-4 h-4" />
+                              </button>
 
-                            {/* Edit SPH */}
-                            <button
-                              onClick={() => handleOpenEditQuotation(sph)}
-                              title="Edit Surat Penawaran"
-                              className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
+                              {/* Konversi ke Faktur Penjualan (Deal 1-Klik) */}
+                              {classification !== "deal" && (
+                                <button
+                                  onClick={() => handleOpenConvertQuotation(sph)}
+                                  title="Konversi SPH ini Menjadi Faktur Penjualan Resmi (Deal)"
+                                  className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                                >
+                                  <ArrowRight className="w-4 h-4" />
+                                </button>
+                              )}
 
-                            {/* Hapus SPH */}
-                            <button
-                              onClick={() => handleDeleteQuotation(sph.id, sph.quotationNumber)}
-                              title="Hapus Surat Penawaran"
-                              className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {/* Tombol Aksi Status: Tandai Expired */}
+                              {classification !== "deal" && classification !== "expired" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQuotationStatus(sph, "Kedaluwarsa")}
+                                  title="Tandai SPH ini sebagai Kedaluwarsa (Expired)"
+                                  className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                                >
+                                  <Clock className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Tombol Aksi Status: Tandai Ditolak (Reject) */}
+                              {classification !== "deal" && classification !== "rejected" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQuotationStatus(sph, "Ditolak")}
+                                  title="Tandai SPH ini sebagai Ditolak oleh Klien (Reject)"
+                                  className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                                >
+                                  <Ban className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Tombol Aksi Status: Buka Kembali / Re-Aktifkan SPH */}
+                              {(classification === "expired" || classification === "rejected") && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateQuotationStatus(sph, "Terkirim")}
+                                  title="Buka Kembali / Aktifkan Kembali SPH ini"
+                                  className="p-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                                >
+                                  <RefreshCw className="w-4 h-4" />
+                                </button>
+                              )}
+
+                              {/* Approval Tanda Tangan Direktur */}
+                              <button
+                                onClick={() => handleOpenApprovalModal(sph as any)}
+                                title={sph.approvalStatus === "Disetujui & Sah" ? "Perbarui Tanda Tangan Digital SPH" : "Approval & Tanda Tangan Digital Direktur SPH"}
+                                className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
+                                  sph.approvalStatus === "Disetujui & Sah"
+                                    ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-700 hover:text-white"
+                                    : "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white"
+                                }`}
+                              >
+                                <PenTool className="w-4 h-4" />
+                              </button>
+
+                              {/* Edit SPH */}
+                              <button
+                                onClick={() => handleOpenEditQuotation(sph)}
+                                title="Edit Surat Penawaran"
+                                className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+
+                              {/* Hapus SPH */}
+                              <button
+                                onClick={() => handleDeleteQuotation(sph.id, sph.quotationNumber)}
+                                title="Hapus Surat Penawaran"
+                                className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
