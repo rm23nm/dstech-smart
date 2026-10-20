@@ -16,6 +16,9 @@ import {
   ShieldCheck,
   Smartphone,
   Eye,
+  AlertTriangle,
+  Trash2,
+  X,
 } from "lucide-react";
 
 interface SiteSettingsData {
@@ -56,6 +59,11 @@ export default function AdminSettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // State Reset Data Transaksi Keuangan (Clean Slate)
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
+  const [isResetting, setIsResetting] = useState(false);
 
   // Toast notification
   const [toast, setToast] = useState<{
@@ -116,6 +124,32 @@ export default function AdminSettingsPage() {
       showToast("error", "Terjadi kesalahan koneksi saat menyimpan pengaturan.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Reset Data Transaksi Keuangan (Clean Slate)
+  const handleResetTransactions = async () => {
+    if (resetConfirmText.trim().toUpperCase() !== "RESET") {
+      showToast("error", "Ketik kata 'RESET' untuk mengonfirmasi pembersihan transaksi");
+      return;
+    }
+    try {
+      setIsResetting(true);
+      const res = await fetch("/api/finance?actionType=reset_transactions", {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast("success", json.message || "Seluruh transaksi keuangan berhasil dibersihkan dari nol!");
+        setIsResetModalOpen(false);
+        setResetConfirmText("");
+      } else {
+        showToast("error", json.error || "Gagal mereset transaksi");
+      }
+    } catch {
+      showToast("error", "Terjadi kesalahan jaringan saat mereset data transaksi.");
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -405,6 +439,60 @@ export default function AdminSettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Section 5: Zona Bahaya & Pembersihan Data Transaksi (Danger Zone) */}
+          <div className="p-8 rounded-3xl bg-red-50/40 border-2 border-red-200/80 shadow-sm space-y-5">
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center font-bold">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-red-950 text-lg">Zona Bahaya: Pembersihan Transaksi</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-red-200 text-red-800">
+                      Danger Zone
+                    </span>
+                  </div>
+                  <p className="text-xs text-red-700/80 mt-0.5">
+                    Kosongkan seluruh data transaksi riwayat untuk memulai pembukuan dari nol (clean slate)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-xs text-slate-700 space-y-2 leading-relaxed">
+              <p>
+                Fitur ini dirancang saat Anda ingin mengosongkan seluruh riwayat demo atau memulai pembukuan baru dari nol tanpa menghapus konfigurasi sistem:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-slate-600 font-medium pl-1">
+                <li>
+                  <strong className="text-red-700">Dibersihkan:</strong> Penjualan, Penawaran (Quotation), Pembelian (PO), Retur Penjualan, Retur Pembelian, Buku Kas Operasional &amp; Biaya Pengeluaran.
+                </li>
+                <li>
+                  <strong className="text-emerald-700">Tetap Aman &amp; Tersimpan:</strong> Rekening Bank/Kas Utama, Master Gudang, Cabang, Pelanggan/Klien, Vendor/Supplier, dan Pengaturan Situs.
+                </li>
+              </ul>
+              <div className="p-3 bg-white/80 rounded-xl border border-red-100 text-[11px] text-slate-500 font-mono">
+                🛡️ Sistem secara otomatis mencadangkan snapshot data sebelum dikosongkan ke folder <code className="text-red-600 font-bold">_backup/</code>.
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setResetConfirmText("");
+                  setIsResetModalOpen(true);
+                }}
+                id="btn-trigger-reset-transactions"
+                className="inline-flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-red-500/20 transition-all cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Bersihkan Data Transaksi (Mulai dari Nol)</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Right Sidebar: Live Preview Card (1 Col) */}
@@ -465,6 +553,85 @@ export default function AdminSettingsPage() {
           </div>
         </div>
       </form>
+
+      {/* Modal Dialog Konfirmasi Reset Transaksi */}
+      {isResetModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-red-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Konfirmasi Pembersihan Data</h3>
+                  <p className="text-xs text-red-600 font-bold">Tindakan ini akan mengosongkan riwayat transaksi!</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs text-slate-600 leading-relaxed">
+              <div className="p-4 bg-red-50 rounded-2xl border border-red-100 text-red-900">
+                <p className="font-bold mb-1">Apakah Anda benar-benar yakin?</p>
+                <p className="text-[11px] text-red-700 leading-normal">
+                  Seluruh data penjualan, penawaran harga, pembelian stok, retur, dan buku arus kas operasional akan dihapus permanen. Master rekening, gudang, pelanggan, dan vendor tetap utuh.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-2">
+                  Ketik kata <span className="text-red-600 font-mono bg-red-50 px-1.5 py-0.5 rounded border border-red-200">RESET</span> untuk melanjutkan:
+                </label>
+                <input
+                  type="text"
+                  value={resetConfirmText}
+                  onChange={(e) => setResetConfirmText(e.target.value)}
+                  placeholder="Ketik RESET"
+                  id="input-confirm-reset"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono font-bold tracking-widest text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 uppercase"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(false)}
+                disabled={isResetting}
+                className="px-5 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Batalkan
+              </button>
+              <button
+                type="button"
+                onClick={handleResetTransactions}
+                disabled={resetConfirmText.trim().toUpperCase() !== "RESET" || isResetting}
+                id="btn-confirm-reset-execute"
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold uppercase tracking-wider shadow-lg shadow-red-600/20 transition-all flex items-center gap-2 cursor-pointer"
+              >
+                {isResetting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Membersihkan...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Ya, Bersihkan Data Transaksi</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

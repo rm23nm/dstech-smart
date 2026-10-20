@@ -1614,7 +1614,35 @@
 
 ---
 
-### 56. Catatan Penting
+### 56. Tugas: Pemindahan Fitur Reset Transaksi Keuangan ke Halaman Pengaturan Situs (Site Settings `/admin/settings`)
+- **Permintaan Pengguna**:
+  *"jangan taruh disitu, namun tempatkan di siteesettings"*
+- **Status**:
+  **Selesai (Completed & Deployed)**
+- **Analisis Kebutuhan**:
+  1. Menghapus tombol `Reset Transaksi (Mulai Nol)` dari header utama dashboard keuangan `src/app/admin/finance/page.tsx` agar tampilan operasional harian tetap bersih, elegan, dan terhindar dari salah klik.
+  2. Memindahkan fungsionalitas pembersihan data transaksi demo/uji coba ke halaman Pengaturan Situs (`src/app/admin/settings/page.tsx`) dalam kartu khusus **"Zona Bahaya & Pembersihan Data (Danger Zone)"**.
+  3. Menyediakan modal dialog konfirmasi keamanan interaktif dengan kata kunci ("RESET") di halaman `/admin/settings` sebelum memanggil endpoint `DELETE /api/finance?actionType=reset_transactions`.
+  4. Tetap mempertahankan tombol hapus satuan (`Trash2`) pada baris item tabel Buku Arus Kas di `admin/finance` untuk kemudahan pengelolaan operasional harian.
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Penyesuaian Dashboard Finance (`src/app/admin/finance/page.tsx`)**:
+     - Hapus tombol `Reset Transaksi (Mulai Nol)` dari header banner.
+  2. [x] **Pemasangan di Halaman Site Settings (`src/app/admin/settings/page.tsx`)**:
+     - Tambahkan kartu "Zona Bahaya & Pembersihan Data Transaksi (Danger Zone)".
+     - Pasang tombol aksi "🗑️ Bersihkan Data Transaksi (Mulai dari Nol)" dan modal konfirmasi keamanan kata kunci ("RESET").
+     - Integrasikan panggilan API `DELETE /api/finance?actionType=reset_transactions` dengan toast notifikasi status.
+  3. [x] **Validasi Kompilasi TypeScript (`npx tsc --noEmit`)**:
+     - Memastikan 0 error pada seluruh berkas yang disesuaikan.
+  4. [x] **Pengujian Antarmuka Browser via Subagent**:
+     - Verifikasi tombol reset sudah bersih dari header `/admin/finance` dan kartu Danger Zone tampil rapi serta berfungsi di `/admin/settings`.
+  5. [x] **Sinkronisasi Kode ke GitHub Repository `rm23nm/dstech-smart`**:
+     - Push commit via `push_with_native_git.js`.
+  6. [x] **Deployment ke Server Live VPS PM2 `dstech-main` dan Verifikasi Akhir**:
+     - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi, dan restart PM2.
+
+---
+
+### 57. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
