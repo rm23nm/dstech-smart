@@ -7013,20 +7013,11 @@ export default function AdminFinanceERPPage() {
                   <span>Rekening</span>
                 </button>
 
-                {/* Toggle Mode 2 Halaman */}
-                <button
-                  type="button"
-                  onClick={() => setPrintTwoPage((v) => !v)}
-                  className={`px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border transition-all ${
-                    printTwoPage
-                      ? "bg-purple-600 text-white border-purple-500 ring-2 ring-purple-300"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                  }`}
-                  title="Mode cetak 2 halaman: Halaman 1 ringkasan + TandaTangan, Halaman 2 lampiran rincian item lengkap"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>{printTwoPage ? "✓ 2 Halaman" : "1 Halaman"}</span>
-                </button>
+                {/* Format Resmi 2 Halaman */}
+                <div className="px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 shadow-sm">
+                  <Layers className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Format Resmi 2 Halaman</span>
+                </div>
 
                 <button
                   onClick={() => window.print()}
@@ -7129,9 +7120,7 @@ export default function AdminFinanceERPPage() {
 
             {/* FAKTUR CONTENT CONTAINER (Siap Cetak & Watermarked) */}
             <div
-              className={`relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet ${
-                printTwoPage ? "print-page-break" : "print-single-sheet"
-              }`}
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet print-page-break"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
@@ -7317,41 +7306,21 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
 
-                {/* Tabel Item Faktur — tampil di halaman 1 jika mode 1 halaman, disembunyikan jika mode 2 halaman */}
-                {!printTwoPage ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-900 text-white uppercase text-[10px] font-black tracking-wider">
-                        <tr>
-                          <th className="p-2.5">No</th>
-                          <th className="p-2.5">Deskripsi Produk / Layanan</th>
-                          <th className="p-2.5 text-center">Qty</th>
-                          <th className="p-2.5 text-center">Satuan</th>
-                          <th className="p-2.5 text-right">Harga Satuan</th>
-                          <th className="p-2.5 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white/70">
-                        {selectedInvoiceForPrint.items.map((it, idx) => (
-                          <tr key={idx}>
-                            <td className="p-2.5 font-bold text-slate-500">{idx + 1}</td>
-                            <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
-                            <td className="p-2.5 text-center font-bold">{it.qty}</td>
-                            <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
-                            <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
-                            <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                {/* Referensi Resmi ke Lampiran Halaman 2 (Detail Item & Spesifikasi Dipisahkan ke Halaman 2) */}
+                <div className="p-3.5 rounded-2xl bg-purple-50/90 border border-purple-300 text-xs text-purple-950 flex items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <Layers className="w-5 h-5 text-purple-600 shrink-0" />
+                    <div>
+                      <p className="font-black text-slate-900">Rincian Deskripsi Item Produk & Jasa Instalasi:</p>
+                      <p className="text-[11px] text-purple-800">
+                        Rincian lengkap deskripsi produk, volume kuantiti, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> dokumen ini ({selectedInvoiceForPrint.items.length} item tagihan).
+                      </p>
+                    </div>
                   </div>
-                ) : (
-                  /* Mode 2 Halaman: ganti tabel dengan referensi ke lampiran */
-                  <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs text-purple-900 flex items-center gap-2">
-                    <Layers className="w-4 h-4 text-purple-500 shrink-0" />
-                    <span className="font-bold">Rincian item barang/layanan tersedia pada <strong>Lampiran Halaman 2</strong> dokumen ini.</span>
-                  </div>
-                )}
+                  <span className="px-2.5 py-1 rounded-lg bg-purple-200/90 text-purple-900 font-mono font-black text-[10px] shrink-0">
+                    {selectedInvoiceForPrint.items.length} ITEM
+                  </span>
+                </div>
 
                 {/* Rincian Perhitungan & Instruksi Rekening */}
                 <div className="flex flex-col sm:flex-row justify-between gap-4 pt-3 border-t border-slate-200 text-xs">
@@ -7553,10 +7522,9 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* HALAMAN 2: LAMPIRAN RINCIAN ITEM FAKTUR PENJUALAN */}
-            {printTwoPage && (
-              <div
-                className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet mt-6 print:mt-0"
-                style={{
+            <div
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-8 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet print-last-sheet mt-6 print:mt-0"
+              style={{
                   paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
                   paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
                 }}
@@ -7693,8 +7661,7 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
         </div>
       )}
 
@@ -8583,20 +8550,11 @@ export default function AdminFinanceERPPage() {
                   <span>Kirim WA / Email</span>
                 </button>
 
-                {/* Toggle Mode 2 Halaman SPH */}
-                <button
-                  type="button"
-                  onClick={() => setPrintTwoPage((v) => !v)}
-                  className={`px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-sm border transition-all ${
-                    printTwoPage
-                      ? "bg-purple-600 text-white border-purple-500 ring-2 ring-purple-300"
-                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                  }`}
-                  title="Mode cetak 2 halaman: Halaman 1 Surat Resmi & Ringkasan Nilai + TTD Lengkap, Halaman 2 Lampiran Rincian Item Penawaran"
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  <span>{printTwoPage ? "✓ 2 Halaman (Lampiran)" : "1 Halaman"}</span>
-                </button>
+                {/* Format Resmi 2 Halaman */}
+                <div className="px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 shadow-sm">
+                  <Layers className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Format Resmi 2 Halaman</span>
+                </div>
 
                 <button
                   onClick={() => window.print()}
@@ -8627,9 +8585,7 @@ export default function AdminFinanceERPPage() {
 
             {/* SPH OFFICIAL LETTER CONTAINER (A4 Standard Print Layout) */}
             <div
-              className={`relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet ${
-                printTwoPage ? "print-page-break" : "print-single-sheet"
-              }`}
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-2.5 text-slate-800 overflow-hidden shadow-sm print-document-sheet print-page-break"
               style={{
                 paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
                 paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
@@ -8752,58 +8708,21 @@ export default function AdminFinanceERPPage() {
                   </p>
                 </div>
 
-                {/* Tabel Item Penawaran — Tampil di halaman 1 jika mode 1 halaman, bila mode 2 halaman digantikan referensi ke Lampiran Halaman 2 */}
-                {!printTwoPage ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border border-slate-200">
-                      <thead className="bg-indigo-950 text-white uppercase text-[10px] font-black tracking-wider">
-                        <tr>
-                          <th className="p-2.5 text-center w-8">No</th>
-                          <th className="p-2.5">Deskripsi Produk / Jasa & Spesifikasi Teknis</th>
-                          <th className="p-2.5 text-center">Qty</th>
-                          <th className="p-2.5 text-center">Satuan</th>
-                          <th className="p-2.5 text-right">Harga Satuan (Rp)</th>
-                          {selectedQuotationForPrint.items.some((it) => (it.discount || 0) > 0) && (
-                            <th className="p-2.5 text-right">Diskon</th>
-                          )}
-                          <th className="p-2.5 text-right">Total (Rp)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white/70">
-                        {selectedQuotationForPrint.items.map((it, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="p-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
-                            <td className="p-2.5 font-bold text-slate-900">{it.productName}</td>
-                            <td className="p-2.5 text-center font-bold">{it.qty}</td>
-                            <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
-                            <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
-                            {selectedQuotationForPrint.items.some((item) => (item.discount || 0) > 0) && (
-                              <td className="p-2.5 text-right text-red-600 font-bold">
-                                {it.discount ? `- ${formatRupiah(it.discount)}` : "-"}
-                              </td>
-                            )}
-                            <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="p-3.5 rounded-xl bg-purple-50/80 border border-purple-200 text-xs text-purple-950 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <Layers className="w-5 h-5 text-purple-600 shrink-0" />
-                      <div>
-                        <p className="font-bold text-slate-900">Rincian Perangkat, Material & Jasa Teknis:</p>
-                        <p className="text-[11px] text-purple-800">
-                          Rincian spesifikasi teknis lengkap, kuantiti, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> surat penawaran ini ({selectedQuotationForPrint.items.length} item penawaran).
-                        </p>
-                      </div>
+                {/* Referensi Resmi ke Lampiran Halaman 2 (Detail Item & Spesifikasi Dipisahkan ke Halaman 2) */}
+                <div className="p-3.5 rounded-2xl bg-purple-50/90 border border-purple-300 text-xs text-purple-950 flex items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <Layers className="w-5 h-5 text-purple-600 shrink-0" />
+                    <div>
+                      <p className="font-black text-slate-900">Rincian Perangkat, Material & Jasa Teknis:</p>
+                      <p className="text-[11px] text-purple-800">
+                        Rincian spesifikasi teknis lengkap, kuantiti, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> surat penawaran ini ({selectedQuotationForPrint.items.length} item penawaran).
+                      </p>
                     </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-purple-200/80 text-purple-900 font-mono font-black text-[10px] shrink-0">
-                      {selectedQuotationForPrint.items.length} ITEM
-                    </span>
                   </div>
-                )}
+                  <span className="px-2.5 py-1 rounded-lg bg-purple-200/90 text-purple-900 font-mono font-black text-[10px] shrink-0">
+                    {selectedQuotationForPrint.items.length} ITEM
+                  </span>
+                </div>
 
                 {/* Rincian Perhitungan & Terbilang */}
                 <div className="flex flex-col sm:flex-row justify-between gap-4 pt-2 text-xs">
@@ -8972,10 +8891,9 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* HALAMAN 2: LAMPIRAN RINCIAN ITEM & SPESIFIKASI TEKNIS PENAWARAN (SPH) */}
-            {printTwoPage && (
-              <div
-                className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-3 text-slate-800 overflow-hidden shadow-sm print-document-sheet mt-6 print:mt-0"
-                style={{
+            <div
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-3 text-slate-800 overflow-hidden shadow-sm print-document-sheet print-last-sheet mt-6 print:mt-0"
+              style={{
                   paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
                   paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
                 }}
@@ -9121,8 +9039,7 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
         </div>
       )}
 
