@@ -1546,7 +1546,7 @@
 - **Permintaan Pengguna**:
   *"pada pembuatan penawaran dan faktur, sepertinya belum terhubung dengan product-product management. kemudian untuk ketersedian stock barangnya juga pada cabang masih belum terhubung"*
 - **Status**:
-  **Sedang Dikerjakan (In Progress)**
+  **Selesai (Completed & Deployed)**
 - **Analisis Kebutuhan**:
   1. **Integrasi Dropdown / Quick Selector Produk dari Modul Product Management (`/admin/products` / `dstech_products`)**:
      - Saat admin menambah baris item barang pada pembuatan Surat Penawaran Harga (SPH) atau Faktur Penjualan, sistem saat ini masih mengandalkan input teks manual bebas.
@@ -1574,9 +1574,9 @@
      - Memastikan seluruh tipe data aman dan 0 error kompilasi.
   7. [x] **Pengujian Visual & Alur Interaktif via Browser Automation Subagent**:
      - Menguji pembuatan SPH dan Faktur Penjualan dengan memilih produk dari katalog dan memverifikasi tampilan ketersediaan stok gudang.
-  8. [ ] **Sinkronisasi Kode ke GitHub Repository `rm23nm/dstech-smart`**:
+  8. [x] **Sinkronisasi Kode ke GitHub Repository `rm23nm/dstech-smart`**:
      - Push commit ke branch `master`.
-  9. [ ] **Deployment ke Server VPS Live PM2 `dstech-main` dan Verifikasi Akhir**:
+  9. [x] **Deployment ke Server VPS Live PM2 `dstech-main` dan Verifikasi Akhir**:
      - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi, dan restart PM2.
 
 ---
