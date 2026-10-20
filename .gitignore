@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# runtime database & application data files
+src/data/
+LAPORAN_PROGRES.md
+_backup/
+temp_github_push/
