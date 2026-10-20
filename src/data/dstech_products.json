@@ -5,6 +5,12 @@
     "category": "Smart Home",
     "price": 1850000,
     "stock": 24,
+    "unit": "Unit",
+    "warehouseStock": {
+      "dstech_wh_1": 16,
+      "dstech_wh_2": 6,
+      "dstech_wh_3": 2
+    },
     "commission": "15%",
     "commissionRate": 15,
     "commissionType": "ONETIME",
@@ -19,6 +25,12 @@
     "category": "Security",
     "price": 3500000,
     "stock": 12,
+    "unit": "Paket",
+    "warehouseStock": {
+      "dstech_wh_1": 8,
+      "dstech_wh_2": 3,
+      "dstech_wh_3": 1
+    },
     "commission": "10%",
     "commissionRate": 10,
     "commissionType": "ONETIME",
@@ -33,6 +45,12 @@
     "category": "Security",
     "price": 1200000,
     "stock": 45,
+    "unit": "Unit",
+    "warehouseStock": {
+      "dstech_wh_1": 30,
+      "dstech_wh_2": 10,
+      "dstech_wh_3": 5
+    },
     "commission": "10%",
     "commissionRate": 10,
     "commissionType": "ONETIME",
@@ -47,6 +65,12 @@
     "category": "Visual",
     "price": 2500000,
     "stock": 8,
+    "unit": "Unit",
+    "warehouseStock": {
+      "dstech_wh_1": 5,
+      "dstech_wh_2": 2,
+      "dstech_wh_3": 1
+    },
     "commission": "15%",
     "commissionRate": 15,
     "commissionType": "ONETIME",
@@ -61,6 +85,12 @@
     "category": "Parking",
     "price": 8500000,
     "stock": 5,
+    "unit": "Unit",
+    "warehouseStock": {
+      "dstech_wh_1": 3,
+      "dstech_wh_2": 2,
+      "dstech_wh_3": 0
+    },
     "commission": "10%",
     "commissionRate": 10,
     "commissionType": "ONETIME",
@@ -68,5 +98,105 @@
     "desc": "Palang parkir otomatis kecepatan tinggi (1.8s) dengan sensor loop detector anti-tabrak kendaraan.",
     "createdAt": "2026-02-20T16:00:00.000Z",
     "updatedAt": "2026-02-20T16:00:00.000Z"
+  },
+  {
+    "id": "dstech_prod_6",
+    "name": "Kabel UTP Cat6 Belden Original (305m)",
+    "category": "Security",
+    "price": 2400000,
+    "stock": 35,
+    "unit": "Roll",
+    "warehouseStock": {
+      "dstech_wh_1": 25,
+      "dstech_wh_2": 8,
+      "dstech_wh_3": 2
+    },
+    "commission": "5%",
+    "commissionRate": 5,
+    "commissionType": "ONETIME",
+    "image": "/service-cctv.png",
+    "desc": "Kabel UTP Cat6 high speed original Belden 1000ft (305 meter) untuk instalasi CCTV IP dan jaringan LAN.",
+    "createdAt": "2026-03-01T08:00:00.000Z",
+    "updatedAt": "2026-03-01T08:00:00.000Z"
+  },
+  {
+    "id": "dstech_prod_7",
+    "name": "NVR Hikvision 8CH 4K UltraHD PoE",
+    "category": "Security",
+    "price": 2850000,
+    "stock": 15,
+    "unit": "Unit",
+    "warehouseStock": {
+      "dstech_wh_1": 10,
+      "dstech_wh_2": 4,
+      "dstech_wh_3": 1
+    },
+    "commission": "10%",
+    "commissionRate": 10,
+    "commissionType": "ONETIME",
+    "image": "/service-cctv.png",
+    "desc": "Network Video Recorder 8 Channel resolusi 4K dengan 8 port PoE independen dan support H.265+.",
+    "createdAt": "2026-03-02T08:00:00.000Z",
+    "updatedAt": "2026-03-02T08:00:00.000Z"
+  },
+  {
+    "id": "dstech_prod_8",
+    "name": "Kamera CCTV IP 4MP DarkFighter Dome",
+    "category": "Security",
+    "price": 1250000,
+    "stock": 42,
+    "unit": "Unit",
+    "warehouseStock": {
+      "dstech_wh_1": 28,
+      "dstech_wh_2": 10,
+      "dstech_wh_3": 4
+    },
+    "commission": "10%",
+    "commissionRate": 10,
+    "commissionType": "ONETIME",
+    "image": "/service-cctv.png",
+    "desc": "Kamera CCTV Dome 4 Megapixel dengan teknologi DarkFighter untuk gambar berwarna jernih di kondisi minim cahaya.",
+    "createdAt": "2026-03-03T08:00:00.000Z",
+    "updatedAt": "2026-03-03T08:00:00.000Z"
+  },
+  {
+    "id": "dstech_prod_9",
+    "name": "Jasa Instalasi CCTV, Piping Konduit & Setting Jaringan",
+    "category": "Jasa & Layanan",
+    "price": 250000,
+    "stock": 999,
+    "unit": "Titik",
+    "warehouseStock": {
+      "dstech_wh_1": 999,
+      "dstech_wh_2": 999,
+      "dstech_wh_3": 999
+    },
+    "commission": "0%",
+    "commissionRate": 0,
+    "commissionType": "ONETIME",
+    "image": "/service-it.png",
+    "desc": "Jasa penarikan kabel, pemasangan pipa konduit high impact, terminasi RJ45, dan alignment kamera.",
+    "createdAt": "2026-03-04T08:00:00.000Z",
+    "updatedAt": "2026-03-04T08:00:00.000Z"
+  },
+  {
+    "id": "dstech_prod_10",
+    "name": "Jasa Commissioning Test & Pelatihan Operator",
+    "category": "Jasa & Layanan",
+    "price": 1500000,
+    "stock": 999,
+    "unit": "Lot",
+    "warehouseStock": {
+      "dstech_wh_1": 999,
+      "dstech_wh_2": 999,
+      "dstech_wh_3": 999
+    },
+    "commission": "0%",
+    "commissionRate": 0,
+    "commissionType": "ONETIME",
+    "image": "/service-it.png",
+    "desc": "Uji fungsi menyeluruh sistem, integrasi cloud remote monitoring, serta sesi pelatihan tim security klien.",
+    "createdAt": "2026-03-05T08:00:00.000Z",
+    "updatedAt": "2026-03-05T08:00:00.000Z"
   }
 ]

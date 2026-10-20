@@ -3,6 +3,55 @@ import fs from "fs";
 import path from "path";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
+const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
+
+function deductProductCatalogStock(items: any[], warehouseId: string = "dstech_wh_1") {
+  try {
+    if (!fs.existsSync(PRODUCTS_FILE)) return;
+    const raw = fs.readFileSync(PRODUCTS_FILE, "utf-8");
+    const products: any[] = JSON.parse(raw);
+    let changed = false;
+
+    for (const item of (items || [])) {
+      if (!item) continue;
+      const qtyToDeduct = Number(item.qty) || 0;
+      if (qtyToDeduct <= 0) continue;
+
+      const targetProd = products.find((p) => {
+        if (item.productId && p.id === item.productId) return true;
+        if (item.productName && p.name && p.name.trim().toLowerCase() === item.productName.trim().toLowerCase()) return true;
+        return false;
+      });
+
+      if (targetProd) {
+        // Jangan potong stok untuk jasa yang tidak terbatas (stock >= 900)
+        if (targetProd.stock < 900) {
+          targetProd.stock = Math.max(0, (Number(targetProd.stock) || 0) - qtyToDeduct);
+        }
+        
+        if (!targetProd.warehouseStock) {
+          targetProd.warehouseStock = {
+            dstech_wh_1: targetProd.stock,
+            dstech_wh_2: 0,
+            dstech_wh_3: 0,
+          };
+        }
+        const currentWhStock = Number(targetProd.warehouseStock[warehouseId]) || 0;
+        if (currentWhStock < 900) {
+          targetProd.warehouseStock[warehouseId] = Math.max(0, currentWhStock - qtyToDeduct);
+        }
+        targetProd.updatedAt = new Date().toISOString();
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf-8");
+    }
+  } catch (err) {
+    console.error("Error in deductProductCatalogStock:", err);
+  }
+}
 
 function readFinanceData() {
   try {
@@ -316,6 +365,7 @@ export async function POST(request: Request) {
         });
       }
 
+      deductProductCatalogStock(newSale.items, newSale.warehouseId);
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
@@ -791,6 +841,7 @@ export async function POST(request: Request) {
       sph.convertedInvoiceId = newSale.invoiceNumber;
       quotations[qIndex] = sph;
 
+      deductProductCatalogStock(newSale.items, newSale.warehouseId);
       writeFinanceData(data);
       return NextResponse.json({
         success: true,

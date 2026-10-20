@@ -149,6 +149,12 @@ export async function POST(req: Request) {
       subCategory: subCategory?.trim() || "",
       price: parsedPrice,
       stock: parsedStock,
+      unit: body.unit?.trim() || "Unit",
+      warehouseStock: body.warehouseStock || {
+        dstech_wh_1: parsedStock,
+        dstech_wh_2: 0,
+        dstech_wh_3: 0,
+      },
       commission: `${commRate}%`,
       commissionRate: commRate,
       commissionType: commissionType === "RECURRING" ? "RECURRING" : "ONETIME",
@@ -171,7 +177,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, category, subCategory, price, stock, commission, commissionType, desc, image } = body;
+    const { id, name, category, subCategory, price, stock, commission, commissionType, desc, image, unit, warehouseStock } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, message: "ID produk wajib disertakan" }, { status: 400 });
@@ -195,6 +201,8 @@ export async function PUT(req: Request) {
       subCategory: subCategory !== undefined ? subCategory.trim() : (products[index].subCategory || ""),
       price: parsedPrice,
       stock: parsedStock,
+      unit: unit !== undefined ? unit.trim() : (products[index].unit || "Unit"),
+      warehouseStock: warehouseStock !== undefined ? warehouseStock : products[index].warehouseStock,
       commission: `${commRate}%`,
       commissionRate: commRate,
       commissionType: commissionType !== undefined ? commissionType : products[index].commissionType,

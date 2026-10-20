@@ -51,6 +51,7 @@
 - **2026-10-20**: Fitur Lengkap Penagihan Pelunasan (Faktur Pelunasan Sisa Kontrak Pasca DP / BAST). Menyediakan alur resmi penagihan pelunasan sisa kontrak proyek yang sebelumnya belum tersedia setelah faktur DP terbentuk. Menambahkan pemilih mode dokumen cetak (`printBillingStage`: "DP" | "Pelunasan" | "Full") pada faktur penjualan, sehingga admin dapat mencetak lembar resmi "FAKTUR PENAGIHAN PELUNASAN KONTRAK" lengkap dengan banner pelunasan pasca BAST, rincian potongan uang muka DP yang telah diterima lunas, sisa tagihan jatuh tempo, instruksi transfer, dan otorisasi tanda tangan. Menambahkan tombol aksi cepat "Tagih Pelunasan" pada tabel penjualan serta menyempurnakan form terima pembayaran pelunasan.
 - **2026-10-20**: Pembuatan Fitur & Template Cetak Berita Acara Serah Terima Pekerjaan & Pengadaan Barang (BAST Proyek Resmi A4). Menyediakan modul dan dokumen resmi BAST sebagai bukti sah bahwa pekerjaan/barang telah selesai dipasang, diuji (commissioning test), dan diserahterimakan dalam kondisi 100% baik kepada klien. Menjadi dokumen prasyarat hukum penagihan faktur pelunasan kontrak pasca DP. Dilengkapi form kustomisasi pihak penyerah/penerima, masa garansi hardware & pemeliharaan, klausul serah terima, rincian barang teruji, tanda tangan dual-pihak (DSP & Klien), serta tombol akses cepat di tabel penjualan dan modal faktur.
 - **2026-10-20**: Pembuatan Fitur & Template Cetak Surat Jalan Pengiriman Material Proyek & Tanda Terima Barang Lapangan (Delivery Order / Material Dispatch Note A4). Menyediakan modul dan dokumen resmi surat jalan sebagai bukti legal pengeluaran material/perangkat dari gudang DSTech ke lokasi proyek klien. Dilengkapi nomor surat jalan otomatis (SJ/DSP/...), informasi gudang asal, alamat tujuan proyek, nomor polisi armada ekspedisi, nama driver/teknisi pengantar, nomor telepon, tabel rincian material kiriman & kondisi fisik saat keluar gudang, serta 3 (tiga) blok pengesahan tanda tangan resmi (Logistik Gudang DSTech, Driver/Ekspedisi, dan Klien Penerima di Lapangan). Terintegrasi dengan tombol aksi cepat di tabel penjualan, modal faktur, dan modal BAST.
+- **2026-10-20**: Integrasi Katalog Product Management & Ketersediaan Stok Real-Time Multi-Cabang/Gudang pada Pembuatan Penawaran (SPH) & Faktur Penjualan (Sale Invoice), serta Mutasi Pemotongan Stok Otomatis. Menghubungkan repeater barang pada formulir SPH dan Faktur Penjualan secara dinamis ke master data produk (`/api/products` & `src/data/dstech_products.json`). Menyediakan pemilih Cabang & Titik Gudang Logistik (`dstech_wh_1` Cilegon, `dstech_wh_2` Serang, `dstech_wh_3` Unit Mobile) serta pemilih cepat katalog ("⚡ Pilih Katalog") per baris barang yang secara instan meng-autofill nama produk resmi, satuan, dan harga acuan katalog, sementara input manual tetap fleksibel untuk item jasa kustom. Menampilkan badge status ketersediaan stok riil (*stock on hand*) per gudang secara real-time (contoh: "⚡ Tersedia: 16 Unit di Gudang Utama Cilegon") dan peringatan jika kuantiti melebihi stok. Menambahkan helper pemotongan stok otomatis di backend `/api/finance` saat faktur diterbitkan atau penawaran dikonversi ke penjualan. Divalidasi kompilasi TypeScript `tsc --noEmit` (0 error), diuji interaktif via browser automation subagent, disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 
 
 
@@ -1541,19 +1542,42 @@
 
 ---
 
-### 54. Antrian Tugas: Integrasi Katalog Product Management & Ketersediaan Stok Cabang/Gudang pada Pembuatan Penawaran (SPH) & Faktur Penjualan
+### 54. Tugas: Integrasi Katalog Product Management & Ketersediaan Stok Cabang/Gudang pada Pembuatan Penawaran (SPH) & Faktur Penjualan
 - **Permintaan Pengguna**:
   *"pada pembuatan penawaran dan faktur, sepertinya belum terhubung dengan product-product management. kemudian untuk ketersedian stock barangnya juga pada cabang masih belum terhubung"*
 - **Status**:
-  **Dalam Antrian (Queued - Setelah Task 53)**
+  **Sedang Dikerjakan (In Progress)**
 - **Analisis Kebutuhan**:
-  1. **Integrasi Dropdown / Autocomplete Produk dari Modul Product Management (`/admin/products` / `dstech_products`)**:
+  1. **Integrasi Dropdown / Quick Selector Produk dari Modul Product Management (`/admin/products` / `dstech_products`)**:
      - Saat admin menambah baris item barang pada pembuatan Surat Penawaran Harga (SPH) atau Faktur Penjualan, sistem saat ini masih mengandalkan input teks manual bebas.
-     - Perlu dihubungkan langsung ke katalog produk DSTech (`/api/products`), sehingga saat mengetik nama barang muncul autocomplete/dropdown pilihan produk lengkap dengan harga katalog resmi (MSRP/harga jual acuan), kategori, dan satuan.
+     - Perlu dihubungkan langsung ke katalog produk DSTech (`/api/products`), sehingga saat memilih produk muncul autocomplete/dropdown pilihan produk lengkap dengan harga katalog resmi (MSRP/harga jual acuan), kategori, dan satuan, sementara input manual tetap dapat diedit untuk jasa/labor kustom.
   2. **Pengecekan Ketersediaan Stok Real-Time per Cabang / Titik Gudang**:
-     - Ketika cabang/gudang dipilih (misal: Gudang Cilegon, Gudang Serang, atau Cabang Jakarta), sistem menampilkan sisa ketersediaan stok (*stock on hand*) produk tersebut di titik gudang/cabang terpilih.
-     - Memberikan indikator stok (misal: "Stok Tersedia: 12 Unit di Gudang Cilegon") dan peringatan jika kuantiti yang ditawarkan/dijual melebihi stok yang ada di cabang terkait.
+     - Ketika cabang/gudang dipilih (misal: Gudang Cilegon, Gudang Serang, atau Mobil Operasional), sistem menampilkan sisa ketersediaan stok (*stock on hand*) produk tersebut di titik gudang/cabang terpilih.
+     - Memberikan indikator stok (misal: "Stok Tersedia: 16 Unit di Gudang Utama Cilegon") dan peringatan jika kuantiti yang ditawarkan/dijual melebihi stok yang ada di cabang terkait.
      - Menghubungkan mutasi pengurangan stok otomatis saat faktur penjualan diterbitkan dari cabang tersebut.
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Persiapan Data Store Produk & Stok Multi-Cabang/Gudang (`dstech_products.json`)**:
+     - Menambahkan properti `warehouseStock` per ID gudang (`dstech_wh_1`, `dstech_wh_2`, `dstech_wh_3`) dan satuan (`unit`) pada produk katalog resmi.
+  2. [x] **Pengambilan Data Produk di Admin Finance (`src/app/admin/finance/page.tsx`)**:
+     - Menambahkan state `products: ProductCatalogItem[]`, mengambil data dari `/api/products` saat memuat data keuangan, dan membuat helper pencarian serta kalkulasi stok per gudang terpilih.
+  3. [x] **Integrasi Dropdown Katalog Produk & Indikator Ketersediaan Stok pada Modal SPH**:
+     - Penambahan pemilih Cabang & Titik Gudang Logistik Acuan di formulir SPH.
+     - Quick selector produk katalog per baris item penawaran (auto-fill nama produk, satuan, dan harga acuan).
+     - Badge indikator stok real-time per gudang terpilih dan peringatan jika kuantiti melebihi stok yang ada.
+  4. [x] **Integrasi Dropdown Katalog Produk & Indikator Ketersediaan Stok pada Modal Faktur Penjualan**:
+     - Penambahan pemilih Cabang Penjualan & Titik Gudang Pengeluaran Barang di formulir Faktur Penjualan.
+     - Quick selector produk katalog per baris item penjualan (auto-fill nama, satuan, harga).
+     - Badge stok real-time per gudang terpilih dan peringatan kuantitas melebihi stok.
+  5. [x] **Sinkronisasi Mutasi Pengurangan Stok Otomatis di Backend (`/api/finance/route.ts`)**:
+     - Saat faktur penjualan diterbitkan atau SPH dikonversi ke faktur, sistem otomatis memotong kuantitas stok produk pada gudang yang dipilih dan stok global di `dstech_products.json`.
+  6. [x] **Validasi Kompilasi TypeScript (`npx tsc --noEmit`)**:
+     - Memastikan seluruh tipe data aman dan 0 error kompilasi.
+  7. [x] **Pengujian Visual & Alur Interaktif via Browser Automation Subagent**:
+     - Menguji pembuatan SPH dan Faktur Penjualan dengan memilih produk dari katalog dan memverifikasi tampilan ketersediaan stok gudang.
+  8. [ ] **Sinkronisasi Kode ke GitHub Repository `rm23nm/dstech-smart`**:
+     - Push commit ke branch `master`.
+  9. [ ] **Deployment ke Server VPS Live PM2 `dstech-main` dan Verifikasi Akhir**:
+     - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi, dan restart PM2.
 
 ---
 

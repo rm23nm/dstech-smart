@@ -49,8 +49,25 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 
+interface ProductCatalogItem {
+  id: string;
+  name: string;
+  category: string;
+  subCategory?: string;
+  price: number;
+  stock: number;
+  unit?: string;
+  commission?: string;
+  commissionRate?: number;
+  commissionType?: string;
+  image?: string;
+  desc?: string;
+  warehouseStock?: Record<string, number>;
+}
+
 interface SaleItem {
   id: string;
+  productId?: string;
   productName: string;
   qty: number;
   unit: string;
@@ -97,6 +114,7 @@ interface SaleInvoice {
 
 interface QuotationItem {
   id: string;
+  productId?: string;
   productName: string;
   qty: number;
   unit: string;
@@ -109,6 +127,8 @@ interface Quotation {
   id: string;
   quotationNumber: string;
   clientId?: string;
+  warehouseId?: string;
+  branchId?: string;
   customerName: string;
   customerOrg?: string;
   customerPhone: string;
@@ -374,6 +394,7 @@ export default function AdminFinanceERPPage() {
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [clients, setClients] = useState<ClientItem[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
+  const [products, setProducts] = useState<ProductCatalogItem[]>([]);
   const [summary, setSummary] = useState<FinanceSummary>({
     totalSalesRevenue: 0,
     totalSalesPaid: 0,
@@ -839,8 +860,26 @@ export default function AdminFinanceERPPage() {
     dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Proyek",
   });
 
-  const [quotationForm, setQuotationForm] = useState({
+  const [quotationForm, setQuotationForm] = useState<{
+    clientId: string;
+    branchId: string;
+    warehouseId: string;
+    customerName: string;
+    customerOrg: string;
+    customerPhone: string;
+    customerAddress: string;
+    subject: string;
+    date: string;
+    validityDays: number;
+    items: QuotationItem[];
+    discount: number;
+    taxRate: number;
+    terms: string;
+    notes: string;
+  }>({
     clientId: "",
+    branchId: "dstech_branch_1",
+    warehouseId: "dstech_wh_1",
     customerName: "",
     customerOrg: "",
     customerPhone: "",
@@ -849,7 +888,7 @@ export default function AdminFinanceERPPage() {
     date: new Date().toISOString().split("T")[0],
     validityDays: 14,
     items: [
-      { id: "1", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
+      { id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
     ],
     discount: 0,
     taxRate: 11,
@@ -858,7 +897,27 @@ export default function AdminFinanceERPPage() {
   });
 
   // New Sale Form State
-  const [saleForm, setSaleForm] = useState({
+  const [saleForm, setSaleForm] = useState<{
+    branchId: string;
+    warehouseId: string;
+    customerName: string;
+    customerPhone: string;
+    customerAddress: string;
+    date: string;
+    dueDate: string;
+    paymentMethod: string;
+    invoiceType: "Standar" | "DP";
+    dpPercentage: number;
+    dpAmount: number;
+    dpNotes: string;
+    items: SaleItem[];
+    discount: number;
+    taxRate: number;
+    paidAmount: number;
+    notes: string;
+  }>({
+    branchId: "dstech_branch_1",
+    warehouseId: "dstech_wh_1",
     customerName: "",
     customerPhone: "",
     customerAddress: "",
@@ -870,7 +929,7 @@ export default function AdminFinanceERPPage() {
     dpAmount: 0,
     dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Instalasi & Pengadaan",
     items: [
-      { id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
+      { id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
     ],
     discount: 0,
     taxRate: 11,
@@ -948,7 +1007,14 @@ export default function AdminFinanceERPPage() {
   const fetchFinanceData = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch("/api/finance");
+      const [res, prodRes] = await Promise.all([
+        fetch("/api/finance"),
+        fetch("/api/products"),
+      ]);
+      if (prodRes.ok) {
+        const pd = await prodRes.json();
+        if (pd.data) setProducts(pd.data);
+      }
       if (res.ok) {
         const d = await res.json();
         if (d.data) {
@@ -1003,13 +1069,147 @@ export default function AdminFinanceERPPage() {
     fetchFinanceData();
   }, []);
 
+  // Helper Informasi Ketersediaan Stok Real-time per Cabang / Gudang
+  const getProductStockInfo = (productIdOrName: string, warehouseId: string = "dstech_wh_1") => {
+    if (!productIdOrName) return null;
+    const prod = products.find(
+      (p) => p.id === productIdOrName || (p.name && p.name.trim().toLowerCase() === productIdOrName.trim().toLowerCase())
+    );
+    if (!prod) return null;
+
+    const isService = prod.category?.toLowerCase().includes("jasa") || prod.category?.toLowerCase().includes("layanan") || prod.stock >= 900;
+    if (isService) {
+      return {
+        product: prod,
+        isService: true,
+        stock: 999,
+        whName: "DSTech Service",
+        label: "Layanan Teknis (Stok Selalu Siap)",
+        badgeClass: "bg-blue-100 text-blue-700 border-blue-200",
+      };
+    }
+
+    const wh = warehouses.find((w) => w.id === warehouseId);
+    const whName = wh ? wh.name.replace("DSTech - ", "").replace("Gudang Utama DSTech - ", "") : "Gudang Utama";
+    let stockInWh = 0;
+    if (prod.warehouseStock && prod.warehouseStock[warehouseId] !== undefined) {
+      stockInWh = Number(prod.warehouseStock[warehouseId]) || 0;
+    } else {
+      stockInWh = Number(prod.stock) || 0;
+    }
+
+    if (stockInWh <= 0) {
+      return {
+        product: prod,
+        isService: false,
+        stock: 0,
+        whName,
+        label: `Stok Habis di ${whName}`,
+        badgeClass: "bg-red-100 text-red-700 border-red-200 font-bold",
+      };
+    } else if (stockInWh <= 3) {
+      return {
+        product: prod,
+        isService: false,
+        stock: stockInWh,
+        whName,
+        label: `Stok Kritis: ${stockInWh} ${prod.unit || "Unit"} di ${whName}`,
+        badgeClass: "bg-amber-100 text-amber-800 border-amber-300 font-bold",
+      };
+    } else {
+      return {
+        product: prod,
+        isService: false,
+        stock: stockInWh,
+        whName,
+        label: `Tersedia: ${stockInWh} ${prod.unit || "Unit"} di ${whName}`,
+        badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300 font-bold",
+      };
+    }
+  };
+
+  const handleSelectProductForSale = (idx: number, productId: string) => {
+    const selected = products.find((p) => p.id === productId);
+    if (!selected) return;
+    setSaleForm((prev) => {
+      const updated = [...prev.items];
+      const qty = updated[idx]?.qty || 1;
+      const price = Number(selected.price) || 0;
+      updated[idx] = {
+        ...updated[idx],
+        productId: selected.id,
+        productName: selected.name,
+        unit: selected.unit || "Unit",
+        price: price,
+        total: qty * price,
+      };
+      return { ...prev, items: updated };
+    });
+  };
+
+  const handleSelectProductForQuotation = (idx: number, productId: string) => {
+    const selected = products.find((p) => p.id === productId);
+    if (!selected) return;
+    setQuotationForm((prev) => {
+      const updated = [...prev.items];
+      const qty = updated[idx]?.qty || 1;
+      const discount = updated[idx]?.discount || 0;
+      const price = Number(selected.price) || 0;
+      updated[idx] = {
+        ...updated[idx],
+        productId: selected.id,
+        productName: selected.name,
+        unit: selected.unit || "Unit",
+        price: price,
+        discount: discount,
+        total: Math.max(0, qty * price - discount),
+      };
+      return { ...prev, items: updated };
+    });
+  };
+
+  const handleSelectProductForEditSale = (idx: number, productId: string) => {
+    if (!editingSale) return;
+    const selected = products.find((p) => p.id === productId);
+    if (!selected) return;
+    const updated = [...editingSale.items];
+    const qty = updated[idx]?.qty || 1;
+    const price = Number(selected.price) || 0;
+    updated[idx] = {
+      ...updated[idx],
+      productId: selected.id,
+      productName: selected.name,
+      unit: selected.unit || "Unit",
+      price: price,
+      total: qty * price,
+    };
+    const subtotal = updated.reduce((acc, curr) => acc + (curr.total || 0), 0);
+    const afterDiscount = Math.max(0, subtotal - Number(editingSale.discount || 0));
+    const taxAmount = (afterDiscount * Number(editingSale.taxRate || 0)) / 100;
+    const grandTotal = afterDiscount + taxAmount;
+    const dpPercentage = editingSale.dpPercentage || 50;
+    const dpAmount =
+      editingSale.invoiceType === "DP" ? Math.round(grandTotal * (dpPercentage / 100)) : 0;
+    const remainingAmount = Math.max(0, grandTotal - (Number(editingSale.paidAmount) || 0));
+
+    setEditingSale({
+      ...editingSale,
+      items: updated,
+      subtotal,
+      taxAmount,
+      grandTotal,
+      dpAmount,
+      remainingAmount,
+    });
+  };
+
   // Handler Sale Form Dynamic Items
   const handleAddSaleItem = () => {
     setSaleForm((prev) => ({
       ...prev,
       items: [
         ...prev.items,
-        { id: String(Date.now()), productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
+        { id: String(Date.now()), productId: "", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
       ],
     }));
   };
@@ -1040,7 +1240,7 @@ export default function AdminFinanceERPPage() {
       ...prev,
       items: [
         ...prev.items,
-        { id: String(Date.now()), productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
+        { id: String(Date.now()), productId: "", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
       ],
     }));
   };
@@ -1110,6 +1310,8 @@ export default function AdminFinanceERPPage() {
           actionType: "quotation",
           payload: {
             clientId: quotationForm.clientId,
+            branchId: quotationForm.branchId || "dstech_branch_1",
+            warehouseId: quotationForm.warehouseId || "dstech_wh_1",
             customerName: quotationForm.customerName,
             customerOrg: quotationForm.customerOrg || quotationForm.customerName,
             customerPhone: quotationForm.customerPhone,
@@ -1136,6 +1338,8 @@ export default function AdminFinanceERPPage() {
         setIsNewQuotationModalOpen(false);
         setQuotationForm({
           clientId: "",
+          branchId: "dstech_branch_1",
+          warehouseId: "dstech_wh_1",
           customerName: "",
           customerOrg: "",
           customerPhone: "",
@@ -1144,7 +1348,7 @@ export default function AdminFinanceERPPage() {
           date: new Date().toISOString().split("T")[0],
           validityDays: 14,
           items: [
-            { id: "1", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
+            { id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
           ],
           discount: 0,
           taxRate: 11,
@@ -1164,6 +1368,8 @@ export default function AdminFinanceERPPage() {
     setEditingQuotation(q);
     setQuotationForm({
       clientId: q.clientId || "",
+      branchId: q.branchId || "dstech_branch_1",
+      warehouseId: q.warehouseId || "dstech_wh_1",
       customerName: q.customerName,
       customerOrg: q.customerOrg || q.customerName,
       customerPhone: q.customerPhone,
@@ -1171,7 +1377,7 @@ export default function AdminFinanceERPPage() {
       subject: q.subject,
       date: q.date,
       validityDays: q.validityDays || 14,
-      items: q.items && q.items.length > 0 ? q.items : [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 }],
+      items: q.items && q.items.length > 0 ? q.items : [{ id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 }],
       discount: q.discount || 0,
       taxRate: q.taxRate || 0,
       terms: q.terms,
@@ -1194,6 +1400,8 @@ export default function AdminFinanceERPPage() {
           id: editingQuotation.id,
           updates: {
             clientId: quotationForm.clientId,
+            branchId: quotationForm.branchId,
+            warehouseId: quotationForm.warehouseId,
             customerName: quotationForm.customerName,
             customerOrg: quotationForm.customerOrg || quotationForm.customerName,
             customerPhone: quotationForm.customerPhone,
@@ -1317,6 +1525,8 @@ export default function AdminFinanceERPPage() {
         body: JSON.stringify({
           actionType: "sale",
           payload: {
+            branchId: saleForm.branchId || "dstech_branch_1",
+            warehouseId: saleForm.warehouseId || "dstech_wh_1",
             customerName: saleForm.customerName,
             customerPhone: saleForm.customerPhone,
             customerAddress: saleForm.customerAddress,
@@ -1343,6 +1553,8 @@ export default function AdminFinanceERPPage() {
         showToast("Faktur Penjualan baru berhasil diterbitkan!");
         setIsNewSaleModalOpen(false);
         setSaleForm({
+          branchId: "dstech_branch_1",
+          warehouseId: "dstech_wh_1",
           customerName: "",
           customerPhone: "",
           customerAddress: "",
@@ -1353,7 +1565,7 @@ export default function AdminFinanceERPPage() {
           dpPercentage: 50,
           dpAmount: 0,
           dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Instalasi & Pengadaan",
-          items: [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
+          items: [{ id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
           discount: 0,
           taxRate: 11,
           paidAmount: 0,
@@ -1518,6 +1730,8 @@ export default function AdminFinanceERPPage() {
           actionType: "sale",
           id: editingSale.id,
           updates: {
+            branchId: editingSale.branchId,
+            warehouseId: editingSale.warehouseId,
             customerName: editingSale.customerName,
             customerPhone: editingSale.customerPhone,
             customerAddress: editingSale.customerAddress,
@@ -5199,6 +5413,42 @@ export default function AdminFinanceERPPage() {
                 </select>
               </div>
 
+              {/* Branch & Warehouse Selection for Sale Invoice */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-blue-50/50 rounded-2xl border border-blue-200/80">
+                <div>
+                  <label className="text-[11px] font-black text-dstech-blue block mb-1">
+                    Kantor Cabang Penjualan:
+                  </label>
+                  <select
+                    value={saleForm.branchId}
+                    onChange={(e) => setSaleForm({ ...saleForm, branchId: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white border border-blue-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-dstech-blue focus:outline-none cursor-pointer"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.city})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-dstech-blue block mb-1">
+                    Titik Gudang Pengeluaran Barang (Sumber Stok):
+                  </label>
+                  <select
+                    value={saleForm.warehouseId}
+                    onChange={(e) => setSaleForm({ ...saleForm, warehouseId: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white border border-blue-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-dstech-blue focus:outline-none cursor-pointer"
+                  >
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.city || w.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">Nama Klien / Pelanggan:</label>
@@ -5284,7 +5534,24 @@ export default function AdminFinanceERPPage() {
                       key={it.id}
                       className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
                     >
-                      <div className="col-span-5">
+                      <div className="col-span-5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-slate-500 font-bold">Produk / Jasa</span>
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) handleSelectProductForSale(idx, e.target.value);
+                            }}
+                            defaultValue=""
+                            className="text-[9px] bg-blue-50 hover:bg-blue-100 text-dstech-blue font-bold border border-blue-200 rounded px-1.5 py-0.5 max-w-[190px] truncate cursor-pointer"
+                          >
+                            <option value="">⚡ Pilih Katalog ({products.length})</option>
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                [{p.category}] {p.name} - {formatRupiah(p.price)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <input
                           type="text"
                           required
@@ -5293,6 +5560,25 @@ export default function AdminFinanceERPPage() {
                           onChange={(e) => handleSaleItemChange(idx, "productName", e.target.value)}
                           className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
                         />
+                        {/* Live Stock Badge */}
+                        {(() => {
+                          const info = getProductStockInfo(it.productId || it.productName, saleForm.warehouseId);
+                          if (!info) return null;
+                          const isOverStock = !info.isService && it.qty > info.stock;
+                          return (
+                            <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                              <span className={`inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border ${info.badgeClass}`}>
+                                <Package className="w-2.5 h-2.5" />
+                                {info.label}
+                              </span>
+                              {isOverStock && (
+                                <span className="text-[8px] text-red-600 font-bold bg-red-50 border border-red-200 px-1 py-0.5 rounded">
+                                  ⚠️ Qty ({it.qty}) &gt; Stok ({info.stock})
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="col-span-2">
                         <input
@@ -6307,6 +6593,42 @@ export default function AdminFinanceERPPage() {
                 </select>
               </div>
 
+              {/* Branch & Warehouse Selection for Quotation */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-indigo-50/40 rounded-2xl border border-indigo-100">
+                <div>
+                  <label className="text-[11px] font-black text-indigo-950 block mb-1">
+                    Kantor Cabang Penerbit Penawaran:
+                  </label>
+                  <select
+                    value={quotationForm.branchId}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, branchId: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white border border-indigo-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none cursor-pointer"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.city})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-indigo-950 block mb-1">
+                    Titik Gudang Acuan Ketersediaan Stok:
+                  </label>
+                  <select
+                    value={quotationForm.warehouseId}
+                    onChange={(e) => setQuotationForm({ ...quotationForm, warehouseId: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white border border-indigo-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none cursor-pointer"
+                  >
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.city || w.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Data Klien & Tujuan Penawaran */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -6462,8 +6784,24 @@ export default function AdminFinanceERPPage() {
                       key={it.id || idx}
                       className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
                     >
-                      <div className="col-span-5">
-                        <label className="text-[9px] text-slate-400 block mb-0.5">Deskripsi Produk / Jasa & Spek</label>
+                      <div className="col-span-5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[9px] text-slate-500 font-bold">Deskripsi Produk / Jasa</label>
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) handleSelectProductForQuotation(idx, e.target.value);
+                            }}
+                            defaultValue=""
+                            className="text-[9px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 rounded px-1.5 py-0.5 max-w-[190px] truncate cursor-pointer"
+                          >
+                            <option value="">⚡ Pilih Katalog ({products.length})</option>
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                [{p.category}] {p.name} - {formatRupiah(p.price)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <input
                           type="text"
                           required
@@ -6472,6 +6810,25 @@ export default function AdminFinanceERPPage() {
                           onChange={(e) => handleQuotationItemChange(idx, "productName", e.target.value)}
                           className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-1 focus:ring-indigo-500"
                         />
+                        {/* Live Stock Badge */}
+                        {(() => {
+                          const info = getProductStockInfo(it.productId || it.productName, quotationForm.warehouseId);
+                          if (!info) return null;
+                          const isOverStock = !info.isService && it.qty > info.stock;
+                          return (
+                            <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                              <span className={`inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border ${info.badgeClass}`}>
+                                <Package className="w-2.5 h-2.5" />
+                                {info.label}
+                              </span>
+                              {isOverStock && (
+                                <span className="text-[8px] text-red-600 font-bold bg-red-50 border border-red-200 px-1 py-0.5 rounded">
+                                  ⚠️ Qty ({it.qty}) &gt; Stok ({info.stock})
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="col-span-2">
                         <label className="text-[9px] text-slate-400 block mb-0.5">Qty</label>
@@ -11832,6 +12189,42 @@ export default function AdminFinanceERPPage() {
                 </div>
               </div>
 
+              {/* Branch & Warehouse Selection for Edit Sale Invoice */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-amber-50/50 rounded-2xl border border-amber-200/80">
+                <div>
+                  <label className="text-[11px] font-black text-amber-900 block mb-1">
+                    Kantor Cabang Penjualan:
+                  </label>
+                  <select
+                    value={editingSale.branchId || "dstech_branch_1"}
+                    onChange={(e) => setEditingSale({ ...editingSale, branchId: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white border border-amber-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+                  >
+                    {branches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} ({b.city})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-amber-900 block mb-1">
+                    Titik Gudang Pengeluaran Barang:
+                  </label>
+                  <select
+                    value={editingSale.warehouseId || "dstech_wh_1"}
+                    onChange={(e) => setEditingSale({ ...editingSale, warehouseId: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-white border border-amber-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-amber-500 focus:outline-none cursor-pointer"
+                  >
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name} ({w.city || w.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Alamat Pemasangan / Proyek:</label>
                 <input
@@ -11864,7 +12257,24 @@ export default function AdminFinanceERPPage() {
                       key={it.id || idx}
                       className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
                     >
-                      <div className="col-span-5">
+                      <div className="col-span-5 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] text-slate-500 font-bold">Produk / Jasa</span>
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) handleSelectProductForEditSale(idx, e.target.value);
+                            }}
+                            defaultValue=""
+                            className="text-[9px] bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold border border-amber-200 rounded px-1.5 py-0.5 max-w-[190px] truncate cursor-pointer"
+                          >
+                            <option value="">⚡ Pilih Katalog ({products.length})</option>
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                [{p.category}] {p.name} - {formatRupiah(p.price)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                         <input
                           type="text"
                           required
@@ -11872,6 +12282,25 @@ export default function AdminFinanceERPPage() {
                           onChange={(e) => handleEditSaleItemChange(idx, "productName", e.target.value)}
                           className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
                         />
+                        {/* Live Stock Badge */}
+                        {(() => {
+                          const info = getProductStockInfo(it.productId || it.productName, editingSale.warehouseId);
+                          if (!info) return null;
+                          const isOverStock = !info.isService && it.qty > info.stock;
+                          return (
+                            <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                              <span className={`inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border ${info.badgeClass}`}>
+                                <Package className="w-2.5 h-2.5" />
+                                {info.label}
+                              </span>
+                              {isOverStock && (
+                                <span className="text-[8px] text-red-600 font-bold bg-red-50 border border-red-200 px-1 py-0.5 rounded">
+                                  ⚠️ Qty ({it.qty}) &gt; Stok ({info.stock})
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="col-span-2">
                         <input
