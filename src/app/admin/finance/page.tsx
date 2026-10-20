@@ -48,6 +48,9 @@ import {
   CheckCheck,
   Eraser,
   ClipboardCheck,
+  Tag,
+  Percent,
+  MessageSquare,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -87,6 +90,10 @@ interface SaleInvoice {
   items: SaleItem[];
   subtotal: number;
   discount: number;
+  discountType?: "fixed" | "percent";
+  discountPercent?: number;
+  discountLabel?: string;
+  revision?: number;
   taxRate: number;
   taxAmount: number;
   grandTotal: number;
@@ -141,6 +148,10 @@ interface Quotation {
   items: QuotationItem[];
   subtotal: number;
   discount: number;
+  discountType?: "fixed" | "percent";
+  discountPercent?: number;
+  discountLabel?: string;
+  revision?: number;
   taxRate: number;
   taxAmount: number;
   grandTotal: number;
@@ -879,6 +890,11 @@ export default function AdminFinanceERPPage() {
     validityDays: number;
     items: QuotationItem[];
     discount: number;
+    discountType: "fixed" | "percent";
+    discountPercent: number;
+    discountLabel: string;
+    revision: number;
+    isRevision?: boolean;
     taxRate: number;
     terms: string;
     notes: string;
@@ -897,6 +913,11 @@ export default function AdminFinanceERPPage() {
       { id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
     ],
     discount: 0,
+    discountType: "fixed",
+    discountPercent: 0,
+    discountLabel: "Diskon Khusus Negosiasi Proyek",
+    revision: 0,
+    isRevision: false,
     taxRate: 11,
     terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
     notes: "",
@@ -918,6 +939,9 @@ export default function AdminFinanceERPPage() {
     dpNotes: string;
     items: SaleItem[];
     discount: number;
+    discountType: "fixed" | "percent";
+    discountPercent: number;
+    discountLabel: string;
     taxRate: number;
     paidAmount: number;
     notes: string;
@@ -938,6 +962,9 @@ export default function AdminFinanceERPPage() {
       { id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
     ],
     discount: 0,
+    discountType: "fixed",
+    discountPercent: 0,
+    discountLabel: "Diskon Khusus Negosiasi Proyek",
     taxRate: 11,
     paidAmount: 0,
     notes: "",
@@ -1274,10 +1301,14 @@ export default function AdminFinanceERPPage() {
 
   const calculateQuotationTotals = () => {
     const subtotal = quotationForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
-    const afterDiscount = Math.max(0, subtotal - Number(quotationForm.discount || 0));
+    const discountVal =
+      quotationForm.discountType === "percent"
+        ? Math.round((subtotal * (Number(quotationForm.discountPercent) || 0)) / 100)
+        : Number(quotationForm.discount || 0);
+    const afterDiscount = Math.max(0, subtotal - discountVal);
     const taxAmount = (afterDiscount * Number(quotationForm.taxRate || 0)) / 100;
     const grandTotal = afterDiscount + taxAmount;
-    return { subtotal, afterDiscount, taxAmount, grandTotal };
+    return { subtotal, discountVal, afterDiscount, taxAmount, grandTotal };
   };
 
   const handleClientSelectForQuotation = (clientId: string) => {
@@ -1296,7 +1327,7 @@ export default function AdminFinanceERPPage() {
 
   const handleCreateQuotationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { subtotal, taxAmount, grandTotal } = calculateQuotationTotals();
+    const { subtotal, discountVal, taxAmount, grandTotal } = calculateQuotationTotals();
 
     if (!quotationForm.customerName.trim()) {
       showToast("Nama Klien / Perusahaan wajib diisi!");
@@ -1327,7 +1358,11 @@ export default function AdminFinanceERPPage() {
             validityDays: Number(quotationForm.validityDays) || 14,
             items: quotationForm.items,
             subtotal,
-            discount: Number(quotationForm.discount) || 0,
+            discount: discountVal,
+            discountType: quotationForm.discountType || "fixed",
+            discountPercent: Number(quotationForm.discountPercent) || 0,
+            discountLabel: quotationForm.discountLabel || "Diskon Khusus Negosiasi Proyek",
+            revision: 0,
             taxRate: Number(quotationForm.taxRate) || 0,
             taxAmount,
             grandTotal,
@@ -1357,6 +1392,11 @@ export default function AdminFinanceERPPage() {
             { id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
           ],
           discount: 0,
+          discountType: "fixed",
+          discountPercent: 0,
+          discountLabel: "Diskon Khusus Negosiasi Proyek",
+          revision: 0,
+          isRevision: false,
           taxRate: 11,
           terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
           notes: "",
@@ -1385,6 +1425,11 @@ export default function AdminFinanceERPPage() {
       validityDays: q.validityDays || 14,
       items: q.items && q.items.length > 0 ? q.items : [{ id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 }],
       discount: q.discount || 0,
+      discountType: q.discountType || "fixed",
+      discountPercent: q.discountPercent || 0,
+      discountLabel: q.discountLabel || "Diskon Khusus Negosiasi Proyek",
+      revision: q.revision || 0,
+      isRevision: false,
       taxRate: q.taxRate || 0,
       terms: q.terms,
       notes: q.notes || "",
@@ -1395,7 +1440,9 @@ export default function AdminFinanceERPPage() {
   const handleSaveEditQuotationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingQuotation) return;
-    const { subtotal, taxAmount, grandTotal } = calculateQuotationTotals();
+    const { subtotal, discountVal, taxAmount, grandTotal } = calculateQuotationTotals();
+    const isRev = Boolean((quotationForm as any).isRevision);
+    const targetRevision = isRev ? ((editingQuotation.revision || 0) + 1) : (editingQuotation.revision || 0);
 
     try {
       const res = await fetch("/api/finance", {
@@ -1417,7 +1464,11 @@ export default function AdminFinanceERPPage() {
             validityDays: Number(quotationForm.validityDays) || 14,
             items: quotationForm.items,
             subtotal,
-            discount: Number(quotationForm.discount) || 0,
+            discount: discountVal,
+            discountType: quotationForm.discountType || "fixed",
+            discountPercent: Number(quotationForm.discountPercent) || 0,
+            discountLabel: quotationForm.discountLabel || "Diskon Khusus Negosiasi Proyek",
+            revision: targetRevision,
             taxRate: Number(quotationForm.taxRate) || 0,
             taxAmount,
             grandTotal,
@@ -1503,7 +1554,11 @@ export default function AdminFinanceERPPage() {
 
   const calculateSaleTotals = () => {
     const subtotal = saleForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
-    const afterDiscount = Math.max(0, subtotal - Number(saleForm.discount || 0));
+    const discountVal =
+      saleForm.discountType === "percent"
+        ? Math.round((subtotal * (Number(saleForm.discountPercent) || 0)) / 100)
+        : Number(saleForm.discount || 0);
+    const afterDiscount = Math.max(0, subtotal - discountVal);
     const taxAmount = (afterDiscount * Number(saleForm.taxRate || 0)) / 100;
     const grandTotal = afterDiscount + taxAmount;
     const dpAmount =
@@ -1512,12 +1567,12 @@ export default function AdminFinanceERPPage() {
           ? saleForm.dpAmount
           : Math.round(grandTotal * (Number(saleForm.dpPercentage || 50) / 100))
         : 0;
-    return { subtotal, afterDiscount, taxAmount, grandTotal, dpAmount };
+    return { subtotal, discountVal, afterDiscount, taxAmount, grandTotal, dpAmount };
   };
 
   const handleCreateSaleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { subtotal, taxAmount, grandTotal, dpAmount } = calculateSaleTotals();
+    const { subtotal, discountVal, taxAmount, grandTotal, dpAmount } = calculateSaleTotals();
 
     if (saleForm.items.some((it) => !it.productName || it.price <= 0)) {
       showToast("Mohon isi nama produk dan harga valid untuk semua baris item!");
@@ -1545,7 +1600,10 @@ export default function AdminFinanceERPPage() {
             dpNotes: saleForm.invoiceType === "DP" ? saleForm.dpNotes : "-",
             items: saleForm.items,
             subtotal,
-            discount: Number(saleForm.discount),
+            discount: discountVal,
+            discountType: saleForm.discountType || "fixed",
+            discountPercent: Number(saleForm.discountPercent) || 0,
+            discountLabel: saleForm.discountLabel || "Diskon Khusus Negosiasi Proyek",
             taxRate: Number(saleForm.taxRate),
             taxAmount,
             grandTotal,
@@ -1573,6 +1631,9 @@ export default function AdminFinanceERPPage() {
           dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Instalasi & Pengadaan",
           items: [{ id: "1", productId: "", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
           discount: 0,
+          discountType: "fixed",
+          discountPercent: 0,
+          discountLabel: "Diskon Khusus Negosiasi Proyek",
           taxRate: 11,
           paidAmount: 0,
           notes: "",
@@ -2027,11 +2088,37 @@ export default function AdminFinanceERPPage() {
     setHasDrawn(false);
   };
 
-  const handleOpenApprovalModal = (invoice: SaleInvoice) => {
-    setSelectedInvoiceForApproval(invoice);
+  const handleOpenApprovalModal = (invoice: any) => {
+    const isQuotation =
+      invoice.quotationNumber !== undefined ||
+      invoice.id?.startsWith("dstech_quot_") ||
+      invoice.id?.startsWith("dstech_sph_") ||
+      invoice.paymentMethod === "SPH Proposal";
+
+    const mappedDoc = isQuotation
+      ? {
+          ...invoice,
+          invoiceNumber: invoice.quotationNumber || invoice.invoiceNumber,
+          dueDate: invoice.validUntil || invoice.dueDate,
+          paymentMethod: "SPH Proposal",
+          paymentStatus: invoice.status || "SPH Proposal",
+          paidAmount: 0,
+          remainingAmount: invoice.grandTotal,
+          warehouseId: invoice.warehouseId || "dstech_wh_1",
+          branchId: invoice.branchId || "dstech_branch_1",
+          salesPerson: "DSTech Commercial Team",
+        }
+      : invoice;
+
+    setSelectedInvoiceForApproval(mappedDoc);
     setSignerNameInput(invoice.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom.");
     setSignerTitleInput(invoice.approvedTitle || financeSettings.signerTitle || "Direktur Keuangan & Operasional");
-    setApprovalNotesInput(invoice.approvalNotes || "Disetujui untuk diterbitkan secara sah kepada klien.");
+    setApprovalNotesInput(
+      invoice.approvalNotes ||
+        (isQuotation
+          ? "Disetujui untuk diterbitkan secara resmi sebagai Surat Penawaran Harga kepada klien."
+          : "Disetujui untuk diterbitkan secara sah kepada klien.")
+    );
     setUploadedSignatureBase64(invoice.signatureImage || "");
     setApprovalMode("canvas");
     setIsApprovalModalOpen(true);
@@ -2057,6 +2144,13 @@ export default function AdminFinanceERPPage() {
         signatureImage = financeSettings.masterSignatureUrl || "";
       }
 
+      const isQuotation =
+        (selectedInvoiceForApproval as any).quotationNumber !== undefined ||
+        selectedInvoiceForApproval.id?.startsWith("dstech_quot_") ||
+        selectedInvoiceForApproval.id?.startsWith("dstech_sph_") ||
+        (selectedInvoiceForApproval as any).paymentMethod === "SPH Proposal";
+      const docType = isQuotation ? "quotation" : "sale";
+
       const res = await fetch("/api/finance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2064,7 +2158,7 @@ export default function AdminFinanceERPPage() {
           actionType: "approve_document",
           payload: {
             id: selectedInvoiceForApproval.id,
-            documentType: "sale",
+            documentType: docType,
             signatureImage,
             signerName: signerNameInput,
             signerTitle: signerTitleInput,
@@ -2075,20 +2169,30 @@ export default function AdminFinanceERPPage() {
 
       const json = await res.json();
       if (json.success) {
-        setSales((prev) =>
-          prev.map((s) => (s.id === selectedInvoiceForApproval.id ? json.data : s))
-        );
-        if (selectedInvoiceForPrint && selectedInvoiceForPrint.id === selectedInvoiceForApproval.id) {
-          setSelectedInvoiceForPrint(json.data);
+        if (isQuotation) {
+          setQuotations((prev) =>
+            prev.map((q) => (q.id === selectedInvoiceForApproval.id ? json.data : q))
+          );
+          if (selectedQuotationForPrint && selectedQuotationForPrint.id === selectedInvoiceForApproval.id) {
+            setSelectedQuotationForPrint(json.data);
+          }
+          showToast(json.message || "Surat Penawaran berhasil disetujui & disahkan!");
+        } else {
+          setSales((prev) =>
+            prev.map((s) => (s.id === selectedInvoiceForApproval.id ? json.data : s))
+          );
+          if (selectedInvoiceForPrint && selectedInvoiceForPrint.id === selectedInvoiceForApproval.id) {
+            setSelectedInvoiceForPrint(json.data);
+          }
+          showToast(json.message || "Faktur berhasil disetujui & disahkan!");
         }
         setIsApprovalModalOpen(false);
-        showToast(json.message || "Faktur berhasil disetujui & disahkan!");
       } else {
-        showToast(json.error || "Gagal menyetujui faktur.");
+        showToast(json.error || `Gagal menyetujui ${isQuotation ? "Surat Penawaran" : "Faktur"}.`);
       }
     } catch (err) {
       console.error("Error approving invoice:", err);
-      showToast("Terjadi kesalahan saat menyetujui faktur.");
+      showToast("Terjadi kesalahan saat menyetujui dokumen.");
     } finally {
       setIsSubmittingApproval(false);
     }
@@ -3445,21 +3549,6 @@ export default function AdminFinanceERPPage() {
       <div className="bg-white p-6 sm:p-8 rounded-[36px] border border-slate-200/80 shadow-sm space-y-6">
         <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
           <button
-            onClick={() => setActiveTab("sales")}
-            className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
-              activeTab === "sales"
-                ? "bg-slate-900 text-white shadow-md"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            <Receipt className="w-4 h-4 text-dstech-blue" />
-            <span>Penjualan & Faktur</span>
-            <span className="px-1.5 py-0.5 rounded-full bg-blue-500/20 text-[10px]">
-              {sales.length}
-            </span>
-          </button>
-
-          <button
             onClick={() => setActiveTab("quotations")}
             className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
               activeTab === "quotations"
@@ -3471,6 +3560,21 @@ export default function AdminFinanceERPPage() {
             <span>Surat Penawaran (SPH)</span>
             <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-[10px]">
               {quotations.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("sales")}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "sales"
+                ? "bg-slate-900 text-white shadow-md"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <Receipt className="w-4 h-4 text-dstech-blue" />
+            <span>Penjualan & Faktur</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-blue-500/20 text-[10px]">
+              {sales.length}
             </span>
           </button>
 
@@ -3963,9 +4067,16 @@ export default function AdminFinanceERPPage() {
                       <tr key={sph.id} className="hover:bg-slate-50/80 transition-colors">
                         {/* No SPH & Perihal */}
                         <td className="p-3">
-                          <span className="font-mono font-black text-indigo-700 block text-xs">
-                            {sph.quotationNumber}
-                          </span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-black text-indigo-700 block text-xs">
+                              {sph.quotationNumber}
+                            </span>
+                            {Boolean(sph.revision && sph.revision > 0) && (
+                              <span className="text-[9px] font-black font-mono px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200">
+                                Rev. 0{sph.revision}
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[11px] font-bold text-slate-800 line-clamp-1 mt-0.5 max-w-[220px]" title={sph.subject}>
                             {sph.subject}
                           </span>
@@ -4016,7 +4127,8 @@ export default function AdminFinanceERPPage() {
                           </span>
                           {sph.discount > 0 && (
                             <span className="text-[10px] text-red-500 font-semibold block">
-                              Diskon: -{formatRupiah(sph.discount)}
+                              {sph.discountLabel || "Diskon Nego"}: -{formatRupiah(sph.discount)}
+                              {sph.discountType === "percent" && sph.discountPercent ? ` (${sph.discountPercent}%)` : ""}
                             </span>
                           )}
                           <span className="text-[10px] text-slate-400 font-semibold">
@@ -4082,21 +4194,7 @@ export default function AdminFinanceERPPage() {
 
                             {/* Approval Tanda Tangan Direktur */}
                             <button
-                              onClick={() => {
-                                setSelectedInvoiceForApproval({
-                                  ...sph,
-                                  invoiceNumber: sph.quotationNumber,
-                                  dueDate: sph.validUntil,
-                                  paymentMethod: "SPH Proposal",
-                                  paymentStatus: sph.status,
-                                  paidAmount: 0,
-                                  remainingAmount: sph.grandTotal,
-                                  warehouseId: "dstech_wh_1",
-                                  branchId: "dstech_branch_1",
-                                  salesPerson: "DSTech Commercial Team",
-                                } as any);
-                                setIsApprovalModalOpen(true);
-                              }}
+                              onClick={() => handleOpenApprovalModal(sph as any)}
                               title={sph.approvalStatus === "Disetujui & Sah" ? "Perbarui Tanda Tangan Digital SPH" : "Approval & Tanda Tangan Digital Direktur SPH"}
                               className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
                                 sph.approvalStatus === "Disetujui & Sah"
@@ -5694,39 +5792,195 @@ export default function AdminFinanceERPPage() {
 
               {/* Calculations Box */}
               {(() => {
-                const { subtotal, taxAmount, grandTotal, dpAmount } = calculateSaleTotals();
+                const { subtotal, discountVal, afterDiscount, taxAmount, grandTotal, dpAmount } = calculateSaleTotals();
                 return (
                   <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
                     <div className="flex items-center justify-between text-slate-300">
                       <span>Subtotal:</span>
                       <span className="font-bold">{formatRupiah(subtotal)}</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] text-slate-400 block mb-1">Diskon Potongan (Rp):</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={saleForm.discount}
-                          onChange={(e) => setSaleForm({ ...saleForm, discount: Number(e.target.value) })}
-                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
-                        />
+                    {/* Panel Diskon Negosiasi Proyek Fleksibel */}
+                    <div className="p-3 rounded-xl bg-slate-800/90 border border-slate-700 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                          <Tag className="w-3.5 h-3.5" />
+                          <span>Diskon Kesepakatan / Negosiasi Khusus:</span>
+                        </div>
+                        {/* Selector Mode: Rp vs % */}
+                        <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-700 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currSub = saleForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+                              setSaleForm((prev) => ({
+                                ...prev,
+                                discountType: "percent",
+                                discount: Math.round((currSub * (Number(prev.discountPercent) || 0)) / 100),
+                              }));
+                            }}
+                            className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                              saleForm.discountType === "percent"
+                                ? "bg-amber-500 text-slate-950 shadow-sm"
+                                : "text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            % Persen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSaleForm((prev) => ({
+                                ...prev,
+                                discountType: "fixed",
+                              }));
+                            }}
+                            className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                              saleForm.discountType !== "percent"
+                                ? "bg-amber-500 text-slate-950 shadow-sm"
+                                : "text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            Rp Nominal
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Quick Chips Persen jika mode percent */}
+                      {saleForm.discountType === "percent" && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-slate-400">Pilihan Cepat:</span>
+                            {[0, 2.5, 5, 7.5, 10, 15].map((pct) => (
+                              <button
+                                key={pct}
+                                type="button"
+                                onClick={() => {
+                                  const currSub = saleForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+                                  const val = Math.round((currSub * pct) / 100);
+                                  setSaleForm((prev) => ({
+                                    ...prev,
+                                    discountType: "percent",
+                                    discountPercent: pct,
+                                    discount: val,
+                                  }));
+                                }}
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                                  Number(saleForm.discountPercent) === pct
+                                    ? "bg-amber-400 text-slate-950 border-amber-300 font-black shadow-sm"
+                                    : "bg-slate-900 text-slate-300 border-slate-700 hover:border-amber-400/50"
+                                }`}
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[9px] text-slate-400 block mb-0.5">Custom Persentase (%):</label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  step={0.5}
+                                  value={saleForm.discountPercent ?? 0}
+                                  onChange={(e) => {
+                                    const pct = Number(e.target.value) || 0;
+                                    const currSub = saleForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+                                    const val = Math.round((currSub * pct) / 100);
+                                    setSaleForm((prev) => ({
+                                      ...prev,
+                                      discountPercent: pct,
+                                      discount: val,
+                                    }));
+                                  }}
+                                  className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-amber-300 text-xs font-bold"
+                                />
+                                <span className="absolute right-2.5 top-1.5 text-xs text-slate-400 font-bold">%</span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-slate-400 block mb-0.5">Nilai Terpotong (Otomatis):</label>
+                              <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-700 text-red-400 text-xs font-bold font-mono">
+                                - {formatRupiah(discountVal)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Input Nominal jika mode fixed */}
+                      {saleForm.discountType !== "percent" && (
+                        <div>
+                          <label className="text-[9px] text-slate-400 block mb-0.5">Potongan Nominal Negosiasi (Rp):</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={saleForm.discount || 0}
+                            onChange={(e) => {
+                              const val = Number(e.target.value) || 0;
+                              const currSub = saleForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+                              const pct = currSub > 0 ? Number(((val / currSub) * 100).toFixed(1)) : 0;
+                              setSaleForm((prev) => ({
+                                ...prev,
+                                discount: val,
+                                discountPercent: pct,
+                              }));
+                            }}
+                            className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-red-400 text-xs font-bold"
+                            placeholder="Contoh: 500000"
+                          />
+                        </div>
+                      )}
+
+                      {/* Label Keterangan Diskon */}
                       <div>
-                        <label className="text-[10px] text-slate-400 block mb-1">PPN (%):</label>
+                        <label className="text-[9px] text-slate-400 block mb-0.5">Keterangan Diskon di Faktur Cetak:</label>
                         <input
-                          type="number"
-                          min={0}
-                          value={saleForm.taxRate}
-                          onChange={(e) => setSaleForm({ ...saleForm, taxRate: Number(e.target.value) })}
-                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                          type="text"
+                          value={saleForm.discountLabel || ""}
+                          onChange={(e) => setSaleForm({ ...saleForm, discountLabel: e.target.value })}
+                          placeholder="Contoh: Diskon Khusus Negosiasi Proyek / Loyalitas Klien"
+                          className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px]"
                         />
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Nominal Pajak PPN ({saleForm.taxRate}%):</span>
-                      <span className="font-bold">{formatRupiah(taxAmount)}</span>
+
+                    {/* PPN Input */}
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Tarif Pajak PPN (%):</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={saleForm.taxRate}
+                        onChange={(e) => setSaleForm({ ...saleForm, taxRate: Number(e.target.value) })}
+                        className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                      />
                     </div>
+
+                    {/* Rincian Transparan */}
+                    <div className="pt-2 border-t border-slate-800 space-y-1 text-xs">
+                      {discountVal > 0 && (
+                        <>
+                          <div className="flex items-center justify-between text-red-400 font-bold">
+                            <span>
+                              {saleForm.discountLabel || "Diskon Khusus Negosiasi"}
+                              {saleForm.discountType === "percent" && saleForm.discountPercent ? ` (${saleForm.discountPercent}%)` : ""}:
+                            </span>
+                            <span>- {formatRupiah(discountVal)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>Dasar Pengenaan Pajak (DPP Kesepakatan):</span>
+                            <span className="font-bold">{formatRupiah(afterDiscount)}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>Nominal Pajak PPN ({saleForm.taxRate}%):</span>
+                        <span className="font-bold">{formatRupiah(taxAmount)}</span>
+                      </div>
+                    </div>
+
                     <div className="border-t border-white/20 pt-2 flex items-center justify-between text-base font-black">
                       <span className="text-amber-400">GRAND TOTAL:</span>
                       <span className="text-xl text-emerald-400">{formatRupiah(grandTotal)}</span>
@@ -6436,10 +6690,21 @@ export default function AdminFinanceERPPage() {
                       <span className="font-bold text-slate-900">{formatRupiah(selectedInvoiceForPrint.subtotal)}</span>
                     </div>
                     {selectedInvoiceForPrint.discount > 0 && (
-                      <div className="flex items-center justify-between text-red-600">
-                        <span>Diskon:</span>
-                        <span className="font-bold">- {formatRupiah(selectedInvoiceForPrint.discount)}</span>
-                      </div>
+                      <>
+                        <div className="flex items-center justify-between text-red-600">
+                          <span>
+                            {selectedInvoiceForPrint.discountLabel || "Diskon Khusus Negosiasi"}
+                            {selectedInvoiceForPrint.discountType === "percent" && selectedInvoiceForPrint.discountPercent ? ` (${selectedInvoiceForPrint.discountPercent}%)` : ""}:
+                          </span>
+                          <span className="font-bold">- {formatRupiah(selectedInvoiceForPrint.discount)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-600 text-[11px] pt-0.5 border-t border-dashed border-slate-200">
+                          <span>DPP / Netto Kontrak:</span>
+                          <span className="font-bold text-slate-900">
+                            {formatRupiah(Math.max(0, selectedInvoiceForPrint.subtotal - selectedInvoiceForPrint.discount))}
+                          </span>
+                        </div>
+                      </>
                     )}
                     <div className="flex items-center justify-between text-slate-600">
                       <span>PPN ({selectedInvoiceForPrint.taxRate}%):</span>
@@ -6955,42 +7220,222 @@ export default function AdminFinanceERPPage() {
 
               {/* Calculations Box */}
               {(() => {
-                const { subtotal, afterDiscount, taxAmount, grandTotal } = calculateQuotationTotals();
+                const { subtotal, discountVal, afterDiscount, taxAmount, grandTotal } = calculateQuotationTotals();
                 return (
-                  <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
+                  <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-3">
                     <div className="flex items-center justify-between text-slate-300">
                       <span>Subtotal Barang & Jasa:</span>
                       <span className="font-bold">{formatRupiah(subtotal)}</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[10px] text-slate-400 block mb-1">Diskon Tambahan (Rp):</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={quotationForm.discount || 0}
-                          onChange={(e) => setQuotationForm({ ...quotationForm, discount: Number(e.target.value) })}
-                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
-                        />
+                    {/* Panel Diskon Negosiasi Proyek Fleksibel */}
+                    <div className="p-3 rounded-xl bg-slate-800/90 border border-slate-700 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                          <Tag className="w-3.5 h-3.5" />
+                          <span>Diskon Kesepakatan / Negosiasi Khusus:</span>
+                        </div>
+                        {/* Selector Mode: Rp vs % */}
+                        <div className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-700 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currSub = quotationForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+                              setQuotationForm((prev) => ({
+                                ...prev,
+                                discountType: "percent",
+                                discount: Math.round((currSub * (Number(prev.discountPercent) || 0)) / 100),
+                              }));
+                            }}
+                            className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                              quotationForm.discountType === "percent"
+                                ? "bg-amber-500 text-slate-950 shadow-sm"
+                                : "text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            % Persen
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setQuotationForm((prev) => ({
+                                ...prev,
+                                discountType: "fixed",
+                              }));
+                            }}
+                            className={`px-2.5 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                              quotationForm.discountType !== "percent"
+                                ? "bg-amber-500 text-slate-950 shadow-sm"
+                                : "text-slate-400 hover:text-white"
+                            }`}
+                          >
+                            Rp Nominal
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Quick Chips Persen jika mode percent */}
+                      {quotationForm.discountType === "percent" && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] text-slate-400">Pilihan Cepat:</span>
+                            {[0, 2.5, 5, 7.5, 10, 15].map((pct) => (
+                              <button
+                                key={pct}
+                                type="button"
+                                onClick={() => {
+                                  const currSub = quotationForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+                                  const val = Math.round((currSub * pct) / 100);
+                                  setQuotationForm((prev) => ({
+                                    ...prev,
+                                    discountType: "percent",
+                                    discountPercent: pct,
+                                    discount: val,
+                                  }));
+                                }}
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                                  Number(quotationForm.discountPercent) === pct
+                                    ? "bg-amber-400 text-slate-950 border-amber-300 font-black shadow-sm"
+                                    : "bg-slate-900 text-slate-300 border-slate-700 hover:border-amber-400/50"
+                                }`}
+                              >
+                                {pct}%
+                              </button>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[9px] text-slate-400 block mb-0.5">Custom Persentase (%):</label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  step={0.5}
+                                  value={quotationForm.discountPercent ?? 0}
+                                  onChange={(e) => {
+                                    const pct = Number(e.target.value) || 0;
+                                    const currSub = quotationForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+                                    const val = Math.round((currSub * pct) / 100);
+                                    setQuotationForm((prev) => ({
+                                      ...prev,
+                                      discountPercent: pct,
+                                      discount: val,
+                                    }));
+                                  }}
+                                  className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-amber-300 text-xs font-bold"
+                                />
+                                <span className="absolute right-2.5 top-1.5 text-xs text-slate-400 font-bold">%</span>
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[9px] text-slate-400 block mb-0.5">Nilai Terpotong (Otomatis):</label>
+                              <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-700 text-red-400 text-xs font-bold font-mono">
+                                - {formatRupiah(discountVal)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Input Nominal jika mode fixed */}
+                      {quotationForm.discountType !== "percent" && (
+                        <div>
+                          <label className="text-[9px] text-slate-400 block mb-0.5">Potongan Nominal Negosiasi (Rp):</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={quotationForm.discount || 0}
+                            onChange={(e) => {
+                              const val = Number(e.target.value) || 0;
+                              const currSub = quotationForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+                              const pct = currSub > 0 ? Number(((val / currSub) * 100).toFixed(1)) : 0;
+                              setQuotationForm((prev) => ({
+                                ...prev,
+                                discount: val,
+                                discountPercent: pct,
+                              }));
+                            }}
+                            className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-red-400 text-xs font-bold"
+                            placeholder="Contoh: 500000"
+                          />
+                        </div>
+                      )}
+
+                      {/* Label Keterangan Diskon */}
                       <div>
-                        <label className="text-[10px] text-slate-400 block mb-1">Tarif Pajak PPN (%):</label>
-                        <select
-                          value={quotationForm.taxRate}
-                          onChange={(e) => setQuotationForm({ ...quotationForm, taxRate: Number(e.target.value) })}
-                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
-                        >
-                          <option value={0}>Bebas PPN (0%)</option>
-                          <option value={11}>PPN 11% (Standar)</option>
-                          <option value={12}>PPN 12%</option>
-                        </select>
+                        <label className="text-[9px] text-slate-400 block mb-0.5">Keterangan Diskon di Dokumen Cetak:</label>
+                        <input
+                          type="text"
+                          value={quotationForm.discountLabel || ""}
+                          onChange={(e) => setQuotationForm({ ...quotationForm, discountLabel: e.target.value })}
+                          placeholder="Contoh: Diskon Khusus Negosiasi Proyek / Loyalitas Klien"
+                          className="w-full p-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-[11px]"
+                        />
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Pajak Pertambahan Nilai ({quotationForm.taxRate}%):</span>
-                      <span className="font-bold">{formatRupiah(taxAmount)}</span>
+                    {/* Opsi Revisi SPH jika sedang Edit SPH */}
+                    {isEditQuotationModalOpen && (
+                      <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-800 text-[11px] flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-indigo-300">Penomoran Revisi SPH (Addendum Negosiasi)</p>
+                          <p className="text-[10px] text-indigo-200/70">
+                            Revisi saat ini: <span className="font-bold font-mono">Rev. 0{editingQuotation?.revision || 0}</span>
+                            {(quotationForm as any).isRevision && (
+                              <span className="text-emerald-400 font-bold ml-1.5">
+                                ➔ Menjadi: Rev. 0{((editingQuotation?.revision || 0) + 1)}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <label className="flex items-center gap-1.5 cursor-pointer bg-indigo-900/90 px-2.5 py-1.5 rounded-lg border border-indigo-700 hover:bg-indigo-800 transition-all">
+                          <input
+                            type="checkbox"
+                            checked={Boolean((quotationForm as any).isRevision)}
+                            onChange={(e) => setQuotationForm((prev) => ({ ...prev, isRevision: e.target.checked } as any))}
+                            className="rounded text-indigo-500 focus:ring-0 cursor-pointer"
+                          />
+                          <span className="font-bold text-white text-[10px]">Tandai Sebagai Revisi Resmi</span>
+                        </label>
+                      </div>
+                    )}
+
+                    {/* PPN Selector */}
+                    <div>
+                      <label className="text-[10px] text-slate-400 block mb-1">Tarif Pajak PPN (%):</label>
+                      <select
+                        value={quotationForm.taxRate}
+                        onChange={(e) => setQuotationForm({ ...quotationForm, taxRate: Number(e.target.value) })}
+                        className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                      >
+                        <option value={0}>Bebas PPN (0%)</option>
+                        <option value={11}>PPN 11% (Standar)</option>
+                        <option value={12}>PPN 12%</option>
+                      </select>
+                    </div>
+
+                    {/* Rincian Transparan */}
+                    <div className="pt-2 border-t border-slate-800 space-y-1 text-xs">
+                      {discountVal > 0 && (
+                        <>
+                          <div className="flex items-center justify-between text-red-400 font-bold">
+                            <span>
+                              {quotationForm.discountLabel || "Diskon Khusus Negosiasi"}
+                              {quotationForm.discountType === "percent" && quotationForm.discountPercent ? ` (${quotationForm.discountPercent}%)` : ""}:
+                            </span>
+                            <span>- {formatRupiah(discountVal)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-slate-300 font-medium">
+                            <span>Dasar Pengenaan Pajak (DPP Kesepakatan):</span>
+                            <span className="font-bold">{formatRupiah(afterDiscount)}</span>
+                          </div>
+                        </>
+                      )}
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>Pajak Pertambahan Nilai ({quotationForm.taxRate}%):</span>
+                        <span className="font-bold">{formatRupiah(taxAmount)}</span>
+                      </div>
                     </div>
 
                     <div className="border-t border-white/20 pt-2 flex items-center justify-between text-base font-black">
@@ -7360,8 +7805,13 @@ export default function AdminFinanceERPPage() {
                     <span className="px-3 py-1 rounded-md bg-indigo-900 text-white font-black text-xs uppercase tracking-wider inline-block">
                       SURAT PENAWARAN HARGA (SPH)
                     </span>
-                    <p className="font-mono font-black text-sm text-indigo-700">
-                      {selectedQuotationForPrint.quotationNumber}
+                    <p className="font-mono font-black text-sm text-indigo-700 flex items-center justify-start sm:justify-end gap-1.5 flex-wrap">
+                      <span>{selectedQuotationForPrint.quotationNumber}</span>
+                      {Boolean(selectedQuotationForPrint.revision && selectedQuotationForPrint.revision > 0) && (
+                        <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-300">
+                          Rev. 0{selectedQuotationForPrint.revision}
+                        </span>
+                      )}
                     </p>
                     <p className="text-[11px] text-slate-500 font-medium">
                       Tanggal: {selectedQuotationForPrint.date}
@@ -7380,7 +7830,12 @@ export default function AdminFinanceERPPage() {
                         <tr>
                           <td className="pr-2 font-bold text-slate-500">Nomor</td>
                           <td className="pr-2">:</td>
-                          <td className="font-mono font-bold text-slate-900">{selectedQuotationForPrint.quotationNumber}</td>
+                          <td className="font-mono font-bold text-slate-900">
+                            {selectedQuotationForPrint.quotationNumber}
+                            {Boolean(selectedQuotationForPrint.revision && selectedQuotationForPrint.revision > 0)
+                              ? ` - Rev. 0${selectedQuotationForPrint.revision}`
+                              : ""}
+                          </td>
                         </tr>
                         <tr>
                           <td className="pr-2 font-bold text-slate-500">Lampiran</td>
@@ -7479,10 +7934,21 @@ export default function AdminFinanceERPPage() {
                       <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.subtotal)}</span>
                     </div>
                     {selectedQuotationForPrint.discount > 0 && (
-                      <div className="flex items-center justify-between text-red-600">
-                        <span>Diskon Khusus:</span>
-                        <span className="font-bold">- {formatRupiah(selectedQuotationForPrint.discount)}</span>
-                      </div>
+                      <>
+                        <div className="flex items-center justify-between text-red-600">
+                          <span>
+                            {selectedQuotationForPrint.discountLabel || "Diskon Khusus Negosiasi"}
+                            {selectedQuotationForPrint.discountType === "percent" && selectedQuotationForPrint.discountPercent ? ` (${selectedQuotationForPrint.discountPercent}%)` : ""}:
+                          </span>
+                          <span className="font-bold">- {formatRupiah(selectedQuotationForPrint.discount)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-600 text-[11px] pt-0.5 border-t border-dashed border-slate-200">
+                          <span>DPP / Netto Kesepakatan:</span>
+                          <span className="font-bold text-slate-900">
+                            {formatRupiah(Math.max(0, selectedQuotationForPrint.subtotal - selectedQuotationForPrint.discount))}
+                          </span>
+                        </div>
+                      </>
                     )}
                     <div className="flex items-center justify-between text-slate-600">
                       <span>PPN ({selectedQuotationForPrint.taxRate}%):</span>
@@ -7577,21 +8043,7 @@ export default function AdminFinanceERPPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              const sph = selectedQuotationForPrint;
-                              setSelectedQuotationForPrint(null);
-                              setSelectedInvoiceForApproval({
-                                ...sph,
-                                invoiceNumber: sph.quotationNumber,
-                                dueDate: sph.validUntil,
-                                paymentMethod: "SPH Proposal",
-                                paymentStatus: sph.status,
-                                paidAmount: 0,
-                                remainingAmount: sph.grandTotal,
-                                warehouseId: "dstech_wh_1",
-                                branchId: "dstech_branch_1",
-                                salesPerson: "DSTech Commercial Team",
-                              } as any);
-                              setIsApprovalModalOpen(true);
+                              handleOpenApprovalModal(selectedQuotationForPrint);
                             }}
                             className="mt-1 px-2.5 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[9px] font-bold shadow-sm flex items-center gap-1 cursor-pointer print:hidden"
                           >
