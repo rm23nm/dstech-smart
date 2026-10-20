@@ -1194,7 +1194,7 @@ export async function DELETE(request: Request) {
     const actionType = url.searchParams.get("actionType");
     const id = url.searchParams.get("id");
 
-    if (!actionType || !id) {
+    if (!actionType || (actionType !== "reset_transactions" && !id)) {
       return NextResponse.json({ success: false, error: "actionType dan id wajib disertakan" }, { status: 400 });
     }
 
@@ -1301,6 +1301,45 @@ export async function DELETE(request: Request) {
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Retur pembelian berhasil dihapus" });
+    }
+
+    if (actionType === "cash_flow") {
+      const initialLen = (data.cash_flow || []).length;
+      data.cash_flow = (data.cash_flow || []).filter((c: any) => c.id !== id);
+      if (data.cash_flow.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Transaksi kas tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Transaksi arus kas berhasil dihapus" });
+    }
+
+    if (actionType === "reset_transactions") {
+      // 1. Buat snapshot backup otomatis sebelum reset data
+      try {
+        const backupDir = path.join(process.cwd(), "..", "_backup");
+        if (fs.existsSync(backupDir)) {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+          const backupPath = path.join(backupDir, `dstech_finance_erp_pre_reset_${timestamp}.json`);
+          fs.writeFileSync(backupPath, JSON.stringify(data, null, 2), "utf-8");
+        }
+      } catch (backupErr) {
+        console.warn("Gagal membuat snapshot backup pre-reset:", backupErr);
+      }
+
+      // 2. Kosongkan seluruh transaksi uji coba/demo
+      data.sales = [];
+      data.quotations = [];
+      data.purchases = [];
+      data.returns_sales = [];
+      data.returns_purchase = [];
+      data.cash_flow = [];
+      data.expenses = [];
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: "Seluruh transaksi keuangan berhasil dibersihkan dari nol. Master rekening bank, gudang, klien, dan supplier tetap aman.",
+      });
     }
 
     return NextResponse.json({ success: false, error: "Tipe aksi DELETE tidak dikenali" }, { status: 400 });

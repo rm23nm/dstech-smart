@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  AlertTriangle,
   X,
   Send,
   Download,
@@ -764,6 +765,11 @@ export default function AdminFinanceERPPage() {
     masterSignatureUrl: "",
     masterStampUrl: "",
   });
+
+  // Reset Transactions Modal State (Clean Slate)
+  const [isResetModalOpen, setIsResetModalOpen] = useState<boolean>(false);
+  const [resetConfirmText, setResetConfirmText] = useState<string>("");
+  const [isResetting, setIsResetting] = useState<boolean>(false);
 
   // Approval & Digital Signature Modal States
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState<boolean>(false);
@@ -1785,6 +1791,54 @@ export default function AdminFinanceERPPage() {
       }
     } catch {
       showToast("Terjadi kesalahan jaringan saat menghapus faktur");
+    }
+  };
+
+  // Handler Hapus Transaksi Kas (Cash Flow)
+  const handleDeleteCashFlow = async (id: string, desc: string) => {
+    if (!window.confirm(`Yakin ingin menghapus catatan kas: "${desc}"? Data yang dihapus tidak dapat dipulihkan.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/finance?actionType=cash_flow&id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast("Catatan transaksi kas berhasil dihapus!");
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal menghapus catatan kas");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menghapus catatan kas");
+    }
+  };
+
+  // Handler Reset Seluruh Transaksi Keuangan (Clean Slate)
+  const handleResetAllTransactions = async () => {
+    if (resetConfirmText.trim().toUpperCase() !== "RESET") {
+      showToast("Ketik kata 'RESET' untuk mengonfirmasi pembersihan transaksi");
+      return;
+    }
+    setIsResetting(true);
+    try {
+      const res = await fetch("/api/finance?actionType=reset_transactions", {
+        method: "DELETE",
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast(result.message || "Seluruh transaksi keuangan berhasil dibersihkan!");
+        setIsResetModalOpen(false);
+        setResetConfirmText("");
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal mereset transaksi keuangan");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat mereset transaksi");
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -3282,6 +3336,17 @@ export default function AdminFinanceERPPage() {
             >
               <Wallet className="w-4 h-4" />
               <span>Catat Kas Masuk/Keluar</span>
+            </button>
+            <button
+              onClick={() => {
+                setResetConfirmText("");
+                setIsResetModalOpen(true);
+              }}
+              className="px-3.5 py-2.5 rounded-2xl bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-400/40 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-md"
+              title="Bersihkan seluruh data transaksi uji coba/demo untuk mulai dari nol"
+            >
+              <Trash2 className="w-4 h-4 text-red-400" />
+              <span>Reset Transaksi (Mulai Nol)</span>
             </button>
             <button
               onClick={fetchFinanceData}
@@ -4808,6 +4873,7 @@ export default function AdminFinanceERPPage() {
                     <th className="p-3">Keterangan / Deskripsi</th>
                     <th className="p-3">Rekening Akun</th>
                     <th className="p-3 text-right">Nominal (IDR)</th>
+                    <th className="p-3 text-center w-16">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -4865,6 +4931,16 @@ export default function AdminFinanceERPPage() {
                           }`}
                         >
                           {cash.type === "IN" ? "+" : "-"} {formatRupiah(cash.amount)}
+                        </td>
+                        <td className="p-3 text-center whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteCashFlow(cash.id, cash.description)}
+                            className="p-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors cursor-pointer"
+                            title="Hapus Transaksi Kas"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -13410,6 +13486,101 @@ export default function AdminFinanceERPPage() {
                   <span>{isSubmittingApproval ? "Memproses Approval..." : "Setujui & Sahkan Faktur Sekarang"}</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RESET SEMUA TRANSAKSI KEUANGAN (CLEAN SLATE) */}
+      {isResetModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsResetModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative border border-red-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-red-100 text-red-600">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-base text-slate-900">Reset Semua Transaksi Keuangan</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Bersihkan data demo / uji coba untuk mulai pencatatan dari nol
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsResetModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-red-50 border border-red-200/80 space-y-2 text-xs text-red-900">
+              <p className="font-bold text-red-800 flex items-center gap-1.5">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>Peringatan Tindakan Permanen:</span>
+              </p>
+              <p className="leading-relaxed">
+                Tindakan ini akan <strong>mengosongkan seluruh data transaksi uji coba/demo</strong> berikut menjadi 0 (nol):
+              </p>
+              <ul className="list-disc list-inside space-y-1 font-semibold text-red-700 pl-1">
+                <li>Seluruh Faktur Penjualan &amp; Tagihan Invoice</li>
+                <li>Seluruh Surat Penawaran Harga (SPH / Quotations)</li>
+                <li>Seluruh Surat Pesanan Pembelian (Purchase Order Supplier)</li>
+                <li>Seluruh Riwayat Retur Penjualan &amp; Retur Pembelian</li>
+                <li>Seluruh Buku Catatan Arus Kas Masuk &amp; Kas Keluar</li>
+              </ul>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 space-y-1">
+              <p className="font-bold flex items-center gap-1.5 text-emerald-800">
+                <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>Data yang Tetap Aman &amp; Terjaga (TIDAK Dihapus):</span>
+              </p>
+              <p className="text-[11px] text-emerald-700">
+                ✓ Akun Login Admin &amp; Superadmin • ✓ Profil PT DSTech Smart Perkasa • ✓ Master Rekening Bank Resmi • ✓ Master Titik Gudang &amp; Cabang • ✓ Master Klien &amp; Supplier • ✓ Katalog Produk
+              </p>
+              <p className="text-[10px] text-emerald-600 font-mono mt-1">
+                * Sistem otomatis membuat salinan cadangan snapshot (backup) sebelum reset dieksekusi.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700">
+                Ketik kata <span className="font-mono text-red-600 bg-red-100 px-1.5 py-0.5 rounded">RESET</span> untuk konfirmasi:
+              </label>
+              <input
+                type="text"
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                placeholder="Ketik RESET"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-sm tracking-wider focus:ring-2 focus:ring-red-500 focus:outline-none uppercase"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsResetModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleResetAllTransactions}
+                disabled={resetConfirmText.trim().toUpperCase() !== "RESET" || isResetting}
+                className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white font-black text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>{isResetting ? "Membersihkan Data..." : "Konfirmasi Bersihkan dari Nol"}</span>
+              </button>
             </div>
           </div>
         </div>

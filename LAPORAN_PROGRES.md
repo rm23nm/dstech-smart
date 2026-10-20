@@ -52,6 +52,7 @@
 - **2026-10-20**: Pembuatan Fitur & Template Cetak Berita Acara Serah Terima Pekerjaan & Pengadaan Barang (BAST Proyek Resmi A4). Menyediakan modul dan dokumen resmi BAST sebagai bukti sah bahwa pekerjaan/barang telah selesai dipasang, diuji (commissioning test), dan diserahterimakan dalam kondisi 100% baik kepada klien. Menjadi dokumen prasyarat hukum penagihan faktur pelunasan kontrak pasca DP. Dilengkapi form kustomisasi pihak penyerah/penerima, masa garansi hardware & pemeliharaan, klausul serah terima, rincian barang teruji, tanda tangan dual-pihak (DSP & Klien), serta tombol akses cepat di tabel penjualan dan modal faktur.
 - **2026-10-20**: Pembuatan Fitur & Template Cetak Surat Jalan Pengiriman Material Proyek & Tanda Terima Barang Lapangan (Delivery Order / Material Dispatch Note A4). Menyediakan modul dan dokumen resmi surat jalan sebagai bukti legal pengeluaran material/perangkat dari gudang DSTech ke lokasi proyek klien. Dilengkapi nomor surat jalan otomatis (SJ/DSP/...), informasi gudang asal, alamat tujuan proyek, nomor polisi armada ekspedisi, nama driver/teknisi pengantar, nomor telepon, tabel rincian material kiriman & kondisi fisik saat keluar gudang, serta 3 (tiga) blok pengesahan tanda tangan resmi (Logistik Gudang DSTech, Driver/Ekspedisi, dan Klien Penerima di Lapangan). Terintegrasi dengan tombol aksi cepat di tabel penjualan, modal faktur, dan modal BAST.
 - **2026-10-20**: Integrasi Katalog Product Management & Ketersediaan Stok Real-Time Multi-Cabang/Gudang pada Pembuatan Penawaran (SPH) & Faktur Penjualan (Sale Invoice), serta Mutasi Pemotongan Stok Otomatis. Menghubungkan repeater barang pada formulir SPH dan Faktur Penjualan secara dinamis ke master data produk (`/api/products` & `src/data/dstech_products.json`). Menyediakan pemilih Cabang & Titik Gudang Logistik (`dstech_wh_1` Cilegon, `dstech_wh_2` Serang, `dstech_wh_3` Unit Mobile) serta pemilih cepat katalog ("⚡ Pilih Katalog") per baris barang yang secara instan meng-autofill nama produk resmi, satuan, dan harga acuan katalog, sementara input manual tetap fleksibel untuk item jasa kustom. Menampilkan badge status ketersediaan stok riil (*stock on hand*) per gudang secara real-time (contoh: "⚡ Tersedia: 16 Unit di Gudang Utama Cilegon") dan peringatan jika kuantiti melebihi stok. Menambahkan helper pemotongan stok otomatis di backend `/api/finance` saat faktur diterbitkan atau penawaran dikonversi ke penjualan. Divalidasi kompilasi TypeScript `tsc --noEmit` (0 error), diuji interaktif via browser automation subagent, disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
+- **2026-10-20**: Penambahan Kolom Aksi & Tombol Hapus pada Buku Arus Kas (Cash Flow) serta Fitur Reset Semua Transaksi Keuangan Bersih dari Nol (Clean Slate). Menyediakan tombol hapus satuan (ikon Trash2) pada setiap baris item kas masuk & keluar di tab Buku Arus Kas lengkap dengan konfirmasi keamanan. Menambahkan tombol '🗑️ Reset Transaksi (Mulai Nol)' di header kendali Admin Finance dengan modal dialog konfirmasi ber-password/kata kunci ('RESET') untuk mengosongkan seluruh data transaksi uji coba/demo (Faktur Penjualan, SPH Penawaran, PO Supplier, Retur, dan Buku Arus Kas) sekaligus menjaga seluruh master data vital (Akun Admin, Rekening Bank, Gudang/Cabang, Klien, Supplier, Katalog Produk) tetap 100% aman dan utuh. Menyediakan sistem snapshot backup otomatis sebelum reset dieksekusi. Divalidasi kompilasi TypeScript `tsc --noEmit` (0 error), diuji via browser automation subagent, disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 
 
 
@@ -1581,7 +1582,39 @@
 
 ---
 
-### 55. Catatan Penting
+### 55. Tugas: Penambahan Tombol Hapus Transaksi Buku Arus Kas & Fitur Reset Semua Transaksi Keuangan Bersih dari Nol (Clean Slate)
+- **Permintaan Pengguna**:
+  *"bagai mana cara mereset semua pengaturan agar bersih dan bisa saya pakai dari nol"* & *"saya mau hapus transaksi keuangan, namun tidak ada tombol hapusnya"*
+- **Status**:
+  **Sedang Dikerjakan (In Progress)**
+- **Analisis Kebutuhan**:
+  1. Pada tabel Tab **Buku Arus Kas (Kas Masuk & Keluar)** (`cash_flow`), kolom Aksi dan tombol Hapus (`Trash2`) belum tersedia, sehingga pengguna tidak dapat menghapus transaksi kas satuan.
+  2. Untuk memulai penggunaan aplikasi dari nol secara bersih (*clean slate*), pengguna membutuhkan opsi penghapusan menyeluruh untuk transaksi uji coba/demo (Faktur Penjualan, SPH Penawaran, PO Supplier, Retur Barang, dan Buku Arus Kas) sekaligus tanpa harus menghapus satu per satu secara manual.
+  3. Master data vital (Akun Login Admin, Profil Perusahaan, Rekening Bank, Titik Gudang & Cabang, Klien, Supplier, Katalog Produk) **wajib tetap dipertahankan** agar sistem langsung siap digunakan untuk transaksi riil tanpa perlu setup ulang dari awal.
+  4. Penyediaan tombol **"🗑️ Reset Transaksi (Mulai dari Nol)"** di dashboard Admin Finance dengan modal konfirmasi keamanan kata kunci ("RESET") untuk mencegah ketidaksengajaan.
+  5. Penyediaan backup snapshot otomatis sebelum reset dieksekusi (`dstech_finance_erp_backup_*.json`).
+- **Rencana Pengerjaan Step-by-Step**:
+  1. [x] **Backend API Finance (`src/app/api/finance/route.ts`)**:
+     - Tambahkan handler `actionType === "cash_flow"` pada method `DELETE` untuk menghapus 1 data kas masuk/keluar berdasarkan ID.
+     - Tambahkan handler `actionType === "reset_transactions"` pada method `DELETE` yang mengosongkan transaksi (`sales`, `quotations`, `purchases`, `returns_sales`, `returns_purchase`, `cash_flow`, `expenses`) ke array kosong `[]`, membuat snapshot cadangan otomatis, dan mempertahankan master data (`bank_accounts`, `warehouses`, `branches`, `clients`, `suppliers`, `settings`).
+  2. [x] **Frontend Admin Finance (`src/app/admin/finance/page.tsx`)**:
+     - Tambahkan kolom "Aksi" dan tombol hapus (`Trash2`) pada setiap baris item tabel Buku Arus Kas (`activeTab === "cash_flow"`).
+     - Tambahkan handler `handleDeleteCashFlow(id: string, desc: string)`.
+     - Tambahkan tombol **"🗑️ Reset Transaksi (Mulai dari Nol)"** pada header Admin Finance (di sebelah tombol `⚙️ Atur Dokumen`).
+     - Buat modal konfirmasi keamanan `isResetModalOpen` dengan peringatan jelas apa saja yang akan dibersihkan dan input verifikasi teks ("RESET").
+     - Tambahkan handler `handleResetAllTransactions()`.
+  3. [x] **Validasi Kompilasi TypeScript (`npx tsc --noEmit`)**:
+     - Memastikan 0 error pada seluruh penambahan tipe, state, dan handler.
+  4. [x] **Pengujian Alur & Antarmuka via Browser Subagent**:
+     - Menguji kemunculan tombol hapus di tabel Buku Arus Kas dan fungsi modal Reset Transaksi Keuangan di `http://localhost:3005/admin/finance`.
+  5. [ ] **Sinkronisasi Kode ke GitHub Repository `rm23nm/dstech-smart`**:
+     - Push commit via `push_with_native_git.js`.
+  6. [ ] **Deployment ke Server Live VPS PM2 `dstech-main` dan Verifikasi Akhir**:
+     - Deploy ke VPS `157.66.34.199:11587`, build Next.js produksi, dan restart PM2.
+
+---
+
+### 56. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
