@@ -104,9 +104,7 @@ export async function POST(request: Request) {
     // Login Sukses
     const token = `dstech_tok_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     const redirectUrl =
-      userRole === "SUPERADMIN"
-        ? "/superadmin"
-        : userRole === "ADMIN"
+      userRole === "SUPERADMIN" || userRole === "ADMIN"
         ? "/admin"
         : userRole === "EMPLOYEE"
         ? "/employee"

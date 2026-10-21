@@ -77,11 +77,7 @@ function LoginForm() {
         } else if (role === "ADMIN" || userData.role === "ADMIN" || userData.role === "SUPERADMIN") {
           localStorage.setItem("dstech_admin_auth", JSON.stringify(sessionPayload));
           localStorage.setItem("dstech_auth_token", userData.token);
-          if (userData.role === "SUPERADMIN") {
-            router.push("/superadmin");
-          } else {
-            router.push("/admin");
-          }
+          router.push("/admin");
         } else {
           localStorage.setItem("dstech_employee_auth", JSON.stringify(sessionPayload));
           localStorage.setItem("dstech_auth_token", userData.token);
