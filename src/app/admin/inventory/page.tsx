@@ -632,7 +632,7 @@ export default function AdminInventoryPage() {
                   : "text-slate-600 hover:text-purple-600"
               }`}
             >
-              <span>🏪 Non-PT / Toko DStech</span>
+              <span>🏪 Non-PT / DSTech Smart</span>
               <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
                 selectedEntityTab === "NON_PT" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-700"
               }`}>

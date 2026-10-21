@@ -464,7 +464,7 @@ export default function PortfoliosAdminPage() {
             }`}
           >
             <Store className="w-4 h-4" />
-            <span>🏪 Non-PT / Toko DStech</span>
+            <span>🏪 Non-PT / DSTech Smart</span>
             <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${selectedEntityTab === "NON_PT" ? "bg-white/20" : "bg-amber-100 text-amber-700"}`}>
               {countNonPT}
             </span>
@@ -562,7 +562,7 @@ export default function PortfoliosAdminPage() {
                             </p>
                             {item.entityType === "NON_PT" ? (
                               <span className="text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                <Store className="w-2.5 h-2.5 text-amber-600" /> Non-PT / Toko
+                                <Store className="w-2.5 h-2.5 text-amber-600" /> Non-PT / DSTech Smart
                               </span>
                             ) : (
                               <span className="text-[9px] font-black bg-blue-100 text-blue-900 border border-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -702,8 +702,8 @@ export default function PortfoliosAdminPage() {
                       <Store className="w-4 h-4 text-amber-600" />
                     </div>
                     <div>
-                      <p className="font-black text-xs">Non-PT / Toko</p>
-                      <p className="text-[10px] text-slate-400">Servis & Usaha Toko</p>
+                      <p className="font-black text-xs">Non-PT / DSTech Smart</p>
+                      <p className="text-[10px] text-slate-400">Servis & Usaha Mandiri</p>
                     </div>
                   </button>
                 </div>
@@ -947,8 +947,8 @@ export default function PortfoliosAdminPage() {
                       <Store className="w-4 h-4 text-amber-600" />
                     </div>
                     <div>
-                      <p className="font-black text-xs">Non-PT / Toko</p>
-                      <p className="text-[10px] text-slate-400">Servis & Usaha Toko</p>
+                      <p className="font-black text-xs">Non-PT / DSTech Smart</p>
+                      <p className="text-[10px] text-slate-400">Servis & Usaha Mandiri</p>
                     </div>
                   </button>
                 </div>

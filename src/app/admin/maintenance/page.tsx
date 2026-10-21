@@ -39,6 +39,7 @@ import {
   Image as ImageIcon,
   UploadCloud,
   Layers,
+  Upload,
 } from "lucide-react";
 
 export interface TaskPhoto {
@@ -148,6 +149,25 @@ export default function MaintenancePage() {
   const [selectedTaskForPrint, setSelectedTaskForPrint] = useState<MaintenanceTask | null>(null);
   const [watermarkOpacity, setWatermarkOpacity] = useState(15);
   const [letterheadEnabled, setLetterheadEnabled] = useState(true);
+  const [customLetterheadUrl, setCustomLetterheadUrl] = useState<string>("");
+
+  const handleLetterheadUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      alert("Ukuran gambar maksimal 8MB!");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const base64Url = uploadEvent.target?.result as string;
+      if (base64Url) {
+        setCustomLetterheadUrl(base64Url);
+        setLetterheadEnabled(true);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Photo States & Modals
   const [selectedTaskForPhotos, setSelectedTaskForPhotos] = useState<MaintenanceTask | null>(null);
@@ -722,7 +742,7 @@ export default function MaintenancePage() {
               : "text-slate-600 hover:text-purple-600"
           }`}
         >
-          <span>🏪 Non-PT / Toko DStech</span>
+          <span>🏪 Non-PT / DSTech Smart</span>
           <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
             selectedEntityTab === "NON_PT" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-700"
           }`}>
@@ -1126,8 +1146,8 @@ export default function MaintenancePage() {
                         : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <p className="text-xs font-bold">🏪 Non-PT / Toko DStech</p>
-                    <p className="text-[10px] opacity-75 mt-0.5">Servis Perorangan, Workshop & Retail</p>
+                    <p className="text-xs font-bold">🏪 Non-PT / DSTech Smart</p>
+                    <p className="text-[10px] opacity-75 mt-0.5">Perorangan, Proyek Mandiri & Servis</p>
                   </button>
                 </div>
               </div>
@@ -1708,6 +1728,25 @@ export default function MaintenancePage() {
                   />
                   <span>Kop Surat</span>
                 </label>
+                <label className="flex items-center gap-1.5 text-xs text-white font-bold bg-slate-800 hover:bg-slate-900 px-3 py-1.5 rounded-xl cursor-pointer shadow-xs transition">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Unggah Kop {selectedTaskForPrint.entityType === "NON_PT" ? "DSTech Smart" : "PT"}</span>
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/jpg, image/webp"
+                    onChange={handleLetterheadUpload}
+                    className="hidden"
+                  />
+                </label>
+                {customLetterheadUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomLetterheadUrl("")}
+                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition cursor-pointer"
+                  >
+                    Reset Kop
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => window.print()}
@@ -1732,7 +1771,12 @@ export default function MaintenancePage() {
               className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 text-slate-800 space-y-6 relative shadow-md font-sans"
               style={{
                 backgroundImage: letterheadEnabled
-                  ? `url('${selectedTaskForPrint.entityType === "NON_PT" ? "/kop_surat_toko.jpg" : "/kop_surat_dstech.jpg"}')`
+                  ? `url('${
+                      customLetterheadUrl ||
+                      (selectedTaskForPrint.entityType === "NON_PT"
+                        ? "/kop_surat_toko.jpg"
+                        : "/kop_surat_dstech.jpg")
+                    }')`
                   : "none",
                 backgroundSize: "100% 100%",
                 backgroundRepeat: "no-repeat",
@@ -1747,12 +1791,12 @@ export default function MaintenancePage() {
                   <div>
                     <h2 className="text-xl font-black text-slate-900 tracking-tight">
                       {selectedTaskForPrint.entityType === "NON_PT"
-                        ? "TOKO DSTECH / WORKSHOP KOMPUTER & CCTV"
+                        ? "DSTECH SMART"
                         : "PT. DSTECH SMART PERKASA"}
                     </h2>
                     <p className="text-xs text-slate-600 mt-0.5">
                       {selectedTaskForPrint.entityType === "NON_PT"
-                        ? "Pusat Servis Laptop, PC Desktop, CCTV Ritel, & Komponen Elektronik"
+                        ? "Pusat Solusi Security System, CCTV, Access Door, & IT Infrastructure"
                         : "Security System • CCTV • Access Control • Barrier Gate • IT Infrastructure"}
                     </p>
                     <p className="text-[10px] text-slate-500">
@@ -1761,10 +1805,10 @@ export default function MaintenancePage() {
                   </div>
                   <div className="text-right">
                     <span className="text-[10px] font-mono text-slate-400">
-                      {selectedTaskForPrint.entityType === "NON_PT" ? "UNIT USAHA RITEL" : "LEGALITAS RESMI"}
+                      {selectedTaskForPrint.entityType === "NON_PT" ? "UNIT USAHA RESMI" : "LEGALITAS RESMI"}
                     </span>
                     <p className="text-xs font-bold text-slate-700">
-                      {selectedTaskForPrint.entityType === "NON_PT" ? "DSTECH-RETAIL-STORE" : "NIB: 2026-DSTECH-ID"}
+                      {selectedTaskForPrint.entityType === "NON_PT" ? "DSTECH-SMART-ID" : "NIB: 2026-DSTECH-ID"}
                     </p>
                   </div>
                 </div>
@@ -1782,7 +1826,7 @@ export default function MaintenancePage() {
 
               {/* Paragraf Pengantar */}
               <p className="text-xs text-slate-700 leading-relaxed text-justify">
-                Pada hari ini, tanggal <strong>{selectedTaskForPrint.date}</strong>, telah dilaksanakan kunjungan teknis pekerjaan pemeliharaan dan pemeriksaan sistem keamanan oleh tim teknisi <strong>PT. DSTech Smart Perkasa</strong> dengan rincian data sebagai berikut:
+                Pada hari ini, tanggal <strong>{selectedTaskForPrint.date}</strong>, telah dilaksanakan kunjungan teknis pekerjaan pemeliharaan dan pemeriksaan sistem oleh tim teknisi <strong>{selectedTaskForPrint.entityType === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}</strong> dengan rincian data sebagai berikut:
               </p>
 
               {/* Data Klien & Pelaksana */}
@@ -1798,7 +1842,7 @@ export default function MaintenancePage() {
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">Pihak Pelaksana (DSTech):</span>
                   <p className="font-black text-slate-900">
-                    {selectedTaskForPrint.entityType === "NON_PT" ? "Toko DStech (Workshop Servis)" : "PT. DSTech Smart Perkasa"}
+                    {selectedTaskForPrint.entityType === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
                   </p>
                   <p className="text-slate-600 text-[11px]">
                     Teknisi Lapangan: <strong>{selectedTaskForPrint.technician}</strong>
@@ -1899,20 +1943,32 @@ export default function MaintenancePage() {
                 {/* Kanan: Pelaksana DSTech */}
                 <div className="text-center space-y-1">
                   <span className="text-[11px] text-slate-500 font-bold block">Pihak Pelaksana:</span>
-                  <span className="font-black text-slate-900 block text-xs">PT. DSTech Smart Perkasa</span>
+                  <span className="font-black text-slate-900 block text-xs">
+                    {selectedTaskForPrint.entityType === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                  </span>
                   <div className="h-24 flex flex-col items-center justify-center relative border-b border-dashed border-slate-300">
                     {/* Stempel bulat digital */}
-                    <div className="w-16 h-16 rounded-full border-2 border-indigo-600/60 text-indigo-700/80 text-[7px] font-black uppercase flex flex-col items-center justify-center rotate-[-12deg] pointer-events-none">
-                      <span>PT. DSTECH</span>
-                      <span className="text-[6px]">SMART PERKASA</span>
-                      <span className="text-[5px]">CILEGON</span>
-                    </div>
+                    {selectedTaskForPrint.entityType !== "NON_PT" ? (
+                      <div className="w-16 h-16 rounded-full border-2 border-indigo-600/60 text-indigo-700/80 text-[7px] font-black uppercase flex flex-col items-center justify-center rotate-[-12deg] pointer-events-none">
+                        <span>PT. DSTECH</span>
+                        <span className="text-[6px]">SMART PERKASA</span>
+                        <span className="text-[5px]">CILEGON</span>
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 rounded-full border-2 border-purple-600/60 text-purple-700/80 text-[7px] font-black uppercase flex flex-col items-center justify-center rotate-[-12deg] pointer-events-none">
+                        <span>DSTECH</span>
+                        <span className="text-[6px]">SMART</span>
+                        <span className="text-[5px]">CILEGON</span>
+                      </div>
+                    )}
                   </div>
                   <div className="pt-1">
                     <p className="font-black text-slate-900 underline text-xs">
                       ( {selectedTaskForPrint.technician} )
                     </p>
-                    <p className="text-[10px] text-slate-500">Teknisi Lapangan DSTech</p>
+                    <p className="text-[10px] text-slate-500">
+                      {selectedTaskForPrint.entityType === "NON_PT" ? "Teknisi DSTech Smart" : "Teknisi Lapangan DSTech"}
+                    </p>
                     <p className="text-[9px] font-mono text-slate-400 mt-0.5">
                       [VERIFIKASI SISTEM: DST-APP-MTC-{selectedTaskForPrint.id.slice(-6)}]
                     </p>
