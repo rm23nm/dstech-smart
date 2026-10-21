@@ -205,6 +205,7 @@ interface SaleInvoice {
   businessEntity?: "PT" | "NON_PT";
   projectId?: string;
   projectName?: string;
+  photos?: ProjectPhoto[];
 }
 
 interface QuotationItem {
@@ -1127,6 +1128,37 @@ export default function AdminFinanceERPPage() {
   const [projectPhotoCaption, setProjectPhotoCaption] = useState<string>("");
   const [projectPhotoFilter, setProjectPhotoFilter] = useState<"all" | "documentation" | "part_replacement">("all");
   const [projectLetterheadEnabled, setProjectLetterheadEnabled] = useState<boolean>(true);
+
+  // Kwitansi Resmi Pembayaran (Official Payment Receipt A4)
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState<boolean>(false);
+  const [receiptDocType, setReceiptDocType] = useState<"sale" | "po">("sale");
+  const [selectedReceiptSale, setSelectedReceiptSale] = useState<SaleInvoice | null>(null);
+  const [selectedReceiptPo, setSelectedReceiptPo] = useState<PurchaseOrder | null>(null);
+  const [selectedReceiptProject, setSelectedReceiptProject] = useState<ProjectItem | null>(null);
+  const [receiptNumber, setReceiptNumber] = useState<string>("");
+  const [receiptDate, setReceiptDate] = useState<string>(new Date().toISOString().slice(0, 10));
+  const [receiptPayer, setReceiptPayer] = useState<string>("");
+  const [receiptRecipient, setReceiptRecipient] = useState<string>("");
+  const [receiptAmount, setReceiptAmount] = useState<number>(0);
+  const [receiptPurpose, setReceiptPurpose] = useState<string>("");
+  const [receiptPaymentMethod, setReceiptPaymentMethod] = useState<string>("Transfer Bank");
+  const [receiptBankName, setReceiptBankName] = useState<string>("Bank Central Asia (BCA)");
+  const [receiptBankAccount, setReceiptBankAccount] = useState<string>("012-345-6789 a.n PT DSTech Smart Perkasa");
+  const [receiptSignerName, setReceiptSignerName] = useState<string>("Ahmad Romadhoni");
+  const [receiptSignerTitle, setReceiptSignerTitle] = useState<string>("Direktur Operasional & Keuangan");
+  const [receiptStage, setReceiptStage] = useState<"Pelunasan" | "Uang Muka (DP)" | "Termin 1" | "Termin 2" | "Termin 3" | "Pembayaran Bertahap" | "Lainnya">("Pelunasan");
+  const [receiptEntity, setReceiptEntity] = useState<"PT" | "NON_PT">("PT");
+  const [isReceiptLetterhead, setIsReceiptLetterhead] = useState<boolean>(true);
+
+  // Foto Dokumentasi Per-Faktur (Invoice Attachment)
+  const [selectedInvoiceForPhotos, setSelectedInvoiceForPhotos] = useState<SaleInvoice | null>(null);
+  const [isInvoicePhotoModalOpen, setIsInvoicePhotoModalOpen] = useState<boolean>(false);
+  const [invoicePhotoCategory, setInvoicePhotoCategory] = useState<"documentation" | "part_replacement">("documentation");
+  const [invoicePhotoCaption, setInvoicePhotoCaption] = useState<string>("");
+  const [isUploadingInvoicePhoto, setIsUploadingInvoicePhoto] = useState<boolean>(false);
+  const [invoicePhotoFilter, setInvoicePhotoFilter] = useState<"all" | "documentation" | "part_replacement">("all");
+  const [selectedInvoiceForPhotoPrint, setSelectedInvoiceForPhotoPrint] = useState<SaleInvoice | null>(null);
+  const [invoicePhotoLetterhead, setInvoicePhotoLetterhead] = useState<boolean>(true);
   const [isPublishPortfolioModalOpen, setIsPublishPortfolioModalOpen] = useState<boolean>(false);
   const [publishPortfolioForm, setPublishPortfolioForm] = useState<{
     projectId: string;
@@ -1847,6 +1879,12 @@ export default function AdminFinanceERPPage() {
     if (nilai < 1000000000) return angkaTerbilang(Math.floor(nilai / 1000000)) + " Juta " + angkaTerbilang(nilai % 1000000);
     if (nilai < 1000000000000) return angkaTerbilang(Math.floor(nilai / 1000000000)) + " Milyar " + angkaTerbilang(nilai % 1000000000);
     return "";
+  };
+
+  const terbilangRupiah = (nilai: number): string => {
+    if (!nilai || nilai === 0) return "Nol Rupiah";
+    const teks = angkaTerbilang(nilai).trim().replace(/\s+/g, " ");
+    return `${teks} Rupiah`;
   };
 
   // Helper Format Ukuran Berkas
@@ -5038,6 +5076,185 @@ export default function AdminFinanceERPPage() {
     }
   };
 
+  // Handlers Kwitansi Resmi Pembayaran (Official Payment Receipt A4)
+  const handleOpenReceiptModal = (params: {
+    type: "sale" | "po";
+    doc: SaleInvoice | PurchaseOrder;
+    project?: ProjectItem | null;
+  }) => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, "0");
+    const dd = String(today.getDate()).padStart(2, "0");
+
+    if (params.type === "sale") {
+      const sale = params.doc as SaleInvoice;
+      const entity = sale.businessEntity || "PT";
+      const prefix = entity === "PT" ? "KW/DSP" : "KW/DTS";
+      const cleanNum = sale.invoiceNumber.replace(/[^a-zA-Z0-9]/g, "").slice(-4) || String(Math.floor(100 + Math.random() * 900));
+      const autoKwNumber = `${prefix}/${yyyy}${mm}/${cleanNum}`;
+
+      setReceiptDocType("sale");
+      setSelectedReceiptSale(sale);
+      setSelectedReceiptPo(null);
+      setSelectedReceiptProject(params.project || projects.find((p) => p.id === sale.projectId) || null);
+      setReceiptEntity(entity);
+      setReceiptNumber(autoKwNumber);
+      setReceiptDate(sale.date || `${yyyy}-${mm}-${dd}`);
+      setReceiptPayer(sale.customerName || "Klien DSTech");
+      setReceiptRecipient(entity === "PT" ? "PT DSTech Smart Perkasa" : "DSTech Smart Solution");
+      setReceiptAmount(sale.paidAmount && sale.paidAmount > 0 ? sale.paidAmount : (sale.grandTotal || 0));
+
+      const purposeDesc = sale.invoiceType === "DP"
+        ? `Pembayaran Uang Muka (DP ${sale.dpPercentage || 30}%) atas Faktur ${sale.invoiceNumber} untuk pekerjaan: ${sale.projectName || "Pengadaan Sistem & Jasa Keamanan"}`
+        : `Pembayaran Tagihan Faktur Penjualan No. ${sale.invoiceNumber} (${sale.projectName || "Pengadaan & Integrasi Sistem DSTech"})`;
+      setReceiptPurpose(purposeDesc);
+
+      setReceiptStage(
+        sale.invoiceType === "DP"
+          ? "Uang Muka (DP)"
+          : sale.paymentStatus === "Lunas"
+          ? "Pelunasan"
+          : "Pembayaran Bertahap"
+      );
+      setReceiptPaymentMethod(sale.paymentMethod || "Transfer Bank");
+      setReceiptBankName("Bank Central Asia (BCA)");
+      setReceiptBankAccount("012-345-6789 a.n PT DSTech Smart Perkasa");
+      setReceiptSignerName(entity === "PT" ? "Ahmad Romadhoni" : "Ramadhani");
+      setReceiptSignerTitle(entity === "PT" ? "Direktur Operasional & Keuangan" : "Owner / Pimpinan");
+    } else {
+      const po = params.doc as PurchaseOrder;
+      const entity = po.businessEntity || "PT";
+      const prefix = entity === "PT" ? "KW-OUT/DSP" : "KW-OUT/DTS";
+      const cleanNum = po.poNumber.replace(/[^a-zA-Z0-9]/g, "").slice(-4) || String(Math.floor(100 + Math.random() * 900));
+      const autoKwNumber = `${prefix}/${yyyy}${mm}/${cleanNum}`;
+
+      setReceiptDocType("po");
+      setSelectedReceiptSale(null);
+      setSelectedReceiptPo(po);
+      setSelectedReceiptProject(params.project || projects.find((p) => p.id === po.projectId) || null);
+      setReceiptEntity(entity);
+      setReceiptNumber(autoKwNumber);
+      setReceiptDate(po.date || `${yyyy}-${mm}-${dd}`);
+      setReceiptPayer(entity === "PT" ? "PT DSTech Smart Perkasa" : "DSTech Smart Solution");
+      setReceiptRecipient(po.supplierName || "Vendor / Supplier");
+      setReceiptAmount(po.grandTotal || 0);
+      setReceiptPurpose(`Pembayaran Pengadaan Material & Barang atas Purchase Order No. ${po.poNumber} (${po.supplierName})`);
+      setReceiptStage(po.status === "Approved" || po.status === "Selesai" ? "Pelunasan" : "Uang Muka (DP)");
+      setReceiptPaymentMethod((po as any).paymentMethod || "Transfer Bank");
+      setReceiptBankName("Bank Central Asia (BCA)");
+      setReceiptBankAccount("Rekening Vendor / Supplier");
+      setReceiptSignerName(entity === "PT" ? "Ahmad Romadhoni" : "Ramadhani");
+      setReceiptSignerTitle(entity === "PT" ? "Direktur Operasional & Keuangan" : "Owner / Pimpinan");
+    }
+
+    setIsReceiptModalOpen(true);
+  };
+
+  // Handlers Foto Dokumentasi Per-Faktur (Invoice Attachment)
+  const handleOpenInvoicePhotos = (sale: SaleInvoice) => {
+    setSelectedInvoiceForPhotos(sale);
+    setInvoicePhotoCategory("documentation");
+    setInvoicePhotoCaption("");
+    setInvoicePhotoFilter("all");
+    setIsInvoicePhotoModalOpen(true);
+  };
+
+  const handleUploadInvoicePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedInvoiceForPhotos || !e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setIsUploadingInvoicePhoto(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("prefix", "dstech_invoice_photo");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success && json.url) {
+        const newPhoto: ProjectPhoto = {
+          id: `dstech_inv_photo_${Date.now()}`,
+          url: json.url,
+          caption:
+            invoicePhotoCaption.trim() ||
+            (invoicePhotoCategory === "part_replacement"
+              ? `Foto Penggantian Part - Faktur ${selectedInvoiceForPhotos.invoiceNumber}`
+              : `Foto Dokumentasi Pekerjaan - Faktur ${selectedInvoiceForPhotos.invoiceNumber}`),
+          category: invoicePhotoCategory,
+          createdAt: new Date().toISOString(),
+        };
+        const updatedPhotos = [...(selectedInvoiceForPhotos.photos || []), newPhoto];
+
+        const updateRes = await fetch("/api/finance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "sale",
+            id: selectedInvoiceForPhotos.id,
+            payload: {
+              ...selectedInvoiceForPhotos,
+              photos: updatedPhotos,
+            },
+          }),
+        });
+
+        if (updateRes.ok) {
+          const updatedSale = { ...selectedInvoiceForPhotos, photos: updatedPhotos };
+          setSelectedInvoiceForPhotos(updatedSale);
+          setSales((prev) =>
+            prev.map((s) => (s.id === selectedInvoiceForPhotos.id ? updatedSale : s))
+          );
+          setInvoicePhotoCaption("");
+          showToast("Foto dokumentasi faktur penagihan berhasil disimpan!");
+        } else {
+          showToast("Gagal menyimpan update foto faktur");
+        }
+      } else {
+        showToast("Gagal upload foto: " + (json.message || "Error"));
+      }
+    } catch (err: any) {
+      showToast("Error: " + (err?.message || "Terjadi kesalahan upload"));
+    } finally {
+      setIsUploadingInvoicePhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveInvoicePhoto = async (photoId: string) => {
+    if (!selectedInvoiceForPhotos) return;
+    const updatedPhotos = (selectedInvoiceForPhotos.photos || []).filter((p) => p.id !== photoId);
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "sale",
+          id: selectedInvoiceForPhotos.id,
+          payload: {
+            ...selectedInvoiceForPhotos,
+            photos: updatedPhotos,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const updatedSale = { ...selectedInvoiceForPhotos, photos: updatedPhotos };
+        setSelectedInvoiceForPhotos(updatedSale);
+        setSales((prev) =>
+          prev.map((s) => (s.id === selectedInvoiceForPhotos.id ? updatedSale : s))
+        );
+        showToast("Foto faktur berhasil dihapus");
+      }
+    } catch {
+      showToast("Gagal menghapus foto faktur");
+    }
+  };
+
   // Warehouse Master Handlers
   const handleOpenAddWarehouse = () => {
     setEditingWarehouse(null);
@@ -6017,6 +6234,33 @@ export default function AdminFinanceERPPage() {
                               )}
                             </button>
 
+                            {/* Kwitansi Resmi Pembayaran Faktur */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReceiptModal({ type: "sale", doc: sale })}
+                              title="Kwitansi Tanda Terima Pembayaran Sah (Official Payment Receipt A4)"
+                              className="p-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Receipt className="w-4 h-4" />
+                            </button>
+
+                            {/* Foto Dokumentasi & Part Penagihan Faktur */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenInvoicePhotos(sale)}
+                              title="Foto Dokumentasi Pekerjaan & Penggantian Part Khusus Faktur Ini"
+                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
+                                sale.photos && sale.photos.length > 0
+                                  ? "bg-purple-100 text-purple-700 hover:bg-purple-600 hover:text-white ring-1 ring-purple-300"
+                                  : "bg-slate-100 text-slate-600 hover:bg-purple-600 hover:text-white"
+                              }`}
+                            >
+                              <Camera className="w-4 h-4" />
+                              {sale.photos && sale.photos.length > 0 && (
+                                <span className="text-[10px] font-black">{sale.photos.length}</span>
+                              )}
+                            </button>
+
                             {/* Edit Faktur */}
                             <button
                               onClick={() => handleOpenEditSale(sale)}
@@ -6797,6 +7041,16 @@ export default function AdminFinanceERPPage() {
                               {po.attachments && po.attachments.length > 0 && (
                                 <span className="text-[10px] font-black">{po.attachments.length}</span>
                               )}
+                            </button>
+
+                            {/* Kwitansi Resmi Pembayaran PO (Kas Keluar) */}
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReceiptModal({ type: "po", doc: po })}
+                              title="Kwitansi Bukti Pembayaran / Pengeluaran PO (Official Payment Receipt A4)"
+                              className="p-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                            >
+                              <Receipt className="w-4 h-4" />
                             </button>
 
                             {/* Edit PO */}
@@ -13431,16 +13685,64 @@ export default function AdminFinanceERPPage() {
                                   </span>
                                 </td>
                                 <td className="p-2.5 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedInvoiceForPrint(s);
-                                    }}
-                                    className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
-                                    title="Lihat Faktur"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </button>
+                                  <div className="flex items-center justify-center gap-1">
+                                    {/* Lihat Faktur */}
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedInvoiceForPrint(s)}
+                                      className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition-all"
+                                      title="Lihat / Cetak Faktur"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Kwitansi Resmi */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenReceiptModal({ type: "sale", doc: s, project: prj })}
+                                      className="p-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer transition-all"
+                                      title="Kwitansi Tanda Terima Pembayaran"
+                                    >
+                                      <Receipt className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Foto Dokumentasi Faktur */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenInvoicePhotos(s)}
+                                      className={`p-1 rounded cursor-pointer transition-all flex items-center gap-0.5 ${
+                                        s.photos && s.photos.length > 0
+                                          ? "bg-purple-100 hover:bg-purple-200 text-purple-700 font-bold"
+                                          : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                                      }`}
+                                      title="Foto Dokumentasi & Pergantian Part Faktur Ini"
+                                    >
+                                      <Camera className="w-3.5 h-3.5" />
+                                      {s.photos && s.photos.length > 0 && (
+                                        <span className="text-[9px] font-black">{s.photos.length}</span>
+                                      )}
+                                    </button>
+
+                                    {/* Edit Faktur */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditSale(s)}
+                                      className="p-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 cursor-pointer transition-all"
+                                      title="Edit Rincian Faktur"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Hapus Faktur */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteSale(s.id, s.invoiceNumber)}
+                                      className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer transition-all"
+                                      title="Hapus Faktur Ini"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -13515,16 +13817,47 @@ export default function AdminFinanceERPPage() {
                                   </span>
                                 </td>
                                 <td className="p-2.5 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setSelectedPoForPrint(po);
-                                    }}
-                                    className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
-                                    title="Lihat PO"
-                                  >
-                                    <Eye className="w-3.5 h-3.5" />
-                                  </button>
+                                  <div className="flex items-center justify-center gap-1">
+                                    {/* Lihat PO */}
+                                    <button
+                                      type="button"
+                                      onClick={() => setSelectedPoForPrint(po)}
+                                      className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition-all"
+                                      title="Lihat / Cetak Purchase Order"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Kwitansi Pembayaran PO */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenReceiptModal({ type: "po", doc: po, project: prj })}
+                                      className="p-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer transition-all"
+                                      title="Kwitansi Pengeluaran / Bukti Pembayaran PO"
+                                    >
+                                      <Receipt className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Edit PO */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditPo(po)}
+                                      className="p-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 cursor-pointer transition-all"
+                                      title="Edit Purchase Order"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {/* Hapus PO */}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeletePo(po)}
+                                      className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer transition-all"
+                                      title="Hapus Purchase Order Ini"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))}
@@ -15033,7 +15366,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL EDIT PURCHASE ORDER (PO) */}
       {isEditPoModalOpen && editingPo && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsEditPoModalOpen(false)}
         >
           <div
@@ -19172,7 +19505,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL EDIT FAKTUR PENJUALAN */}
       {isEditSaleModalOpen && editingSale && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsEditSaleModalOpen(false)}
         >
           <div
@@ -21368,6 +21701,798 @@ export default function AdminFinanceERPPage() {
                   className="max-h-[75vh] max-w-full object-contain rounded-xl shadow-2xl"
                 />
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KWITANSI TANDA TERIMA PEMBAYARAN RESMI A4 (OFFICIAL PAYMENT RECEIPT) */}
+      {isReceiptModalOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+          onClick={() => setIsReceiptModalOpen(false)}
+        >
+          <div
+            className="bg-slate-100 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[96vh] flex flex-col border border-slate-300 overflow-hidden my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal Kwitansi */}
+            <div className="p-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <span>Kwitansi Tanda Terima Pembayaran Sah (A4)</span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                      {receiptDocType === "sale" ? "Penerimaan Kas (Klien)" : "Pengeluaran Kas (PO)"}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Dokumen bukti sah tanda terima uang pembayaran faktur/PO dengan format standar akuntansi & terbilang rupiah resmi.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsReceiptLetterhead(!isReceiptLetterhead)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                    isReceiptLetterhead
+                      ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                      : "bg-slate-50 border-slate-200 text-slate-500"
+                  }`}
+                >
+                  {isReceiptLetterhead ? "✓ Kop Surat Aktif" : "Kop Surat Nonaktif"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadPdf(
+                      "#print-receipt-sheet",
+                      `KWITANSI_${receiptNumber.replace(/[\/\\?%*:|"<>]/g, "_")}_${receiptPayer.replace(/\s+/g, "_")}.pdf`
+                    );
+                  }}
+                  disabled={isDownloadingPdf}
+                  className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Unduh PDF"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak (Print)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReceiptModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Sub-Editor Penyesuaian Data Kwitansi */}
+            <div className="p-3 bg-amber-50/50 border-b border-amber-200/60 text-xs shrink-0 grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+              <div className="sm:col-span-3">
+                <label className="font-bold text-slate-600 block mb-0.5 text-[10px]">Nomor Kwitansi:</label>
+                <input
+                  type="text"
+                  value={receiptNumber}
+                  onChange={(e) => setReceiptNumber(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-mono font-bold text-slate-800 text-xs"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="font-bold text-slate-600 block mb-0.5 text-[10px]">Tanggal Kwitansi:</label>
+                <input
+                  type="date"
+                  value={receiptDate}
+                  onChange={(e) => setReceiptDate(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-800 text-xs"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="font-bold text-slate-600 block mb-0.5 text-[10px]">Tahapan:</label>
+                <select
+                  value={receiptStage}
+                  onChange={(e) => setReceiptStage(e.target.value as any)}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-800 text-xs"
+                >
+                  <option value="Pelunasan">Pelunasan</option>
+                  <option value="Uang Muka (DP)">Uang Muka (DP)</option>
+                  <option value="Termin 1">Termin 1</option>
+                  <option value="Termin 2">Termin 2</option>
+                  <option value="Termin 3">Termin 3</option>
+                  <option value="Pembayaran Bertahap">Pembayaran Bertahap</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="font-bold text-slate-600 block mb-0.5 text-[10px]">Metode Bayar:</label>
+                <select
+                  value={receiptPaymentMethod}
+                  onChange={(e) => setReceiptPaymentMethod(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-800 text-xs"
+                >
+                  <option value="Transfer Bank">Transfer Bank</option>
+                  <option value="Tunai / Kas">Tunai / Kas</option>
+                  <option value="Giro / Cek">Giro / Cek</option>
+                  <option value="QRIS">QRIS</option>
+                </select>
+              </div>
+              <div className="sm:col-span-3">
+                <label className="font-bold text-slate-600 block mb-0.5 text-[10px]">Nominal (Rp):</label>
+                <input
+                  type="number"
+                  value={receiptAmount}
+                  onChange={(e) => setReceiptAmount(Number(e.target.value) || 0)}
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-900 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Scrollable Document Preview Area */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/60 flex justify-center">
+              {/* LEMBAR A4 PRINT KWITANSI */}
+              <div
+                id="print-receipt-sheet"
+                className="w-full max-w-[794px] min-h-[520px] bg-white rounded-2xl shadow-xl p-8 sm:p-12 relative text-slate-800 border border-slate-200 print:shadow-none print:border-none print:rounded-none print:m-0 print:p-8 flex flex-col justify-between"
+                style={{
+                  fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                }}
+              >
+                {/* Kop Surat Resmi */}
+                {isReceiptLetterhead && (
+                  <div className="mb-6 border-b-2 border-slate-800 pb-4">
+                    {getLetterheadConfig(receiptEntity).url ? (
+                      <div className="w-full flex items-center justify-center">
+                        <img
+                          src={getLetterheadConfig(receiptEntity).url}
+                          alt="Kop Surat Resmi DSTech"
+                          className="max-h-24 w-auto object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-xl font-black text-slate-900 tracking-wider">
+                            {receiptEntity === "PT" ? "PT DSTECH SMART PERKASA" : "DSTECH SMART SOLUTION"}
+                          </h2>
+                          <p className="text-xs text-slate-600 font-medium">
+                            Security Systems • Smart IoT Automation • IT Infrastructure • Fiber Optic
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            Komplek Ruko Grand Cilegon Residence, Cilegon - Banten | Telp/WA: +62 822-8356-8344
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-[10px] font-mono font-bold text-slate-400 block">KODE ENTITAS:</span>
+                          <span className="text-xs font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                            {receiptEntity === "PT" ? "PT. DSTECH SMART PERKASA" : "NON-PT / PERORANGAN"}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Judul Dokumen Kwitansi */}
+                <div className="flex items-start justify-between border-b border-dashed border-slate-300 pb-4 mb-6">
+                  <div>
+                    <h1 className="text-2xl font-black text-slate-900 tracking-wider uppercase font-serif">
+                      KWITANSI PEMBAYARAN
+                    </h1>
+                    <p className="text-[11px] text-slate-500 tracking-wide font-sans uppercase">
+                      {receiptDocType === "sale"
+                        ? "OFFICIAL PAYMENT RECEIPT / TANDA TERIMA PEMBAYARAN SAH"
+                        : "OFFICIAL DISBURSEMENT VOUCHER / BUKTI PEMBAYARAN PENGADAAN"}
+                    </p>
+                  </div>
+                  <div className="text-right space-y-0.5">
+                    <p className="text-[11px] font-bold text-slate-500">
+                      NO: <span className="font-mono font-black text-slate-900 text-sm">{receiptNumber}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-600">
+                      Tanggal: <strong className="text-slate-900">{new Date(receiptDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</strong>
+                    </p>
+                    <span className="inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-900 mt-0.5">
+                      {receiptStage}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Rincian Kwitansi Indonesia Baku */}
+                <div className="space-y-4 text-xs">
+                  {/* Telah Diterima Dari */}
+                  <div className="grid grid-cols-12 gap-2 items-baseline">
+                    <div className="col-span-3 font-bold text-slate-600">
+                      {receiptDocType === "sale" ? "Telah Diterima Dari" : "Dibayarkan Kepada"}
+                    </div>
+                    <div className="col-span-1 text-center font-bold text-slate-400">:</div>
+                    <div className="col-span-8 font-black text-slate-900 text-sm border-b border-slate-300 pb-1">
+                      {receiptPayer}
+                    </div>
+                  </div>
+
+                  {/* Uang Sejumlah (Terbilang Huruf) */}
+                  <div className="grid grid-cols-12 gap-2 items-start">
+                    <div className="col-span-3 font-bold text-slate-600 pt-1">
+                      Uang Sejumlah
+                    </div>
+                    <div className="col-span-1 text-center font-bold text-slate-400 pt-1">:</div>
+                    <div className="col-span-8 p-3 bg-amber-50/70 border border-amber-200 rounded-xl font-bold font-serif italic text-amber-950 text-xs leading-relaxed shadow-2xs">
+                      # {terbilangRupiah(receiptAmount)} #
+                    </div>
+                  </div>
+
+                  {/* Untuk Pembayaran */}
+                  <div className="grid grid-cols-12 gap-2 items-baseline">
+                    <div className="col-span-3 font-bold text-slate-600">
+                      Untuk Pembayaran
+                    </div>
+                    <div className="col-span-1 text-center font-bold text-slate-400">:</div>
+                    <div className="col-span-8 font-medium text-slate-800 border-b border-slate-300 pb-1 leading-relaxed">
+                      {receiptPurpose}
+                    </div>
+                  </div>
+
+                  {/* Metode & Keterangan Tambahan */}
+                  <div className="grid grid-cols-12 gap-2 items-baseline">
+                    <div className="col-span-3 font-bold text-slate-600">
+                      Metode Pembayaran
+                    </div>
+                    <div className="col-span-1 text-center font-bold text-slate-400">:</div>
+                    <div className="col-span-8 font-semibold text-slate-700 flex flex-wrap items-center gap-2">
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold border border-slate-200">
+                        {receiptPaymentMethod}
+                      </span>
+                      <span>{receiptBankName}</span>
+                      <span className="text-slate-400 text-[11px]">({receiptBankAccount})</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bagian Bawah: Nominal Besar & Tanda Tangan Sah */}
+                <div className="pt-8 mt-6 border-t border-dashed border-slate-300 grid grid-cols-12 gap-6 items-end">
+                  {/* Kotak Nominal Angka Besar */}
+                  <div className="col-span-6 space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Jumlah Terbayar (IDR):
+                    </span>
+                    <div className="inline-block p-3.5 bg-slate-900 text-white rounded-2xl border-2 border-slate-800 shadow-md">
+                      <span className="font-mono text-xl sm:text-2xl font-black tracking-wide text-amber-400">
+                        {formatRupiah(receiptAmount)}
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 italic leading-tight pt-1">
+                      * Kwitansi ini sah dan berkekuatan hukum sebagai bukti pelunasan setelah dana efektif diterima/didebet pada rekening resmi perusahaan.
+                    </p>
+                  </div>
+
+                  {/* Pengesahan Tanda Tangan & Cap Stempel */}
+                  <div className="col-span-6 text-center space-y-1">
+                    <p className="text-[11px] text-slate-500">
+                      Batam, {new Date(receiptDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                    </p>
+                    <p className="font-black text-slate-900 text-xs uppercase tracking-wide">
+                      {receiptEntity === "PT" ? "PT DSTECH SMART PERKASA" : "DSTECH SMART SOLUTION"}
+                    </p>
+                    <div className="h-20 flex items-center justify-center relative">
+                      {financeSettings.masterStampUrl ? (
+                        <img
+                          src={financeSettings.masterStampUrl}
+                          alt="Cap Stempel Resmi"
+                          className="absolute h-18 opacity-80 pointer-events-none"
+                        />
+                      ) : (
+                        <div className="print-stamp-circle absolute right-4 w-14 h-14 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[6px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
+                          <span className="font-black text-[6px]">{receiptEntity === "PT" ? "PT. DSTECH" : "DSTECH"}</span>
+                          <span className="text-[5px] tracking-tight">{receiptEntity === "PT" ? "SMART PERKASA" : "SMART"}</span>
+                        </div>
+                      )}
+                      <span className="text-[10px] text-slate-300 italic">
+                        ( Tanda Tangan & Cap Sah )
+                      </span>
+                    </div>
+                    <div className="pt-1">
+                      <p className="font-black text-slate-900 underline text-xs">
+                        {receiptSignerName}
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        {receiptSignerTitle}
+                      </p>
+                      <p className="text-[8px] font-mono text-slate-400 mt-0.5">
+                        [VERIFIKASI SISTEM: DST-REC-{receiptNumber.slice(-6)}]
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KELOLA & UPLOAD FOTO DOKUMENTASI PER-FAKTUR (TUGAS 84) */}
+      {isInvoicePhotoModalOpen && selectedInvoiceForPhotos && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+          onClick={() => setIsInvoicePhotoModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[94vh] flex flex-col border border-slate-200 overflow-hidden my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal Foto Faktur */}
+            <div className="p-4 sm:p-6 bg-gradient-to-r from-purple-50 via-indigo-50 to-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-600/10 text-purple-600 flex items-center justify-center font-bold">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <span>Dokumentasi Foto Khusus Faktur {selectedInvoiceForPhotos.invoiceNumber}</span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                      {selectedInvoiceForPhotos.photos?.length || 0} Foto
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Lampirkan foto fisik pekerjaan dan bukti pergantian part khusus lembar faktur tagihan ini untuk klien: <strong className="text-slate-800">{selectedInvoiceForPhotos.customerName}</strong>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoiceForPhotoPrint(selectedInvoiceForPhotos)}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak Lampiran A4</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsInvoicePhotoModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Upload Box Foto Faktur */}
+            <div className="p-4 sm:p-6 bg-slate-50 border-b border-slate-200 space-y-3 shrink-0">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-800 flex items-center gap-2 text-xs">
+                  <UploadCloud className="w-4 h-4 text-purple-600" />
+                  <span>Upload Foto Dokumentasi untuk Faktur Ini</span>
+                </span>
+                <span className="text-[11px] text-slate-400">JPG, PNG, WEBP (Maks 10 MB)</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+                <div className="sm:col-span-4">
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">Kategori Foto:</label>
+                  <select
+                    value={invoicePhotoCategory}
+                    onChange={(e) => setInvoicePhotoCategory(e.target.value as "documentation" | "part_replacement")}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="documentation">📸 Foto Dokumentasi Pekerjaan</option>
+                    <option value="part_replacement">⚙️ Foto Pergantian Part / Sparepart</option>
+                  </select>
+                </div>
+                <div className="sm:col-span-5">
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">Keterangan / Keterangan Pekerjaan:</label>
+                  <input
+                    type="text"
+                    value={invoicePhotoCaption}
+                    onChange={(e) => setInvoicePhotoCaption(e.target.value)}
+                    placeholder="Contoh: Instalasi kamera dome di lobby utama..."
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 text-xs"
+                  />
+                </div>
+                <div className="sm:col-span-3 flex items-end">
+                  <label className="w-full px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold cursor-pointer transition-all flex items-center justify-center gap-2 shadow-xs text-xs">
+                    <UploadCloud className="w-4 h-4" />
+                    <span>{isUploadingInvoicePhoto ? "Mengunggah..." : "Pilih File Foto"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={isUploadingInvoicePhoto}
+                      onChange={handleUploadInvoicePhoto}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Pills & List */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setInvoicePhotoFilter("all")}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      invoicePhotoFilter === "all"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    Semua ({selectedInvoiceForPhotos.photos?.length || 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInvoicePhotoFilter("documentation")}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      invoicePhotoFilter === "documentation"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    📸 Pekerjaan ({selectedInvoiceForPhotos.photos?.filter((p) => p.category === "documentation").length || 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInvoicePhotoFilter("part_replacement")}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      invoicePhotoFilter === "part_replacement"
+                        ? "bg-amber-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    ⚙️ Pergantian Part ({selectedInvoiceForPhotos.photos?.filter((p) => p.category === "part_replacement").length || 0})
+                  </button>
+                </div>
+                <span className="text-[11px] text-slate-400">
+                  Total {selectedInvoiceForPhotos.photos?.length || 0} foto tersimpan pada faktur ini
+                </span>
+              </div>
+
+              {/* Gallery Grid */}
+              {(!selectedInvoiceForPhotos.photos || selectedInvoiceForPhotos.photos.length === 0) ? (
+                <div className="p-10 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-2">
+                  <Camera className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p className="font-bold text-slate-700 text-xs">Belum Ada Foto Dokumentasi untuk Faktur Ini</p>
+                  <p className="text-slate-400 text-[11px]">
+                    Unggah foto dokumentasi pekerjaan atau bukti pergantian part di atas untuk dijadikan lampiran fisik invoice saat penagihan.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {selectedInvoiceForPhotos.photos
+                    .filter((p) => invoicePhotoFilter === "all" || p.category === invoicePhotoFilter)
+                    .map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="rounded-2xl border border-slate-200 overflow-hidden bg-white shadow-xs flex flex-col group hover:shadow-md transition-all"
+                      >
+                        <div className="relative h-44 w-full bg-slate-100 overflow-hidden">
+                          <img
+                            src={photo.url}
+                            alt={photo.caption}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <span
+                            className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                              photo.category === "part_replacement"
+                                ? "bg-amber-500 text-white"
+                                : "bg-purple-600 text-white"
+                            }`}
+                          >
+                            {photo.category === "part_replacement" ? "Pergantian Part" : "Dokumentasi"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveInvoicePhoto(photo.id)}
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-rose-600 text-slate-600 hover:text-white transition-all shadow-sm cursor-pointer"
+                            title="Hapus Foto"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <div className="p-3 text-xs space-y-1 flex-1 flex flex-col justify-between">
+                          <p className="font-bold text-slate-800 line-clamp-2">
+                            {photo.caption}
+                          </p>
+                          <span className="text-[10px] text-slate-400 block pt-1">
+                            {photo.createdAt ? new Date(photo.createdAt).toLocaleString("id-ID") : "Baru saja"}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CETAK LEMBAR A4 LAMPIRAN FOTO DOKUMENTASI FAKTUR (TUGAS 84) */}
+      {selectedInvoiceForPhotoPrint && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+          onClick={() => setSelectedInvoiceForPhotoPrint(null)}
+        >
+          <div
+            className="bg-slate-100 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[96vh] flex flex-col border border-slate-300 overflow-hidden my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal Cetak Lampiran Foto */}
+            <div className="p-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold">
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <span>Lampiran Foto Dokumentasi & Part Faktur (A4)</span>
+                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                      {selectedInvoiceForPhotoPrint.invoiceNumber}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Lembar cetak bukti fisik pekerjaan ber-kop surat resmi untuk kelengkapan administrasi penagihan invoice.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setInvoicePhotoLetterhead(!invoicePhotoLetterhead)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                    invoicePhotoLetterhead
+                      ? "bg-purple-50 border-purple-200 text-purple-700"
+                      : "bg-slate-50 border-slate-200 text-slate-500"
+                  }`}
+                >
+                  {invoicePhotoLetterhead ? "✓ Kop Surat Aktif" : "Kop Surat Nonaktif"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDownloadPdf(
+                      "#print-invoice-photos-sheet",
+                      `LAMPIRAN_FOTO_${selectedInvoiceForPhotoPrint.invoiceNumber}_${selectedInvoiceForPhotoPrint.customerName.replace(/\s+/g, "_")}.pdf`
+                    );
+                  }}
+                  disabled={isDownloadingPdf}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Unduh PDF"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak (Print)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoiceForPhotoPrint(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Preview Area Lembar A4 */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/60 flex justify-center">
+              <div
+                id="print-invoice-photos-sheet"
+                className="w-full max-w-[794px] min-h-[900px] bg-white rounded-2xl shadow-xl p-8 sm:p-12 relative text-slate-800 border border-slate-200 print:shadow-none print:border-none print:rounded-none print:m-0 print:p-8 space-y-6"
+                style={{
+                  fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                }}
+              >
+                {/* Kop Surat Resmi */}
+                {invoicePhotoLetterhead && (
+                  <div className="mb-6 border-b-2 border-slate-800 pb-4">
+                    {getLetterheadConfig(selectedInvoiceForPhotoPrint.businessEntity).url ? (
+                      <div className="w-full flex items-center justify-center">
+                        <img
+                          src={getLetterheadConfig(selectedInvoiceForPhotoPrint.businessEntity).url}
+                          alt="Kop Surat Resmi"
+                          className="max-h-24 w-auto object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-xl font-black text-slate-900 tracking-wider">
+                            {selectedInvoiceForPhotoPrint.businessEntity === "NON_PT" ? "DSTECH SMART SOLUTION" : "PT DSTECH SMART PERKASA"}
+                          </h2>
+                          <p className="text-xs text-slate-600 font-medium">
+                            Security Systems • Smart IoT Automation • IT Infrastructure • Fiber Optic
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Judul Lembar Lampiran */}
+                <div className="text-center space-y-1 border-b border-slate-200 pb-4">
+                  <h1 className="text-xl font-black text-slate-900 tracking-wider uppercase font-serif">
+                    LAMPIRAN DOKUMENTASI PEKERJAAN & BUKTI FISIK
+                  </h1>
+                  <p className="text-xs text-slate-500 tracking-wide font-sans uppercase">
+                    KELENGKAPAN ADMINISTRASI PENAGIHAN FAKTUR PENJUALAN
+                  </p>
+                </div>
+
+                {/* Info Identitas Faktur */}
+                <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Kepada Klien:</span>
+                    <p className="font-black text-slate-900">{selectedInvoiceForPhotoPrint.customerName}</p>
+                    <p className="text-slate-600 text-[11px]">{selectedInvoiceForPhotoPrint.customerAddress || "Alamat Klien"}</p>
+                    <p className="text-slate-600 text-[11px]">
+                      Telp / Kontak: <strong>{selectedInvoiceForPhotoPrint.customerPhone || "-"}</strong>
+                    </p>
+                  </div>
+                  <div className="space-y-1 text-right">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Data Faktur Tagihan:</span>
+                    <p className="font-black text-slate-900 font-mono text-sm">{selectedInvoiceForPhotoPrint.invoiceNumber}</p>
+                    <p className="text-slate-600 text-[11px]">
+                      Tanggal: <strong>{selectedInvoiceForPhotoPrint.date}</strong> | Jatuh Tempo: <strong>{selectedInvoiceForPhotoPrint.dueDate}</strong>
+                    </p>
+                    <p className="text-slate-600 text-[11px]">
+                      Total Tagihan: <strong className="text-slate-900">{formatRupiah(selectedInvoiceForPhotoPrint.grandTotal)}</strong>
+                    </p>
+                    {selectedInvoiceForPhotoPrint.projectName && (
+                      <p className="text-indigo-600 text-[11px] font-bold">
+                        Proyek: {selectedInvoiceForPhotoPrint.projectName}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* I. FOTO DOKUMENTASI PEKERJAAN */}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                    <h4 className="font-black text-slate-900 text-xs flex items-center gap-1.5 uppercase">
+                      <span>I. Dokumentasi Pelaksanaan Pekerjaan Lapangan</span>
+                    </h4>
+                    <span className="text-[10px] text-slate-400">
+                      {selectedInvoiceForPhotoPrint.photos?.filter((p) => p.category === "documentation").length || 0} Foto
+                    </span>
+                  </div>
+
+                  {(!selectedInvoiceForPhotoPrint.photos || selectedInvoiceForPhotoPrint.photos.filter((p) => p.category === "documentation").length === 0) ? (
+                    <p className="text-xs text-slate-400 italic py-2">Tidak ada foto dokumentasi pekerjaan pada faktur ini.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedInvoiceForPhotoPrint.photos
+                        .filter((p) => p.category === "documentation")
+                        .map((photo, idx) => (
+                          <div
+                            key={photo.id || idx}
+                            className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50/50 space-y-2 p-2.5 shadow-2xs"
+                          >
+                            <div className="h-48 w-full bg-slate-200 rounded-lg overflow-hidden flex items-center justify-center">
+                              <img
+                                src={photo.url}
+                                alt={photo.caption}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="space-y-0.5">
+                              <p className="text-xs font-bold text-slate-800 leading-tight">
+                                {idx + 1}. {photo.caption}
+                              </p>
+                              <span className="text-[10px] text-slate-400 block">
+                                Tanggal: {photo.createdAt ? new Date(photo.createdAt).toLocaleDateString("id-ID") : selectedInvoiceForPhotoPrint.date}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* II. FOTO PERGANTIAN PART / SPAREPART */}
+                <div className="space-y-3 pt-4">
+                  <div className="flex items-center justify-between border-b border-amber-200 pb-1.5">
+                    <h4 className="font-black text-amber-950 text-xs flex items-center gap-1.5 uppercase">
+                      <span>II. Bukti Fisik Pergantian Part & Material Terpasang</span>
+                    </h4>
+                    <span className="text-[10px] text-slate-400">
+                      {selectedInvoiceForPhotoPrint.photos?.filter((p) => p.category === "part_replacement").length || 0} Foto
+                    </span>
+                  </div>
+
+                  {(!selectedInvoiceForPhotoPrint.photos || selectedInvoiceForPhotoPrint.photos.filter((p) => p.category === "part_replacement").length === 0) ? (
+                    <p className="text-xs text-slate-400 italic py-2">Tidak ada pergantian suku cadang / sparepart khusus pada faktur ini.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedInvoiceForPhotoPrint.photos
+                        .filter((p) => p.category === "part_replacement")
+                        .map((photo, idx) => (
+                          <div
+                            key={photo.id || idx}
+                            className="rounded-xl border border-amber-200 overflow-hidden bg-amber-50/30 space-y-2 p-2.5 shadow-2xs"
+                          >
+                            <div className="h-48 w-full bg-slate-200 rounded-lg overflow-hidden flex items-center justify-center">
+                              <img
+                                src={photo.url}
+                                alt={photo.caption}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="space-y-0.5">
+                              <p className="text-xs font-bold text-slate-800 leading-tight">
+                                {idx + 1}. {photo.caption}
+                              </p>
+                              <span className="text-[10px] text-slate-400 block">
+                                Tanggal: {photo.createdAt ? new Date(photo.createdAt).toLocaleDateString("id-ID") : selectedInvoiceForPhotoPrint.date}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Pengesahan Tanda Tangan Ganda A4 */}
+                <div className="pt-8 border-t border-slate-200 grid grid-cols-2 gap-8 text-xs">
+                  <div className="text-center space-y-1">
+                    <span className="text-[11px] text-slate-500 font-bold block">Pihak Klien / Penerima:</span>
+                    <span className="font-black text-slate-900 block">{selectedInvoiceForPhotoPrint.customerName}</span>
+                    <div className="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
+                      <span className="text-[10px] text-slate-300 italic">( Tanda Tangan & Cap Klien )</span>
+                    </div>
+                    <div className="pt-1">
+                      <p className="font-black text-slate-900 underline text-xs">
+                        ( .................................................... )
+                      </p>
+                      <p className="text-[10px] text-slate-500">PIC / Penanggung Jawab Lapangan</p>
+                    </div>
+                  </div>
+
+                  <div className="text-center space-y-1">
+                    <span className="text-[11px] text-slate-500 font-bold block">Pihak Pelaksana Teknis:</span>
+                    <span className="font-black text-slate-900 block">
+                      {selectedInvoiceForPhotoPrint.businessEntity === "NON_PT" ? "DSTECH SMART SOLUTION" : "PT DSTECH SMART PERKASA"}
+                    </span>
+                    <div className="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+                      {financeSettings.masterStampUrl ? (
+                        <img
+                          src={financeSettings.masterStampUrl}
+                          alt="Cap Resmi"
+                          className="h-16 opacity-75 pointer-events-none"
+                        />
+                      ) : (
+                        <div className="print-stamp-circle absolute right-4 w-12 h-12 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[5px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
+                          <span className="font-black text-[5.5px]">{selectedInvoiceForPhotoPrint.businessEntity === "NON_PT" ? "DSTECH" : "PT. DSTECH"}</span>
+                          <span className="text-[4.5px] tracking-tight">{selectedInvoiceForPhotoPrint.businessEntity === "NON_PT" ? "SMART" : "SMART PERKASA"}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="pt-1">
+                      <p className="font-black text-slate-900 underline text-xs">
+                        ( {selectedInvoiceForPhotoPrint.salesPerson || "Ahmad Romadhoni"} )
+                      </p>
+                      <p className="text-[10px] text-slate-500">Project Coordinator / Teknisi Pelaksana</p>
+                      <p className="text-[8px] font-mono text-slate-400 mt-0.5">
+                        [VERIFIKASI SISTEM: DST-INV-PHOTO-{selectedInvoiceForPhotoPrint.id.slice(-6)}]
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
