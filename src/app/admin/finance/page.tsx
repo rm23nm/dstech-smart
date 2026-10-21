@@ -563,6 +563,7 @@ export default function AdminFinanceERPPage() {
 
   // Modal States
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState<boolean>(false);
+  const [pendingMaintenanceTicketId, setPendingMaintenanceTicketId] = useState<string | null>(null);
   const [isNewPoModalOpen, setIsNewPoModalOpen] = useState<boolean>(false);
   const [poSearchQuery, setPoSearchQuery] = useState<string>("");
   const [poStatusFilter, setPoStatusFilter] = useState<string>("Semua");
@@ -2252,6 +2253,36 @@ export default function AdminFinanceERPPage() {
       ) {
         setActiveTab(tab as any);
       }
+
+      // Integrasi 1-klik dari Penugasan Maintenance (/admin/maintenance)
+      if (params.get("fromMaintenance") === "true") {
+        setActiveTab("sales");
+        const ticketId = params.get("ticketId") || "";
+        const clientName = params.get("clientName") || "";
+        const desc = params.get("desc") || "";
+        const entityType = params.get("entityType") || "PT";
+
+        setPendingMaintenanceTicketId(ticketId);
+        setSaleForm((prev) => ({
+          ...prev,
+          customerName: clientName || prev.customerName,
+          businessEntity: entityType === "NON_PT" ? "NON_PT" : "PT",
+          notes: `Tiket Maintenance: ${ticketId}${desc ? " - " + desc : ""}`,
+          items: [
+            {
+              id: "1",
+              productId: "",
+              productName: `Jasa Pemeliharaan / Perbaikan Lapangan (${ticketId})${desc ? " - " + desc : ""}`,
+              qty: 1,
+              unit: "Layanan",
+              price: 0,
+              total: 0,
+            },
+          ],
+        }));
+        setIsNewSaleModalOpen(true);
+        showToast(`✓ Menyiapkan Faktur Penagihan untuk Tiket ${ticketId}`);
+      }
     }
   }, []);
 
@@ -2936,7 +2967,34 @@ export default function AdminFinanceERPPage() {
       });
 
       if (res.ok) {
-        showToast("Faktur Penjualan baru berhasil diterbitkan!");
+        const saleResult = await res.json().catch(() => null);
+        const newInvoiceNumber = saleResult?.data?.invoiceNumber || "";
+        showToast(`Faktur Penjualan baru ${newInvoiceNumber} berhasil diterbitkan!`);
+
+        // Sinkronisasi status penagihan tiket maintenance jika ada
+        const targetTicketId =
+          pendingMaintenanceTicketId ||
+          (saleForm.notes.match(/MTC-[A-Z0-9-]+/i) ? saleForm.notes.match(/MTC-[A-Z0-9-]+/i)?.[0] : null);
+
+        if (targetTicketId) {
+          try {
+            await fetch("/api/employee/tasks", {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: targetTicketId,
+                ticketNumber: targetTicketId,
+                invoiceStatus: "Sudah Ditagihkan",
+                invoiceNumber: newInvoiceNumber,
+              }),
+            });
+            setPendingMaintenanceTicketId(null);
+            showToast(`✓ Tiket Maintenance ${targetTicketId} berhasil ditautkan ke Faktur ${newInvoiceNumber}!`);
+          } catch (syncErr) {
+            console.error("Gagal sinkronisasi invoice ke tiket maintenance:", syncErr);
+          }
+        }
+
         setIsNewSaleModalOpen(false);
         setSaleForm({
           branchId: "dstech_branch_1",

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Wrench,
   Calendar,
@@ -40,6 +41,10 @@ import {
   UploadCloud,
   Layers,
   Upload,
+  Receipt,
+  Navigation,
+  Package,
+  AlertTriangle as AlertTriangleIcon,
 } from "lucide-react";
 
 export interface TaskPhoto {
@@ -77,6 +82,29 @@ interface MaintenanceTask {
   completionDate?: string;
   createdAt?: string;
   updatedAt?: string;
+  // GPS Tracking
+  latitude?: number | null;
+  longitude?: number | null;
+  googleMapsUrl?: string;
+  // Material & Damage tracking
+  damagedItems?: Array<{
+    id: string;
+    name: string;
+    qty?: number;
+    quantity?: number;
+    unit: string;
+    condition: string;
+    action?: string;
+    actionTaken?: string;
+    note?: string;
+    notes?: string;
+  }>;
+  usedMaterials?: any[];
+  linkedMaterialRequests?: any[];
+  // Invoice
+  invoiceStatus?: string;
+  invoiceNumber?: string;
+  invoiceId?: string;
 }
 
 interface ClientOption {
@@ -122,6 +150,7 @@ const PRESET_EQUIPMENT_ITEMS = [
 ];
 
 export default function MaintenancePage() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<MaintenanceTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -199,9 +228,9 @@ export default function MaintenancePage() {
     deadline: new Date().toISOString().split("T")[0],
     status: "Pending" as MaintenanceTask["status"],
     priority: "Medium" as MaintenanceTask["priority"],
-    technician: "Ikhsan Maulidi",
+    technician: "",
     technicianId: "",
-    technicianPhone: "+6282259494242",
+    technicianPhone: "",
     scope: [
       "Pembersihan lensa optik & housing kamera CCTV",
       "Pengecekan tegangan adaptor & power supply 12V",
@@ -267,7 +296,7 @@ export default function MaintenancePage() {
         } else {
           // Fallback default technicians
           setTechnicians([
-            { id: "dstech_tech_1", name: "Ikhsan Maulidi", phone: "+6282259494242", email: "ikhsan@dstechsmart.com" },
+            { id: "dstech_tech_1", name: "RAMADHANI ST", phone: "+6282259494242", email: "rm23nm@dstechsmart.com" },
             { id: "dstech_tech_2", name: "Teknisi Hendra", phone: "085712345678", email: "hendra@dstechsmart.com" },
           ]);
         }
@@ -275,10 +304,25 @@ export default function MaintenancePage() {
     } catch (err) {
       console.warn("Using fallback masters:", err);
       setTechnicians([
-        { id: "dstech_tech_1", name: "Ikhsan Maulidi", phone: "+6282259494242", email: "ikhsan@dstechsmart.com" },
+        { id: "dstech_tech_1", name: "RAMADHANI ST", phone: "+6282259494242", email: "rm23nm@dstechsmart.com" },
         { id: "dstech_tech_2", name: "Teknisi Hendra", phone: "085712345678", email: "hendra@dstechsmart.com" },
       ]);
     }
+  };
+
+  // Handler: Generate Invoice dari tiket Completed (1-klik)
+  const handleGenerateInvoice = (task: MaintenanceTask) => {
+    // Encode data tiket sebagai query param untuk pre-fill form finance
+    const invoiceParams = new URLSearchParams({
+      fromMaintenance: "true",
+      ticketId: task.id,
+      ticketNumber: task.ticketNumber || task.id,
+      clientName: task.client,
+      clientPhone: task.clientPhone || "",
+      description: `Jasa Maintenance & Perbaikan - ${task.title}`,
+      entityType: task.entityType || "PT",
+    });
+    router.push(`/admin/finance?${invoiceParams.toString()}`);
   };
 
   useEffect(() => {
@@ -309,9 +353,9 @@ export default function MaintenancePage() {
       deadline: now.toISOString().split("T")[0],
       status: "Pending",
       priority: "Medium",
-      technician: technicians[0]?.name || "Ikhsan Maulidi",
+      technician: technicians[0]?.name || "",
       technicianId: technicians[0]?.id || "",
-      technicianPhone: technicians[0]?.phone || "+6282259494242",
+      technicianPhone: technicians[0]?.phone || "",
       scope: [
         "Pembersihan lensa optik & housing kamera CCTV",
         "Pengecekan tegangan adaptor & power supply 12V",
@@ -1068,6 +1112,24 @@ export default function MaintenancePage() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Buat Faktur (jika Completed & belum ditagihkan) */}
+                  {isDone && (task.invoiceStatus === "Belum Ditagihkan" || !task.invoiceStatus) && (
+                    <button
+                      onClick={() => handleGenerateInvoice(task)}
+                      className="w-full mt-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      title="Buat Faktur Penagihan Otomatis dari Tiket Ini"
+                    >
+                      <Receipt className="w-3.5 h-3.5" />
+                      <span>🧾 Buat Faktur Penagihan</span>
+                    </button>
+                  )}
+                  {isDone && task.invoiceStatus && task.invoiceStatus !== "Belum Ditagihkan" && (
+                    <div className="w-full mt-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-[11px] flex items-center justify-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Sudah Ditagihkan {task.invoiceNumber ? `(${task.invoiceNumber})` : ""}</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -1665,19 +1727,133 @@ export default function MaintenancePage() {
               </div>
             )}
 
+            {/* GPS Tracking Lokasi Teknisi */}
+            {(selectedTaskForDetail.latitude || selectedTaskForDetail.googleMapsUrl) && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-800 uppercase flex items-center gap-1.5">
+                    <Navigation className="w-3.5 h-3.5 text-emerald-600" /> GPS Lokasi Kunjungan Teknisi:
+                  </span>
+                  {selectedTaskForDetail.latitude && selectedTaskForDetail.longitude && (
+                    <span className="text-[10px] font-mono text-emerald-700 bg-white/80 px-2 py-0.5 rounded-md border border-emerald-200">
+                      {selectedTaskForDetail.latitude}, {selectedTaskForDetail.longitude}
+                    </span>
+                  )}
+                </div>
+                <a
+                  href={
+                    selectedTaskForDetail.googleMapsUrl ||
+                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedTaskForDetail.location)}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] transition-colors shadow-xs"
+                >
+                  <Navigation className="w-3 h-3" /> Buka Navigasi Google Maps
+                </a>
+              </div>
+            )}
+
+            {/* Barang Rusak yang Ditarik / Diganti */}
+            {selectedTaskForDetail.damagedItems && selectedTaskForDetail.damagedItems.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-rose-800 flex items-center gap-1.5">
+                  <AlertTriangleIcon className="w-3.5 h-3.5 text-rose-600" />
+                  Barang Rusak yang Ditarik / Diganti dari Lokasi Klien:
+                </span>
+                <div className="space-y-1.5">
+                  {selectedTaskForDetail.damagedItems.map((item, idx) => (
+                    <div key={idx} className="p-2.5 rounded-xl bg-rose-50/80 border border-rose-200 text-xs space-y-0.5">
+                      <div className="flex items-center justify-between font-bold text-rose-900">
+                        <span>{item.name}</span>
+                        <span className="text-[11px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">
+                          {item.qty || (item as any).quantity || 1} {item.unit}
+                        </span>
+                      </div>
+                      <p className="text-rose-700 text-[11px]">Kondisi: {item.condition}</p>
+                      <p className="text-rose-600 text-[10px]">Tindakan: {item.action || (item as any).actionTaken}</p>
+                      {(item.note || (item as any).notes) && (
+                        <p className="text-slate-500 text-[10px] italic">Catatan: {item.note || (item as any).notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Material yang Diajukan dari Gudang */}
+            {selectedTaskForDetail.linkedMaterialRequests && selectedTaskForDetail.linkedMaterialRequests.length > 0 && (
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-indigo-800 flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-indigo-600" />
+                  Material Gudang yang Digunakan untuk Tugas Ini:
+                </span>
+                <div className="space-y-1">
+                  {selectedTaskForDetail.linkedMaterialRequests.map((req: any, idx: number) => (
+                    <div key={idx} className="p-2 rounded-xl bg-indigo-50/80 border border-indigo-200 text-[11px] flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-indigo-900">{req.materialName || "Material"} — {req.qty} {req.unit}</p>
+                        {req.date && <p className="text-indigo-500 text-[10px]">Tanggal Pengajuan: {req.date}</p>}
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        req.status === "Approved" || req.status === "Disetujui"
+                          ? "bg-emerald-100 text-emerald-800"
+                          : req.status === "Rejected"
+                          ? "bg-rose-100 text-rose-800"
+                          : "bg-amber-100 text-amber-800"
+                      }`}>
+                        {req.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Status Penagihan Faktur */}
+            {selectedTaskForDetail.invoiceStatus === "Sudah Ditagihkan" && (
+              <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs flex items-center justify-between">
+                <span className="text-blue-800 font-bold flex items-center gap-1.5">
+                  <Receipt className="w-4 h-4 text-blue-600" /> Sudah Ditagihkan ke Faktur Keuangan
+                </span>
+                {selectedTaskForDetail.invoiceNumber && (
+                  <span className="font-mono text-blue-900 font-black bg-blue-100 px-2 py-0.5 rounded-md text-[11px]">
+                    {selectedTaskForDetail.invoiceNumber}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Footer Buttons */}
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedTaskForPrint(selectedTaskForDetail);
-                  setSelectedTaskForDetail(null);
-                }}
-                className="px-3.5 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Cetak BAST A4</span>
-              </button>
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-3 border-t border-slate-100 text-xs">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTaskForPrint(selectedTaskForDetail);
+                    setSelectedTaskForDetail(null);
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak BAST A4</span>
+                </button>
+
+                {/* Tombol Buat Faktur Penagihan jika tiket Completed & Belum Ditagihkan */}
+                {selectedTaskForDetail.status === "Completed" && (selectedTaskForDetail.invoiceStatus === "Belum Ditagihkan" || !selectedTaskForDetail.invoiceStatus) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleGenerateInvoice(selectedTaskForDetail);
+                      setSelectedTaskForDetail(null);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer"
+                  >
+                    <Receipt className="w-3.5 h-3.5" />
+                    <span>🧾 Buat Faktur Penagihan</span>
+                  </button>
+                )}
+              </div>
 
               <button
                 type="button"
@@ -1886,30 +2062,89 @@ export default function MaintenancePage() {
               </div>
 
               {/* Tabel Material & Sparepart */}
-              {selectedTaskForPrint.equipment && selectedTaskForPrint.equipment.length > 0 && (
+              {((selectedTaskForPrint.equipment && selectedTaskForPrint.equipment.length > 0) ||
+                (selectedTaskForPrint.linkedMaterialRequests && selectedTaskForPrint.linkedMaterialRequests.length > 0)) && (
                 <div className="space-y-2 text-xs">
                   <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">
                     II. Material & Peralatan Pendukung yang Digunakan:
                   </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedTaskForPrint.equipment.map((eq, idx) => (
-                      <span key={idx} className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200">
-                        • {eq}
-                      </span>
-                    ))}
-                  </div>
+                  {selectedTaskForPrint.linkedMaterialRequests && selectedTaskForPrint.linkedMaterialRequests.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block">Material Diajukan dari Gudang:</span>
+                      <div className="grid grid-cols-2 gap-2">
+                        {selectedTaskForPrint.linkedMaterialRequests.map((req: any, idx: number) => (
+                          <div key={idx} className="p-2 rounded-lg bg-indigo-50/60 border border-indigo-200 text-[11px] flex justify-between">
+                            <span className="font-bold text-indigo-900">• {req.materialName || "Material"}</span>
+                            <span className="font-mono text-indigo-700 font-bold">{req.qty} {req.unit}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedTaskForPrint.equipment && selectedTaskForPrint.equipment.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {selectedTaskForPrint.equipment.map((eq, idx) => (
+                        <span key={idx} className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200">
+                          • {eq}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Tabel Barang Rusak yang Ditarik / Diganti */}
+              {selectedTaskForPrint.damagedItems && selectedTaskForPrint.damagedItems.length > 0 && (
+                <div className="space-y-2 text-xs">
+                  <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider text-rose-800">
+                    III. Berita Acara Tarikan Barang Rusak / Part Diganti:
+                  </h4>
+                  <table className="w-full text-xs border border-rose-200 rounded-xl overflow-hidden">
+                    <thead>
+                      <tr className="bg-rose-50 text-rose-900 font-bold border-b border-rose-200 text-left">
+                        <th className="p-2 w-10 text-center">No</th>
+                        <th className="p-2">Nama Barang / Part</th>
+                        <th className="p-2 w-20 text-center">Jumlah</th>
+                        <th className="p-2">Kondisi Kerusakan</th>
+                        <th className="p-2">Tindakan / Disposisi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-rose-100 bg-white">
+                      {selectedTaskForPrint.damagedItems.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-rose-50/30">
+                          <td className="p-2 text-center font-bold text-slate-500">{idx + 1}</td>
+                          <td className="p-2 font-bold text-slate-800">{item.name}</td>
+                          <td className="p-2 text-center font-mono font-bold text-rose-800">
+                            {item.qty || (item as any).quantity || 1} {item.unit}
+                          </td>
+                          <td className="p-2 text-rose-700">{item.condition}</td>
+                          <td className="p-2 text-slate-600">{item.action || (item as any).actionTaken}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
 
               {/* Hasil Kunjungan & Rekomendasi */}
               <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2">
-                <div>
-                  <span className="font-black text-slate-900 block text-[11px] uppercase">
-                    Hasil Temuan Kunjungan & Tindakan Teknisi:
-                  </span>
-                  <p className="text-slate-700 text-[11px] mt-0.5 leading-relaxed">
-                    {selectedTaskForPrint.report || "Seluruh perangkat telah diperiksa dan berfungsi secara optimal sesuai standar operasional."}
-                  </p>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <span className="font-black text-slate-900 block text-[11px] uppercase">
+                      Hasil Temuan Kunjungan & Tindakan Teknisi:
+                    </span>
+                    <p className="text-slate-700 text-[11px] mt-0.5 leading-relaxed">
+                      {selectedTaskForPrint.report || "Seluruh perangkat telah diperiksa dan berfungsi secara optimal sesuai standar operasional."}
+                    </p>
+                  </div>
+                  {(selectedTaskForPrint.latitude && selectedTaskForPrint.longitude) && (
+                    <div className="shrink-0 text-right bg-white p-2 rounded-lg border border-slate-200">
+                      <span className="text-[9px] font-bold uppercase text-emerald-700 block">Koordinat GPS Valid:</span>
+                      <span className="text-[10px] font-mono font-bold text-slate-700 block">
+                        {selectedTaskForPrint.latitude}, {selectedTaskForPrint.longitude}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 {selectedTaskForPrint.recommendation && (
                   <div className="pt-2 border-t border-slate-200">
