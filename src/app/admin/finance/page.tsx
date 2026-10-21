@@ -21709,15 +21709,15 @@ export default function AdminFinanceERPPage() {
       {/* MODAL KWITANSI TANDA TERIMA PEMBAYARAN RESMI A4 (OFFICIAL PAYMENT RECEIPT) */}
       {isReceiptModalOpen && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn overflow-y-auto print-modal-backdrop"
           onClick={() => setIsReceiptModalOpen(false)}
         >
           <div
-            className="bg-slate-100 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[96vh] flex flex-col border border-slate-300 overflow-hidden my-auto"
+            className="bg-slate-100 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[96vh] flex flex-col border border-slate-300 overflow-hidden my-auto print-modal-box"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header Modal Kwitansi */}
-            <div className="p-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+            <div className="p-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 print:hidden">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-bold">
                   <Receipt className="w-5 h-5" />
@@ -21779,7 +21779,7 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* Sub-Editor Penyesuaian Data Kwitansi */}
-            <div className="p-3 bg-amber-50/50 border-b border-amber-200/60 text-xs shrink-0 grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+            <div className="p-3 bg-amber-50/50 border-b border-amber-200/60 text-xs shrink-0 grid grid-cols-1 sm:grid-cols-12 gap-2.5 print:hidden">
               <div className="sm:col-span-3">
                 <label className="font-bold text-slate-600 block mb-0.5 text-[10px]">Nomor Kwitansi:</label>
                 <input
@@ -21839,14 +21839,14 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* Scrollable Document Preview Area */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/60 flex justify-center">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/60 flex justify-center print:p-0 print:m-0 print:bg-transparent print:overflow-visible">
               {/* LEMBAR A4 PRINT KWITANSI */}
               {(() => {
                 const receiptLetterheadCfg = getLetterheadConfig(receiptEntity);
                 return (
                   <div
                     id="print-receipt-sheet"
-                    className="relative w-full max-w-[794px] min-h-[580px] bg-white rounded-2xl shadow-xl border border-slate-300 overflow-hidden print-document-sheet print:shadow-none print:border-none print:rounded-none print:m-0 flex flex-col justify-between"
+                    className="relative w-full max-w-[794px] min-h-[580px] bg-white rounded-2xl shadow-xl border border-slate-300 overflow-hidden print-document-sheet print-single-sheet print:shadow-none print:border-none print:rounded-none print:m-0 flex flex-col justify-between"
                     style={{
                       paddingTop: `${isReceiptLetterhead && receiptLetterheadCfg.enabled && receiptLetterheadCfg.url ? (receiptLetterheadCfg.paddingTop || 85) : 32}px`,
                       paddingBottom: `${isReceiptLetterhead && receiptLetterheadCfg.enabled && receiptLetterheadCfg.url ? (receiptLetterheadCfg.paddingBottom || 80) : 32}px`,
@@ -22223,15 +22223,15 @@ export default function AdminFinanceERPPage() {
       {/* MODAL CETAK LEMBAR A4 LAMPIRAN FOTO DOKUMENTASI FAKTUR (TUGAS 84) */}
       {selectedInvoiceForPhotoPrint && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn overflow-y-auto print-modal-backdrop"
           onClick={() => setSelectedInvoiceForPhotoPrint(null)}
         >
           <div
-            className="bg-slate-100 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[96vh] flex flex-col border border-slate-300 overflow-hidden my-auto"
+            className="bg-slate-100 rounded-3xl shadow-2xl max-w-4xl w-full max-h-[96vh] flex flex-col border border-slate-300 overflow-hidden my-auto print-modal-box"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header Modal Cetak Lampiran Foto */}
-            <div className="p-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0">
+            <div className="p-4 sm:px-6 bg-white border-b border-slate-200 flex items-center justify-between gap-3 shrink-0 print:hidden">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-600 flex items-center justify-center font-bold">
                   <Printer className="w-5 h-5" />
@@ -22293,13 +22293,13 @@ export default function AdminFinanceERPPage() {
             </div>
 
             {/* Scrollable Preview Area Lembar A4 */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/60 flex justify-center">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/60 flex justify-center print:p-0 print:m-0 print:bg-transparent print:overflow-visible">
               {(() => {
                 const photoLetterheadCfg = getLetterheadConfig(selectedInvoiceForPhotoPrint.businessEntity);
                 return (
                   <div
                     id="print-invoice-photos-sheet"
-                    className="relative w-full max-w-[794px] min-h-[900px] bg-white rounded-2xl shadow-xl border border-slate-300 overflow-hidden print-document-sheet print:shadow-none print:border-none print:rounded-none print:m-0 flex flex-col justify-between"
+                    className="relative w-full max-w-[794px] min-h-[900px] bg-white rounded-2xl shadow-xl border border-slate-300 overflow-hidden print-document-sheet print-single-sheet print:shadow-none print:border-none print:rounded-none print:m-0 flex flex-col justify-between"
                     style={{
                       paddingTop: `${invoicePhotoLetterhead && photoLetterheadCfg.enabled && photoLetterheadCfg.url ? (photoLetterheadCfg.paddingTop || 85) : 32}px`,
                       paddingBottom: `${invoicePhotoLetterhead && photoLetterheadCfg.enabled && photoLetterheadCfg.url ? (photoLetterheadCfg.paddingBottom || 80) : 32}px`,
