@@ -5128,8 +5128,9 @@ export default function AdminFinanceERPPage() {
       setReceiptPaymentMethod(sale.paymentMethod || "Transfer Bank");
       setReceiptBankName("Bank Central Asia (BCA)");
       setReceiptBankAccount("012-345-6789 a.n PT DSTech Smart Perkasa");
-      setReceiptSignerName(entity === "PT" ? "Ahmad Romadhoni" : "Ramadhani");
-      setReceiptSignerTitle(entity === "PT" ? "Direktur Operasional & Keuangan" : "Owner / Pimpinan");
+      const signerCfg = getLetterheadConfig(entity);
+      setReceiptSignerName(signerCfg.signerName || (entity === "PT" ? "RAMADHANI ST" : "RAMADHANI ST"));
+      setReceiptSignerTitle(signerCfg.signerTitle || (entity === "PT" ? "Direktur" : "Owner / Pimpinan"));
     } else {
       const po = params.doc as PurchaseOrder;
       const entity = po.businessEntity || "PT";
@@ -5152,8 +5153,9 @@ export default function AdminFinanceERPPage() {
       setReceiptPaymentMethod((po as any).paymentMethod || "Transfer Bank");
       setReceiptBankName("Bank Central Asia (BCA)");
       setReceiptBankAccount("Rekening Vendor / Supplier");
-      setReceiptSignerName(entity === "PT" ? "Ahmad Romadhoni" : "Ramadhani");
-      setReceiptSignerTitle(entity === "PT" ? "Direktur Operasional & Keuangan" : "Owner / Pimpinan");
+      const poSignerCfg = getLetterheadConfig(entity);
+      setReceiptSignerName(poSignerCfg.signerName || (entity === "PT" ? "RAMADHANI ST" : "RAMADHANI ST"));
+      setReceiptSignerTitle(poSignerCfg.signerTitle || (entity === "PT" ? "Direktur" : "Owner / Pimpinan"));
     }
 
     setIsReceiptModalOpen(true);
@@ -21852,6 +21854,26 @@ export default function AdminFinanceERPPage() {
                   className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-900 text-xs"
                 />
               </div>
+              <div className="sm:col-span-6">
+                <label className="font-bold text-slate-600 block mb-0.5 text-[10px]">Nama Penandatangan (Otomatis dari Pengaturan):</label>
+                <input
+                  type="text"
+                  value={receiptSignerName}
+                  onChange={(e) => setReceiptSignerName(e.target.value)}
+                  placeholder="Nama Penandatangan"
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-800 text-xs"
+                />
+              </div>
+              <div className="sm:col-span-6">
+                <label className="font-bold text-slate-600 block mb-0.5 text-[10px]">Jabatan Penandatangan:</label>
+                <input
+                  type="text"
+                  value={receiptSignerTitle}
+                  onChange={(e) => setReceiptSignerTitle(e.target.value)}
+                  placeholder="Jabatan Penandatangan"
+                  className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-bold text-slate-800 text-xs"
+                />
+              </div>
             </div>
 
             {/* Scrollable Document Preview Area */}
@@ -22014,16 +22036,24 @@ export default function AdminFinanceERPPage() {
                                 <span className="text-[5px] tracking-tight">{receiptEntity === "PT" ? "SMART PERKASA" : "SMART"}</span>
                               </div>
                             )}
-                            <span className="text-[10px] text-slate-300 italic">
-                              ( Tanda Tangan & Cap Sah )
-                            </span>
+                            {financeSettings.masterSignatureUrl ? (
+                              <img
+                                src={financeSettings.masterSignatureUrl}
+                                alt="Tanda Tangan Sah"
+                                className="h-16 relative z-10 pointer-events-none"
+                              />
+                            ) : (
+                              <span className="text-[10px] text-slate-300 italic">
+                                ( Tanda Tangan & Cap Sah )
+                              </span>
+                            )}
                           </div>
                           <div className="pt-1">
                             <p className="font-black text-slate-900 underline text-xs">
-                              {receiptSignerName}
+                              ( {receiptSignerName || receiptLetterheadCfg.signerName || "RAMADHANI ST"} )
                             </p>
                             <p className="text-[10px] text-slate-500">
-                              {receiptSignerTitle}
+                              {receiptSignerTitle || receiptLetterheadCfg.signerTitle || "Direktur"}
                             </p>
                             <p className="text-[8px] font-mono text-slate-400 mt-0.5">
                               [VERIFIKASI SISTEM: DST-REC-{receiptNumber.slice(-6)}]
