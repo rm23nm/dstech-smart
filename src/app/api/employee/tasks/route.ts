@@ -27,25 +27,103 @@ function writeTasks(tasks: any[]) {
 }
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status");
+  try {
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get("status");
+    const technician = searchParams.get("technician");
+    const type = searchParams.get("type");
+    const query = searchParams.get("query")?.toLowerCase();
 
-  let tasks = readTasks();
-  if (status && status !== "Semua") {
-    tasks = tasks.filter((t: any) => t.status.toLowerCase() === status.toLowerCase());
+    let tasks = readTasks();
+
+    if (status && status !== "Semua") {
+      tasks = tasks.filter((t: any) => t.status?.toLowerCase() === status.toLowerCase());
+    }
+
+    if (technician && technician !== "Semua") {
+      tasks = tasks.filter((t: any) => t.technician?.toLowerCase() === technician.toLowerCase());
+    }
+
+    if (type && type !== "Semua") {
+      tasks = tasks.filter((t: any) => (t.type || "Preventive Maintenance")?.toLowerCase() === type.toLowerCase());
+    }
+
+    if (query) {
+      tasks = tasks.filter(
+        (t: any) =>
+          t.title?.toLowerCase().includes(query) ||
+          t.client?.toLowerCase().includes(query) ||
+          t.location?.toLowerCase().includes(query) ||
+          t.ticketNumber?.toLowerCase().includes(query) ||
+          t.technician?.toLowerCase().includes(query)
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      total: tasks.length,
+      data: tasks,
+    });
+  } catch (err: any) {
+    console.error("Error in GET /api/employee/tasks:", err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
+}
 
-  return NextResponse.json({
-    success: true,
-    total: tasks.length,
-    data: tasks,
-  });
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const tasks = readTasks();
+
+    const now = new Date();
+    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const countThisMonth = tasks.filter((t: any) => t.ticketNumber?.includes(`MTC-${yearMonth}`)).length + 1;
+    const autoTicketNumber = `MTC-${yearMonth}-${String(countThisMonth).padStart(3, "0")}`;
+
+    const newTask = {
+      id: `dstech_task_${Date.now()}`,
+      ticketNumber: body.ticketNumber?.trim() || autoTicketNumber,
+      type: body.type || "Preventive Maintenance",
+      title: body.title?.trim() || "Kunjungan Pemeliharaan Rutin",
+      client: body.client?.trim() || "Klien Umum",
+      clientId: body.clientId || "",
+      clientPhone: body.clientPhone || "",
+      clientPic: body.clientPic || "",
+      location: body.location?.trim() || "",
+      date: body.date || now.toISOString().split("T")[0],
+      deadline: body.deadline || body.date || now.toISOString().split("T")[0],
+      status: body.status || "Pending",
+      priority: body.priority || "Medium",
+      technician: body.technician?.trim() || "Teknisi Lapangan",
+      technicianId: body.technicianId || "",
+      technicianPhone: body.technicianPhone || "",
+      scope: Array.isArray(body.scope) ? body.scope.filter((s: string) => s && s.trim()) : [],
+      equipment: Array.isArray(body.equipment) ? body.equipment.filter((e: string) => e && e.trim()) : [],
+      report: body.report || "",
+      notes: body.notes || "",
+      recommendation: body.recommendation || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    tasks.unshift(newTask);
+    writeTasks(tasks);
+
+    return NextResponse.json({
+      success: true,
+      message: "Tiket maintenance & penugasan teknisi berhasil dibuat",
+      data: newTask,
+    });
+  } catch (err: any) {
+    console.error("Error creating task:", err);
+    return NextResponse.json({ success: false, error: err.message || "Gagal membuat tugas" }, { status: 500 });
+  }
 }
 
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, status, report } = body;
+    const { id } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: "Task ID diperlukan" }, { status: 400 });
@@ -58,18 +136,57 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "Tugas tidak ditemukan" }, { status: 404 });
     }
 
-    if (status !== undefined) tasks[index].status = status;
-    if (report !== undefined) tasks[index].report = report;
+    // Update fields allowed
+    const updatedTask = {
+      ...tasks[index],
+      ...body,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // If status changed to Completed and no completionDate set, set it
+    if (body.status === "Completed" && !updatedTask.completionDate) {
+      updatedTask.completionDate = new Date().toISOString().split("T")[0];
+    }
+
+    tasks[index] = updatedTask;
+    writeTasks(tasks);
+
+    return NextResponse.json({
+      success: true,
+      message: "Tiket penugasan maintenance berhasil diperbarui",
+      data: tasks[index],
+    });
+  } catch (err: any) {
+    console.error("Error updating task:", err);
+    return NextResponse.json({ success: false, error: err.message || "Gagal memperbarui tugas" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: "Task ID wajib disertakan" }, { status: 400 });
+    }
+
+    let tasks = readTasks();
+    const initialLength = tasks.length;
+    tasks = tasks.filter((t: any) => t.id !== id);
+
+    if (tasks.length === initialLength) {
+      return NextResponse.json({ success: false, error: "Tiket tugas tidak ditemukan" }, { status: 404 });
+    }
 
     writeTasks(tasks);
 
     return NextResponse.json({
       success: true,
-      message: "Status penugasan berhasil diperbarui",
-      data: tasks[index],
+      message: "Tiket maintenance berhasil dihapus",
     });
-  } catch (err) {
-    console.error("Error updating task:", err);
-    return NextResponse.json({ success: false, error: "Gagal memperbarui tugas" }, { status: 500 });
+  } catch (err: any) {
+    console.error("Error deleting task:", err);
+    return NextResponse.json({ success: false, error: err.message || "Gagal menghapus tiket" }, { status: 500 });
   }
 }

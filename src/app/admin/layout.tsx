@@ -23,17 +23,20 @@ import {
   FileDown,
   BookOpen,
   Scale,
+  Wrench,
 } from "lucide-react";
 
 interface SearchResult {
   title: string;
-  category: "Navigasi" | "Produk" | "Mitra" | "User" | "Pengaturan" | "Keuangan";
+  category: "Navigasi" | "Produk" | "Mitra" | "User" | "Pengaturan" | "Keuangan" | "Operasional";
   url: string;
   desc: string;
 }
 
 const SEARCH_CATALOG: SearchResult[] = [
   { title: "Dashboard Overview", category: "Navigasi", url: "/admin", desc: "Ringkasan metrik omset, stok, dan partner" },
+  { title: "Jadwal & Tiket Maintenance", category: "Operasional", url: "/admin/maintenance", desc: "Kelola jadwal kunjungan rutin, servis darurat CCTV, dan penugasan teknisi lapangan" },
+  { title: "Surat Tugas & BAST Maintenance", category: "Operasional", url: "/admin/maintenance", desc: "Cetak Berita Acara Kunjungan Pemeliharaan & SPK Teknisi ber-Kop Surat DSTech" },
   { title: "Keuangan & ERP Dashboard", category: "Keuangan", url: "/admin/finance", desc: "Ringkasan finansial, omset penjualan, pembelian PO, laba rugi, dan arus kas" },
   { title: "Faktur & Penjualan", category: "Keuangan", url: "/admin/finance", desc: "Kelola faktur penjualan, status pelunasan, PPN, dan cetak invoice resmi" },
   { title: "Pembelian & Purchase Order (PO)", category: "Keuangan", url: "/admin/finance", desc: "Kelola pesanan pembelian material ke supplier dan status hutang" },
@@ -138,6 +141,12 @@ export default function AdminLayout({
       href: "/admin/finance",
       icon: Scale,
       active: pathname.startsWith("/admin/finance"),
+    },
+    {
+      label: "Jadwal & Maintenance",
+      href: "/admin/maintenance",
+      icon: Wrench,
+      active: pathname.startsWith("/admin/maintenance"),
     },
     {
       label: "Product Management",
