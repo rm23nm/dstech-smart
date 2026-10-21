@@ -24,6 +24,7 @@ import {
   BookOpen,
   Scale,
   Wrench,
+  Warehouse,
 } from "lucide-react";
 
 interface SearchResult {
@@ -44,6 +45,7 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Laporan Laba Rugi (P&L)", category: "Keuangan", url: "/admin/finance", desc: "Laporan pendapatan kotor, HPP / beban pokok, dan laba bersih operasional" },
   { title: "Buku Arus Kas (Cash Flow)", category: "Keuangan", url: "/admin/finance", desc: "Mutasi kas masuk dan keluar Bank Mandiri, BCA, dan Kas Tunai / Petty Cash" },
   { title: "Multi-Gudang & Cabang", category: "Keuangan", url: "/admin/finance", desc: "Valuasi stok antar gudang utama Cilegon, Serang, dan transit proyek" },
+  { title: "Manajemen Stok & Gudang", category: "Operasional", url: "/admin/inventory", desc: "Kelola kartu stok real-time, stok per gudang Cilegon/Serang, stock opname, dan approval material teknisi" },
   { title: "Daftar Klien & Pelanggan (Customers)", category: "Keuangan", url: "/admin/finance", desc: "Direktori klien B2B industri, komersial, instansi, PIC, kontak WhatsApp, dan piutang" },
   { title: "Daftar Supplier & Vendor (Vendors)", category: "Keuangan", url: "/admin/finance", desc: "Direktori vendor CCTV, kabel, biometrik, PIC sales, rekening bank transfer PO, dan hutang" },
   { title: "Manajemen Produk (CRUD)", category: "Produk", url: "/admin/products", desc: "Tambah, edit, hapus inventori CCTV & Smart Home" },
@@ -147,6 +149,12 @@ export default function AdminLayout({
       href: "/admin/maintenance",
       icon: Wrench,
       active: pathname.startsWith("/admin/maintenance"),
+    },
+    {
+      label: "Manajemen Stok & Gudang",
+      href: "/admin/inventory",
+      icon: Warehouse,
+      active: pathname.startsWith("/admin/inventory"),
     },
     {
       label: "Product Management",

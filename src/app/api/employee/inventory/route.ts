@@ -26,11 +26,51 @@ function writeInventory(data: any) {
   }
 }
 
+const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
+
 export async function GET() {
   const data = readInventory();
+  
+  // Baca data material riil dari master database produk terpusat
+  let realMaterials: any[] = [];
+  try {
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      const rawProducts = JSON.parse(fs.readFileSync(PRODUCTS_FILE, "utf-8"));
+      realMaterials = rawProducts
+        .filter((p: any) => !p.category?.toLowerCase().includes("jasa") && (Number(p.stock) || 0) < 900)
+        .map((p: any) => {
+          const stock = Number(p.stock) || 0;
+          const minStock = Number(p.minStock) || 3;
+          const status = stock <= 0 ? "Habis" : stock <= minStock ? "Menipis" : "Aman";
+          return {
+            id: p.id,
+            name: p.name,
+            category: p.category || "Material",
+            stock,
+            unit: p.unit || "Pcs",
+            minStock,
+            status,
+            location: p.location || "Gudang Utama DSTech - Cilegon",
+            description: p.desc || "",
+            hasConversion: Boolean(p.hasConversion),
+            subUnit: p.subUnit,
+            conversionRatio: p.conversionRatio ? Number(p.conversionRatio) : undefined,
+            subStockTotal: p.subStockTotal ? Number(p.subStockTotal) : undefined,
+            conversionLabel: p.conversionLabel,
+            warehouseStock: p.warehouseStock || { dstech_wh_1: stock, dstech_wh_2: 0, dstech_wh_3: 0 }
+          };
+        });
+    }
+  } catch (err) {
+    console.error("Error loading products for technician inventory:", err);
+  }
+
+  // Gunakan realMaterials jika tersedia, fallback ke data.materials
+  const finalMaterials = realMaterials.length > 0 ? realMaterials : (data.materials || []);
+
   return NextResponse.json({
     success: true,
-    materials: data.materials || [],
+    materials: finalMaterials,
     requests: data.requests || [],
   });
 }
