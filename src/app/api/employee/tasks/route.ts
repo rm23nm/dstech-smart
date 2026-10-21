@@ -64,6 +64,38 @@ export async function GET(request: Request) {
       );
     }
 
+    const INVENTORY_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_inventory.json");
+    let inventoryRequests: any[] = [];
+    try {
+      if (fs.existsSync(INVENTORY_FILE)) {
+        const invData = JSON.parse(fs.readFileSync(INVENTORY_FILE, "utf-8"));
+        inventoryRequests = invData.requests || [];
+      }
+    } catch (e) {
+      console.error("Error reading inventory requests for tasks:", e);
+    }
+
+    // Tempelkan permohonan material terkait ke masing-masing tugas
+    tasks = tasks.map((t: any) => {
+      const relatedReqs = inventoryRequests.filter(
+        (r: any) =>
+          (r.taskId && r.taskId === t.id) ||
+          (r.taskTitle && (r.taskTitle.includes(t.title) || (t.ticketNumber && r.taskTitle.includes(t.ticketNumber))))
+      );
+      return {
+        ...t,
+        damagedItems: Array.isArray(t.damagedItems) ? t.damagedItems : [],
+        usedMaterials: Array.isArray(t.usedMaterials) ? t.usedMaterials : [],
+        latitude: t.latitude || null,
+        longitude: t.longitude || null,
+        googleMapsUrl: t.googleMapsUrl || (t.location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(t.location)}` : ""),
+        invoiceStatus: t.invoiceStatus || "Belum Ditagihkan",
+        invoiceNumber: t.invoiceNumber || "",
+        invoiceId: t.invoiceId || "",
+        linkedMaterialRequests: relatedReqs,
+      };
+    });
+
     return NextResponse.json({
       success: true,
       total: tasks.length,
@@ -105,6 +137,14 @@ export async function POST(request: Request) {
       technicianPhone: body.technicianPhone || "",
       scope: Array.isArray(body.scope) ? body.scope.filter((s: string) => s && s.trim()) : [],
       equipment: Array.isArray(body.equipment) ? body.equipment.filter((e: string) => e && e.trim()) : [],
+      damagedItems: Array.isArray(body.damagedItems) ? body.damagedItems : [],
+      usedMaterials: Array.isArray(body.usedMaterials) ? body.usedMaterials : [],
+      latitude: body.latitude !== undefined ? Number(body.latitude) : null,
+      longitude: body.longitude !== undefined ? Number(body.longitude) : null,
+      googleMapsUrl: body.googleMapsUrl || (body.location ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(body.location)}` : ""),
+      invoiceStatus: body.invoiceStatus || "Belum Ditagihkan",
+      invoiceNumber: body.invoiceNumber || "",
+      invoiceId: body.invoiceId || "",
       report: body.report || "",
       notes: body.notes || "",
       recommendation: body.recommendation || "",
@@ -208,6 +248,10 @@ export async function PUT(request: Request) {
     // If status changed to Completed and no completionDate set, set it
     if (body.status === "Completed" && !updatedTask.completionDate) {
       updatedTask.completionDate = new Date().toISOString().split("T")[0];
+    }
+
+    if (body.latitude && body.longitude && (!body.googleMapsUrl || body.googleMapsUrl.includes("search/?api=1"))) {
+      updatedTask.googleMapsUrl = `https://www.google.com/maps?q=${body.latitude},${body.longitude}`;
     }
 
     tasks[index] = updatedTask;

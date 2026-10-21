@@ -78,7 +78,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { items, materialName, qty, unit, taskTitle, requestedBy, notes } = body;
+    const { items, materialName, qty, unit, taskTitle, taskId, ticketNumber, requestedBy, notes } = body;
 
     let requestItems: Array<{
       materialId: string;
@@ -146,6 +146,8 @@ export async function POST(request: Request) {
       materialName: summaryName,
       qty: totalQty,
       unit: requestItems.length === 1 ? requestItems[0].unit : "Item",
+      taskId: taskId || "",
+      ticketNumber: ticketNumber || "",
       taskTitle: taskTitle || "Penugasan Lapangan",
       requestedBy: requestedBy || "Ikhsan Maulidi",
       date: new Date().toISOString().split("T")[0],

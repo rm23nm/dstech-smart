@@ -41,8 +41,24 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 
+interface DamagedItem {
+  id: string;
+  name: string;
+  qty: number;
+  unit: string;
+  condition: string;
+  action: string;
+  note?: string;
+  quantity?: number;
+  actionTaken?: string;
+  notes?: string;
+}
+
 interface EmployeeTask {
   id: string;
+  ticketNumber?: string;
+  entityType?: "PT" | "NON_PT";
+  type?: string;
   title: string;
   client: string;
   location: string;
@@ -56,6 +72,15 @@ interface EmployeeTask {
   equipment: string[];
   report: string;
   photos?: TaskPhoto[];
+  damagedItems?: DamagedItem[];
+  usedMaterials?: any[];
+  latitude?: number | null;
+  longitude?: number | null;
+  googleMapsUrl?: string;
+  invoiceStatus?: string;
+  invoiceNumber?: string;
+  invoiceId?: string;
+  linkedMaterialRequests?: any[];
 }
 
 interface TaskPhoto {
@@ -199,18 +224,42 @@ export default function EmployeeDashboard() {
   // Modals state
   const [selectedTask, setSelectedTask] = useState<EmployeeTask | null>(null);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState<boolean>(false);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
   const [taskStatusForm, setTaskStatusForm] = useState<{
     status: "Pending" | "In Progress" | "Completed";
     report: string;
     photos: TaskPhoto[];
+    damagedItems: DamagedItem[];
+    latitude?: number | null;
+    longitude?: number | null;
+    googleMapsUrl?: string;
   }>({
     status: "In Progress",
     report: "",
     photos: [],
+    damagedItems: [],
+    latitude: null,
+    longitude: null,
+    googleMapsUrl: "",
   });
   const [isUploadingTaskPhoto, setIsUploadingTaskPhoto] = useState<boolean>(false);
   const [taskPhotoCategory, setTaskPhotoCategory] = useState<"documentation" | "part_replacement">("documentation");
   const [taskPhotoCaption, setTaskPhotoCaption] = useState<string>("");
+  const [newDamagedItem, setNewDamagedItem] = useState<{
+    name: string;
+    quantity: number;
+    unit: string;
+    condition: string;
+    actionTaken: string;
+    notes: string;
+  }>({
+    name: "",
+    quantity: 1,
+    unit: "unit",
+    condition: "Rusak / Mati Total",
+    actionTaken: "Diganti Baru dari Gudang",
+    notes: "",
+  });
 
   interface FormRequestItem {
     materialId: string;
@@ -232,6 +281,8 @@ export default function EmployeeDashboard() {
   const [requestForm, setRequestForm] = useState<{
     items: FormRequestItem[];
     taskTitle: string;
+    taskId?: string;
+    ticketNumber?: string;
     notes: string;
   }>({
     items: [
@@ -246,6 +297,8 @@ export default function EmployeeDashboard() {
       },
     ],
     taskTitle: "",
+    taskId: "",
+    ticketNumber: "",
     notes: "",
   });
 
@@ -492,6 +545,116 @@ export default function EmployeeDashboard() {
     loadData();
   }, []);
 
+  // Handler ambil koordinat GPS terkini teknisi
+  const handleGetCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      showToast("Perangkat Anda tidak mendukung fitur Geolocation.");
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        setTaskStatusForm((prev) => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+          googleMapsUrl: mapsUrl,
+        }));
+        setIsLocating(false);
+        showToast("Koordinat GPS berhasil dikunci!");
+      },
+      (err) => {
+        setIsLocating(false);
+        showToast("Gagal mengambil lokasi GPS: " + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // Handler kelola barang rusak yang diganti / ditarik
+  const handleAddDamagedItem = () => {
+    if (!newDamagedItem.name.trim()) {
+      showToast("Nama komponen / barang rusak wajib diisi");
+      return;
+    }
+    const newItem: DamagedItem = {
+      id: `dmg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: newDamagedItem.name.trim(),
+      qty: Number(newDamagedItem.quantity) || 1,
+      unit: newDamagedItem.unit || "unit",
+      condition: newDamagedItem.condition,
+      action: newDamagedItem.actionTaken,
+      note: newDamagedItem.notes || "",
+      quantity: Number(newDamagedItem.quantity) || 1,
+      actionTaken: newDamagedItem.actionTaken,
+      notes: newDamagedItem.notes || "",
+    };
+    setTaskStatusForm((prev) => ({
+      ...prev,
+      damagedItems: [...(prev.damagedItems || []), newItem],
+    }));
+    setNewDamagedItem({
+      name: "",
+      quantity: 1,
+      unit: "unit",
+      condition: "Rusak / Mati Total",
+      actionTaken: "Diganti Baru dari Gudang",
+      notes: "",
+    });
+    showToast("Komponen rusak ditambahkan ke daftar");
+  };
+
+  const handleRemoveDamagedItem = (idOrIndex: string | number) => {
+    setTaskStatusForm((prev) => ({
+      ...prev,
+      damagedItems: (prev.damagedItems || []).filter((item, idx) =>
+        typeof idOrIndex === "number" ? idx !== idOrIndex : item.id !== idOrIndex
+      ),
+    }));
+  };
+
+  const handleUpdateDamagedItem = (id: string, field: keyof DamagedItem, value: any) => {
+    setTaskStatusForm((prev) => ({
+      ...prev,
+      damagedItems: (prev.damagedItems || []).map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      ),
+    }));
+  };
+
+  // Handler buka form pengajuan material langsung terkait tugas
+  const handleOpenRequestMaterialForTask = (task: EmployeeTask) => {
+    const firstMat = materials.find((m) => m.stock > 0) || materials[0];
+    const hasConv = !!firstMat?.hasConversion;
+    setRequestForm({
+      items: [
+        {
+          materialId: firstMat?.id || "",
+          materialName: firstMat?.name || "",
+          qty: 1,
+          unit: firstMat?.unit || "Pcs",
+          maxStock: firstMat?.stock || 999,
+          hasConversion: hasConv,
+          subUnit: firstMat?.subUnit,
+          conversionRatio: firstMat?.conversionRatio,
+          subStockTotal: firstMat?.subStockTotal,
+          conversionLabel: firstMat?.conversionLabel,
+          selectedUnit: firstMat?.unit || "Pcs",
+          equivalentQty: hasConv && firstMat?.conversionRatio ? firstMat.conversionRatio : undefined,
+          equivalentUnit: hasConv ? firstMat?.subUnit : undefined,
+        },
+      ],
+      taskId: task.id,
+      ticketNumber: task.ticketNumber || "",
+      taskTitle: `[${task.ticketNumber || task.id}] ${task.title} - ${task.client}`,
+      notes: `Kebutuhan material untuk tiket tugas ${task.title} (${task.client})`,
+    });
+    setIsRequestModalOpen(true);
+  };
+
   // Handler update task status & foto dokumentasi
   const handleUpdateTaskStatus = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -506,6 +669,10 @@ export default function EmployeeDashboard() {
         status: taskStatusForm.status,
         report: taskStatusForm.report,
         photos: taskStatusForm.photos || [],
+        damagedItems: taskStatusForm.damagedItems || [],
+        latitude: taskStatusForm.latitude || null,
+        longitude: taskStatusForm.longitude || null,
+        googleMapsUrl: taskStatusForm.googleMapsUrl || (taskStatusForm.latitude && taskStatusForm.longitude ? `https://www.google.com/maps/search/?api=1&query=${taskStatusForm.latitude},${taskStatusForm.longitude}` : undefined),
       };
 
       const res = await fetch("/api/employee/tasks", {
@@ -525,6 +692,10 @@ export default function EmployeeDashboard() {
                   status: taskStatusForm.status,
                   report: taskStatusForm.report,
                   photos: taskStatusForm.photos || [],
+                  damagedItems: taskStatusForm.damagedItems || [],
+                  latitude: taskStatusForm.latitude || null,
+                  longitude: taskStatusForm.longitude || null,
+                  googleMapsUrl: taskStatusForm.googleMapsUrl || (taskStatusForm.latitude && taskStatusForm.longitude ? `https://www.google.com/maps/search/?api=1&query=${taskStatusForm.latitude},${taskStatusForm.longitude}` : undefined),
                 }
               : t
           )
@@ -536,10 +707,14 @@ export default function EmployeeDashboard() {
                 status: taskStatusForm.status,
                 report: taskStatusForm.report,
                 photos: taskStatusForm.photos || [],
+                damagedItems: taskStatusForm.damagedItems || [],
+                latitude: taskStatusForm.latitude || null,
+                longitude: taskStatusForm.longitude || null,
+                googleMapsUrl: taskStatusForm.googleMapsUrl || (taskStatusForm.latitude && taskStatusForm.longitude ? `https://www.google.com/maps/search/?api=1&query=${taskStatusForm.latitude},${taskStatusForm.longitude}` : undefined),
               }
             : null
         );
-        showToast("Status penugasan & foto dokumentasi berhasil disimpan!");
+        showToast("Status penugasan, koordinat GPS & rincian barang berhasil disimpan!");
         setIsStatusModalOpen(false);
 
         // Re-fetch data segar dari server
@@ -608,6 +783,35 @@ export default function EmployeeDashboard() {
       ...prev,
       photos: (prev.photos || []).filter((p) => p.id !== photoId),
     }));
+  };
+
+  // GPS check-in helper for task
+  const handleDetectTaskGps = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      showToast("Browser tidak mendukung geolokasi GPS");
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lng = Number(pos.coords.longitude.toFixed(6));
+        const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        setTaskStatusForm((prev) => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+          googleMapsUrl: url,
+        }));
+        setIsLocating(false);
+        showToast(`📍 GPS Check-in berhasil: ${lat}, ${lng}`);
+      },
+      (err) => {
+        setIsLocating(false);
+        showToast("Gagal deteksi GPS: " + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   // Multi-item material request helpers
@@ -1212,14 +1416,26 @@ export default function EmployeeDashboard() {
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
+                            type="button"
+                            onClick={() => handleOpenRequestMaterialForTask(activeTask)}
+                            className="px-4 py-3 rounded-2xl bg-white/20 hover:bg-white/30 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer whitespace-nowrap flex items-center gap-1.5"
+                          >
+                            <Package className="w-3.5 h-3.5" /> Ajukan Material
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => {
                               setSelectedTask(activeTask);
                               setTaskStatusForm({
                                 status: activeTask.status,
                                 report: activeTask.report || "",
                                 photos: activeTask.photos || [],
+                                damagedItems: activeTask.damagedItems || [],
+                                latitude: activeTask.latitude,
+                                longitude: activeTask.longitude,
+                                googleMapsUrl: activeTask.googleMapsUrl,
                               });
                               setIsStatusModalOpen(true);
                             }}
@@ -1345,20 +1561,34 @@ export default function EmployeeDashboard() {
                             </div>
 
                             {/* Action Buttons */}
-                            <div className="flex items-center justify-end gap-2 pt-2">
+                            <div className="flex flex-wrap items-center justify-end gap-2 pt-2">
                               <button
+                                type="button"
+                                onClick={() => handleOpenRequestMaterialForTask(task)}
+                                className="px-3 py-2 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 text-dstech-blue font-bold text-xs transition-all cursor-pointer flex items-center gap-1"
+                                title="Ajukan material atau suku cadang untuk tiket ini"
+                              >
+                                <Package className="w-3.5 h-3.5" /> Material
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => setSelectedTask(task)}
                                 className="px-4 py-2 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs transition-all cursor-pointer"
                               >
                                 Detail Tugas
                               </button>
                               <button
+                                type="button"
                                 onClick={() => {
                                   setSelectedTask(task);
                                   setTaskStatusForm({
                                     status: task.status,
                                     report: task.report || "",
                                     photos: task.photos || [],
+                                    damagedItems: task.damagedItems || [],
+                                    latitude: task.latitude,
+                                    longitude: task.longitude,
+                                    googleMapsUrl: task.googleMapsUrl,
                                   });
                                   setIsStatusModalOpen(true);
                                 }}
@@ -2284,6 +2514,55 @@ export default function EmployeeDashboard() {
                 </div>
               )}
 
+              {selectedTask.damagedItems && selectedTask.damagedItems.length > 0 && (
+                <div className="p-4 bg-rose-50/60 rounded-2xl border border-rose-100">
+                  <div className="flex items-center gap-2 mb-2 text-rose-800 font-bold text-xs uppercase tracking-wider">
+                    <AlertTriangle className="w-4 h-4 text-rose-500" />
+                    Barang / Sparepart Rusak ({selectedTask.damagedItems.length})
+                  </div>
+                  <div className="space-y-2">
+                    {selectedTask.damagedItems.map((item, idx) => (
+                      <div key={idx} className="p-2.5 bg-white rounded-xl border border-rose-100 text-xs">
+                        <div className="flex items-start justify-between">
+                          <span className="font-bold text-slate-800">{item.name}</span>
+                          <span className="text-[11px] font-semibold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
+                            {item.quantity} {item.unit || "unit"}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          Kondisi: <span className="font-medium text-slate-700">{item.condition}</span> | Tindakan: <span className="font-medium text-slate-700">{item.actionTaken}</span>
+                        </div>
+                        {item.notes && <div className="text-[11px] text-slate-400 mt-0.5 italic">Catatan: {item.notes}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(selectedTask.latitude || selectedTask.googleMapsUrl) && (
+                <div className="p-3 bg-emerald-50/70 rounded-2xl border border-emerald-100 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 text-emerald-800">
+                    <MapPin className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div>
+                      <p className="font-bold">Koordinat GPS Check-in Lapangan</p>
+                      <p className="text-[11px] text-emerald-700 font-mono">
+                        {selectedTask.latitude?.toFixed(6)}, {selectedTask.longitude?.toFixed(6)}
+                      </p>
+                    </div>
+                  </div>
+                  {selectedTask.googleMapsUrl && (
+                    <a
+                      href={selectedTask.googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 transition-colors"
+                    >
+                      Buka Peta <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              )}
+
               {selectedTask.report && (
                 <div>
                   <p className="font-bold text-slate-400 uppercase text-[10px]">Laporan Kerja Terakhir:</p>
@@ -2294,19 +2573,32 @@ export default function EmployeeDashboard() {
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            <div className="flex flex-wrap items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
               <button
+                type="button"
                 onClick={() => setSelectedTask(null)}
                 className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs"
               >
                 Tutup
               </button>
               <button
+                type="button"
+                onClick={() => handleOpenRequestMaterialForTask(selectedTask)}
+                className="px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 text-dstech-blue font-bold text-xs flex items-center gap-1.5"
+              >
+                <Package className="w-3.5 h-3.5" /> Ajukan Material
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setTaskStatusForm({
                     status: selectedTask.status,
                     report: selectedTask.report || "",
                     photos: selectedTask.photos || [],
+                    damagedItems: selectedTask.damagedItems || [],
+                    latitude: selectedTask.latitude,
+                    longitude: selectedTask.longitude,
+                    googleMapsUrl: selectedTask.googleMapsUrl,
                   });
                   setIsStatusModalOpen(true);
                 }}
@@ -2375,6 +2667,145 @@ export default function EmployeeDashboard() {
                   placeholder="Contoh: Unit OTB selesai terminasi, tes sinyal -18dBm, fisik rapi dan siap serah terima..."
                   className="w-full p-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none"
                 />
+              </div>
+
+              {/* LOKASI GPS CHECK-IN TIKET */}
+              <div className="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-blue-600" />
+                    <span className="font-black text-slate-900 text-xs">Titik Lokasi GPS Kunjungan Lapangan</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDetectTaskGps}
+                    disabled={isLocating}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    <Compass className={`w-3.5 h-3.5 ${isLocating ? "animate-spin" : ""}`} />
+                    <span>{isLocating ? "Mendeteksi Satelit..." : "📍 Ambil Titik GPS Sekarang"}</span>
+                  </button>
+                </div>
+                {taskStatusForm.latitude && taskStatusForm.longitude ? (
+                  <div className="flex items-center justify-between text-[11px] bg-white p-2.5 rounded-xl border border-blue-100">
+                    <span className="font-mono text-slate-700 font-bold">
+                      {taskStatusForm.latitude.toFixed(6)}, {taskStatusForm.longitude.toFixed(6)}
+                    </span>
+                    <a
+                      href={taskStatusForm.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${taskStatusForm.latitude},${taskStatusForm.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-bold inline-flex items-center gap-1"
+                    >
+                      Buka di Google Maps <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500 italic">
+                    Belum ada koordinat GPS tercatat. Klik tombol di atas saat berada di lokasi klien.
+                  </p>
+                )}
+              </div>
+
+              {/* DAFTAR BARANG / KOMPONEN RUSAK YANG DIGANTI */}
+              <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span className="font-black text-slate-900 text-xs">Komponen / Barang Rusak yang Ditemukan</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                    {taskStatusForm.damagedItems?.length || 0} Komponen
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Nama Komponen / Unit Rusak:</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Adaptor CCTV 12V 5A / Port SFP Switch"
+                      value={newDamagedItem.name}
+                      onChange={(e) => setNewDamagedItem({ ...newDamagedItem, name: e.target.value })}
+                      className="w-full p-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Jumlah & Satuan:</label>
+                    <div className="flex gap-1">
+                      <input
+                        type="number"
+                        min={1}
+                        value={newDamagedItem.quantity}
+                        onChange={(e) => setNewDamagedItem({ ...newDamagedItem, quantity: Number(e.target.value) || 1 })}
+                        className="w-16 p-2 rounded-xl border border-slate-200 text-xs bg-white text-center font-bold"
+                      />
+                      <input
+                        type="text"
+                        placeholder="unit/pcs"
+                        value={newDamagedItem.unit}
+                        onChange={(e) => setNewDamagedItem({ ...newDamagedItem, unit: e.target.value })}
+                        className="flex-1 p-2 rounded-xl border border-slate-200 text-xs bg-white"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Kondisi Kerusakan:</label>
+                    <input
+                      type="text"
+                      value={newDamagedItem.condition}
+                      onChange={(e) => setNewDamagedItem({ ...newDamagedItem, condition: e.target.value })}
+                      className="w-full p-2 rounded-xl border border-slate-200 text-xs bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">Tindakan Penanganan:</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        value={newDamagedItem.actionTaken}
+                        onChange={(e) => setNewDamagedItem({ ...newDamagedItem, actionTaken: e.target.value })}
+                        className="flex-1 p-2 rounded-xl border border-slate-200 text-xs bg-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddDamagedItem}
+                        className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shrink-0 cursor-pointer shadow-xs"
+                      >
+                        + Tambah
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* List items */}
+                {taskStatusForm.damagedItems && taskStatusForm.damagedItems.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    {taskStatusForm.damagedItems.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-white border border-amber-200 text-xs">
+                        <div>
+                          <p className="font-bold text-slate-800">
+                            {item.name} <span className="text-amber-700">({item.quantity} {item.unit})</span>
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            Kondisi: {item.condition} • Tindakan: {item.actionTaken}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDamagedItem(idx)}
+                          className="w-6 h-6 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 flex items-center justify-center shrink-0 cursor-pointer"
+                          title="Hapus item rusak"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* UPLOAD FOTO DOKUMENTASI & PERGANTIAN PART */}
