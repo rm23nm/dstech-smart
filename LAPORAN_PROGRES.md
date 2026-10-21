@@ -70,6 +70,7 @@
 - **2026-10-21**: Sistem Otomasi Laporan Foto Dokumentasi & Pergantian Part Siap Cetak Lampiran Faktur Tagihan A4 (Maintenance & Project). Menyediakan sistem pelaporan bukti fisik komprehensif bagi PIC teknisi dan admin: (1) Form upload foto cepat (bisa langsung dari kamera HP teknisi di lapangan atau file galeri) dengan pilihan kategori wajib: `📸 Foto Dokumentasi Pekerjaan` atau `⚙️ Foto Pergantian Part / Sparepart` beserta keterangan/caption rincian tindakan; (2) Galeri foto terstruktur pada tiket maintenance (`/admin/maintenance`), portal teknisi (`/employee`), dan berkas proyek (`/admin/finance` -> Project Dossier); (3) Generator otomatis Lembar Resmi A4 *"Lampiran Laporan Foto Dokumentasi & Pergantian Part"* ber-Kop Surat Resmi PT DSTech Smart Perkasa (`kop_surat_dstech.jpg`), lengkap dengan nomor dokumen legalitas penagihan, data klien & proyek/tiket, tata letak grid foto rapi ber-caption, perbandingan part rusak vs part baru, pernyataan legalitas, serta dual signature block (PIC Pengawas Klien & Project Manager/Teknisi DSTech) siap 1-klik cetak/simpan PDF untuk disandingkan langsung dengan Faktur Tagihan (Invoice) penagihan ke klien. Lolos validasi TypeScript 0 error, pengujian visual browser subagent, push GitHub commit `2d8412b`, dan live deploy sukses di VPS PM2 `dstech-main` (HTTP 200 OK).
 - **2026-10-21**: Pemisahan Independen Kop Surat, Watermark, dan Rekening Bank Perusahaan (PT. DSTech Smart Perkasa vs Non-PT / Toko DStech). Menyediakan kontrol independen penuh di `/admin/finance` untuk masing-masing entitas: (1) Kop surat mandiri PT (`/kop_surat_dstech.jpg`) dan Non-PT (`/kop_surat_toko.jpg`); (2) Slider opasitas watermark terpisah; (3) Rekening bank terisolasi per entitas bisnis; (4) Lembar cetak dokumen keuangan (SPH, Faktur, PO, BAST Retur) otomatis memuat kop surat, watermark, dan legalitas sesuai entitas yang dipilih. Lolos validasi TypeScript, browser subagent, commit git `3fb738d`, dan sukses deploy ke VPS live.
 - **2026-10-21**: Pembaruan Penamaan 'Toko DStech' Menjadi 'DSTech Smart', Penyesuaian Pihak Pelaksana & Stempel Digital BAST Non-PT, serta Penambahan Fitur Upload Langsung Kop Surat. Mengakomodasi 3 permintaan pengguna: (1) Mengganti seluruh label 'Toko DStech' atau 'Non-PT / Toko' menjadi 'DSTech Smart' (atau 'Non-PT / DSTech Smart') di seluruh modul admin (`/admin/categories`, `/admin/products`, `/admin/portfolios`, `/admin/inventory`, `/admin/maintenance`, dan data JSON pendukung); (2) Menyesuaikan pihak pelaksana pada lembar cetak Berita Acara Kunjungan Maintenance A4 (`printable-bast-maintenance`): untuk tiket Non-PT, pihak pelaksana otomatis tertulis 'DSTech Smart', pengantar tidak lagi menyebut 'PT', pengesahan tanda tangan menggunakan 'Teknisi DSTech Smart', dan stempel digital otomatis berganti menjadi stempel bulat ungu bertuliskan 'DSTECH SMART CILEGON' (sedangkan tiket PT tetap menggunakan 'PT. DSTech Smart Perkasa' dan stempel biru); (3) Menyediakan tombol upload kop surat langsung (`<Upload />`) di toolbar pratinjau cetak BAST `/admin/maintenance` sehingga pengguna dapat mengunggah gambar kop surat baru secara instan tanpa harus berpindah halaman, di samping pengaturan permanen di ERP Keuangan `/admin/finance`. Lolos validasi TypeScript (`npx tsc --noEmit` 0 error), disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
+- **2026-10-22**: Perbaikan Bug Upload Foto Faktur & Proyek (Penyelarasan Body Payload/Updates PUT API), Isolasi Cetak Lembar Kwitansi & Lampiran Foto A4 (Pencegahan Kebocoran Tampilan Dashboard Utama saat Print), serta Penomoran Otomatis Faktur Dinamis Mengikuti Tanggal Pilihan Pengguna (INV-DSTECH-YYYYMM-XXX). Memperbaiki akar masalah gagal simpan foto dokumentasi faktur pada `handleUploadInvoicePhoto` di mana backend API menolak `payload` karena hanya menerima `updates`, menyertakan `isReceiptModalOpen` dan `selectedInvoiceForPhotoPrint` ke `isAnyPrintModalOpen` agar modal kwitansi dan cetak foto bersih tanpa dashboard utama, serta memperbarui logika nomor faktur otomatis agar sinkron dengan tahun dan bulan dari tanggal yang dipilih pengguna (misal 2026-03-13 menghasilkan INV-DSTECH-202603-XXX). Lolos kompilasi TypeScript 0 error dan lolos build Next.js.
 
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
@@ -2438,7 +2439,34 @@
 
 ---
 
-### 80. Catatan Penting
+### 81. Tugas: Perbaikan Simpan Upload Foto Faktur, Cetak Bersih Lembar Kwitansi A4, dan Penomoran Otomatis Faktur Dinamis Sesuai Tanggal Pilihan
+- **Permintaan Pengguna**:
+  1. *"ketika diupload file gambarnya masih belum bisa"*
+  2. *"ketika diklik cetak pada kuitansi masih muncul seperti ini, bukan file kuitansi yang keluar"*
+  3. *"kemudian jika saya membuat tanggal faktur misalnya di tanggal 03/13/2026, maka pada nomor faktur harus bisa otomatis setkan ke nomor tanggal tersebut, INV-DSTECH-202603-001. jangan INV-DSTECH-202610-001. karena itu akan bentrok dengan tanggalnya"*
+- **Status**: Selesai & Terverifikasi
+- **Akar Masalah**:
+  1. Di `src/app/api/finance/route.ts` pada method `PUT`, backend mengecek `if (!updates) return 400`, sedangkan di frontend `handleUploadInvoicePhoto`, `handleSaveEditPhoto`, dan `handleRemoveInvoicePhoto` mengirimkan properti `payload`, bukan `updates`. Akibatnya request ditolak dengan HTTP 400 dan foto tidak tersimpan.
+  2. Di `src/app/admin/finance/page.tsx`, `isReceiptModalOpen` dan `selectedInvoiceForPhotoPrint` belum dimasukkan ke dalam `isAnyPrintModalOpen`. Akibatnya container dashboard finance utama tidak mendapatkan class `print:hidden`, sehingga dashboard utama ikut tercetak saat klik Print Kwitansi.
+  3. Di pembuatan faktur penjualan backend dan frontend, nomor faktur selalu mengambil bulan dari `new Date().toISOString().slice(0, 7)` (bulan sistem saat ini / Oktober) dan mengabaikan `date` yang dipilih pengguna.
+- **Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Membuat backup file ke `_backup/route.ts.bak_fix_upload` dan `_backup/page.tsx.bak_fix_upload`.
+  - [x] **Langkah 2 (Penyelarasan API PUT)**:
+    - Di `src/app/api/finance/route.ts`: Mengubah pembacaan body menjadi `const updates = body.updates || body.payload;` sehingga fleksibel menerima baik properti `updates` maupun `payload`.
+    - Di `src/app/admin/finance/page.tsx`: Menyertakan properti `updates` dan `payload` keduanya pada `handleUploadInvoicePhoto`, `handleSaveEditPhoto`, `handleRemoveInvoicePhoto`, `handleUploadProjectPhoto`, dan `handleRemoveProjectPhoto`.
+  - [x] **Langkah 3 (Isolasi Cetak Kwitansi & Lampiran Foto A4)**:
+    - Di `src/app/admin/finance/page.tsx`: Memperbarui `isAnyPrintModalOpen` dengan menambahkan `isReceiptModalOpen` dan `selectedInvoiceForPhotoPrint`. Saat modal kwitansi dibuka, seluruh kontainer dashboard keuangan otomatis disembunyikan total (`print:hidden`), menyisakan lembar A4 kwitansi bersih siap cetak atau download PDF.
+  - [x] **Langkah 4 (Penomoran Faktur Dinamis Sesuai Tanggal Pilihan)**:
+    - Di `src/app/api/finance/route.ts`: Menghitung tahun dan bulan dari `payload.date` (contoh `2026-03-13` menghasilkan `202603`), serta memprioritaskan `payload.invoiceNumber` jika diisi secara khusus.
+    - Di `src/app/admin/finance/page.tsx`: Menambahkan helper `generateInvoiceNumberForDate(dateStr, entity)`, input Nomor Faktur di formulir Buat Faktur, dan event handler saat `saleForm.date` diubah agar otomatis memperbarui nomor faktur sesuai bulan yang dipilih (misal `INV-DSTECH-202603-001`).
+  - [x] **Langkah 5 (Validasi Kompilasi & Build)**:
+    - Kompilasi TypeScript `npx tsc --noEmit` lolos 100% (0 error).
+    - Next.js Production Build `npm run build` berhasil mengompilasi 46 dari 46 rute dengan sukses.
+  - [x] **Langkah 6 (Sinkronisasi & Deployment)**: Push commit ke GitHub `rm23nm/dstech-smart` dan deploy ke live VPS 157.66.34.199.
+
+---
+
+### 82. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

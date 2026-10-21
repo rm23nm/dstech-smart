@@ -1491,6 +1491,7 @@ export default function AdminFinanceERPPage() {
     paidAmount: number;
     notes: string;
     businessEntity: "PT" | "NON_PT";
+    invoiceNumber?: string;
     projectId?: string;
     projectName?: string;
   }>({
@@ -1503,6 +1504,7 @@ export default function AdminFinanceERPPage() {
     dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
     paymentMethod: "Transfer Bank Mandiri PT DSTech Smart Perkasa",
     invoiceType: "Standar",
+    invoiceNumber: "",
     dpPercentage: 50,
     dpAmount: 0,
     dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Instalasi & Pengadaan",
@@ -1521,6 +1523,15 @@ export default function AdminFinanceERPPage() {
     projectId: "",
     projectName: "",
   });
+
+  const generateInvoiceNumberForDate = (dateStr: string, entity: "PT" | "NON_PT" = "PT") => {
+    const prefixInv = entity === "NON_PT" ? "INV-DTS" : "INV-DSTECH";
+    const d = dateStr ? new Date(dateStr) : new Date();
+    const ym = !isNaN(d.getTime())
+      ? `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}`
+      : new Date().toISOString().slice(0, 7).replace("-", "");
+    return `${prefixInv}-${ym}-${String((sales?.length || 0) + 1).padStart(3, "0")}`;
+  };
 
   // New PO Form State
   const [poForm, setPoForm] = useState<{
@@ -2984,6 +2995,7 @@ export default function AdminFinanceERPPage() {
             customerName: saleForm.customerName,
             customerPhone: saleForm.customerPhone,
             customerAddress: saleForm.customerAddress,
+            invoiceNumber: saleForm.invoiceNumber?.trim() || generateInvoiceNumberForDate(saleForm.date, saleForm.businessEntity),
             date: saleForm.date,
             dueDate: saleForm.dueDate,
             paymentMethod: saleForm.paymentMethod,
@@ -3050,6 +3062,7 @@ export default function AdminFinanceERPPage() {
           dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
           paymentMethod: getDefaultTransferLabel(),
           invoiceType: "Standar",
+          invoiceNumber: "",
           dpPercentage: 50,
           dpAmount: 0,
           dpNotes: "Pengajuan Uang Muka (DP 50%) Pelaksanaan Instalasi & Pengadaan",
@@ -5026,6 +5039,10 @@ export default function AdminFinanceERPPage() {
           body: JSON.stringify({
             actionType: "project",
             id: selectedProjectForDetail.id,
+            updates: {
+              ...selectedProjectForDetail,
+              photos: updatedPhotos,
+            },
             payload: {
               ...selectedProjectForDetail,
               photos: updatedPhotos,
@@ -5070,6 +5087,10 @@ export default function AdminFinanceERPPage() {
         body: JSON.stringify({
           actionType: "project",
           id: selectedProjectForDetail.id,
+          updates: {
+            ...selectedProjectForDetail,
+            photos: updatedPhotos,
+          },
           payload: {
             ...selectedProjectForDetail,
             photos: updatedPhotos,
@@ -5233,6 +5254,10 @@ export default function AdminFinanceERPPage() {
           body: JSON.stringify({
             actionType: "sale",
             id: selectedInvoiceForPhotos.id,
+            updates: {
+              ...selectedInvoiceForPhotos,
+              photos: updatedPhotos,
+            },
             payload: {
               ...selectedInvoiceForPhotos,
               photos: updatedPhotos,
@@ -5291,6 +5316,10 @@ export default function AdminFinanceERPPage() {
         body: JSON.stringify({
           actionType: "sale",
           id: selectedInvoiceForPhotos.id,
+          updates: {
+            ...selectedInvoiceForPhotos,
+            photos: updatedPhotos,
+          },
           payload: {
             ...selectedInvoiceForPhotos,
             photos: updatedPhotos,
@@ -5325,6 +5354,10 @@ export default function AdminFinanceERPPage() {
         body: JSON.stringify({
           actionType: "sale",
           id: selectedInvoiceForPhotos.id,
+          updates: {
+            ...selectedInvoiceForPhotos,
+            photos: updatedPhotos,
+          },
           payload: {
             ...selectedInvoiceForPhotos,
             photos: updatedPhotos,
@@ -5552,7 +5585,9 @@ export default function AdminFinanceERPPage() {
     selectedReturnSaleForPrint ||
     selectedReturnPurchaseForPrint ||
     isBastModalOpen ||
-    isDeliveryModalOpen
+    isDeliveryModalOpen ||
+    isReceiptModalOpen ||
+    selectedInvoiceForPhotoPrint
   );
 
   const displaySummary = useMemo(() => {
@@ -8844,8 +8879,29 @@ export default function AdminFinanceERPPage() {
                 />
               </div>
 
-              {/* Tanggal Faktur & Jatuh Tempo */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-blue-50/70 rounded-2xl border border-blue-200/90">
+              {/* Nomor Faktur & Tanggal Penerbitan */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-blue-50/70 rounded-2xl border border-blue-200/90">
+                <div>
+                  <label className="text-[11px] font-black text-slate-800 flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-dstech-blue" />
+                      Nomor Faktur: <span className="text-red-500">*</span>
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100/80 px-2 py-0.5 rounded-full">
+                      Auto Tanggal
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={saleForm.invoiceNumber || generateInvoiceNumberForDate(saleForm.date, saleForm.businessEntity)}
+                    onChange={(e) => setSaleForm({ ...saleForm, invoiceNumber: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-blue-200 bg-white font-mono font-bold text-slate-900 text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none uppercase"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Otomatis sinkron dengan tanggal faktur di samping.
+                  </span>
+                </div>
                 <div>
                   <label className="text-[11px] font-black text-slate-800 flex items-center justify-between mb-1.5">
                     <span className="flex items-center gap-1.5">
@@ -8853,18 +8909,26 @@ export default function AdminFinanceERPPage() {
                       Tanggal Faktur (Penerbitan): <span className="text-red-500">*</span>
                     </span>
                     <span className="text-[10px] text-dstech-blue font-bold bg-blue-100/80 px-2 py-0.5 rounded-full">
-                      Bebas Diubah / Backdate
+                      Bebas Diubah
                     </span>
                   </label>
                   <input
                     type="date"
                     required
                     value={saleForm.date}
-                    onChange={(e) => setSaleForm({ ...saleForm, date: e.target.value })}
+                    onChange={(e) => {
+                      const newDate = e.target.value;
+                      const autoNum = generateInvoiceNumberForDate(newDate, saleForm.businessEntity);
+                      setSaleForm({
+                        ...saleForm,
+                        date: newDate,
+                        invoiceNumber: autoNum,
+                      });
+                    }}
                     className="w-full p-2.5 rounded-xl border border-blue-200 bg-white font-bold text-slate-900 text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none"
                   />
                   <span className="text-[10px] text-slate-500 mt-1 block">
-                    Default: Tanggal hari ini. Dapat diubah ke tanggal transaksi lampau.
+                    Ubah tanggal maka nomor faktur otomatis menyesuaikan.
                   </span>
                 </div>
                 <div>
@@ -8874,7 +8938,7 @@ export default function AdminFinanceERPPage() {
                       Tanggal Jatuh Tempo: <span className="text-red-500">*</span>
                     </span>
                     <span className="text-[10px] text-amber-800 font-bold bg-amber-100/80 px-2 py-0.5 rounded-full">
-                      Batas Akhir Pelunasan
+                      Batas Pelunasan
                     </span>
                   </label>
                   <input

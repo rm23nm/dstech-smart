@@ -281,9 +281,14 @@ export async function POST(request: Request) {
     if (actionType === "sale") {
       const isNonPt = payload.businessEntity === "NON_PT";
       const prefixInv = isNonPt ? "INV-DTS" : "INV-DSTECH";
-      const newInvoiceNumber = `${prefixInv}-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(
+      const saleDate = payload.date ? new Date(payload.date) : new Date();
+      const yearMonth = !isNaN(saleDate.getTime())
+        ? `${saleDate.getFullYear()}${String(saleDate.getMonth() + 1).padStart(2, "0")}`
+        : new Date().toISOString().slice(0, 7).replace("-", "");
+      const generatedInvoiceNumber = `${prefixInv}-${yearMonth}-${String(
         (data.sales?.length || 0) + 1
       ).padStart(3, "0")}`;
+      const newInvoiceNumber = payload.invoiceNumber?.trim() || generatedInvoiceNumber;
 
       const grandTotal = Number(payload.grandTotal) || 0;
       const paidAmount = Number(payload.paidAmount) || 0;
@@ -985,7 +990,10 @@ export async function POST(request: Request) {
       const sph = quotations[qIndex];
       const isNonPt = (sph as any).businessEntity === "NON_PT";
       const prefixInv = isNonPt ? "INV-DTS" : "INV-DSTECH";
-      const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
+      const sphDate = sph.date ? new Date(sph.date) : new Date();
+      const yearMonth = !isNaN(sphDate.getTime())
+        ? `${sphDate.getFullYear()}${String(sphDate.getMonth() + 1).padStart(2, "0")}`
+        : new Date().toISOString().slice(0, 7).replace("-", "");
       const newInvoiceNumber = `${prefixInv}-${yearMonth}-${String((data.sales?.length || 0) + 1).padStart(3, "0")}`;
 
       const grandTotal = Number(sph.grandTotal) || 0;
@@ -1215,7 +1223,8 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { actionType, id, updates } = body;
+    const { actionType, id } = body;
+    const updates = body.updates || body.payload;
     const data = readFinanceData();
 
     if (!updates) {
