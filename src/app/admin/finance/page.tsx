@@ -281,6 +281,24 @@ interface FinanceSettings {
   signerTitle?: string;
   masterSignatureUrl?: string;
   masterStampUrl?: string;
+
+  // Entitas PT (PT. DSTech Smart Perkasa)
+  letterheadUrl_PT?: string;
+  letterheadEnabled_PT?: boolean;
+  watermarkOpacity_PT?: number;
+  letterheadPaddingTop_PT?: number;
+  letterheadPaddingBottom_PT?: number;
+  signerName_PT?: string;
+  signerTitle_PT?: string;
+
+  // Entitas Non-PT (DSTech Smart Mandiri)
+  letterheadUrl_NON_PT?: string;
+  letterheadEnabled_NON_PT?: boolean;
+  watermarkOpacity_NON_PT?: number;
+  letterheadPaddingTop_NON_PT?: number;
+  letterheadPaddingBottom_NON_PT?: number;
+  signerName_NON_PT?: string;
+  signerTitle_NON_PT?: string;
 }
 
 interface PurchaseItem {
@@ -928,6 +946,7 @@ export default function AdminFinanceERPPage() {
 
   // Letterhead Settings Modal State
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState<boolean>(false);
+  const [letterheadEntityTab, setLetterheadEntityTab] = useState<"PT" | "NON_PT">("PT");
   const [tempSettings, setTempSettings] = useState<FinanceSettings>({
     letterheadUrl: "/kop_surat_dstech.jpg",
     letterheadEnabled: true,
@@ -935,11 +954,54 @@ export default function AdminFinanceERPPage() {
     letterheadPaddingTop: 80,
     letterheadPaddingBottom: 75,
     letterheadFitMode: "fill",
-    signerName: "H. Agus Supriyadi, S.T., M.Kom.",
-    signerTitle: "Direktur Keuangan & Operasional",
+    signerName: "RAMADHANI ST",
+    signerTitle: "Direktur",
     masterSignatureUrl: "",
     masterStampUrl: "",
+    // PT Defaults
+    letterheadUrl_PT: "/kop_surat_dstech.jpg",
+    letterheadEnabled_PT: true,
+    watermarkOpacity_PT: 0.15,
+    letterheadPaddingTop_PT: 80,
+    letterheadPaddingBottom_PT: 75,
+    signerName_PT: "RAMADHANI ST",
+    signerTitle_PT: "Direktur",
+    // Non-PT Defaults
+    letterheadUrl_NON_PT: "",
+    letterheadEnabled_NON_PT: true,
+    watermarkOpacity_NON_PT: 0.15,
+    letterheadPaddingTop_NON_PT: 80,
+    letterheadPaddingBottom_NON_PT: 75,
+    signerName_NON_PT: "RAMADHANI ST",
+    signerTitle_NON_PT: "Owner / Pengelola Usaha",
   });
+
+  // Helper untuk mendapatkan konfigurasi kop surat sesuai entitas dokumen (PT vs Non-PT)
+  const getLetterheadConfig = (entity?: "PT" | "NON_PT" | string) => {
+    const isNonPt = entity === "NON_PT";
+    if (isNonPt) {
+      return {
+        url: financeSettings.letterheadUrl_NON_PT || financeSettings.letterheadUrl || "/kop_surat_dstech.jpg",
+        enabled: financeSettings.letterheadEnabled_NON_PT !== undefined ? financeSettings.letterheadEnabled_NON_PT : financeSettings.letterheadEnabled,
+        opacity: financeSettings.watermarkOpacity_NON_PT !== undefined ? financeSettings.watermarkOpacity_NON_PT : (financeSettings.watermarkOpacity ?? 0.15),
+        paddingTop: financeSettings.letterheadPaddingTop_NON_PT || financeSettings.letterheadPaddingTop || 80,
+        paddingBottom: financeSettings.letterheadPaddingBottom_NON_PT || financeSettings.letterheadPaddingBottom || 75,
+        fitMode: financeSettings.letterheadFitMode || "fill",
+        signerName: financeSettings.signerName_NON_PT || "RAMADHANI ST",
+        signerTitle: financeSettings.signerTitle_NON_PT || "Owner / Pengelola Usaha",
+      };
+    }
+    return {
+      url: financeSettings.letterheadUrl_PT || financeSettings.letterheadUrl || "/kop_surat_dstech.jpg",
+      enabled: financeSettings.letterheadEnabled_PT !== undefined ? financeSettings.letterheadEnabled_PT : financeSettings.letterheadEnabled,
+      opacity: financeSettings.watermarkOpacity_PT !== undefined ? financeSettings.watermarkOpacity_PT : (financeSettings.watermarkOpacity ?? 0.15),
+      paddingTop: financeSettings.letterheadPaddingTop_PT || financeSettings.letterheadPaddingTop || 80,
+      paddingBottom: financeSettings.letterheadPaddingBottom_PT || financeSettings.letterheadPaddingBottom || 75,
+      fitMode: financeSettings.letterheadFitMode || "fill",
+      signerName: financeSettings.signerName_PT || financeSettings.signerName || "RAMADHANI ST",
+      signerTitle: financeSettings.signerTitle_PT || financeSettings.signerTitle || "Direktur",
+    };
+  };
 
   // Laporan Laba Rugi Print & PDF Modal State
   const [isPnlPrintModalOpen, setIsPnlPrintModalOpen] = useState<boolean>(false);
@@ -3273,15 +3335,34 @@ export default function AdminFinanceERPPage() {
     }
   };
 
-  // Handler Pengaturan Kop Surat
-  const handleOpenSettingsModal = () => {
+  // Handler Pengaturan Kop Surat (PT vs Non-PT)
+  const handleOpenSettingsModal = (defaultTab?: "PT" | "NON_PT" | React.MouseEvent<any> | any) => {
+    if (defaultTab === "PT" || defaultTab === "NON_PT") {
+      setLetterheadEntityTab(defaultTab);
+    }
     setTempSettings({
       ...financeSettings,
       letterheadPaddingTop: financeSettings.letterheadPaddingTop || 80,
       letterheadPaddingBottom: financeSettings.letterheadPaddingBottom || 75,
       letterheadFitMode: financeSettings.letterheadFitMode || "fill",
-      signerName: financeSettings.signerName !== undefined ? financeSettings.signerName : "H. Agus Supriyadi, S.T., M.Kom.",
-      signerTitle: financeSettings.signerTitle !== undefined ? financeSettings.signerTitle : "Direktur Keuangan & Operasional",
+      signerName: financeSettings.signerName || "RAMADHANI ST",
+      signerTitle: financeSettings.signerTitle || "Direktur",
+      // PT
+      letterheadUrl_PT: financeSettings.letterheadUrl_PT || financeSettings.letterheadUrl || "/kop_surat_dstech.jpg",
+      letterheadEnabled_PT: financeSettings.letterheadEnabled_PT !== undefined ? financeSettings.letterheadEnabled_PT : financeSettings.letterheadEnabled,
+      watermarkOpacity_PT: financeSettings.watermarkOpacity_PT !== undefined ? financeSettings.watermarkOpacity_PT : (financeSettings.watermarkOpacity ?? 0.15),
+      letterheadPaddingTop_PT: financeSettings.letterheadPaddingTop_PT || financeSettings.letterheadPaddingTop || 80,
+      letterheadPaddingBottom_PT: financeSettings.letterheadPaddingBottom_PT || financeSettings.letterheadPaddingBottom || 75,
+      signerName_PT: financeSettings.signerName_PT || financeSettings.signerName || "RAMADHANI ST",
+      signerTitle_PT: financeSettings.signerTitle_PT || financeSettings.signerTitle || "Direktur",
+      // Non-PT
+      letterheadUrl_NON_PT: financeSettings.letterheadUrl_NON_PT || "",
+      letterheadEnabled_NON_PT: financeSettings.letterheadEnabled_NON_PT !== undefined ? financeSettings.letterheadEnabled_NON_PT : true,
+      watermarkOpacity_NON_PT: financeSettings.watermarkOpacity_NON_PT !== undefined ? financeSettings.watermarkOpacity_NON_PT : 0.15,
+      letterheadPaddingTop_NON_PT: financeSettings.letterheadPaddingTop_NON_PT || 80,
+      letterheadPaddingBottom_NON_PT: financeSettings.letterheadPaddingBottom_NON_PT || 75,
+      signerName_NON_PT: financeSettings.signerName_NON_PT || "RAMADHANI ST",
+      signerTitle_NON_PT: financeSettings.signerTitle_NON_PT || "Owner / Pengelola Usaha",
     });
     setIsSettingsModalOpen(true);
   };
@@ -3293,16 +3374,27 @@ export default function AdminFinanceERPPage() {
       showToast("Ukuran file gambar maksimal 8MB!");
       return;
     }
+    const isNonPt = letterheadEntityTab === "NON_PT";
     const reader = new FileReader();
     reader.onload = (uploadEvent) => {
       const base64Url = uploadEvent.target?.result as string;
       if (base64Url) {
-        setTempSettings((prev) => ({
-          ...prev,
-          letterheadUrl: base64Url,
-          letterheadEnabled: true,
-        }));
-        showToast("Gambar kop surat baru berhasil dimuat! Klik Simpan Pengaturan.");
+        if (isNonPt) {
+          setTempSettings((prev) => ({
+            ...prev,
+            letterheadUrl_NON_PT: base64Url,
+            letterheadEnabled_NON_PT: true,
+          }));
+          showToast("Gambar kop surat Non-PT (DSTech Mandiri) berhasil dimuat! Klik Simpan Pengaturan.");
+        } else {
+          setTempSettings((prev) => ({
+            ...prev,
+            letterheadUrl_PT: base64Url,
+            letterheadUrl: base64Url,
+            letterheadEnabled_PT: true,
+          }));
+          showToast("Gambar kop surat PT. DSTech Smart Perkasa berhasil dimuat! Klik Simpan Pengaturan.");
+        }
       }
     };
     reader.readAsDataURL(file);
@@ -3311,13 +3403,32 @@ export default function AdminFinanceERPPage() {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const sanitizedSettings = {
+      const sanitizedSettings: FinanceSettings = {
         ...tempSettings,
-        letterheadPaddingTop: tempSettings.letterheadPaddingTop || 80,
-        letterheadPaddingBottom: tempSettings.letterheadPaddingBottom || 75,
+        // Global / Fallback
+        letterheadUrl: tempSettings.letterheadUrl_PT || tempSettings.letterheadUrl || "/kop_surat_dstech.jpg",
+        letterheadEnabled: tempSettings.letterheadEnabled_PT !== undefined ? tempSettings.letterheadEnabled_PT : tempSettings.letterheadEnabled,
+        letterheadPaddingTop: tempSettings.letterheadPaddingTop_PT || tempSettings.letterheadPaddingTop || 80,
+        letterheadPaddingBottom: tempSettings.letterheadPaddingBottom_PT || tempSettings.letterheadPaddingBottom || 75,
         letterheadFitMode: tempSettings.letterheadFitMode || "fill",
-        signerName: tempSettings.signerName?.trim() || "H. Agus Supriyadi, S.T., M.Kom.",
-        signerTitle: tempSettings.signerTitle?.trim() || "Direktur Keuangan & Operasional",
+        signerName: tempSettings.signerName_PT || tempSettings.signerName || "RAMADHANI ST",
+        signerTitle: tempSettings.signerTitle_PT || tempSettings.signerTitle || "Direktur",
+        // PT
+        letterheadUrl_PT: tempSettings.letterheadUrl_PT || tempSettings.letterheadUrl || "/kop_surat_dstech.jpg",
+        letterheadEnabled_PT: tempSettings.letterheadEnabled_PT !== undefined ? tempSettings.letterheadEnabled_PT : true,
+        watermarkOpacity_PT: tempSettings.watermarkOpacity_PT !== undefined ? tempSettings.watermarkOpacity_PT : (tempSettings.watermarkOpacity ?? 0.15),
+        letterheadPaddingTop_PT: tempSettings.letterheadPaddingTop_PT || 80,
+        letterheadPaddingBottom_PT: tempSettings.letterheadPaddingBottom_PT || 75,
+        signerName_PT: tempSettings.signerName_PT?.trim() || "RAMADHANI ST",
+        signerTitle_PT: tempSettings.signerTitle_PT?.trim() || "Direktur",
+        // Non-PT
+        letterheadUrl_NON_PT: tempSettings.letterheadUrl_NON_PT || "",
+        letterheadEnabled_NON_PT: tempSettings.letterheadEnabled_NON_PT !== undefined ? tempSettings.letterheadEnabled_NON_PT : true,
+        watermarkOpacity_NON_PT: tempSettings.watermarkOpacity_NON_PT !== undefined ? tempSettings.watermarkOpacity_NON_PT : 0.15,
+        letterheadPaddingTop_NON_PT: tempSettings.letterheadPaddingTop_NON_PT || 80,
+        letterheadPaddingBottom_NON_PT: tempSettings.letterheadPaddingBottom_NON_PT || 75,
+        signerName_NON_PT: tempSettings.signerName_NON_PT?.trim() || "RAMADHANI ST",
+        signerTitle_NON_PT: tempSettings.signerTitle_NON_PT?.trim() || "Owner / Pengelola Usaha",
       };
       const res = await fetch("/api/finance", {
         method: "PUT",
@@ -19829,7 +19940,7 @@ export default function AdminFinanceERPPage() {
                 <div>
                   <h3 className="font-black text-sm text-slate-900">Pengaturan Kop Surat & Background</h3>
                   <p className="text-[10px] text-slate-400">
-                    Ganti template gambar kop surat dan watermark cetak resmi DSTech
+                    Ganti template gambar kop surat dan watermark cetak PT vs Non-PT
                   </p>
                 </div>
               </div>
@@ -19841,28 +19952,88 @@ export default function AdminFinanceERPPage() {
               </button>
             </div>
 
-            {/* Pratinjau Gambar Saat Ini */}
+            {/* Tab Pemilihan Entitas Bisnis (PT vs Non-PT) */}
+            <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setLetterheadEntityTab("PT")}
+                className={`py-2 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  letterheadEntityTab === "PT"
+                    ? "bg-white text-dstech-blue shadow-sm ring-2 ring-blue-300"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Building2 className="w-4 h-4 text-dstech-blue" />
+                <span>🏢 PT. DSTech Smart Perkasa</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setLetterheadEntityTab("NON_PT")}
+                className={`py-2 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  letterheadEntityTab === "NON_PT"
+                    ? "bg-white text-emerald-700 shadow-sm ring-2 ring-emerald-300"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Briefcase className="w-4 h-4 text-emerald-600" />
+                <span>🏬 DSTech Non-PT (Usaha Mandiri)</span>
+              </button>
+            </div>
+
+            {/* Info Entitas Aktif */}
+            <div className={`p-2.5 rounded-xl border text-[11px] flex items-center justify-between ${
+              letterheadEntityTab === "NON_PT"
+                ? "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                : "bg-blue-50/80 border-blue-200 text-blue-900"
+            }`}>
+              <div>
+                <p className="font-bold">
+                  {letterheadEntityTab === "NON_PT"
+                    ? "Konfigurasi Khusus: DSTech Usaha Mandiri (Non-PT)"
+                    : "Konfigurasi Resmi: PT. DSTech Smart Perkasa"}
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  {letterheadEntityTab === "NON_PT"
+                    ? "Digunakan otomatis saat mencetak Faktur, Penawaran, Surat Jalan & Rekening Non-PT"
+                    : "Digunakan otomatis saat mencetak Faktur, Penawaran, Surat Jalan & Rekening PT"}
+                </p>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full font-black text-[10px] ${
+                letterheadEntityTab === "NON_PT" ? "bg-emerald-600 text-white" : "bg-dstech-blue text-white"
+              }`}>
+                {letterheadEntityTab}
+              </span>
+            </div>
+
+            {/* Pratinjau Gambar Sesuai Tab Aktif */}
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center space-y-3">
               <div className="flex items-center justify-between w-full">
                 <span className="text-[10px] font-black uppercase tracking-wider text-dstech-blue">
-                  Preview Resolusi Pas Dokumen A4
+                  Preview Resolusi Pas Dokumen A4 ({letterheadEntityTab})
                 </span>
                 <span className="text-[10px] text-slate-500 font-bold">
-                  {tempSettings.letterheadEnabled ? "Kop Aktif" : "Kop Nonaktif"}
+                  {(letterheadEntityTab === "NON_PT" ? tempSettings.letterheadEnabled_NON_PT : tempSettings.letterheadEnabled_PT)
+                    ? "Kop Aktif"
+                    : "Kop Nonaktif"}
                 </span>
               </div>
 
               <div className="w-48 h-64 rounded-xl border-2 border-dashed border-slate-300 overflow-hidden shadow-inner relative bg-white flex items-center justify-center p-1">
-                {tempSettings.letterheadUrl ? (
+                {(letterheadEntityTab === "NON_PT" ? tempSettings.letterheadUrl_NON_PT : (tempSettings.letterheadUrl_PT || tempSettings.letterheadUrl)) ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={tempSettings.letterheadUrl}
-                    alt="Kop Surat DSTech"
+                    src={letterheadEntityTab === "NON_PT" ? (tempSettings.letterheadUrl_NON_PT || "") : (tempSettings.letterheadUrl_PT || tempSettings.letterheadUrl || "/kop_surat_dstech.jpg")}
+                    alt={`Kop Surat ${letterheadEntityTab}`}
                     className="w-full h-full object-contain"
-                    style={{ opacity: tempSettings.letterheadEnabled ? 1 : 0.25 }}
+                    style={{
+                      opacity: (letterheadEntityTab === "NON_PT" ? tempSettings.letterheadEnabled_NON_PT : tempSettings.letterheadEnabled_PT) ? 1 : 0.25,
+                    }}
                   />
                 ) : (
-                  <span className="text-slate-400 text-xs font-bold">Belum ada gambar</span>
+                  <div className="text-center p-3">
+                    <p className="text-slate-400 text-xs font-bold">Belum ada gambar kop Non-PT</p>
+                    <p className="text-[9px] text-slate-400 mt-1">Silakan klik unggah file di bawah</p>
+                  </div>
                 )}
               </div>
 
@@ -19870,7 +20041,7 @@ export default function AdminFinanceERPPage() {
               <div className="flex flex-col sm:flex-row items-center gap-2 w-full justify-center pt-1">
                 <label className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-600 text-white font-bold text-xs cursor-pointer shadow-md transition">
                   <Download className="w-3.5 h-3.5" />
-                  <span>Unggah File Kop Surat (PNG/JPG)</span>
+                  <span>Unggah Kop {letterheadEntityTab === "NON_PT" ? "Non-PT" : "PT"} (PNG/JPG)</span>
                   <input
                     type="file"
                     accept="image/png, image/jpeg, image/jpg, image/webp"
@@ -19878,62 +20049,104 @@ export default function AdminFinanceERPPage() {
                     className="hidden"
                   />
                 </label>
-                {tempSettings.letterheadUrl && tempSettings.letterheadUrl !== "/kop_surat_dstech.jpg" && (
+                {letterheadEntityTab === "PT" && tempSettings.letterheadUrl_PT && tempSettings.letterheadUrl_PT !== "/kop_surat_dstech.jpg" && (
                   <button
                     type="button"
                     onClick={() =>
                       setTempSettings((prev) => ({
                         ...prev,
                         letterheadUrl: "/kop_surat_dstech.jpg",
-                        letterheadEnabled: true,
+                        letterheadUrl_PT: "/kop_surat_dstech.jpg",
+                        letterheadEnabled_PT: true,
                       }))
                     }
                     className="px-3 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer transition"
                   >
-                    Reset Kop Standar
+                    Reset Kop PT Standar
+                  </button>
+                )}
+                {letterheadEntityTab === "NON_PT" && tempSettings.letterheadUrl_NON_PT && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTempSettings((prev) => ({
+                        ...prev,
+                        letterheadUrl_NON_PT: "",
+                      }))
+                    }
+                    className="px-3 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs cursor-pointer transition"
+                  >
+                    Hapus Kop Non-PT
                   </button>
                 )}
               </div>
               <p className="text-[10px] text-slate-500 text-center">
-                Format: PNG / JPG / WebP transparan atau ber-header kop surat. Resolusi rekomendasi proporsional lembar A4.
+                Format: PNG / JPG / WebP proporsional A4. File otomatis tersimpan khusus untuk entitas {letterheadEntityTab}.
               </p>
             </div>
 
             <form onSubmit={handleSaveSettings} className="space-y-4 text-xs">
               <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200/80 flex items-center justify-between">
                 <div>
-                  <p className="font-bold text-slate-900">Tampilkan Kop Surat & Background Resmi</p>
+                  <p className="font-bold text-slate-900">
+                    Aktifkan Kop Surat Resmi ({letterheadEntityTab})
+                  </p>
                   <p className="text-[10px] text-slate-500">
-                    Terapkan latar belakang kop surat pada lembar cetak penawaran SPH, faktur tagihan, dan PO
+                    Terapkan latar belakang kop surat saat mencetak dokumen {letterheadEntityTab}
                   </p>
                 </div>
                 <input
                   type="checkbox"
-                  checked={tempSettings.letterheadEnabled}
-                  onChange={(e) => setTempSettings({ ...tempSettings, letterheadEnabled: e.target.checked })}
+                  checked={
+                    letterheadEntityTab === "NON_PT"
+                      ? (tempSettings.letterheadEnabled_NON_PT ?? true)
+                      : (tempSettings.letterheadEnabled_PT ?? tempSettings.letterheadEnabled ?? true)
+                  }
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    if (letterheadEntityTab === "NON_PT") {
+                      setTempSettings({ ...tempSettings, letterheadEnabled_NON_PT: checked });
+                    } else {
+                      setTempSettings({ ...tempSettings, letterheadEnabled_PT: checked, letterheadEnabled: checked });
+                    }
+                  }}
                   className="w-5 h-5 rounded text-dstech-blue cursor-pointer"
                 />
               </div>
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
-                  Path / URL / Sumber Gambar Kop Surat:
+                  Path / URL / Sumber Gambar Kop Surat ({letterheadEntityTab}):
                 </label>
                 <input
                   type="text"
-                  required
-                  value={tempSettings.letterheadUrl}
-                  onChange={(e) => setTempSettings({ ...tempSettings, letterheadUrl: e.target.value })}
-                  placeholder="/kop_surat_dstech.jpg atau unggah file di atas"
+                  value={
+                    letterheadEntityTab === "NON_PT"
+                      ? (tempSettings.letterheadUrl_NON_PT || "")
+                      : (tempSettings.letterheadUrl_PT || tempSettings.letterheadUrl || "")
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (letterheadEntityTab === "NON_PT") {
+                      setTempSettings({ ...tempSettings, letterheadUrl_NON_PT: val });
+                    } else {
+                      setTempSettings({ ...tempSettings, letterheadUrl_PT: val, letterheadUrl: val });
+                    }
+                  }}
+                  placeholder={letterheadEntityTab === "NON_PT" ? "Path file kop Non-PT atau unggah di atas" : "/kop_surat_dstech.jpg"}
                   className="w-full p-2.5 rounded-xl border border-slate-200 font-mono text-xs"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="font-bold text-slate-700">Tingkat Transparansi Watermark:</label>
+                  <label className="font-bold text-slate-700">Tingkat Transparansi Watermark ({letterheadEntityTab}):</label>
                   <span className="font-mono font-bold text-dstech-blue">
-                    {Math.round((tempSettings.watermarkOpacity !== undefined ? tempSettings.watermarkOpacity : 1) * 100)}%
+                    {Math.round(
+                      (letterheadEntityTab === "NON_PT"
+                        ? (tempSettings.watermarkOpacity_NON_PT ?? 0.15)
+                        : (tempSettings.watermarkOpacity_PT ?? tempSettings.watermarkOpacity ?? 1)) * 100
+                    )}%
                   </span>
                 </div>
                 <input
@@ -19941,93 +20154,25 @@ export default function AdminFinanceERPPage() {
                   min="0.05"
                   max="1.0"
                   step="0.05"
-                  value={tempSettings.watermarkOpacity !== undefined ? tempSettings.watermarkOpacity : 1}
-                  onChange={(e) =>
-                    setTempSettings({ ...tempSettings, watermarkOpacity: parseFloat(e.target.value) })
+                  value={
+                    letterheadEntityTab === "NON_PT"
+                      ? (tempSettings.watermarkOpacity_NON_PT ?? 0.15)
+                      : (tempSettings.watermarkOpacity_PT ?? tempSettings.watermarkOpacity ?? 1)
                   }
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    if (letterheadEntityTab === "NON_PT") {
+                      setTempSettings({ ...tempSettings, watermarkOpacity_NON_PT: val });
+                    } else {
+                      setTempSettings({ ...tempSettings, watermarkOpacity_PT: val, watermarkOpacity: val });
+                    }
+                  }}
                   className="w-full cursor-pointer"
                 />
                 <div className="flex justify-between text-[10px] text-slate-400 mt-1">
                   <span>Lembut (15%)</span>
                   <span>Jelas (50%)</span>
                   <span>Kop Utuh / Nyata (100%)</span>
-                </div>
-              </div>
-
-              {/* Tombol Preset Cepat */}
-              <div className="space-y-1.5 pt-1">
-                <label className="font-bold text-slate-700 block">Pilihan Preset Background Cepat:</label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setTempSettings((prev) => ({
-                        ...prev,
-                        letterheadUrl: "/kop_surat_dstech.jpg",
-                        letterheadEnabled: true,
-                        letterheadFitMode: "bleed",
-                        watermarkOpacity: 1.0,
-                      }))
-                    }
-                    className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-dstech-blue font-bold text-[10px] cursor-pointer"
-                  >
-                    Full Bleed Canva (100%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setTempSettings((prev) => ({
-                        ...prev,
-                        letterheadUrl: "/kop_surat_dstech.jpg",
-                        letterheadEnabled: true,
-                        letterheadFitMode: "fill",
-                        watermarkOpacity: 1.0,
-                      }))
-                    }
-                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
-                  >
-                    Kop Utuh / Nyata (100%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setTempSettings((prev) => ({
-                        ...prev,
-                        letterheadUrl: "/kop_surat_dstech.jpg",
-                        letterheadEnabled: true,
-                        watermarkOpacity: 0.15,
-                      }))
-                    }
-                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
-                  >
-                    Watermark Lembut (15%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTempSettings((prev) => ({ ...prev, watermarkOpacity: 0.08 }))}
-                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
-                  >
-                    Watermark Lembut (8%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTempSettings((prev) => ({ ...prev, watermarkOpacity: 0.25 }))}
-                    className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
-                  >
-                    Watermark Jelas (25%)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setTempSettings((prev) => ({
-                        ...prev,
-                        letterheadEnabled: false,
-                      }))
-                    }
-                    className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[10px] cursor-pointer"
-                  >
-                    Nonaktifkan Kop
-                  </button>
                 </div>
               </div>
 
@@ -20092,10 +20237,10 @@ export default function AdminFinanceERPPage() {
                 </div>
               </div>
 
-              {/* Pengaturan Jarak Margin Lembar Dokumen (Header & Footer) */}
+              {/* Pengaturan Jarak Margin Lembar Kop (Header & Footer) */}
               <div className="pt-2 border-t border-slate-100 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-slate-800 text-xs">Jarak Margin Lembar Kop (Header & Footer):</h4>
+                  <h4 className="font-bold text-slate-800 text-xs">Jarak Margin Lembar Kop ({letterheadEntityTab}):</h4>
                   <span className="text-[10px] text-slate-500 font-medium">Mencegah teks tertimpa desain kop</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -20103,7 +20248,9 @@ export default function AdminFinanceERPPage() {
                     <div className="flex items-center justify-between text-[11px]">
                       <label className="font-bold text-slate-700">Jarak Turun Header Atas:</label>
                       <span className="font-mono font-bold text-dstech-blue">
-                        {tempSettings.letterheadPaddingTop || 80}px
+                        {(letterheadEntityTab === "NON_PT"
+                          ? tempSettings.letterheadPaddingTop_NON_PT
+                          : (tempSettings.letterheadPaddingTop_PT || tempSettings.letterheadPaddingTop)) || 80}px
                       </span>
                     </div>
                     <input
@@ -20111,10 +20258,19 @@ export default function AdminFinanceERPPage() {
                       min="24"
                       max="240"
                       step="5"
-                      value={tempSettings.letterheadPaddingTop || 80}
-                      onChange={(e) =>
-                        setTempSettings({ ...tempSettings, letterheadPaddingTop: parseInt(e.target.value) || 80 })
+                      value={
+                        (letterheadEntityTab === "NON_PT"
+                          ? tempSettings.letterheadPaddingTop_NON_PT
+                          : (tempSettings.letterheadPaddingTop_PT || tempSettings.letterheadPaddingTop)) || 80
                       }
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 80;
+                        if (letterheadEntityTab === "NON_PT") {
+                          setTempSettings({ ...tempSettings, letterheadPaddingTop_NON_PT: val });
+                        } else {
+                          setTempSettings({ ...tempSettings, letterheadPaddingTop_PT: val, letterheadPaddingTop: val });
+                        }
+                      }}
                       className="w-full cursor-pointer"
                     />
                     <div className="flex justify-between text-[9px] text-slate-400">
@@ -20128,7 +20284,9 @@ export default function AdminFinanceERPPage() {
                     <div className="flex items-center justify-between text-[11px]">
                       <label className="font-bold text-slate-700">Jarak Naik Footer Bawah:</label>
                       <span className="font-mono font-bold text-emerald-600">
-                        {tempSettings.letterheadPaddingBottom || 75}px
+                        {(letterheadEntityTab === "NON_PT"
+                          ? tempSettings.letterheadPaddingBottom_NON_PT
+                          : (tempSettings.letterheadPaddingBottom_PT || tempSettings.letterheadPaddingBottom)) || 75}px
                       </span>
                     </div>
                     <input
@@ -20136,10 +20294,19 @@ export default function AdminFinanceERPPage() {
                       min="24"
                       max="220"
                       step="5"
-                      value={tempSettings.letterheadPaddingBottom || 75}
-                      onChange={(e) =>
-                        setTempSettings({ ...tempSettings, letterheadPaddingBottom: parseInt(e.target.value) || 75 })
+                      value={
+                        (letterheadEntityTab === "NON_PT"
+                          ? tempSettings.letterheadPaddingBottom_NON_PT
+                          : (tempSettings.letterheadPaddingBottom_PT || tempSettings.letterheadPaddingBottom)) || 75
                       }
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 75;
+                        if (letterheadEntityTab === "NON_PT") {
+                          setTempSettings({ ...tempSettings, letterheadPaddingBottom_NON_PT: val });
+                        } else {
+                          setTempSettings({ ...tempSettings, letterheadPaddingBottom_PT: val, letterheadPaddingBottom: val });
+                        }
+                      }}
                       className="w-full cursor-pointer"
                     />
                     <div className="flex justify-between text-[9px] text-slate-400">
@@ -20149,60 +20316,34 @@ export default function AdminFinanceERPPage() {
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setTempSettings((prev) => ({
-                        ...prev,
-                        letterheadPaddingTop: 80,
-                        letterheadPaddingBottom: 75,
-                      }))
-                    }
-                    className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-[10px] cursor-pointer"
-                  >
-                    Preset DSTech Resmi (Header 80px, Footer 75px)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setTempSettings((prev) => ({
-                        ...prev,
-                        letterheadPaddingTop: 80,
-                        letterheadPaddingBottom: 60,
-                      }))
-                    }
-                    className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
-                  >
-                    Preset Banner Ramping (80px / 60px)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setTempSettings((prev) => ({
-                        ...prev,
-                        letterheadPaddingTop: 160,
-                        letterheadPaddingBottom: 130,
-                      }))
-                    }
-                    className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] cursor-pointer"
-                  >
-                    Preset Banner Luas (160px / 130px)
-                  </button>
-                </div>
               </div>
 
               {/* Penandatangan Dokumen Resmi DSTech */}
               <div className="pt-3 border-t border-slate-100 space-y-3">
-                <h4 className="font-bold text-slate-800 text-xs">Penandatangan Resmi Dokumen (Direksi DSTech):</h4>
+                <h4 className="font-bold text-slate-800 text-xs">
+                  Penandatangan Dokumen ({letterheadEntityTab === "NON_PT" ? "DSTech Non-PT" : "PT. DSTech Smart Perkasa"}):
+                </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Nama Direktur Penandatangan:</label>
+                    <label className="font-bold text-slate-700 block mb-1">
+                      {letterheadEntityTab === "NON_PT" ? "Nama Pimpinan / Pengelola:" : "Nama Direktur Penandatangan:"}
+                    </label>
                     <input
                       type="text"
-                      value={tempSettings.signerName ?? ""}
-                      placeholder="Contoh: H. Agus Supriyadi, S.T., M.Kom."
-                      onChange={(e) => setTempSettings({ ...tempSettings, signerName: e.target.value })}
+                      value={
+                        (letterheadEntityTab === "NON_PT"
+                          ? tempSettings.signerName_NON_PT
+                          : (tempSettings.signerName_PT ?? tempSettings.signerName)) ?? ""
+                      }
+                      placeholder={letterheadEntityTab === "NON_PT" ? "Contoh: RAMADHANI ST" : "Contoh: RAMADHANI ST"}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (letterheadEntityTab === "NON_PT") {
+                          setTempSettings({ ...tempSettings, signerName_NON_PT: val });
+                        } else {
+                          setTempSettings({ ...tempSettings, signerName_PT: val, signerName: val });
+                        }
+                      }}
                       className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold"
                     />
                   </div>
@@ -20210,9 +20351,20 @@ export default function AdminFinanceERPPage() {
                     <label className="font-bold text-slate-700 block mb-1">Jabatan Resmi:</label>
                     <input
                       type="text"
-                      value={tempSettings.signerTitle ?? ""}
-                      placeholder="Contoh: Direktur Keuangan & Operasional"
-                      onChange={(e) => setTempSettings({ ...tempSettings, signerTitle: e.target.value })}
+                      value={
+                        (letterheadEntityTab === "NON_PT"
+                          ? tempSettings.signerTitle_NON_PT
+                          : (tempSettings.signerTitle_PT ?? tempSettings.signerTitle)) ?? ""
+                      }
+                      placeholder={letterheadEntityTab === "NON_PT" ? "Contoh: Owner / Pengelola Usaha" : "Contoh: Direktur"}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (letterheadEntityTab === "NON_PT") {
+                          setTempSettings({ ...tempSettings, signerTitle_NON_PT: val });
+                        } else {
+                          setTempSettings({ ...tempSettings, signerTitle_PT: val, signerTitle: val });
+                        }
+                      }}
                       className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold"
                     />
                   </div>
@@ -20232,7 +20384,7 @@ export default function AdminFinanceERPPage() {
                   className="px-5 py-2.5 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold shadow-md cursor-pointer flex items-center gap-2"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Simpan Pengaturan Kop Surat</span>
+                  <span>Simpan Pengaturan ({letterheadEntityTab})</span>
                 </button>
               </div>
             </form>
