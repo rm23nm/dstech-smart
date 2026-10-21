@@ -49,6 +49,7 @@ import {
   UserPlus,
   PenTool,
   CheckCheck,
+  Check,
   Eraser,
   ClipboardCheck,
   Tag,
@@ -1159,6 +1160,11 @@ export default function AdminFinanceERPPage() {
   const [invoicePhotoFilter, setInvoicePhotoFilter] = useState<"all" | "documentation" | "part_replacement">("all");
   const [selectedInvoiceForPhotoPrint, setSelectedInvoiceForPhotoPrint] = useState<SaleInvoice | null>(null);
   const [invoicePhotoLetterhead, setInvoicePhotoLetterhead] = useState<boolean>(true);
+  const [printPhotoCategoryFilter, setPrintPhotoCategoryFilter] = useState<"ALL" | "documentation" | "part_replacement">("ALL");
+  const [editingPhotoId, setEditingPhotoId] = useState<string | null>(null);
+  const [editingPhotoCaption, setEditingPhotoCaption] = useState<string>("");
+  const [editingPhotoCategory, setEditingPhotoCategory] = useState<"documentation" | "part_replacement">("documentation");
+  const [uploadProgressText, setUploadProgressText] = useState<string>("");
   const [isPublishPortfolioModalOpen, setIsPublishPortfolioModalOpen] = useState<boolean>(false);
   const [publishPortfolioForm, setPublishPortfolioForm] = useState<{
     projectId: string;
@@ -5167,42 +5173,60 @@ export default function AdminFinanceERPPage() {
     setInvoicePhotoCategory("documentation");
     setInvoicePhotoCaption("");
     setInvoicePhotoFilter("all");
+    setEditingPhotoId(null);
+    setUploadProgressText("");
     setIsInvoicePhotoModalOpen(true);
   };
 
   const handleUploadInvoicePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedInvoiceForPhotos || !e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
+    const files = Array.from(e.target.files);
     setIsUploadingInvoicePhoto(true);
 
     try {
-      // Kompresi cerdas otomatis ke target ~40 KB
-      const { file: fileToUpload, originalSize, compressedSize } = await compressImageFile(file, 40);
-      const ratio = originalSize > compressedSize ? Math.round((1 - compressedSize / originalSize) * 100) : 0;
+      const newlyAddedPhotos: ProjectPhoto[] = [];
+      const totalFiles = files.length;
+      let totalOriginal = 0;
+      let totalCompressed = 0;
 
-      const formData = new FormData();
-      formData.append("file", fileToUpload);
-      formData.append("prefix", "dstech_invoice_photo");
+      for (let i = 0; i < totalFiles; i++) {
+        const file = files[i];
+        setUploadProgressText(`Mengompresi & mengunggah foto ${i + 1} dari ${totalFiles}...`);
 
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const json = await res.json();
-      if (json.success && json.url) {
-        const newPhoto: ProjectPhoto = {
-          id: `dstech_inv_photo_${Date.now()}`,
-          url: json.url,
-          caption:
-            invoicePhotoCaption.trim() ||
-            (invoicePhotoCategory === "part_replacement"
-              ? `Foto Penggantian Part - Faktur ${selectedInvoiceForPhotos.invoiceNumber}`
-              : `Foto Dokumentasi Pekerjaan - Faktur ${selectedInvoiceForPhotos.invoiceNumber}`),
-          category: invoicePhotoCategory,
-          createdAt: new Date().toISOString(),
-        };
-        const updatedPhotos = [...(selectedInvoiceForPhotos.photos || []), newPhoto];
+        // Kompresi cerdas otomatis ke target ~40 KB
+        const { file: fileToUpload, originalSize, compressedSize } = await compressImageFile(file, 40);
+        totalOriginal += originalSize;
+        totalCompressed += compressedSize;
 
+        const formData = new FormData();
+        formData.append("file", fileToUpload);
+        formData.append("prefix", "dstech_invoice_photo");
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const json = await res.json();
+        if (json.success && json.url) {
+          const userCap = invoicePhotoCaption.trim();
+          const finalCaption = totalFiles > 1 && userCap
+            ? `${userCap} (${i + 1})`
+            : userCap || (invoicePhotoCategory === "part_replacement"
+                ? `Foto Pergantian Part - Faktur ${selectedInvoiceForPhotos.invoiceNumber}${totalFiles > 1 ? ` (${i + 1})` : ""}`
+                : `Foto Dokumentasi Pekerjaan - Faktur ${selectedInvoiceForPhotos.invoiceNumber}${totalFiles > 1 ? ` (${i + 1})` : ""}`);
+
+          newlyAddedPhotos.push({
+            id: `dstech_inv_photo_${Date.now()}_${i}_${Math.floor(Math.random() * 1000)}`,
+            url: json.url,
+            caption: finalCaption,
+            category: invoicePhotoCategory,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      if (newlyAddedPhotos.length > 0) {
+        const updatedPhotos = [...(selectedInvoiceForPhotos.photos || []), ...newlyAddedPhotos];
         const updateRes = await fetch("/api/finance", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -5223,22 +5247,70 @@ export default function AdminFinanceERPPage() {
             prev.map((s) => (s.id === selectedInvoiceForPhotos.id ? updatedSale : s))
           );
           setInvoicePhotoCaption("");
+          const ratio = totalOriginal > totalCompressed ? Math.round((1 - totalCompressed / totalOriginal) * 100) : 0;
           showToast(
-            ratio > 0
-              ? `✓ Foto faktur tersimpan: ${formatBytes(originalSize)} ➔ ${formatBytes(compressedSize)} (Hemat ${ratio}%)`
-              : "Foto dokumentasi faktur penagihan berhasil disimpan!"
+            `✓ Berhasil mengunggah ${newlyAddedPhotos.length} foto! ${formatBytes(totalOriginal)} ➔ ${formatBytes(totalCompressed)} (Hemat ${ratio}%)`
           );
         } else {
           showToast("Gagal menyimpan update foto faktur");
         }
       } else {
-        showToast("Gagal upload foto: " + (json.message || "Error"));
+        showToast("Tidak ada file foto yang berhasil diunggah");
       }
     } catch (err: any) {
       showToast("Error: " + (err?.message || "Terjadi kesalahan upload"));
     } finally {
       setIsUploadingInvoicePhoto(false);
+      setUploadProgressText("");
       e.target.value = "";
+    }
+  };
+
+  const handleStartEditPhoto = (photo: ProjectPhoto) => {
+    setEditingPhotoId(photo.id);
+    setEditingPhotoCaption(photo.caption || "");
+    setEditingPhotoCategory(photo.category || "documentation");
+  };
+
+  const handleSaveEditPhoto = async () => {
+    if (!selectedInvoiceForPhotos || !editingPhotoId) return;
+    const updatedPhotos = (selectedInvoiceForPhotos.photos || []).map((p) =>
+      p.id === editingPhotoId
+        ? {
+            ...p,
+            caption: editingPhotoCaption.trim() || p.caption,
+            category: editingPhotoCategory,
+          }
+        : p
+    );
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "sale",
+          id: selectedInvoiceForPhotos.id,
+          payload: {
+            ...selectedInvoiceForPhotos,
+            photos: updatedPhotos,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const updatedSale = { ...selectedInvoiceForPhotos, photos: updatedPhotos };
+        setSelectedInvoiceForPhotos(updatedSale);
+        setSales((prev) =>
+          prev.map((s) => (s.id === selectedInvoiceForPhotos.id ? updatedSale : s))
+        );
+        setEditingPhotoId(null);
+        showToast("✓ Keterangan & kategori foto berhasil disimpan!");
+      } else {
+        showToast("Gagal menyimpan perubahan foto");
+      }
+    } catch {
+      showToast("Gagal mengupdate foto");
     }
   };
 
@@ -22151,9 +22223,10 @@ export default function AdminFinanceERPPage() {
                 <div className="sm:col-span-3 flex items-end">
                   <label className="w-full px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold cursor-pointer transition-all flex items-center justify-center gap-2 shadow-xs text-xs">
                     <UploadCloud className="w-4 h-4" />
-                    <span>{isUploadingInvoicePhoto ? "Mengunggah..." : "Pilih File Foto"}</span>
+                    <span>{isUploadingInvoicePhoto ? (uploadProgressText || "Mengunggah...") : "Pilih File (Bisa Banyak)"}</span>
                     <input
                       type="file"
+                      multiple
                       accept="image/*"
                       disabled={isUploadingInvoicePhoto}
                       onChange={handleUploadInvoicePhoto}
@@ -22162,6 +22235,12 @@ export default function AdminFinanceERPPage() {
                   </label>
                 </div>
               </div>
+              {uploadProgressText && (
+                <div className="p-2 rounded-lg bg-purple-100 text-purple-800 text-xs font-bold flex items-center gap-2 animate-pulse">
+                  <UploadCloud className="w-4 h-4 animate-bounce" />
+                  <span>{uploadProgressText}</span>
+                </div>
+              )}
             </div>
 
             {/* Filter Pills & List */}
@@ -22240,23 +22319,85 @@ export default function AdminFinanceERPPage() {
                           >
                             {photo.category === "part_replacement" ? "Pergantian Part" : "Dokumentasi"}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveInvoicePhoto(photo.id)}
-                            className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-rose-600 text-slate-600 hover:text-white transition-all shadow-sm cursor-pointer"
-                            title="Hapus Foto"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <div className="absolute top-2 right-2 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditPhoto(photo)}
+                              className="p-1.5 rounded-full bg-white/90 hover:bg-purple-600 text-slate-600 hover:text-white transition-all shadow-sm cursor-pointer"
+                              title="Edit Keterangan / Kategori"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveInvoicePhoto(photo.id)}
+                              className="p-1.5 rounded-full bg-white/90 hover:bg-rose-600 text-slate-600 hover:text-white transition-all shadow-sm cursor-pointer"
+                              title="Hapus Foto"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <div className="p-3 text-xs space-y-1 flex-1 flex flex-col justify-between">
-                          <p className="font-bold text-slate-800 line-clamp-2">
-                            {photo.caption}
-                          </p>
-                          <span className="text-[10px] text-slate-400 block pt-1">
-                            {photo.createdAt ? new Date(photo.createdAt).toLocaleString("id-ID") : "Baru saja"}
-                          </span>
-                        </div>
+
+                        {editingPhotoId === photo.id ? (
+                          <div className="p-3 bg-purple-50/70 border-t border-purple-200 text-xs space-y-2">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Kategori:</label>
+                              <select
+                                value={editingPhotoCategory}
+                                onChange={(e) => setEditingPhotoCategory(e.target.value as any)}
+                                className="w-full px-2 py-1 rounded-lg border border-purple-300 bg-white font-bold text-slate-800 text-xs"
+                              >
+                                <option value="documentation">📸 Dokumentasi Pekerjaan</option>
+                                <option value="part_replacement">⚙️ Pergantian Part</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 block mb-0.5">Keterangan:</label>
+                              <input
+                                type="text"
+                                value={editingPhotoCaption}
+                                onChange={(e) => setEditingPhotoCaption(e.target.value)}
+                                className="w-full px-2 py-1 rounded-lg border border-purple-300 bg-white text-slate-800 text-xs"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1.5 pt-1">
+                              <button
+                                type="button"
+                                onClick={handleSaveEditPhoto}
+                                className="px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1 cursor-pointer"
+                              >
+                                <Check className="w-3 h-3" />
+                                <span>Simpan</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingPhotoId(null)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
+                              >
+                                Batal
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 text-xs space-y-1 flex-1 flex flex-col justify-between">
+                            <p className="font-bold text-slate-800 line-clamp-2">
+                              {photo.caption}
+                            </p>
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+                              <span>
+                                {photo.createdAt ? new Date(photo.createdAt).toLocaleString("id-ID") : "Baru saja"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditPhoto(photo)}
+                                className="text-purple-600 hover:text-purple-800 font-bold cursor-pointer"
+                              >
+                                Ubah Keterangan
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                 </div>
@@ -22294,7 +22435,44 @@ export default function AdminFinanceERPPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Pilihan Kategori Cetak Lampiran Foto */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPrintPhotoCategoryFilter("ALL")}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      printPhotoCategoryFilter === "ALL"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    Semua (Dokumentasi & Part)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintPhotoCategoryFilter("documentation")}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      printPhotoCategoryFilter === "documentation"
+                        ? "bg-purple-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    📸 Hanya Dokumentasi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintPhotoCategoryFilter("part_replacement")}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      printPhotoCategoryFilter === "part_replacement"
+                        ? "bg-amber-600 text-white shadow-xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`}
+                  >
+                    ⚙️ Hanya Pergantian Part
+                  </button>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => setInvoicePhotoLetterhead(!invoicePhotoLetterhead)}
@@ -22386,7 +22564,11 @@ export default function AdminFinanceERPPage() {
                       {/* Judul Lembar Lampiran */}
                       <div className="text-center space-y-1 border-b-2 border-slate-800 pb-3">
                         <h1 className="text-xl font-black text-slate-900 tracking-wider uppercase font-serif">
-                          LAMPIRAN DOKUMENTASI PEKERJAAN & BUKTI FISIK
+                          {printPhotoCategoryFilter === "documentation"
+                            ? "LAMPIRAN DOKUMENTASI PEKERJAAN LAPANGAN"
+                            : printPhotoCategoryFilter === "part_replacement"
+                            ? "LAMPIRAN BUKTI FISIK PERGANTIAN PART & MATERIAL"
+                            : "LAMPIRAN DOKUMENTASI PEKERJAAN & BUKTI FISIK PART"}
                         </h1>
                         <p className="text-xs text-slate-500 tracking-wide font-sans uppercase font-bold">
                           KELENGKAPAN ADMINISTRASI PENAGIHAN FAKTUR PENJUALAN
@@ -22420,91 +22602,95 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
 
-                {/* I. FOTO DOKUMENTASI PEKERJAAN */}
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
-                    <h4 className="font-black text-slate-900 text-xs flex items-center gap-1.5 uppercase">
-                      <span>I. Dokumentasi Pelaksanaan Pekerjaan Lapangan</span>
-                    </h4>
-                    <span className="text-[10px] text-slate-400">
-                      {selectedInvoiceForPhotoPrint.photos?.filter((p) => p.category === "documentation").length || 0} Foto
-                    </span>
-                  </div>
-
-                  {(!selectedInvoiceForPhotoPrint.photos || selectedInvoiceForPhotoPrint.photos.filter((p) => p.category === "documentation").length === 0) ? (
-                    <p className="text-xs text-slate-400 italic py-2">Tidak ada foto dokumentasi pekerjaan pada faktur ini.</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      {selectedInvoiceForPhotoPrint.photos
-                        .filter((p) => p.category === "documentation")
-                        .map((photo, idx) => (
-                          <div
-                            key={photo.id || idx}
-                            className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50/50 space-y-2 p-2.5 shadow-2xs"
-                          >
-                            <div className="h-48 w-full bg-slate-200 rounded-lg overflow-hidden flex items-center justify-center">
-                              <img
-                                src={photo.url}
-                                alt={photo.caption}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="space-y-0.5">
-                              <p className="text-xs font-bold text-slate-800 leading-tight">
-                                {idx + 1}. {photo.caption}
-                              </p>
-                              <span className="text-[10px] text-slate-400 block">
-                                Tanggal: {photo.createdAt ? new Date(photo.createdAt).toLocaleDateString("id-ID") : selectedInvoiceForPhotoPrint.date}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                {/* I. FOTO DOKUMENTASI PEKERJAAN (HANYA MUNCUL JIKA DIPILIH ATAU SEMUA) */}
+                {(printPhotoCategoryFilter === "ALL" || printPhotoCategoryFilter === "documentation") && (
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between border-b border-slate-200 pb-1.5">
+                      <h4 className="font-black text-slate-900 text-xs flex items-center gap-1.5 uppercase">
+                        <span>{printPhotoCategoryFilter === "ALL" ? "I. Dokumentasi Pelaksanaan Pekerjaan Lapangan" : "Dokumentasi Pelaksanaan Pekerjaan Lapangan"}</span>
+                      </h4>
+                      <span className="text-[10px] text-slate-400">
+                        {selectedInvoiceForPhotoPrint.photos?.filter((p) => p.category === "documentation").length || 0} Foto
+                      </span>
                     </div>
-                  )}
-                </div>
 
-                {/* II. FOTO PERGANTIAN PART / SPAREPART */}
-                <div className="space-y-3 pt-4">
-                  <div className="flex items-center justify-between border-b border-amber-200 pb-1.5">
-                    <h4 className="font-black text-amber-950 text-xs flex items-center gap-1.5 uppercase">
-                      <span>II. Bukti Fisik Pergantian Part & Material Terpasang</span>
-                    </h4>
-                    <span className="text-[10px] text-slate-400">
-                      {selectedInvoiceForPhotoPrint.photos?.filter((p) => p.category === "part_replacement").length || 0} Foto
-                    </span>
+                    {(!selectedInvoiceForPhotoPrint.photos || selectedInvoiceForPhotoPrint.photos.filter((p) => p.category === "documentation").length === 0) ? (
+                      <p className="text-xs text-slate-400 italic py-2">Tidak ada foto dokumentasi pekerjaan pada faktur ini.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        {selectedInvoiceForPhotoPrint.photos
+                          .filter((p) => p.category === "documentation")
+                          .map((photo, idx) => (
+                            <div
+                              key={photo.id || idx}
+                              className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50/50 space-y-2 p-2.5 shadow-2xs"
+                            >
+                              <div className="h-48 w-full bg-slate-200 rounded-lg overflow-hidden flex items-center justify-center">
+                                <img
+                                  src={photo.url}
+                                  alt={photo.caption}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="space-y-0.5">
+                                <p className="text-xs font-bold text-slate-800 leading-tight">
+                                  {idx + 1}. {photo.caption}
+                                </p>
+                                <span className="text-[10px] text-slate-400 block">
+                                  Tanggal: {photo.createdAt ? new Date(photo.createdAt).toLocaleDateString("id-ID") : selectedInvoiceForPhotoPrint.date}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
+                )}
 
-                  {(!selectedInvoiceForPhotoPrint.photos || selectedInvoiceForPhotoPrint.photos.filter((p) => p.category === "part_replacement").length === 0) ? (
-                    <p className="text-xs text-slate-400 italic py-2">Tidak ada pergantian suku cadang / sparepart khusus pada faktur ini.</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-4">
-                      {selectedInvoiceForPhotoPrint.photos
-                        .filter((p) => p.category === "part_replacement")
-                        .map((photo, idx) => (
-                          <div
-                            key={photo.id || idx}
-                            className="rounded-xl border border-amber-200 overflow-hidden bg-amber-50/30 space-y-2 p-2.5 shadow-2xs"
-                          >
-                            <div className="h-48 w-full bg-slate-200 rounded-lg overflow-hidden flex items-center justify-center">
-                              <img
-                                src={photo.url}
-                                alt={photo.caption}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="space-y-0.5">
-                              <p className="text-xs font-bold text-slate-800 leading-tight">
-                                {idx + 1}. {photo.caption}
-                              </p>
-                              <span className="text-[10px] text-slate-400 block">
-                                Tanggal: {photo.createdAt ? new Date(photo.createdAt).toLocaleDateString("id-ID") : selectedInvoiceForPhotoPrint.date}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                {/* II. FOTO PERGANTIAN PART / SPAREPART (HANYA MUNCUL JIKA DIPILIH ATAU SEMUA) */}
+                {(printPhotoCategoryFilter === "ALL" || printPhotoCategoryFilter === "part_replacement") && (
+                  <div className="space-y-3 pt-4">
+                    <div className="flex items-center justify-between border-b border-amber-200 pb-1.5">
+                      <h4 className="font-black text-amber-950 text-xs flex items-center gap-1.5 uppercase">
+                        <span>{printPhotoCategoryFilter === "ALL" ? "II. Bukti Fisik Pergantian Part & Material Terpasang" : "Bukti Fisik Pergantian Part & Material Terpasang"}</span>
+                      </h4>
+                      <span className="text-[10px] text-slate-400">
+                        {selectedInvoiceForPhotoPrint.photos?.filter((p) => p.category === "part_replacement").length || 0} Foto
+                      </span>
                     </div>
-                  )}
-                </div>
+
+                    {(!selectedInvoiceForPhotoPrint.photos || selectedInvoiceForPhotoPrint.photos.filter((p) => p.category === "part_replacement").length === 0) ? (
+                      <p className="text-xs text-slate-400 italic py-2">Tidak ada pergantian suku cadang / sparepart khusus pada faktur ini.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        {selectedInvoiceForPhotoPrint.photos
+                          .filter((p) => p.category === "part_replacement")
+                          .map((photo, idx) => (
+                            <div
+                              key={photo.id || idx}
+                              className="rounded-xl border border-amber-200 overflow-hidden bg-amber-50/30 space-y-2 p-2.5 shadow-2xs"
+                            >
+                              <div className="h-48 w-full bg-slate-200 rounded-lg overflow-hidden flex items-center justify-center">
+                                <img
+                                  src={photo.url}
+                                  alt={photo.caption}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <div className="space-y-0.5">
+                                <p className="text-xs font-bold text-slate-800 leading-tight">
+                                  {idx + 1}. {photo.caption}
+                                </p>
+                                <span className="text-[10px] text-slate-400 block">
+                                  Tanggal: {photo.createdAt ? new Date(photo.createdAt).toLocaleDateString("id-ID") : selectedInvoiceForPhotoPrint.date}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Pengesahan Tanda Tangan Ganda A4 */}
                 <div className="pt-8 border-t border-slate-200 grid grid-cols-2 gap-8 text-xs">
