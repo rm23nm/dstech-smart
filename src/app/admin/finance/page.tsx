@@ -70,6 +70,7 @@ import {
   HardDrive,
   Briefcase,
   FolderKanban,
+  Globe,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -143,6 +144,8 @@ export interface ProjectItem {
   picProject?: string;
   description?: string;
   createdAt?: string;
+  isPublishedToPortfolio?: boolean;
+  portfolioId?: string;
 }
 
 interface SaleInvoice {
@@ -1043,6 +1046,32 @@ export default function AdminFinanceERPPage() {
   const [editingProject, setEditingProject] = useState<ProjectItem | null>(null);
   const [selectedProjectForDetail, setSelectedProjectForDetail] = useState<ProjectItem | null>(null);
   const [projectDossierTab, setProjectDossierTab] = useState<"summary" | "sales" | "purchases" | "cash">("summary");
+  const [isPublishPortfolioModalOpen, setIsPublishPortfolioModalOpen] = useState<boolean>(false);
+  const [publishPortfolioForm, setPublishPortfolioForm] = useState<{
+    projectId: string;
+    projectCode: string;
+    title: string;
+    client: string;
+    category: string;
+    location: string;
+    completionDate: string;
+    description: string;
+    image: string;
+    videoUrl: string;
+  }>({
+    projectId: "",
+    projectCode: "",
+    title: "",
+    client: "",
+    category: "Industrial & Factory",
+    location: "Cilegon, Banten",
+    completionDate: new Date().toISOString().slice(0, 7),
+    description: "",
+    image: "/portfolio-industrial.png",
+    videoUrl: "",
+  });
+  const [isPublishingPortfolio, setIsPublishingPortfolio] = useState<boolean>(false);
+  const [isUploadingPortfolioImg, setIsUploadingPortfolioImg] = useState<boolean>(false);
   const [projectFilterStatus, setProjectFilterStatus] = useState<string>("ALL");
   const [projectForm, setProjectForm] = useState<{
     projectCode: string;
@@ -4578,6 +4607,146 @@ export default function AdminFinanceERPPage() {
     }
   };
 
+  const handleOpenPublishPortfolio = (project: ProjectItem) => {
+    let initialCat = "Industrial & Factory";
+    const combinedText = `${project.projectName} ${project.description || ""}`.toLowerCase();
+    if (combinedText.includes("cctv") || combinedText.includes("security") || combinedText.includes("kamera")) {
+      initialCat = "Security & CCTV";
+    } else if (combinedText.includes("smart home") || combinedText.includes("iot") || combinedText.includes("otomasi")) {
+      initialCat = "Smart Home & Automation";
+    } else if (combinedText.includes("access") || combinedText.includes("barrier") || combinedText.includes("gate")) {
+      initialCat = "Access Control & Gate";
+    } else if (combinedText.includes("jaringan") || combinedText.includes("fiber") || combinedText.includes("lan") || combinedText.includes("server")) {
+      initialCat = "IT & Network Infrastructure";
+    } else if (combinedText.includes("masjid") || combinedText.includes("mosque")) {
+      initialCat = "Public & Commercial";
+    }
+
+    setPublishPortfolioForm({
+      projectId: project.id,
+      projectCode: project.projectCode,
+      title: project.projectName,
+      client: project.clientName || "Klien DSTech Smart",
+      category: initialCat,
+      location: project.clientAddress || "Cilegon, Banten",
+      completionDate: project.actualEndDate || project.targetEndDate || new Date().toISOString().slice(0, 7),
+      description: project.description?.trim()
+        ? project.description
+        : `Implementasi dan instalasi profesional ${project.projectName} untuk ${project.clientName || "klien"}. Dikerjakan dengan standar mutu terbaik dan garansi purnajual PT DSTech Smart Perkasa.`,
+      image: "/portfolio-industrial.png",
+      videoUrl: "",
+    });
+    setIsPublishPortfolioModalOpen(true);
+  };
+
+  const handleUploadPortfolioImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingPortfolioImg(true);
+      const { file: fileToUpload } = await compressImageFile(file);
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("docType", "portfolio");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setPublishPortfolioForm((prev) => ({
+          ...prev,
+          image: data.url,
+        }));
+        showToast("✓ Foto portofolio berhasil diunggah!");
+      } else {
+        showToast("Gagal mengunggah foto portofolio.");
+      }
+    } catch (err) {
+      console.error("Error uploading portfolio image:", err);
+      showToast("Gagal memproses foto portofolio.");
+    } finally {
+      setIsUploadingPortfolioImg(false);
+    }
+  };
+
+  const handlePublishToPortfolioSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!publishPortfolioForm.title.trim()) {
+      showToast("Judul proyek portofolio wajib diisi!");
+      return;
+    }
+    if (!publishPortfolioForm.client.trim()) {
+      showToast("Nama klien wajib diisi!");
+      return;
+    }
+
+    setIsPublishingPortfolio(true);
+    try {
+      // 1. POST ke /api/portfolios
+      const portRes = await fetch("/api/portfolios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: publishPortfolioForm.title.trim(),
+          client: publishPortfolioForm.client.trim(),
+          category: publishPortfolioForm.category,
+          location: publishPortfolioForm.location.trim(),
+          completionDate: publishPortfolioForm.completionDate,
+          description: publishPortfolioForm.description.trim(),
+          image: publishPortfolioForm.image.trim() || "/portfolio-industrial.png",
+          videoUrl: publishPortfolioForm.videoUrl.trim(),
+        }),
+      });
+
+      const portData = await portRes.json();
+      if (!portRes.ok || !portData.success) {
+        showToast(portData.message || "Gagal mempublikasikan ke portofolio");
+        setIsPublishingPortfolio(false);
+        return;
+      }
+
+      const createdPortId = portData.data?.id;
+
+      // 2. Update status proyek di ERP dstech_projects
+      if (publishPortfolioForm.projectId) {
+        const prjToUpdate = projects.find((p) => p.id === publishPortfolioForm.projectId);
+        if (prjToUpdate) {
+          await fetch("/api/finance", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              actionType: "project",
+              id: publishPortfolioForm.projectId,
+              payload: {
+                ...prjToUpdate,
+                isPublishedToPortfolio: true,
+                portfolioId: createdPortId,
+              },
+            }),
+          });
+        }
+      }
+
+      showToast(`🎉 Sukses! Proyek "${publishPortfolioForm.title}" berhasil dipublikasikan ke Portofolio Publik Website!`);
+      setIsPublishPortfolioModalOpen(false);
+      await fetchFinanceData();
+
+      if (selectedProjectForDetail && selectedProjectForDetail.id === publishPortfolioForm.projectId) {
+        setSelectedProjectForDetail((prev) =>
+          prev ? { ...prev, isPublishedToPortfolio: true, portfolioId: createdPortId } : null
+        );
+      }
+    } catch (err) {
+      console.error("Error publishing to portfolio:", err);
+      showToast("Terjadi kesalahan saat mempublikasikan ke portofolio");
+    } finally {
+      setIsPublishingPortfolio(false);
+    }
+  };
+
   // Warehouse Master Handlers
   const handleOpenAddWarehouse = () => {
     setEditingWarehouse(null);
@@ -7639,6 +7808,12 @@ export default function AdminFinanceERPPage() {
                             >
                               {prj.businessEntity === "NON_PT" ? "🏬 DSTech Smart" : "🏢 PT. DSTech Smart"}
                             </span>
+                            {prj.isPublishedToPortfolio && (
+                              <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-teal-50 text-teal-700 border border-teal-200 flex items-center gap-1">
+                                <Globe className="w-2.5 h-2.5" />
+                                <span>Portofolio</span>
+                              </span>
+                            )}
                           </div>
                           <h4 className="text-sm font-black text-slate-800 mt-1 line-clamp-1">{prj.projectName}</h4>
                           <p className="text-xs text-slate-500 font-semibold flex items-center gap-1 mt-0.5">
@@ -7711,6 +7886,17 @@ export default function AdminFinanceERPPage() {
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>Dossier</span>
+                          </button>
+                          <button
+                            onClick={() => handleOpenPublishPortfolio(prj)}
+                            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                              prj.isPublishedToPortfolio
+                                ? "bg-teal-50 text-teal-700 hover:bg-teal-600 hover:text-white"
+                                : "bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white"
+                            }`}
+                            title={prj.isPublishedToPortfolio ? "Update Portofolio Website" : "Publikasikan ke Portofolio Website"}
+                          >
+                            <Globe className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleOpenEditProject(prj)}
@@ -12343,6 +12529,12 @@ export default function AdminFinanceERPPage() {
                         >
                           {prj.status}
                         </span>
+                        {prj.isPublishedToPortfolio && (
+                          <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-300 flex items-center gap-1 shadow-2xs">
+                            <Globe className="w-3 h-3 text-teal-600" />
+                            <span>Tayang di Portofolio</span>
+                          </span>
+                        )}
                       </div>
                       <h3 className="text-lg font-black text-slate-900 mt-1">{prj.projectName}</h3>
                       <p className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
@@ -12356,7 +12548,19 @@ export default function AdminFinanceERPPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPublishPortfolio(prj)}
+                      className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all ${
+                        prj.isPublishedToPortfolio
+                          ? "bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-300"
+                          : "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                      }`}
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>{prj.isPublishedToPortfolio ? "Update Portofolio" : "Publikasikan ke Portofolio"}</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleOpenEditProject(prj)}
@@ -12806,6 +13010,258 @@ export default function AdminFinanceERPPage() {
             </div>
           );
         })()
+      )}
+
+      {/* MODAL PUBLIKASI PROYEK KE PORTOFOLIO WEBSITE */}
+      {isPublishPortfolioModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => !isPublishingPortfolio && setIsPublishPortfolioModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-md">
+                  <Globe className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                      {publishPortfolioForm.projectCode || "PORTOFOLIO WEBSITE"}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Publikasi Resmi
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 mt-0.5">
+                    Publikasikan ke Portofolio Website
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Kurasi data proyek untuk ditampilkan pada halaman portofolio publik & beranda dstechsmart.com
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={isPublishingPortfolio}
+                onClick={() => setIsPublishPortfolioModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Form Kurasi */}
+            <form onSubmit={handlePublishToPortfolioSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                {/* Judul Proyek */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Judul Proyek Publik <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={publishPortfolioForm.title}
+                    onChange={(e) => setPublishPortfolioForm({ ...publishPortfolioForm, title: e.target.value })}
+                    placeholder="Contoh: Instalasi CCTV & Smart Security Pabrik Baja"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-800"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Gunakan judul yang menarik, jelas, dan menggambarkan hasil instalasi.
+                  </span>
+                </div>
+
+                {/* Nama Klien */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Nama Klien / Perusahaan <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={publishPortfolioForm.client}
+                    onChange={(e) => setPublishPortfolioForm({ ...publishPortfolioForm, client: e.target.value })}
+                    placeholder="Contoh: PT. Krakatau Posco"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-800"
+                  />
+                </div>
+
+                {/* Kategori Portofolio */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Kategori Layanan <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={publishPortfolioForm.category}
+                    onChange={(e) => setPublishPortfolioForm({ ...publishPortfolioForm, category: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-800 bg-white"
+                  >
+                    <option value="Industrial & Factory">Industrial & Factory (Pabrik & Industri)</option>
+                    <option value="Commercial & Office">Commercial & Office (Gedung & Kantor)</option>
+                    <option value="Security & CCTV">Security & CCTV (Kamera & Keamanan)</option>
+                    <option value="Access Control & Gate">Access Control & Smart Barrier Gate</option>
+                    <option value="Smart Home & Automation">Smart Home & Otomasi Hunian</option>
+                    <option value="IT & Network Infrastructure">IT & Jaringan Fiber Optic / LAN</option>
+                    <option value="Public & Commercial">Fasilitas Umum & Masjid</option>
+                    <option value="Residential">Residensial & Perumahan</option>
+                  </select>
+                </div>
+
+                {/* Lokasi */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Lokasi Pekerjaan
+                  </label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      value={publishPortfolioForm.location}
+                      onChange={(e) => setPublishPortfolioForm({ ...publishPortfolioForm, location: e.target.value })}
+                      placeholder="Contoh: Kawasan Industri Cilegon, Banten"
+                      className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Tanggal / Periode Selesai */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Bulan & Tahun Selesai
+                  </label>
+                  <div className="relative">
+                    <Calendar className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="month"
+                      value={publishPortfolioForm.completionDate}
+                      onChange={(e) => setPublishPortfolioForm({ ...publishPortfolioForm, completionDate: e.target.value })}
+                      className="w-full pl-9 pr-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Deskripsi Portofolio */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Deskripsi Ringkasan Hasil Pekerjaan
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={publishPortfolioForm.description}
+                    onChange={(e) => setPublishPortfolioForm({ ...publishPortfolioForm, description: e.target.value })}
+                    placeholder="Jelaskan ruang lingkup instalasi, jumlah perangkat yang terpasang, keunggulan solusi, dan kepuasan klien..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-800 leading-relaxed"
+                  />
+                </div>
+
+                {/* Foto Hasil Kerja */}
+                <div className="sm:col-span-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                      <HardDrive className="w-4 h-4 text-indigo-600" />
+                      <span>Foto Hasil Instalasi / Dokumentasi Lapangan</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400">Direkomendasikan foto asli hasil kerja</span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    {/* Thumbnail Preview */}
+                    <div className="w-24 h-20 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden relative shrink-0 flex items-center justify-center">
+                      {publishPortfolioForm.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={publishPortfolioForm.image}
+                          alt="Pratinjau Portofolio"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = "/portfolio-industrial.png";
+                          }}
+                        />
+                      ) : (
+                        <Globe className="w-8 h-8 text-slate-400" />
+                      )}
+                    </div>
+
+                    {/* Upload Controls */}
+                    <div className="flex-1 space-y-2 w-full">
+                      <div className="flex items-center gap-2">
+                        <label className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-indigo-700 font-bold border border-indigo-200 cursor-pointer transition-all flex items-center gap-1.5 text-xs shadow-2xs">
+                          <UploadCloud className="w-3.5 h-3.5" />
+                          <span>{isUploadingPortfolioImg ? "Mengunggah..." : "Upload Foto Proyek"}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            disabled={isUploadingPortfolioImg}
+                            onChange={handleUploadPortfolioImage}
+                            className="hidden"
+                          />
+                        </label>
+                        <span className="text-[10px] text-slate-500">atau masukkan URL gambar:</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={publishPortfolioForm.image}
+                        onChange={(e) => setPublishPortfolioForm({ ...publishPortfolioForm, image: e.target.value })}
+                        placeholder="/uploads/dstech_img_... atau URL gambar publik"
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-[11px] text-slate-700"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Video Dokumentasi (Opsional) */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Link Video Dokumentasi / YouTube (Opsional)
+                  </label>
+                  <input
+                    type="url"
+                    value={publishPortfolioForm.videoUrl}
+                    onChange={(e) => setPublishPortfolioForm({ ...publishPortfolioForm, videoUrl: e.target.value })}
+                    placeholder="https://www.youtube.com/watch?v=... atau https://youtu.be/..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs text-slate-800"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">
+                    Jika diisi, pengunjung website dapat memutar video dokumentasi hasil kerja langsung di galeri portofolio.
+                  </span>
+                </div>
+              </div>
+
+              {/* Notice Banner */}
+              <div className="p-3 rounded-2xl bg-indigo-50/70 border border-indigo-200 text-indigo-900 flex items-start gap-2.5">
+                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed">
+                  <strong>Privasi Klien & Keamanan Data:</strong> Data yang dipublikasikan hanya berupa dokumentasi visual dan deskripsi teknis hasil kerja. Rincian anggaran biaya internal (HPP, margin laba, dan nota belanja) <strong>tetap 100% rahasia</strong> di internal ERP dan tidak akan ditampilkan ke publik.
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  disabled={isPublishingPortfolio}
+                  onClick={() => setIsPublishPortfolioModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isPublishingPortfolio || isUploadingPortfolioImg}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black cursor-pointer shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Globe className="w-4 h-4" />
+                  <span>{isPublishingPortfolio ? "Mempublikasikan..." : "Tayangkan ke Portofolio Website"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* MODAL MASTER DATA: TAMBAH / EDIT TITIK GUDANG */}
