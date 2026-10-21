@@ -68,6 +68,7 @@
 - **2026-10-21**: Integrasi Sinkronisasi Manajemen Proyek ERP ke Portofolio Publik Website (Opsi A: Tombol Kurasi & Publikasi Manual Proyek Selesai). Menyediakan alur resmi publikasi proyek yang telah selesai dikerjakan (`Completed`) dari dashboard Manajemen Proyek ERP ke Portofolio Publik website (`dstechsmart.com/portfolio` dan beranda), lengkap dengan modal formulir kurasi (judul proyek, klien, kategori instalasi, lokasi, deskripsi publik, foto hasil kerja & URL video YouTube dokumentasi), validasi input, pengiriman ke API `/api/portfolios` ber-prefix `dstech_port_`, serta indikator status publikasi pada Project Dossier.
 - **2026-10-21**: Modul Manajemen Penjadwalan & Operasional Lapangan Maintenance Mandiri Terpisah (`/admin/maintenance` & `/superadmin/maintenance`). Memisahkan pencatatan dan tata kelola pekerjaan pemeliharaan (Maintenance Rutin Berkala & Tiket Perbaikan/Troubleshooting) dari modul proyek utama agar alur kerja teknisi dan riwayat servis SLA tercatat mandiri tanpa membebani kalkulasi P&L proyek. Dilengkapi navigasi sidebar, tab kalender & daftar jadwal kunjungan, filter status & prioritas tiket, penugasan teknisi PIC, modal terbit surat tugas SPK maintenance, sinkronisasi ke backend `/api/employee/tasks` ber-prefix `dstech_task_`, dan integrasi real-time ke portal mobile teknisi `/employee`.
 - **2026-10-21**: Sistem Otomasi Laporan Foto Dokumentasi & Pergantian Part Siap Cetak Lampiran Faktur Tagihan A4 (Maintenance & Project). Menyediakan sistem pelaporan bukti fisik komprehensif bagi PIC teknisi dan admin: (1) Form upload foto cepat (bisa langsung dari kamera HP teknisi di lapangan atau file galeri) dengan pilihan kategori wajib: `📸 Foto Dokumentasi Pekerjaan` atau `⚙️ Foto Pergantian Part / Sparepart` beserta keterangan/caption rincian tindakan; (2) Galeri foto terstruktur pada tiket maintenance (`/admin/maintenance`), portal teknisi (`/employee`), dan berkas proyek (`/admin/finance` -> Project Dossier); (3) Generator otomatis Lembar Resmi A4 *"Lampiran Laporan Foto Dokumentasi & Pergantian Part"* ber-Kop Surat Resmi PT DSTech Smart Perkasa (`kop_surat_dstech.jpg`), lengkap dengan nomor dokumen legalitas penagihan, data klien & proyek/tiket, tata letak grid foto rapi ber-caption, perbandingan part rusak vs part baru, pernyataan legalitas, serta dual signature block (PIC Pengawas Klien & Project Manager/Teknisi DSTech) siap 1-klik cetak/simpan PDF untuk disandingkan langsung dengan Faktur Tagihan (Invoice) penagihan ke klien. Lolos validasi TypeScript 0 error, pengujian visual browser subagent, push GitHub commit `2d8412b`, dan live deploy sukses di VPS PM2 `dstech-main` (HTTP 200 OK).
+- **2026-10-21**: Penyatuan Dashboard Tunggal Admin & Pengalihan Penuh Rute Superadmin ke /admin (Opsi C). Mengeliminasi duplikasi portal dashboard ganda yang membingungkan: Menghapus dashboard terpisah `/superadmin` yang sebelumnya berisi data dummy/mock awal, menyelaraskan seluruh alur login (`/login` dan `/api/auth/login`) untuk role `SUPERADMIN` dan `ADMIN` langsung membuka portal operasional resmi `/admin` yang memuat data riil terintegrasi database MySQL, serta memasang auto-redirect menyeluruh pada layout `/superadmin` (termasuk sub-rute `/superadmin/finance`, `/superadmin/products`, `/superadmin/categories`, dll.) agar otomatis dialihkan ke rute `/admin/...` terkait secara instan dan mulus. Lolos validasi kompilasi TypeScript 0 error, pengujian visual browser subagent, push GitHub commit `3b53c26`, dan live deploy sukses di VPS PM2 `dstech-main`.
 
 
 
@@ -2336,7 +2337,29 @@
 
 ---
 
-### 76. Catatan Penting
+### 76. Tugas: Penyatuan Dashboard Tunggal Admin & Pengalihan Penuh Rute Superadmin ke /admin (Opsi C)
+- **Permintaan Pengguna**:
+  1. *"saya bingung kenapa ada 2 tampilan dasbord yang berbeda, dan datanya juga berbeda"*
+  2. *"pakai Opsi C saja"*
+- **Status**: Selesai (Completed)
+- **Penyebab & Analisis Masalah**:
+  1. Sebelumnya terdapat dua portal dashboard terpisah: `/admin` (portal operasional korporat tema terang dengan data riil terintegrasi database MySQL/API) dan `/superadmin` (konsol tema gelap awal dengan data statis dummy mock 150M).
+  2. Akun dengan role `SUPERADMIN` saat login sebelumnya di-redirect ke `/superadmin` sehingga melihat data dummy yang membingungkan dan berbeda dengan portal `/admin`.
+  3. Berdasarkan pilihan pengguna (Opsi C), seluruh akses Superadmin dan Admin akan disatukan ke satu pintu dashboard tunggal yang sah dan mutakhir yaitu `/admin`.
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Buat backup file cadangan (`_backup/login_page.tsx.bak1`, `_backup/auth_login_route.ts.bak1`, `_backup/superadmin_page.tsx.bak1`, `_backup/superadmin_layout.tsx.bak1`, `_backup/LAPORAN_PROGRES.md.bak75`).
+  - [x] **Langkah 2**: Ubah redirection login di frontend `src/app/login/page.tsx` agar role `SUPERADMIN` maupun `ADMIN` diarahkan langsung ke `/admin`.
+  - [x] **Langkah 3**: Ubah redirect login API di backend `src/app/api/auth/login/route.ts` agar menetapkan `redirectUrl: "/admin"` untuk role `SUPERADMIN`.
+  - [x] **Langkah 4**: Pasang auto-redirect di `src/app/superadmin/page.tsx` dan `src/app/superadmin/layout.tsx` sehingga jika pengguna membuka URL `/superadmin` atau sub-rutenya, otomatis dialihkan langsung ke rute `/admin` terkait.
+  - [x] **Langkah 5**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error).
+  - [x] **Langkah 6**: Uji coba verifikasi redirect di browser via browser subagent.
+  - [x] **Langkah 7**: Push ke remote GitHub `rm23nm/dstech-smart` via `push_with_native_git.js` (commit `3b53c26`).
+  - [x] **Langkah 8**: Deploy ke server live VPS 157.66.34.199 via SSH dan restart PM2 `dstech-main`.
+  - [x] **Langkah 9**: Perbarui status di LAPORAN_PROGRES.md menjadi Selesai.
+
+---
+
+### 77. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
