@@ -56,7 +56,17 @@
 - **2026-10-20**: Resolusi Tuntas & Perlindungan Permanen Data Pengguna (Isolasi Database Runtime JSON dari Siklus Git Push/Pull Deploy).
 - **2026-10-20**: Fitur Kirim Dokumen via WhatsApp & Email Cepat pada Seluruh Transaksi & Berkas Bisnis (/admin/finance). Menyediakan generator pesan bisnis profesional (WA format & mailto) untuk SPH, Faktur, PO Supplier, Retur, dan Surat Jalan, normalisasi nomor HP internasional (628...), modal kirim interaktif dengan tombol buka WA / Email dan salin teks, serta tombol akses cepat di tabel dan toolbar cetak.
 - **2026-10-20**: Fitur Manajemen Status SPH (Auto & Manual Expired, Deal, Reject) serta Sistem Sortir & Quick Filter Status (/admin/finance). Mengakomodasi penawaran yang sudah lama tidak dikonversi ke faktur menjadi kedaluwarsa (Expired) baik secara otomatis berdasarkan tanggal masa berlaku (validUntil) maupun manual melalui tombol aksi cepat. Menambahkan badge visual tegas (Deal/Faktur, Menunggu Respon, Kedaluwarsa, Ditolak), aksi cepat (Tandai Expired, Tandai Reject, Buka Kembali / Re-Aktifkan, Konversi Faktur), 4 kartu mini KPI analitik status SPH, 5 Quick Filter Status Chips (Semua, Deal, Menunggu, Expired, Reject) dengan counter real-time, serta dropdown sortir serbaguna (Tanggal Terbaru/Terlama, Status Deal/Expired Teratas, Masa Berlaku, Nilai Tertinggi/Terendah, Klien A-Z). Lolos pengujian tsc 0 error, browser subagent, push ke GitHub (commit 65bdbbd), dan live deploy ke server VPS PM2 dstech-main (PID 3908210).
-- **2026-10-20**: Pembenahan Tuntas Lembar Cetak Dokumen & Fitur Cetak 2 Halaman (Halaman 1: Dokumen Utama Lengkap & Sah, Halaman 2: Lampiran Rincian Item Penawaran & Faktur Lengkap Tanpa Terpotong). Mengatasi masalah terpotongnya tanda tangan dan isi dokumen akibat overflow hidden dan batas 297mm di globals.css. Menambahkan pemisah halaman cetak .print-page-break, mode cetak 2 halaman profesional pada SPH dan Faktur (Halaman 1: surat resmi lengkap kop, ringkasan nilai penawaran/tagihan, instruksi rekening, terms, dan dual signature tanda tangan sah + stempel digital & barcode verifikasi; Halaman 2: lembar lampiran rincian item, spesifikasi teknis, rekapitulasi biaya, dan paraf pengesahan). Dilengkapi tombol toggle [1 Halaman / 2 Halaman] di header preview. Divalidasi tsc 0 error, di-push ke GitHub commit 98f4f91, dan dideploy sukses ke VPS PM2 dstech-main (PID 3897877). Menginvestigasi dan menyelesaikan tuntas masalah di mana setiap kali revisi kode dideploy, data yang telah diubah/dihapus/diperbaiki pengguna (seperti NIB 1909220127034, NPWP 60.648.216.4-102.000, Nama Direktur 'RAMADHANI ST', Rekening BCA 295-074-0321, dan pembersihan data demo) selalu ter-reset kembali ke data bawaan lama. Akar masalah ditemukan pada folder `src/data/*.json` yang sebelumnya ikut tersalin dan terlacak oleh Git, sehingga setiap kali deploy menjalankan `git stash && git pull`, Git memindahkan data riil pengguna ke stash dan menimpanya dengan data demo dari repositori. Tindakan perbaikan: Menyelamatkan dan memulihkan seluruh data riil pengguna dari stash, menghapus pelacakan `src/data/` dari Git (`git rm --cached -r src/data/`), menambahkan `src/data/` ke `.gitignore`, dan memperbarui script `push_with_native_git.js` agar Git hanya mengelola kode program dan tidak akan pernah menyentuh atau menimpa berkas database runtime pengguna lagi. Seluruh data riil pengguna kini 100% aman, utuh, dan persisten baik di lokal maupun live server.
+- **2026-10-20**: Pembenahan Tuntas Lembar Cetak Dokumen & Fitur Cetak 2 Halaman (Halaman 1: Dokumen Utama Lengkap & Sah, Halaman 2: Lampiran Rincian Item Penawaran & Faktur Lengkap Tanpa Terpotong).
+- **2026-10-20**: Pemisahan Mutlak 2 Halaman Cetak Dokumen Keuangan (Faktur Penjualan & SPH Penawaran) — Halaman 1 Dokumen Pengantar & Sah Tanpa Tabel Produk, Halaman 2 Lampiran Rincian Detail Produk & Spesifikasi Teknis. Mengeliminasi pencampuran tabel detail produk di Halaman 1 sehingga Halaman Utama murni memuat pengantar resmi, ringkasan nilai, instruksi rekening resmi, syarat & garansi, dan tanda tangan sah dual approval + stempel bulat digital resmi & barcode verifikasi. Tabel rincian detail produk, spesifikasi teknis, harga, diskon, dan rekapitulasi biaya dipisahkan secara permanen ke Halaman 2 (Lembar Lampiran Resmi). Mengoptimalkan stylesheet `@media print` universal sehingga browser Chromium (Chrome/Edge) membagi cetakan menjadi tepat 2 halaman A4 (Page 1 of 2 dan Page 2 of 2) tanpa terpotong atau terbelah. Divalidasi kompilasi TypeScript 0 error, diuji via browser subagent, dipush ke GitHub commit `fbca99b`, dan dideploy sukses ke server live VPS PM2 `dstech-main` (PID 3958706).
+- **2026-10-20**: Fitur Download Langsung File PDF Terkompresi Standar A4 untuk Seluruh 7 Jenis Dokumen Bisnis & Legalitas Keuangan (SPH Penawaran 2 Halaman, Faktur Penjualan Multi-Termin/DP/Standar 2 Halaman, Purchase Order Supplier, BAST Retur Barang, BAST Serah Terima Proyek, Surat Jalan Pengiriman, serta Lembar Resmi A4 Laporan Laba Rugi Komprehensif ber-Kop Surat DSTech). Mengintegrasikan tombol aksi hijau 'Download File PDF' berikon unduh di setiap toolbar modal cetak dokumen dan tabel data, memanfaatkan pustaka `html2pdf.js` dinamis dengan preset A4 210x297mm full bleed 0 margin dan optimasi canvas render gambar berkualitas tinggi, serta sinkronisasi dinamis `document.title` saat print/simpan PDF browser sehingga penamaan berkas otomatis terisi rapi standar korporat (`[DOKUMEN]_[NOMOR]_[PIHAK].pdf`) tanpa perlu diketik manual. Divalidasi kompilasi TypeScript (0 error), diuji visual via browser testing subagent, dipush ke GitHub master (commit `945bdfd`), dan dideploy sukses ke server live VPS PM2 `dstech-main` (PID 3991053).
+- **2026-10-20**: Fitur Sistem Penagihan Multi-Termin Bertahap (Milestone Billing) & Pemisahan Entitas Bisnis PT vs Usaha Mandiri Non-PT (DSTech Smart) pada Seluruh Transaksi Keuangan ERP.
+  1. Multi-Termin Bertahap: Menyediakan opsi skema penagihan Multi-Termin dinamis dengan preset cepat (30-40-30, 40-30-20-10, 50-30-20), repeater tahapan termin (nama termin, persentase bobot %, nominal rupiah terhitung otomatis, tanggal jatuh tempo, dan syarat pencairan progres pekerjaan), validasi bobot 100%, konversi SPH ke Multi-Termin, badge status termin pada tabel penjualan, modal terima pembayaran per termin aktif, dan pratinjau cetak resmi 2 halaman (Halaman 1: Banner penagihan termin berjalan, tabel rekapitulasi progres termin & milestone kontrak, rekening bank, pengesahan direksi; Halaman 2: Lampiran rincian detail barang & spesifikasi teknis).
+  2. Pemisahan Profil Entitas (PT. DSTech Smart Perkasa vs DSTech Smart Usaha Mandiri Non-PT): Mengintegrasikan entity selector global di toolbar dashboard keuangan ('Semua Entitas', 'PT. DSTech Smart Perkasa', 'DSTech Smart Non-PT'), switch entitas pada pembuatan Faktur Penjualan dan SPH (saat memilih Non-PT: otomatis Bebas PPN 0%, nomor faktur `INV/DTS-...`, kop surat usaha mandiri DSTech Smart tanpa embel-embel PT dan tanpa NPWP PT, rekening kas mandiri, dan tanda tangan tanpa stempel PT). Divalidasi TypeScript tsc (0 error), diuji via browser automation subagent, dipush ke GitHub (commit `c5c4836`), dan dideploy sukses ke server live VPS PM2 `dstech-main` (PID 4009675).
+- **2026-10-20**: Pemisahan Mutlak Transaksi Keuangan, Arus Kas Masuk/Keluar, Rekening Bank, dan Laporan Laba Rugi Berdasarkan Entitas Bisnis (PT. DSTech Smart Perkasa vs Usaha Mandiri Non-PT DSTech Smart). Menyelesaikan masalah pencampuran data antar-entitas: (1) Menambahkan field `entityType` pada `BankAccount` dan filter tab entitas ('Semua Rekening', 'Khusus PT', 'Khusus Non-PT / Pribadi') serta selector entitas pada formulir tambah/edit rekening di modal Pengaturan Rekening Bank; (2) Menambahkan selector `businessEntity` pada modal Catat Arus Kas (`cashForm`) dan membatasi pilihan rekening bank hanya yang sesuai peruntukan entitas transaksi tersebut; (3) Menambahkan selector entitas pada form Purchase Order (PO); (4) Memperbarui seluruh badge counter tab navigasi (`scopedCounts.sales`, `scopedCounts.quotations`, `scopedCounts.purchases`, `scopedCounts.cashFlow`) agar menampilkan jumlah riil sesuai filter entitas aktif; (5) Memperbarui ringkasan Kas Masuk (IN) & Kas Keluar (OUT) serta Tab & Lembar Cetak A4 Laporan Laba Rugi (P&L) menggunakan `displaySummary` terfilter entitas dan judul dinamis; (6) Otomatisasi pewarisan entitas kas masuk dari pelunasan faktur. Lolos validasi TypeScript (0 error), diuji via browser subagent, disinkronkan ke GitHub repository `rm23nm/dstech-smart` (commit `867a7df`), dan dideploy sukses ke server live VPS PM2 `dstech-main` (PID 4019246).
+- **2026-10-21**: Perbaikan Berkas Lampiran/Nota Rusak & Tidak Bisa Dibuka Pasca Upload (Penyelesaian Routing Static Uploads Nginx Reverse Proxy Live). Mengatasi masalah gambar nota/berkas bukti transaksi yang rusak (ikon gambar patah / hitam di browser) saat dibuka: File berhasil disimpan oleh API `/api/upload` ke direktori fisik `/www/wwwroot/dstechsmart.com/public/uploads/` (ber-prefix aman `dstech_doc_...`), namun blok reverse proxy Nginx pada `nextjs_proxy.conf` meneruskan seluruh request `location ^~ /` ke server proses Next.js port 3005 yang tidak melayani file statis dinamis runtime di luar fase build sehingga mengembalikan respon `HTTP 404 Not Found`. Mengonfigurasi direktif Nginx `location ^~ /uploads/ { alias /www/wwwroot/dstechsmart.com/public/uploads/; expires 30d; access_log off; }` tepat sebelum proxy pass Next.js, menguji sintaks Nginx (`nginx -t` lolos), me-reload Nginx, dan memastikan folder `public/uploads` di lokal tersedia. Pengujian HTTP request ke live domain `https://dstechsmart.com/uploads/...` langsung mengembalikan `HTTP/1.1 200 OK` dan berkas gambar tampil jernih serta utuh.
+- **2026-10-21**: Sistem Integrasi Project Management Terpadu & Modal Dossier Finansial Proyek. Mengimplementasikan fitur Project-Centric Cost Accounting pada ERP Keuangan DSTech Smart: (1) Menambahkan interface `ProjectItem`, state `selectedProjectForDetail`, `projectDossierTab`, dan handler `handleConvertQuotationToProject`, `handleOpenAddProject`, `handleOpenEditProject`, `handleDeleteProject`, `handleSaveProjectSubmit` di `finance/page.tsx`; (2) Menambahkan selector "Tautkan ke Master Proyek" pada formulir Buat & Edit SPH, Faktur Penjualan, PO Supplier, dan Catat Arus Kas sehingga setiap transaksi dapat dikaitkan langsung ke proyek terkait; (3) Tombol cepat "🚀 Jadikan Proyek Baru" pada SPH berstatus Disetujui/Deal untuk mengonversi SPH menjadi Master Proyek baru secara otomatis; (4) Modal Project Dossier Komprehensif dengan 4 tab (Ringkasan P&L, Faktur Penjualan, PO Material, Kas Lapangan) yang memuat KPI Nilai Kontrak, Total Faktur, Total Pengeluaran, Laba Bersih & Margin %; (5) Kompresi gambar nota/kuitansi adaptif < 50 KB multi-stage step-down quality/scale. Lolos validasi TypeScript (0 error).
+
+
 
 
 
@@ -724,7 +734,7 @@
 1. "pada faktur tolong ajukan pengajuan DP"
 2. "tombol apus, edit dan cetak buat icon saja"
 3. "untuk edit faktur, hapus dan terima pembayaran dimana?"
-**Status**: Sedang Dikerjakan
+**Status**: Selesai
 
 **Penyebab Masalah / Analisis Kebutuhan**:
 - Pada tabel Faktur Penjualan sebelumnya:
@@ -1933,7 +1943,300 @@
 
 ---
 
-### 65. Catatan Penting
+---
+
+### 66. Tugas: Pemisahan Mutlak 2 Halaman Cetak Dokumen Keuangan (Faktur Penjualan & SPH Penawaran) — Halaman 1 Dokumen Pengantar & Sah Tanpa Tabel Produk, Halaman 2 Lampiran Rincian Detail Produk & Spesifikasi Teknis
+- **Permintaan User**: "ini masih belum benar, kemudian masih dalam 1 halaman, belum ada pemisahan antar detail deskripsi produknya dengan halaman utama"
+- **Status**: **Selesai**
+- **Analisis Kebutuhan & Akar Masalah**:
+  1. **Pemisahan Konten Antar Halaman**:
+     - Pengguna menginstruksikan bahwa detail deskripsi produk **TIDAK BOLEH** bercampur dalam Halaman Utama (Halaman 1).
+     - **Halaman 1 (Halaman Utama Dokumen Resmi)**: Harus murni berisi Kop Surat, No. Dokumen, Data Klien/Instansi, Pengantar Resmi / Status Penagihan, Kotak Referensi Lampiran ("Rincian lengkap item & spesifikasi teknis terlampir pada Lembar Lampiran Halaman 2"), Ringkasan Nilai Total Faktur/SPH, Terbilang, Rekening Resmi DSTech, Terms/Garansi, dan Blok Tanda Tangan Sah Dual Approval (Klien & Direktur DSTech) lengkap dengan Stempel Digital Bulat & Barcode Verifikasi Sistem. Tanda tangan harus rapi dan aman di atas batas footer kop surat, tanpa pernah terdorong ke bawah.
+     - **Halaman 2 (Lembar Lampiran Resmi)**: Khusus memuat Kop Surat / Header Lampiran Resmi, Judul "LAMPIRAN RINCIAN DETAIL PRODUK & SPESIFIKASI TEKNIS", Referensi No. Dokumen & Klien, Tabel Lengkap Detail Deskripsi Produk & Spesifikasi Teknis (No, Nama & Deskripsi Spesifikasi, Qty, Satuan, Harga Satuan, Diskon, Total Biaya), Rekapitulasi Nilai Akhir (Subtotal, Diskon, PPN, Grand Total), Catatan Teknis, dan Paraf Pengesahan Lampiran.
+  2. **Resolusi Deteksi Halaman Chromium Print Engine**:
+     - Chromium print preview hanya mendeteksi 1 halaman ("Pages: 1") jika ada ancestor (`html`, `body`, `<main>`, modal backdrop, modal dialog card) yang memiliki `overflow: auto/hidden`, `max-height`, atau `display: flex`.
+     - Solusi: Atur seluruh ancestor saat `@media print` menjadi `position: static !important; overflow: visible !important; max-height: none !important; height: auto !important; display: block !important;`.
+     - Kunci dimensi setiap `.print-document-sheet` tepat pada ukuran fisik A4 (`width: 210mm !important; height: 297mm !important; max-height: 297mm !important; min-height: 297mm !important; page-break-after: always !important; break-after: page !important; overflow: hidden !important;`) sehingga Chromium membagi hasil cetak menjadi tepat 2 halaman fisik A4 (Page 1 of 2 dan Page 2 of 2).
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Buat backup file cadangan ke folder `_backup/` (`admin_finance_page.tsx.bak29`, `globals.css.bak5`, `LAPORAN_PROGRES.md.bak61`).
+  - [x] **Langkah 2**: Perbaiki stylesheet `@media print` di `src/app/globals.css` agar seluruh parent container di-reset ke `overflow: visible; max-height: none; height: auto; position: static;` dan masing-masing lembar A4 (`.print-document-sheet`) menerapkan `height: 297mm; page-break-after: always; break-after: page;` dengan lembar kedua menerapkan `page-break-after: avoid; break-after: avoid;`.
+  - [x] **Langkah 3**: Perbaiki template cetak Faktur Penjualan di `src/app/admin/finance/page.tsx`:
+    - Halaman 1: Hapus seluruh tabel item produk dari Halaman 1. Pasang kotak resmi pemberitahuan lampiran. Pastikan dual signature & stempel selalu muat presisi di Halaman 1.
+    - Halaman 2: Selalu dirender sebagai lembar Lampiran Resmi Rincian Produk Faktur.
+  - [x] **Langkah 4**: Perbaiki template cetak Surat Penawaran Harga (SPH) di `src/app/admin/finance/page.tsx`:
+    - Halaman 1: Hapus seluruh tabel item produk dari Halaman 1. Pasang kotak resmi info lampiran. Pastikan surat pengantar, total penawaran, terms, rekening, dan dual approval muat presisi di Halaman 1.
+    - Halaman 2: Selalu dirender sebagai lembar Lampiran Resmi Rincian Produk & Spesifikasi Teknis SPH.
+  - [x] **Langkah 5**: Validasi kompilasi TypeScript lokal (`node ./node_modules/typescript/bin/tsc --noEmit`) hingga 0 error.
+  - [x] **Langkah 6**: Pengujian visual preview browser untuk memastikan Halaman 1 dan Halaman 2 terpisah sempurna.
+  - [x] **Langkah 7**: Sinkronisasi komit ke GitHub via `push_with_native_git.js`.
+  - [x] **Langkah 8**: Deploy ke server live VPS PM2 `dstech-main` dan verifikasi akhir.
+
+---
+
+---
+
+### 67. Tugas: Sistem Manajemen & Penagihan Faktur Multi-Termin Bertahap (Milestone / Progressive Billing)
+- **Permintaan User**: "tambahkan multy termin juga"
+- **Status**: **Sedang Dikerjakan (In Progress)**
+- **Analisis Kebutuhan**:
+  1. **Konsep & Model Data Multi-Termin**:
+     - Memperluas tipe faktur penjualan (`invoiceType`) dengan opsi `"Termin"` (Multi-Termin Bertahap), melengkapi tipe `"Standar"` (kontrak penuh) dan `"DP"` (2 tahap).
+     - Struktur data `InvoiceTermin`: `id`, `name` (contoh: "Termin 1: Uang Muka / SPK", "Termin 2: Pengiriman Material & Instalasi 50%", "Termin 3: BAST & Commissioning"), `percentage` (bobot %), `amount` (nominal rupiah terhitung otomatis), `dueDate`, `condition` (syarat pencairan/milestone), `status` ("Lunas" | "Ditagihkan" | "Belum Ditagih"), `paidAmount`, `paidDate`.
+  2. **Form Pembuatan & Pengaturan Termin**:
+     - Pemilih skema penagihan pada modal Buat Faktur, Edit Faktur, dan Konversi SPH: Standar, DP 2 Tahap, dan Multi-Termin.
+     - Preset cepat multi-termin:
+       - *Preset 3 Termin*: 30% (DP SPK) - 40% (Material & Tarik Kabel 50%) - 30% (Pelunasan BAST).
+       - *Preset 4 Termin*: 40% (DP SPK) - 30% (Pemasangan Unit) - 20% (BAST) - 10% (Retensi 3 Bulan).
+       - *Preset 3 Termin (50-30-20)*: 50% (DP) - 30% (Progres Fisik) - 20% (Pelunasan).
+     - Dynamic repeater baris termin: Tambah/hapus termin kustom, penamaan milestone bebas, auto-kalkulasi nominal rupiah, dan validasi total persentase = 100%.
+  3. **Tampilan Tabel Penjualan**:
+     - Badge informatif `📑 Multi-Termin (X Tahap)` dengan indikator progres termin aktif.
+  4. **Lembar Cetak Faktur Termin Resmi (Standar 2 Halaman A4)**:
+     - Toolbar pemilih lembar cetak: Cetak Termin 1, Termin 2, Termin 3, dst., atau Rekapitulasi Kontrak.
+     - **Halaman 1 (Halaman Utama Dokumen Sah)**:
+       - Judul Dokumen: `FAKTUR PENAGIHAN TERMIN (TERMIN KE-X)`.
+       - Banner Penagihan Termin Berjalan: Menampilkan nama termin, persentase bobot, syarat progres, dan nominal tagihan termin berjalan secara tegas.
+       - Tabel Rekapitulasi Seluruh Termin Kontrak (*Milestone Billing Summary*): No, Termin & Keterangan Progres, Bobot %, Nominal Tagihan, Status Pembayaran.
+       - Box Referensi Lampiran Halaman 2.
+       - Instruksi Rekening Resmi Transfer Bank DSTech.
+       - Dual Approval Tanda Tangan Sah + Stempel Bulat Digital Resmi & Barcode Verifikasi Sistem.
+     - **Halaman 2 (Lembar Lampiran Resmi)**:
+       - Judul: `LAMPIRAN RINCIAN ITEM FAKTUR TERMIN KE-X`.
+       - Tabel Lengkap Detail Deskripsi Produk & Spesifikasi Teknis.
+       - Rekapitulasi Nilai Kontrak Keseluruhan & Porsi Termin.
+       - Paraf Pengesahan Lampiran (DSTech & Klien).
+  5. **Alur Pembayaran Kas per Termin**:
+     - Modal Terima Pembayaran mendukung opsi pelunasan per termin, mengupdate status termin menjadi Lunas, serta mencatat kas masuk otomatis ke Buku Kas.
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Buat backup file cadangan ke folder `_backup/` (`admin_finance_page.tsx.bak30`, `LAPORAN_PROGRES.md.bak62`).
+  - [x] **Langkah 2**: Perbarui interface TypeScript di `src/app/admin/finance/page.tsx` (`InvoiceTermin`, penambahan properti `termins` pada `SaleInvoice`, `saleForm`, dan `convertForm`).
+  - [x] **Langkah 3**: Tambahkan selector skema penagihan Multi-Termin, preset cepat, dan repeater baris termin pada form modal Buat Faktur, Edit Faktur, dan Konversi SPH.
+  - [x] **Langkah 4**: Perbarui tabel penjualan agar menampilkan badge dan status Multi-Termin secara informatif.
+  - [x] **Langkah 5**: Perbarui template cetak Faktur Penjualan resmi agar mendukung penagihan termin (selector termin di toolbar, banner termin berjalan, tabel rekapitulasi progres termin di Halaman 1, dan lembar lampiran di Halaman 2).
+  - [x] **Langkah 6**: Integrasikan form Terima Pembayaran agar mendukung pemilihan pembayaran per termin aktif.
+  - [x] **Langkah 7**: Validasi kompilasi TypeScript lokal (`node ./node_modules/typescript/bin/tsc --noEmit`) hingga 0 error.
+  - [x] **Langkah 8**: Pengujian visual antarmuka browser.
+  - [x] **Langkah 9**: Push perubahan ke GitHub via `push_with_native_git.js` (commit `75eed3f`).
+  - [x] **Langkah 10**: Deploy ke server live VPS PM2 `dstech-main` (PID 3985924) dan verifikasi akhir.
+
+---
+
+### 68. Tugas: Penambahan Fitur Download File PDF pada SPH, Faktur Penjualan, PO Pembelian, Retur Barang, dan Laporan Laba Rugi
+**Permintaan User**: "tolog tambahkan juga fitur donwload file PDF pada SPH, Faktur/invoice penjualan dan pembelian, retur Barang, Laporan laba rugi"
+**Status**: Selesai Penuh (Completed)
+- **Analisis Kebutuhan**:
+  1. Pengguna memerlukan tombol khusus untuk langsung mengunduh dokumen resmi dalam format berkas PDF (`.pdf`) dengan penamaan berkas otomatis yang rapi dan standar korporat.
+  2. Cakupan 7 modul dokumen bisnis keuangan:
+     - **SPH (Surat Penawaran Harga)**: Download PDF penawaran resmi 2 halaman (Halaman Pengantar & Lampiran Produk).
+     - **Faktur Penjualan (Sales Invoice)**: Download PDF faktur resmi 2 halaman (baik skema Standar, DP, maupun Multi-Termin per tahapan).
+     - **Purchase Order (Faktur Pembelian Supplier)**: Download PDF lembar PO resmi pengadaan barang ke vendor.
+     - **Retur Barang (Penjualan & Pembelian)**: Download PDF Berita Acara Serah Terima (BAST) Retur Barang / RMA Form.
+     - **Laporan Laba Rugi (Profit & Loss / P&L)**: Pembuatan modal cetak & template berkas A4 resmi Laporan Laba Rugi Komprehensif ber-Kop Surat DSTech, memuat omzet penjualan, HPP, laba kotor, rincian pengeluaran operasional per kategori, laba bersih, rasio profit margin, dan dual otorisasi pengesahan direksi, dilengkapi tombol langsung Download PDF.
+     - **BAST Proyek Resmi**: Download PDF lembar Berita Acara Serah Terima Pekerjaan & Pengadaan Barang A4.
+     - **Surat Jalan Pengiriman**: Download PDF lembar Surat Jalan / Delivery Order ekspedisi gudang A4.
+  3. Mekanisme download PDF:
+     - Pemuatan pustaka `html2pdf.js` secara dinamis (tanpa perlu instalasi npm lokal yang membebani disk C:), memungkinkan ekspor langsung berkas `.pdf` terunduh ke folder Downloads pengguna.
+     - Sinkronisasi `document.title` dinamis sehingga jika pengguna memilih print dialog bawaan browser, penamaan file otomatis terisi standar `[JENIS]_[NOMOR]_[PIHAK].pdf`.
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Buat backup file cadangan ke folder `_backup/` (`admin_finance_page.tsx.bak31`, `LAPORAN_PROGRES.md.bak63`).
+  - [x] **Langkah 2**: Bangun fungsi helper universal `handleDownloadPDF(elementId, filename)` dengan dukungan loader `html2pdf` dinamis dan fallback print-to-pdf dengan dynamic title.
+  - [x] **Langkah 3**: Integrasikan tombol "📥 Download PDF" pada modal cetak dan tabel SPH Penawaran.
+  - [x] **Langkah 4**: Integrasikan tombol "📥 Download PDF" pada modal cetak dan tabel Faktur Penjualan (mendukung Standar, DP, dan Termin).
+  - [x] **Langkah 5**: Integrasikan tombol "📥 Download PDF" pada modal cetak dan tabel Purchase Order (PO Pembelian).
+  - [x] **Langkah 6**: Integrasikan tombol "📥 Download PDF" pada modal cetak dan tabel Berita Acara Retur Barang.
+  - [x] **Langkah 7**: Bangun antarmuka modal cetak resmi A4 Laporan Laba Rugi Komprehensif (P&L Report) ber-kop surat resmi DSTech, rincian omzet, HPP, laba kotor, rincian biaya operasional, laba bersih, rasio margin, dual tanda tangan direksi, serta tombol "📥 Download PDF Laba Rugi".
+  - [x] **Langkah 8**: Validasi kompilasi TypeScript lokal (`node ./node_modules/typescript/bin/tsc --noEmit`) hingga 0 error.
+  - [x] **Langkah 9**: Pengujian fungsionalitas dan visual browser subagent.
+  - [x] **Langkah 10**: Push perubahan ke remote GitHub repository `rm23nm/dstech-smart` via `push_with_native_git.js` (commit `945bdfd`).
+  - [x] **Langkah 11**: Deploy ke server live VPS PM2 `dstech-main` (PID 3991053) dan verifikasi akhir.
+  - [x] **Langkah 12**: Perbarui laporan progres permanen dengan checklist selesai.
+
+---
+
+### 69. Tugas: Fitur Upload File Arsip Lampiran Terkompresi pada Seluruh Dokumen Bisnis & Pencatatan Keuangan (SPH, Faktur, PO, Retur, dan Nota Pengeluaran Kas)
+**Permintaan User**: "tolong tambahkan fitur upload file arsip pada seluruh dokumen, SPH, Penjualan dan Faktur, Pembelian dan PO, Retur barang, kemudian pencatatan keuangan. agar saya bisa upload arsip yang dibutuhkan sesuai dengan penepmatan dokumennya. yang paling penting juga pada fitur pencatatan pengeluaran. jika ada nota yang dicatat bisa diupload kedalamnya. seluruh file harus dikompres sekecil mungkin. agar tidak banyak memakan spacenya server"
+**Status**: Selesai
+- **Analisis Kebutuhan**:
+  1. **Kompresi File Otomatis di Sisi Klien (Client-Side Compression)**:
+     - Untuk file gambar/foto (JPG, JPEG, PNG, WebP) nota/struk/dokumen: kompres secara otomatis sebelum dikirim ke server menggunakan HTML5 `<canvas>`.
+     - Skala resolusi maksimal: max width/height 1280px / 1600px (sangat tajam untuk membaca teks kuitansi/nota) dan kualitas kompresi JPEG 0.75.
+     - Menghemat ruang server secara drastis: foto kamera smartphone yang awalnya 5MB - 12MB akan susut menjadi hanya ~60KB - 120KB (penghematan space server >98%).
+     - Tampilkan indikator ukuran sebelum dan sesudah kompresi (misal: "Foto dikompres: 5.4 MB ➔ 84 KB (Hemat 98%)").
+  2. **Dukungan Berkas PDF**:
+     - Memperluas API upload `/api/upload` agar menerima berkas dokumen PDF (`application/pdf`) selain gambar.
+     - Penamaan file otomatis ber-prefix wajib aplikasi `dstech_doc_` atau `dstech_archive_`.
+  3. **Penempatan Modul Upload Arsip**:
+     - **Pencatatan Keuangan & Beban Pengeluaran (Buku Arus Kas & Biaya Operasional)**:
+       - Pada formulir Catat Arus Kas Keluar & Pengeluaran: field khusus "Upload Nota / Struk Bukti Pengeluaran" dengan kompresi instan & live thumbnail preview.
+       - Pada tabel Arus Kas & tabel Pengeluaran: badge / thumbnail nota yang dapat diklik untuk membuka modal Lightbox Pratinjau Bukti Transaksi.
+     - **SPH (Surat Penawaran Harga)**:
+       - Dukungan upload berkas arsip pendukung SPH (Surat Permintaan Penawaran Klien, Gambar Layout/Denah, BoQ/RAB, Brosur Teknis).
+     - **Faktur Penjualan (Sales Invoice)**:
+       - Dukungan upload berkas arsip faktur (PO Resmi Klien, Bukti Transfer DP/Pelunasan, Surat Perjanjian Kontrak/SPK, BAST/Surat Jalan basah).
+     - **Pembelian & PO Supplier**:
+       - Dukungan upload berkas arsip pembelian (Invoice Resmi Supplier, Resi Ekspedisi, Bukti Pembayaran PO).
+     - **Retur Barang (Sales Return & Purchase Return)**:
+       - Dukungan upload foto kondisi kerusakan unit fisik barang, dokumen klaim garansi RMA, atau tanda terima vendor.
+  4. **Modal Pengelola Arsip Universal (Document Archives Manager Modal)**:
+     - Menyediakan modal interaktif "Kelola Arsip Dokumen" untuk melihat daftar lampiran berkas yang sudah diunggah pada dokumen tersebut, mengunggah lampiran baru (drag & drop / klik), membuka pratinjau berkas (image lightbox / PDF viewer link), mengunduh arsip, dan menghapus arsip.
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Buat backup file cadangan ke folder `_backup/` (`admin_finance_page.tsx.bak32`, `LAPORAN_PROGRES.md.bak64`).
+  - [x] **Langkah 2**: Perbarui endpoint API `src/app/api/upload/route.ts` agar mendukung MIME type `application/pdf`, penamaan prefix wajib `dstech_doc_`, dan batas ukuran yang aman.
+  - [x] **Langkah 3**: Bangun fungsi helper kompresi gambar klien `compressImageFile(file, maxWidth, maxHeight, quality)` di `src/app/admin/finance/page.tsx`.
+  - [x] **Langkah 4**: Perbarui interface TypeScript di `src/app/admin/finance/page.tsx` (`DocumentAttachment`, penambahan properti `attachments` pada SPH, Faktur, PO, Retur, Arus Kas, dan Beban Pengeluaran, serta `receiptUrl` pada kas keluar & beban).
+  - [x] **Langkah 5**: Integrasikan fitur upload nota bukti pengeluaran langsung pada modal Catat Transaksi Arus Kas & Modal Tambah Pengeluaran, lengkap dengan live preview, status kompresi, dan lightbox view.
+  - [x] **Langkah 6**: Bangun Modal Universal "Kelola Arsip Dokumen" (Upload file arsip terkompresi, list arsip dengan tanggal & ukuran terkompresi, pratinjau foto/PDF, dan hapus berkas).
+  - [x] **Langkah 7**: Pasang tombol aksi "📁 Arsip Dokumen" pada baris tabel SPH, Faktur Penjualan, Purchase Order, dan Retur Barang.
+  - [x] **Langkah 8**: Sinkronisasi data arsip pada API backend `/api/finance` (`src/app/api/finance/route.ts`) agar properti `attachments` dan `receiptUrl` tersimpan persisten ke JSON/database.
+  - [x] **Langkah 9**: Validasi kompilasi TypeScript lokal (`node ./node_modules/typescript/bin/tsc --noEmit`) hingga 0 error.
+  - [x] **Langkah 10**: Uji fungsionalitas upload, kompresi, dan pratinjau via browser testing subagent.
+  - [x] **Langkah 11**: Push perubahan ke remote GitHub repository `rm23nm/dstech-smart` via `push_with_native_git.js` (commit `dd15cb0`).
+  - [x] **Langkah 12**: Deploy ke server live VPS PM2 `dstech-main` dan verifikasi akhir (Status HTTP 200).
+  - [x] **Langkah 13**: Perbarui laporan progres permanen dengan checklist selesai.
+
+---
+
+### 70. Tugas: Sistem Dual Bookkeeping / Multi-Entity (Pembukuan Resmi PT. DSTech Smart Perkasa vs Pembukuan Usaha Mandiri Non-PT "DSTech Smart" Tanpa PPN)
+**Permintaan User**: "bagai mana cara agar saya bisa membuat 2 pembukuan, 1 pembukuan pencatataan kerjaan dari pemasukkan PT. dan 1 lagi pemasukaan pekerjaan pribadi tanpa PT? saya ingin menerapkan sistem sama seperti pada PT pada pekerjaan dengan sistem yang tidak memakai atas nama PT. karena ada klient yang tidak ingin membayar pajak PPN, sehingga saya terkadang memakai faktur usaha non PT. yang sudah berjalan nama usahanya Dstech Smart saja"
+**Status**: Selesai
+- **Analisis Kebutuhan Arsitektur**:
+  1. **Dual Entity Profil**:
+     - **Entitas 1: `PT` (PT. DSTech Smart Perkasa)**:
+       - Badan hukum resmi, PKP (Pajak Pertambahan Nilai 11%/12%).
+       - Legalitas tercetak: NIB 1909220127034, NPWP 60.648.216.4-102.000, Kop Surat Resmi PT. DSTech Smart Perkasa.
+       - Rekening Bank: Rekening Bank Perusahaan PT (Mandiri PT / BCA PT).
+       - Pengesahan: Stempel bulat digital resmi PT + Tanda Tangan Direktur.
+     - **Entitas 2: `NON_PT` (DSTech Smart)**:
+       - Usaha mandiri perorangan yang sudah berjalan untuk melayani klien toko, perumahan, UMKM, atau klien yang tidak ingin membayar pajak PPN.
+       - Legalitas tercetak: Nama Usaha **"DSTech Smart"** (Solusi Security System, CCTV, IT Infrastructure), **TANPA embel-embel PT dan TANPA NPWP PT**.
+       - Pajak: **Non-PKP / Bebas PPN (0% PPN)** secara otomatis.
+       - Rekening Bank: Rekening Pribadi Owner / Kas Mandiri (dapat diatur di master rekening bank).
+       - Pengesahan: Tanda Tangan Penanggung Jawab / Owner (tanpa stempel PT).
+  2. **Entity Switcher Global di Toolbar Finance ERP**:
+     - Tombol cepat di header: `[ 🏢 PT. DSTech Smart Perkasa ]` | `[ 👤 DSTech Smart (Non-PT) ]` | `[ 🌐 Semua (Konsolidasi) ]`.
+     - Menyaring data tabel SPH, Faktur Penjualan, PO Pembelian, dan Buku Arus Kas sesuai entitas aktif.
+     - Ringkasan Finansial (Omzet, Piutang, Kas Masuk/Keluar) terpisah secara otomatis.
+  3. **Formulir Transaksi (SPH, Faktur, PO, Kas)**:
+     - Disediakan toggle/selector entitas: `Entitas: PT. DSTech Smart Perkasa` atau `DSTech Smart (Non-PT)`.
+     - Saat memilih `DSTech Smart (Non-PT)`:
+       - PPN otomatis dikunci 0% (Bebas Pajak PPN).
+       - Prefix nomor dokumen otomatis `INV/DTS-...` atau `SPH/DTS-...` (bukan format PT `INV/DSP-...`).
+       - Rekening pembayaran default diarahkan ke rekening Non-PT / Pribadi.
+  4. **Adaptasi Dinamis Lembar Cetak Dokumen (Faktur & SPH 2 Halaman, PO, Surat Jalan, BAST)**:
+     - Header Kop Surat, Judul Perusahaan, NIB/NPWP, Stempel, dan Rekening Bank otomatis beralih antara format **PT. DSTech Smart Perkasa** dan format **DSTech Smart** sesuai entitas dokumen.
+  5. **Buku Arus Kas Terpisah**:
+     - Arus kas masuk dan keluar proyek Non-PT terpisah dari kas PT, sehingga tidak tercampur dalam kewajiban pelaporan pajak tahunan PT.
+- **Status**: Selesai
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Buat backup file cadangan (`_backup/admin_finance_page.tsx.bak33`, `_backup/LAPORAN_PROGRES.md.bak65`).
+  - [x] **Langkah 2**: Perluas interface data di `src/app/admin/finance/page.tsx` (`businessEntity?: "PT" | "NON_PT"`, `InvoiceTermin`, properti akun bank `entityType?: "PT" | "NON_PT" | "ALL"`).
+  - [x] **Langkah 3**: Pasang state global `selectedEntityFilter: "ALL" | "PT" | "NON_PT"` dan Entity Switcher Widget di bagian atas dashboard Keuangan.
+  - [x] **Langkah 4**: Tambahkan selector entitas bisnis pada form Buat/Edit Faktur Penjualan, SPH Penawaran, PO Supplier, dan Catat Arus Kas.
+  - [x] **Langkah 5**: Tambahkan logika otomatisasi untuk entitas `NON_PT`: PPN 0%, nomor faktur `INV/DTS-...`, dan pemilihan rekening non-PT.
+  - [x] **Langkah 6**: Update template cetak 2 halaman (Faktur & SPH), BAST, dan Surat Jalan agar merender kop surat, nama usaha **DSTech Smart**, tanda tangan, dan rekening bank sesuai entitas dokumen.
+  - [x] **Langkah 7**: Filter transaksi pada tabel Penjualan, SPH, Pembelian, dan Arus Kas berdasarkan `selectedEntityFilter`.
+  - [x] **Langkah 8**: Sinkronisasi penyimpanan properti `businessEntity` dan `termins` pada backend API `/api/finance`.
+  - [x] **Langkah 9**: Validasi kompilasi TypeScript lokal (`node ./node_modules/typescript/bin/tsc --noEmit`) hingga 0 error.
+  - [x] **Langkah 10**: Uji fungsionalitas dan tampilan cetak entitas PT vs DSTech Smart Non-PT serta multi-termin via browser subagent.
+  - [x] **Langkah 11**: Push perubahan ke GitHub repository `rm23nm/dstech-smart` via `push_with_native_git.js` (commit `c5c4836`).
+  - [x] **Langkah 12**: Deploy ke server live VPS PM2 `dstech-main` (PID 4009675) dan verifikasi akhir.
+### 68. Tugas: Pemisahan Mutlak Transaksi Keuangan, Arus Kas Masuk/Keluar, dan Rekening Bank Berdasarkan Entitas (PT. DSTech Smart Perkasa vs DSTech Smart Non-PT)
+- **Status**: Selesai
+- **Latar Belakang & Masalah**:
+  Pengguna mendapati bahwa saat memilih jenis usaha `DSTech Smart (Non-PT)`:
+  1. Data transaksi PT dan Non-PT masih bercampur di beberapa seksi (khususnya Buku Arus Kas masuk/keluar, Laporan Laba Rugi P&L, dan badge counter tab).
+  2. Rekening bank resmi pada modal Pengaturan Rekening Bank masih menyatu dan menampilkan kedua entitas tanpa pemisahan/penandaan entitas yang tegas.
+  3. Form Catat Arus Kas Masuk/Keluar (`cashForm`) belum memiliki pilihan entitas bisnis dan belum membatasi pilihan rekening bank sesuai entitasnya.
+  4. Form Pembelian PO (`poForm`) belum memiliki selector entitas bisnis.
+  5. Pengguna meminta: *"sebaiknya semuanya dipisahkan,, karena nanti biaya keluar masuk semua terpisah. untuk rekening juga masih menyatu, bisa terlihat keduanya"*.
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Buat backup file cadangan (`_backup/admin_finance_page.tsx.bak34`, `_backup/LAPORAN_PROGRES.md.bak66`).
+  - [x] **Langkah 2**: Perluas schema akun bank (`BankAccount`) dan form rekening bank (`bankAccountForm`) agar memiliki field `entityType: "PT" | "NON_PT" | "ALL"` dan tampilkan badge visual di modal pengaturan rekening.
+  - [x] **Langkah 3**: Tambahkan filter entitas pada modal Pengaturan Rekening Bank sehingga pengguna dapat menyaring rekening khusus PT, khusus Non-PT/Pribadi, atau Semua.
+  - [x] **Langkah 4**: Perbarui form Catat Kas Masuk/Keluar (`isNewCashModalOpen` & `cashForm`): tambahkan selector entitas (`businessEntity: "PT" | "NON_PT"`, default mengikuti `selectedEntity` yang sedang aktif), dan batasi pilihan rekening bank hanya yang sesuai dengan entitas transaksi tersebut.
+  - [x] **Langkah 5**: Perbarui form Purchase Order (`isNewPoModalOpen`, `isEditPoModalOpen`): tambahkan selector entitas (`businessEntity: "PT" | "NON_PT"`).
+  - [x] **Langkah 6**: Perbarui seluruh tab badge counter (`quotations.length`, `sales.length`, `purchases.length`, `cashFlow.length`) agar menghitung data yang sesuai dengan `selectedEntity` saat ini (bukan total gabungan mentah).
+  - [x] **Langkah 7**: Perbarui ringkasan Kas Masuk (IN) & Kas Keluar (OUT) di Tab Buku Arus Kas agar menggunakan `displaySummary.totalCashIn` dan `displaySummary.totalCashOut` terpisah per entitas.
+  - [x] **Langkah 8**: Perbarui Tab Laporan Laba Rugi (`pl_report`) dan Pratinjau Cetak P&L agar menggunakan data terpisah `displaySummary` dan judul entitas yang dinamis.
+  - [x] **Langkah 9**: Pastikan pencatatan kas otomatis dari pelunasan faktur (modal terima pembayaran) mewarisi `businessEntity` dari faktur yang dibayar.
+  - [x] **Langkah 10**: Validasi kompilasi TypeScript lokal (`node ./node_modules/typescript/bin/tsc --noEmit`) hingga 0 error.
+  - [x] **Langkah 11**: Uji coba via browser subagent pada tab Penjualan, SPH, Arus Kas, dan Modal Rekening Bank untuk memastikan tidak ada kebocoran data antar-entitas.
+  - [x] **Langkah 12**: Push perubahan ke GitHub repository `rm23nm/dstech-smart` via `push_with_native_git.js` (commit `867a7df`).
+  - [x] **Langkah 13**: Deploy ke server live VPS PM2 `dstech-main` (PID 4019246) dan verifikasi akhir.
+  - [x] **Langkah 14**: Update laporan progres permanen dengan status selesai.
+
+### 69. Tugas: Sistem Integrasi Project Management Terpadu dengan Penawaran (SPH), Faktur Penjualan, Pembelian (PO), dan Buku Arus Kas Keuangan (Project-Centric Cost Accounting)
+- **Status**: Selesai
+- **Permintaan Pengguna**:
+  *"bagai mana cara mengagbungkan Project managemen dengan SPH, faktur, Pembelian, dan PO serta pencatatan keuangannya. agar setiap ada penawaran bisa tercatat sebagai project, kemudian semua pengeluaran dan pemasukkan bisa dikelompokkan untuk kebutuhan project tersebut"*
+- **Konsep & Arsitektur Solusi**:
+  1. **Master Proyek (`dstech_projects`)**:
+     - Setiap penawaran/proyek memiliki kode proyek unik (`PRJ-202610-XXX`), nama proyek, klien, nilai kontrak acuan, status pelaksanaan (`Planning`, `In Progress`, `Completed`, `On Hold`), entitas bisnis (`PT` | `NON_PT`), dan estimasi anggaran.
+  2. **Jangkar Kaitan Transaksi (`projectId` & `projectName`)**:
+     - **SPH (Surat Penawaran)**: Dapat langsung didaftarkan sebagai proyek atau dikonversi menjadi Proyek baru saat status menjadi Deal/Disetujui.
+     - **Faktur Penjualan (`sales`)**: Dikaitkan ke `projectId` untuk mencatat realisasi penagihan dan kas masuk proyek.
+     - **Pembelian Supplier (`purchases`)**: Dikaitkan ke `projectId` untuk mencatat biaya material/perangkat (HPP proyek).
+     - **Buku Arus Kas (`cash_flow`)**: Memiliki pilihan `projectId` agar pengeluaran operasional lapangan (bensin, makan teknisi, sewa alat) dan kas masuk teralokasi langsung ke proyek bersangkutan.
+  3. **Tab Terdedikasi "Manajemen Proyek" (`projects`) di Dashboard Keuangan**:
+     - Menampilkan daftar seluruh proyek beserta ringkasan finansial real-time:
+       - Nilai Kontrak vs Total Faktur Terbit.
+       - Pemasukan Kas Diterima (*Cash Inflow*).
+       - Total Belanja Material (PO Supplier).
+       - Total Pengeluaran Kas Lapangan (Operasional Kas Keluar).
+       - **Laba Kotor & Laba Bersih Proyek (Project P&L)** serta Margin Profit %.
+     - Modal Detail Finansial & Dokumen Proyek (*Project Dossier*).
+     - Aksi Cepat: "+ Buat Proyek Baru", "Buat SPH Proyek Ini", "Buat Faktur Penagihan", "Catat PO Material", "Catat Kas Lapangan".
+- **Langkah-langkah yang Telah Selesai Dikerjakan**:
+  - [x] **Langkah 1**: Buat backup file cadangan (`_backup/admin_finance_page.tsx.bak35`, `_backup/LAPORAN_PROGRES.md.bak67`, `_backup/finance_route.ts.bak1`).
+  - [x] **Langkah 2**: Perluas schema data di backend API (`dstech-smart/src/app/api/finance/route.ts`) untuk mendukung master entitas `projects` (GET, POST, PUT, DELETE) dengan prefix penyimpanan `dstech_projects` dan mengikat `projectId`/`projectName` ke seluruh transaksi (SPH, Penjualan, PO, Kas).
+  - [x] **Langkah 3**: Perluas interface TypeScript di frontend (`dstech-smart/src/app/admin/finance/page.tsx`): interface `ProjectItem`, serta atribut `projectId?: string` dan `projectName?: string` pada `Quotation`, `SaleInvoice`, `PurchaseOrder`, dan `CashFlowItem`.
+  - [x] **Langkah 4**: Tambahkan Tab Navigasi Baru **"Manajemen Proyek"** di navbar dashboard admin finance beserta badge counter terfilter entitas aktif.
+  - [x] **Langkah 5**: Tambahkan selector `projectId` (Pilih Proyek Terkait / Buat Proyek Baru) pada formulir:
+    - Form Buat & Edit SPH (`isNewQuotationModalOpen`, `isEditQuotationModalOpen`).
+    - Form Buat & Edit Faktur Penjualan (`isNewSaleModalOpen`, `isEditSaleModalOpen`).
+    - Form Buat & Edit PO Supplier (`isNewPoModalOpen`, `isEditPoModalOpen`).
+    - Form Catat Transaksi Arus Kas (`isNewCashModalOpen`).
+  - [x] **Langkah 6**: Tambahkan tombol aksi cepat pada SPH Deal: *"🚀 Konversi Jadi Proyek Baru"* yang secara otomatis meng-generate data proyek dari rincian SPH.
+  - [x] **Langkah 7**: Bangun tampilan Tab "Manajemen Proyek":
+    - Kartu KPI Ikhtisar Finansial Portofolio Proyek (Total Nilai Kontrak Seluruh Proyek, Total Biaya Belanja PO, Total Kas Lapangan, Estimasi Net Profit Proyek).
+    - Tabel Daftar Proyek dengan status, progress bar keuangan (Persentase Pemasukan & Penyerapan Biaya), serta tombol aksi icon (Detail Finansial Dossier, Edit, Hapus).
+    - Modal Rincian Finansial Proyek Komprehensif (Menampilkan 4 tab: Ikhtisar P&L Proyek, Faktur & Penagihan, Belanja Material PO, dan Kas Operasional Lapangan).
+  - [x] **Langkah 8**: Penerapan Kompresi Gambar Adaptif Dinamis Otomatis < 50 KB pada seluruh upload nota/kuitansi/berkas di ERP Keuangan dengan multi-stage step-down quality dan canvas scale-down.
+  - [x] **Langkah 9**: Validasi kompilasi TypeScript lokal (`node ./node_modules/typescript/bin/tsc --noEmit`) 100% lolos (0 error).
+  - [x] **Langkah 10**: Push perubahan ke GitHub repository `rm23nm/dstech-smart` via `push_with_native_git.js`.
+  - [x] **Langkah 11**: Deploy ke server live VPS PM2 `dstech-main` dan verifikasi akhir.
+  - [x] **Langkah 12**: Perbarui laporan progres permanen dengan status selesai.
+
+### 70. Tugas: Perbaikan Berkas Lampiran/Nota Transaksi yang Rusak & Tidak Bisa Dibuka Pasca Upload
+- **Status**: Selesai
+- **Permintaan Pengguna**:
+  *"file yang diupload, tidak bisa dibuka, rusak"* (disertai tangkapan layar browser saat membuka berkas hasil upload yang menampilkan broken image / layar hitam).
+- **Akar Masalah (Root Cause)**:
+  1. File berkas bukti transaksi (misal: `dstech_doc_1792515097273_tanda_tangan_BARCODE1.jpg`) berhasil diupload dan tersimpan secara fisik di server live di `/www/wwwroot/dstechsmart.com/public/uploads/`.
+  2. URL publik berkas yang dihasilkan adalah `/uploads/[nama_file]`.
+  3. Namun, pada konfigurasi reverse proxy Nginx live (`/www/server/panel/vhost/nginx/proxy/dstechsmart.com/nextjs_proxy.conf`), hanya folder `/_next/static` yang di-alias ke file fisik server. Seluruh request URL lainnya (`location ^~ /`) diteruskan ke proses Next.js di `http://127.0.0.1:3005`.
+  4. Server Next.js runtime secara bawaan *tidak* melayani file baru yang ditambahkan ke `public/` saat runtime (di luar proses build), sehingga Next.js merespon dengan `HTTP 404 Not Found`.
+  5. Akibatnya, saat pengguna mengklik tombol pratinjau (mata) atau membuka berkas di tab baru, browser menerima halaman 404 HTML, bukan gambar JPEG/PNG aslinya, sehingga browser menampilkan gambar rusak (*broken image*).
+- **Langkah Penanganan & Solusi yang Telah Selesai Dikerjakan**:
+  - [x] **Langkah 1**: Buat backup file cadangan (`_backup/LAPORAN_PROGRES.md.bak68` dan `nextjs_proxy.conf.bak` di VPS).
+  - [x] **Langkah 2**: Tambahkan konfigurasi static alias di Nginx proxy live:
+    ```nginx
+    location ^~ /uploads/ {
+        alias /www/wwwroot/dstechsmart.com/public/uploads/;
+        expires 30d;
+        access_log off;
+    }
+    ```
+  - [x] **Langkah 3**: Upload konfigurasi ke server VPS via SFTP, lakukan pengujian sintaks (`/www/server/nginx/sbin/nginx -t` sukses), dan reload Nginx (`nginx -s reload`).
+  - [x] **Langkah 4**: Pastikan folder `public/uploads/` di lokal juga tersedia untuk dev lokal port 3005.
+  - [x] **Langkah 5**: Lakukan verifikasi pengujian HTTP request:
+    - `curl -I https://dstechsmart.com/uploads/dstech_doc_1792515097273_tanda_tangan_BARCODE1.jpg` ➔ **HTTP/1.1 200 OK** (Content-Type: `image/jpeg`, Content-Length: 98036 bytes).
+    - `curl -I https://dstechsmart.com/uploads/dstech_doc_1792515119710_WhatsApp_Image_2026-10-07_at_1.jpg` ➔ **HTTP/1.1 200 OK** (Content-Type: `image/jpeg`, Content-Length: 151847 bytes).
+  - [x] **Langkah 6**: Verifikasi PM2 `dstech-main` dan seluruh service server tetap online normal 100%.
+
+---
+
+### 71. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
@@ -1949,3 +2252,5 @@
 
 ---
 *Laporan ini dibuat untuk memudahkan Agen AI selanjutnya melanjutkan pekerjaan.*
+
+
