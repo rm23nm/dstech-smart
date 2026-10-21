@@ -21841,180 +21841,184 @@ export default function AdminFinanceERPPage() {
             {/* Scrollable Document Preview Area */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/60 flex justify-center">
               {/* LEMBAR A4 PRINT KWITANSI */}
-              <div
-                id="print-receipt-sheet"
-                className="w-full max-w-[794px] min-h-[520px] bg-white rounded-2xl shadow-xl p-8 sm:p-12 relative text-slate-800 border border-slate-200 print:shadow-none print:border-none print:rounded-none print:m-0 print:p-8 flex flex-col justify-between"
-                style={{
-                  fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                }}
-              >
-                {/* Kop Surat Resmi */}
-                {isReceiptLetterhead && (
-                  <div className="mb-6 border-b-2 border-slate-800 pb-4">
-                    {getLetterheadConfig(receiptEntity).url ? (
-                      <div className="w-full flex items-center justify-center">
-                        <img
-                          src={getLetterheadConfig(receiptEntity).url}
-                          alt="Kop Surat Resmi DSTech"
-                          className="max-h-24 w-auto object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
+              {(() => {
+                const receiptLetterheadCfg = getLetterheadConfig(receiptEntity);
+                return (
+                  <div
+                    id="print-receipt-sheet"
+                    className="relative w-full max-w-[794px] min-h-[580px] bg-white rounded-2xl shadow-xl border border-slate-300 overflow-hidden print-document-sheet print:shadow-none print:border-none print:rounded-none print:m-0 flex flex-col justify-between"
+                    style={{
+                      paddingTop: `${isReceiptLetterhead && receiptLetterheadCfg.enabled && receiptLetterheadCfg.url ? (receiptLetterheadCfg.paddingTop || 85) : 32}px`,
+                      paddingBottom: `${isReceiptLetterhead && receiptLetterheadCfg.enabled && receiptLetterheadCfg.url ? (receiptLetterheadCfg.paddingBottom || 80) : 32}px`,
+                      paddingLeft: "16mm",
+                      paddingRight: "16mm",
+                      fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                    }}
+                  >
+                    {/* Background Kop Surat Resmi DSTech Full Width */}
+                    {isReceiptLetterhead && receiptLetterheadCfg.enabled && receiptLetterheadCfg.url && (
+                      <img
+                        src={receiptLetterheadCfg.url}
+                        alt="Kop Surat Resmi"
+                        className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                          receiptLetterheadCfg.fitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                        }`}
+                        style={{
+                          objectFit:
+                            receiptLetterheadCfg.fitMode === "cover"
+                              ? "cover"
+                              : receiptLetterheadCfg.fitMode === "contain"
+                              ? "contain"
+                              : "fill",
+                          objectPosition: "top center",
+                          width: receiptLetterheadCfg.fitMode === "bleed" ? "102.5%" : "100%",
+                          height: receiptLetterheadCfg.fitMode === "bleed" ? "102%" : "100%",
+                          top: receiptLetterheadCfg.fitMode === "bleed" ? "-1%" : "0",
+                          left: receiptLetterheadCfg.fitMode === "bleed" ? "-1.25%" : "0",
+                          opacity: receiptLetterheadCfg.opacity !== undefined ? receiptLetterheadCfg.opacity : 1,
+                          WebkitPrintColorAdjust: "exact",
+                          printColorAdjust: "exact",
+                        }}
+                      />
+                    )}
+
+                    {/* Konten Kwitansi di Layer Atas */}
+                    <div className="relative z-10 flex flex-col justify-between h-full flex-1">
+                      {/* Judul Dokumen Kwitansi */}
+                      <div className="flex items-start justify-between border-b-2 border-slate-800 pb-3 mb-5">
                         <div>
-                          <h2 className="text-xl font-black text-slate-900 tracking-wider">
-                            {receiptEntity === "PT" ? "PT DSTECH SMART PERKASA" : "DSTECH SMART SOLUTION"}
-                          </h2>
-                          <p className="text-xs text-slate-600 font-medium">
-                            Security Systems • Smart IoT Automation • IT Infrastructure • Fiber Optic
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            Komplek Ruko Grand Cilegon Residence, Cilegon - Banten | Telp/WA: +62 822-8356-8344
+                          <h1 className="text-2xl font-black text-slate-900 tracking-wider uppercase font-serif">
+                            KWITANSI PEMBAYARAN
+                          </h1>
+                          <p className="text-[11px] text-slate-500 tracking-wide font-sans uppercase font-bold">
+                            {receiptDocType === "sale"
+                              ? "OFFICIAL PAYMENT RECEIPT / TANDA TERIMA PEMBAYARAN SAH"
+                              : "OFFICIAL DISBURSEMENT VOUCHER / BUKTI PEMBAYARAN PENGADAAN"}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <span className="text-[10px] font-mono font-bold text-slate-400 block">KODE ENTITAS:</span>
-                          <span className="text-xs font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                            {receiptEntity === "PT" ? "PT. DSTECH SMART PERKASA" : "NON-PT / PERORANGAN"}
+                        <div className="text-right space-y-0.5">
+                          <p className="text-[11px] font-bold text-slate-500">
+                            NO: <span className="font-mono font-black text-slate-900 text-sm">{receiptNumber}</span>
+                          </p>
+                          <p className="text-[11px] text-slate-600">
+                            Tanggal: <strong className="text-slate-900">{new Date(receiptDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</strong>
+                          </p>
+                          <span className="inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-900 mt-0.5">
+                            {receiptStage}
                           </span>
                         </div>
                       </div>
-                    )}
-                  </div>
-                )}
 
-                {/* Judul Dokumen Kwitansi */}
-                <div className="flex items-start justify-between border-b border-dashed border-slate-300 pb-4 mb-6">
-                  <div>
-                    <h1 className="text-2xl font-black text-slate-900 tracking-wider uppercase font-serif">
-                      KWITANSI PEMBAYARAN
-                    </h1>
-                    <p className="text-[11px] text-slate-500 tracking-wide font-sans uppercase">
-                      {receiptDocType === "sale"
-                        ? "OFFICIAL PAYMENT RECEIPT / TANDA TERIMA PEMBAYARAN SAH"
-                        : "OFFICIAL DISBURSEMENT VOUCHER / BUKTI PEMBAYARAN PENGADAAN"}
-                    </p>
-                  </div>
-                  <div className="text-right space-y-0.5">
-                    <p className="text-[11px] font-bold text-slate-500">
-                      NO: <span className="font-mono font-black text-slate-900 text-sm">{receiptNumber}</span>
-                    </p>
-                    <p className="text-[11px] text-slate-600">
-                      Tanggal: <strong className="text-slate-900">{new Date(receiptDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</strong>
-                    </p>
-                    <span className="inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-900 mt-0.5">
-                      {receiptStage}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Rincian Kwitansi Indonesia Baku */}
-                <div className="space-y-4 text-xs">
-                  {/* Telah Diterima Dari */}
-                  <div className="grid grid-cols-12 gap-2 items-baseline">
-                    <div className="col-span-3 font-bold text-slate-600">
-                      {receiptDocType === "sale" ? "Telah Diterima Dari" : "Dibayarkan Kepada"}
-                    </div>
-                    <div className="col-span-1 text-center font-bold text-slate-400">:</div>
-                    <div className="col-span-8 font-black text-slate-900 text-sm border-b border-slate-300 pb-1">
-                      {receiptPayer}
-                    </div>
-                  </div>
-
-                  {/* Uang Sejumlah (Terbilang Huruf) */}
-                  <div className="grid grid-cols-12 gap-2 items-start">
-                    <div className="col-span-3 font-bold text-slate-600 pt-1">
-                      Uang Sejumlah
-                    </div>
-                    <div className="col-span-1 text-center font-bold text-slate-400 pt-1">:</div>
-                    <div className="col-span-8 p-3 bg-amber-50/70 border border-amber-200 rounded-xl font-bold font-serif italic text-amber-950 text-xs leading-relaxed shadow-2xs">
-                      # {terbilangRupiah(receiptAmount)} #
-                    </div>
-                  </div>
-
-                  {/* Untuk Pembayaran */}
-                  <div className="grid grid-cols-12 gap-2 items-baseline">
-                    <div className="col-span-3 font-bold text-slate-600">
-                      Untuk Pembayaran
-                    </div>
-                    <div className="col-span-1 text-center font-bold text-slate-400">:</div>
-                    <div className="col-span-8 font-medium text-slate-800 border-b border-slate-300 pb-1 leading-relaxed">
-                      {receiptPurpose}
-                    </div>
-                  </div>
-
-                  {/* Metode & Keterangan Tambahan */}
-                  <div className="grid grid-cols-12 gap-2 items-baseline">
-                    <div className="col-span-3 font-bold text-slate-600">
-                      Metode Pembayaran
-                    </div>
-                    <div className="col-span-1 text-center font-bold text-slate-400">:</div>
-                    <div className="col-span-8 font-semibold text-slate-700 flex flex-wrap items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold border border-slate-200">
-                        {receiptPaymentMethod}
-                      </span>
-                      <span>{receiptBankName}</span>
-                      <span className="text-slate-400 text-[11px]">({receiptBankAccount})</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bagian Bawah: Nominal Besar & Tanda Tangan Sah */}
-                <div className="pt-8 mt-6 border-t border-dashed border-slate-300 grid grid-cols-12 gap-6 items-end">
-                  {/* Kotak Nominal Angka Besar */}
-                  <div className="col-span-6 space-y-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Jumlah Terbayar (IDR):
-                    </span>
-                    <div className="inline-block p-3.5 bg-slate-900 text-white rounded-2xl border-2 border-slate-800 shadow-md">
-                      <span className="font-mono text-xl sm:text-2xl font-black tracking-wide text-amber-400">
-                        {formatRupiah(receiptAmount)}
-                      </span>
-                    </div>
-                    <p className="text-[9px] text-slate-400 italic leading-tight pt-1">
-                      * Kwitansi ini sah dan berkekuatan hukum sebagai bukti pelunasan setelah dana efektif diterima/didebet pada rekening resmi perusahaan.
-                    </p>
-                  </div>
-
-                  {/* Pengesahan Tanda Tangan & Cap Stempel */}
-                  <div className="col-span-6 text-center space-y-1">
-                    <p className="text-[11px] text-slate-500">
-                      Batam, {new Date(receiptDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
-                    </p>
-                    <p className="font-black text-slate-900 text-xs uppercase tracking-wide">
-                      {receiptEntity === "PT" ? "PT DSTECH SMART PERKASA" : "DSTECH SMART SOLUTION"}
-                    </p>
-                    <div className="h-20 flex items-center justify-center relative">
-                      {financeSettings.masterStampUrl ? (
-                        <img
-                          src={financeSettings.masterStampUrl}
-                          alt="Cap Stempel Resmi"
-                          className="absolute h-18 opacity-80 pointer-events-none"
-                        />
-                      ) : (
-                        <div className="print-stamp-circle absolute right-4 w-14 h-14 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[6px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
-                          <span className="font-black text-[6px]">{receiptEntity === "PT" ? "PT. DSTECH" : "DSTECH"}</span>
-                          <span className="text-[5px] tracking-tight">{receiptEntity === "PT" ? "SMART PERKASA" : "SMART"}</span>
+                      {/* Rincian Kwitansi Indonesia Baku */}
+                      <div className="space-y-4 text-xs">
+                        {/* Telah Diterima Dari */}
+                        <div className="grid grid-cols-12 gap-2 items-baseline">
+                          <div className="col-span-3 font-bold text-slate-700">
+                            {receiptDocType === "sale" ? "Telah Diterima Dari" : "Dibayarkan Kepada"}
+                          </div>
+                          <div className="col-span-1 text-center font-bold text-slate-400">:</div>
+                          <div className="col-span-8 font-black text-slate-900 text-sm border-b border-slate-300 pb-1">
+                            {receiptPayer}
+                          </div>
                         </div>
-                      )}
-                      <span className="text-[10px] text-slate-300 italic">
-                        ( Tanda Tangan & Cap Sah )
-                      </span>
-                    </div>
-                    <div className="pt-1">
-                      <p className="font-black text-slate-900 underline text-xs">
-                        {receiptSignerName}
-                      </p>
-                      <p className="text-[10px] text-slate-500">
-                        {receiptSignerTitle}
-                      </p>
-                      <p className="text-[8px] font-mono text-slate-400 mt-0.5">
-                        [VERIFIKASI SISTEM: DST-REC-{receiptNumber.slice(-6)}]
-                      </p>
+
+                        {/* Uang Sejumlah (Terbilang Huruf) */}
+                        <div className="grid grid-cols-12 gap-2 items-start">
+                          <div className="col-span-3 font-bold text-slate-700 pt-1">
+                            Uang Sejumlah
+                          </div>
+                          <div className="col-span-1 text-center font-bold text-slate-400 pt-1">:</div>
+                          <div className="col-span-8 p-3 bg-amber-50/70 border border-amber-200 rounded-xl font-bold font-serif italic text-amber-950 text-xs leading-relaxed shadow-2xs">
+                            # {terbilangRupiah(receiptAmount)} #
+                          </div>
+                        </div>
+
+                        {/* Untuk Pembayaran */}
+                        <div className="grid grid-cols-12 gap-2 items-baseline">
+                          <div className="col-span-3 font-bold text-slate-700">
+                            Untuk Pembayaran
+                          </div>
+                          <div className="col-span-1 text-center font-bold text-slate-400">:</div>
+                          <div className="col-span-8 font-medium text-slate-800 border-b border-slate-300 pb-1 leading-relaxed">
+                            {receiptPurpose}
+                          </div>
+                        </div>
+
+                        {/* Metode & Keterangan Tambahan */}
+                        <div className="grid grid-cols-12 gap-2 items-baseline">
+                          <div className="col-span-3 font-bold text-slate-700">
+                            Metode Pembayaran
+                          </div>
+                          <div className="col-span-1 text-center font-bold text-slate-400">:</div>
+                          <div className="col-span-8 font-semibold text-slate-700 flex flex-wrap items-center gap-2">
+                            <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold border border-slate-200">
+                              {receiptPaymentMethod}
+                            </span>
+                            <span>{receiptBankName}</span>
+                            <span className="text-slate-400 text-[11px]">({receiptBankAccount})</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bagian Bawah: Nominal Besar & Tanda Tangan Sah */}
+                      <div className="pt-6 mt-6 border-t border-dashed border-slate-300 grid grid-cols-12 gap-6 items-end">
+                        {/* Kotak Nominal Angka Besar */}
+                        <div className="col-span-6 space-y-2">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Jumlah Terbayar (IDR):
+                          </span>
+                          <div className="inline-block p-3.5 bg-slate-900 text-white rounded-2xl border-2 border-slate-800 shadow-md">
+                            <span className="font-mono text-xl sm:text-2xl font-black tracking-wide text-amber-400">
+                              {formatRupiah(receiptAmount)}
+                            </span>
+                          </div>
+                          <p className="text-[9px] text-slate-400 italic leading-tight pt-1">
+                            * Kwitansi ini sah dan berkekuatan hukum sebagai bukti pelunasan setelah dana efektif diterima/didebet pada rekening resmi perusahaan.
+                          </p>
+                        </div>
+
+                        {/* Pengesahan Tanda Tangan & Cap Stempel */}
+                        <div className="col-span-6 text-center space-y-1">
+                          <p className="text-[11px] text-slate-500">
+                            Batam, {new Date(receiptDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                          </p>
+                          <p className="font-black text-slate-900 text-xs uppercase tracking-wide">
+                            {receiptEntity === "PT" ? "PT DSTECH SMART PERKASA" : "DSTECH SMART SOLUTION"}
+                          </p>
+                          <div className="h-20 flex items-center justify-center relative">
+                            {financeSettings.masterStampUrl ? (
+                              <img
+                                src={financeSettings.masterStampUrl}
+                                alt="Cap Stempel Resmi"
+                                className="absolute h-18 opacity-80 pointer-events-none"
+                              />
+                            ) : (
+                              <div className="print-stamp-circle absolute right-4 w-14 h-14 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[6px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
+                                <span className="font-black text-[6px]">{receiptEntity === "PT" ? "PT. DSTECH" : "DSTECH"}</span>
+                                <span className="text-[5px] tracking-tight">{receiptEntity === "PT" ? "SMART PERKASA" : "SMART"}</span>
+                              </div>
+                            )}
+                            <span className="text-[10px] text-slate-300 italic">
+                              ( Tanda Tangan & Cap Sah )
+                            </span>
+                          </div>
+                          <div className="pt-1">
+                            <p className="font-black text-slate-900 underline text-xs">
+                              {receiptSignerName}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              {receiptSignerTitle}
+                            </p>
+                            <p className="text-[8px] font-mono text-slate-400 mt-0.5">
+                              [VERIFIKASI SISTEM: DST-REC-{receiptNumber.slice(-6)}]
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -22290,48 +22294,58 @@ export default function AdminFinanceERPPage() {
 
             {/* Scrollable Preview Area Lembar A4 */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-200/60 flex justify-center">
-              <div
-                id="print-invoice-photos-sheet"
-                className="w-full max-w-[794px] min-h-[900px] bg-white rounded-2xl shadow-xl p-8 sm:p-12 relative text-slate-800 border border-slate-200 print:shadow-none print:border-none print:rounded-none print:m-0 print:p-8 space-y-6"
-                style={{
-                  fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-                }}
-              >
-                {/* Kop Surat Resmi */}
-                {invoicePhotoLetterhead && (
-                  <div className="mb-6 border-b-2 border-slate-800 pb-4">
-                    {getLetterheadConfig(selectedInvoiceForPhotoPrint.businessEntity).url ? (
-                      <div className="w-full flex items-center justify-center">
-                        <img
-                          src={getLetterheadConfig(selectedInvoiceForPhotoPrint.businessEntity).url}
-                          alt="Kop Surat Resmi"
-                          className="max-h-24 w-auto object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h2 className="text-xl font-black text-slate-900 tracking-wider">
-                            {selectedInvoiceForPhotoPrint.businessEntity === "NON_PT" ? "DSTECH SMART SOLUTION" : "PT DSTECH SMART PERKASA"}
-                          </h2>
-                          <p className="text-xs text-slate-600 font-medium">
-                            Security Systems • Smart IoT Automation • IT Infrastructure • Fiber Optic
-                          </p>
-                        </div>
-                      </div>
+              {(() => {
+                const photoLetterheadCfg = getLetterheadConfig(selectedInvoiceForPhotoPrint.businessEntity);
+                return (
+                  <div
+                    id="print-invoice-photos-sheet"
+                    className="relative w-full max-w-[794px] min-h-[900px] bg-white rounded-2xl shadow-xl border border-slate-300 overflow-hidden print-document-sheet print:shadow-none print:border-none print:rounded-none print:m-0 flex flex-col justify-between"
+                    style={{
+                      paddingTop: `${invoicePhotoLetterhead && photoLetterheadCfg.enabled && photoLetterheadCfg.url ? (photoLetterheadCfg.paddingTop || 85) : 32}px`,
+                      paddingBottom: `${invoicePhotoLetterhead && photoLetterheadCfg.enabled && photoLetterheadCfg.url ? (photoLetterheadCfg.paddingBottom || 80) : 32}px`,
+                      paddingLeft: "16mm",
+                      paddingRight: "16mm",
+                      fontFamily: "'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                    }}
+                  >
+                    {/* Background Kop Surat Resmi DSTech Full Width */}
+                    {invoicePhotoLetterhead && photoLetterheadCfg.enabled && photoLetterheadCfg.url && (
+                      <img
+                        src={photoLetterheadCfg.url}
+                        alt="Kop Surat Resmi"
+                        className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                          photoLetterheadCfg.fitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                        }`}
+                        style={{
+                          objectFit:
+                            photoLetterheadCfg.fitMode === "cover"
+                              ? "cover"
+                              : photoLetterheadCfg.fitMode === "contain"
+                              ? "contain"
+                              : "fill",
+                          objectPosition: "top center",
+                          width: photoLetterheadCfg.fitMode === "bleed" ? "102.5%" : "100%",
+                          height: photoLetterheadCfg.fitMode === "bleed" ? "102%" : "100%",
+                          top: photoLetterheadCfg.fitMode === "bleed" ? "-1%" : "0",
+                          left: photoLetterheadCfg.fitMode === "bleed" ? "-1.25%" : "0",
+                          opacity: photoLetterheadCfg.opacity !== undefined ? photoLetterheadCfg.opacity : 1,
+                          WebkitPrintColorAdjust: "exact",
+                          printColorAdjust: "exact",
+                        }}
+                      />
                     )}
-                  </div>
-                )}
 
-                {/* Judul Lembar Lampiran */}
-                <div className="text-center space-y-1 border-b border-slate-200 pb-4">
-                  <h1 className="text-xl font-black text-slate-900 tracking-wider uppercase font-serif">
-                    LAMPIRAN DOKUMENTASI PEKERJAAN & BUKTI FISIK
-                  </h1>
-                  <p className="text-xs text-slate-500 tracking-wide font-sans uppercase">
-                    KELENGKAPAN ADMINISTRASI PENAGIHAN FAKTUR PENJUALAN
-                  </p>
-                </div>
+                    {/* Konten Lampiran di Layer Atas */}
+                    <div className="relative z-10 space-y-6 flex-1 flex flex-col justify-between">
+                      {/* Judul Lembar Lampiran */}
+                      <div className="text-center space-y-1 border-b-2 border-slate-800 pb-3">
+                        <h1 className="text-xl font-black text-slate-900 tracking-wider uppercase font-serif">
+                          LAMPIRAN DOKUMENTASI PEKERJAAN & BUKTI FISIK
+                        </h1>
+                        <p className="text-xs text-slate-500 tracking-wide font-sans uppercase font-bold">
+                          KELENGKAPAN ADMINISTRASI PENAGIHAN FAKTUR PENJUALAN
+                        </p>
+                      </div>
 
                 {/* Info Identitas Faktur */}
                 <div className="grid grid-cols-2 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
@@ -22493,6 +22507,9 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          );
+        })()}
             </div>
           </div>
         </div>
