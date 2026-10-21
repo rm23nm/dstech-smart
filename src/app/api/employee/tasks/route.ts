@@ -126,15 +126,70 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const { id } = body;
 
-    if (!id) {
-      return NextResponse.json({ success: false, error: "Task ID diperlukan" }, { status: 400 });
+    if (!id && !body.ticketNumber && !body.title) {
+      return NextResponse.json({ success: false, error: "Task ID atau data penugasan diperlukan" }, { status: 400 });
     }
 
     const tasks = readTasks();
-    const index = tasks.findIndex((t: any) => t.id === id);
+    let index = -1;
+
+    if (id) {
+      index = tasks.findIndex(
+        (t: any) =>
+          t.id === id ||
+          t.ticketNumber === id ||
+          String(t.id).toLowerCase() === String(id).toLowerCase() ||
+          String(t.ticketNumber).toLowerCase() === String(id).toLowerCase()
+      );
+    }
+
+    if (index === -1 && body.ticketNumber) {
+      index = tasks.findIndex(
+        (t: any) =>
+          t.ticketNumber === body.ticketNumber ||
+          String(t.ticketNumber).toLowerCase() === String(body.ticketNumber).toLowerCase()
+      );
+    }
+
+    if (index === -1 && body.title) {
+      index = tasks.findIndex(
+        (t: any) =>
+          t.title && body.title && t.title.trim().toLowerCase() === body.title.trim().toLowerCase()
+      );
+    }
 
     if (index === -1) {
-      return NextResponse.json({ success: false, error: "Tugas tidak ditemukan" }, { status: 404 });
+      // Buatkan data penugasan baru jika belum tercatat di database JSON
+      const newTask = {
+        id: id || `dstech_task_${Date.now()}`,
+        ticketNumber: body.ticketNumber || `MTC-${new Date().toISOString().slice(0, 7).replace("-", "")}-001`,
+        title: body.title || "Penugasan Maintenance Lapangan",
+        client: body.client || "Klien Umum",
+        location: body.location || "-",
+        date: body.date || new Date().toISOString().split("T")[0],
+        deadline: body.deadline || new Date().toISOString().split("T")[0],
+        status: body.status || "In Progress",
+        priority: body.priority || "Medium",
+        technician: body.technician || "Teknisi Lapangan",
+        technicianPhone: body.technicianPhone || "",
+        scope: Array.isArray(body.scope) ? body.scope : [],
+        equipment: Array.isArray(body.equipment) ? body.equipment : [],
+        report: body.report || "",
+        notes: body.notes || "",
+        recommendation: body.recommendation || "",
+        photos: Array.isArray(body.photos) ? body.photos : [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      tasks.unshift(newTask);
+      writeTasks(tasks);
+
+      return NextResponse.json({
+        success: true,
+        message: "Tiket penugasan maintenance berhasil disimpan",
+        data: newTask,
+      });
     }
 
     // Update fields allowed

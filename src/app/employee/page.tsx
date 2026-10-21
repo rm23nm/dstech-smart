@@ -498,18 +498,25 @@ export default function EmployeeDashboard() {
     if (!selectedTask) return;
 
     try {
+      const payload = {
+        id: selectedTask.id,
+        ticketNumber: (selectedTask as any).ticketNumber || "",
+        title: selectedTask.title,
+        client: selectedTask.client,
+        status: taskStatusForm.status,
+        report: taskStatusForm.report,
+        photos: taskStatusForm.photos || [],
+      };
+
       const res = await fetch("/api/employee/tasks", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: selectedTask.id,
-          status: taskStatusForm.status,
-          report: taskStatusForm.report,
-          photos: taskStatusForm.photos || [],
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (res.ok) {
+      const json = await res.json();
+
+      if (res.ok && json.success) {
         setTasks((prev) =>
           prev.map((t) =>
             t.id === selectedTask.id
@@ -534,8 +541,16 @@ export default function EmployeeDashboard() {
         );
         showToast("Status penugasan & foto dokumentasi berhasil disimpan!");
         setIsStatusModalOpen(false);
+
+        // Re-fetch data segar dari server
+        fetch("/api/employee/tasks")
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.success && Array.isArray(d.data)) setTasks(d.data);
+          })
+          .catch(() => {});
       } else {
-        showToast("Gagal menyimpan update tugas");
+        showToast("Gagal menyimpan update tugas: " + (json.error || ""));
       }
     } catch {
       showToast("Terjadi kesalahan jaringan");
