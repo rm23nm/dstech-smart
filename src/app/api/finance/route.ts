@@ -1191,6 +1191,7 @@ export async function POST(request: Request) {
         actualEndDate: payload.actualEndDate || "",
         picProject: payload.picProject || "Project Manager DSTech",
         description: payload.description || "-",
+        photos: Array.isArray(payload.photos) ? payload.photos : [],
         createdAt: new Date().toISOString(),
       };
 

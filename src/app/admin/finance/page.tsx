@@ -71,6 +71,8 @@ import {
   Briefcase,
   FolderKanban,
   Globe,
+  Camera,
+  Wrench,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -132,6 +134,7 @@ export interface ProjectItem {
   clientName: string;
   clientPhone?: string;
   clientAddress?: string;
+  clientPic?: string;
   businessEntity?: "PT" | "NON_PT";
   quotationId?: string;
   quotationNumber?: string;
@@ -146,6 +149,15 @@ export interface ProjectItem {
   createdAt?: string;
   isPublishedToPortfolio?: boolean;
   portfolioId?: string;
+  photos?: ProjectPhoto[];
+}
+
+export interface ProjectPhoto {
+  id: string;
+  url: string;
+  caption: string;
+  category: "documentation" | "part_replacement";
+  createdAt?: string;
 }
 
 interface SaleInvoice {
@@ -1045,7 +1057,13 @@ export default function AdminFinanceERPPage() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState<boolean>(false);
   const [editingProject, setEditingProject] = useState<ProjectItem | null>(null);
   const [selectedProjectForDetail, setSelectedProjectForDetail] = useState<ProjectItem | null>(null);
-  const [projectDossierTab, setProjectDossierTab] = useState<"summary" | "sales" | "purchases" | "cash">("summary");
+  const [projectDossierTab, setProjectDossierTab] = useState<"summary" | "sales" | "purchases" | "cash" | "photos">("summary");
+  const [selectedProjectForPhotoPrint, setSelectedProjectForPhotoPrint] = useState<ProjectItem | null>(null);
+  const [isUploadingProjectPhoto, setIsUploadingProjectPhoto] = useState<boolean>(false);
+  const [projectPhotoCategory, setProjectPhotoCategory] = useState<"documentation" | "part_replacement">("documentation");
+  const [projectPhotoCaption, setProjectPhotoCaption] = useState<string>("");
+  const [projectPhotoFilter, setProjectPhotoFilter] = useState<"all" | "documentation" | "part_replacement">("all");
+  const [projectLetterheadEnabled, setProjectLetterheadEnabled] = useState<boolean>(true);
   const [isPublishPortfolioModalOpen, setIsPublishPortfolioModalOpen] = useState<boolean>(false);
   const [publishPortfolioForm, setPublishPortfolioForm] = useState<{
     projectId: string;
@@ -4744,6 +4762,101 @@ export default function AdminFinanceERPPage() {
       showToast("Terjadi kesalahan saat mempublikasikan ke portofolio");
     } finally {
       setIsPublishingPortfolio(false);
+    }
+  };
+
+  const handleUploadProjectPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedProjectForDetail) return;
+
+    try {
+      setIsUploadingProjectPhoto(true);
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("docType", "project_photo");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (json.success && json.url) {
+        const newPhoto: ProjectPhoto = {
+          id: `dstech_photo_${Date.now()}`,
+          url: json.url,
+          caption:
+            projectPhotoCaption.trim() ||
+            (projectPhotoCategory === "part_replacement"
+              ? "Foto Pergantian Part / Sparepart Proyek"
+              : "Foto Dokumentasi Instalasi Proyek"),
+          category: projectPhotoCategory,
+          createdAt: new Date().toISOString(),
+        };
+        const updatedPhotos = [...(selectedProjectForDetail.photos || []), newPhoto];
+
+        const updateRes = await fetch("/api/finance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "project",
+            id: selectedProjectForDetail.id,
+            payload: {
+              ...selectedProjectForDetail,
+              photos: updatedPhotos,
+            },
+          }),
+        });
+
+        if (updateRes.ok) {
+          const updatedPrj = { ...selectedProjectForDetail, photos: updatedPhotos };
+          setSelectedProjectForDetail(updatedPrj);
+          setProjects((prev) =>
+            prev.map((p) => (p.id === selectedProjectForDetail.id ? updatedPrj : p))
+          );
+          setProjectPhotoCaption("");
+          showToast("Foto dokumentasi proyek berhasil disimpan!");
+        } else {
+          showToast("Gagal menyimpan update foto proyek");
+        }
+      } else {
+        showToast("Gagal upload foto: " + (json.message || "Error"));
+      }
+    } catch (err: any) {
+      showToast("Error: " + (err?.message || "Terjadi kesalahan upload"));
+    } finally {
+      setIsUploadingProjectPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleRemoveProjectPhoto = async (photoId: string) => {
+    if (!selectedProjectForDetail) return;
+    const updatedPhotos = (selectedProjectForDetail.photos || []).filter((p) => p.id !== photoId);
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "project",
+          id: selectedProjectForDetail.id,
+          payload: {
+            ...selectedProjectForDetail,
+            photos: updatedPhotos,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const updatedPrj = { ...selectedProjectForDetail, photos: updatedPhotos };
+        setSelectedProjectForDetail(updatedPrj);
+        setProjects((prev) =>
+          prev.map((p) => (p.id === selectedProjectForDetail.id ? updatedPrj : p))
+        );
+        showToast("Foto berhasil dihapus");
+      }
+    } catch {
+      showToast("Gagal menghapus foto");
     }
   };
 
@@ -12570,6 +12683,15 @@ export default function AdminFinanceERPPage() {
                       <span>Edit Master</span>
                     </button>
                     <button
+                      type="button"
+                      onClick={() => setSelectedProjectForPhotoPrint(prj)}
+                      className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                      title="Cetak Lampiran Laporan Foto Dokumentasi & Pergantian Part untuk Invoice"
+                    >
+                      <Printer className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Lampiran Laporan Foto</span>
+                    </button>
+                    <button
                       onClick={() => setSelectedProjectForDetail(null)}
                       className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
                     >
@@ -12688,6 +12810,18 @@ export default function AdminFinanceERPPage() {
                   >
                     <CreditCard className="w-3.5 h-3.5" />
                     <span>Kas & Lapangan ({prjCashOut.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProjectDossierTab("photos")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      projectDossierTab === "photos"
+                        ? "bg-purple-600 text-white shadow"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Foto Dokumentasi & Part ({prj.photos?.length || 0})</span>
                   </button>
                 </div>
 
@@ -12996,6 +13130,188 @@ export default function AdminFinanceERPPage() {
                   </div>
                 )}
 
+                {/* Tab Content: Photos Documentation & Part Replacement */}
+                {projectDossierTab === "photos" && (
+                  <div className="space-y-4 text-xs">
+                    <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-2xl border border-purple-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <h4 className="font-black text-slate-800 text-sm flex items-center gap-2">
+                          <Camera className="w-4 h-4 text-purple-600" />
+                          <span>Laporan Foto Dokumentasi & Pergantian Part Proyek</span>
+                        </h4>
+                        <p className="text-slate-600 text-xs mt-0.5">
+                          Lampiran otomatis foto bukti fisik pekerjaan dan penggantian part siap cetak dengan Kop Surat resmi PT DSTech Smart Perkasa untuk kelengkapan faktur tagihan (invoice).
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProjectForPhotoPrint(prj)}
+                          className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-2 cursor-pointer shadow-sm transition-all"
+                        >
+                          <Printer className="w-4 h-4" />
+                          <span>Cetak Lampiran Faktur</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Photo Upload Box */}
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-800 flex items-center gap-2">
+                          <UploadCloud className="w-4 h-4 text-purple-600" />
+                          <span>Upload Foto Baru ke Proyek</span>
+                        </span>
+                        <span className="text-[11px] text-slate-400">Format: JPG, PNG, WEBP</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                        <div className="sm:col-span-4">
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">Kategori Foto:</label>
+                          <select
+                            value={projectPhotoCategory}
+                            onChange={(e) => setProjectPhotoCategory(e.target.value as "documentation" | "part_replacement")}
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          >
+                            <option value="documentation">📸 Foto Dokumentasi Pekerjaan</option>
+                            <option value="part_replacement">⚙️ Foto Pergantian Part / Sparepart</option>
+                          </select>
+                        </div>
+                        <div className="sm:col-span-5">
+                          <label className="text-[10px] font-bold text-slate-500 block mb-1">Keterangan / Deskripsi Foto:</label>
+                          <input
+                            type="text"
+                            value={projectPhotoCaption}
+                            onChange={(e) => setProjectPhotoCaption(e.target.value)}
+                            placeholder="Contoh: Unit barrier gate terpasang di gate 1..."
+                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                        </div>
+                        <div className="sm:col-span-3 flex items-end">
+                          <label className="w-full px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold cursor-pointer transition-all flex items-center justify-center gap-2 shadow-xs">
+                            <UploadCloud className="w-4 h-4" />
+                            <span>{isUploadingProjectPhoto ? "Mengunggah..." : "Pilih File Foto"}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              disabled={isUploadingProjectPhoto}
+                              onChange={handleUploadProjectPhoto}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Filter Pills */}
+                    <div className="flex items-center justify-between flex-wrap gap-2 pt-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setProjectPhotoFilter("all")}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            projectPhotoFilter === "all"
+                              ? "bg-purple-600 text-white shadow-xs"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                        >
+                          Semua ({prj.photos?.length || 0})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setProjectPhotoFilter("documentation")}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            projectPhotoFilter === "documentation"
+                              ? "bg-purple-600 text-white shadow-xs"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                        >
+                          📸 Dokumentasi ({prj.photos?.filter((p) => p.category === "documentation").length || 0})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setProjectPhotoFilter("part_replacement")}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            projectPhotoFilter === "part_replacement"
+                              ? "bg-amber-600 text-white shadow-xs"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                        >
+                          ⚙️ Pergantian Part ({prj.photos?.filter((p) => p.category === "part_replacement").length || 0})
+                        </button>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        Total {prj.photos?.length || 0} foto tersimpan
+                      </span>
+                    </div>
+
+                    {/* Gallery Grid */}
+                    {(!prj.photos || prj.photos.length === 0) ? (
+                      <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-2">
+                        <Camera className="w-10 h-10 text-slate-300 mx-auto" />
+                        <h5 className="font-bold text-slate-700">Belum Ada Foto Dokumentasi / Part</h5>
+                        <p className="text-slate-400 text-xs max-w-md mx-auto">
+                          Gunakan form upload di atas untuk melampirkan foto hasil pekerjaan lapangan dan suku cadang yang diganti untuk proyek ini.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {prj.photos
+                          .filter((p) => projectPhotoFilter === "all" || p.category === projectPhotoFilter)
+                          .map((photo) => (
+                            <div
+                              key={photo.id}
+                              className="group relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs hover:shadow-md transition-all flex flex-col"
+                            >
+                              <div className="relative aspect-video bg-slate-100 overflow-hidden cursor-pointer" onClick={() => window.open(photo.url, "_blank")}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={photo.url}
+                                  alt={photo.caption || "Foto Proyek"}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                />
+                                <span
+                                  className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                    photo.category === "part_replacement"
+                                      ? "bg-amber-500 text-white"
+                                      : "bg-blue-600 text-white"
+                                  }`}
+                                >
+                                  {photo.category === "part_replacement" ? "⚙️ Part" : "📸 Dokumentasi"}
+                                </span>
+                              </div>
+                              <div className="p-3 flex-1 flex flex-col justify-between">
+                                <p className="font-bold text-slate-800 text-xs line-clamp-2 leading-snug">
+                                  {photo.caption || "Tanpa Keterangan"}
+                                </p>
+                                <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-100 text-[10px] text-slate-400">
+                                  <span>{photo.createdAt ? new Date(photo.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => window.open(photo.url, "_blank")}
+                                      className="p-1 rounded-md text-slate-500 hover:text-purple-600 hover:bg-purple-50 cursor-pointer"
+                                      title="Buka Foto Penuh"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveProjectPhoto(photo.id)}
+                                      className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 cursor-pointer"
+                                      title="Hapus Foto"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Footer Modal */}
                 <div className="flex items-center justify-end pt-3 border-t border-slate-100">
                   <button
@@ -13260,6 +13576,316 @@ export default function AdminFinanceERPPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CETAK LEMBAR A4 RESMI: LAMPIRAN FOTO DOKUMENTASI & PERGANTIAN PART PROYEK */}
+      {selectedProjectForPhotoPrint && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+          onClick={() => setSelectedProjectForPhotoPrint(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-4 sm:p-6 space-y-4 shadow-2xl relative my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Dialog Kontrol Cetak */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-purple-50 text-purple-600">
+                  <Printer className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Lampiran Laporan Foto Dokumentasi & Part Proyek
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Format Dokumen Resmi Standar A4 PT DSTech Smart Perkasa untuk Lampiran Faktur Tagihan
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Toggle Kop Surat */}
+                <button
+                  type="button"
+                  onClick={() => setProjectLetterheadEnabled(!projectLetterheadEnabled)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border ${
+                    projectLetterheadEnabled
+                      ? "bg-emerald-50 border-emerald-300 text-emerald-700"
+                      : "bg-slate-100 border-slate-300 text-slate-600"
+                  }`}
+                  title="Toggle Kop Surat Gambar"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Kop Surat: {projectLetterheadEnabled ? "AKTIF" : "POLOS"}</span>
+                </button>
+
+                {/* Print Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const printable = document.getElementById("printable-project-photo-attachment");
+                    if (!printable) {
+                      window.print();
+                      return;
+                    }
+                    const printWindow = window.open("", "_blank");
+                    if (!printWindow) {
+                      window.print();
+                      return;
+                    }
+                    printWindow.document.write(`
+                      <html>
+                        <head>
+                          <title>Lampiran_Foto_${selectedProjectForPhotoPrint.projectCode}_${selectedProjectForPhotoPrint.clientName}</title>
+                          <script src="https://cdn.tailwindcss.com"></script>
+                          <style>
+                            @page { size: A4; margin: 0; }
+                            body { margin: 0; font-family: sans-serif; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                          </style>
+                        </head>
+                        <body>
+                          ${printable.outerHTML}
+                          <script>
+                            window.onload = function() {
+                              setTimeout(function() {
+                                window.print();
+                                window.close();
+                              }, 500);
+                            };
+                          </script>
+                        </body>
+                      </html>
+                    `);
+                    printWindow.document.close();
+                  }}
+                  className="px-4 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak / Simpan PDF</span>
+                </button>
+
+                {/* Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedProjectForPhotoPrint(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* LEMBAR DOKUMEN RESMI A4: LAMPIRAN FOTO DOKUMENTASI PROYEK */}
+            <div
+              id="printable-project-photo-attachment"
+              className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 text-slate-800 space-y-6 relative shadow-md font-sans"
+              style={{
+                backgroundImage: projectLetterheadEnabled ? "url('/kop_surat_dstech.jpg')" : "none",
+                backgroundSize: "100% 100%",
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "top center",
+                paddingTop: projectLetterheadEnabled ? "135px" : "32px",
+                paddingBottom: projectLetterheadEnabled ? "110px" : "32px",
+              }}
+            >
+              {/* Fallback header if letterhead disabled */}
+              {!projectLetterheadEnabled && (
+                <div className="flex items-center justify-between border-b-2 border-slate-800 pb-4">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">PT. DSTECH SMART PERKASA</h2>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Security System • CCTV AI • Access Control • Barrier Gate • IT Infrastructure
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      Jl. Raya Cilegon No. 88, Cilegon, Banten • Telp/WA: 0822-5949-4242 • www.dstechsmart.com
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-mono text-slate-400">LEGALITAS RESMI</span>
+                    <p className="text-xs font-bold text-slate-700">NIB: 2026-DSTECH-ID</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Title Dokumen */}
+              <div className="text-center space-y-1">
+                <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase underline decoration-2 underline-offset-4">
+                  LAMPIRAN LAPORAN FOTO DOKUMENTASI & PERGANTIAN PART
+                </h2>
+                <p className="text-xs font-mono font-bold text-slate-600">
+                  Nomor Dokumen: LAMP-PRJ-{selectedProjectForPhotoPrint.projectCode || selectedProjectForPhotoPrint.id}
+                </p>
+                <p className="text-[10px] text-slate-400 italic">
+                  (Dokumen Lampiran Bukti Fisik Lapangan Pendukung Faktur Tagihan / BAST Pelaksanaan Proyek)
+                </p>
+              </div>
+
+              {/* Data Klien & Informasi Proyek */}
+              <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50/70 p-3.5 rounded-xl border border-slate-200">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Pihak Penerima (Klien):</span>
+                  <p className="font-black text-slate-900">{selectedProjectForPhotoPrint.clientName}</p>
+                  <p className="text-slate-600 text-[11px]">{selectedProjectForPhotoPrint.clientAddress || "Lokasi Proyek Klien"}</p>
+                  <p className="text-slate-600 text-[11px]">
+                    PIC Proyek Klien: <strong>{selectedProjectForPhotoPrint.clientPic || "Bapak/Ibu Pimpinan"}</strong>
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Data Pekerjaan Proyek:</span>
+                  <p className="font-black text-slate-900">{selectedProjectForPhotoPrint.projectName}</p>
+                  <p className="text-slate-600 text-[11px]">
+                    Kode Proyek: <strong>{selectedProjectForPhotoPrint.projectCode}</strong> • Nilai: {formatRupiah(selectedProjectForPhotoPrint.contractValue)}
+                  </p>
+                  <p className="text-slate-600 text-[11px]">
+                    Periode: <strong>{selectedProjectForPhotoPrint.startDate}</strong> s/d <strong>{selectedProjectForPhotoPrint.actualEndDate || selectedProjectForPhotoPrint.targetEndDate || "-"}</strong> • PIC: {selectedProjectForPhotoPrint.picProject || "Tim Teknis DSTech"}
+                  </p>
+                </div>
+              </div>
+
+              {/* I. FOTO DOKUMENTASI PEKERJAAN PROYEK */}
+              <div className="space-y-3">
+                <div className="border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                  <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-purple-700" />
+                    <span>I. FOTO DOKUMENTASI PEKERJAAN LAPANGAN (INSTALASI & IMPLEMENTASI)</span>
+                  </h4>
+                  <span className="text-[10px] text-slate-400">
+                    {selectedProjectForPhotoPrint.photos?.filter((p) => p.category === "documentation").length || 0} Dokumentasi
+                  </span>
+                </div>
+
+                {(!selectedProjectForPhotoPrint.photos || selectedProjectForPhotoPrint.photos.filter((p) => p.category === "documentation").length === 0) ? (
+                  <p className="text-xs text-slate-400 italic py-2">Tidak ada foto dokumentasi pekerjaan.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedProjectForPhotoPrint.photos
+                      .filter((p) => p.category === "documentation")
+                      .map((photo, idx) => (
+                        <div
+                          key={photo.id || idx}
+                          className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50/50 space-y-2 p-2.5 shadow-2xs"
+                        >
+                          <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-300 relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo.url}
+                              alt={photo.caption}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "/service-cctv.png";
+                              }}
+                            />
+                            <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[8px] font-mono px-1.5 py-0.5 rounded">
+                              Foto #{idx + 1}
+                            </span>
+                          </div>
+                          <div className="text-[11px] space-y-0.5">
+                            <span className="text-[9px] font-bold text-purple-700 uppercase block">Keterangan:</span>
+                            <p className="font-medium text-slate-800 leading-snug">{photo.caption}</p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* II. FOTO PERGANTIAN PART / SPAREPART */}
+              <div className="space-y-3 pt-2">
+                <div className="border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                  <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-amber-700" />
+                    <span>II. FOTO BUKTI PERGANTIAN PART / SPAREPART (UNIT RUSAK VS UNIT BARU)</span>
+                  </h4>
+                  <span className="text-[10px] text-slate-400">
+                    {selectedProjectForPhotoPrint.photos?.filter((p) => p.category === "part_replacement").length || 0} Penggantian
+                  </span>
+                </div>
+
+                {(!selectedProjectForPhotoPrint.photos || selectedProjectForPhotoPrint.photos.filter((p) => p.category === "part_replacement").length === 0) ? (
+                  <p className="text-xs text-slate-400 italic py-2">Tidak ada pergantian suku cadang / sparepart pada proyek ini.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedProjectForPhotoPrint.photos
+                      .filter((p) => p.category === "part_replacement")
+                      .map((photo, idx) => (
+                        <div
+                          key={photo.id || idx}
+                          className="rounded-xl border border-amber-200 overflow-hidden bg-amber-50/30 space-y-2 p-2.5 shadow-2xs"
+                        >
+                          <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-300 relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo.url}
+                              alt={photo.caption}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "/service-it.png";
+                              }}
+                            />
+                            <span className="absolute bottom-1 right-1 bg-amber-700 text-white text-[8px] font-mono px-1.5 py-0.5 rounded">
+                              Part #{idx + 1}
+                            </span>
+                          </div>
+                          <div className="text-[11px] space-y-0.5">
+                            <span className="text-[9px] font-bold text-amber-800 uppercase block">Rincian Komponen / Tindakan:</span>
+                            <p className="font-medium text-slate-800 leading-snug">{photo.caption}</p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* III. PERNYATAAN FISIK & KOLOM TANDA TANGAN LEGALITAS */}
+              <div className="space-y-4 pt-4 border-t border-slate-200 text-xs">
+                <p className="text-[11px] text-slate-600 leading-relaxed text-justify">
+                  Demikian lampiran dokumentasi foto ini dibuat secara sebenar-benarnya sebagai bukti fisik pelaksanaan pekerjaan proyek di lapangan guna memenuhi kelengkapan administrasi penagihan invoice dan Berita Acara Serah Terima (BAST).
+                </p>
+
+                <div className="grid grid-cols-2 gap-8 pt-2">
+                  {/* Kiri: Penerima Klien */}
+                  <div className="text-center space-y-1">
+                    <span className="text-[11px] text-slate-500 font-bold block">Pihak Penerima / Klien:</span>
+                    <span className="font-black text-slate-900 block text-xs">{selectedProjectForPhotoPrint.clientName}</span>
+                    <div className="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
+                      <span className="text-[10px] text-slate-300 italic">( Tanda Tangan & Cap Stempel Klien )</span>
+                    </div>
+                    <div className="pt-1">
+                      <p className="font-black text-slate-900 underline text-xs">
+                        ( {selectedProjectForPhotoPrint.clientPic || "PIC / Penanggung Jawab Lapangan"} )
+                      </p>
+                      <p className="text-[10px] text-slate-500">Jabatan: Pengawas Lapangan</p>
+                    </div>
+                  </div>
+
+                  {/* Kanan: Pelaksana DSTech */}
+                  <div className="text-center space-y-1">
+                    <span className="text-[11px] text-slate-500 font-bold block">Pihak Pelaksana:</span>
+                    <span className="font-black text-slate-900 block text-xs">PT. DSTech Smart Perkasa</span>
+                    <div className="h-20 flex flex-col items-center justify-center relative border-b border-dashed border-slate-300">
+                      {/* Stempel bulat digital */}
+                      <div className="w-16 h-16 rounded-full border-2 border-indigo-600/60 text-indigo-700/80 text-[7px] font-black uppercase flex flex-col items-center justify-center rotate-[-12deg] pointer-events-none">
+                        <span>PT. DSTECH</span>
+                        <span className="text-[6px]">SMART PERKASA</span>
+                        <span className="text-[5px]">CILEGON</span>
+                      </div>
+                    </div>
+                    <div className="pt-1">
+                      <p className="font-black text-slate-900 underline text-xs">
+                        ( {selectedProjectForPhotoPrint.picProject || "Ahmad Romadhoni"} )
+                      </p>
+                      <p className="text-[10px] text-slate-500">Project Manager / Koordinator Teknis</p>
+                      <p className="text-[9px] font-mono text-slate-400 mt-0.5">
+                        [VERIFIKASI SISTEM: DST-APP-PRJ-PHOTO-{selectedProjectForPhotoPrint.id.slice(-6)}]
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}

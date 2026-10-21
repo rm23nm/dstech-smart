@@ -35,7 +35,19 @@ import {
   Briefcase,
   AlertCircle,
   ListTodo,
+  Camera,
+  Image as ImageIcon,
+  UploadCloud,
+  Layers,
 } from "lucide-react";
+
+export interface TaskPhoto {
+  id: string;
+  url: string;
+  caption: string;
+  category: "documentation" | "part_replacement";
+  createdAt: string;
+}
 
 interface MaintenanceTask {
   id: string;
@@ -56,6 +68,7 @@ interface MaintenanceTask {
   technicianPhone: string;
   scope: string[];
   equipment: string[];
+  photos?: TaskPhoto[];
   report?: string;
   notes?: string;
   recommendation?: string;
@@ -133,6 +146,21 @@ export default function MaintenancePage() {
   const [selectedTaskForPrint, setSelectedTaskForPrint] = useState<MaintenanceTask | null>(null);
   const [watermarkOpacity, setWatermarkOpacity] = useState(15);
   const [letterheadEnabled, setLetterheadEnabled] = useState(true);
+
+  // Photo States & Modals
+  const [selectedTaskForPhotos, setSelectedTaskForPhotos] = useState<MaintenanceTask | null>(null);
+  const [selectedTaskForPhotoPrint, setSelectedTaskForPhotoPrint] = useState<MaintenanceTask | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoCategoryFilter, setPhotoCategoryFilter] = useState<"all" | "documentation" | "part_replacement">("all");
+  const [photoForm, setPhotoForm] = useState<{
+    url: string;
+    caption: string;
+    category: "documentation" | "part_replacement";
+  }>({
+    url: "",
+    caption: "",
+    category: "documentation",
+  });
 
   // Form State
   const [formData, setFormData] = useState({
@@ -424,6 +452,101 @@ export default function MaintenancePage() {
       }
     } catch (err) {
       console.error("Quick status change error:", err);
+    }
+  };
+
+  // Upload Photo File via /api/upload
+  const handleUploadPhotoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingPhoto(true);
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("docType", "maintenance_photo");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (json.success && json.url) {
+        setPhotoForm((prev) => ({ ...prev, url: json.url }));
+      } else {
+        alert("Gagal mengunggah foto: " + (json.message || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Error upload: " + err.message);
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  // Add Photo to Task
+  const handleAddPhotoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTaskForPhotos) return;
+    if (!photoForm.url.trim()) {
+      alert("Harap unggah foto atau masukkan URL terlebih dahulu.");
+      return;
+    }
+    if (!photoForm.caption.trim()) {
+      alert("Harap berikan keterangan foto.");
+      return;
+    }
+
+    const newPhoto: TaskPhoto = {
+      id: `dstech_photo_${Date.now()}`,
+      url: photoForm.url.trim(),
+      caption: photoForm.caption.trim(),
+      category: photoForm.category,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedPhotos = [...(selectedTaskForPhotos.photos || []), newPhoto];
+
+    try {
+      const res = await fetch("/api/employee/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedTaskForPhotos.id, photos: updatedPhotos }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const updatedTask = { ...selectedTaskForPhotos, photos: updatedPhotos };
+        setSelectedTaskForPhotos(updatedTask);
+        setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+        setPhotoForm({ url: "", caption: "", category: "documentation" });
+      } else {
+        alert("Gagal menyimpan foto: " + (json.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
+  };
+
+  // Delete Photo from Task
+  const handleDeletePhoto = async (photoId: string) => {
+    if (!selectedTaskForPhotos) return;
+    if (!confirm("Hapus foto ini dari laporan?")) return;
+
+    const updatedPhotos = (selectedTaskForPhotos.photos || []).filter((p) => p.id !== photoId);
+
+    try {
+      const res = await fetch("/api/employee/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selectedTaskForPhotos.id, photos: updatedPhotos }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const updatedTask = { ...selectedTaskForPhotos, photos: updatedPhotos };
+        setSelectedTaskForPhotos(updatedTask);
+        setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+      }
+    } catch (err: any) {
+      alert("Error: " + err.message);
     }
   };
 
@@ -819,7 +942,15 @@ export default function MaintenancePage() {
                     </div>
 
                     {/* Icon Action Buttons */}
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        onClick={() => setSelectedTaskForPhotos(task)}
+                        className="px-2 py-1 rounded-lg bg-cyan-50 hover:bg-cyan-600 hover:text-white text-cyan-800 font-bold text-[10px] transition-all cursor-pointer flex items-center gap-1 border border-cyan-200"
+                        title="Kelola Foto Dokumentasi & Pergantian Part"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Foto ({task.photos?.length || 0})</span>
+                      </button>
                       <button
                         onClick={() => setSelectedTaskForPrint(task)}
                         className="p-1.5 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white transition-all cursor-pointer"
@@ -1671,6 +1802,533 @@ export default function MaintenancePage() {
                     <p className="text-[9px] font-mono text-slate-400 mt-0.5">
                       [VERIFIKASI SISTEM: DST-APP-MTC-{selectedTaskForPrint.id.slice(-6)}]
                     </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MODAL KELOLA FOTO DOKUMENTASI & PERGANTIAN PART */}
+      {selectedTaskForPhotos && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedTaskForPhotos(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white shadow-md">
+                  <Camera className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-cyan-50 text-cyan-700 border border-cyan-200">
+                      {selectedTaskForPhotos.ticketNumber || selectedTaskForPhotos.id}
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                      {selectedTaskForPhotos.photos?.length || 0} Foto Terlampir
+                    </span>
+                  </div>
+                  <h3 className="text-base font-black text-slate-900 mt-0.5">
+                    Laporan Foto Dokumentasi & Pergantian Part
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Klien: <strong>{selectedTaskForPhotos.client}</strong> • {selectedTaskForPhotos.location}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedTaskForPhotos(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* FORM UPLOAD FOTO BARU */}
+            <form onSubmit={handleAddPhotoSubmit} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 text-xs">
+              <span className="text-[11px] font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                <UploadCloud className="w-4 h-4 text-cyan-600" />
+                <span>Unggah Foto Dokumentasi Lapangan / Part Baru</span>
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Kategori Foto */}
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                    Kategori Foto:
+                  </label>
+                  <select
+                    value={photoForm.category}
+                    onChange={(e) => setPhotoForm({ ...photoForm, category: e.target.value as any })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-bold text-slate-800 text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                  >
+                    <option value="documentation">📸 Foto Dokumentasi Pekerjaan</option>
+                    <option value="part_replacement">⚙️ Foto Pergantian Part / Sparepart</option>
+                  </select>
+                </div>
+
+                {/* Upload File Input */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                    Pilih File Foto (Kamera / Galeri):
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <label className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-cyan-700 font-bold flex items-center gap-1.5 cursor-pointer text-xs shadow-2xs">
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{isUploadingPhoto ? "Mengunggah..." : "Pilih / Jepret Foto"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={isUploadingPhoto}
+                        onChange={handleUploadPhotoFile}
+                        className="hidden"
+                      />
+                    </label>
+                    <input
+                      type="text"
+                      value={photoForm.url}
+                      onChange={(e) => setPhotoForm({ ...photoForm, url: e.target.value })}
+                      placeholder="/uploads/dstech_... atau URL gambar"
+                      className="flex-1 px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono text-[11px] text-slate-700 focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Caption / Keterangan Foto */}
+                <div className="sm:col-span-3">
+                  <label className="block text-[10px] font-bold text-slate-600 uppercase mb-1">
+                    Keterangan Singkat Foto (Hasil Pekerjaan / Part yang Diganti):
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={photoForm.caption}
+                      onChange={(e) => setPhotoForm({ ...photoForm, caption: e.target.value })}
+                      placeholder="Contoh: Pemasangan kamera CCTV 02 arah loading dock / Penggantian adaptor 12V 2A yang rusak"
+                      className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 text-xs focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isUploadingPhoto || !photoForm.url.trim()}
+                      className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-700 text-white font-bold text-xs shrink-0 cursor-pointer shadow-md transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Simpan Foto</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Thumbnail Preview */}
+              {photoForm.url && (
+                <div className="flex items-center gap-3 pt-2 border-t border-slate-200/80">
+                  <div className="w-16 h-12 rounded-lg border border-slate-300 overflow-hidden relative shrink-0 bg-slate-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={photoForm.url} alt="Pratinjau" className="w-full h-full object-cover" />
+                  </div>
+                  <span className="text-[11px] text-slate-600 truncate font-mono">{photoForm.url}</span>
+                </div>
+              )}
+            </form>
+
+            {/* DAFTAR FOTO TERLAMPIR */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                  Foto Terlampir ({selectedTaskForPhotos.photos?.length || 0})
+                </span>
+
+                {/* Filter Category */}
+                <div className="flex items-center gap-1 text-[11px]">
+                  <button
+                    type="button"
+                    onClick={() => setPhotoCategoryFilter("all")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      photoCategoryFilter === "all"
+                        ? "bg-slate-800 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    Semua ({selectedTaskForPhotos.photos?.length || 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoCategoryFilter("documentation")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      photoCategoryFilter === "documentation"
+                        ? "bg-cyan-600 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    Dokumentasi ({selectedTaskForPhotos.photos?.filter((p) => p.category === "documentation").length || 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPhotoCategoryFilter("part_replacement")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                      photoCategoryFilter === "part_replacement"
+                        ? "bg-amber-600 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    Pergantian Part ({selectedTaskForPhotos.photos?.filter((p) => p.category === "part_replacement").length || 0})
+                  </button>
+                </div>
+              </div>
+
+              {(!selectedTaskForPhotos.photos || selectedTaskForPhotos.photos.length === 0) ? (
+                <div className="text-center py-8 rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-slate-400 text-xs">
+                  <Camera className="w-8 h-8 mx-auto text-slate-300 mb-1" />
+                  <p>Belum ada foto yang diunggah untuk tiket ini.</p>
+                  <p className="text-[10px] mt-0.5">Unggah foto dokumentasi atau penggantian sparepart menggunakan formulir di atas.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {selectedTaskForPhotos.photos
+                    .filter((p) => photoCategoryFilter === "all" || p.category === photoCategoryFilter)
+                    .map((photo, idx) => (
+                      <div
+                        key={photo.id || idx}
+                        className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-2xs hover:shadow-sm transition-all flex flex-col justify-between"
+                      >
+                        <div className="relative aspect-video bg-slate-100">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={photo.url}
+                            alt={photo.caption}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = "/service-cctv.png";
+                            }}
+                          />
+                          <span
+                            className={`absolute top-2 left-2 text-[9px] font-black px-2 py-0.5 rounded-full uppercase shadow-xs ${
+                              photo.category === "part_replacement"
+                                ? "bg-amber-500 text-white"
+                                : "bg-cyan-600 text-white"
+                            }`}
+                          >
+                            {photo.category === "part_replacement" ? "⚙️ Pergantian Part" : "📸 Dokumentasi"}
+                          </span>
+                        </div>
+
+                        <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
+                          <p className="text-xs font-semibold text-slate-800 leading-snug line-clamp-2">
+                            {photo.caption}
+                          </p>
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+                            <span>
+                              {photo.createdAt ? new Date(photo.createdAt).toLocaleDateString("id-ID") : "-"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePhoto(photo.id)}
+                              className="text-red-500 hover:text-red-700 font-bold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Hapus</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer Modal Action */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setSelectedTaskForPhotos(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Tutup
+              </button>
+
+              <button
+                type="button"
+                disabled={!selectedTaskForPhotos.photos || selectedTaskForPhotos.photos.length === 0}
+                onClick={() => {
+                  setSelectedTaskForPhotoPrint(selectedTaskForPhotos);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs cursor-pointer shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                <Printer className="w-4 h-4" />
+                <span>🖨️ Cetak Lembar Lampiran Foto A4 (Siap Invoice)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PRATINJAU & CETAK RESMI LAMPIRAN LAPORAN FOTO A4 */}
+      {selectedTaskForPhotoPrint && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+          onClick={() => setSelectedTaskForPhotoPrint(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[95vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Kontrol Cetak */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 print:hidden">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white shadow-md">
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Pratinjau Lampiran Laporan Foto Dokumentasi & Part (A4 Resmi)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Format cetak resmi ber-Kop Surat DSTech, siap langsung dilampirkan bersama Faktur Tagihan / Invoice.
+                  </p>
+                </div>
+              </div>
+
+              {/* Controls */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <label className="flex items-center gap-1.5 text-xs text-slate-600 font-bold bg-slate-100 px-3 py-1.5 rounded-xl cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={letterheadEnabled}
+                    onChange={(e) => setLetterheadEnabled(e.target.checked)}
+                    className="rounded text-blue-600"
+                  />
+                  <span>Kop Surat</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs flex items-center gap-2 shadow-md cursor-pointer transition-all"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak Dokumen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTaskForPhotoPrint(null)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* LEMBAR DOKUMEN RESMI A4: LAMPIRAN FOTO DOKUMENTASI */}
+            <div
+              id="printable-photo-attachment"
+              className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 text-slate-800 space-y-6 relative shadow-md font-sans"
+              style={{
+                backgroundImage: letterheadEnabled ? "url('/kop_surat_dstech.jpg')" : "none",
+                backgroundSize: "100% 100%",
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "top center",
+                paddingTop: letterheadEnabled ? "135px" : "32px",
+                paddingBottom: letterheadEnabled ? "110px" : "32px",
+              }}
+            >
+              {/* Fallback header if letterhead disabled */}
+              {!letterheadEnabled && (
+                <div className="flex items-center justify-between border-b-2 border-slate-800 pb-4">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">PT. DSTECH SMART PERKASA</h2>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Security System • CCTV • Access Control • Barrier Gate • IT Infrastructure
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      Jl. Raya Cilegon No. 88, Cilegon, Banten • Telp/WA: 0822-5949-4242 • www.dstechsmart.com
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-mono text-slate-400">LEGALITAS RESMI</span>
+                    <p className="text-xs font-bold text-slate-700">NIB: 2026-DSTECH-ID</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Title Dokumen */}
+              <div className="text-center space-y-1">
+                <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase underline decoration-2 underline-offset-4">
+                  LAMPIRAN LAPORAN FOTO DOKUMENTASI & PERGANTIAN PART
+                </h2>
+                <p className="text-xs font-mono font-bold text-slate-600">
+                  Nomor Dokumen: LAMP-MTC-{selectedTaskForPhotoPrint.ticketNumber?.replace("MTC-", "") || selectedTaskForPhotoPrint.id}
+                </p>
+                <p className="text-[10px] text-slate-400 italic">
+                  (Dokumen Lampiran Bukti Fisik Lapangan Pendukung Faktur Tagihan / BAST Pekerjaan)
+                </p>
+              </div>
+
+              {/* Data Klien & Informasi Tiket */}
+              <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50/70 p-3.5 rounded-xl border border-slate-200">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Pihak Penerima (Klien):</span>
+                  <p className="font-black text-slate-900">{selectedTaskForPhotoPrint.client}</p>
+                  <p className="text-slate-600 text-[11px]">{selectedTaskForPhotoPrint.location}</p>
+                  <p className="text-slate-600 text-[11px]">
+                    PIC Lapangan: <strong>{selectedTaskForPhotoPrint.clientPic || "-"}</strong> ({selectedTaskForPhotoPrint.clientPhone || "-"})
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Data Pekerjaan:</span>
+                  <p className="font-black text-slate-900">{selectedTaskForPhotoPrint.title}</p>
+                  <p className="text-slate-600 text-[11px]">
+                    Kategori: <strong>{selectedTaskForPhotoPrint.type || "Maintenance"}</strong>
+                  </p>
+                  <p className="text-slate-600 text-[11px]">
+                    Tanggal Pelaksanaan: <strong>{selectedTaskForPhotoPrint.date}</strong> • PIC: {selectedTaskForPhotoPrint.technician}
+                  </p>
+                </div>
+              </div>
+
+              {/* I. FOTO DOKUMENTASI PEKERJAAN LAPANGAN */}
+              <div className="space-y-3">
+                <div className="border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                  <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-cyan-700" />
+                    <span>I. FOTO DOKUMENTASI PEKERJAAN LAPANGAN (INSTALASI & PEMELIHARAAN)</span>
+                  </h4>
+                  <span className="text-[10px] text-slate-400">
+                    {selectedTaskForPhotoPrint.photos?.filter((p) => p.category === "documentation").length || 0} Dokumentasi
+                  </span>
+                </div>
+
+                {(!selectedTaskForPhotoPrint.photos || selectedTaskForPhotoPrint.photos.filter((p) => p.category === "documentation").length === 0) ? (
+                  <p className="text-xs text-slate-400 italic py-2">Tidak ada foto dokumentasi pekerjaan.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedTaskForPhotoPrint.photos
+                      .filter((p) => p.category === "documentation")
+                      .map((photo, idx) => (
+                        <div
+                          key={photo.id || idx}
+                          className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50/50 space-y-2 p-2.5 shadow-2xs"
+                        >
+                          <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-300 relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo.url}
+                              alt={photo.caption}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "/service-cctv.png";
+                              }}
+                            />
+                            <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[8px] font-mono px-1.5 py-0.5 rounded">
+                              Foto #{idx + 1}
+                            </span>
+                          </div>
+                          <div className="text-[11px] space-y-0.5">
+                            <span className="text-[9px] font-bold text-cyan-700 uppercase block">Keterangan:</span>
+                            <p className="font-medium text-slate-800 leading-snug">{photo.caption}</p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* II. FOTO PERGANTIAN PART / SPAREPART */}
+              <div className="space-y-3 pt-2">
+                <div className="border-b border-slate-200 pb-1.5 flex items-center justify-between">
+                  <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider flex items-center gap-2">
+                    <Wrench className="w-4 h-4 text-amber-700" />
+                    <span>II. FOTO BUKTI PERGANTIAN PART / SPAREPART (UNIT RUSAK VS UNIT BARU)</span>
+                  </h4>
+                  <span className="text-[10px] text-slate-400">
+                    {selectedTaskForPhotoPrint.photos?.filter((p) => p.category === "part_replacement").length || 0} Penggantian
+                  </span>
+                </div>
+
+                {(!selectedTaskForPhotoPrint.photos || selectedTaskForPhotoPrint.photos.filter((p) => p.category === "part_replacement").length === 0) ? (
+                  <p className="text-xs text-slate-400 italic py-2">Tidak ada pergantian sparepart pada kunjungan ini.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {selectedTaskForPhotoPrint.photos
+                      .filter((p) => p.category === "part_replacement")
+                      .map((photo, idx) => (
+                        <div
+                          key={photo.id || idx}
+                          className="rounded-xl border border-amber-200 overflow-hidden bg-amber-50/30 space-y-2 p-2.5 shadow-2xs"
+                        >
+                          <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-300 relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={photo.url}
+                              alt={photo.caption}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "/service-it.png";
+                              }}
+                            />
+                            <span className="absolute bottom-1 right-1 bg-amber-700 text-white text-[8px] font-mono px-1.5 py-0.5 rounded">
+                              Part #{idx + 1}
+                            </span>
+                          </div>
+                          <div className="text-[11px] space-y-0.5">
+                            <span className="text-[9px] font-bold text-amber-800 uppercase block">Rincian Komponen / Tindakan:</span>
+                            <p className="font-medium text-slate-800 leading-snug">{photo.caption}</p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+
+              {/* III. PERNYATAAN FISIK & KOLOM TANDA TANGAN LEGALITAS */}
+              <div className="space-y-4 pt-4 border-t border-slate-200 text-xs">
+                <p className="text-[11px] text-slate-600 leading-relaxed text-justify">
+                  Demikian lampiran dokumentasi foto ini dibuat secara sebenar-benarnya sebagai bukti fisik pelaksanaan pekerjaan di lapangan guna memenuhi kelengkapan administrasi penagihan dan Berita Acara Serah Terima (BAST).
+                </p>
+
+                <div className="grid grid-cols-2 gap-8 pt-2">
+                  {/* Kiri: Penerima Klien */}
+                  <div className="text-center space-y-1">
+                    <span className="text-[11px] text-slate-500 font-bold block">Pihak Penerima / Klien:</span>
+                    <span className="font-black text-slate-900 block text-xs">{selectedTaskForPhotoPrint.client}</span>
+                    <div className="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
+                      <span className="text-[10px] text-slate-300 italic">( Tanda Tangan & Cap Stempel Klien )</span>
+                    </div>
+                    <div className="pt-1">
+                      <p className="font-black text-slate-900 underline text-xs">
+                        ( {selectedTaskForPhotoPrint.clientPic || "PIC / Penanggung Jawab Lapangan"} )
+                      </p>
+                      <p className="text-[10px] text-slate-500">Jabatan: Pengawas Lapangan</p>
+                    </div>
+                  </div>
+
+                  {/* Kanan: Pelaksana DSTech */}
+                  <div className="text-center space-y-1">
+                    <span className="text-[11px] text-slate-500 font-bold block">Pihak Pelaksana:</span>
+                    <span className="font-black text-slate-900 block text-xs">PT. DSTech Smart Perkasa</span>
+                    <div className="h-20 flex flex-col items-center justify-center relative border-b border-dashed border-slate-300">
+                      {/* Stempel bulat digital */}
+                      <div className="w-16 h-16 rounded-full border-2 border-indigo-600/60 text-indigo-700/80 text-[7px] font-black uppercase flex flex-col items-center justify-center rotate-[-12deg] pointer-events-none">
+                        <span>PT. DSTECH</span>
+                        <span className="text-[6px]">SMART PERKASA</span>
+                        <span className="text-[5px]">CILEGON</span>
+                      </div>
+                    </div>
+                    <div className="pt-1">
+                      <p className="font-black text-slate-900 underline text-xs">
+                        ( {selectedTaskForPhotoPrint.technician} )
+                      </p>
+                      <p className="text-[10px] text-slate-500">Teknisi Lapangan DSTech</p>
+                      <p className="text-[9px] font-mono text-slate-400 mt-0.5">
+                        [VERIFIKASI SISTEM: DST-APP-MTC-PHOTO-{selectedTaskForPhotoPrint.id.slice(-6)}]
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

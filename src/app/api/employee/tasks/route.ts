@@ -102,6 +102,7 @@ export async function POST(request: Request) {
       report: body.report || "",
       notes: body.notes || "",
       recommendation: body.recommendation || "",
+      photos: Array.isArray(body.photos) ? body.photos : [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

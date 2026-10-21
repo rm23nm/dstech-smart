@@ -36,6 +36,9 @@ import {
   RefreshCw,
   ArrowRightLeft,
   Calculator,
+  Camera,
+  Upload,
+  Image as ImageIcon,
 } from "lucide-react";
 
 interface EmployeeTask {
@@ -52,6 +55,15 @@ interface EmployeeTask {
   scope: string[];
   equipment: string[];
   report: string;
+  photos?: TaskPhoto[];
+}
+
+interface TaskPhoto {
+  id: string;
+  url: string;
+  caption: string;
+  category: "documentation" | "part_replacement";
+  createdAt?: string;
 }
 
 interface MaterialItem {
@@ -187,10 +199,18 @@ export default function EmployeeDashboard() {
   // Modals state
   const [selectedTask, setSelectedTask] = useState<EmployeeTask | null>(null);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState<boolean>(false);
-  const [taskStatusForm, setTaskStatusForm] = useState<{ status: "Pending" | "In Progress" | "Completed"; report: string }>({
+  const [taskStatusForm, setTaskStatusForm] = useState<{
+    status: "Pending" | "In Progress" | "Completed";
+    report: string;
+    photos: TaskPhoto[];
+  }>({
     status: "In Progress",
     report: "",
+    photos: [],
   });
+  const [isUploadingTaskPhoto, setIsUploadingTaskPhoto] = useState<boolean>(false);
+  const [taskPhotoCategory, setTaskPhotoCategory] = useState<"documentation" | "part_replacement">("documentation");
+  const [taskPhotoCaption, setTaskPhotoCaption] = useState<string>("");
 
   interface FormRequestItem {
     materialId: string;
@@ -472,7 +492,7 @@ export default function EmployeeDashboard() {
     loadData();
   }, []);
 
-  // Handler update task status
+  // Handler update task status & foto dokumentasi
   const handleUpdateTaskStatus = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedTask) return;
@@ -485,6 +505,7 @@ export default function EmployeeDashboard() {
           id: selectedTask.id,
           status: taskStatusForm.status,
           report: taskStatusForm.report,
+          photos: taskStatusForm.photos || [],
         }),
       });
 
@@ -492,11 +513,26 @@ export default function EmployeeDashboard() {
         setTasks((prev) =>
           prev.map((t) =>
             t.id === selectedTask.id
-              ? { ...t, status: taskStatusForm.status, report: taskStatusForm.report }
+              ? {
+                  ...t,
+                  status: taskStatusForm.status,
+                  report: taskStatusForm.report,
+                  photos: taskStatusForm.photos || [],
+                }
               : t
           )
         );
-        showToast("Status penugasan & laporan kerja berhasil disimpan!");
+        setSelectedTask((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: taskStatusForm.status,
+                report: taskStatusForm.report,
+                photos: taskStatusForm.photos || [],
+              }
+            : null
+        );
+        showToast("Status penugasan & foto dokumentasi berhasil disimpan!");
         setIsStatusModalOpen(false);
       } else {
         showToast("Gagal menyimpan update tugas");
@@ -504,6 +540,59 @@ export default function EmployeeDashboard() {
     } catch {
       showToast("Terjadi kesalahan jaringan");
     }
+  };
+
+  // Upload photo handler for technicians
+  const handleUploadTaskPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingTaskPhoto(true);
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("docType", "technician_photo");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (json.success && json.url) {
+        const newPhoto: TaskPhoto = {
+          id: `dstech_photo_${Date.now()}`,
+          url: json.url,
+          caption:
+            taskPhotoCaption.trim() ||
+            (taskPhotoCategory === "part_replacement"
+              ? "Foto Pergantian Part Lapangan"
+              : "Dokumentasi Pekerjaan Lapangan"),
+          category: taskPhotoCategory,
+          createdAt: new Date().toISOString(),
+        };
+        setTaskStatusForm((prev) => ({
+          ...prev,
+          photos: [...(prev.photos || []), newPhoto],
+        }));
+        setTaskPhotoCaption("");
+        showToast("Foto berhasil diunggah!");
+      } else {
+        showToast("Gagal unggah foto: " + (json.message || "Error"));
+      }
+    } catch (err: any) {
+      showToast("Error upload: " + err.message);
+    } finally {
+      setIsUploadingTaskPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  // Remove photo from taskStatusForm
+  const handleRemoveTaskPhoto = (photoId: string) => {
+    setTaskStatusForm((prev) => ({
+      ...prev,
+      photos: (prev.photos || []).filter((p) => p.id !== photoId),
+    }));
   };
 
   // Multi-item material request helpers
@@ -1112,7 +1201,11 @@ export default function EmployeeDashboard() {
                           <button
                             onClick={() => {
                               setSelectedTask(activeTask);
-                              setTaskStatusForm({ status: activeTask.status, report: activeTask.report || "" });
+                              setTaskStatusForm({
+                                status: activeTask.status,
+                                report: activeTask.report || "",
+                                photos: activeTask.photos || [],
+                              });
                               setIsStatusModalOpen(true);
                             }}
                             className="px-5 py-3 rounded-2xl bg-white text-dstech-blue hover:bg-blue-50 font-black text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer whitespace-nowrap"
@@ -1247,7 +1340,11 @@ export default function EmployeeDashboard() {
                               <button
                                 onClick={() => {
                                   setSelectedTask(task);
-                                  setTaskStatusForm({ status: task.status, report: task.report || "" });
+                                  setTaskStatusForm({
+                                    status: task.status,
+                                    report: task.report || "",
+                                    photos: task.photos || [],
+                                  });
                                   setIsStatusModalOpen(true);
                                 }}
                                 className="px-4 py-2 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-sm cursor-pointer"
@@ -2142,6 +2239,36 @@ export default function EmployeeDashboard() {
                 </div>
               </div>
 
+              {selectedTask.photos && selectedTask.photos.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="font-bold text-slate-400 uppercase text-[10px]">
+                      Foto Dokumentasi & Part ({selectedTask.photos.length}):
+                    </p>
+                    <span className="text-[10px] text-dstech-blue font-bold">Siap Lampiran Invoice</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-2xl border border-slate-100 max-h-48 overflow-y-auto">
+                    {selectedTask.photos.map((p) => (
+                      <div key={p.id} className="relative rounded-xl overflow-hidden border border-slate-200 bg-white shadow-xs">
+                        <img src={p.url} alt={p.caption} className="w-full h-24 object-cover" />
+                        <div className="p-1.5 bg-white text-[10px]">
+                          <span
+                            className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider mb-1 ${
+                              p.category === "part_replacement"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
+                            {p.category === "part_replacement" ? "⚙️ Pergantian Part" : "📸 Dokumentasi"}
+                          </span>
+                          <p className="font-bold text-slate-800 line-clamp-1">{p.caption}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {selectedTask.report && (
                 <div>
                   <p className="font-bold text-slate-400 uppercase text-[10px]">Laporan Kerja Terakhir:</p>
@@ -2161,46 +2288,51 @@ export default function EmployeeDashboard() {
               </button>
               <button
                 onClick={() => {
-                  setTaskStatusForm({ status: selectedTask.status, report: selectedTask.report || "" });
+                  setTaskStatusForm({
+                    status: selectedTask.status,
+                    report: selectedTask.report || "",
+                    photos: selectedTask.photos || [],
+                  });
                   setIsStatusModalOpen(true);
                 }}
                 className="px-5 py-2.5 rounded-xl bg-dstech-blue text-white font-bold text-xs hover:bg-blue-700 shadow-sm"
               >
-                Update Status Tugas
+                Update Status & Foto
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: Form Update Status & Laporan */}
+      {/* MODAL 2: Form Update Status, Laporan & Upload Foto Dokumentasi */}
       {isStatusModalOpen && selectedTask && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsStatusModalOpen(false)}
         >
           <div
-            className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-6 shadow-2xl relative"
+            className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-dstech-blue">
-                  Formulir Progres Lapangan
+                  Formulir Progres & Dokumentasi Lapangan
                 </span>
-                <h3 className="text-lg font-black text-slate-900 mt-1">Update Status Kerja</h3>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">Update Status & Lampiran Foto</h3>
+                <p className="text-xs text-slate-500 font-medium">Tugas: {selectedTask.title} — {selectedTask.client}</p>
               </div>
               <button
                 onClick={() => setIsStatusModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateTaskStatus} className="space-y-4 text-xs">
+            <form onSubmit={handleUpdateTaskStatus} className="space-y-4 text-xs overflow-y-auto pr-1 flex-1">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Status Progres:</label>
+                <label className="font-bold text-slate-700 block mb-1">Status Progres Pekerjaan:</label>
                 <select
                   value={taskStatusForm.status}
                   onChange={(e) =>
@@ -2209,7 +2341,7 @@ export default function EmployeeDashboard() {
                       status: e.target.value as "Pending" | "In Progress" | "Completed",
                     })
                   }
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 focus:ring-2 focus:ring-dstech-blue focus:outline-none"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 focus:ring-2 focus:ring-dstech-blue focus:outline-none"
                 >
                   <option value="Pending">Pending / Menunggu Jadwal</option>
                   <option value="In Progress">In Progress (Sedang Dikerjakan)</option>
@@ -2219,30 +2351,132 @@ export default function EmployeeDashboard() {
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
-                  Catatan Progres Lapangan & Kendala (Opsional):
+                  Catatan Progres Lapangan & Kendala:
                 </label>
                 <textarea
-                  rows={4}
+                  rows={3}
                   value={taskStatusForm.report}
                   onChange={(e) => setTaskStatusForm({ ...taskStatusForm, report: e.target.value })}
-                  placeholder="Contoh: Penarikan kabel selesai, konektor sudah dicrimping, tinggal tunggu power supply dari klien..."
-                  className="w-full p-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none"
+                  placeholder="Contoh: Unit OTB selesai terminasi, tes sinyal -18dBm, fisik rapi dan siap serah terima..."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3">
+              {/* UPLOAD FOTO DOKUMENTASI & PERGANTIAN PART */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-dstech-blue" />
+                    <span className="font-black text-slate-900 text-xs">
+                      Unggah Foto Bukti Kerja (Otomatis Masuk Lampiran Faktur)
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {taskStatusForm.photos?.length || 0} Foto Terlampir
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-bold text-slate-600 shrink-0">Kategori Foto:</label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTaskPhotoCategory("documentation")}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                          taskPhotoCategory === "documentation"
+                            ? "bg-dstech-blue text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        📸 Dokumentasi Pekerjaan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTaskPhotoCategory("part_replacement")}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                          taskPhotoCategory === "part_replacement"
+                            ? "bg-amber-600 text-white shadow-xs"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        }`}
+                      >
+                        ⚙️ Pergantian Part (Lama/Baru)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Keterangan foto (contoh: Pemasangan Switch Cisco / Power supply rusak diganti)..."
+                      value={taskPhotoCaption}
+                      onChange={(e) => setTaskPhotoCaption(e.target.value)}
+                      className="flex-1 p-2 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-dstech-blue"
+                    />
+                    <label className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shrink-0">
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{isUploadingTaskPhoto ? "Mengunggah..." : "Pilih / Kamera"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleUploadTaskPhoto}
+                        disabled={isUploadingTaskPhoto}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Previews */}
+                {taskStatusForm.photos && taskStatusForm.photos.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
+                    {taskStatusForm.photos.map((p) => (
+                      <div key={p.id} className="relative rounded-xl overflow-hidden border border-slate-200 bg-white group">
+                        <img src={p.url} alt={p.caption} className="w-full h-20 object-cover" />
+                        <div className="p-1.5 text-[9px]">
+                          <span
+                            className={`inline-block px-1 py-0.5 rounded font-black uppercase text-[8px] mb-0.5 ${
+                              p.category === "part_replacement"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
+                            {p.category === "part_replacement" ? "⚙️ Part" : "📸 Dok"}
+                          </span>
+                          <p className="font-semibold text-slate-700 truncate">{p.caption}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTaskPhoto(p.id)}
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center opacity-80 hover:opacity-100 cursor-pointer shadow-xs"
+                          title="Hapus foto ini"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-400 italic text-center py-2">
+                    Belum ada foto yang diunggah. Ambil foto pekerjaan dan sparepart agar invoice tagihan dapat langsung diverifikasi klien.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsStatusModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs"
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-dstech-blue text-white font-bold text-xs hover:bg-blue-700 shadow-md"
+                  className="px-5 py-2.5 rounded-xl bg-dstech-blue text-white font-bold text-xs hover:bg-blue-700 shadow-md cursor-pointer"
                 >
-                  Simpan Laporan
+                  Simpan Laporan & Foto
                 </button>
               </div>
             </form>
