@@ -149,7 +149,7 @@ export async function POST(request: Request) {
       taskId: taskId || "",
       ticketNumber: ticketNumber || "",
       taskTitle: taskTitle || "Penugasan Lapangan",
-      requestedBy: requestedBy || "Ikhsan Maulidi",
+      requestedBy: requestedBy || "Teknisi Lapangan",
       date: new Date().toISOString().split("T")[0],
       status: "Menunggu Approval",
       notes: notes || "-",

@@ -67,7 +67,7 @@ export async function POST(request: Request) {
         const newRecord = {
           id: `dstech_att_${Date.now()}`,
           date: dateStr,
-          employeeName: body.employeeName || "Ikhsan Maulidi",
+          employeeName: body.employeeName || "Teknisi Lapangan",
           checkIn: timeStr,
           checkOut: "-",
           location: location || "Kantor DSTech Smart Perkasa (Cilegon)",
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
         const newRecord = {
           id: `dstech_att_${Date.now()}`,
           date: dateStr,
-          employeeName: body.employeeName || "Ikhsan Maulidi",
+          employeeName: body.employeeName || "Teknisi Lapangan",
           checkIn: "08:00 WIB",
           checkOut: timeStr,
           location: location || "Kantor DSTech Smart Perkasa (Cilegon)",
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
 
       const newOT = {
         id: `dstech_ot_${Date.now()}`,
-        employeeName: body.employeeName || "Ikhsan Maulidi",
+        employeeName: body.employeeName || "Teknisi Lapangan",
         date,
         startTime,
         endTime,

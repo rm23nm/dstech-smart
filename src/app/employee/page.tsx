@@ -193,8 +193,21 @@ interface KmsGuideItem {
   updatedBy: string;
 }
 
+interface EmployeeUserSession {
+  isLoggedIn: boolean;
+  id: string;
+  role: string;
+  name: string;
+  email: string;
+  phone?: string;
+  loginTime?: string;
+}
+
 export default function EmployeeDashboard() {
   const router = useRouter();
+
+  // Current logged in technician session
+  const [currentUser, setCurrentUser] = useState<EmployeeUserSession | null>(null);
 
   // Navigation state
   const [activeTab, setActiveTab] = useState<"tasks" | "inventory" | "attendance">("tasks");
@@ -501,6 +514,23 @@ export default function EmployeeDashboard() {
       );
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Load logged-in technician session from localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const rawAuth = localStorage.getItem("dstech_employee_auth");
+        if (rawAuth) {
+          const parsed = JSON.parse(rawAuth);
+          if (parsed && (parsed.name || parsed.email)) {
+            setCurrentUser(parsed);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load technician auth:", err);
+      }
+    }
   }, []);
 
   // Fetch initial data
@@ -1006,7 +1036,7 @@ export default function EmployeeDashboard() {
             conversionLabel: it.conversionLabel,
           })),
           taskTitle: requestForm.taskTitle || defaultTask,
-          requestedBy: "Ikhsan Maulidi",
+          requestedBy: currentUser?.name || "Teknisi Lapangan",
           notes: requestForm.notes,
         }),
       });
@@ -1058,7 +1088,7 @@ export default function EmployeeDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "checkin",
-          employeeName: "Ikhsan Maulidi",
+          employeeName: currentUser?.name || "Teknisi Lapangan",
           location: checkInLocation,
           latitude: checkInCoords.lat,
           longitude: checkInCoords.lng,
@@ -1088,7 +1118,7 @@ export default function EmployeeDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "checkout",
-          employeeName: "Ikhsan Maulidi",
+          employeeName: currentUser?.name || "Teknisi Lapangan",
           location: checkOutLocation,
           latitude: checkOutCoords.lat,
           longitude: checkOutCoords.lng,
@@ -1118,7 +1148,7 @@ export default function EmployeeDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "overtime",
-          employeeName: "Ikhsan Maulidi",
+          employeeName: currentUser?.name || "Teknisi Lapangan",
           ...overtimeForm,
         }),
       });
@@ -1143,7 +1173,7 @@ export default function EmployeeDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...newAnnouncementForm,
-          author: "Ikhsan Maulidi (Senior Tech)",
+          author: currentUser ? `${currentUser.name} (${currentUser.role === "EMPLOYEE" ? "Teknisi Lapangan" : currentUser.role})` : "Teknisi Lapangan",
         }),
       });
 
@@ -1281,8 +1311,12 @@ export default function EmployeeDashboard() {
               <User className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-black text-slate-900 truncate">Ikhsan Maulidi</p>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Teknisi Senior</p>
+              <p className="text-xs font-black text-slate-900 truncate">
+                {currentUser?.name || "Teknisi DSTech"}
+              </p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                {currentUser?.role === "EMPLOYEE" ? "Teknisi Lapangan" : (currentUser?.role || "Staff Teknis")}
+              </p>
             </div>
           </div>
 
@@ -1362,7 +1396,7 @@ export default function EmployeeDashboard() {
                 </span>
               </div>
               <h1 className="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">
-                Halo, Ikhsan Maulidi!
+                Halo, {currentUser?.name || "Teknisi DSTech"}!
               </h1>
               <p className="text-slate-500 font-medium text-xs sm:text-sm mt-0.5">
                 Kelola penugasan lapangan, cek inventori material, dan catat presensi kerja hari ini.
@@ -1382,7 +1416,7 @@ export default function EmployeeDashboard() {
 
               {/* Quick WhatsApp Coord */}
               <a
-                href="https://wa.me/6282259494242?text=Halo%20Team%20Leader,%20saya%20Ikhsan%20ingin%20koordinasi%20lapangan."
+                href={`https://wa.me/6282259494242?text=Halo%20Team%20Leader,%20saya%20${encodeURIComponent(currentUser?.name || "Teknisi")}%20ingin%20koordinasi%20lapangan.`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-11 h-11 rounded-2xl bg-green-50 text-green-600 hover:bg-green-600 hover:text-white transition-all flex items-center justify-center shadow-sm"
@@ -1467,7 +1501,7 @@ export default function EmployeeDashboard() {
                       <div>
                         <h3 className="text-lg font-black text-slate-900">Daftar Surat Tugas Kerja</h3>
                         <p className="text-slate-400 text-xs font-medium">
-                          Pekerjaan yang ditugaskan kepada Ikhsan Maulidi
+                          Pekerjaan yang ditugaskan kepada {currentUser?.name || "Teknisi Lapangan"}
                         </p>
                       </div>
 

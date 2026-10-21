@@ -2410,7 +2410,35 @@
 
 ---
 
-### 79. Catatan Penting
+### 79. Tugas: Penyelarasan Nama Entitas Toko Menjadi 'DSTech Smart', Perbaikan Pihak Pelaksana & Stempel BAST Non-PT, serta Penambahan Fitur Upload Kop Surat
+- **Permintaan Pengguna**:
+  1. *"toko DStech ganti dengan Dstech SMart"*
+  2. *"punya toko masih memakai pihak pelaksananya PT"*
+  3. *"toko juga punya kop surat upload, itu uploadnya dimana?"*
+- **Status**: Selesai & Terverifikasi
+- **Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Seluruh file kerja dicadangkan ke `_backup/*.bak_task82` sebelum dilakukan pengeditan.
+  - [x] **Langkah 2 (Penyelarasan Nama Toko -> DSTech Smart)**:
+    - `src/app/admin/categories/page.tsx`: Label filter dan badge `🏪 Non-PT / Toko` diubah menjadi `🏪 Non-PT / DSTech Smart`.
+    - `src/app/admin/products/page.tsx`: Label filter dan badge diubah menjadi `🏪 Non-PT / DSTech Smart`.
+    - `src/app/admin/portfolios/page.tsx`: Label filter dan badge diubah menjadi `🏪 Non-PT / DSTech Smart`.
+    - `src/app/admin/inventory/page.tsx`: Tab filter stok diubah menjadi `🏪 Non-PT / DSTech Smart`.
+    - `src/app/admin/maintenance/page.tsx`: Tab filter tiket dan selector form diubah menjadi `🏪 Non-PT / DSTech Smart`.
+    - `src/data/dstech_employee_tasks.json`, `src/data/dstech_products.json`, `src/data/dstech_categories.json`: Keterangan dan penamaan lokasi/toko disesuaikan dengan identitas "DSTech Smart".
+  - [x] **Langkah 3 (Pihak Pelaksana & Stempel BAST Maintenance Non-PT)**:
+    - Paragraf pengantar BAST A4: Dibuat dinamis menggunakan `{selectedTaskForPrint.entityType === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}`.
+    - Pihak Pelaksana (Pihak Pertama): Ditulis `DSTech Smart` untuk tiket Non-PT.
+    - Tanda tangan teknisi: `Teknisi DSTech Smart` untuk tiket Non-PT.
+    - Stempel digital BAST A4: Jika Non-PT, menampilkan stempel bulat digital ungu `DSTECH SMART CILEGON`, jika PT menampilkan stempel biru `PT. DSTECH SMART PERKASA CILEGON`.
+  - [x] **Langkah 4 (Fitur Unggah Kop Surat Langsung di Lembar Cetak BAST & Penjelasan Lokasi ERP)**:
+    - Di toolbar modal cetak BAST `/admin/maintenance`, ditambahkan tombol unggah kop surat interaktif `<Upload />` bertuliskan `"Unggah Kop DSTech Smart"` / `"Unggah Kop PT"` dengan input file FileReader base64, penyimpanan instan, dan tombol "Reset Kop".
+    - Lokasi upload permanen di ERP Keuangan (`/admin/finance` -> "Kop Surat & Legalitas" -> Tab "Non-PT" -> "Unggah Kop Non-PT") siap dijelaskan dengan gamblang ke pengguna.
+  - [x] **Langkah 5 (Validasi Kompilasi)**: Menjalankan `npx tsc --noEmit` dan berhasil 0 error.
+  - [x] **Langkah 6 (Sinkronisasi & Deployment)**: Push commit ke GitHub `rm23nm/dstech-smart` dan deploy ke live VPS 157.66.34.199.
+
+---
+
+### 80. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
