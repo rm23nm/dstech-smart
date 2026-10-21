@@ -1897,12 +1897,12 @@ export default function AdminFinanceERPPage() {
   };
 
   // Helper Kompresi Berkas Gambar Klien (Client-Side Compression Target < 50 KB)
-  // Menjaga kualitas visual teks/angka nota namun memangkas ukuran hingga < 50 KB (30-48 KB)
+  // Menjaga kualitas visual teks/angka nota namun memangkas ukuran hingga ~40 KB (30-40 KB)
   const compressImageFile = async (
     file: File,
-    maxTargetSizeKb = 48,
-    initialMaxWidth = 1000,
-    initialMaxHeight = 1400
+    maxTargetSizeKb = 40,
+    initialMaxWidth = 960,
+    initialMaxHeight = 1280
   ): Promise<{ file: File; originalSize: number; compressedSize: number }> => {
     const originalSize = file.size;
     if (!file.type.startsWith("image/")) {
@@ -4987,8 +4987,12 @@ export default function AdminFinanceERPPage() {
 
     try {
       setIsUploadingProjectPhoto(true);
+      // Kompresi cerdas otomatis ke target ~40 KB
+      const { file: fileToUpload, originalSize, compressedSize } = await compressImageFile(file, 40);
+      const ratio = originalSize > compressedSize ? Math.round((1 - compressedSize / originalSize) * 100) : 0;
+
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", fileToUpload);
       fd.append("docType", "project_photo");
 
       const res = await fetch("/api/upload", {
@@ -5030,7 +5034,11 @@ export default function AdminFinanceERPPage() {
             prev.map((p) => (p.id === selectedProjectForDetail.id ? updatedPrj : p))
           );
           setProjectPhotoCaption("");
-          showToast("Foto dokumentasi proyek berhasil disimpan!");
+          showToast(
+            ratio > 0
+              ? `✓ Foto proyek tersimpan: ${formatBytes(originalSize)} ➔ ${formatBytes(compressedSize)} (Hemat ${ratio}%)`
+              : "Foto dokumentasi proyek berhasil disimpan!"
+          );
         } else {
           showToast("Gagal menyimpan update foto proyek");
         }
@@ -5166,8 +5174,12 @@ export default function AdminFinanceERPPage() {
     setIsUploadingInvoicePhoto(true);
 
     try {
+      // Kompresi cerdas otomatis ke target ~40 KB
+      const { file: fileToUpload, originalSize, compressedSize } = await compressImageFile(file, 40);
+      const ratio = originalSize > compressedSize ? Math.round((1 - compressedSize / originalSize) * 100) : 0;
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileToUpload);
       formData.append("prefix", "dstech_invoice_photo");
 
       const res = await fetch("/api/upload", {
@@ -5209,7 +5221,11 @@ export default function AdminFinanceERPPage() {
             prev.map((s) => (s.id === selectedInvoiceForPhotos.id ? updatedSale : s))
           );
           setInvoicePhotoCaption("");
-          showToast("Foto dokumentasi faktur penagihan berhasil disimpan!");
+          showToast(
+            ratio > 0
+              ? `✓ Foto faktur tersimpan: ${formatBytes(originalSize)} ➔ ${formatBytes(compressedSize)} (Hemat ${ratio}%)`
+              : "Foto dokumentasi faktur penagihan berhasil disimpan!"
+          );
         } else {
           showToast("Gagal menyimpan update foto faktur");
         }
@@ -13326,7 +13342,7 @@ export default function AdminFinanceERPPage() {
 
           return (
             <div
-              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn print:hidden"
               onClick={() => setSelectedProjectForDetail(null)}
             >
               <div
@@ -22027,7 +22043,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL KELOLA & UPLOAD FOTO DOKUMENTASI PER-FAKTUR (TUGAS 84) */}
       {isInvoicePhotoModalOpen && selectedInvoiceForPhotos && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-sm animate-fadeIn overflow-y-auto print:hidden"
           onClick={() => setIsInvoicePhotoModalOpen(false)}
         >
           <div
