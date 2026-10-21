@@ -72,6 +72,7 @@
 - **2026-10-21**: Pembaruan Penamaan 'Toko DStech' Menjadi 'DSTech Smart', Penyesuaian Pihak Pelaksana & Stempel Digital BAST Non-PT, serta Penambahan Fitur Upload Langsung Kop Surat. Mengakomodasi 3 permintaan pengguna: (1) Mengganti seluruh label 'Toko DStech' atau 'Non-PT / Toko' menjadi 'DSTech Smart' (atau 'Non-PT / DSTech Smart') di seluruh modul admin (`/admin/categories`, `/admin/products`, `/admin/portfolios`, `/admin/inventory`, `/admin/maintenance`, dan data JSON pendukung); (2) Menyesuaikan pihak pelaksana pada lembar cetak Berita Acara Kunjungan Maintenance A4 (`printable-bast-maintenance`): untuk tiket Non-PT, pihak pelaksana otomatis tertulis 'DSTech Smart', pengantar tidak lagi menyebut 'PT', pengesahan tanda tangan menggunakan 'Teknisi DSTech Smart', dan stempel digital otomatis berganti menjadi stempel bulat ungu bertuliskan 'DSTECH SMART CILEGON' (sedangkan tiket PT tetap menggunakan 'PT. DSTech Smart Perkasa' dan stempel biru); (3) Menyediakan tombol upload kop surat langsung (`<Upload />`) di toolbar pratinjau cetak BAST `/admin/maintenance` sehingga pengguna dapat mengunggah gambar kop surat baru secara instan tanpa harus berpindah halaman, di samping pengaturan permanen di ERP Keuangan `/admin/finance`. Lolos validasi TypeScript (`npx tsc --noEmit` 0 error), disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-22**: Perbaikan Bug Upload Foto Faktur & Proyek (Penyelarasan Body Payload/Updates PUT API), Isolasi Cetak Lembar Kwitansi & Lampiran Foto A4 (Pencegahan Kebocoran Tampilan Dashboard Utama saat Print), serta Penomoran Otomatis Faktur Dinamis Mengikuti Tanggal Pilihan Pengguna (INV-DSTECH-YYYYMM-XXX). Memperbaiki akar masalah gagal simpan foto dokumentasi faktur pada `handleUploadInvoicePhoto` di mana backend API menolak `payload` karena hanya menerima `updates`, menyertakan `isReceiptModalOpen` dan `selectedInvoiceForPhotoPrint` ke `isAnyPrintModalOpen` agar modal kwitansi dan cetak foto bersih tanpa dashboard utama, serta memperbarui logika nomor faktur otomatis agar sinkron dengan tahun dan bulan dari tanggal yang dipilih pengguna (misal 2026-03-13 menghasilkan INV-DSTECH-202603-XXX). Lolos kompilasi TypeScript 0 error dan lolos build Next.js.
 - **2026-10-22**: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Seluruh 5 Modul ERP Keuangan (Penjualan & Faktur, Pembelian & PO, Retur Barang, Laporan Laba Rugi, dan Buku Arus Kas). Mengimplementasikan top control bar seragam dengan preset periode (Semua Tanggal, Hari Ini, Bulan Ini, Bulan Lalu, Tahun Ini, Rentang Kustom dengan Date Picker Mulai-Selesai), dropdown sortir tanggal & nominal (Tanggal Terbaru, Tanggal Terlama, Nominal Tertinggi/Terendah, Nama A-Z), input pencarian interaktif, dan penempatan berdampingan tepat di sebelah tombol Form Input utama masing-masing modul. Laba Rugi mengkalkulasi pendapatan, HPP, beban operasional, dan laba bersih secara dinamis sesuai periode terpilih. Lolos validasi TypeScript 0 error dan build Next.js sukses.
+- **2026-10-22**: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Modul Manajemen Proyek (Projects). Mengimplementasikan top control bar seragam pada tab Manajemen Proyek dengan preset periode (Semua Tanggal, Hari Ini, Bulan Ini, Bulan Lalu, Tahun Ini, Rentang Kustom dengan Date Picker Mulai-Selesai), dropdown sortir tanggal & nilai kontrak (Tanggal Mulai Terbaru/Terlama, Nilai Kontrak Tertinggi/Terendah, Nama Proyek A-Z), filter status proyek (In Progress, Completed, Planning, On Hold), input pencarian multi-field (nomor PRJ, nama proyek, klien, PIC, deskripsi), serta kartu ringkasan KPI dan grid kartu proyek yang tersaring dinamis, ditempatkan rapi berdampingan dengan tombol `+ Buat Proyek Baru`. Lolos validasi TypeScript 0 error dan build Next.js sukses.
 
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
@@ -2491,7 +2492,27 @@
 
 ---
 
-### 83. Catatan Penting
+### 83. Tugas: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Modul Manajemen Proyek (Projects)
+- **Permintaan Pengguna**:
+  *"pada manajemen proyek juga sama"*
+- **Status**: Selesai & Terverifikasi
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Membuat backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_filters_projects`.
+  - [x] **Langkah 2 (State Manajemen Pencarian, Filter Tanggal, dan Sortir Proyek)**:
+    - Modul Manajemen Proyek (`projects`): `projectSearchQuery`, `projectDateFilter`, `projectStartDate`, `projectEndDate`, `projectSortBy`.
+    - Hook `useMemo` untuk `filteredAndSortedProjects` dengan dukungan pencarian multi-field (kode proyek `PRJ-...`, nama proyek, nama klien, PIC teknisi/lapangan, dan deskripsi), filter rentang tanggal mulai proyek/pembuatan, serta opsi sortir (Tanggal Mulai Terbaru/Terlama, Nilai Kontrak Tertinggi/Terendah, Nama Proyek A-Z).
+  - [x] **Langkah 3 (Implementasi Antarmuka Top Control Bar Berdampingan dengan Tombol Form Input)**:
+    - Menempatkan input pencarian interaktif, pemilih preset periode tanggal, input rentang tanggal kustom (jika dipilih), dropdown sortir proyek, dan filter status proyek berdampingan tepat di sebelah tombol form input `+ Buat Proyek Baru`.
+    - Memperbarui kartu ringkasan KPI dan grid kartu proyek agar menampilkan data hasil penyaringan.
+  - [x] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
+    - Kompilasi TypeScript `npx tsc --noEmit` (0 error).
+    - Build Next.js `npm run build` sukses 46/46 rute.
+    - Push ke GitHub repository `rm23nm/dstech-smart`.
+    - Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 84. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

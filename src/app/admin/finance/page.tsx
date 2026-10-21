@@ -1268,6 +1268,11 @@ export default function AdminFinanceERPPage() {
   const [isPublishingPortfolio, setIsPublishingPortfolio] = useState<boolean>(false);
   const [isUploadingPortfolioImg, setIsUploadingPortfolioImg] = useState<boolean>(false);
   const [projectFilterStatus, setProjectFilterStatus] = useState<string>("ALL");
+  const [projectSearchQuery, setProjectSearchQuery] = useState<string>("");
+  const [projectDateFilter, setProjectDateFilter] = useState<DateFilterPeriod>("ALL");
+  const [projectStartDate, setProjectStartDate] = useState<string>("");
+  const [projectEndDate, setProjectEndDate] = useState<string>("");
+  const [projectSortBy, setProjectSortBy] = useState<string>("date_desc");
   const [projectForm, setProjectForm] = useState<{
     projectCode: string;
     projectName: string;
@@ -3222,6 +3227,50 @@ export default function AdminFinanceERPPage() {
     const balance = totalIn - totalOut;
     return { totalIn, totalOut, balance, count: filteredAndSortedCashFlow.length };
   }, [filteredAndSortedCashFlow]);
+
+  // Hook Filter & Sort: Manajemen Proyek
+  const filteredAndSortedProjects = useMemo(() => {
+    return projects
+      .filter((p) => {
+        const matchEntity = selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity;
+        if (!matchEntity) return false;
+
+        const matchStatus = projectFilterStatus === "ALL" || p.status === projectFilterStatus;
+        if (!matchStatus) return false;
+
+        const q = projectSearchQuery.toLowerCase().trim();
+        const matchQuery =
+          !q ||
+          (p.projectCode && p.projectCode.toLowerCase().includes(q)) ||
+          (p.projectName && p.projectName.toLowerCase().includes(q)) ||
+          (p.clientName && p.clientName.toLowerCase().includes(q)) ||
+          (p.picProject && p.picProject.toLowerCase().includes(q)) ||
+          (p.description && p.description.toLowerCase().includes(q));
+
+        if (!matchQuery) return false;
+
+        const matchDate = checkDateInRange(p.startDate || p.createdAt, projectDateFilter, projectStartDate, projectEndDate);
+        return matchDate;
+      })
+      .sort((a, b) => {
+        if (projectSortBy === "date_desc") {
+          return new Date(b.startDate || b.createdAt || 0).getTime() - new Date(a.startDate || a.createdAt || 0).getTime();
+        }
+        if (projectSortBy === "date_asc") {
+          return new Date(a.startDate || a.createdAt || 0).getTime() - new Date(b.startDate || b.createdAt || 0).getTime();
+        }
+        if (projectSortBy === "value_desc") {
+          return (Number(b.contractValue) || 0) - (Number(a.contractValue) || 0);
+        }
+        if (projectSortBy === "value_asc") {
+          return (Number(a.contractValue) || 0) - (Number(b.contractValue) || 0);
+        }
+        if (projectSortBy === "name_asc") {
+          return (a.projectName || "").localeCompare(b.projectName || "");
+        }
+        return 0;
+      });
+  }, [projects, selectedEntity, projectFilterStatus, projectSearchQuery, projectDateFilter, projectStartDate, projectEndDate, projectSortBy]);
 
   const handleOpenConvertQuotation = (q: Quotation) => {
     setSelectedQuotationForConvert(q);
@@ -9098,48 +9147,122 @@ export default function AdminFinanceERPPage() {
         {/* TAB 9: MANAJEMEN PROYEK (PROJECTS) */}
         {activeTab === "projects" && (
           <div className="space-y-4">
-            {/* Header & Filter Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-slate-500">Filter Status:</span>
-                {(["ALL", "In Progress", "Completed", "Planning", "On Hold"] as const).map((st) => (
+            {/* Top Control Bar Manajemen Proyek */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+              {/* Pencarian Proyek */}
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="Cari nomor PRJ-..., nama proyek, klien, PIC, atau deskripsi..."
+                  value={projectSearchQuery}
+                  onChange={(e) => setProjectSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50/50"
+                />
+                {projectSearchQuery && (
                   <button
-                    key={st}
-                    onClick={() => setProjectFilterStatus(st)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      projectFilterStatus === st
-                        ? "bg-slate-900 text-white shadow"
-                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-                    }`}
+                    onClick={() => setProjectSearchQuery("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
-                    {st === "ALL" ? "Semua Proyek" : st}
+                    <X className="w-3.5 h-3.5" />
                   </button>
-                ))}
+                )}
               </div>
 
-              <button
-                onClick={handleOpenAddProject}
-                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ Buat Proyek Baru</span>
-              </button>
+              {/* Kelompok Filter Tanggal, Sortir, Status, dan Tombol Form Input */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter Periode Tanggal */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Tanggal:</span>
+                  <select
+                    value={projectDateFilter}
+                    onChange={(e) => setProjectDateFilter(e.target.value as DateFilterPeriod)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="ALL">📅 Semua Tanggal</option>
+                    <option value="TODAY">⚡ Hari Ini</option>
+                    <option value="THIS_MONTH">📆 Bulan Ini</option>
+                    <option value="LAST_MONTH">⏪ Bulan Lalu</option>
+                    <option value="THIS_YEAR">🗓️ Tahun Ini</option>
+                    <option value="CUSTOM">🎯 Rentang Kustom...</option>
+                  </select>
+                </div>
+
+                {/* Input Rentang Kustom jika dipilih */}
+                {projectDateFilter === "CUSTOM" && (
+                  <div className="flex items-center gap-1.5 bg-indigo-50/80 border border-indigo-200 rounded-xl px-2.5 py-1 text-xs">
+                    <input
+                      type="date"
+                      value={projectStartDate}
+                      onChange={(e) => setProjectStartDate(e.target.value)}
+                      className="bg-white border border-indigo-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Mulai"
+                    />
+                    <span className="text-indigo-600 font-black">s/d</span>
+                    <input
+                      type="date"
+                      value={projectEndDate}
+                      onChange={(e) => setProjectEndDate(e.target.value)}
+                      className="bg-white border border-indigo-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Selesai"
+                    />
+                  </div>
+                )}
+
+                {/* Dropdown Sortir Tanggal (seperti modul SPH) */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Sortir:</span>
+                  <select
+                    value={projectSortBy}
+                    onChange={(e) => setProjectSortBy(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="date_desc">📅 Tanggal Mulai Terbaru</option>
+                    <option value="date_asc">📅 Tanggal Mulai Terlama</option>
+                    <option value="value_desc">💰 Nilai Kontrak Tertinggi</option>
+                    <option value="value_asc">💰 Nilai Kontrak Terendah</option>
+                    <option value="name_asc">🏢 Nama Proyek (A-Z)</option>
+                  </select>
+                </div>
+
+                {/* Filter Status Proyek */}
+                <select
+                  value={projectFilterStatus}
+                  onChange={(e) => setProjectFilterStatus(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-700 focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="Planning">Planning</option>
+                  <option value="On Hold">On Hold</option>
+                </select>
+
+                {/* Tombol Form Input Utama */}
+                <button
+                  type="button"
+                  onClick={handleOpenAddProject}
+                  className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Buat Proyek Baru</span>
+                </button>
+              </div>
             </div>
 
             {/* Quick KPI Summary Bar for Projects */}
             {(() => {
-              const scopedProj = projects.filter(
-                (p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity
-              );
-              const totalContractVal = scopedProj.reduce((acc, curr) => acc + (curr.contractValue || 0), 0);
-              const activeCount = scopedProj.filter((p) => p.status === "In Progress").length;
-              const completedCount = scopedProj.filter((p) => p.status === "Completed").length;
+              const totalContractVal = filteredAndSortedProjects.reduce((acc, curr) => acc + (curr.contractValue || 0), 0);
+              const activeCount = filteredAndSortedProjects.filter((p) => p.status === "In Progress").length;
+              const completedCount = filteredAndSortedProjects.filter((p) => p.status === "Completed").length;
 
               return (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-indigo-50/60 border border-indigo-200/80">
                   <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase">Total Proyek Terdaftar</p>
-                    <p className="text-xl font-black text-slate-900 mt-1">{scopedProj.length} <span className="text-xs font-bold text-slate-500">Proyek</span></p>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase">Proyek Terfilter</p>
+                    <p className="text-xl font-black text-slate-900 mt-1">{filteredAndSortedProjects.length} <span className="text-xs font-bold text-slate-500">Proyek</span></p>
                   </div>
                   <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-sm">
                     <p className="text-[11px] font-bold text-slate-400 uppercase">Sedang Berjalan (Aktif)</p>
@@ -9159,9 +9282,7 @@ export default function AdminFinanceERPPage() {
 
             {/* Project List Cards / Table */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {projects
-                .filter((p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity)
-                .filter((p) => projectFilterStatus === "ALL" || p.status === projectFilterStatus)
+              {filteredAndSortedProjects
                 .map((prj) => {
                   const prjSales = sales.filter((s) => s.projectId === prj.id || s.notes?.includes(prj.projectCode));
                   const prjPurchases = purchases.filter((po) => po.notes?.includes(prj.projectCode) || po.supplierName?.includes(prj.projectCode));
@@ -9300,19 +9421,20 @@ export default function AdminFinanceERPPage() {
                 })}
             </div>
 
-            {projects.filter((p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity).length === 0 && (
+            {filteredAndSortedProjects.length === 0 && (
               <div className="text-center py-12 bg-white rounded-3xl border border-dashed border-slate-200">
                 <Briefcase className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <h4 className="font-black text-slate-700">Belum Ada Proyek untuk Entitas Ini</h4>
+                <h4 className="font-black text-slate-700">Tidak ada Proyek yang sesuai filter</h4>
                 <p className="text-xs text-slate-400 mt-1">
-                  Mulai catat proyek pengadaan, instalasi CCTV, atau pekerjaan jaringan untuk memonitor keuangan proyek.
+                  Coba ubah kata kunci pencarian, rentang tanggal, atau filter status proyek di atas.
                 </p>
                 <button
+                  type="button"
                   onClick={handleOpenAddProject}
                   className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black cursor-pointer hover:bg-indigo-700 transition-all inline-flex items-center gap-1.5 shadow"
                 >
                   <Plus className="w-4 h-4" />
-                  + Buat Proyek Pertama
+                  + Buat Proyek Baru
                 </button>
               </div>
             )}
