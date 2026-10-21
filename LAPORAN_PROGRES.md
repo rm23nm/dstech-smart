@@ -71,6 +71,7 @@
 - **2026-10-21**: Pemisahan Independen Kop Surat, Watermark, dan Rekening Bank Perusahaan (PT. DSTech Smart Perkasa vs Non-PT / Toko DStech). Menyediakan kontrol independen penuh di `/admin/finance` untuk masing-masing entitas: (1) Kop surat mandiri PT (`/kop_surat_dstech.jpg`) dan Non-PT (`/kop_surat_toko.jpg`); (2) Slider opasitas watermark terpisah; (3) Rekening bank terisolasi per entitas bisnis; (4) Lembar cetak dokumen keuangan (SPH, Faktur, PO, BAST Retur) otomatis memuat kop surat, watermark, dan legalitas sesuai entitas yang dipilih. Lolos validasi TypeScript, browser subagent, commit git `3fb738d`, dan sukses deploy ke VPS live.
 - **2026-10-21**: Pembaruan Penamaan 'Toko DStech' Menjadi 'DSTech Smart', Penyesuaian Pihak Pelaksana & Stempel Digital BAST Non-PT, serta Penambahan Fitur Upload Langsung Kop Surat. Mengakomodasi 3 permintaan pengguna: (1) Mengganti seluruh label 'Toko DStech' atau 'Non-PT / Toko' menjadi 'DSTech Smart' (atau 'Non-PT / DSTech Smart') di seluruh modul admin (`/admin/categories`, `/admin/products`, `/admin/portfolios`, `/admin/inventory`, `/admin/maintenance`, dan data JSON pendukung); (2) Menyesuaikan pihak pelaksana pada lembar cetak Berita Acara Kunjungan Maintenance A4 (`printable-bast-maintenance`): untuk tiket Non-PT, pihak pelaksana otomatis tertulis 'DSTech Smart', pengantar tidak lagi menyebut 'PT', pengesahan tanda tangan menggunakan 'Teknisi DSTech Smart', dan stempel digital otomatis berganti menjadi stempel bulat ungu bertuliskan 'DSTECH SMART CILEGON' (sedangkan tiket PT tetap menggunakan 'PT. DSTech Smart Perkasa' dan stempel biru); (3) Menyediakan tombol upload kop surat langsung (`<Upload />`) di toolbar pratinjau cetak BAST `/admin/maintenance` sehingga pengguna dapat mengunggah gambar kop surat baru secara instan tanpa harus berpindah halaman, di samping pengaturan permanen di ERP Keuangan `/admin/finance`. Lolos validasi TypeScript (`npx tsc --noEmit` 0 error), disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-22**: Perbaikan Bug Upload Foto Faktur & Proyek (Penyelarasan Body Payload/Updates PUT API), Isolasi Cetak Lembar Kwitansi & Lampiran Foto A4 (Pencegahan Kebocoran Tampilan Dashboard Utama saat Print), serta Penomoran Otomatis Faktur Dinamis Mengikuti Tanggal Pilihan Pengguna (INV-DSTECH-YYYYMM-XXX). Memperbaiki akar masalah gagal simpan foto dokumentasi faktur pada `handleUploadInvoicePhoto` di mana backend API menolak `payload` karena hanya menerima `updates`, menyertakan `isReceiptModalOpen` dan `selectedInvoiceForPhotoPrint` ke `isAnyPrintModalOpen` agar modal kwitansi dan cetak foto bersih tanpa dashboard utama, serta memperbarui logika nomor faktur otomatis agar sinkron dengan tahun dan bulan dari tanggal yang dipilih pengguna (misal 2026-03-13 menghasilkan INV-DSTECH-202603-XXX). Lolos kompilasi TypeScript 0 error dan lolos build Next.js.
+- **2026-10-22**: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Seluruh 5 Modul ERP Keuangan (Penjualan & Faktur, Pembelian & PO, Retur Barang, Laporan Laba Rugi, dan Buku Arus Kas). Mengimplementasikan top control bar seragam dengan preset periode (Semua Tanggal, Hari Ini, Bulan Ini, Bulan Lalu, Tahun Ini, Rentang Kustom dengan Date Picker Mulai-Selesai), dropdown sortir tanggal & nominal (Tanggal Terbaru, Tanggal Terlama, Nominal Tertinggi/Terendah, Nama A-Z), input pencarian interaktif, dan penempatan berdampingan tepat di sebelah tombol Form Input utama masing-masing modul. Laba Rugi mengkalkulasi pendapatan, HPP, beban operasional, dan laba bersih secara dinamis sesuai periode terpilih. Lolos validasi TypeScript 0 error dan build Next.js sukses.
 
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
@@ -2466,7 +2467,31 @@
 
 ---
 
-### 82. Catatan Penting
+### 82. Tugas: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Seluruh 5 Modul ERP Keuangan (Penjualan & Faktur, Pembelian & PO, Retur Barang, Laporan Laba Rugi, dan Buku Arus Kas)
+- **Permintaan Pengguna**:
+  *"tolong tambahkan fitur fillter tanggal dan pencarian nama seperti modul SPH, kedalam Penjualan dan faktur, Pembelian dan PO, Retur Barang, Laporan laba rugi, Buku Arus Kas, disamping tombol form input"*
+- **Status**: Selesai & Terverifikasi
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Membuat backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_filters_all_tabs`.
+  - [x] **Langkah 2 (Helper Filter Tanggal Universal)**:
+    - Menyiapkan fungsi helper `checkDateInRange(dateStr, filterType, startDate, endDate)` yang mendukung filter: `Semua Tanggal`, `Hari Ini`, `Bulan Ini`, `Bulan Lalu`, `Tahun Ini`, serta `Rentang Kustom` (Custom Date Range).
+  - [x] **Langkah 3 (State Manajemen Pencarian, Filter Tanggal, dan Sortir)**:
+    - Modul Penjualan (`sales`): `searchQuery`, `saleDateFilter`, `saleStartDate`, `saleEndDate`, `saleSortBy`.
+    - Modul Pembelian (`purchases`): `poSearchQuery`, `poDateFilter`, `poStartDate`, `poEndDate`, `poSortBy`.
+    - Modul Retur (`returns`): `returnSearchQuery`, `returnDateFilter`, `returnStartDate`, `returnEndDate`, `returnSortBy`.
+    - Modul Laba Rugi (`pl_report`): `pnlSearchQuery`, `pnlDateFilter`, `pnlStartDate`, `pnlEndDate`, serta kalkulasi pendapatan, HPP, beban, dan laba dinamis sesuai rentang tanggal.
+    - Modul Arus Kas (`cash_flow`): `cashSearchQuery`, `cashDateFilter`, `cashStartDate`, `cashEndDate`, `cashSortBy`.
+  - [x] **Langkah 4 (Implementasi Antarmuka Top Control Bar Berdampingan dengan Tombol Form Input)**:
+    - Merancang komponen baris kontrol seragam seperti modul SPH dengan input pencarian interaktif, pemilih preset periode tanggal, input rentang tanggal kustom (jika dipilih), dropdown sortir tanggal, dan tombol form input utama masing-masing modul.
+  - [x] **Langkah 5 (Validasi Kompilasi, Build, & Deployment)**:
+    - Kompilasi TypeScript `npx tsc --noEmit` lolos 100% (0 error).
+    - Next.js Production Build `npm run build` sukses mengompilasi 46 dari 46 rute.
+    - Push ke GitHub repository `rm23nm/dstech-smart`.
+    - Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 83. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

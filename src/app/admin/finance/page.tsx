@@ -555,10 +555,20 @@ export default function AdminFinanceERPPage() {
     totalSuppliersCount: 0,
   });
 
-  // Filter & Search states
+  // Filter & Search states (Universal Date Filter Type)
+  type DateFilterPeriod = "ALL" | "TODAY" | "THIS_MONTH" | "LAST_MONTH" | "THIS_YEAR" | "CUSTOM";
+
   const [selectedEntity, setSelectedEntity] = useState<"ALL" | "PT" | "NON_PT">("ALL");
+
+  // Penjualan / Sales
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("Semua");
+  const [saleDateFilter, setSaleDateFilter] = useState<DateFilterPeriod>("ALL");
+  const [saleStartDate, setSaleStartDate] = useState<string>("");
+  const [saleEndDate, setSaleEndDate] = useState<string>("");
+  const [saleSortBy, setSaleSortBy] = useState<string>("date_desc");
+
+  // Master Klien & Supplier
   const [clientSearchQuery, setClientSearchQuery] = useState<string>("");
   const [clientCategoryFilter, setClientCategoryFilter] = useState<string>("Semua");
   const [supplierSearchQuery, setSupplierSearchQuery] = useState<string>("");
@@ -567,8 +577,74 @@ export default function AdminFinanceERPPage() {
   const [isNewSaleModalOpen, setIsNewSaleModalOpen] = useState<boolean>(false);
   const [pendingMaintenanceTicketId, setPendingMaintenanceTicketId] = useState<string | null>(null);
   const [isNewPoModalOpen, setIsNewPoModalOpen] = useState<boolean>(false);
+
+  // Pembelian / Purchases
   const [poSearchQuery, setPoSearchQuery] = useState<string>("");
   const [poStatusFilter, setPoStatusFilter] = useState<string>("Semua");
+  const [poDateFilter, setPoDateFilter] = useState<DateFilterPeriod>("ALL");
+  const [poStartDate, setPoStartDate] = useState<string>("");
+  const [poEndDate, setPoEndDate] = useState<string>("");
+  const [poSortBy, setPoSortBy] = useState<string>("date_desc");
+
+  // Retur Barang / Returns
+  const [returnSearchQuery, setReturnSearchQuery] = useState<string>("");
+  const [returnDateFilter, setReturnDateFilter] = useState<DateFilterPeriod>("ALL");
+  const [returnStartDate, setReturnStartDate] = useState<string>("");
+  const [returnEndDate, setReturnEndDate] = useState<string>("");
+  const [returnSortBy, setReturnSortBy] = useState<string>("date_desc");
+
+  // Laporan Laba Rugi / P&L
+  const [pnlSearchQuery, setPnlSearchQuery] = useState<string>("");
+  const [pnlDateFilter, setPnlDateFilter] = useState<DateFilterPeriod>("THIS_MONTH");
+  const [pnlStartDate, setPnlStartDate] = useState<string>("");
+  const [pnlEndDate, setPnlEndDate] = useState<string>("");
+
+  // Buku Arus Kas / Cash Flow
+  const [cashSearchQuery, setCashSearchQuery] = useState<string>("");
+  const [cashDateFilter, setCashDateFilter] = useState<DateFilterPeriod>("ALL");
+  const [cashStartDate, setCashStartDate] = useState<string>("");
+  const [cashEndDate, setCashEndDate] = useState<string>("");
+  const [cashSortBy, setCashSortBy] = useState<string>("date_desc");
+
+  const checkDateInRange = (
+    dateStr: string | undefined | null,
+    period: DateFilterPeriod,
+    customStart?: string,
+    customEnd?: string
+  ): boolean => {
+    if (period === "ALL") return true;
+    if (!dateStr) return false;
+    const cleanDate = dateStr.slice(0, 10);
+    const d = new Date(cleanDate);
+    if (isNaN(d.getTime())) return false;
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    if (period === "TODAY") {
+      return cleanDate === todayStr;
+    }
+    if (period === "THIS_MONTH") {
+      const curYear = now.getFullYear();
+      const curMonth = String(now.getMonth() + 1).padStart(2, "0");
+      return cleanDate.startsWith(`${curYear}-${curMonth}`);
+    }
+    if (period === "LAST_MONTH") {
+      const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevYear = prevDate.getFullYear();
+      const prevMonth = String(prevDate.getMonth() + 1).padStart(2, "0");
+      return cleanDate.startsWith(`${prevYear}-${prevMonth}`);
+    }
+    if (period === "THIS_YEAR") {
+      return cleanDate.startsWith(String(now.getFullYear()));
+    }
+    if (period === "CUSTOM") {
+      if (customStart && cleanDate < customStart) return false;
+      if (customEnd && cleanDate > customEnd) return false;
+      return true;
+    }
+    return true;
+  };
   const [isEditPoModalOpen, setIsEditPoModalOpen] = useState<boolean>(false);
   const [editingPo, setEditingPo] = useState<PurchaseOrder | null>(null);
   const [editPoForm, setEditPoForm] = useState<{
@@ -2879,6 +2955,273 @@ export default function AdminFinanceERPPage() {
         return 0;
       });
   }, [quotations, quotationSearchQuery, quotationStatusFilter, quotationSortBy, selectedEntity]);
+
+  // Hook Filter & Sort: Penjualan & Faktur
+  const filteredAndSortedSales = useMemo(() => {
+    return sales
+      .filter((s) => {
+        const matchEntity = selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity;
+        if (!matchEntity) return false;
+
+        const q = searchQuery.toLowerCase().trim();
+        const matchQuery =
+          !q ||
+          (s.invoiceNumber && s.invoiceNumber.toLowerCase().includes(q)) ||
+          (s.customerName && s.customerName.toLowerCase().includes(q)) ||
+          (s.notes && s.notes.toLowerCase().includes(q)) ||
+          (s.projectName && s.projectName.toLowerCase().includes(q));
+
+        if (!matchQuery) return false;
+
+        const matchStatus = statusFilter === "Semua" || s.paymentStatus === statusFilter;
+        if (!matchStatus) return false;
+
+        const matchDate = checkDateInRange(s.date, saleDateFilter, saleStartDate, saleEndDate);
+        return matchDate;
+      })
+      .sort((a, b) => {
+        if (saleSortBy === "date_desc") {
+          return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+        }
+        if (saleSortBy === "date_asc") {
+          return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
+        }
+        if (saleSortBy === "total_desc") {
+          return (Number(b.grandTotal) || 0) - (Number(a.grandTotal) || 0);
+        }
+        if (saleSortBy === "total_asc") {
+          return (Number(a.grandTotal) || 0) - (Number(b.grandTotal) || 0);
+        }
+        if (saleSortBy === "client_asc") {
+          return (a.customerName || "").localeCompare(b.customerName || "");
+        }
+        return 0;
+      });
+  }, [sales, selectedEntity, searchQuery, statusFilter, saleDateFilter, saleStartDate, saleEndDate, saleSortBy]);
+
+  // Hook Filter & Sort: Pembelian & PO
+  const filteredAndSortedPurchases = useMemo(() => {
+    return purchases
+      .filter((po) => {
+        const matchEntity = selectedEntity === "ALL" || (po.businessEntity || "PT") === selectedEntity;
+        if (!matchEntity) return false;
+
+        const q = poSearchQuery.toLowerCase().trim();
+        const matchQuery =
+          !q ||
+          (po.poNumber && po.poNumber.toLowerCase().includes(q)) ||
+          (po.supplierName && po.supplierName.toLowerCase().includes(q)) ||
+          (po.supplierContact && po.supplierContact.toLowerCase().includes(q)) ||
+          (po.notes && po.notes.toLowerCase().includes(q)) ||
+          (po.items && po.items.some((it) => it.productName && it.productName.toLowerCase().includes(q)));
+
+        if (!matchQuery) return false;
+
+        const matchStatus = poStatusFilter === "Semua" || po.status === poStatusFilter;
+        if (!matchStatus) return false;
+
+        const matchDate = checkDateInRange(po.date, poDateFilter, poStartDate, poEndDate);
+        return matchDate;
+      })
+      .sort((a, b) => {
+        if (poSortBy === "date_desc") {
+          return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+        }
+        if (poSortBy === "date_asc") {
+          return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
+        }
+        if (poSortBy === "total_desc") {
+          return (Number(b.grandTotal) || 0) - (Number(a.grandTotal) || 0);
+        }
+        if (poSortBy === "total_asc") {
+          return (Number(a.grandTotal) || 0) - (Number(b.grandTotal) || 0);
+        }
+        if (poSortBy === "supplier_asc") {
+          return (a.supplierName || "").localeCompare(b.supplierName || "");
+        }
+        return 0;
+      });
+  }, [purchases, selectedEntity, poSearchQuery, poStatusFilter, poDateFilter, poStartDate, poEndDate, poSortBy]);
+
+  // Hook Filter & Sort: Retur Barang
+  const filteredAndSortedReturnsSales = useMemo(() => {
+    return returnsSales
+      .filter((ret) => {
+        const matchEntity = selectedEntity === "ALL" || (ret.businessEntity || "PT") === selectedEntity;
+        if (!matchEntity) return false;
+
+        const q = returnSearchQuery.toLowerCase().trim();
+        const matchQuery =
+          !q ||
+          (ret.returnNumber && ret.returnNumber.toLowerCase().includes(q)) ||
+          (ret.customerName && ret.customerName.toLowerCase().includes(q)) ||
+          (ret.invoiceNumber && ret.invoiceNumber.toLowerCase().includes(q)) ||
+          (ret.productName && ret.productName.toLowerCase().includes(q));
+
+        if (!matchQuery) return false;
+
+        const matchDate = checkDateInRange(ret.date, returnDateFilter, returnStartDate, returnEndDate);
+        return matchDate;
+      })
+      .sort((a, b) => {
+        if (returnSortBy === "date_desc") {
+          return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+        }
+        if (returnSortBy === "date_asc") {
+          return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
+        }
+        if (returnSortBy === "name_asc") {
+          return (a.customerName || "").localeCompare(b.customerName || "");
+        }
+        return 0;
+      });
+  }, [returnsSales, selectedEntity, returnSearchQuery, returnDateFilter, returnStartDate, returnEndDate, returnSortBy]);
+
+  const filteredAndSortedReturnsPurchase = useMemo(() => {
+    return returnsPurchase
+      .filter((ret) => {
+        const matchEntity = selectedEntity === "ALL" || (ret.businessEntity || "PT") === selectedEntity;
+        if (!matchEntity) return false;
+
+        const q = returnSearchQuery.toLowerCase().trim();
+        const matchQuery =
+          !q ||
+          (ret.returnNumber && ret.returnNumber.toLowerCase().includes(q)) ||
+          (ret.supplierName && ret.supplierName.toLowerCase().includes(q)) ||
+          (ret.poNumber && ret.poNumber.toLowerCase().includes(q)) ||
+          (ret.productName && ret.productName.toLowerCase().includes(q));
+
+        if (!matchQuery) return false;
+
+        const matchDate = checkDateInRange(ret.date, returnDateFilter, returnStartDate, returnEndDate);
+        return matchDate;
+      })
+      .sort((a, b) => {
+        if (returnSortBy === "date_desc") {
+          return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+        }
+        if (returnSortBy === "date_asc") {
+          return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
+        }
+        if (returnSortBy === "name_asc") {
+          return (a.supplierName || "").localeCompare(b.supplierName || "");
+        }
+        return 0;
+      });
+  }, [returnsPurchase, selectedEntity, returnSearchQuery, returnDateFilter, returnStartDate, returnEndDate, returnSortBy]);
+
+  // Hook Filter & Kalkulasi: Laporan Laba Rugi
+  const pnlReportCalculation = useMemo(() => {
+    const scopedSales = sales.filter((s) => {
+      const matchEntity = selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity;
+      if (!matchEntity) return false;
+      return checkDateInRange(s.date, pnlDateFilter, pnlStartDate, pnlEndDate);
+    });
+
+    const scopedPurchases = purchases.filter((p) => {
+      const matchEntity = selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity;
+      if (!matchEntity) return false;
+      return checkDateInRange(p.date, pnlDateFilter, pnlStartDate, pnlEndDate);
+    });
+
+    const scopedCash = cashFlow.filter((c) => {
+      const matchEntity = selectedEntity === "ALL" || (c.businessEntity || "PT") === selectedEntity;
+      if (!matchEntity) return false;
+      return checkDateInRange(c.date, pnlDateFilter, pnlStartDate, pnlEndDate);
+    });
+
+    const totalRevenue = scopedSales.reduce((acc, s) => acc + (Number(s.grandTotal) || 0), 0);
+    const totalHpp = scopedPurchases.reduce((acc, p) => acc + (Number(p.grandTotal) || 0), 0);
+    const grossProfit = totalRevenue - totalHpp;
+
+    const operationalExpenses = scopedCash.filter((c) => c.type === "OUT" && !c.category?.toLowerCase().includes("stok"));
+    const totalExpenses = operationalExpenses.reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+    const netProfit = grossProfit - totalExpenses;
+
+    let periodLabel = "Semua Riwayat Transaksi";
+    const now = new Date();
+    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    if (pnlDateFilter === "THIS_MONTH") {
+      periodLabel = `${months[now.getMonth()]} ${now.getFullYear()}`;
+    } else if (pnlDateFilter === "LAST_MONTH") {
+      const prevM = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+      const prevY = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      periodLabel = `${months[prevM]} ${prevY}`;
+    } else if (pnlDateFilter === "THIS_YEAR") {
+      periodLabel = `Tahun ${now.getFullYear()}`;
+    } else if (pnlDateFilter === "CUSTOM") {
+      periodLabel = `${pnlStartDate || "Awal"} s/d ${pnlEndDate || "Sekarang"}`;
+    }
+
+    return {
+      scopedSales,
+      scopedPurchases,
+      operationalExpenses,
+      totalRevenue,
+      totalHpp,
+      grossProfit,
+      totalExpenses,
+      netProfit,
+      periodLabel,
+    };
+  }, [sales, purchases, cashFlow, selectedEntity, pnlDateFilter, pnlStartDate, pnlEndDate]);
+
+  // Hook Filter & Sort: Buku Arus Kas
+  const filteredAndSortedCashFlow = useMemo(() => {
+    return cashFlow
+      .filter((cash) => {
+        const matchEntity = selectedEntity === "ALL" || (cash.businessEntity || "PT") === selectedEntity;
+        if (!matchEntity) return false;
+
+        if (cashAccountFilter !== "ALL") {
+          if (cashAccountFilter === "TUNAI") {
+            const isTunai =
+              cash.account.toLowerCase().includes("tunai") ||
+              cash.account.toLowerCase().includes("kas kecil") ||
+              cash.account.toLowerCase().includes("petty");
+            if (!isTunai) return false;
+          } else {
+            if (!cash.account.toLowerCase().includes(cashAccountFilter.toLowerCase())) return false;
+          }
+        }
+
+        const q = cashSearchQuery.toLowerCase().trim();
+        const matchQuery =
+          !q ||
+          (cash.description && cash.description.toLowerCase().includes(q)) ||
+          (cash.category && cash.category.toLowerCase().includes(q)) ||
+          (cash.account && cash.account.toLowerCase().includes(q)) ||
+          (cash.reference && cash.reference.toLowerCase().includes(q)) ||
+          (cash.projectName && cash.projectName.toLowerCase().includes(q));
+
+        if (!matchQuery) return false;
+
+        const matchDate = checkDateInRange(cash.date, cashDateFilter, cashStartDate, cashEndDate);
+        return matchDate;
+      })
+      .sort((a, b) => {
+        if (cashSortBy === "date_desc") {
+          return new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime();
+        }
+        if (cashSortBy === "date_asc") {
+          return new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime();
+        }
+        if (cashSortBy === "amount_desc") {
+          return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+        }
+        if (cashSortBy === "amount_asc") {
+          return (Number(a.amount) || 0) - (Number(b.amount) || 0);
+        }
+        return 0;
+      });
+  }, [cashFlow, selectedEntity, cashAccountFilter, cashSearchQuery, cashDateFilter, cashStartDate, cashEndDate, cashSortBy]);
+
+  const cashFlowMetrics = useMemo(() => {
+    const totalIn = filteredAndSortedCashFlow.filter((c) => c.type === "IN").reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+    const totalOut = filteredAndSortedCashFlow.filter((c) => c.type === "OUT").reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+    const balance = totalIn - totalOut;
+    return { totalIn, totalOut, balance, count: filteredAndSortedCashFlow.length };
+  }, [filteredAndSortedCashFlow]);
 
   const handleOpenConvertQuotation = (q: Quotation) => {
     setSelectedQuotationForConvert(q);
@@ -6011,23 +6354,91 @@ export default function AdminFinanceERPPage() {
         {/* TAB 1: PENJUALAN & FAKTUR */}
         {activeTab === "sales" && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="relative flex-1">
+            {/* Top Control Bar Penjualan */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+              {/* Pencarian Nama Klien / No Faktur */}
+              <div className="relative flex-1 min-w-[240px]">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="text"
                   placeholder="Cari nomor faktur INV-..., nama klien, atau catatan proyek..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-dstech-red focus:outline-none"
+                  className="w-full pl-10 pr-8 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none bg-slate-50/50"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
+              {/* Kelompok Filter Tanggal, Sortir, Status, dan Tombol Form Input */}
               <div className="flex flex-wrap items-center gap-2">
+                {/* Filter Periode Tanggal */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-dstech-blue shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Tanggal:</span>
+                  <select
+                    value={saleDateFilter}
+                    onChange={(e) => setSaleDateFilter(e.target.value as DateFilterPeriod)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="ALL">📅 Semua Tanggal</option>
+                    <option value="TODAY">⚡ Hari Ini</option>
+                    <option value="THIS_MONTH">📆 Bulan Ini</option>
+                    <option value="LAST_MONTH">⏪ Bulan Lalu</option>
+                    <option value="THIS_YEAR">🗓️ Tahun Ini</option>
+                    <option value="CUSTOM">🎯 Rentang Kustom...</option>
+                  </select>
+                </div>
+
+                {/* Input Rentang Kustom jika dipilih */}
+                {saleDateFilter === "CUSTOM" && (
+                  <div className="flex items-center gap-1.5 bg-blue-50/80 border border-blue-200 rounded-xl px-2.5 py-1 text-xs">
+                    <input
+                      type="date"
+                      value={saleStartDate}
+                      onChange={(e) => setSaleStartDate(e.target.value)}
+                      className="bg-white border border-blue-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Mulai"
+                    />
+                    <span className="text-blue-500 font-black">s/d</span>
+                    <input
+                      type="date"
+                      value={saleEndDate}
+                      onChange={(e) => setSaleEndDate(e.target.value)}
+                      className="bg-white border border-blue-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Selesai"
+                    />
+                  </div>
+                )}
+
+                {/* Dropdown Sortir Tanggal (seperti modul SPH) */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Sortir:</span>
+                  <select
+                    value={saleSortBy}
+                    onChange={(e) => setSaleSortBy(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="date_desc">📅 Tanggal Terbaru</option>
+                    <option value="date_asc">📅 Tanggal Terlama</option>
+                    <option value="total_desc">💰 Total Tertinggi</option>
+                    <option value="total_asc">💰 Total Terendah</option>
+                    <option value="client_asc">🏢 Nama Klien (A-Z)</option>
+                  </select>
+                </div>
+
+                {/* Filter Status Bayar */}
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="p-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white focus:outline-none"
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-700 focus:outline-none cursor-pointer"
                 >
                   <option value="Semua">Semua Status Bayar</option>
                   <option value="Lunas">Lunas</option>
@@ -6038,27 +6449,31 @@ export default function AdminFinanceERPPage() {
 
                 {/* Tombol Pengaturan Rekening Bank DSTech */}
                 <button
+                  type="button"
                   onClick={() => setIsBankAccountsModalOpen(true)}
                   title="Kelola Rekening Bank Perusahaan DSTech"
-                  className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
                 >
-                  <Landmark className="w-4 h-4 text-emerald-600" />
-                  <span className="hidden sm:inline">Rekening Bank DSTech</span>
+                  <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="hidden xl:inline">Rekening Bank</span>
                 </button>
 
                 {/* Tombol Pengaturan Kop Surat */}
                 <button
+                  type="button"
                   onClick={handleOpenSettingsModal}
                   title="Atur Background Kop Surat Resmi Faktur"
-                  className="px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
                 >
-                  <FileText className="w-4 h-4 text-dstech-blue" />
-                  <span className="hidden sm:inline">Kop Surat & Watermark</span>
+                  <FileText className="w-3.5 h-3.5 text-dstech-blue" />
+                  <span className="hidden xl:inline">Kop Surat</span>
                 </button>
 
+                {/* Tombol Form Input Utama */}
                 <button
+                  type="button"
                   onClick={handleOpenNewSaleModal}
-                  className="px-4 py-2.5 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  className="px-3.5 py-1.5 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Tambah Penjualan</span>
@@ -6080,17 +6495,16 @@ export default function AdminFinanceERPPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {sales
-                    .filter((s) => {
-                      const matchEntity = selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity;
-                      if (!matchEntity) return false;
-                      const matchQuery =
-                        s.invoiceNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        s.customerName.toLowerCase().includes(searchQuery.toLowerCase());
-                      const matchStatus = statusFilter === "Semua" || s.paymentStatus === statusFilter;
-                      return matchQuery && matchStatus;
-                    })
-                    .map((sale) => (
+                  {filteredAndSortedSales.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-400">
+                        <FileText className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                        <p className="font-bold text-slate-600">Tidak ada Faktur Penjualan yang sesuai filter</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Coba ubah kata kunci pencarian, rentang tanggal, atau filter status di atas.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAndSortedSales.map((sale) => (
                       <tr key={sale.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="p-3 font-black text-slate-900 whitespace-nowrap">
                           <div className="flex flex-wrap items-center gap-1.5">
@@ -6406,7 +6820,8 @@ export default function AdminFinanceERPPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -6930,23 +7345,91 @@ export default function AdminFinanceERPPage() {
         {/* TAB 2: PEMBELIAN & PURCHASE ORDER (PO) */}
         {activeTab === "purchases" && (
           <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="relative flex-1">
+            {/* Top Control Bar Pembelian & PO */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+              {/* Pencarian Supplier / Vendor / No PO */}
+              <div className="relative flex-1 min-w-[240px]">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="text"
-                  placeholder="Cari nomor PO, supplier, atau barang belanja..."
+                  placeholder="Cari nomor PO, nama supplier, atau barang belanja..."
                   value={poSearchQuery}
                   onChange={(e) => setPoSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full pl-10 pr-8 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none bg-slate-50/50"
                 />
+                {poSearchQuery && (
+                  <button
+                    onClick={() => setPoSearchQuery("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Kelompok Filter Tanggal, Sortir, Status, dan Tombol Form Input */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter Periode Tanggal */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Tanggal:</span>
+                  <select
+                    value={poDateFilter}
+                    onChange={(e) => setPoDateFilter(e.target.value as DateFilterPeriod)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="ALL">📅 Semua Tanggal</option>
+                    <option value="TODAY">⚡ Hari Ini</option>
+                    <option value="THIS_MONTH">📆 Bulan Ini</option>
+                    <option value="LAST_MONTH">⏪ Bulan Lalu</option>
+                    <option value="THIS_YEAR">🗓️ Tahun Ini</option>
+                    <option value="CUSTOM">🎯 Rentang Kustom...</option>
+                  </select>
+                </div>
+
+                {/* Input Rentang Kustom jika dipilih */}
+                {poDateFilter === "CUSTOM" && (
+                  <div className="flex items-center gap-1.5 bg-amber-50/80 border border-amber-200 rounded-xl px-2.5 py-1 text-xs">
+                    <input
+                      type="date"
+                      value={poStartDate}
+                      onChange={(e) => setPoStartDate(e.target.value)}
+                      className="bg-white border border-amber-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Mulai"
+                    />
+                    <span className="text-amber-600 font-black">s/d</span>
+                    <input
+                      type="date"
+                      value={poEndDate}
+                      onChange={(e) => setPoEndDate(e.target.value)}
+                      className="bg-white border border-amber-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Selesai"
+                    />
+                  </div>
+                )}
+
+                {/* Dropdown Sortir Tanggal (seperti modul SPH) */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Sortir:</span>
+                  <select
+                    value={poSortBy}
+                    onChange={(e) => setPoSortBy(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="date_desc">📅 Tanggal Terbaru</option>
+                    <option value="date_asc">📅 Tanggal Terlama</option>
+                    <option value="total_desc">💰 Total Belanja Tertinggi</option>
+                    <option value="total_asc">💰 Total Belanja Terendah</option>
+                    <option value="supplier_asc">🏢 Nama Supplier (A-Z)</option>
+                  </select>
+                </div>
+
+                {/* Filter Status PO */}
                 <select
                   value={poStatusFilter}
                   onChange={(e) => setPoStatusFilter(e.target.value)}
-                  className="px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-700 focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-700 focus:ring-2 focus:ring-amber-500 cursor-pointer"
                 >
                   <option value="Semua">Semua Status PO</option>
                   <option value="Draf">Draf</option>
@@ -6955,9 +7438,11 @@ export default function AdminFinanceERPPage() {
                   <option value="Dibatalkan">Dibatalkan</option>
                 </select>
 
+                {/* Tombol Form Input Utama */}
                 <button
+                  type="button"
                   onClick={() => setIsNewPoModalOpen(true)}
-                  className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm whitespace-nowrap"
+                  className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Buat PO Baru</span>
@@ -6981,22 +7466,16 @@ export default function AdminFinanceERPPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {purchases
-                    .filter((po) => {
-                      const matchEntity = selectedEntity === "ALL" || (po.businessEntity || "PT") === selectedEntity;
-                      if (!matchEntity) return false;
-                      const q = poSearchQuery.toLowerCase();
-                      const matchQuery =
-                        !poSearchQuery ||
-                        (po.poNumber && po.poNumber.toLowerCase().includes(q)) ||
-                        (po.supplierName && po.supplierName.toLowerCase().includes(q)) ||
-                        (po.supplierContact && po.supplierContact.toLowerCase().includes(q)) ||
-                        (po.items &&
-                          po.items.some((it) => it.productName && it.productName.toLowerCase().includes(q)));
-                      const matchStatus = poStatusFilter === "Semua" || po.status === poStatusFilter;
-                      return matchQuery && matchStatus;
-                    })
-                    .map((po) => (
+                  {filteredAndSortedPurchases.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-8 text-center text-slate-400">
+                        <ShoppingCart className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                        <p className="font-bold text-slate-600">Tidak ada Purchase Order (PO) yang sesuai filter</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Coba ubah kata kunci pencarian, rentang tanggal, atau status PO di atas.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAndSortedPurchases.map((po) => (
                       <tr key={po.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="p-3 font-mono font-black text-amber-700 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
@@ -7200,7 +7679,8 @@ export default function AdminFinanceERPPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -7256,6 +7736,86 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
+            {/* Top Control Bar Retur Barang */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+              {/* Pencarian Retur */}
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="Cari nomor retur RET-..., nama klien/supplier, atau nama produk..."
+                  value={returnSearchQuery}
+                  onChange={(e) => setReturnSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-rose-500 focus:outline-none bg-slate-50/50"
+                />
+                {returnSearchQuery && (
+                  <button
+                    onClick={() => setReturnSearchQuery("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Kelompok Filter Tanggal & Sortir */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter Periode Tanggal */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Tanggal:</span>
+                  <select
+                    value={returnDateFilter}
+                    onChange={(e) => setReturnDateFilter(e.target.value as DateFilterPeriod)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="ALL">📅 Semua Tanggal</option>
+                    <option value="TODAY">⚡ Hari Ini</option>
+                    <option value="THIS_MONTH">📆 Bulan Ini</option>
+                    <option value="LAST_MONTH">⏪ Bulan Lalu</option>
+                    <option value="THIS_YEAR">🗓️ Tahun Ini</option>
+                    <option value="CUSTOM">🎯 Rentang Kustom...</option>
+                  </select>
+                </div>
+
+                {/* Input Rentang Kustom jika dipilih */}
+                {returnDateFilter === "CUSTOM" && (
+                  <div className="flex items-center gap-1.5 bg-rose-50/80 border border-rose-200 rounded-xl px-2.5 py-1 text-xs">
+                    <input
+                      type="date"
+                      value={returnStartDate}
+                      onChange={(e) => setReturnStartDate(e.target.value)}
+                      className="bg-white border border-rose-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Mulai"
+                    />
+                    <span className="text-rose-600 font-black">s/d</span>
+                    <input
+                      type="date"
+                      value={returnEndDate}
+                      onChange={(e) => setReturnEndDate(e.target.value)}
+                      className="bg-white border border-rose-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Selesai"
+                    />
+                  </div>
+                )}
+
+                {/* Dropdown Sortir Tanggal */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Sortir:</span>
+                  <select
+                    value={returnSortBy}
+                    onChange={(e) => setReturnSortBy(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="date_desc">📅 Tanggal Terbaru</option>
+                    <option value="date_asc">📅 Tanggal Terlama</option>
+                    <option value="name_asc">🏢 Nama (A-Z)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Retur Penjualan (Dari Pelanggan / Klien) */}
               <div className="space-y-4">
@@ -7269,7 +7829,7 @@ export default function AdminFinanceERPPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-black bg-red-100 text-red-800 px-2 py-0.5 rounded-full">
-                      {returnsSales.length} Kasus
+                      {filteredAndSortedReturnsSales.length} Kasus
                     </span>
                     <button
                       type="button"
@@ -7283,13 +7843,13 @@ export default function AdminFinanceERPPage() {
                 </div>
 
                 <div className="space-y-3">
-                  {returnsSales.length === 0 ? (
+                  {filteredAndSortedReturnsSales.length === 0 ? (
                     <div className="p-8 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-2">
                       <RotateCcw className="w-8 h-8 text-slate-300 mx-auto" />
-                      <p className="text-xs font-bold text-slate-500">Belum ada riwayat retur penjualan dari klien</p>
+                      <p className="text-xs font-bold text-slate-500">Tidak ada riwayat retur penjualan yang sesuai filter</p>
                     </div>
                   ) : (
-                    returnsSales.map((ret) => (
+                    filteredAndSortedReturnsSales.map((ret) => (
                       <div
                         key={ret.id}
                         className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition-all space-y-3"
@@ -7437,7 +7997,7 @@ export default function AdminFinanceERPPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] font-black bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                      {returnsPurchase.length} Kasus
+                      {filteredAndSortedReturnsPurchase.length} Kasus
                     </span>
                     <button
                       type="button"
@@ -7451,13 +8011,13 @@ export default function AdminFinanceERPPage() {
                 </div>
 
                 <div className="space-y-3">
-                  {returnsPurchase.length === 0 ? (
+                  {filteredAndSortedReturnsPurchase.length === 0 ? (
                     <div className="p-8 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center space-y-2">
                       <Truck className="w-8 h-8 text-slate-300 mx-auto" />
-                      <p className="text-xs font-bold text-slate-500">Belum ada riwayat retur pembelian ke supplier</p>
+                      <p className="text-xs font-bold text-slate-500">Tidak ada riwayat retur pembelian yang sesuai filter</p>
                     </div>
                   ) : (
-                    returnsPurchase.map((ret) => (
+                    filteredAndSortedReturnsPurchase.map((ret) => (
                       <div
                         key={ret.id}
                         className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-sm hover:shadow-md transition-all space-y-3"
@@ -7599,6 +8159,100 @@ export default function AdminFinanceERPPage() {
         {/* TAB 4: LAPORAN LABA RUGI (INCOME STATEMENT / P&L) */}
         {activeTab === "pl_report" && (
           <div className="space-y-6">
+            {/* Top Control Bar Laporan Laba Rugi */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+              {/* Pencarian Pos / Akun / Keterangan */}
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="Cari rincian akun pendapatan, HPP, atau beban pengeluaran..."
+                  value={pnlSearchQuery}
+                  onChange={(e) => setPnlSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50"
+                />
+                {pnlSearchQuery && (
+                  <button
+                    onClick={() => setPnlSearchQuery("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Kelompok Filter Periode Tanggal Laba Rugi & Aksi Cetak */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter Periode Tanggal */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Periode:</span>
+                  <select
+                    value={pnlDateFilter}
+                    onChange={(e) => setPnlDateFilter(e.target.value as DateFilterPeriod)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="THIS_MONTH">📆 Bulan Ini ({new Date().toLocaleString("id-ID", { month: "long" })})</option>
+                    <option value="LAST_MONTH">⏪ Bulan Lalu</option>
+                    <option value="THIS_YEAR">🗓️ Tahun Ini ({new Date().getFullYear()})</option>
+                    <option value="ALL">📅 Semua Riwayat (All Time)</option>
+                    <option value="CUSTOM">🎯 Rentang Kustom...</option>
+                  </select>
+                </div>
+
+                {/* Input Rentang Kustom jika dipilih */}
+                {pnlDateFilter === "CUSTOM" && (
+                  <div className="flex items-center gap-1.5 bg-emerald-50/80 border border-emerald-200 rounded-xl px-2.5 py-1 text-xs">
+                    <input
+                      type="date"
+                      value={pnlStartDate}
+                      onChange={(e) => setPnlStartDate(e.target.value)}
+                      className="bg-white border border-emerald-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Mulai"
+                    />
+                    <span className="text-emerald-600 font-black">s/d</span>
+                    <input
+                      type="date"
+                      value={pnlEndDate}
+                      onChange={(e) => setPnlEndDate(e.target.value)}
+                      className="bg-white border border-emerald-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Selesai"
+                    />
+                  </div>
+                )}
+
+                {/* Tombol Unduh PDF */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPnlPrintModalOpen(true);
+                    setTimeout(() => {
+                      handleDownloadPdf(
+                        "#print-pnl-sheet",
+                        `LAPORAN_LABA_RUGI_${selectedEntity === "NON_PT" ? "NON_PT" : "PT"}_${pnlReportCalculation.periodLabel.replace(/[\s/]/g, "_")}.pdf`
+                      );
+                    }, 500);
+                  }}
+                  disabled={isDownloadingPdf}
+                  title="Unduh Berkas PDF Laporan Laba Rugi Langsung"
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+
+                {/* Tombol Pratinjau Cetak Resmi A4 */}
+                <button
+                  type="button"
+                  onClick={() => setIsPnlPrintModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Pratinjau Cetak Resmi A4</span>
+                </button>
+              </div>
+            </div>
+
             <div className="p-6 rounded-3xl bg-slate-900 text-white space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
                 <div>
@@ -7606,36 +8260,11 @@ export default function AdminFinanceERPPage() {
                     Laporan Laba Rugi Komprehensif (Income Statement)
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Periode: Berjalan Oktober 2026 • {selectedEntity === "NON_PT" ? "DSTech Smart (Non-PT)" : selectedEntity === "PT" ? "PT. DSTech Smart Perkasa" : "Konsolidasi Seluruh Entitas"}
+                    Periode: {pnlReportCalculation.periodLabel} • {selectedEntity === "NON_PT" ? "DSTech Smart (Non-PT)" : selectedEntity === "PT" ? "PT. DSTech Smart Perkasa" : "Konsolidasi Seluruh Entitas"}
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPnlPrintModalOpen(true);
-                      setTimeout(() => {
-                        handleDownloadPdf(
-                          "#print-pnl-sheet",
-                          `LAPORAN_LABA_RUGI_${selectedEntity === "NON_PT" ? "NON_PT" : "PT"}_OKTOBER_2026.pdf`
-                        );
-                      }, 500);
-                    }}
-                    disabled={isDownloadingPdf}
-                    title="Unduh Berkas PDF Laporan Laba Rugi Langsung"
-                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm disabled:opacity-50"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsPnlPrintModalOpen(true)}
-                    className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Pratinjau Cetak Resmi A4</span>
-                  </button>
+                <div className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold font-mono">
+                  {pnlReportCalculation.scopedSales.length} Faktur Penjualan • {pnlReportCalculation.scopedPurchases.length} PO Belanja
                 </div>
               </div>
 
@@ -7645,12 +8274,12 @@ export default function AdminFinanceERPPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm font-black text-blue-400 border-b border-white/10 pb-1">
                     <span>1. PENDAPATAN OPERASIONAL</span>
-                    <span>{formatRupiah(displaySummary.totalSalesRevenue)}</span>
+                    <span>{formatRupiah(pnlReportCalculation.totalRevenue)}</span>
                   </div>
                   <div className="pl-4 space-y-1 text-slate-300">
                     <div className="flex items-center justify-between">
-                      <span>• Penjualan Perangkat CCTV, Access Control, IoT & Jaringan</span>
-                      <span>{formatRupiah(displaySummary.totalSalesRevenue)}</span>
+                      <span>• Penjualan Perangkat CCTV, Access Control, IoT & Jaringan ({pnlReportCalculation.scopedSales.length} Transaksi)</span>
+                      <span>{formatRupiah(pnlReportCalculation.totalRevenue)}</span>
                     </div>
                   </div>
                 </div>
@@ -7659,12 +8288,12 @@ export default function AdminFinanceERPPage() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm font-black text-amber-400 border-b border-white/10 pb-1">
                     <span>2. HARGA POKOK PENJUALAN (HPP & BELANJA STOK)</span>
-                    <span>({formatRupiah(displaySummary.totalPurchasesCost)})</span>
+                    <span>({formatRupiah(pnlReportCalculation.totalHpp)})</span>
                   </div>
                   <div className="pl-4 space-y-1 text-slate-300">
                     <div className="flex items-center justify-between">
-                      <span>• Pembelian Stok Kamera IP, NVR, Storage & Kabel Belden</span>
-                      <span>({formatRupiah(displaySummary.totalPurchasesCost)})</span>
+                      <span>• Pembelian Stok Kamera IP, NVR, Storage & Aksesoris ({pnlReportCalculation.scopedPurchases.length} Order)</span>
+                      <span>({formatRupiah(pnlReportCalculation.totalHpp)})</span>
                     </div>
                   </div>
                 </div>
@@ -7672,22 +8301,24 @@ export default function AdminFinanceERPPage() {
                 {/* LABA KOTOR */}
                 <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between text-sm font-black text-white">
                   <span>LABA KOTOR (GROSS PROFIT)</span>
-                  <span className="text-emerald-400">{formatRupiah(displaySummary.grossProfit)}</span>
+                  <span className="text-emerald-400">{formatRupiah(pnlReportCalculation.grossProfit)}</span>
                 </div>
 
                 {/* 3. Beban Operasional */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm font-black text-red-400 border-b border-white/10 pb-1">
                     <span>3. BEBAN OPERASIONAL & UMUM</span>
-                    <span>({formatRupiah(displaySummary.totalOperatingExpenses)})</span>
+                    <span>({formatRupiah(pnlReportCalculation.totalExpenses)})</span>
                   </div>
                   <div className="pl-4 space-y-1.5 text-slate-300">
-                    {expenses.map((exp) => (
-                      <div key={exp.id} className="flex items-center justify-between">
-                        <span>• {exp.category}</span>
-                        <span>({formatRupiah(exp.amount)})</span>
-                      </div>
-                    ))}
+                    {expenses
+                      .filter((exp) => !pnlSearchQuery || exp.category.toLowerCase().includes(pnlSearchQuery.toLowerCase()))
+                      .map((exp) => (
+                        <div key={exp.id} className="flex items-center justify-between">
+                          <span>• {exp.category}</span>
+                          <span>({formatRupiah(exp.amount)})</span>
+                        </div>
+                      ))}
                   </div>
                 </div>
 
@@ -7698,7 +8329,7 @@ export default function AdminFinanceERPPage() {
                     <span>LABA BERSIH USAHA (NET OPERATING PROFIT)</span>
                   </div>
                   <span className="text-xl font-black text-emerald-400">
-                    {formatRupiah(displaySummary.netProfit)}
+                    {formatRupiah(pnlReportCalculation.netProfit)}
                   </span>
                 </div>
               </div>
@@ -7709,58 +8340,142 @@ export default function AdminFinanceERPPage() {
         {/* TAB 5: BUKU ARUS KAS (CASH FLOW) */}
         {activeTab === "cash_flow" && (
           <div className="space-y-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
-                  <p className="text-[10px] font-bold text-emerald-700 uppercase">Kas Masuk (IN)</p>
-                  <p className="text-sm font-black text-emerald-800">{formatRupiah(displaySummary.totalCashIn)}</p>
-                </div>
-                <div className="p-3 rounded-2xl bg-red-50 border border-red-200">
-                  <p className="text-[10px] font-bold text-red-700 uppercase">Kas Keluar (OUT)</p>
-                  <p className="text-sm font-black text-red-800">{formatRupiah(displaySummary.totalCashOut)}</p>
-                </div>
-                <div className={`p-3 rounded-2xl border ${displaySummary.currentCashBalance >= 0 ? "bg-blue-50 border-blue-200" : "bg-rose-50 border-rose-200"}`}>
-                  <p className="text-[10px] font-bold text-slate-600 uppercase">Saldo Kas Berjalan</p>
-                  <p className={`text-sm font-black ${displaySummary.currentCashBalance >= 0 ? "text-blue-900" : "text-rose-700"}`}>
-                    {formatRupiah(displaySummary.currentCashBalance)}
-                  </p>
-                </div>
+            {/* Metrik Ringkasan Arus Kas (Terfilter Tanggal & Akun) */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-2xs">
+                <p className="text-[10px] font-bold text-emerald-700 uppercase">Kas Masuk (IN)</p>
+                <p className="text-base font-black text-emerald-800">{formatRupiah(cashFlowMetrics.totalIn)}</p>
+                <p className="text-[9px] text-emerald-600 font-medium mt-0.5">{filteredAndSortedCashFlow.filter(c => c.type === "IN").length} Transaksi</p>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-red-50 border border-red-200 shadow-2xs">
+                <p className="text-[10px] font-bold text-red-700 uppercase">Kas Keluar (OUT)</p>
+                <p className="text-base font-black text-red-800">{formatRupiah(cashFlowMetrics.totalOut)}</p>
+                <p className="text-[9px] text-red-600 font-medium mt-0.5">{filteredAndSortedCashFlow.filter(c => c.type === "OUT").length} Transaksi</p>
+              </div>
+              <div className={`p-3.5 rounded-2xl border shadow-2xs ${cashFlowMetrics.balance >= 0 ? "bg-blue-50 border-blue-200" : "bg-rose-50 border-rose-200"}`}>
+                <p className="text-[10px] font-bold text-slate-600 uppercase">Saldo Kas Periode Ini</p>
+                <p className={`text-base font-black ${cashFlowMetrics.balance >= 0 ? "text-blue-900" : "text-rose-700"}`}>
+                  {formatRupiah(cashFlowMetrics.balance)}
+                </p>
+                <p className="text-[9px] text-slate-500 font-medium mt-0.5">{cashFlowMetrics.count} Total Mutasi</p>
+              </div>
+            </div>
+
+            {/* Top Control Bar Buku Arus Kas */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+              {/* Pencarian Keterangan / Pihak Terkait / Ref */}
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="Cari keterangan arus kas, kategori, kontak, atau no bukti..."
+                  value={cashSearchQuery}
+                  onChange={(e) => setCashSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none bg-slate-50/50"
+                />
+                {cashSearchQuery && (
+                  <button
+                    onClick={() => setCashSearchQuery("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
 
+              {/* Kelompok Filter Tanggal, Sortir, Akun Bank, dan Tombol Form Input */}
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase whitespace-nowrap">Filter Akun:</span>
+                {/* Filter Periode Tanggal */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Tanggal:</span>
+                  <select
+                    value={cashDateFilter}
+                    onChange={(e) => setCashDateFilter(e.target.value as DateFilterPeriod)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="ALL">📅 Semua Tanggal</option>
+                    <option value="TODAY">⚡ Hari Ini</option>
+                    <option value="THIS_MONTH">📆 Bulan Ini</option>
+                    <option value="LAST_MONTH">⏪ Bulan Lalu</option>
+                    <option value="THIS_YEAR">🗓️ Tahun Ini</option>
+                    <option value="CUSTOM">🎯 Rentang Kustom...</option>
+                  </select>
+                </div>
+
+                {/* Input Rentang Kustom jika dipilih */}
+                {cashDateFilter === "CUSTOM" && (
+                  <div className="flex items-center gap-1.5 bg-purple-50/80 border border-purple-200 rounded-xl px-2.5 py-1 text-xs">
+                    <input
+                      type="date"
+                      value={cashStartDate}
+                      onChange={(e) => setCashStartDate(e.target.value)}
+                      className="bg-white border border-purple-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Mulai"
+                    />
+                    <span className="text-purple-600 font-black">s/d</span>
+                    <input
+                      type="date"
+                      value={cashEndDate}
+                      onChange={(e) => setCashEndDate(e.target.value)}
+                      className="bg-white border border-purple-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                      title="Tanggal Selesai"
+                    />
+                  </div>
+                )}
+
+                {/* Dropdown Sortir Tanggal */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <span className="text-slate-400 font-semibold shrink-0">Sortir:</span>
+                  <select
+                    value={cashSortBy}
+                    onChange={(e) => setCashSortBy(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                  >
+                    <option value="date_desc">📅 Tanggal Terbaru</option>
+                    <option value="date_asc">📅 Tanggal Terlama</option>
+                    <option value="amount_desc">💰 Nominal Terbesar</option>
+                    <option value="amount_asc">💰 Nominal Terkecil</option>
+                  </select>
+                </div>
+
+                {/* Filter Rekening Akun */}
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-xl text-xs">
+                  <span className="text-slate-400 font-semibold shrink-0">Akun:</span>
                   <select
                     value={cashAccountFilter}
                     onChange={(e) => setCashAccountFilter(e.target.value)}
                     className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
                   >
-                    <option value="ALL">Semua Rekening & Kas ({scopedCounts.cashFlow})</option>
+                    <option value="ALL">Semua Akun</option>
                     {bankAccounts
                       .filter((b) => selectedEntity === "ALL" || (b.entityType || "PT") === selectedEntity || b.entityType === "ALL")
                       .map((b) => (
                         <option key={b.id} value={b.bankName}>
-                          {b.bankName} - {b.accountNumber} ({b.accountHolder})
+                          {b.bankName} - {b.accountNumber}
                         </option>
                       ))}
                     <option value="TUNAI">Kas Tunai / Petty Cash</option>
                   </select>
                 </div>
 
+                {/* Tombol Kelola Rekening Bank */}
                 <button
                   type="button"
                   onClick={() => setIsBankAccountsModalOpen(true)}
-                  className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-dstech-blue font-bold text-xs flex items-center gap-1.5 border border-blue-200 cursor-pointer transition-colors"
+                  className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-dstech-blue font-bold text-xs flex items-center gap-1 border border-blue-200 cursor-pointer transition-colors"
                   title="Kelola Rekening Bank Resmi"
                 >
                   <Landmark className="w-3.5 h-3.5" />
-                  <span>Rekening Bank ({bankAccounts.length})</span>
+                  <span className="hidden xl:inline">Rekening Bank</span>
                 </button>
 
+                {/* Tombol Form Input Utama */}
                 <button
                   type="button"
                   onClick={() => handleOpenNewCashModal("IN")}
-                  className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   <span>+ Catat Transaksi Kas</span>
@@ -7782,21 +8497,16 @@ export default function AdminFinanceERPPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {cashFlow
-                    .filter((cash) => {
-                      const matchEntity = selectedEntity === "ALL" || (cash.businessEntity || "PT") === selectedEntity;
-                      if (!matchEntity) return false;
-                      if (cashAccountFilter === "ALL") return true;
-                      if (cashAccountFilter === "TUNAI") {
-                        return (
-                          cash.account.toLowerCase().includes("tunai") ||
-                          cash.account.toLowerCase().includes("kas kecil") ||
-                          cash.account.toLowerCase().includes("petty")
-                        );
-                      }
-                      return cash.account.toLowerCase().includes(cashAccountFilter.toLowerCase());
-                    })
-                    .map((cash) => (
+                  {filteredAndSortedCashFlow.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="p-8 text-center text-slate-400">
+                        <Wallet className="w-10 h-10 mx-auto text-slate-300 mb-2" />
+                        <p className="font-bold text-slate-600">Tidak ada transaksi Arus Kas yang sesuai filter</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Coba ubah kata kunci pencarian, rentang tanggal, atau filter akun kas di atas.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAndSortedCashFlow.map((cash) => (
                       <tr key={cash.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="p-3 font-medium text-slate-500 whitespace-nowrap">{cash.date}</td>
                         <td className="p-3 whitespace-nowrap">
@@ -7900,7 +8610,8 @@ export default function AdminFinanceERPPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
