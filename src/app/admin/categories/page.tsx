@@ -24,11 +24,13 @@ import {
   ArrowRight
 } from "lucide-react";
 import Link from "next/link";
+import { Building2, Store } from "lucide-react";
 
 export interface DstechSubCategory {
   id: string;
   name: string;
   slug: string;
+  entityType?: "PT" | "NON_PT";
 }
 
 export interface DstechCategory {
@@ -37,6 +39,7 @@ export interface DstechCategory {
   slug: string;
   icon?: string;
   description?: string;
+  entityType?: "PT" | "NON_PT";
   subCategories: DstechSubCategory[];
   productCount?: number;
 }
@@ -56,6 +59,7 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<DstechCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEntityTab, setSelectedEntityTab] = useState<"ALL" | "PT" | "NON_PT">("ALL");
 
   // Modals
   const [isAddCatModalOpen, setIsAddCatModalOpen] = useState(false);
@@ -75,10 +79,16 @@ export default function CategoriesPage() {
   } | null>(null);
 
   // Form State
-  const [catForm, setCatForm] = useState({
+  const [catForm, setCatForm] = useState<{
+    name: string;
+    icon: string;
+    description: string;
+    entityType: "PT" | "NON_PT";
+  }>({
     name: "",
     icon: "Shield",
     description: "",
+    entityType: "PT",
   });
   const [subForm, setSubForm] = useState({
     name: "",
@@ -115,27 +125,37 @@ export default function CategoriesPage() {
     fetchCategories();
   }, []);
 
-  // Filter categories by search
+  // Filter categories by entity & search
   const filteredCategories = useMemo(() => {
-    if (!searchQuery.trim()) return categories;
+    let result = categories;
+    if (selectedEntityTab === "PT") {
+      result = result.filter((c) => (c.entityType || "PT") === "PT");
+    } else if (selectedEntityTab === "NON_PT") {
+      result = result.filter((c) => c.entityType === "NON_PT");
+    }
+
+    if (!searchQuery.trim()) return result;
     const q = searchQuery.toLowerCase();
-    return categories.filter((cat) => {
+    return result.filter((cat) => {
       const matchCat =
         cat.name.toLowerCase().includes(q) ||
         (cat.description && cat.description.toLowerCase().includes(q));
       const matchSub = cat.subCategories?.some((s) => s.name.toLowerCase().includes(q));
       return matchCat || matchSub;
     });
-  }, [categories, searchQuery]);
+  }, [categories, searchQuery, selectedEntityTab]);
 
   // Statistics
+  const countPT = useMemo(() => categories.filter((c) => (c.entityType || "PT") === "PT").length, [categories]);
+  const countNonPT = useMemo(() => categories.filter((c) => c.entityType === "NON_PT").length, [categories]);
+
   const totalSubCategories = useMemo(() => {
-    return categories.reduce((acc, c) => acc + (c.subCategories?.length || 0), 0);
-  }, [categories]);
+    return filteredCategories.reduce((acc, c) => acc + (c.subCategories?.length || 0), 0);
+  }, [filteredCategories]);
 
   const totalProducts = useMemo(() => {
-    return categories.reduce((acc, c) => acc + (c.productCount || 0), 0);
-  }, [categories]);
+    return filteredCategories.reduce((acc, c) => acc + (c.productCount || 0), 0);
+  }, [filteredCategories]);
 
   // Handle Add Category
   const handleAddCategory = async (e: React.FormEvent) => {
@@ -154,13 +174,14 @@ export default function CategoriesPage() {
           name: catForm.name.trim(),
           icon: catForm.icon,
           description: catForm.description.trim(),
+          entityType: catForm.entityType || "PT",
         }),
       });
       const json = await res.json();
       if (res.ok && json.success) {
         showToast("Kategori utama berhasil ditambahkan!");
         setIsAddCatModalOpen(false);
-        setCatForm({ name: "", icon: "Shield", description: "" });
+        setCatForm({ name: "", icon: "Shield", description: "", entityType: "PT" });
         fetchCategories();
       } else {
         showToast(json.message || "Gagal membuat kategori", "error");
@@ -187,6 +208,7 @@ export default function CategoriesPage() {
           name: catForm.name.trim(),
           icon: catForm.icon,
           description: catForm.description.trim(),
+          entityType: catForm.entityType || "PT",
         }),
       });
       const json = await res.json();
@@ -373,7 +395,12 @@ export default function CategoriesPage() {
           </Link>
           <button
             onClick={() => {
-              setCatForm({ name: "", icon: "Shield", description: "" });
+              setCatForm({
+                name: "",
+                icon: "Shield",
+                description: "",
+                entityType: selectedEntityTab === "NON_PT" ? "NON_PT" : "PT",
+              });
               setIsAddCatModalOpen(true);
             }}
             className="h-12 px-6 rounded-2xl bg-dstech-blue text-white font-black text-xs uppercase tracking-wider hover:bg-dstech-red transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2 active:scale-95"
@@ -384,16 +411,31 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards: Pemisahan Entitas PT vs Non-PT */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Total Kategori</p>
-            <h3 className="text-3xl font-black text-slate-900 mt-1">{categories.length}</h3>
-            <p className="text-xs font-bold text-green-600 mt-1">Struktur Utama Terdaftar</p>
+            <p className="text-xs font-black text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5" /> Kategori PT
+            </p>
+            <h3 className="text-3xl font-black text-slate-900 mt-1">{countPT}</h3>
+            <p className="text-xs font-bold text-slate-400 mt-1">PT. DSTech Smart Perkasa</p>
           </div>
           <div className="w-14 h-14 rounded-2xl bg-blue-50 text-dstech-blue flex items-center justify-center">
-            <FolderTree className="w-7 h-7" />
+            <Building2 className="w-7 h-7" />
+          </div>
+        </div>
+
+        <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-xs font-black text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
+              <Store className="w-3.5 h-3.5" /> Kategori Non-PT
+            </p>
+            <h3 className="text-3xl font-black text-slate-900 mt-1">{countNonPT}</h3>
+            <p className="text-xs font-bold text-slate-400 mt-1">Toko Fisik / Ritel DSTech</p>
+          </div>
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <Store className="w-7 h-7" />
           </div>
         </div>
 
@@ -401,33 +443,69 @@ export default function CategoriesPage() {
           <div>
             <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Sub-Kategori</p>
             <h3 className="text-3xl font-black text-slate-900 mt-1">{totalSubCategories}</h3>
-            <p className="text-xs font-bold text-dstech-blue mt-1">Klasifikasi Spesifik</p>
+            <p className="text-xs font-bold text-dstech-blue mt-1">Klasifikasi Terinci</p>
           </div>
           <div className="w-14 h-14 rounded-2xl bg-red-50 text-dstech-red flex items-center justify-center">
             <Layers className="w-7 h-7" />
           </div>
         </div>
 
-        <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
+        <div className="p-6 rounded-3xl bg-slate-900 text-white shadow-xl shadow-slate-900/10 flex items-center justify-between">
           <div>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Produk Terkait</p>
-            <h3 className="text-3xl font-black text-slate-900 mt-1">{totalProducts}</h3>
-            <p className="text-xs font-bold text-slate-500 mt-1">Item dalam Katalog</p>
+            <p className="text-xs font-black text-white/50 uppercase tracking-wider">Katalog Produk</p>
+            <h3 className="text-3xl font-black text-white mt-1">{totalProducts}</h3>
+            <p className="text-xs font-bold text-green-400 mt-1">Item dalam Katalog</p>
           </div>
-          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+          <div className="w-14 h-14 rounded-2xl bg-white/10 text-white flex items-center justify-center">
             <Package className="w-7 h-7" />
           </div>
         </div>
+      </div>
 
-        <div className="p-6 rounded-3xl bg-slate-900 text-white shadow-xl shadow-slate-900/10 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-black text-white/50 uppercase tracking-wider">Status Integrasi</p>
-            <h3 className="text-2xl font-black text-white mt-1">Prefix dstech_</h3>
-            <p className="text-xs font-bold text-green-400 mt-1">Aman & Terisolasi 100%</p>
-          </div>
-          <div className="w-14 h-14 rounded-2xl bg-white/10 text-white flex items-center justify-center">
-            <Shield className="w-7 h-7" />
-          </div>
+      {/* Entity Selector Tab Bar & Search */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 bg-slate-100 rounded-3xl">
+        <div className="flex items-center gap-1.5 p-1 bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setSelectedEntityTab("ALL")}
+            className={`px-4 py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer whitespace-nowrap ${
+              selectedEntityTab === "ALL"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Semua ({categories.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedEntityTab("PT")}
+            className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              selectedEntityTab === "PT"
+                ? "bg-dstech-blue text-white shadow-md shadow-blue-500/20"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>🏢 PT. DSTech Smart Perkasa</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${selectedEntityTab === "PT" ? "bg-white/20" : "bg-blue-100 text-dstech-blue"}`}>
+              {countPT}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedEntityTab("NON_PT")}
+            className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              selectedEntityTab === "NON_PT"
+                ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Store className="w-4 h-4" />
+            <span>🏪 Non-PT / Toko DStech</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${selectedEntityTab === "NON_PT" ? "bg-white/20" : "bg-amber-100 text-amber-700"}`}>
+              {countNonPT}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -475,7 +553,12 @@ export default function CategoriesPage() {
           </p>
           <button
             onClick={() => {
-              setCatForm({ name: "", icon: "Shield", description: "" });
+              setCatForm({
+                name: "",
+                icon: "Shield",
+                description: "",
+                entityType: selectedEntityTab === "NON_PT" ? "NON_PT" : "PT",
+              });
               setIsAddCatModalOpen(true);
             }}
             className="mt-6 h-11 px-6 rounded-2xl bg-dstech-blue text-white font-bold text-xs uppercase tracking-wider hover:bg-dstech-red transition-all"
@@ -502,11 +585,20 @@ export default function CategoriesPage() {
                       <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">
                         {cat.id}
                       </span>
-                      <span className="text-xs font-bold bg-blue-100 text-dstech-blue px-2.5 py-0.5 rounded-full">
+                      {cat.entityType === "NON_PT" ? (
+                        <span className="text-[11px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                          <Store className="w-3 h-3 text-amber-600" /> Non-PT / Toko DStech
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-black bg-blue-100 text-blue-900 border border-blue-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-xs">
+                          <Building2 className="w-3 h-3 text-dstech-blue" /> PT. DSTech Smart Perkasa
+                        </span>
+                      )}
+                      <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-full">
                         {cat.subCategories?.length || 0} Sub-Kategori
                       </span>
                       {cat.productCount !== undefined && cat.productCount > 0 && (
-                        <span className="text-xs font-bold bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <span className="text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                           <Package className="w-3 h-3" /> {cat.productCount} Produk
                         </span>
                       )}
@@ -539,6 +631,7 @@ export default function CategoriesPage() {
                         name: cat.name,
                         icon: cat.icon || "Shield",
                         description: cat.description || "",
+                        entityType: cat.entityType || "PT",
                       });
                       setIsEditCatModalOpen(true);
                     }}
@@ -660,6 +753,50 @@ export default function CategoriesPage() {
             </div>
 
             <form onSubmit={handleAddCategory} className="space-y-5 mt-6">
+              {/* Pemilihan Entitas (PT vs Non-PT) */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
+                  Entitas Bisnis / Kepemilikan <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCatForm({ ...catForm, entityType: "PT" })}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      catForm.entityType === "PT"
+                        ? "bg-blue-50 border-dstech-blue text-dstech-blue ring-2 ring-blue-300"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                      <Building2 className="w-4 h-4 text-dstech-blue" />
+                    </div>
+                    <div>
+                      <p className="font-black text-xs">PT. DSTech</p>
+                      <p className="text-[10px] text-slate-400">Proyek & Tender Resmi</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCatForm({ ...catForm, entityType: "NON_PT" })}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      catForm.entityType === "NON_PT"
+                        ? "bg-amber-50 border-amber-500 text-amber-700 ring-2 ring-amber-300"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                      <Store className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="font-black text-xs">Non-PT / Toko</p>
+                      <p className="text-[10px] text-slate-400">Ritel & Jasa Mandiri</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
                   Nama Kategori <span className="text-red-500">*</span>
@@ -755,6 +892,50 @@ export default function CategoriesPage() {
             </div>
 
             <form onSubmit={handleEditCategory} className="space-y-5 mt-6">
+              {/* Pemilihan Entitas (PT vs Non-PT) */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
+                  Entitas Bisnis / Kepemilikan <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setCatForm({ ...catForm, entityType: "PT" })}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      catForm.entityType === "PT"
+                        ? "bg-blue-50 border-dstech-blue text-dstech-blue ring-2 ring-blue-300"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                      <Building2 className="w-4 h-4 text-dstech-blue" />
+                    </div>
+                    <div>
+                      <p className="font-black text-xs">PT. DSTech</p>
+                      <p className="text-[10px] text-slate-400">Proyek & Tender Resmi</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCatForm({ ...catForm, entityType: "NON_PT" })}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      catForm.entityType === "NON_PT"
+                        ? "bg-amber-50 border-amber-500 text-amber-700 ring-2 ring-amber-300"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                      <Store className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="font-black text-xs">Non-PT / Toko</p>
+                      <p className="text-[10px] text-slate-400">Ritel & Jasa Mandiri</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
                   Nama Kategori <span className="text-red-500">*</span>

@@ -17,6 +17,7 @@ import {
   Loader2,
   ExternalLink,
   Building2,
+  Store,
   MapPin,
   Calendar,
   Layers,
@@ -57,6 +58,7 @@ export default function PortfoliosAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Semua Sektor");
+  const [selectedEntityTab, setSelectedEntityTab] = useState<"ALL" | "PT" | "NON_PT">("ALL");
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -66,10 +68,21 @@ export default function PortfoliosAdminPage() {
   const [selectedPortfolio, setSelectedPortfolio] = useState<PortfolioItem | null>(null);
 
   // Form State
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    title: string;
+    client: string;
+    category: string;
+    entityType: "PT" | "NON_PT";
+    location: string;
+    completionDate: string;
+    description: string;
+    image: string;
+    videoUrl: string;
+  }>({
     title: "",
     client: "",
     category: "Industrial",
+    entityType: "PT",
     location: "Cilegon, Banten",
     completionDate: "",
     description: "",
@@ -120,6 +133,11 @@ export default function PortfoliosAdminPage() {
   // Filtered list
   const filteredPortfolios = useMemo(() => {
     return portfolios.filter((p) => {
+      const matchEntity =
+        selectedEntityTab === "ALL" ||
+        (selectedEntityTab === "PT" && (p.entityType || "PT") === "PT") ||
+        (selectedEntityTab === "NON_PT" && p.entityType === "NON_PT");
+
       const matchSearch =
         p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -130,18 +148,21 @@ export default function PortfoliosAdminPage() {
         selectedCategory === "Semua Sektor" ||
         p.category.toLowerCase() === selectedCategory.toLowerCase();
 
-      return matchSearch && matchCategory;
+      return matchEntity && matchSearch && matchCategory;
     });
-  }, [portfolios, searchQuery, selectedCategory]);
+  }, [portfolios, searchQuery, selectedCategory, selectedEntityTab]);
 
   // Statistics
+  const countPT = useMemo(() => portfolios.filter((p) => (p.entityType || "PT") === "PT").length, [portfolios]);
+  const countNonPT = useMemo(() => portfolios.filter((p) => p.entityType === "NON_PT").length, [portfolios]);
+
   const stats = useMemo(() => {
-    const total = portfolios.length;
-    const withVideo = portfolios.filter((p) => p.videoUrl && p.videoUrl.trim() !== "").length;
-    const withPhoto = portfolios.filter((p) => p.image && p.image.trim() !== "").length;
-    const sectors = new Set(portfolios.map((p) => p.category)).size;
+    const total = filteredPortfolios.length;
+    const withVideo = filteredPortfolios.filter((p) => p.videoUrl && p.videoUrl.trim() !== "").length;
+    const withPhoto = filteredPortfolios.filter((p) => p.image && p.image.trim() !== "").length;
+    const sectors = new Set(filteredPortfolios.map((p) => p.category)).size;
     return { total, withVideo, withPhoto, sectors };
-  }, [portfolios]);
+  }, [filteredPortfolios]);
 
   // Handle Image Upload via /api/upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,6 +199,7 @@ export default function PortfoliosAdminPage() {
       title: "",
       client: "",
       category: "Industrial",
+      entityType: selectedEntityTab === "NON_PT" ? "NON_PT" : "PT",
       location: "Cilegon, Banten",
       completionDate: new Date().toISOString().slice(0, 7),
       description: "",
@@ -194,6 +216,7 @@ export default function PortfoliosAdminPage() {
       title: p.title,
       client: p.client,
       category: p.category,
+      entityType: p.entityType || "PT",
       location: p.location || "",
       completionDate: p.completionDate || "",
       description: p.description || "",
@@ -351,27 +374,31 @@ export default function PortfoliosAdminPage() {
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards: Pemisahan Entitas PT vs Non-PT */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Total Proyek</p>
-            <h3 className="text-3xl font-black text-slate-900 mt-1">{stats.total}</h3>
-            <p className="text-xs font-bold text-emerald-600 mt-1">Status Selesai</p>
+            <p className="text-xs font-black text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5" /> Portofolio PT
+            </p>
+            <h3 className="text-3xl font-black text-slate-900 mt-1">{countPT}</h3>
+            <p className="text-xs font-bold text-slate-400 mt-1">PT. DSTech Smart Perkasa</p>
           </div>
           <div className="w-14 h-14 rounded-2xl bg-blue-50 text-dstech-blue flex items-center justify-center">
-            <FolderKanban className="w-7 h-7" />
+            <Building2 className="w-7 h-7" />
           </div>
         </div>
 
         <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
           <div>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Sektor Klien</p>
-            <h3 className="text-3xl font-black text-slate-900 mt-1">{stats.sectors}</h3>
-            <p className="text-xs font-bold text-dstech-blue mt-1">Klasifikasi Industri</p>
+            <p className="text-xs font-black text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
+              <Store className="w-3.5 h-3.5" /> Portofolio Non-PT
+            </p>
+            <h3 className="text-3xl font-black text-slate-900 mt-1">{countNonPT}</h3>
+            <p className="text-xs font-bold text-slate-400 mt-1">Toko Fisik / Servis Toko</p>
           </div>
-          <div className="w-14 h-14 rounded-2xl bg-red-50 text-dstech-red flex items-center justify-center">
-            <Building2 className="w-7 h-7" />
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <Store className="w-7 h-7" />
           </div>
         </div>
 
@@ -388,13 +415,60 @@ export default function PortfoliosAdminPage() {
 
         <div className="p-6 rounded-3xl bg-slate-900 text-white shadow-xl shadow-slate-900/10 flex items-center justify-between">
           <div>
-            <p className="text-xs font-black text-white/50 uppercase tracking-wider">Dokumentasi Video</p>
-            <h3 className="text-3xl font-black text-emerald-400 mt-1">{stats.withVideo}</h3>
-            <p className="text-xs font-bold text-white/80 mt-1">Video YouTube / MP4</p>
+            <p className="text-xs font-black text-white/50 uppercase tracking-wider">Tampil Di Website</p>
+            <h3 className="text-2xl font-black text-white mt-1">Hanya Portofolio PT</h3>
+            <p className="text-xs font-bold text-green-400 mt-1">Publik Terisolasi 100%</p>
           </div>
           <div className="w-14 h-14 rounded-2xl bg-white/10 text-emerald-400 flex items-center justify-center">
             <Video className="w-7 h-7" />
           </div>
+        </div>
+      </div>
+
+      {/* Entity Selector Tab Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-2 bg-slate-100 rounded-3xl">
+        <div className="flex items-center gap-1.5 p-1 bg-white rounded-2xl shadow-sm border border-slate-200/60 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setSelectedEntityTab("ALL")}
+            className={`px-4 py-2.5 rounded-xl font-black text-xs transition-all cursor-pointer whitespace-nowrap ${
+              selectedEntityTab === "ALL"
+                ? "bg-slate-900 text-white shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            Semua Portofolio ({portfolios.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedEntityTab("PT")}
+            className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              selectedEntityTab === "PT"
+                ? "bg-dstech-blue text-white shadow-md shadow-blue-500/20"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Building2 className="w-4 h-4" />
+            <span>🏢 PT. DSTech Smart Perkasa</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${selectedEntityTab === "PT" ? "bg-white/20" : "bg-blue-100 text-dstech-blue"}`}>
+              {countPT}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedEntityTab("NON_PT")}
+            className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              selectedEntityTab === "NON_PT"
+                ? "bg-amber-600 text-white shadow-md shadow-amber-500/20"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            <Store className="w-4 h-4" />
+            <span>🏪 Non-PT / Toko DStech</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${selectedEntityTab === "NON_PT" ? "bg-white/20" : "bg-amber-100 text-amber-700"}`}>
+              {countNonPT}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -482,9 +556,20 @@ export default function PortfoliosAdminPage() {
                           )}
                         </div>
                         <div>
-                          <p className="text-[10px] font-black text-dstech-blue uppercase tracking-widest">
-                            {item.client}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-[10px] font-black text-dstech-blue uppercase tracking-widest">
+                              {item.client}
+                            </p>
+                            {item.entityType === "NON_PT" ? (
+                              <span className="text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Store className="w-2.5 h-2.5 text-amber-600" /> Non-PT / Toko
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-black bg-blue-100 text-blue-900 border border-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Building2 className="w-2.5 h-2.5 text-dstech-blue" /> PT. DSTech
+                              </span>
+                            )}
+                          </div>
                           <h4 className="font-bold text-slate-900 text-sm group-hover:text-dstech-red transition-colors">
                             {item.title}
                           </h4>
@@ -580,6 +665,50 @@ export default function PortfoliosAdminPage() {
             </div>
 
             <form onSubmit={handleAddSubmit} className="space-y-5 mt-6">
+              {/* Selector Entitas PT vs Non-PT */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
+                  Entitas Bisnis Proyek <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, entityType: "PT" })}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      formData.entityType === "PT"
+                        ? "bg-blue-50 border-dstech-blue text-dstech-blue ring-2 ring-blue-300"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                      <Building2 className="w-4 h-4 text-dstech-blue" />
+                    </div>
+                    <div>
+                      <p className="font-black text-xs">PT. DSTech</p>
+                      <p className="text-[10px] text-slate-400">Tampil di Web Utama</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, entityType: "NON_PT" })}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      formData.entityType === "NON_PT"
+                        ? "bg-amber-50 border-amber-500 text-amber-700 ring-2 ring-amber-300"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                      <Store className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="font-black text-xs">Non-PT / Toko</p>
+                      <p className="text-[10px] text-slate-400">Servis & Usaha Toko</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">
@@ -781,6 +910,50 @@ export default function PortfoliosAdminPage() {
             </div>
 
             <form onSubmit={handleEditSubmit} className="space-y-5 mt-6">
+              {/* Selector Entitas PT vs Non-PT */}
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
+                  Entitas Bisnis Proyek <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, entityType: "PT" })}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      formData.entityType === "PT"
+                        ? "bg-blue-50 border-dstech-blue text-dstech-blue ring-2 ring-blue-300"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                      <Building2 className="w-4 h-4 text-dstech-blue" />
+                    </div>
+                    <div>
+                      <p className="font-black text-xs">PT. DSTech</p>
+                      <p className="text-[10px] text-slate-400">Tampil di Web Utama</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, entityType: "NON_PT" })}
+                    className={`p-3 rounded-2xl border text-left flex items-center gap-3 transition-all cursor-pointer ${
+                      formData.entityType === "NON_PT"
+                        ? "bg-amber-50 border-amber-500 text-amber-700 ring-2 ring-amber-300"
+                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                      <Store className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="font-black text-xs">Non-PT / Toko</p>
+                      <p className="text-[10px] text-slate-400">Servis & Usaha Toko</p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-1.5">

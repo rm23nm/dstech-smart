@@ -32,9 +32,14 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
     const technician = searchParams.get("technician");
     const type = searchParams.get("type");
+    const entity = searchParams.get("entity");
     const query = searchParams.get("query")?.toLowerCase();
 
     let tasks = readTasks();
+
+    if (entity && entity !== "ALL") {
+      tasks = tasks.filter((t: any) => (t.entityType || "PT") === entity);
+    }
 
     if (status && status !== "Semua") {
       tasks = tasks.filter((t: any) => t.status?.toLowerCase() === status.toLowerCase());
@@ -83,6 +88,7 @@ export async function POST(request: Request) {
     const newTask = {
       id: `dstech_task_${Date.now()}`,
       ticketNumber: body.ticketNumber?.trim() || autoTicketNumber,
+      entityType: body.entityType === "NON_PT" ? "NON_PT" : "PT",
       type: body.type || "Preventive Maintenance",
       title: body.title?.trim() || "Kunjungan Pemeliharaan Rutin",
       client: body.client?.trim() || "Klien Umum",

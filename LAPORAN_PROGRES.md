@@ -68,7 +68,8 @@
 - **2026-10-21**: Integrasi Sinkronisasi Manajemen Proyek ERP ke Portofolio Publik Website (Opsi A: Tombol Kurasi & Publikasi Manual Proyek Selesai). Menyediakan alur resmi publikasi proyek yang telah selesai dikerjakan (`Completed`) dari dashboard Manajemen Proyek ERP ke Portofolio Publik website (`dstechsmart.com/portfolio` dan beranda), lengkap dengan modal formulir kurasi (judul proyek, klien, kategori instalasi, lokasi, deskripsi publik, foto hasil kerja & URL video YouTube dokumentasi), validasi input, pengiriman ke API `/api/portfolios` ber-prefix `dstech_port_`, serta indikator status publikasi pada Project Dossier.
 - **2026-10-21**: Modul Manajemen Penjadwalan & Operasional Lapangan Maintenance Mandiri Terpisah (`/admin/maintenance` & `/superadmin/maintenance`). Memisahkan pencatatan dan tata kelola pekerjaan pemeliharaan (Maintenance Rutin Berkala & Tiket Perbaikan/Troubleshooting) dari modul proyek utama agar alur kerja teknisi dan riwayat servis SLA tercatat mandiri tanpa membebani kalkulasi P&L proyek. Dilengkapi navigasi sidebar, tab kalender & daftar jadwal kunjungan, filter status & prioritas tiket, penugasan teknisi PIC, modal terbit surat tugas SPK maintenance, sinkronisasi ke backend `/api/employee/tasks` ber-prefix `dstech_task_`, dan integrasi real-time ke portal mobile teknisi `/employee`.
 - **2026-10-21**: Sistem Otomasi Laporan Foto Dokumentasi & Pergantian Part Siap Cetak Lampiran Faktur Tagihan A4 (Maintenance & Project). Menyediakan sistem pelaporan bukti fisik komprehensif bagi PIC teknisi dan admin: (1) Form upload foto cepat (bisa langsung dari kamera HP teknisi di lapangan atau file galeri) dengan pilihan kategori wajib: `📸 Foto Dokumentasi Pekerjaan` atau `⚙️ Foto Pergantian Part / Sparepart` beserta keterangan/caption rincian tindakan; (2) Galeri foto terstruktur pada tiket maintenance (`/admin/maintenance`), portal teknisi (`/employee`), dan berkas proyek (`/admin/finance` -> Project Dossier); (3) Generator otomatis Lembar Resmi A4 *"Lampiran Laporan Foto Dokumentasi & Pergantian Part"* ber-Kop Surat Resmi PT DSTech Smart Perkasa (`kop_surat_dstech.jpg`), lengkap dengan nomor dokumen legalitas penagihan, data klien & proyek/tiket, tata letak grid foto rapi ber-caption, perbandingan part rusak vs part baru, pernyataan legalitas, serta dual signature block (PIC Pengawas Klien & Project Manager/Teknisi DSTech) siap 1-klik cetak/simpan PDF untuk disandingkan langsung dengan Faktur Tagihan (Invoice) penagihan ke klien. Lolos validasi TypeScript 0 error, pengujian visual browser subagent, push GitHub commit `2d8412b`, dan live deploy sukses di VPS PM2 `dstech-main` (HTTP 200 OK).
-- **2026-10-21**: Penyatuan Dashboard Tunggal Admin & Pengalihan Penuh Rute Superadmin ke /admin (Opsi C). Mengeliminasi duplikasi portal dashboard ganda yang membingungkan: Menghapus dashboard terpisah `/superadmin` yang sebelumnya berisi data dummy/mock awal, menyelaraskan seluruh alur login (`/login` dan `/api/auth/login`) untuk role `SUPERADMIN` dan `ADMIN` langsung membuka portal operasional resmi `/admin` yang memuat data riil terintegrasi database MySQL, serta memasang auto-redirect menyeluruh pada layout `/superadmin` (termasuk sub-rute `/superadmin/finance`, `/superadmin/products`, `/superadmin/categories`, dll.) agar otomatis dialihkan ke rute `/admin/...` terkait secara instan dan mulus. Lolos validasi kompilasi TypeScript 0 error, pengujian visual browser subagent, push GitHub commit `3b53c26`, dan live deploy sukses di VPS PM2 `dstech-main`.
+- **2026-10-21**: Pemisahan Independen Kop Surat, Watermark, dan Rekening Bank Perusahaan (PT. DSTech Smart Perkasa vs Non-PT / Toko DStech). Menyediakan kontrol independen penuh di `/admin/finance` untuk masing-masing entitas: (1) Kop surat mandiri PT (`/kop_surat_dstech.jpg`) dan Non-PT (`/kop_surat_toko.jpg`); (2) Slider opasitas watermark terpisah; (3) Rekening bank terisolasi per entitas bisnis; (4) Lembar cetak dokumen keuangan (SPH, Faktur, PO, BAST Retur) otomatis memuat kop surat, watermark, dan legalitas sesuai entitas yang dipilih. Lolos validasi TypeScript, browser subagent, commit git `3fb738d`, dan sukses deploy ke VPS live.
+- **2026-10-21**: Pemisahan Total Entitas PT. DSTech Smart Perkasa vs Non-PT / Toko DStech pada Seluruh Modul Operasional (Kategori & Sub-Kategori, Produk, Portofolio Proyek, Stok & Gudang, Jadwal Maintenance) dan Isolasi Mutlak 100% Katalog Website Utama Publik (Hanya Menampilkan Entitas PT). Menuntaskan pemisahan entitas menyeluruh: (1) Manajemen Kategori (`/admin/categories`): Tab filter entitas (Semua, 🏢 PT, 🏪 Non-PT), KPI cards, badge entitas, dan selector entitas pada modal; (2) Manajemen Produk (`/admin/products`): Tab filter entitas, KPI cards, badge entitas, dan selector modal; (3) Portofolio Proyek (`/admin/portfolios`): Tab filter entitas, KPI cards, badge entitas, dan selector modal; (4) Manajemen Stok & Gudang (`/admin/inventory`): Tab filter entitas pada kartu stok real-time, badge entitas produk, dan KPI stok per entitas; (5) Jadwal & Tiket Maintenance (`/admin/maintenance`): Tab filter entitas tiket, badge entitas, selector modal formulir tugas, serta kop surat BAST A4 yang adaptif terhadap entitas tiket; (6) Website Utama Publik (`/`, `/shop`, `ProductSection.tsx`, `PortfolioSection.tsx`): Integrasi filter ketat `?entity=PT&isPublic=true` dan client-side guard `ptOnly` yang menjamin 100% tidak ada produk atau portofolio Non-PT yang bocor ke pengunjung website publik. Lolos validasi kompilasi TypeScript (`npx tsc --noEmit` 0 error), lolos pengujian visual browser subagent di seluruh modul admin dan e-store publik, disinkronkan ke repositori GitHub, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 
 
 
@@ -2359,7 +2360,60 @@
 
 ---
 
-### 77. Catatan Penting
+### 77. Tugas: Pemisahan Independen Kop Surat, Watermark, & Rekening Bank PT vs Non-PT (/admin/finance)
+- **Status**: Selesai & Deployed
+- **Penyelesaian**:
+  - Modal pengaturan dokumen di `/admin/finance` dilengkapi tab entitas untuk mengatur kop surat PT (`/kop_surat_dstech.jpg`) dan kop surat Non-PT (`/kop_surat_toko.jpg`).
+  - Slider opasitas watermark berdiri sendiri untuk PT dan Non-PT.
+  - Rekening bank dan rekening kas tunai dipisahkan dengan ketat per entitas bisnis.
+  - Lembar cetak dokumen keuangan (Faktur, SPH, PO, Retur) memuat kop surat dan watermark sesuai entitas aktif transaksi.
+  - Lolos TypeScript, browser test, push GitHub `3fb738d`, dan live VPS deploy.
+
+---
+
+### 78. Tugas: Pemisahan Total Entitas PT vs Non-PT pada Seluruh Modul Operasional & Isolasi Website Publik Hanya PT
+- **Permintaan Pengguna**:
+  1. *"Kategori dan sub kategori juga masih menyatu."*
+  2. *"walaupun dilakukan pemisahan semuanya, untuk yang tampil pada website utama adalah yang PT, jangan ada yang non PT"*
+  3. *"Manajemen Portofolio Proyek masih menyatu dengan PT, Manajemen stok juga masih menyatu, Jadwal mantenance masih menyatu, Produk managemen masih nyatu,"*
+- **Status**: Selesai (Completed & Terverifikasi Browser)
+- **Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1**: Backup file cadangan ke folder `_backup/*.bak_task81`.
+  - [x] **Langkah 2 (Kategori & Sub-Kategori)**:
+    - `src/data/dstech_categories.json`: ditambahkan `entityType: "PT"` (6 kategori korporat) dan `entityType: "NON_PT"` (2 kategori ritel toko).
+    - `src/app/api/categories/route.ts`: support query param `?entity=PT/NON_PT` dan persistensi di POST/PUT.
+    - `src/app/admin/categories/page.tsx`: tab filter entitas, counter KPI PT & Non-PT, badge entitas, dan selector modal.
+  - [x] **Langkah 3 (Manajemen Produk)**:
+    - `src/data/dstech_products.json`: ditambahkan `entityType: "PT"` (17 produk utama) dan `entityType: "NON_PT"` (produk ritel & servis toko).
+    - `src/app/api/products/route.ts`: support `?entity=PT/NON_PT` dan `?isPublic=true` (menjamin hanya PT untuk publik).
+    - `src/app/admin/products/page.tsx`: tab filter entitas, counter KPI, badge entitas, dan selector modal.
+  - [x] **Langkah 4 (Manajemen Portofolio Proyek)**:
+    - `src/data/dstech_portfolios.json`: ditambahkan `entityType: "PT"` dan item `entityType: "NON_PT"`.
+    - `src/app/api/portfolios/route.ts`: support filter `?entity=PT/NON_PT` dan `?isPublic=true`.
+    - `src/app/admin/portfolios/page.tsx`: tab filter entitas, counter KPI, badge entitas, dan selector modal.
+  - [x] **Langkah 5 (Manajemen Stok & Gudang)**:
+    - `src/app/admin/inventory/page.tsx`: tab filter entitas di kartu stok real-time, badge entitas produk di tabel stok, dan KPI counter PT vs Non-PT.
+  - [x] **Langkah 6 (Jadwal Maintenance)**:
+    - `src/data/dstech_employee_tasks.json`: ditambahkan `entityType: "PT"` dan task ritel toko `entityType: "NON_PT"`.
+    - `src/app/api/employee/tasks/route.ts`: support query `?entity=PT/NON_PT`, persistensi POST & PUT.
+    - `src/app/admin/maintenance/page.tsx`: tab filter entitas, badge entitas, selector modal, dan kop surat BAST A4 adaptif (PT vs Toko).
+  - [x] **Langkah 7 (Website Utama Publik - Isolasi Mutlak Hanya PT)**:
+    - `src/components/ProductSection.tsx`: fetch `/api/products?entity=PT&isPublic=true` dan client-side guard `ptOnly`.
+    - `src/components/PortfolioSection.tsx`: fetch `/api/portfolios?entity=PT&isPublic=true` dan client-side guard `ptOnly`.
+    - `src/app/shop/page.tsx`: fetch `/api/products?entity=PT&isPublic=true` dan client-side guard `ptOnly`.
+  - [x] **Langkah 8**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error).
+  - [x] **Langkah 9**: Uji coba visual menyeluruh melalui browser automation subagent:
+    - `/admin/categories` (Lolos - filter PT & Non-PT presisi).
+    - `/admin/products` (Lolos - filter PT & Non-PT presisi, badge Non-PT tampil).
+    - `/admin/portfolios` (Lolos - filter PT & Non-PT presisi, badge Non-PT tampil).
+    - `/admin/inventory` (Lolos - filter stok PT vs Non-PT presisi).
+    - `/admin/maintenance` (Lolos - filter tiket PT vs Non-PT presisi).
+    - `/shop` (Lolos 100% isolasi - hanya produk PT yang tampil, tidak ada satupun produk Non-PT yang bocor ke publik).
+  - [x] **Langkah 10**: Push ke repositori GitHub `rm23nm/dstech-smart` dan deploy ke live VPS.
+
+---
+
+### 79. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

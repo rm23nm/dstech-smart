@@ -6,6 +6,7 @@ export interface DstechSubCategory {
   id: string;
   name: string;
   slug: string;
+  entityType?: "PT" | "NON_PT";
 }
 
 export interface DstechCategory {
@@ -14,6 +15,7 @@ export interface DstechCategory {
   slug: string;
   icon?: string;
   description?: string;
+  entityType?: "PT" | "NON_PT";
   subCategories: DstechSubCategory[];
 }
 
@@ -53,10 +55,20 @@ function slugify(text: string): string {
     .replace(/\-\-+/g, "-");
 }
 
-// GET: Ambil semua kategori & subkategori (termasuk kalkulasi jumlah produk)
-export async function GET() {
+// GET: Ambil kategori & subkategori (mendukung filter query ?entity=PT atau ?entity=NON_PT)
+export async function GET(req: Request) {
   try {
-    const categories = readCategories();
+    const { searchParams } = new URL(req.url);
+    const entity = searchParams.get("entity"); // 'PT' | 'NON_PT' | null
+
+    let categories = readCategories();
+
+    // Filter berdasarkan entitas jika diminta
+    if (entity === "PT") {
+      categories = categories.filter((c) => (c.entityType || "PT") === "PT");
+    } else if (entity === "NON_PT") {
+      categories = categories.filter((c) => c.entityType === "NON_PT");
+    }
     
     // Hitung jumlah produk per kategori jika file produk tersedia
     let productCounts: Record<string, number> = {};
@@ -65,9 +77,13 @@ export async function GET() {
         const prodRaw = fs.readFileSync(PRODUCTS_FILE, "utf-8");
         const prods = JSON.parse(prodRaw);
         if (Array.isArray(prods)) {
-          prods.forEach((p: { category?: string }) => {
+          prods.forEach((p: { category?: string; entityType?: string }) => {
             if (p.category) {
               const catKey = p.category.toLowerCase().trim();
+              // Jika ada filter entity, hitung produk yang cocok entitasnya
+              if (entity && (p.entityType || "PT") !== entity) {
+                return;
+              }
               productCounts[catKey] = (productCounts[catKey] || 0) + 1;
             }
           });
@@ -82,6 +98,7 @@ export async function GET() {
       const count = productCounts[matchKey] || 0;
       return {
         ...cat,
+        entityType: cat.entityType || "PT",
         productCount: count,
       };
     });
@@ -129,6 +146,7 @@ export async function POST(req: Request) {
         id: `dstech_subcat_${Date.now()}`,
         name: subName,
         slug: slugify(subName),
+        entityType: body.entityType || categories[targetCatIndex].entityType || "PT",
       };
 
       if (!Array.isArray(categories[targetCatIndex].subCategories)) {
@@ -170,6 +188,7 @@ export async function POST(req: Request) {
       slug: slugify(catName),
       icon: body.icon?.trim() || "FolderTree",
       description: body.description?.trim() || "",
+      entityType: body.entityType === "NON_PT" ? "NON_PT" : "PT",
       subCategories: Array.isArray(body.subCategories) ? body.subCategories : [],
     };
 
@@ -228,7 +247,7 @@ export async function PUT(req: Request) {
     }
 
     // Skenario 2: Edit Kategori Utama
-    const { id, name, icon, description } = body;
+    const { id, name, icon, description, entityType } = body;
     const targetIndex = categories.findIndex((c) => c.id === id);
     if (targetIndex === -1) {
       return NextResponse.json(
@@ -243,6 +262,7 @@ export async function PUT(req: Request) {
     }
     if (icon !== undefined) categories[targetIndex].icon = icon;
     if (description !== undefined) categories[targetIndex].description = description.trim();
+    if (entityType === "PT" || entityType === "NON_PT") categories[targetIndex].entityType = entityType;
 
     writeCategories(categories);
     return NextResponse.json({

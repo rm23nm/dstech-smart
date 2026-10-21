@@ -106,15 +106,16 @@ export default function PortfolioSection() {
   const [selectedCategory, setSelectedCategory] = useState<string>("Semua");
   const [activeVideo, setActiveVideo] = useState<{ title: string; client: string; videoUrl: string } | null>(null);
 
-  // Fetch dynamic portfolios from backend API
+  // Fetch dynamic portfolios from backend API (Hanya Entitas PT untuk Website Publik)
   useEffect(() => {
     async function loadPortfolios() {
       try {
-        const res = await fetch("/api/portfolios");
+        const res = await fetch("/api/portfolios?entity=PT&isPublic=true");
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
-            setPortfolios(data);
+            const ptOnly = data.filter((item: any) => !item.entityType || item.entityType === "PT");
+            setPortfolios(ptOnly);
           }
         }
       } catch (err) {

@@ -168,13 +168,14 @@ export default function ProductSection() {
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null);
 
-  // Fetch dynamic products from /api/products
+  // Fetch dynamic products from /api/products (Hanya Entitas PT untuk Website Publik)
   useEffect(() => {
-    fetch("/api/products?t=" + Date.now())
+    fetch("/api/products?entity=PT&isPublic=true&t=" + Date.now())
       .then((res) => res.json())
       .then((json) => {
         if (json && json.success && Array.isArray(json.data)) {
-          setProducts(json.data);
+          const ptOnly = json.data.filter((p: any) => !p.entityType || p.entityType === "PT");
+          setProducts(ptOnly);
         }
       })
       .catch((err) => console.error("Gagal memuat produk beranda:", err))

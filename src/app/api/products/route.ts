@@ -123,15 +123,27 @@ function writeProducts(products: unknown[]) {
   }
 }
 
-export async function GET() {
-  const products = readProducts();
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const entity = searchParams.get("entity"); // 'PT' | 'NON_PT' | 'ALL' | null
+  const isPublic = searchParams.get("public") === "true";
+
+  let products = readProducts();
+
+  // Aturan Ketat: Untuk website publik atau query entity=PT, HANYA tampilkan PT!
+  if (isPublic || entity === "PT") {
+    products = products.filter((p: { entityType?: string }) => (p.entityType || "PT") === "PT");
+  } else if (entity === "NON_PT") {
+    products = products.filter((p: { entityType?: string }) => p.entityType === "NON_PT");
+  }
+
   return NextResponse.json({ success: true, data: products });
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, category, subCategory, price, stock, commission, commissionType, desc, image } = body;
+    const { name, category, subCategory, price, stock, commission, commissionType, desc, image, entityType } = body;
 
     if (!name || name.trim() === "") {
       return NextResponse.json({ success: false, message: "Nama produk wajib diisi" }, { status: 400 });
@@ -147,6 +159,7 @@ export async function POST(req: Request) {
       name: name.trim(),
       category: category?.trim() || "Security System",
       subCategory: subCategory?.trim() || "",
+      entityType: entityType === "NON_PT" ? "NON_PT" : "PT",
       price: parsedPrice,
       stock: parsedStock,
       unit: body.unit?.trim() || "Unit",
@@ -177,7 +190,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, category, subCategory, price, stock, commission, commissionType, desc, image, unit, warehouseStock } = body;
+    const { id, name, category, subCategory, price, stock, commission, commissionType, desc, image, unit, warehouseStock, entityType } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, message: "ID produk wajib disertakan" }, { status: 400 });
@@ -199,6 +212,7 @@ export async function PUT(req: Request) {
       name: name !== undefined ? name.trim() : products[index].name,
       category: category !== undefined ? category.trim() : products[index].category,
       subCategory: subCategory !== undefined ? subCategory.trim() : (products[index].subCategory || ""),
+      entityType: entityType === "NON_PT" || entityType === "PT" ? entityType : (products[index].entityType || "PT"),
       price: parsedPrice,
       stock: parsedStock,
       unit: unit !== undefined ? unit.trim() : (products[index].unit || "Unit"),

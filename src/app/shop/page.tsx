@@ -145,14 +145,15 @@ export default function ShopPage() {
     }
   }, []);
 
-  // Fetch live products from /api/products
+  // Fetch live products from /api/products (Hanya Entitas PT untuk Website Publik)
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/products?t=" + Date.now());
+      const res = await fetch("/api/products?entity=PT&isPublic=true&t=" + Date.now());
       const data = await res.json();
       if (data && data.success && Array.isArray(data.data) && data.data.length > 0) {
-        setProducts(data.data);
+        const ptOnly = data.data.filter((p: any) => !p.entityType || p.entityType === "PT");
+        setProducts(ptOnly);
       }
     } catch (err) {
       console.error("Gagal memuat produk dari API:", err);

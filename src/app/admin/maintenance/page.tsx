@@ -52,6 +52,7 @@ export interface TaskPhoto {
 interface MaintenanceTask {
   id: string;
   ticketNumber?: string;
+  entityType?: "PT" | "NON_PT";
   type?: string;
   title: string;
   client: string;
@@ -126,6 +127,7 @@ export default function MaintenancePage() {
 
   // Filter States
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedEntityTab, setSelectedEntityTab] = useState<"ALL" | "PT" | "NON_PT">("ALL");
   const [filterStatus, setFilterStatus] = useState("Semua");
   const [filterType, setFilterType] = useState("Semua");
   const [filterTechnician, setFilterTechnician] = useState("Semua");
@@ -165,6 +167,7 @@ export default function MaintenancePage() {
   // Form State
   const [formData, setFormData] = useState({
     ticketNumber: "",
+    entityType: "PT" as "PT" | "NON_PT",
     type: "Preventive Maintenance",
     title: "",
     client: "",
@@ -274,6 +277,7 @@ export default function MaintenancePage() {
 
     setFormData({
       ticketNumber: autoTicket,
+      entityType: selectedEntityTab === "NON_PT" ? "NON_PT" : "PT",
       type: "Preventive Maintenance",
       title: "Maintenance & Pembersihan Rutin Kamera CCTV",
       client: clients[0]?.name || "PT. Krakatau Posco Energy",
@@ -305,6 +309,7 @@ export default function MaintenancePage() {
     setEditingId(task.id);
     setFormData({
       ticketNumber: task.ticketNumber || "",
+      entityType: task.entityType || "PT",
       type: task.type || "Preventive Maintenance",
       title: task.title,
       client: task.client,
@@ -552,6 +557,10 @@ export default function MaintenancePage() {
 
   // Filtered Tasks
   const filteredTasks = tasks.filter((t) => {
+    // Filter Entitas
+    if (selectedEntityTab === "PT" && (t.entityType || "PT") !== "PT") return false;
+    if (selectedEntityTab === "NON_PT" && t.entityType !== "NON_PT") return false;
+
     const matchSearch =
       searchQuery === "" ||
       t.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -569,6 +578,8 @@ export default function MaintenancePage() {
 
   // KPI Calculations
   const totalCount = tasks.length;
+  const countPT = tasks.filter((t) => (t.entityType || "PT") === "PT").length;
+  const countNonPT = tasks.filter((t) => t.entityType === "NON_PT").length;
   const pendingCount = tasks.filter((t) => t.status === "Pending").length;
   const inProgressCount = tasks.filter((t) => t.status === "In Progress").length;
   const completedCount = tasks.filter((t) => t.status === "Completed").length;
@@ -671,6 +682,53 @@ export default function MaintenancePage() {
           <p className="text-2xl font-black text-rose-800">{urgentCount}</p>
           <span className="text-[10px] text-rose-600/80 block">Prioritas Urgent / High</span>
         </div>
+      </div>
+
+      {/* ENTITY TAB SWITCHER (PT vs Non-PT) */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/80 w-fit">
+        <button
+          type="button"
+          onClick={() => setSelectedEntityTab("ALL")}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            selectedEntityTab === "ALL"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          Semua Tiket ({totalCount})
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedEntityTab("PT")}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            selectedEntityTab === "PT"
+              ? "bg-dstech-blue text-white shadow-sm"
+              : "text-slate-600 hover:text-dstech-blue"
+          }`}
+        >
+          <span>🏢 PT. DSTech Smart Perkasa</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+            selectedEntityTab === "PT" ? "bg-white/20 text-white" : "bg-blue-100 text-dstech-blue"
+          }`}>
+            {countPT}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setSelectedEntityTab("NON_PT")}
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            selectedEntityTab === "NON_PT"
+              ? "bg-purple-600 text-white shadow-sm"
+              : "text-slate-600 hover:text-purple-600"
+          }`}
+        >
+          <span>🏪 Non-PT / Toko DStech</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+            selectedEntityTab === "NON_PT" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-700"
+          }`}>
+            {countNonPT}
+          </span>
+        </button>
       </div>
 
       {/* SEARCH & FILTERS BAR */}
@@ -823,6 +881,15 @@ export default function MaintenancePage() {
                         <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono border border-slate-200">
                           {task.ticketNumber || task.id}
                         </span>
+                        {task.entityType === "NON_PT" ? (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200">
+                            🏪 Non-PT
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-md bg-blue-50 text-dstech-blue border border-blue-200">
+                            🏢 PT
+                          </span>
+                        )}
                         <span
                           className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase ${
                             task.type === "Corrective Maintenance"
@@ -1032,6 +1099,39 @@ export default function MaintenancePage() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              {/* Selector Entitas PT vs Non-PT */}
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <label className="block text-[11px] font-black text-slate-700 mb-1.5 uppercase tracking-wider">
+                  Entitas Bisnis / Pelaksana:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, entityType: "PT" })}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      (formData.entityType || "PT") === "PT"
+                        ? "bg-blue-50 border-dstech-blue text-dstech-blue font-bold shadow-xs"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="text-xs font-bold">🏢 PT. DSTech Smart Perkasa</p>
+                    <p className="text-[10px] opacity-75 mt-0.5">Kontrak Pemeliharaan Korporat & Industri</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, entityType: "NON_PT" })}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      formData.entityType === "NON_PT"
+                        ? "bg-purple-50 border-purple-600 text-purple-700 font-bold shadow-xs"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <p className="text-xs font-bold">🏪 Non-PT / Toko DStech</p>
+                    <p className="text-[10px] opacity-75 mt-0.5">Servis Perorangan, Workshop & Retail</p>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 {/* Tipe Pekerjaan */}
                 <div>
@@ -1631,7 +1731,9 @@ export default function MaintenancePage() {
               id="printable-bast-maintenance"
               className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 text-slate-800 space-y-6 relative shadow-md font-sans"
               style={{
-                backgroundImage: letterheadEnabled ? "url('/kop_surat_dstech.jpg')" : "none",
+                backgroundImage: letterheadEnabled
+                  ? `url('${selectedTaskForPrint.entityType === "NON_PT" ? "/kop_surat_toko.jpg" : "/kop_surat_dstech.jpg"}')`
+                  : "none",
                 backgroundSize: "100% 100%",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "top center",
@@ -1643,17 +1745,27 @@ export default function MaintenancePage() {
               {!letterheadEnabled && (
                 <div className="flex items-center justify-between border-b-2 border-slate-800 pb-4">
                   <div>
-                    <h2 className="text-xl font-black text-slate-900 tracking-tight">PT. DSTECH SMART PERKASA</h2>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">
+                      {selectedTaskForPrint.entityType === "NON_PT"
+                        ? "TOKO DSTECH / WORKSHOP KOMPUTER & CCTV"
+                        : "PT. DSTECH SMART PERKASA"}
+                    </h2>
                     <p className="text-xs text-slate-600 mt-0.5">
-                      Security System • CCTV • Access Control • Barrier Gate • IT Infrastructure
+                      {selectedTaskForPrint.entityType === "NON_PT"
+                        ? "Pusat Servis Laptop, PC Desktop, CCTV Ritel, & Komponen Elektronik"
+                        : "Security System • CCTV • Access Control • Barrier Gate • IT Infrastructure"}
                     </p>
                     <p className="text-[10px] text-slate-500">
                       Jl. Raya Cilegon No. 88, Cilegon, Banten • Telp/WA: 0822-5949-4242 • www.dstechsmart.com
                     </p>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] font-mono text-slate-400">LEGALITAS RESMI</span>
-                    <p className="text-xs font-bold text-slate-700">NIB: 2026-DSTECH-ID</p>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      {selectedTaskForPrint.entityType === "NON_PT" ? "UNIT USAHA RITEL" : "LEGALITAS RESMI"}
+                    </span>
+                    <p className="text-xs font-bold text-slate-700">
+                      {selectedTaskForPrint.entityType === "NON_PT" ? "DSTECH-RETAIL-STORE" : "NIB: 2026-DSTECH-ID"}
+                    </p>
                   </div>
                 </div>
               )}
@@ -1685,7 +1797,9 @@ export default function MaintenancePage() {
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">Pihak Pelaksana (DSTech):</span>
-                  <p className="font-black text-slate-900">PT. DSTech Smart Perkasa</p>
+                  <p className="font-black text-slate-900">
+                    {selectedTaskForPrint.entityType === "NON_PT" ? "Toko DStech (Workshop Servis)" : "PT. DSTech Smart Perkasa"}
+                  </p>
                   <p className="text-slate-600 text-[11px]">
                     Teknisi Lapangan: <strong>{selectedTaskForPrint.technician}</strong>
                   </p>

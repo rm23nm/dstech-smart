@@ -7,6 +7,7 @@ export interface PortfolioItem {
   title: string;
   client: string;
   category: string;
+  entityType?: "PT" | "NON_PT";
   location?: string;
   completionDate?: string;
   description: string;
@@ -42,10 +43,22 @@ function writePortfolios(data: PortfolioItem[]): boolean {
   }
 }
 
-// GET: Ambil seluruh daftar portofolio proyek
-export async function GET() {
+// GET: Ambil daftar portofolio proyek (mendukung filter query ?entity=PT / ?entity=NON_PT dan ?public=true)
+export async function GET(req: Request) {
   try {
-    const portfolios = readPortfolios();
+    const { searchParams } = new URL(req.url);
+    const entity = searchParams.get("entity"); // 'PT' | 'NON_PT' | 'ALL' | null
+    const isPublic = searchParams.get("public") === "true";
+
+    let portfolios = readPortfolios();
+
+    // Aturan ketat user: Website publik / default hanya portofolio PT!
+    if (isPublic || entity === "PT") {
+      portfolios = portfolios.filter((p) => (p.entityType || "PT") === "PT");
+    } else if (entity === "NON_PT") {
+      portfolios = portfolios.filter((p) => p.entityType === "NON_PT");
+    }
+
     return NextResponse.json({
       success: true,
       data: portfolios,
@@ -63,7 +76,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { title, client, category, location, completionDate, description, image, videoUrl } = body;
+    const { title, client, category, location, completionDate, description, image, videoUrl, entityType } = body;
 
     if (!title || !title.trim()) {
       return NextResponse.json(
@@ -85,6 +98,7 @@ export async function POST(req: Request) {
       title: title.trim(),
       client: client.trim(),
       category: category?.trim() || "Industrial",
+      entityType: entityType === "NON_PT" ? "NON_PT" : "PT",
       location: location?.trim() || "Cilegon, Banten",
       completionDate: completionDate?.trim() || new Date().toISOString().slice(0, 7),
       description: description?.trim() || "",
@@ -115,7 +129,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, title, client, category, location, completionDate, description, image, videoUrl, status } = body;
+    const { id, title, client, category, location, completionDate, description, image, videoUrl, status, entityType } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -139,6 +153,7 @@ export async function PUT(req: Request) {
       title: title !== undefined ? title.trim() : portfolios[index].title,
       client: client !== undefined ? client.trim() : portfolios[index].client,
       category: category !== undefined ? category.trim() : portfolios[index].category,
+      entityType: entityType === "NON_PT" || entityType === "PT" ? entityType : (portfolios[index].entityType || "PT"),
       location: location !== undefined ? location.trim() : portfolios[index].location,
       completionDate: completionDate !== undefined ? completionDate.trim() : portfolios[index].completionDate,
       description: description !== undefined ? description.trim() : portfolios[index].description,

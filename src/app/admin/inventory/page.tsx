@@ -29,6 +29,7 @@ import {
   ChevronRight,
   ShieldCheck,
   SlidersHorizontal,
+  Store,
 } from "lucide-react";
 
 interface WarehouseItem {
@@ -46,6 +47,7 @@ interface InventoryProduct {
   id: string;
   name: string;
   category: string;
+  entityType?: "PT" | "NON_PT";
   price: number;
   stock: number;
   unit: string;
@@ -135,6 +137,7 @@ export default function AdminInventoryPage() {
 
   // Filter states
   const [selectedWarehouseFilter, setSelectedWarehouseFilter] = useState<string>("all");
+  const [selectedEntityTab, setSelectedEntityTab] = useState<"ALL" | "PT" | "NON_PT">("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [stockStatusFilter, setStockStatusFilter] = useState<string>("all");
@@ -210,6 +213,10 @@ export default function AdminInventoryPage() {
     return items.filter((item) => {
       if (item.isService) return false;
 
+      // Filter Entitas PT vs Non-PT
+      if (selectedEntityTab === "PT" && (item.entityType || "PT") !== "PT") return false;
+      if (selectedEntityTab === "NON_PT" && item.entityType !== "NON_PT") return false;
+
       // Filter gudang
       if (selectedWarehouseFilter !== "all") {
         const whStock = item.warehouseStock?.[selectedWarehouseFilter] || 0;
@@ -245,7 +252,11 @@ export default function AdminInventoryPage() {
 
       return true;
     });
-  }, [items, selectedWarehouseFilter, searchQuery, selectedCategory, stockStatusFilter]);
+  }, [items, selectedWarehouseFilter, searchQuery, selectedCategory, stockStatusFilter, selectedEntityTab]);
+
+  // Statistics
+  const countPT = useMemo(() => items.filter((i) => !i.isService && (i.entityType || "PT") === "PT").length, [items]);
+  const countNonPT = useMemo(() => items.filter((i) => !i.isService && i.entityType === "NON_PT").length, [items]);
 
   // Categories list for filter
   const categoriesList = useMemo(() => {
@@ -469,7 +480,14 @@ export default function AdminInventoryPage() {
             <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Katalog Barang</span>
           </div>
           <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">{summary.totalItems}</p>
-          <p className="text-[11px] text-slate-500 font-medium mt-1">Item Produk & Material Fisik</p>
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <span className="text-[10px] font-bold text-dstech-blue bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+              🏢 PT: {countPT}
+            </span>
+            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-100">
+              🏪 Non-PT: {countNonPT}
+            </span>
+          </div>
           <div className="absolute bottom-0 left-0 h-1 w-0 group-hover:w-full bg-dstech-blue transition-all duration-300" />
         </div>
 
@@ -576,6 +594,53 @@ export default function AdminInventoryPage() {
       {/* TAB 1: KARTU STOK BARANG REAL-TIME */}
       {activeTab === "stock" && (
         <div className="space-y-4">
+          {/* Entity Tab Switcher (PT vs Non-PT) */}
+          <div className="flex items-center gap-2 p-1.5 bg-slate-100/80 rounded-2xl border border-slate-200/80 w-fit">
+            <button
+              type="button"
+              onClick={() => setSelectedEntityTab("ALL")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedEntityTab === "ALL"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Semua Entitas ({countPT + countNonPT})
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedEntityTab("PT")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedEntityTab === "PT"
+                  ? "bg-dstech-blue text-white shadow-sm"
+                  : "text-slate-600 hover:text-dstech-blue"
+              }`}
+            >
+              <span>🏢 PT. DSTech Smart Perkasa</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                selectedEntityTab === "PT" ? "bg-white/20 text-white" : "bg-blue-100 text-dstech-blue"
+              }`}>
+                {countPT}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedEntityTab("NON_PT")}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedEntityTab === "NON_PT"
+                  ? "bg-purple-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-purple-600"
+              }`}
+            >
+              <span>🏪 Non-PT / Toko DStech</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                selectedEntityTab === "NON_PT" ? "bg-white/20 text-white" : "bg-purple-100 text-purple-700"
+              }`}>
+                {countNonPT}
+              </span>
+            </button>
+          </div>
+
           {/* Controls Bar */}
           <div className="p-4 rounded-3xl bg-white border border-slate-200/90 shadow-sm space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -696,7 +761,18 @@ export default function AdminInventoryPage() {
                                 )}
                               </div>
                               <div>
-                                <p className="font-bold text-slate-900 text-xs">{item.name}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-bold text-slate-900 text-xs">{item.name}</p>
+                                  {item.entityType === "NON_PT" ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-50 text-purple-700 border border-purple-200">
+                                      🏪 Non-PT
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-50 text-dstech-blue border border-blue-200">
+                                      🏢 PT
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
                                   <MapPin className="w-3 h-3" />
                                   <span>{item.location || "Gudang Utama DSTech"}</span>
