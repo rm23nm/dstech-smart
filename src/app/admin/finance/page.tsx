@@ -2786,6 +2786,15 @@ export default function AdminFinanceERPPage() {
     }
   };
 
+  const handleOpenNewSaleModal = () => {
+    setSaleForm((prev) => ({
+      ...prev,
+      date: new Date().toISOString().split("T")[0],
+      dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+    }));
+    setIsNewSaleModalOpen(true);
+  };
+
   const calculateSaleTotals = () => {
     const subtotal = saleForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
     const discountVal =
@@ -5157,14 +5166,14 @@ export default function AdminFinanceERPPage() {
 
           <div className="flex flex-wrap items-center gap-2.5">
             <button
-              onClick={() => setIsNewSaleModalOpen(true)}
+              onClick={handleOpenNewSaleModal}
               className="px-4 py-2.5 rounded-2xl bg-dstech-red hover:bg-red-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Buat Faktur Penjualan</span>
             </button>
             <button
-              onClick={() => setIsNewCashModalOpen(true)}
+              onClick={() => handleOpenNewCashModal("IN")}
               className="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-lg flex items-center gap-2 cursor-pointer"
             >
               <Wallet className="w-4 h-4" />
@@ -5537,7 +5546,7 @@ export default function AdminFinanceERPPage() {
                 </button>
 
                 <button
-                  onClick={() => setIsNewSaleModalOpen(true)}
+                  onClick={handleOpenNewSaleModal}
                   className="px-4 py-2.5 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
@@ -8322,6 +8331,275 @@ export default function AdminFinanceERPPage() {
                 />
               </div>
 
+              {/* Tanggal Faktur & Jatuh Tempo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-blue-50/70 rounded-2xl border border-blue-200/90">
+                <div>
+                  <label className="text-[11px] font-black text-slate-800 flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-dstech-blue" />
+                      Tanggal Faktur (Penerbitan): <span className="text-red-500">*</span>
+                    </span>
+                    <span className="text-[10px] text-dstech-blue font-bold bg-blue-100/80 px-2 py-0.5 rounded-full">
+                      Bebas Diubah / Backdate
+                    </span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={saleForm.date}
+                    onChange={(e) => setSaleForm({ ...saleForm, date: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-blue-200 bg-white font-bold text-slate-900 text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Default: Tanggal hari ini. Dapat diubah ke tanggal transaksi lampau.
+                  </span>
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-slate-800 flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-600" />
+                      Tanggal Jatuh Tempo: <span className="text-red-500">*</span>
+                    </span>
+                    <span className="text-[10px] text-amber-800 font-bold bg-amber-100/80 px-2 py-0.5 rounded-full">
+                      Batas Akhir Pelunasan
+                    </span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={saleForm.dueDate}
+                    onChange={(e) => setSaleForm({ ...saleForm, dueDate: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-blue-200 bg-white font-bold text-slate-900 text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Default: +14 hari dari penerbitan faktur.
+                  </span>
+                </div>
+              </div>
+
+              {/* SKEMA PENERBITAN FAKTUR */}
+              <div className="p-3.5 bg-gradient-to-br from-indigo-50/90 via-blue-50/60 to-purple-50/80 rounded-2xl border-2 border-indigo-200 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <label className="text-xs font-black text-indigo-950 flex items-center gap-1.5 uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4 text-indigo-600" />
+                    <span>Skema Penerbitan Faktur:</span>
+                  </label>
+                  <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                    saleForm.invoiceType === "Standar"
+                      ? "bg-blue-100 text-blue-800 border border-blue-200"
+                      : saleForm.invoiceType === "DP"
+                      ? "bg-amber-100 text-amber-900 border border-amber-300"
+                      : "bg-purple-100 text-purple-900 border border-purple-300"
+                  }`}>
+                    {saleForm.invoiceType === "Standar"
+                      ? "⚡ Standar Penuh (100%)"
+                      : saleForm.invoiceType === "DP"
+                      ? `⚡ Uang Muka (DP ${saleForm.dpPercentage || 50}%)`
+                      : "⚡ Multi-Termin Progresif"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setSaleForm({ ...saleForm, invoiceType: "Standar" })}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      saleForm.invoiceType === "Standar"
+                        ? "border-dstech-blue bg-white text-dstech-blue ring-2 ring-blue-500/30 shadow-sm"
+                        : "border-slate-200 bg-white/70 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <p className="font-black text-xs flex items-center justify-between">
+                      <span>⚡ Penuh 100%</span>
+                      {saleForm.invoiceType === "Standar" && <CheckCheck className="w-3.5 h-3.5 text-dstech-blue" />}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Faktur standar lunas/tempo langsung senilai 100% tanpa skema termin.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { grandTotal } = calculateSaleTotals();
+                      const pct = saleForm.dpPercentage || 50;
+                      setSaleForm({
+                        ...saleForm,
+                        invoiceType: "DP",
+                        dpPercentage: pct,
+                        dpAmount: Math.round(grandTotal * (pct / 100)),
+                        dpNotes: `Pengajuan Uang Muka (DP ${pct}%) Pelaksanaan Instalasi & Pengadaan`,
+                      });
+                    }}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      saleForm.invoiceType === "DP"
+                        ? "border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-500/30 shadow-sm"
+                        : "border-slate-200 bg-white/70 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <p className="font-black text-xs flex items-center justify-between">
+                      <span>⚡ Uang Muka (DP)</span>
+                      {saleForm.invoiceType === "DP" && <CheckCheck className="w-3.5 h-3.5 text-amber-600" />}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      2 Tahap: Pengajuan Uang Muka (DP) untuk mulai proyek, sisa dilunasi saat BAST.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const { grandTotal } = calculateSaleTotals();
+                      setSaleForm({
+                        ...saleForm,
+                        invoiceType: "Termin",
+                        termins:
+                          saleForm.termins.length > 0
+                            ? saleForm.termins
+                            : getDefaultTermins(grandTotal, saleForm.dueDate),
+                      });
+                    }}
+                    className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                      saleForm.invoiceType === "Termin"
+                        ? "border-purple-600 bg-purple-50 text-purple-900 ring-2 ring-purple-600/30 shadow-sm"
+                        : "border-slate-200 bg-white/70 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <p className="font-black text-xs flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Layers className="w-3.5 h-3.5 text-purple-600" />
+                        Multi-Termin
+                      </span>
+                      {saleForm.invoiceType === "Termin" && <CheckCheck className="w-3.5 h-3.5 text-purple-600" />}
+                    </p>
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Penagihan bertahap berdasarkan milestone progres (3 atau 4 tahapan).
+                    </p>
+                  </button>
+                </div>
+
+                {/* Pengaturan Khusus jika DP dipilih */}
+                {saleForm.invoiceType === "DP" && (
+                  <div className="p-3 rounded-xl bg-amber-100/70 border border-amber-300 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      <span className="font-black text-amber-950 text-xs">Pilihan Cepat Persentase DP:</span>
+                      <div className="flex items-center gap-1">
+                        {[20, 30, 40, 50, 70].map((pct) => (
+                          <button
+                            key={pct}
+                            type="button"
+                            onClick={() => {
+                              const { grandTotal } = calculateSaleTotals();
+                              setSaleForm({
+                                ...saleForm,
+                                dpPercentage: pct,
+                                dpAmount: Math.round(grandTotal * (pct / 100)),
+                                dpNotes: `Pengajuan Uang Muka (DP ${pct}%) Pelaksanaan Instalasi & Pengadaan`,
+                              });
+                            }}
+                            className={`px-2 py-0.5 rounded text-[10px] font-black cursor-pointer transition-all ${
+                              saleForm.dpPercentage === pct
+                                ? "bg-amber-600 text-white shadow-xs"
+                                : "bg-white text-amber-800 border border-amber-300 hover:bg-amber-50"
+                            }`}
+                          >
+                            {pct}%
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-900 block mb-0.5">Persentase DP (%):</label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={saleForm.dpPercentage}
+                            onChange={(e) => {
+                              const pct = Number(e.target.value) || 0;
+                              const { grandTotal } = calculateSaleTotals();
+                              setSaleForm({
+                                ...saleForm,
+                                dpPercentage: pct,
+                                dpAmount: Math.round(grandTotal * (pct / 100)),
+                                dpNotes: `Pengajuan Uang Muka (DP ${pct}%) Pelaksanaan Instalasi & Pengadaan`,
+                              });
+                            }}
+                            className="w-full p-2 rounded-lg bg-white border border-amber-300 text-xs font-bold text-amber-950"
+                          />
+                          <span className="absolute right-3 top-2 text-xs font-bold text-slate-400">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-amber-900 block mb-0.5">Keterangan / Berita Penagihan DP:</label>
+                        <input
+                          type="text"
+                          value={saleForm.dpNotes}
+                          onChange={(e) => setSaleForm({ ...saleForm, dpNotes: e.target.value })}
+                          className="w-full p-2 rounded-lg bg-white border border-amber-300 text-xs font-medium text-slate-800"
+                          placeholder="Catatan penagihan DP..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pengaturan Khusus jika Multi-Termin dipilih */}
+                {saleForm.invoiceType === "Termin" && (
+                  <div className="p-3 rounded-xl bg-purple-100/70 border border-purple-300 space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      <span className="font-black text-purple-950 text-xs">Preset Skema Termin Cepat:</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const { grandTotal } = calculateSaleTotals();
+                            setSaleForm({
+                              ...saleForm,
+                              termins: getPresetTermins("3_tahap", grandTotal, saleForm.dueDate),
+                            });
+                          }}
+                          className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-purple-900 border border-purple-300 hover:bg-purple-50 cursor-pointer"
+                        >
+                          3 Tahap (30-40-30)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const { grandTotal } = calculateSaleTotals();
+                            setSaleForm({
+                              ...saleForm,
+                              termins: getPresetTermins("4_tahap", grandTotal, saleForm.dueDate),
+                            });
+                          }}
+                          className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-purple-900 border border-purple-300 hover:bg-purple-50 cursor-pointer"
+                        >
+                          4 Tahap (40-30-20-10)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const { grandTotal } = calculateSaleTotals();
+                            setSaleForm({
+                              ...saleForm,
+                              termins: getPresetTermins("50_30_20", grandTotal, saleForm.dueDate),
+                            });
+                          }}
+                          className="px-2 py-0.5 rounded text-[10px] font-bold bg-white text-purple-900 border border-purple-300 hover:bg-purple-50 cursor-pointer"
+                        >
+                          3 Tahap (50-30-20)
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-purple-800">
+                      Rincian termin, bobot persentase, dan nominal rupiah akan otomatis disinkronkan dan dapat diatur detail pada tabel kalkulasi di bawah.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Items Table Repeater */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between">
@@ -9105,6 +9383,29 @@ export default function AdminFinanceERPPage() {
                     </div>
                   </button>
                 </div>
+              </div>
+
+              {/* Tanggal Transaksi Kas */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+                <label className="text-[11px] font-black text-slate-800 flex items-center justify-between mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-purple-600" />
+                    Tanggal Transaksi Kas: <span className="text-red-500">*</span>
+                  </span>
+                  <span className="text-[10px] text-purple-700 font-bold bg-purple-100 px-2 py-0.5 rounded-full">
+                    Bebas Diubah / Backdate
+                  </span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={cashForm.date}
+                  onChange={(e) => setCashForm({ ...cashForm, date: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 text-xs focus:ring-2 focus:ring-purple-600 focus:outline-none"
+                />
+                <span className="text-[10px] text-slate-500 block">
+                  Default: Hari ini. Ubah tanggal jika mencatat transaksi kas lampau/kemarin.
+                </span>
               </div>
 
               <div>
