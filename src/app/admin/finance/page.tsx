@@ -26,6 +26,7 @@ import {
   X,
   Send,
   Download,
+  Upload,
   Calendar,
   Layers,
   Sparkles,
@@ -728,13 +729,15 @@ export default function AdminFinanceERPPage() {
     notes: string;
     includeDspSignature: boolean;
     hideDefaultHeader: boolean;
+    bastSignatureImage: string;
+    bastApprovalDate: string;
   }>({
     bastNumber: "",
     bastDate: new Date().toISOString().split("T")[0],
     projectLocation: "",
     projectName: "Pengadaan & Instalasi Sistem Keamanan & IT Infrastructure",
-    handedByName: "Ahmad Romadhoni",
-    handedByTitle: "Direktur PT. DSTech Smart Perkasa",
+    handedByName: "Rian Hidayat, S.T.",
+    handedByTitle: "Project Manager & Site Engineer",
     receivedByName: "",
     receivedByTitle: "Penanggung Jawab / Klien",
     warrantyHardware: "2 (dua) tahun garansi resmi unit pabrikan",
@@ -742,7 +745,19 @@ export default function AdminFinanceERPPage() {
     notes: "Seluruh perangkat dan instalasi telah melalui tahapan uji fungsi (commissioning test) bersama dan dinyatakan dalam kondisi 100% lengkap, baik, dan beroperasi normal.",
     includeDspSignature: true,
     hideDefaultHeader: true,
+    bastSignatureImage: "",
+    bastApprovalDate: "",
   });
+
+  // BAST Project Manager Approval States
+  const [isBastApprovalModalOpen, setIsBastApprovalModalOpen] = useState<boolean>(false);
+  const [bastApprovalSignerName, setBastApprovalSignerName] = useState<string>("Rian Hidayat, S.T.");
+  const [bastApprovalSignerTitle, setBastApprovalSignerTitle] = useState<string>("Project Manager & Site Engineer");
+  const [bastApprovalMode, setBastApprovalMode] = useState<"canvas" | "upload">("canvas");
+  const [bastUploadedSignature, setBastUploadedSignature] = useState<string>("");
+  const bastCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const [isBastDrawing, setIsBastDrawing] = useState<boolean>(false);
+  const [hasBastDrawn, setHasBastDrawn] = useState<boolean>(false);
 
   const handleOpenBastModal = (sale: SaleInvoice) => {
     const invClean = sale.invoiceNumber ? sale.invoiceNumber.replace(/^INV-/, "") : "001";
@@ -755,8 +770,8 @@ export default function AdminFinanceERPPage() {
       bastDate: new Date().toISOString().split("T")[0],
       projectLocation: sale.customerAddress || "Lokasi Proyek Klien",
       projectName: `Pengadaan & Instalasi - ${sale.customerName || "Proyek Klien"}`,
-      handedByName: financeSettings.signerName || "Ahmad Romadhoni",
-      handedByTitle: financeSettings.signerTitle || "Direktur PT. DSTech Smart Perkasa",
+      handedByName: "Rian Hidayat, S.T.",
+      handedByTitle: "Project Manager & Site Engineer",
       receivedByName: sale.customerName || "Bapak/Ibu Pimpinan",
       receivedByTitle: "Penanggung Jawab / Klien",
       warrantyHardware: "2 (dua) tahun garansi resmi unit pabrikan",
@@ -764,6 +779,8 @@ export default function AdminFinanceERPPage() {
       notes: "Seluruh perangkat dan instalasi telah melalui tahapan uji fungsi (commissioning test) bersama dan dinyatakan dalam kondisi 100% lengkap, baik, dan beroperasi normal.",
       includeDspSignature: true,
       hideDefaultHeader: financeSettings.letterheadEnabled && Boolean(financeSettings.letterheadUrl),
+      bastSignatureImage: "",
+      bastApprovalDate: "",
     });
     setSelectedSaleForBast(sale);
     setIsBastModalOpen(true);
@@ -787,6 +804,10 @@ export default function AdminFinanceERPPage() {
     notes: string;
     includeDspStamp: boolean;
     hideDefaultHeader: boolean;
+    warehouseStaffName: string;
+    warehouseStaffTitle: string;
+    warehouseSignatureImage: string;
+    warehouseApprovalDate: string;
   }>({
     doNumber: "",
     doDate: new Date().toISOString().split("T")[0],
@@ -801,7 +822,21 @@ export default function AdminFinanceERPPage() {
     notes: "Seluruh barang dan material telah diperiksa dalam kondisi baru, tersegel, dan utuh saat diberangkatkan dari gudang. Harap periksa fisik barang saat penerimaan di lokasi proyek.",
     includeDspStamp: true,
     hideDefaultHeader: true,
+    warehouseStaffName: "Ahmad Fauzi",
+    warehouseStaffTitle: "Staf Logistik & Pengeluaran Material",
+    warehouseSignatureImage: "",
+    warehouseApprovalDate: "",
   });
+
+  // Delivery Order Warehouse Staff Approval States
+  const [isDeliveryApprovalModalOpen, setIsDeliveryApprovalModalOpen] = useState<boolean>(false);
+  const [deliveryApprovalStaffName, setDeliveryApprovalStaffName] = useState<string>("Ahmad Fauzi");
+  const [deliveryApprovalStaffTitle, setDeliveryApprovalStaffTitle] = useState<string>("Staf Logistik & Pengeluaran Material");
+  const [deliveryApprovalMode, setDeliveryApprovalMode] = useState<"canvas" | "upload">("canvas");
+  const [deliveryUploadedSignature, setDeliveryUploadedSignature] = useState<string>("");
+  const deliveryCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const [isDeliveryDrawing, setIsDeliveryDrawing] = useState<boolean>(false);
+  const [hasDeliveryDrawn, setHasDeliveryDrawn] = useState<boolean>(false);
 
   const handleOpenDeliveryModal = (sale: SaleInvoice) => {
     const invClean = sale.invoiceNumber ? sale.invoiceNumber.replace(/^INV-/, "") : "001";
@@ -826,6 +861,10 @@ export default function AdminFinanceERPPage() {
       notes: "Seluruh material telah dihitung dan diperiksa dalam kondisi baru, lengkap, dan tersegel baik dari gudang PT. DSTech Smart Perkasa. Harap periksa fisik barang saat serah terima di lokasi proyek.",
       includeDspStamp: true,
       hideDefaultHeader: financeSettings.letterheadEnabled && Boolean(financeSettings.letterheadUrl),
+      warehouseStaffName: "Ahmad Fauzi",
+      warehouseStaffTitle: "Staf Logistik & Pengeluaran Material",
+      warehouseSignatureImage: "",
+      warehouseApprovalDate: "",
     });
     setSelectedSaleForDelivery(sale);
     setIsDeliveryModalOpen(true);
@@ -4009,6 +4048,158 @@ export default function AdminFinanceERPPage() {
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasDrawn(false);
+  };
+
+  // Delivery Order Warehouse Staff Canvas Handlers
+  const startDeliveryDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = deliveryCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    setIsDeliveryDrawing(true);
+    setHasDeliveryDrawn(true);
+    const rect = canvas.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  };
+
+  const drawDelivery = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDeliveryDrawing) return;
+    const canvas = deliveryCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#1e3a8a"; // Navy Corporate Blue
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const stopDeliveryDrawing = () => {
+    setIsDeliveryDrawing(false);
+  };
+
+  const clearDeliveryCanvas = () => {
+    const canvas = deliveryCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasDeliveryDrawn(false);
+  };
+
+  const handleOpenDeliveryApprovalModal = () => {
+    setDeliveryApprovalStaffName(deliveryConfig.warehouseStaffName || "Ahmad Fauzi");
+    setDeliveryApprovalStaffTitle(deliveryConfig.warehouseStaffTitle || "Staf Logistik & Pengeluaran Material");
+    setDeliveryUploadedSignature(deliveryConfig.warehouseSignatureImage || "");
+    setDeliveryApprovalMode("canvas");
+    setHasDeliveryDrawn(false);
+    setIsDeliveryApprovalModalOpen(true);
+  };
+
+  const handleSaveDeliveryApproval = () => {
+    let sigImg = "";
+    if (deliveryApprovalMode === "canvas" && deliveryCanvasRef.current && hasDeliveryDrawn) {
+      sigImg = deliveryCanvasRef.current.toDataURL("image/png");
+    } else if (deliveryApprovalMode === "upload") {
+      sigImg = deliveryUploadedSignature;
+    } else if (deliveryConfig.warehouseSignatureImage) {
+      sigImg = deliveryConfig.warehouseSignatureImage;
+    }
+
+    setDeliveryConfig((prev) => ({
+      ...prev,
+      warehouseStaffName: deliveryApprovalStaffName.trim() || "Staf Logistik Gudang",
+      warehouseStaffTitle: deliveryApprovalStaffTitle.trim() || "QC & Logistik Pengeluaran",
+      warehouseSignatureImage: sigImg,
+      warehouseApprovalDate: new Date().toISOString().split("T")[0],
+    }));
+
+    setIsDeliveryApprovalModalOpen(false);
+    showToast("Tanda tangan & otorisasi Petugas Gudang berhasil disimpan pada Surat Jalan!");
+  };
+
+  // BAST Project Manager Canvas Handlers
+  const startBastDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = bastCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    setIsBastDrawing(true);
+    setHasBastDrawn(true);
+    const rect = canvas.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  };
+
+  const drawBast = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isBastDrawing) return;
+    const canvas = bastCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#581c87"; // Purple Corporate Ink
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const stopBastDrawing = () => {
+    setIsBastDrawing(false);
+  };
+
+  const clearBastCanvas = () => {
+    const canvas = bastCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasBastDrawn(false);
+  };
+
+  const handleOpenBastApprovalModal = () => {
+    setBastApprovalSignerName(bastConfig.handedByName || "Rian Hidayat, S.T.");
+    setBastApprovalSignerTitle(bastConfig.handedByTitle || "Project Manager & Site Engineer");
+    setBastUploadedSignature(bastConfig.bastSignatureImage || "");
+    setBastApprovalMode("canvas");
+    setHasBastDrawn(false);
+    setIsBastApprovalModalOpen(true);
+  };
+
+  const handleSaveBastApproval = () => {
+    let sigImg = "";
+    if (bastApprovalMode === "canvas" && bastCanvasRef.current && hasBastDrawn) {
+      sigImg = bastCanvasRef.current.toDataURL("image/png");
+    } else if (bastApprovalMode === "upload") {
+      sigImg = bastUploadedSignature;
+    } else if (bastConfig.bastSignatureImage) {
+      sigImg = bastConfig.bastSignatureImage;
+    }
+
+    setBastConfig((prev) => ({
+      ...prev,
+      handedByName: bastApprovalSignerName.trim() || "Rian Hidayat, S.T.",
+      handedByTitle: bastApprovalSignerTitle.trim() || "Project Manager & Site Engineer",
+      bastSignatureImage: sigImg,
+      bastApprovalDate: new Date().toISOString().split("T")[0],
+    }));
+
+    setIsBastApprovalModalOpen(false);
+    showToast("Tanda tangan Project Manager berhasil disahkan pada lembar BAST!");
   };
 
   const handleOpenApprovalModal = (invoice: any) => {
@@ -12034,8 +12225,34 @@ export default function AdminFinanceERPPage() {
                       <p className="text-[10px] font-bold text-slate-500 uppercase">
                         Paraf {selectedInvoiceForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
                       </p>
-                      <div className="h-10 flex items-center justify-center font-serif italic text-xs font-bold text-slate-800">
-                        {selectedInvoiceForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
+                      <div className="h-10 relative flex items-center justify-center">
+                        {selectedInvoiceForPrint.signatureImage ? (
+                          <>
+                            <div className="print-stamp-circle absolute right-2 w-10 h-10 rounded-full border-2 border-dashed border-dstech-blue/50 flex flex-col items-center justify-center text-[5px] text-dstech-blue font-bold uppercase rotate-[-12deg] pointer-events-none bg-blue-50/40">
+                              <span className="font-black text-[4.5px]">
+                                {selectedInvoiceForPrint.businessEntity === "NON_PT" ? "DSTECH" : "PT. DSTECH"}
+                              </span>
+                              <span className="text-[3.5px] tracking-tight">
+                                {selectedInvoiceForPrint.businessEntity === "NON_PT" ? "SMART SERVICES" : "SMART PERKASA"}
+                              </span>
+                              <span className="text-[3.5px] text-emerald-600 font-mono font-black mt-0.5">PARAF SAH</span>
+                            </div>
+                            <img
+                              src={selectedInvoiceForPrint.signatureImage}
+                              alt="Paraf Digital"
+                              className="print-signature-img max-h-10 max-w-[110px] object-contain relative z-10"
+                            />
+                          </>
+                        ) : (
+                          <div className="font-serif italic text-xs font-bold text-slate-800">
+                            {selectedInvoiceForPrint.approvedBy || financeSettings.signerName || "Ahmad Romadhoni"}
+                          </div>
+                        )}
+                      </div>
+                      <div className="pt-1 border-t border-slate-200">
+                        <p className="text-[9.5px] font-bold text-slate-800">
+                          ( {selectedInvoiceForPrint.approvedBy || financeSettings.signerName || "Ahmad Romadhoni"} )
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -19368,6 +19585,20 @@ export default function AdminFinanceERPPage() {
                   <span>{bastConfig.hideDefaultHeader ? "Logo DSP: Sembunyi" : "Logo DSP: Tampil"}</span>
                 </button>
 
+                <button
+                  type="button"
+                  onClick={handleOpenBastApprovalModal}
+                  title="Otorisasi & Tanda Tangan Digital BAST (Project Manager / Site Engineer)"
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all border ${
+                    bastConfig.bastSignatureImage
+                      ? "bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200"
+                      : "bg-purple-600 hover:bg-purple-700 text-white border-purple-600 shadow-md animate-pulse"
+                  }`}
+                >
+                  <PenTool className="w-3.5 h-3.5" />
+                  <span>{bastConfig.bastSignatureImage ? `✓ BAST Sah: ${bastConfig.handedByName}` : "✍️ Approval BAST"}</span>
+                </button>
+
                 {selectedSaleForBast.invoiceType === "DP" && selectedSaleForBast.remainingAmount > 0 && (
                   <button
                     type="button"
@@ -19563,6 +19794,16 @@ export default function AdminFinanceERPPage() {
                     <label htmlFor="includeDspSigBast" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
                       Bubuhkan Tanda Tangan &amp; Stempel Resmi PT. DSTech Smart Perkasa
                     </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenBastApprovalModal}
+                      className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    >
+                      <PenTool className="w-3.5 h-3.5" />
+                      <span>{bastConfig.bastSignatureImage ? "Ubah Tanda Tangan Project Manager" : "✍️ Bubuhkan Tanda Tangan Project Manager"}</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -19796,10 +20037,10 @@ export default function AdminFinanceERPPage() {
                             <span className="text-[4px] text-dstech-blue font-mono font-black mt-0.5">OFFICIAL BAST</span>
                           </div>
 
-                          {financeSettings.masterSignatureUrl ? (
+                          {(bastConfig.bastSignatureImage || selectedSaleForBast.signatureImage || financeSettings.masterSignatureUrl) ? (
                             <img
-                              src={financeSettings.masterSignatureUrl}
-                              alt="Tanda Tangan DSP"
+                              src={bastConfig.bastSignatureImage || selectedSaleForBast.signatureImage || financeSettings.masterSignatureUrl}
+                              alt="Tanda Tangan Pihak I BAST"
                               className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
                             />
                           ) : (
@@ -19902,6 +20143,20 @@ export default function AdminFinanceERPPage() {
                 >
                   {deliveryConfig.hideDefaultHeader ? <EyeOff className="w-3.5 h-3.5 text-amber-600" /> : <Eye className="w-3.5 h-3.5 text-slate-600" />}
                   <span>{deliveryConfig.hideDefaultHeader ? "Logo DSP: Sembunyi" : "Logo DSP: Tampil"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenDeliveryApprovalModal}
+                  title="Otorisasi & Tanda Tangan Digital Petugas Logistik Gudang"
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all border ${
+                    deliveryConfig.warehouseSignatureImage
+                      ? "bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-200"
+                      : "bg-amber-600 hover:bg-amber-700 text-white border-amber-600 shadow-md animate-pulse"
+                  }`}
+                >
+                  <PenTool className="w-3.5 h-3.5" />
+                  <span>{deliveryConfig.warehouseSignatureImage ? `✓ Logistik Sah: ${deliveryConfig.warehouseStaffName}` : "✍️ Approval Petugas Gudang"}</span>
                 </button>
 
                 <button
@@ -20083,6 +20338,16 @@ export default function AdminFinanceERPPage() {
                     <label htmlFor="includeDspStampDo" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
                       Bubuhkan Stempel Resmi QC &amp; Logistik Gudang PT. DSTech Smart Perkasa
                     </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenDeliveryApprovalModal}
+                      className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+                    >
+                      <PenTool className="w-3.5 h-3.5" />
+                      <span>{deliveryConfig.warehouseSignatureImage ? "Ubah Tanda Tangan Petugas Gudang" : "✍️ Bubuhkan Tanda Tangan Petugas Gudang"}</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -20300,30 +20565,44 @@ export default function AdminFinanceERPPage() {
                     <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                       YANG MENYERAHKAN,
                     </p>
-                    <p className="text-[10px] font-black text-slate-900">Gudang &amp; Logistik DSTech</p>
+                    <p className="text-[10px] font-black text-slate-900">
+                      {selectedSaleForDelivery.businessEntity === "NON_PT"
+                        ? "Gudang & Logistik DSTECH SMART"
+                        : "Gudang & Logistik PT. DSTech Smart Perkasa"}
+                    </p>
 
                     <div className="h-11 relative flex items-center justify-center">
-                      {deliveryConfig.includeDspStamp ? (
-                        <>
-                          <div className="w-12 h-12 rounded-full border-2 border-dashed border-amber-600/70 flex flex-col items-center justify-center text-[5.5px] text-amber-900 font-bold uppercase rotate-[-10deg] pointer-events-none bg-amber-50/50">
-                            <span className="font-black text-[5px]">PT. DSTECH</span>
-                            <span className="text-[4px] tracking-tight">SMART PERKASA</span>
-                            <span className="text-[4px] text-emerald-700 font-mono font-black mt-0.5">DISPATCHED</span>
-                          </div>
-                        </>
+                      {deliveryConfig.includeDspStamp && (
+                        <div className="w-12 h-12 rounded-full border-2 border-dashed border-amber-600/70 flex flex-col items-center justify-center text-[5.5px] text-amber-900 font-bold uppercase rotate-[-10deg] pointer-events-none bg-amber-50/50 absolute right-2">
+                          <span className="font-black text-[5px]">
+                            {selectedSaleForDelivery.businessEntity === "NON_PT" ? "DSTECH" : "PT. DSTECH"}
+                          </span>
+                          <span className="text-[4px] tracking-tight">
+                            {selectedSaleForDelivery.businessEntity === "NON_PT" ? "SMART SERVICES" : "SMART PERKASA"}
+                          </span>
+                          <span className="text-[4px] text-emerald-700 font-mono font-black mt-0.5">DISPATCHED</span>
+                        </div>
+                      )}
+
+                      {deliveryConfig.warehouseSignatureImage ? (
+                        <img
+                          src={deliveryConfig.warehouseSignatureImage}
+                          alt="Tanda Tangan Petugas Gudang"
+                          className="print-signature-img max-h-11 max-w-[120px] object-contain relative z-10"
+                        />
                       ) : (
                         <div className="font-serif italic text-xs text-slate-400 select-none">
-                          ( Stempel Gudang )
+                          ( Stempel &amp; Paraf Gudang )
                         </div>
                       )}
                     </div>
 
                     <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-[10px]">
-                        ( Bagian Logistik Gudang )
+                        ( {deliveryConfig.warehouseStaffName || "Bagian Logistik Gudang"} )
                       </p>
                       <p className="text-[8.5px] text-slate-500 mt-0.5">
-                        QC &amp; Logistik Pengeluaran
+                        {deliveryConfig.warehouseStaffTitle || "QC & Logistik Pengeluaran"}
                       </p>
                     </div>
                   </div>
@@ -20375,6 +20654,344 @@ export default function AdminFinanceERPPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL OTORISASI & TANDA TANGAN DIGITAL BAST (PROJECT MANAGER / SITE ENGINEER) */}
+      {isBastApprovalModalOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsBastApprovalModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-purple-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700">
+                  <PenTool className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-sm">Otorisasi &amp; Tanda Tangan BAST</h3>
+                  <p className="text-[10px] text-purple-700 font-bold">Pengesahan Serah Terima Fisik (Project Manager)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBastApprovalModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Nama Project Manager / Penyerah</label>
+                  <input
+                    type="text"
+                    value={bastApprovalSignerName}
+                    onChange={(e) => setBastApprovalSignerName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none font-semibold"
+                    placeholder="Contoh: Rian Hidayat, S.T."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Jabatan Otorisator Lapangan</label>
+                  <input
+                    type="text"
+                    value={bastApprovalSignerTitle}
+                    onChange={(e) => setBastApprovalSignerTitle(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none font-semibold"
+                    placeholder="Contoh: Project Manager &amp; Site Engineer"
+                  />
+                </div>
+              </div>
+
+              {/* Pilihan Metode Tanda Tangan */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1.5">Metode Tanda Tangan Digital</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBastApprovalMode("canvas")}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      bastApprovalMode === "canvas"
+                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <PenTool className="w-3.5 h-3.5" />
+                    <span>Gores Langsung</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBastApprovalMode("upload")}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      bastApprovalMode === "upload"
+                        ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Berkas / PNG</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Area Canvas Gores Langsung */}
+              {bastApprovalMode === "canvas" ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500">
+                    <span>Goreskan tanda tangan Project Manager pada kotak di bawah:</span>
+                    <button
+                      type="button"
+                      onClick={clearBastCanvas}
+                      className="text-red-600 hover:text-red-700 font-bold underline cursor-pointer"
+                    >
+                      Hapus &amp; Ulangi
+                    </button>
+                  </div>
+                  <div className="border-2 border-dashed border-purple-300 rounded-2xl bg-purple-50/20 p-1 relative flex items-center justify-center overflow-hidden">
+                    <canvas
+                      ref={bastCanvasRef}
+                      width={440}
+                      height={160}
+                      onMouseDown={startBastDrawing}
+                      onMouseMove={drawBast}
+                      onMouseUp={stopBastDrawing}
+                      onMouseLeave={stopBastDrawing}
+                      onTouchStart={startBastDrawing}
+                      onTouchMove={drawBast}
+                      onTouchEnd={stopBastDrawing}
+                      className="cursor-crosshair bg-white rounded-xl touch-none w-full max-w-full h-40"
+                    />
+                    {!hasBastDrawn && !bastConfig.bastSignatureImage && (
+                      <div className="absolute pointer-events-none text-slate-300 text-xs italic select-none">
+                        (Tanda tangani di sini...)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Area Upload File Tanda Tangan */
+                <div className="space-y-2">
+                  <label className="block text-[10px] text-slate-500">
+                    Pilih file gambar tanda tangan (format PNG transparan disarankan):
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setBastUploadedSignature(event.target?.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200 cursor-pointer"
+                  />
+                  {bastUploadedSignature && (
+                    <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center h-24">
+                      <img src={bastUploadedSignature} alt="Pratinjau Tanda Tangan" className="max-h-20 object-contain" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsBastApprovalModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveBastApproval}
+                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all hover:scale-105"
+              >
+                <Check className="w-4 h-4" />
+                <span>Sah &amp; Simpan Tanda Tangan BAST</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL OTORISASI & TANDA TANGAN DIGITAL PETUGAS GUDANG (SURAT JALAN) */}
+      {isDeliveryApprovalModalOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsDeliveryApprovalModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-amber-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700">
+                  <PenTool className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-sm">Otorisasi &amp; Tanda Tangan Surat Jalan</h3>
+                  <p className="text-[10px] text-amber-700 font-bold">Pengesahan Pengeluaran Barang (Petugas Logistik Gudang)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeliveryApprovalModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Nama Petugas Logistik / Gudang</label>
+                  <input
+                    type="text"
+                    value={deliveryApprovalStaffName}
+                    onChange={(e) => setDeliveryApprovalStaffName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none font-semibold"
+                    placeholder="Contoh: Ahmad Fauzi"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Jabatan Petugas Pengeluaran</label>
+                  <input
+                    type="text"
+                    value={deliveryApprovalStaffTitle}
+                    onChange={(e) => setDeliveryApprovalStaffTitle(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-amber-400 focus:outline-none font-semibold"
+                    placeholder="Contoh: QC &amp; Logistik Pengeluaran"
+                  />
+                </div>
+              </div>
+
+              {/* Pilihan Metode Tanda Tangan */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1.5">Metode Tanda Tangan Digital</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryApprovalMode("canvas")}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      deliveryApprovalMode === "canvas"
+                        ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <PenTool className="w-3.5 h-3.5" />
+                    <span>Gores Langsung</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryApprovalMode("upload")}
+                    className={`py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                      deliveryApprovalMode === "upload"
+                        ? "bg-amber-600 text-white border-amber-600 shadow-sm"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Berkas / PNG</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Area Canvas Gores Langsung */}
+              {deliveryApprovalMode === "canvas" ? (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500">
+                    <span>Goreskan tanda tangan / paraf Petugas Gudang pada kotak di bawah:</span>
+                    <button
+                      type="button"
+                      onClick={clearDeliveryCanvas}
+                      className="text-red-600 hover:text-red-700 font-bold underline cursor-pointer"
+                    >
+                      Hapus &amp; Ulangi
+                    </button>
+                  </div>
+                  <div className="border-2 border-dashed border-amber-300 rounded-2xl bg-amber-50/20 p-1 relative flex items-center justify-center overflow-hidden">
+                    <canvas
+                      ref={deliveryCanvasRef}
+                      width={440}
+                      height={160}
+                      onMouseDown={startDeliveryDrawing}
+                      onMouseMove={drawDelivery}
+                      onMouseUp={stopDeliveryDrawing}
+                      onMouseLeave={stopDeliveryDrawing}
+                      onTouchStart={startDeliveryDrawing}
+                      onTouchMove={drawDelivery}
+                      onTouchEnd={stopDeliveryDrawing}
+                      className="cursor-crosshair bg-white rounded-xl touch-none w-full max-w-full h-40"
+                    />
+                    {!hasDeliveryDrawn && !deliveryConfig.warehouseSignatureImage && (
+                      <div className="absolute pointer-events-none text-slate-300 text-xs italic select-none">
+                        (Tanda tangani / paraf di sini...)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Area Upload File Tanda Tangan */
+                <div className="space-y-2">
+                  <label className="block text-[10px] text-slate-500">
+                    Pilih file gambar tanda tangan / paraf (format PNG transparan disarankan):
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setDeliveryUploadedSignature(event.target?.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 cursor-pointer"
+                  />
+                  {deliveryUploadedSignature && (
+                    <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center h-24">
+                      <img src={deliveryUploadedSignature} alt="Pratinjau Tanda Tangan" className="max-h-20 object-contain" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDeliveryApprovalModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDeliveryApproval}
+                className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all hover:scale-105"
+              >
+                <Check className="w-4 h-4" />
+                <span>Sah &amp; Simpan Tanda Tangan Gudang</span>
+              </button>
             </div>
           </div>
         </div>
@@ -23159,15 +23776,15 @@ export default function AdminFinanceERPPage() {
                                 <span className="text-[5px] tracking-tight">{receiptEntity === "PT" ? "SMART PERKASA" : "SMART"}</span>
                               </div>
                             )}
-                            {financeSettings.masterSignatureUrl ? (
+                            {(selectedReceiptSale?.signatureImage || financeSettings.masterSignatureUrl) ? (
                               <img
-                                src={financeSettings.masterSignatureUrl}
+                                src={selectedReceiptSale?.signatureImage || financeSettings.masterSignatureUrl}
                                 alt="Tanda Tangan Sah"
                                 className="h-16 relative z-10 pointer-events-none"
                               />
                             ) : (
                               <span className="text-[10px] text-slate-300 italic">
-                                ( Tanda Tangan & Cap Sah )
+                                ( Tanda Tangan &amp; Cap Sah )
                               </span>
                             )}
                           </div>

@@ -2577,7 +2577,42 @@
 
 ---
 
-### 87. Catatan Penting
+### 87. Tugas: Pemisahan & Penyediaan Fitur Approval Mandiri Tiap Dokumen (Faktur: Direksi/Keuangan, BAST: Project Manager, Surat Jalan: Logistik Gudang) Beserta Entitas PT / Non-PT
+- **Permintaan Pengguna**:
+  1. *"setelah diaproval, kenapa tanda tangannya berbeda-beda antara faktur, BAST, lampiran, surat jalan?"*
+  2. *"untuk aproval surat jalan pastinya berbeda, karena dia punya petugas masing-masing. namun saya belum menemukan cara untuk imput aprovalnya"*
+  3. *"Gudang & Logistik DSTech ganti dengan nama Gudang & Logistik PT. Dstech Smart Perkasa kalau PT dan non PT Gudang & Logistik DSTECH SMART"*
+  4. *"kalau bisa untuk Faktur, BAST, Surat jalan itu memiliki USer yang aprove masing-masing. karena tidak mungkin 1 orang yang sama"*
+- **Status**: Sedang Dikerjakan (In Progress)
+- **Akar Masalah & Kebutuhan Solusi**:
+  1. **Faktur & Lampiran**: Merupakan dokumen legalitas keuangan yang disahkan oleh Direktur / Manajer Keuangan. Tanda tangan digital Direktur pada Halaman 1 kini telah tersinkronisasi ke Lampiran Halaman 2.
+  2. **BAST (Berita Acara Serah Terima)**: Merupakan dokumen teknis lapangan serah terima fisik pekerjaan, yang diotorisasi oleh Project Manager / Site Engineer (Pihak I) dan Klien (Pihak II). Perlu disediakan tombol & modal **Approval BAST** mandiri (nama penyerah, jabatan, tanda tangan digital/upload).
+  3. **Surat Jalan (Delivery Order)**: Merupakan dokumen ekspedisi logistik barang, yang diotorisasi oleh Petugas Gudang / Logistik DSTech (Pihak Penyerah), Supir (Pihak Pembawa), dan Mandor/PIC Lapangan (Pihak Penerima). Perlu disediakan tombol & modal **Approval Petugas Gudang** mandiri.
+  4. **Entitas Dinamis**: Penamaan di Surat Jalan harus otomatis mengikuti jenis entitas transaksi: jika PT menjadi `Gudang & Logistik PT. DSTech Smart Perkasa`, jika Non-PT menjadi `Gudang & Logistik DSTECH SMART`.
+- **Rencana Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Membuat salinan cadangan file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_sync_approval_and_do_staff_sig`.
+  - [x] **Langkah 2 (Sinkronisasi Tanda Tangan Approval Faktur ke Lampiran Halaman 2)**:
+    - Di Lampiran Faktur (Halaman 2), render gambar tanda tangan digital (`selectedInvoiceForPrint.signatureImage`) dan stempel bulat resmi agar identik dengan Halaman 1.
+  - [ ] **Langkah 3 (Approval Mandiri BAST - Project Manager / Otoritas Lapangan)**:
+    - Menambahkan state `bastSignatureImage`, `bastSignerName`, `bastSignerTitle`.
+    - Menyediakan tombol aksi `✍️ Approval BAST` di toolbar dan panel edit BAST.
+    - Membangun Modal Tanda Tangan Digital BAST (Canvas Pad goresan tangan / upload tanda tangan digital Project Manager).
+    - Menampilkan tanda tangan digital Project Manager pada Pihak I BAST.
+  - [ ] **Langkah 4 (Approval Mandiri Surat Jalan - Petugas Gudang & Logistik + Entitas PT/Non-PT)**:
+    - Menambahkan tombol aksi `✍️ Approval Petugas Gudang` di toolbar dan panel edit Surat Jalan.
+    - Membangun Modal Tanda Tangan Digital Petugas Logistik Gudang (Canvas Pad / upload tanda tangan).
+    - Menampilkan tanda tangan digital petugas logistik gudang di Blok 1 Surat Jalan ("YANG MENYERAHKAN").
+    - Menyesuaikan penamaan penyerah di Surat Jalan: jika PT -> `Gudang & Logistik PT. DSTech Smart Perkasa`, jika Non-PT -> `Gudang & Logistik DSTECH SMART`.
+  - [ ] **Langkah 5 (Validasi Kompilasi, Build, & Deployment)**:
+    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
+    - Build Next.js `npm run build` berhasil.
+    - Push ke GitHub repository `rm23nm/dstech-smart`.
+    - Deploy ke live server VPS PM2 `dstech-main`.
+    - Memberikan panduan penggunaan kepada pengguna.
+
+---
+
+### 88. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
