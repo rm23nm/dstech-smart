@@ -67,6 +67,7 @@ import {
   FolderArchive,
   UploadCloud,
   Eye,
+  EyeOff,
   FileCheck2,
   HardDrive,
   Briefcase,
@@ -726,6 +727,7 @@ export default function AdminFinanceERPPage() {
     warrantyMaintenance: string;
     notes: string;
     includeDspSignature: boolean;
+    hideDefaultHeader: boolean;
   }>({
     bastNumber: "",
     bastDate: new Date().toISOString().split("T")[0],
@@ -739,6 +741,7 @@ export default function AdminFinanceERPPage() {
     warrantyMaintenance: "6 (enam) bulan pemeliharaan teknis PT. DSTech Smart Perkasa",
     notes: "Seluruh perangkat dan instalasi telah melalui tahapan uji fungsi (commissioning test) bersama dan dinyatakan dalam kondisi 100% lengkap, baik, dan beroperasi normal.",
     includeDspSignature: true,
+    hideDefaultHeader: true,
   });
 
   const handleOpenBastModal = (sale: SaleInvoice) => {
@@ -760,6 +763,7 @@ export default function AdminFinanceERPPage() {
       warrantyMaintenance: "6 (enam) bulan pemeliharaan teknis PT. DSTech Smart Perkasa",
       notes: "Seluruh perangkat dan instalasi telah melalui tahapan uji fungsi (commissioning test) bersama dan dinyatakan dalam kondisi 100% lengkap, baik, dan beroperasi normal.",
       includeDspSignature: true,
+      hideDefaultHeader: financeSettings.letterheadEnabled && Boolean(financeSettings.letterheadUrl),
     });
     setSelectedSaleForBast(sale);
     setIsBastModalOpen(true);
@@ -782,6 +786,7 @@ export default function AdminFinanceERPPage() {
     receivedByTitle: string;
     notes: string;
     includeDspStamp: boolean;
+    hideDefaultHeader: boolean;
   }>({
     doNumber: "",
     doDate: new Date().toISOString().split("T")[0],
@@ -795,6 +800,7 @@ export default function AdminFinanceERPPage() {
     receivedByTitle: "PIC Lapangan / Penanggung Jawab",
     notes: "Seluruh barang dan material telah diperiksa dalam kondisi baru, tersegel, dan utuh saat diberangkatkan dari gudang. Harap periksa fisik barang saat penerimaan di lokasi proyek.",
     includeDspStamp: true,
+    hideDefaultHeader: true,
   });
 
   const handleOpenDeliveryModal = (sale: SaleInvoice) => {
@@ -819,6 +825,7 @@ export default function AdminFinanceERPPage() {
       receivedByTitle: "PIC Lapangan / Mandor Proyek",
       notes: "Seluruh material telah dihitung dan diperiksa dalam kondisi baru, lengkap, dan tersegel baik dari gudang PT. DSTech Smart Perkasa. Harap periksa fisik barang saat serah terima di lokasi proyek.",
       includeDspStamp: true,
+      hideDefaultHeader: financeSettings.letterheadEnabled && Boolean(financeSettings.letterheadUrl),
     });
     setSelectedSaleForDelivery(sale);
     setIsDeliveryModalOpen(true);
@@ -19347,6 +19354,20 @@ export default function AdminFinanceERPPage() {
                   <span>Kop Surat</span>
                 </button>
 
+                <button
+                  type="button"
+                  onClick={() => setBastConfig({ ...bastConfig, hideDefaultHeader: !bastConfig.hideDefaultHeader })}
+                  title={bastConfig.hideDefaultHeader ? "Tampilkan Logo DSP & Header Bawaan" : "Sembunyikan Logo DSP & Header Bawaan (Gunakan Kop Bergambar)"}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all border ${
+                    bastConfig.hideDefaultHeader
+                      ? "bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100"
+                      : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                  }`}
+                >
+                  {bastConfig.hideDefaultHeader ? <EyeOff className="w-3.5 h-3.5 text-purple-600" /> : <Eye className="w-3.5 h-3.5 text-slate-600" />}
+                  <span>{bastConfig.hideDefaultHeader ? "Logo DSP: Sembunyi" : "Logo DSP: Tampil"}</span>
+                </button>
+
                 {selectedSaleForBast.invoiceType === "DP" && selectedSaleForBast.remainingAmount > 0 && (
                   <button
                     type="button"
@@ -19518,17 +19539,31 @@ export default function AdminFinanceERPPage() {
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
-                  <input
-                    type="checkbox"
-                    id="includeDspSigBast"
-                    checked={bastConfig.includeDspSignature}
-                    onChange={(e) => setBastConfig({ ...bastConfig, includeDspSignature: e.target.checked })}
-                    className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
-                  />
-                  <label htmlFor="includeDspSigBast" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
-                    Bubuhkan Tanda Tangan &amp; Stempel Resmi PT. DSTech Smart Perkasa
-                  </label>
+                <div className="flex flex-wrap items-center gap-4 pt-1 border-t border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="hideDefaultHeaderBast"
+                      checked={bastConfig.hideDefaultHeader}
+                      onChange={(e) => setBastConfig({ ...bastConfig, hideDefaultHeader: e.target.checked })}
+                      className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <label htmlFor="hideDefaultHeaderBast" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                      Sembunyikan Logo DSP &amp; Header Bawaan (Rekomendasi saat pakai Kop Gambar)
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="includeDspSigBast"
+                      checked={bastConfig.includeDspSignature}
+                      onChange={(e) => setBastConfig({ ...bastConfig, includeDspSignature: e.target.checked })}
+                      className="rounded border-slate-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <label htmlFor="includeDspSigBast" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                      Bubuhkan Tanda Tangan &amp; Stempel Resmi PT. DSTech Smart Perkasa
+                    </label>
+                  </div>
                 </div>
               </div>
             )}
@@ -19581,43 +19616,67 @@ export default function AdminFinanceERPPage() {
               )}
 
               <div className="relative z-10 space-y-3 print:space-y-2">
-                {/* Kop Surat Perusahaan */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-slate-900 pb-3">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-dstech-blue flex items-center justify-center text-white font-black text-base shadow">
-                        DSP
-                      </div>
-                      <div>
-                        <h2 className="font-black text-slate-900 text-sm tracking-tight leading-none uppercase">
-                          PT. DSTECH SMART PERKASA
-                        </h2>
-                        <p className="text-[10px] text-dstech-blue font-bold tracking-wider mt-0.5">
-                          SOLUSI SECURITY SYSTEM &amp; IT INFRASTRUCTURE
-                        </p>
-                      </div>
+                {/* Header Dokumen BAST */}
+                {bastConfig.hideDefaultHeader ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-slate-900 pb-2.5">
+                    <div>
+                      <span className="inline-block px-3 py-1 rounded-md bg-purple-700 text-white font-black text-xs tracking-wider uppercase shadow-sm">
+                        BERITA ACARA SERAH TERIMA (BAST)
+                      </span>
                     </div>
-                    <p className="text-[9.5px] text-slate-600 max-w-sm leading-tight mt-1">
-                      Jl. KH Wasyid No. 88, Jombang Masjid, Cilegon - Banten 42411
-                      <br />
-                      NIB: 1205240058291 | NPWP: 40.231.890.1-417.000
-                    </p>
+                    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-slate-700 text-[10px] sm:text-right font-medium">
+                      <p>
+                        No: <span className="font-mono font-bold text-slate-900">{bastConfig.bastNumber}</span>
+                      </p>
+                      <span className="hidden sm:inline text-slate-300">•</span>
+                      <p>
+                        Ref Faktur: <span className="font-mono font-bold text-slate-800">{selectedSaleForBast.invoiceNumber}</span>
+                      </p>
+                      <span className="hidden sm:inline text-slate-300">•</span>
+                      <p>
+                        Tanggal: <span className="font-bold text-slate-800">{bastConfig.bastDate}</span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="sm:text-right space-y-0.5">
-                    <span className="inline-block px-3 py-1 rounded-md bg-purple-700 text-white font-black text-[10px] tracking-wider uppercase shadow-sm">
-                      BERITA ACARA SERAH TERIMA (BAST)
-                    </span>
-                    <p className="text-[10px] text-slate-500 font-mono font-bold mt-1">
-                      No: <span className="text-slate-900">{bastConfig.bastNumber}</span>
-                    </p>
-                    <p className="text-[9.5px] text-slate-500">
-                      Ref Faktur: <span className="font-mono font-bold text-slate-800">{selectedSaleForBast.invoiceNumber}</span>
-                    </p>
-                    <p className="text-[9.5px] text-slate-500">
-                      Tanggal: <span className="font-bold text-slate-800">{bastConfig.bastDate}</span>
-                    </p>
+                ) : (
+                  /* Kop Surat Perusahaan Default */
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-slate-900 pb-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-dstech-blue flex items-center justify-center text-white font-black text-base shadow">
+                          DSP
+                        </div>
+                        <div>
+                          <h2 className="font-black text-slate-900 text-sm tracking-tight leading-none uppercase">
+                            PT. DSTECH SMART PERKASA
+                          </h2>
+                          <p className="text-[10px] text-dstech-blue font-bold tracking-wider mt-0.5">
+                            SOLUSI SECURITY SYSTEM &amp; IT INFRASTRUCTURE
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-[9.5px] text-slate-600 max-w-sm leading-tight mt-1">
+                        Jl. KH Wasyid No. 88, Jombang Masjid, Cilegon - Banten 42411
+                        <br />
+                        NIB: 1205240058291 | NPWP: 40.231.890.1-417.000
+                      </p>
+                    </div>
+                    <div className="sm:text-right space-y-0.5">
+                      <span className="inline-block px-3 py-1 rounded-md bg-purple-700 text-white font-black text-[10px] tracking-wider uppercase shadow-sm">
+                        BERITA ACARA SERAH TERIMA (BAST)
+                      </span>
+                      <p className="text-[10px] text-slate-500 font-mono font-bold mt-1">
+                        No: <span className="text-slate-900">{bastConfig.bastNumber}</span>
+                      </p>
+                      <p className="text-[9.5px] text-slate-500">
+                        Ref Faktur: <span className="font-mono font-bold text-slate-800">{selectedSaleForBast.invoiceNumber}</span>
+                      </p>
+                      <p className="text-[9.5px] text-slate-500">
+                        Tanggal: <span className="font-bold text-slate-800">{bastConfig.bastDate}</span>
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Paragraf Pembuka & Dasar Kesepakatan */}
                 <div className="text-[10.5px] text-slate-700 leading-relaxed space-y-1">
@@ -19833,6 +19892,20 @@ export default function AdminFinanceERPPage() {
 
                 <button
                   type="button"
+                  onClick={() => setDeliveryConfig({ ...deliveryConfig, hideDefaultHeader: !deliveryConfig.hideDefaultHeader })}
+                  title={deliveryConfig.hideDefaultHeader ? "Tampilkan Logo DSP & Header Bawaan" : "Sembunyikan Logo DSP & Header Bawaan (Gunakan Kop Bergambar)"}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all border ${
+                    deliveryConfig.hideDefaultHeader
+                      ? "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100"
+                      : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                  }`}
+                >
+                  {deliveryConfig.hideDefaultHeader ? <EyeOff className="w-3.5 h-3.5 text-amber-600" /> : <Eye className="w-3.5 h-3.5 text-slate-600" />}
+                  <span>{deliveryConfig.hideDefaultHeader ? "Logo DSP: Sembunyi" : "Logo DSP: Tampil"}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => {
                     const s = selectedSaleForDelivery;
                     setIsDeliveryModalOpen(false);
@@ -19986,17 +20059,31 @@ export default function AdminFinanceERPPage() {
                     />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
-                  <input
-                    type="checkbox"
-                    id="includeDspStampDo"
-                    checked={deliveryConfig.includeDspStamp}
-                    onChange={(e) => setDeliveryConfig({ ...deliveryConfig, includeDspStamp: e.target.checked })}
-                    className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                  />
-                  <label htmlFor="includeDspStampDo" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
-                    Bubuhkan Stempel Resmi QC &amp; Logistik Gudang PT. DSTech Smart Perkasa
-                  </label>
+                <div className="flex flex-wrap items-center gap-4 pt-1 border-t border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="hideDefaultHeaderDo"
+                      checked={deliveryConfig.hideDefaultHeader}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, hideDefaultHeader: e.target.checked })}
+                      className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <label htmlFor="hideDefaultHeaderDo" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                      Sembunyikan Logo DSP &amp; Header Bawaan (Rekomendasi saat pakai Kop Gambar)
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="includeDspStampDo"
+                      checked={deliveryConfig.includeDspStamp}
+                      onChange={(e) => setDeliveryConfig({ ...deliveryConfig, includeDspStamp: e.target.checked })}
+                      className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <label htmlFor="includeDspStampDo" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                      Bubuhkan Stempel Resmi QC &amp; Logistik Gudang PT. DSTech Smart Perkasa
+                    </label>
+                  </div>
                 </div>
               </div>
             )}
@@ -20049,43 +20136,67 @@ export default function AdminFinanceERPPage() {
               )}
 
               <div className="relative z-10 space-y-3 print:space-y-2">
-                {/* Kop Surat Perusahaan */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-slate-900 pb-3">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-dstech-blue flex items-center justify-center text-white font-black text-base shadow">
-                        DSP
-                      </div>
-                      <div>
-                        <h2 className="font-black text-slate-900 text-sm tracking-tight leading-none uppercase">
-                          PT. DSTECH SMART PERKASA
-                        </h2>
-                        <p className="text-[10px] text-dstech-blue font-bold tracking-wider mt-0.5">
-                          DIVISI LOGISTIK &amp; RANTAI PASOK MATERIAL PROYEK
-                        </p>
-                      </div>
+                {/* Header Dokumen Surat Jalan */}
+                {deliveryConfig.hideDefaultHeader ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-slate-900 pb-2.5">
+                    <div>
+                      <span className="inline-block px-3 py-1 rounded-md bg-amber-600 text-white font-black text-xs tracking-wider uppercase shadow-sm">
+                        SURAT JALAN MATERIAL (DELIVERY ORDER)
+                      </span>
                     </div>
-                    <p className="text-[9.5px] text-slate-600 max-w-sm leading-tight mt-1">
-                      Jl. KH Wasyid No. 88, Jombang Masjid, Cilegon - Banten 42411
-                      <br />
-                      NIB: 1205240058291 | NPWP: 40.231.890.1-417.000
-                    </p>
+                    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-slate-700 text-[10px] sm:text-right font-medium">
+                      <p>
+                        No: <span className="font-mono font-bold text-slate-900">{deliveryConfig.doNumber}</span>
+                      </p>
+                      <span className="hidden sm:inline text-slate-300">•</span>
+                      <p>
+                        Ref Faktur: <span className="font-mono font-bold text-slate-800">{selectedSaleForDelivery.invoiceNumber}</span>
+                      </p>
+                      <span className="hidden sm:inline text-slate-300">•</span>
+                      <p>
+                        Tanggal Kirim: <span className="font-bold text-slate-800">{deliveryConfig.doDate}</span>
+                      </p>
+                    </div>
                   </div>
-                  <div className="sm:text-right space-y-0.5">
-                    <span className="inline-block px-3 py-1 rounded-md bg-amber-600 text-white font-black text-[10px] tracking-wider uppercase shadow-sm">
-                      SURAT JALAN MATERIAL (DELIVERY ORDER)
-                    </span>
-                    <p className="text-[10px] text-slate-500 font-mono font-bold mt-1">
-                      No: <span className="text-slate-900">{deliveryConfig.doNumber}</span>
-                    </p>
-                    <p className="text-[9.5px] text-slate-500">
-                      Ref Faktur: <span className="font-mono font-bold text-slate-800">{selectedSaleForDelivery.invoiceNumber}</span>
-                    </p>
-                    <p className="text-[9.5px] text-slate-500">
-                      Tanggal Kirim: <span className="font-bold text-slate-800">{deliveryConfig.doDate}</span>
-                    </p>
+                ) : (
+                  /* Kop Surat Perusahaan Default */
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-slate-900 pb-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-dstech-blue flex items-center justify-center text-white font-black text-base shadow">
+                          DSP
+                        </div>
+                        <div>
+                          <h2 className="font-black text-slate-900 text-sm tracking-tight leading-none uppercase">
+                            PT. DSTECH SMART PERKASA
+                          </h2>
+                          <p className="text-[10px] text-dstech-blue font-bold tracking-wider mt-0.5">
+                            DIVISI LOGISTIK &amp; RANTAI PASOK MATERIAL PROYEK
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-[9.5px] text-slate-600 max-w-sm leading-tight mt-1">
+                        Jl. KH Wasyid No. 88, Jombang Masjid, Cilegon - Banten 42411
+                        <br />
+                        NIB: 1205240058291 | NPWP: 40.231.890.1-417.000
+                      </p>
+                    </div>
+                    <div className="sm:text-right space-y-0.5">
+                      <span className="inline-block px-3 py-1 rounded-md bg-amber-600 text-white font-black text-[10px] tracking-wider uppercase shadow-sm">
+                        SURAT JALAN MATERIAL (DELIVERY ORDER)
+                      </span>
+                      <p className="text-[10px] text-slate-500 font-mono font-bold mt-1">
+                        No: <span className="text-slate-900">{deliveryConfig.doNumber}</span>
+                      </p>
+                      <p className="text-[9.5px] text-slate-500">
+                        Ref Faktur: <span className="font-mono font-bold text-slate-800">{selectedSaleForDelivery.invoiceNumber}</span>
+                      </p>
+                      <p className="text-[9.5px] text-slate-500">
+                        Tanggal Kirim: <span className="font-bold text-slate-800">{deliveryConfig.doDate}</span>
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Grid Informasi Pengiriman (Asal Gudang vs Tujuan Proyek) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px] bg-slate-50/90 p-2.5 rounded-xl border border-slate-200">
