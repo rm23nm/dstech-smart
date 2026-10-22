@@ -2740,7 +2740,37 @@
 
 ---
 
-### 93. Catatan Penting
+### 94. Tugas: Penyediaan Endpoint Publik Lembar Cetak Dokumen Resmi (`/api/finance/print`) untuk Mengatasi Error 404 pada Tautan WhatsApp
+- **Permintaan Pengguna**:
+  *"seluruh dokumen linknya eror"* (Screenshot menampilkan 404 | This page could not be found pada URL `/api/finance/print?doc=invoice&no=...`)
+- **Status**: Selesai & Terverifikasi
+- **Akar Masalah**:
+  Tautan unduh dokumen publik yang digenerate untuk WhatsApp mengarah ke `https://dstechsmart.com/api/finance/print?doc=...&no=...`. Rute Next.js untuk endpoint ini sebelumnya belum dibuat di folder `src/app/api/finance/print/`, sehingga server Next.js mengembalikan halaman standar 404 Not Found.
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Pembuatan Route Handler Publik)**:
+    - Membuat file rute `src/app/api/finance/print/route.ts` yang menangani permintaan `GET(req)`.
+    - Mengambil parameter query `doc` (`invoice`, `bast`, `delivery`, `photos`) dan `no` (nomor invoice/dokumen).
+    - Membaca data transaksi faktur, rekening bank resmi, dan pengaturan kop surat resmi langsung dari `dstech_finance_erp.json`.
+  - [x] **Langkah 2 (Desain Lembar Cetak Dokumen A4 Responsif)**:
+    - Merender HTML dokumen cetak A4 yang tajam dan presisi:
+      - **Faktur Penjualan (`doc=invoice`)**: Rincian produk, harga, diskon, PPN, grand total, terbilang rupiah, rekening bank resmi, dan tanda tangan sah.
+      - **Berita Acara (`doc=bast`)**: Pernyataan resmi serah terima barang/jasa, spesifikasi, dan pengesahan dua belah pihak.
+      - **Surat Jalan (`doc=delivery`)**: Alamat pengiriman, kuantitas item barang, paraf gudang, pengemudi, dan penerima.
+      - **Dokumentasi Foto (`doc=photos`)**: Grid foto fisik pekerjaan lapangan, part pengganti, dan pengesahan pelaksana.
+    - Dilengkapi toolbar atas (khusus layar, otomatis tersembunyi saat dicetak / `print:hidden`):
+      - Tombol **🖨️ Cetak (Print)** untuk memicu dialog cetak browser langsung.
+      - Tombol **⬇️ Unduh PDF** (didukung library `html2pdf.js` client-side).
+      - Tab Bar Navigasi Dokumen Terkait agar klien dapat beralih melihat Faktur, BAST, Surat Jalan, atau Foto Dokumentasi dengan 1 klik.
+  - [x] **Langkah 3 (Validasi Kompilasi, Pengujian Lokal, & Deployment)**:
+    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
+    - Build Next.js `npm run build` sukses 47/47 rute (rute `/api/finance/print` terdaftar sebagai dynamic route).
+    - Pengujian HTTP lokal untuk ke-4 jenis dokumen menghasilkan Status 200 OK.
+    - Push ke GitHub repository `rm23nm/dstech-smart`.
+    - Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 95. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
