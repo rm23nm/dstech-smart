@@ -23,7 +23,9 @@ import {
   Star,
   Download,
   FileText,
+  Smartphone,
 } from "lucide-react";
+
 
 interface Product {
   id: string;
@@ -837,7 +839,15 @@ export default function ShopPage() {
           <p className="text-slate-400 text-xs font-medium">
             &copy; {new Date().getFullYear()} PT. DSTech Smart Perkasa &bull; Solusi Keamanan & IT Infrastructure Terpercaya
           </p>
-          <div className="flex gap-6 text-xs font-bold text-slate-400">
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs font-bold text-slate-400">
+            <a 
+              href="/dstech-smart-app.apk" 
+              download="dstech-smart-app.apk"
+              className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 transition-colors bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/30 px-3 py-1.5 rounded-xl shadow-sm"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Download App Android (6.2 MB)</span>
+            </a>
             <Link href="/" className="hover:text-white transition-colors">
               Beranda
             </Link>

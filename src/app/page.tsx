@@ -22,8 +22,11 @@ import {
   Menu,
   X,
   ArrowRight,
-  LogIn
+  LogIn,
+  Smartphone,
+  Download
 } from "lucide-react";
+
 import Link from "next/link";
 
 interface SiteSettings {
@@ -415,11 +418,11 @@ export default function Home() {
       <footer className="bg-white border-t-4 border-dstech-blue pt-16 sm:pt-24 pb-12 overflow-hidden relative">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 sm:gap-12 mb-12 relative z-10">
             {/* Col 1: About */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="space-y-6">
                <div className="relative w-40 sm:w-52 h-12 sm:h-16">
                   <Image src="/logo.png" alt={settings.companyName || "DSTech Logo"} fill className="object-contain object-left" />
                </div>
-               <p className="text-sm sm:text-base text-slate-600 font-medium leading-relaxed max-w-md">
+               <p className="text-sm text-slate-600 font-medium leading-relaxed max-w-sm">
                   {settings.tagline}
                </p>
                <div className="flex gap-3 pt-2">
@@ -488,6 +491,35 @@ export default function Home() {
                   {settings.companyName} &bull; Est. 2017
                </div>
             </div>
+
+            {/* Col 4: Mobile App Download */}
+            <div className="space-y-4 p-5 bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950 text-white rounded-2xl border border-slate-700/70 shadow-xl relative overflow-hidden group">
+               <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none"></div>
+               <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                     Mobile App
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">v1.0.0 &bull; 6.2 MB</span>
+               </div>
+               <div>
+                  <h4 className="text-white font-black text-sm tracking-tight flex items-center gap-2">
+                     <Smartphone className="w-4 h-4 text-emerald-400" />
+                     DSTech Smart Android
+                  </h4>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                     Unduh aplikasi resmi untuk akses cepat operasional, kuitansi, faktur, dan manajemen langsung dari HP Anda.
+                  </p>
+               </div>
+               <a 
+                 href="/dstech-smart-app.apk"
+                 download="dstech-smart-app.apk"
+                 className="w-full flex items-center justify-center gap-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-lg shadow-emerald-950/40 transition-all active:scale-95 cursor-pointer"
+               >
+                  <Download className="w-4 h-4" />
+                  <span>Download APK Android</span>
+               </a>
+            </div>
          </div>
          
          {/* Bottom Footer Bar */}
@@ -495,7 +527,15 @@ export default function Home() {
             <p className="text-slate-500 text-xs font-medium">
               &copy; {new Date().getFullYear()} {settings.companyName}. All rights reserved.
             </p>
-            <div className="flex gap-6 text-xs font-bold text-slate-500">
+            <div className="flex flex-wrap justify-center sm:justify-end items-center gap-4 sm:gap-6 text-xs font-bold text-slate-500">
+               <a 
+                 href="/dstech-smart-app.apk" 
+                 download="dstech-smart-app.apk" 
+                 className="flex items-center gap-1.5 text-emerald-600 hover:text-emerald-700 font-bold transition-colors bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200"
+               >
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Download APK (6.2 MB)</span>
+               </a>
                <a href="/admin" className="hover:text-dstech-blue transition-colors">Admin Portal</a>
                <a href="/shop" className="hover:text-dstech-red transition-colors">E-Store</a>
                <a href="/affiliate" className="hover:text-dstech-blue transition-colors">Partner</a>
