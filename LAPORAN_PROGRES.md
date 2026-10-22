@@ -2615,22 +2615,37 @@
 ### 88. Tugas: Pemindahan & Integrasi Pengaturan Rekening Bank dan Kop Surat ke Menu Site Setting (`/admin/settings`)
 - **Permintaan Pengguna**:
   *"pengaturan Rekening Bank dan Kop surat belum dipindahkan ke Site setting"*
-- **Status**: Antrian Pekerjaan Selanjutnya (Queued)
+- **Status**: Selesai & Terverifikasi
 - **Konteks & Analisis Masalah**:
-  - Saat ini, pengaturan Rekening Bank (BCA, Mandiri, BSI, dll.) dan Kop Surat Dokumen (Upload Gambar Kop Surat, Mode Bleed/Cover/Contain, Padding Atas/Bawah) masih berada di dalam modal pengaturan lokal Keuangan (`isSettingsModalOpen` di `/admin/finance`).
+  - Sebelumnya pengaturan Rekening Bank dan Kop Surat hanya dapat diakses melalui modal kecil di dalam modul Keuangan (`/admin/finance`).
   - Pengguna menghendaki pengaturan terpusat (Master Data Perusahaan) berada di halaman **Site Settings** (`/admin/settings`) agar konfigurasi rekening bank dan kop surat resmi perusahaan dapat dikelola secara sentral dari satu menu master settings dan otomatis disinkronkan ke seluruh modul yang membutuhkan (Keuangan, Faktur, Surat Jalan, BAST, Penawaran/SPH).
-- **Rencana Penyelesaian Step-by-Step**:
-  - [ ] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/settings/page.tsx` dan `src/app/admin/finance/page.tsx` ke folder `_backup/`.
-  - [ ] **Langkah 2 (Inspeksi & Desain UI di Site Settings)**:
-    - Buka `src/app/admin/settings/page.tsx`.
-    - Tambahkan Tab / Bagian khusus: **"Informasi Rekening Bank Perusahaan"** (Daftar Akun Bank, No Rekening, Atas Nama, Cabang, Status Aktif) dan **"Kop Surat Resmi Perusahaan"** (Upload Gambar Kop Surat Resmi, Preview A4, Margin Padding Top/Bottom, Mode Tampilan Bleed/Contain/Cover).
-  - [ ] **Langkah 3 (Sinkronisasi Data Master ke Keuangan)**:
-    - Pastikan data rekening bank dan kop surat yang tersimpan di Site Settings tersinkronisasi ke API `/api/settings` atau database `dstech_settings` sehingga modul Keuangan (`/admin/finance`) membaca data master dari Site Settings.
-  - [ ] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
-    - Jalankan `npx tsc --noEmit` untuk verifikasi TypeScript.
-    - Jalankan `npm run build` lokal.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/settings/page.tsx`, `src/app/api/settings/route.ts`, dan `src/app/admin/finance/page.tsx` ke folder `_backup/`.
+  - [x] **Langkah 2 (Pengembangan Backend API & Sinkronisasi Dua Arah)**:
+    - Memperluas `src/app/api/settings/route.ts` dengan skema `bankAccounts` dan `letterheadSettings`.
+    - Mengintegrasikan sinkronisasi otomatis dua arah ke file data store `dstech_finance_erp.json` sehingga setiap perubahan di Site Settings langsung ter-update di modul Keuangan secara real-time.
+  - [x] **Langkah 3 (Desain UI Tab Navigasi di Site Settings `/admin/settings`)**:
+    - **Tab 1: 🏢 Profil & Legalitas Perusahaan**: Form identitas PT, NIB, NPWP, WhatsApp CS, email, alamat kantor, Google Maps, dan pratinjau footer website.
+    - **Tab 2: 💳 Master Rekening Bank Resmi**:
+      - Filter tab: 🌐 Semua, 🏢 Khusus PT, 🏬 Khusus Non-PT.
+      - Tombol `+ Tambah Rekening Bank` dengan modal form lengkap (Nama Bank Preset/Custom, Nomor Rekening, Atas Nama, Cabang, Peruntukan Entitas PT/Non-PT/ALL, Status Aktif/Nonaktif, dan Checkbox Rekening Utama).
+      - Grid kartu rekening modern dengan tombol aksi Ubah, Jadikan Utama, dan Hapus.
+    - **Tab 3: 📑 Template Kop Surat Dokumen (PT & Non-PT)**:
+      - Switcher tab entitas: 🏢 Entitas PT vs 🏬 Entitas Non-PT.
+      - Fitur unggah gambar kop surat (PNG / JPG / WebP) dan tombol reset ke berkas bawaan.
+      - Kontrol Margin Lembar Dokumen: Slider Padding Atas (Top Margin) dan Padding Bawah (Bottom Margin).
+      - Pilihan Mode Pemasangan Gambar: Bleed (Full Ujung Kertas), Fill (Pas Lembar), Contain (Proporsional), Cover (Penuh).
+      - Form Pejabat Penandatangan Resmi (Nama & Jabatan Direktur / Owner).
+      - Pratinjau Lembar A4 interaktif real-time dengan dummy invoice untuk menguji kecocokan margin.
+    - **Tab 4: ⚠️ Zona Bahaya**: Pembersihan data transaksi (Clean slate) dengan konfirmasi ketik `RESET`.
+  - [x] **Langkah 4 (Banner & Navigasi di Modul Keuangan `/admin/finance`)**:
+    - Menambahkan banner informatif dengan tombol pintasan `Buka Site Settings →` pada modal Rekening Bank dan modal Kop Surat di halaman Keuangan.
+  - [x] **Langkah 5 (Validasi Kompilasi, Build, & Deployment)**:
+    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
+    - Build Next.js `npm run build` sukses 46/46 rute.
+    - Push ke GitHub repository `rm23nm/dstech-smart` commit `a60e385`.
+    - Deploy ke live server VPS PM2 `dstech-main` (PID 299530, status online).
+    - Berikan konfirmasi dan panduan penggunaan kepada pengguna.
 
 ---
 
