@@ -87,8 +87,8 @@ export async function GET(req: Request) {
     });
   }
 
-  // Pengaturan Kop Surat & Info Perusahaan
-  const letterheadUrl = settings.letterheadUrl || "/images/kop_surat_dstech.jpg";
+  // Pengaturan Kop Surat & Info Perusahaan Resmi
+  const letterheadUrl = settings.letterheadUrl || "/kop_surat_dstech.jpg";
   const letterheadEnabled = settings.letterheadEnabled !== false;
   const signerName = sale.approvedBy || settings.signerName || "RAMADHANI ST";
   const signerTitle = sale.approvedTitle || settings.signerTitle || "Direktur";
@@ -118,40 +118,40 @@ export async function GET(req: Request) {
     documentTitle = `BAST - ${sale.invoiceNumber}`;
     documentContent = `
       <!-- LEMBAR BAST -->
-      <div class="text-center pb-6 border-b border-slate-300">
+      <div class="text-center pb-4 border-b border-slate-300">
         <h2 class="text-lg font-black tracking-widest text-slate-900 uppercase">BERITA ACARA SERAH TERIMA PEKERJAAN</h2>
         <p class="text-xs font-bold text-slate-600 tracking-wider">Nomor: BAST/DST/${sale.invoiceNumber}</p>
-        <p class="text-[11px] text-slate-500 mt-1">Lampiran Faktur: ${sale.invoiceNumber}</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Lampiran Faktur: ${sale.invoiceNumber}</p>
       </div>
 
-      <div class="py-6 space-y-4 text-xs leading-relaxed text-slate-700">
+      <div class="py-4 space-y-4 text-xs leading-relaxed text-slate-700">
         <p>Pada hari ini, tanggal <strong>${sale.date}</strong>, telah dilaksanakan serah terima pekerjaan pengadaan dan instalasi perangkat teknologi keamanan &amp; infrastruktur IT dengan rincian pihak-pihak terkait sebagai berikut:</p>
         
-        <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div class="grid grid-cols-2 gap-4 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
           <div>
             <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">PIHAK PERTAMA (Pelaksana):</span>
-            <p class="font-black text-slate-900 mt-1">PT. DSTECH SMART PERKASA</p>
-            <p class="text-slate-600">Solusi Security System &amp; IT Infrastructure</p>
-            <p class="text-[11px] text-slate-500 mt-1">PIC: ${sale.salesPerson || "Tim Teknis DSTech"}</p>
+            <p class="font-black text-slate-900 mt-0.5">PT. DSTECH SMART PERKASA</p>
+            <p class="text-slate-600 text-[11px]">Solusi Security System &amp; IT Infrastructure</p>
+            <p class="text-[10px] text-slate-500 mt-1">PIC: ${sale.salesPerson || "Tim Teknis DSTech"}</p>
           </div>
           <div>
             <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">PIHAK KEDUA (Penerima):</span>
-            <p class="font-black text-slate-900 mt-1">${sale.customerName}</p>
-            <p class="text-slate-600">${sale.customerAddress || "Lokasi Klien"}</p>
-            <p class="text-[11px] text-slate-500 mt-1">Telp: ${sale.customerPhone || "-"}</p>
+            <p class="font-black text-slate-900 mt-0.5">${sale.customerName}</p>
+            <p class="text-slate-600 text-[11px]">${sale.customerAddress || "Lokasi Klien"}</p>
+            <p class="text-[10px] text-slate-500 mt-1">Telp: ${sale.customerPhone || "-"}</p>
           </div>
         </div>
 
         <p>PIHAK PERTAMA telah menyerahkan seluruh barang/pekerjaan yang tercantum dalam Faktur No. <strong>${sale.invoiceNumber}</strong> kepada PIHAK KEDUA dalam kondisi baik, lengkap, berfungsi normal, dan telah lolos uji coba operasional (User Acceptance Test) sebagai berikut:</p>
 
-        <table class="w-full text-xs border border-slate-300 mt-3">
+        <table class="w-full text-xs border border-slate-300 mt-2">
           <thead class="bg-slate-100 font-bold text-slate-800">
             <tr>
               <th class="border border-slate-300 p-2 text-center w-10">No</th>
               <th class="border border-slate-300 p-2 text-left">Deskripsi Barang / Jasa Instalasi</th>
               <th class="border border-slate-300 p-2 text-center w-16">Qty</th>
               <th class="border border-slate-300 p-2 text-center w-20">Satuan</th>
-              <th class="border border-slate-300 p-2 text-center w-24">Kondisi Fisik</th>
+              <th class="border border-slate-300 p-2 text-center w-28">Kondisi Fisik</th>
             </tr>
           </thead>
           <tbody>
@@ -167,12 +167,12 @@ export async function GET(req: Request) {
           </tbody>
         </table>
 
-        <p class="text-[11px] text-slate-500 italic mt-2">
+        <p class="text-[10px] text-slate-500 italic mt-1">
           Catatan: Dengan ditandatanganinya Berita Acara ini, maka masa garansi teknis resmi DSTech Smart mulai berlaku terhitung sejak tanggal serah terima di atas.
         </p>
 
         <!-- Tanda Tangan BAST -->
-        <div class="grid grid-cols-2 gap-8 pt-8 mt-8 border-t border-slate-200 text-center">
+        <div class="grid grid-cols-2 gap-8 pt-6 mt-6 border-t border-slate-200 text-center">
           <div>
             <span class="text-xs text-slate-500 block mb-1">PIHAK KEDUA (Penerima):</span>
             <span class="font-bold text-slate-800 block">${sale.customerName}</span>
@@ -199,38 +199,38 @@ export async function GET(req: Request) {
     documentTitle = `Surat Jalan - ${sale.invoiceNumber}`;
     documentContent = `
       <!-- LEMBAR SURAT JALAN (DELIVERY ORDER) -->
-      <div class="text-center pb-6 border-b border-slate-300">
+      <div class="text-center pb-4 border-b border-slate-300">
         <h2 class="text-lg font-black tracking-widest text-slate-900 uppercase">SURAT JALAN / DELIVERY ORDER</h2>
         <p class="text-xs font-bold text-slate-600 tracking-wider">Nomor: SJ/DST/${sale.invoiceNumber}</p>
-        <p class="text-[11px] text-slate-500 mt-1">Ref Faktur: ${sale.invoiceNumber}</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Ref Faktur: ${sale.invoiceNumber}</p>
       </div>
 
-      <div class="py-6 space-y-4 text-xs leading-relaxed text-slate-700">
-        <div class="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+      <div class="py-4 space-y-4 text-xs leading-relaxed text-slate-700">
+        <div class="grid grid-cols-2 gap-4 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
           <div>
             <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">KIRIM DARI:</span>
-            <p class="font-black text-slate-900 mt-1">Gudang Logistik PT. DSTech Smart Perkasa</p>
-            <p class="text-slate-600">Kota Cilegon - Banten</p>
-            <p class="text-[11px] text-slate-500 mt-1">Petugas: ${sale.salesPerson || "Admin Logistik"}</p>
+            <p class="font-black text-slate-900 mt-0.5">Gudang Logistik PT. DSTech Smart Perkasa</p>
+            <p class="text-slate-600 text-[11px]">Kota Cilegon - Banten</p>
+            <p class="text-[10px] text-slate-500 mt-1">Petugas: ${sale.salesPerson || "Admin Logistik"}</p>
           </div>
           <div>
             <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">KIRIM KEPADA (Penerima):</span>
-            <p class="font-black text-slate-900 mt-1">${sale.customerName}</p>
-            <p class="text-slate-600">${sale.customerAddress || "Lokasi Pengiriman Klien"}</p>
-            <p class="text-[11px] text-slate-500 mt-1">No. Kontak: ${sale.customerPhone || "-"}</p>
+            <p class="font-black text-slate-900 mt-0.5">${sale.customerName}</p>
+            <p class="text-slate-600 text-[11px]">${sale.customerAddress || "Lokasi Pengiriman Klien"}</p>
+            <p class="text-[10px] text-slate-500 mt-1">No. Kontak: ${sale.customerPhone || "-"}</p>
           </div>
         </div>
 
         <p class="text-xs text-slate-600">Mohon diterima barang-barang berikut dalam kondisi baik dan tersegel:</p>
 
-        <table class="w-full text-xs border border-slate-300 mt-3">
+        <table class="w-full text-xs border border-slate-300 mt-2">
           <thead class="bg-slate-100 font-bold text-slate-800">
             <tr>
               <th class="border border-slate-300 p-2 text-center w-10">No</th>
               <th class="border border-slate-300 p-2 text-left">Nama / Jenis Barang</th>
               <th class="border border-slate-300 p-2 text-center w-20">Kuantitas</th>
               <th class="border border-slate-300 p-2 text-center w-20">Satuan</th>
-              <th class="border border-slate-300 p-2 text-left">Keterangan / Serial Number</th>
+              <th class="border border-slate-300 p-2 text-left">Keterangan / Status</th>
             </tr>
           </thead>
           <tbody>
@@ -247,7 +247,7 @@ export async function GET(req: Request) {
         </table>
 
         <!-- 3 Tanda Tangan Surat Jalan -->
-        <div class="grid grid-cols-3 gap-4 pt-8 mt-8 border-t border-slate-200 text-center">
+        <div class="grid grid-cols-3 gap-4 pt-6 mt-6 border-t border-slate-200 text-center">
           <div>
             <span class="text-[11px] text-slate-500 block mb-1">Gudang / Pengirim:</span>
             <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
@@ -278,15 +278,15 @@ export async function GET(req: Request) {
     const photos: any[] = sale.photos || [];
     documentContent = `
       <!-- LEMBAR DOKUMENTASI FOTO -->
-      <div class="text-center pb-6 border-b border-slate-300">
+      <div class="text-center pb-4 border-b border-slate-300">
         <h2 class="text-lg font-black tracking-widest text-slate-900 uppercase">LAPORAN FOTO DOKUMENTASI &amp; PERGANTIAN PART</h2>
         <p class="text-xs font-bold text-slate-600 tracking-wider">Lampiran Faktur No: ${sale.invoiceNumber}</p>
-        <p class="text-[11px] text-slate-500 mt-1">Klien: ${sale.customerName} | Tanggal: ${sale.date}</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Klien: ${sale.customerName} | Tanggal: ${sale.date}</p>
       </div>
 
-      <div class="py-6 space-y-6 text-xs text-slate-700">
+      <div class="py-4 space-y-4 text-xs text-slate-700">
         ${photos.length === 0 ? `
-          <div class="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-slate-400">
+          <div class="p-8 text-center bg-slate-50/80 rounded-2xl border border-dashed border-slate-300 text-slate-400">
             <span class="text-3xl block mb-2">📸</span>
             <p class="font-bold">Foto dokumentasi fisik pekerjaan telah terarsip secara digital di server.</p>
             <p class="text-[11px] mt-1">Silakan hubungi tim teknis DSTech untuk permintaan arsip foto beresolusi tinggi.</p>
@@ -294,16 +294,16 @@ export async function GET(req: Request) {
         ` : `
           <div class="grid grid-cols-2 gap-4">
             ${photos.map((photo: any, idx: number) => `
-              <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50 shadow-2xs">
-                <div class="h-48 bg-slate-200 flex items-center justify-center overflow-hidden">
+              <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/80 shadow-2xs">
+                <div class="h-44 bg-slate-200 flex items-center justify-center overflow-hidden">
                   <img src="${photo.url || photo.photoUrl}" alt="${photo.title || 'Foto Pekerjaan'}" class="w-full h-full object-cover" />
                 </div>
-                <div class="p-3 space-y-1">
-                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${photo.category === 'part_replacement' ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'}">
+                <div class="p-2.5 space-y-0.5">
+                  <span class="text-[9px] font-bold px-2 py-0.5 rounded-full ${photo.category === 'part_replacement' ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'}">
                     ${photo.category === 'part_replacement' ? '⚙️ Pergantian Part' : '📸 Dokumentasi Lapangan'}
                   </span>
                   <p class="font-bold text-slate-900 mt-1">${photo.title || `Foto Dokumentasi ${idx + 1}`}</p>
-                  <p class="text-[11px] text-slate-500">${photo.description || photo.notes || '-'}</p>
+                  <p class="text-[10px] text-slate-500">${photo.description || photo.notes || '-'}</p>
                 </div>
               </div>
             `).join("")}
@@ -311,7 +311,7 @@ export async function GET(req: Request) {
         `}
 
         <!-- Pengesahan Dokumentasi -->
-        <div class="grid grid-cols-2 gap-8 pt-8 mt-8 border-t border-slate-200 text-center">
+        <div class="grid grid-cols-2 gap-8 pt-6 mt-6 border-t border-slate-200 text-center">
           <div>
             <span class="text-xs text-slate-500 block mb-1">Pihak Klien / Pengawas:</span>
             <span class="font-bold text-slate-800 block">${sale.customerName}</span>
@@ -338,10 +338,10 @@ export async function GET(req: Request) {
     const terbilangRupiah = angkaKeTerbilang(sale.grandTotal) + " Rupiah";
     documentContent = `
       <!-- LEMBAR FAKTUR PENJUALAN -->
-      <div class="flex justify-between items-start pb-6 border-b border-slate-300">
+      <div class="flex justify-between items-start pb-4 border-b border-slate-300">
         <div>
           <h2 class="text-xl font-black text-slate-900 tracking-wider uppercase">FAKTUR PENJUALAN</h2>
-          <p class="text-xs font-mono font-bold text-indigo-700">NO: ${sale.invoiceNumber}</p>
+          <p class="text-xs font-mono font-bold text-indigo-700 mt-0.5">NO: ${sale.invoiceNumber}</p>
           <div class="mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
             sale.paymentStatus === 'Lunas' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
           }">
@@ -356,24 +356,24 @@ export async function GET(req: Request) {
       </div>
 
       <!-- Info Klien -->
-      <div class="py-4 border-b border-slate-200 grid grid-cols-2 gap-4 text-xs">
+      <div class="py-3 border-b border-slate-200 grid grid-cols-2 gap-4 text-xs">
         <div>
           <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">DITAGIHKAN KEPADA:</span>
           <p class="font-black text-slate-900 text-sm mt-0.5">${sale.customerName}</p>
           ${sale.customerPic ? `<p class="font-bold text-indigo-600">Up. ${sale.customerPic}</p>` : ''}
-          <p class="text-slate-600 mt-1 leading-relaxed">${sale.customerAddress || 'Alamat Klien'}</p>
-          <p class="text-slate-500 mt-0.5">Telp: ${sale.customerPhone || '-'}</p>
+          <p class="text-slate-600 mt-0.5 leading-relaxed text-[11px]">${sale.customerAddress || 'Alamat Klien'}</p>
+          <p class="text-slate-500 text-[11px] mt-0.5">Telp: ${sale.customerPhone || '-'}</p>
         </div>
         <div>
           <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">DITERBITKAN OLEH:</span>
           <p class="font-black text-slate-900 text-sm mt-0.5">PT. DSTECH SMART PERKASA</p>
-          <p class="text-slate-600 leading-relaxed">Jl. Raya Cilegon No. 18, Kota Cilegon - Banten</p>
-          <p class="text-slate-500">Website: https://dstechsmart.com | Email: info@dstechsmart.com</p>
+          <p class="text-slate-600 leading-relaxed text-[11px]">Jl. Raya Cilegon No. 18, Kota Cilegon - Banten</p>
+          <p class="text-slate-500 text-[10px]">Website: https://dstechsmart.com | Email: cs@dstechsmart.com</p>
         </div>
       </div>
 
       <!-- Tabel Rincian Item -->
-      <table class="w-full text-xs border border-slate-300 mt-4">
+      <table class="w-full text-xs border border-slate-300 mt-3">
         <thead class="bg-slate-100 font-bold text-slate-800">
           <tr>
             <th class="border border-slate-300 p-2 text-center w-10">No</th>
@@ -400,47 +400,47 @@ export async function GET(req: Request) {
       </table>
 
       <!-- Kalkulasi Subtotal & Terbilang -->
-      <div class="grid grid-cols-2 gap-6 mt-4 pt-4 border-t border-slate-200 text-xs">
-        <div class="space-y-3">
-          <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
-            <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">TERBILANG:</span>
-            <p class="font-bold italic text-slate-800 mt-1">"# ${terbilangRupiah} #"</p>
+      <div class="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-slate-200 text-xs">
+        <div class="space-y-2">
+          <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+            <span class="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">TERBILANG:</span>
+            <p class="font-bold italic text-slate-800 text-[11px] mt-0.5">"# ${terbilangRupiah} #"</p>
           </div>
 
-          <div class="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-indigo-950 space-y-1">
-            <span class="text-[10px] text-indigo-700 font-bold block uppercase tracking-wider">REKENING RESMI PEMBAYARAN TRANSFER:</span>
+          <div class="p-2.5 bg-indigo-50/70 rounded-xl border border-indigo-100 text-indigo-950 space-y-0.5">
+            <span class="text-[9px] text-indigo-700 font-bold block uppercase tracking-wider">REKENING RESMI TRANSFER:</span>
             <p class="font-bold text-xs">${defaultBank.bankName}</p>
-            <p class="font-mono text-sm font-black text-indigo-900">${defaultBank.accountNumber}</p>
-            <p class="text-[11px] text-indigo-800">a/n ${defaultBank.accountHolder} (${defaultBank.branch || 'Kantor Cabang'})</p>
+            <p class="font-mono text-xs font-black text-indigo-900">${defaultBank.accountNumber}</p>
+            <p class="text-[10px] text-indigo-800">a/n ${defaultBank.accountHolder} (${defaultBank.branch || 'Kantor Cabang'})</p>
           </div>
         </div>
 
-        <div class="space-y-1.5 text-right">
-          <div class="flex justify-between py-1 text-slate-600">
+        <div class="space-y-1 text-right">
+          <div class="flex justify-between py-0.5 text-slate-600">
             <span>Subtotal:</span>
             <span class="font-bold text-slate-900">${formatRupiah(sale.subtotal)}</span>
           </div>
           ${sale.discount && sale.discount > 0 ? `
-            <div class="flex justify-between py-1 text-red-600">
+            <div class="flex justify-between py-0.5 text-red-600">
               <span>${sale.discountLabel || 'Diskon'}:</span>
               <span class="font-bold">-${formatRupiah(sale.discount)}</span>
             </div>
           ` : ''}
           ${sale.taxAmount && sale.taxAmount > 0 ? `
-            <div class="flex justify-between py-1 text-slate-600">
+            <div class="flex justify-between py-0.5 text-slate-600">
               <span>PPN (${sale.taxRate || 11}%):</span>
               <span class="font-bold text-slate-900">${formatRupiah(sale.taxAmount)}</span>
             </div>
           ` : ''}
-          <div class="flex justify-between py-2 border-t-2 border-slate-800 text-base font-black text-slate-900">
+          <div class="flex justify-between py-1 border-t-2 border-slate-800 text-sm font-black text-slate-900">
             <span>Total Tagihan:</span>
             <span class="text-indigo-700">${formatRupiah(sale.grandTotal)}</span>
           </div>
-          <div class="flex justify-between py-1 text-emerald-700 font-bold">
+          <div class="flex justify-between py-0.5 text-emerald-700 font-bold">
             <span>Sudah Dibayar:</span>
             <span>${formatRupiah(sale.paidAmount || 0)}</span>
           </div>
-          <div class="flex justify-between py-1 text-amber-800 font-black border-t border-dashed border-slate-300">
+          <div class="flex justify-between py-0.5 text-amber-800 font-black border-t border-dashed border-slate-300">
             <span>Sisa Tagihan:</span>
             <span>${formatRupiah(sale.remainingAmount || 0)}</span>
           </div>
@@ -448,22 +448,22 @@ export async function GET(req: Request) {
       </div>
 
       <!-- Tanda Tangan & Cap Resmi -->
-      <div class="grid grid-cols-2 gap-8 pt-6 mt-6 border-t border-slate-200 text-center">
+      <div class="grid grid-cols-2 gap-8 pt-4 mt-4 border-t border-slate-200 text-center">
         <div>
-          <span class="text-[11px] text-slate-500 block mb-1">Penerima / Klien:</span>
+          <span class="text-[10px] text-slate-500 block mb-1">Penerima / Klien:</span>
           <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
             <span class="text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap )</span>
           </div>
-          <p class="font-bold text-slate-900 text-xs mt-1.5 underline">${sale.customerName}</p>
+          <p class="font-bold text-slate-900 text-xs mt-1 underline">${sale.customerName}</p>
         </div>
         <div>
-          <span class="text-[11px] text-slate-500 block mb-1">Hormat Kami,</span>
+          <span class="text-[10px] text-slate-500 block mb-1">Hormat Kami,</span>
           <span class="font-bold text-slate-900 text-xs block">PT. DSTECH SMART PERKASA</span>
           <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
             ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-16 object-contain z-10" />` : ""}
             ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-16 opacity-75 absolute right-4" />` : ""}
           </div>
-          <p class="font-black text-slate-900 text-xs mt-1.5 underline">( ${signerName} )</p>
+          <p class="font-black text-slate-900 text-xs mt-1 underline">( ${signerName} )</p>
           <p class="text-[10px] text-slate-500">${signerTitle}</p>
         </div>
       </div>
@@ -481,16 +481,27 @@ export async function GET(req: Request) {
       <script src="https://cdn.tailwindcss.com"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
       <style>
+        @page {
+          size: A4 portrait;
+          margin: 0;
+        }
         @media print {
-          body { background: white !important; padding: 0 !important; }
-          .print-hidden { display: none !important; }
+          body {
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .print-hidden {
+            display: none !important;
+          }
           .print-sheet {
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
-            width: 100% !important;
-            max-width: 100% !important;
-            padding: 0 !important;
+            width: 210mm !important;
+            height: 297mm !important;
+            min-height: 297mm !important;
+            page-break-after: always;
           }
         }
       </style>
@@ -498,7 +509,7 @@ export async function GET(req: Request) {
     <body class="bg-slate-100 text-slate-900 font-sans min-h-screen py-4 sm:py-8 px-2 sm:px-4">
       
       <!-- Top Action Toolbar (Layar saja, print:hidden) -->
-      <div class="max-w-4xl mx-auto mb-4 bg-white rounded-2xl p-4 shadow-md border border-slate-200 flex flex-wrap items-center justify-between gap-3 print-hidden">
+      <div class="max-w-[210mm] mx-auto mb-4 bg-white rounded-2xl p-4 shadow-md border border-slate-200 flex flex-wrap items-center justify-between gap-3 print-hidden">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow">
             DST
@@ -509,8 +520,19 @@ export async function GET(req: Request) {
           </div>
         </div>
 
-        <!-- Tombol Aksi Cepat Cetak & Download -->
-        <div class="flex items-center gap-2">
+        <!-- Tombol Aksi Cepat Cetak, Toggle Kop Surat & Download -->
+        <div class="flex flex-wrap items-center gap-2">
+          <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100">
+            <input
+              type="checkbox"
+              id="toggle-letterhead"
+              ${letterheadEnabled ? 'checked' : ''}
+              onchange="toggleLetterhead(this.checked)"
+              class="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+            />
+            <span>Kop Surat Resmi</span>
+          </label>
+
           <button
             type="button"
             onclick="downloadAsPdf()"
@@ -529,7 +551,7 @@ export async function GET(req: Request) {
       </div>
 
       <!-- Tab Navigasi Dokumen Terkait (Faktur, BAST, Surat Jalan, Foto) -->
-      <div class="max-w-4xl mx-auto mb-4 flex items-center gap-2 overflow-x-auto pb-1 print-hidden">
+      <div class="max-w-[210mm] mx-auto mb-4 flex items-center gap-2 overflow-x-auto pb-1 print-hidden">
         ${tabs.map((tab) => `
           <a
             href="?doc=${tab.id}&no=${encNo}"
@@ -544,52 +566,54 @@ export async function GET(req: Request) {
         `).join("")}
       </div>
 
-      <!-- LEMBAR DOKUMEN FISIK A4 -->
+      <!-- LEMBAR DOKUMEN FISIK A4 (Presisi Kertas A4 210mm x 297mm) -->
       <div
         id="print-sheet-document"
-        class="print-sheet max-w-4xl mx-auto bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden relative"
+        class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800"
+        style="width: 210mm; min-height: 297mm; max-width: 100%; box-sizing: border-box;"
       >
-        <!-- Kop Surat Resmi Gambar (Jika diaktifkan) -->
-        ${letterheadEnabled ? `
-          <div class="w-full">
-            <img
-              src="${letterheadUrl}"
-              alt="Kop Surat Resmi PT. DSTech Smart Perkasa"
-              class="w-full object-cover max-h-36"
-            />
-          </div>
-        ` : `
-          <div class="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-            <div>
-              <h2 class="font-black text-base text-slate-900">PT. DSTECH SMART PERKASA</h2>
-              <p class="text-xs text-slate-500">Security System, Access Control &amp; IT Infrastructure Solutions</p>
-            </div>
-            <div class="text-right text-xs text-slate-500 font-mono">
-              OFFICIAL DOCUMENT
-            </div>
-          </div>
-        `}
+        <!-- Background Kop Surat Resmi Gambar A4 Penuh (Full Bleed) -->
+        <img
+          id="letterhead-bg-img"
+          src="${letterheadUrl}"
+          alt="Kop Surat Resmi"
+          class="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+          style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${letterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+        />
 
-        <!-- Isi Dokumen -->
-        <div class="p-6 sm:p-10 space-y-4">
+        <!-- Area Isi Dokumen dengan Padding Top & Bottom yang Disesuaikan -->
+        <div
+          id="document-content-wrapper"
+          class="relative z-10 space-y-4"
+          style="padding-top: ${letterheadEnabled ? '120px' : '30px'}; padding-bottom: ${letterheadEnabled ? '90px' : '30px'}; padding-left: 42px; padding-right: 42px;"
+        >
           ${documentContent}
-        </div>
-
-        <!-- Footer Hak Cipta -->
-        <div class="p-4 bg-slate-50 border-t border-slate-200 text-center text-[10px] text-slate-400">
-          Dokumen ini diterbitkan secara sah melalui sistem Enterprise ERP PT. DSTech Smart Perkasa. Verifikasi: ${sale.verificationCode || sale.id}
         </div>
       </div>
 
       <script>
+        function toggleLetterhead(enabled) {
+          const bgImg = document.getElementById('letterhead-bg-img');
+          const wrapper = document.getElementById('document-content-wrapper');
+          if (enabled) {
+            bgImg.style.display = 'block';
+            wrapper.style.paddingTop = '120px';
+            wrapper.style.paddingBottom = '90px';
+          } else {
+            bgImg.style.display = 'none';
+            wrapper.style.paddingTop = '30px';
+            wrapper.style.paddingBottom = '30px';
+          }
+        }
+
         function downloadAsPdf() {
           const element = document.getElementById('print-sheet-document');
           const opt = {
-            margin:       0.3,
+            margin:       0,
             filename:     '${documentTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf',
             image:        { type: 'jpeg', quality: 0.98 },
             html2canvas:  { scale: 2, useCORS: true },
-            jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
           };
           html2pdf().set(opt).from(element).save();
         }
