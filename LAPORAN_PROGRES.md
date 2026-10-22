@@ -76,6 +76,7 @@
 - **2026-10-22**: Peningkatan Akses & Visibilitas Approval Faktur Digital dan Tombol Input Pembayaran Pelunasan / Cicilan Klien pada Modul Penjualan & Invoicing (`sales`). Mengatasi kebingungan pengguna: (1) Mengubah status 'Menunggu Approval' pada tabel faktur menjadi tombol aksi interaktif berwarna kuning animasi halus bertuliskan 'Approval Faktur' yang bisa langsung diklik untuk memunculkan modal tanda tangan digital direktur; (2) Menyediakan tombol aksi utama berlabel tegas warna hijau emerald '+ Input Bayar' pada setiap faktur yang belum lunas (dilengkapi modal pencatatan nominal, tanggal bayar, metode/rekening bank penerima, dan bukti transfer); (3) Menyediakan tombol cepat 'Approval Faktur' dan '+ Input Bayar' langsung di toolbar atas modal cetak/pratinjau faktur. Lolos validasi TypeScript 0 error dan build Next.js sukses.
 - **2026-10-22**: Penyembunyian Kolom Rincian Item pada Tabel Faktur Penjualan (`sales`) agar Tampilan Tabel Ringkas, Rapi, dan Tidak Memanjang ke Bawah. Menghilangkan kolom 'Rincian Item' yang sebelumnya merender seluruh baris produk/jasa vertikal (menyebabkan baris faktur melorot sangat panjang ke bawah), menggantikannya dengan badge ringkas dan informatif '📦 X Item' di bawah nomor faktur, dan menyesuaikan colSpan tabel menjadi 6 sehingga seluruh baris faktur memiliki ketinggian seragam dan proporsional. Lolos validasi TypeScript 0 error dan build Next.js sukses.
 - **2026-10-22**: Kompresi File Gambar Lampiran Maksimal ~40 KB (Client-Side HTML5 Canvas Strict Scale-Down & Ekspor PDF Super Ringan). Mengakomodasi permintaan pengguna agar file lampiran gambar dikompresi ke 40 KB dan tidak besar-besar: (1) Menyempurnakan algoritma kompresi gambar `compressImageFile` di `src/app/admin/finance/page.tsx` dengan target strict `maxTargetSizeKb = 40` (maksimal 40 * 1024 bytes) menggunakan loop adaptif bertahap (kualitas JPEG 0.70 -> 0.20 dan multi-step adaptive downscaling 0.80x dimensi jika file kamera awal sangat besar) sehingga seluruh nota, bukti transfer kas, dan foto proyek dijamin berada di bawah 40 KB tanpa mengaburkan teks dokumen; (2) Memasang fungsi kompresi client-side target ~40 KB pada formulir upload foto teknisi di portal `/employee` (`compressTechnicianPhoto`) dan admin maintenance `/admin/maintenance` (`compressMaintenancePhoto`) agar foto kamera HP teknisi di lapangan (3-10 MB) otomatis terkompresi ~40 KB sebelum dikirim ke server; (3) Mengoptimalkan parameter ekspor PDF pada endpoint cetak publik `/api/finance/print` (`quality: 0.65`, `scale: 1.5`) sehingga lembar SPH ber-lampiran foto brosur produk dan lembar faktur ber-foto dokumentasi menghasilkan file PDF unduhan yang sangat ringan (100-200 KB) dan cepat dibuka di perangkat mobile klien via WhatsApp. Lolos validasi TypeScript 0 error dan build Next.js lokal 47/47 rute sukses.
+- **2026-10-22**: Fitur Lampirkan Foto & Spesifikasi Khusus pada Item Barang yang Di-Input Manual di Formulir SPH (Kompresi Otomatis ~40 KB & Sinkronisasi Lembar 2 Lampiran SPH). Memenuhi kebutuhan pengguna terkait cara melampirkan foto barang/jasa yang di-input manual di luar katalog produk: (1) Menambahkan tombol upload foto interaktif `📷 Foto Item` langsung pada setiap baris item formulir pembuatan dan pengeditan SPH (`quotationForm.items`); (2) Setiap foto yang dipilih pengguna dari galeri/kamera otomatis dikompresi secara ketat ke ukuran target $\le$ 40 KB via `compressImageFile(file, 40)` sebelum diunggah ke server; (3) Menyediakan thumbnail pratinjau mini foto barang di samping input nama produk dengan status visual badge hijau `✓ Foto Lampiran Terpasang (~40 KB)` dan tombol hapus/ganti foto; (4) Menghubungkan URL foto item manual ke generator Lembar 2 (Lampiran Foto & Spesifikasi Produk SPH) di `/api/finance/print?doc=sph` sehingga foto barang manual otomatis dicetak rapi dan jernih dalam kartu katalog lampiran penawaran harga resmi. Lolos kompilasi TypeScript 0 error dan build Next.js lokal 47/47 rute sukses.
 
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
@@ -2832,7 +2833,30 @@
 
 ---
 
-### 97. Catatan Penting
+### 97. Tugas: Fitur Lampirkan Foto & Spesifikasi pada Item Manual SPH (Kompresi Otomatis ~40 KB)
+- **Permintaan Pengguna**: *"untuk file item yang di input manual,bagai mana cara melampirkan fotonya,"* -> *"ok, lanjutkan"*
+- **Status**: Selesai & Terverifikasi
+- **Rincian Penyelesaian Step-by-Step**:
+  1. [x] **Langkah 1 (Cadangan Backup)**:
+     - Telah dibuat file backup cadangan di folder `_backup` sebelum modifikasi dilakukan.
+  2. [x] **Langkah 2 (Update Interface & State Item SPH)**:
+     - Menambahkan properti `image?: string;` dan `description?: string;` pada `QuotationItem` di `src/app/admin/finance/page.tsx`.
+     - Memperbarui `handleAddQuotationItem` dan `handleSelectProductForQuotation` agar otomatis menyinkronkan properti `image` dan `description`.
+  3. [x] **Langkah 3 (Komponen Upload Foto & Thumbnail pada Form Item SPH)**:
+     - Pada repeater item baris barang `quotationForm.items.map`, menambahkan tombol upload foto `📷 Foto` dengan input file gambar tersembunyi.
+     - Menghubungkan ke fungsi kompresi client-side `compressImageFile(file, 40)` sehingga gambar otomatis terpangkas ringan $\le$ 40 KB sebelum dikirim ke `/api/upload`.
+     - Menyediakan thumbnail pratinjau mini foto barang di samping input nama produk dengan status visual badge hijau `✓ Foto Lampiran Terpasang (~40 KB)` dan tombol hapus/ganti foto.
+  4. [x] **Langkah 4 (Sinkronisasi ke Lembar Lampiran Cetak & PDF SPH `/api/finance/print?doc=sph`)**:
+     - Memastikan generator Lembar 2 (Lampiran Foto & Spesifikasi Produk SPH) di `/api/finance/print/route.ts` memprioritaskan `item.image` manual yang diunggah pengguna sehingga foto perangkat manual langsung tampil pada kartu katalog resmi SPH.
+  5. [x] **Langkah 5 (Validasi Kompilasi, Pengujian Lokal, & Deployment)**:
+     - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
+     - Build Next.js `npm run build` lokal sukses 47/47 rute.
+     - Push ke GitHub repository `rm23nm/dstech-smart`.
+     - Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 98. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

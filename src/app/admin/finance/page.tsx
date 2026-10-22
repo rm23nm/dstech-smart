@@ -76,6 +76,7 @@ import {
   Globe,
   Camera,
   Wrench,
+  Loader2,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -222,6 +223,8 @@ interface QuotationItem {
   price: number;
   discount: number;
   total: number;
+  image?: string;
+  description?: string;
 }
 
 interface Quotation {
@@ -1406,6 +1409,7 @@ export default function AdminFinanceERPPage() {
   const [selectedQuotationForPrint, setSelectedQuotationForPrint] = useState<Quotation | null>(null);
   const [selectedQuotationForConvert, setSelectedQuotationForConvert] = useState<Quotation | null>(null);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState<boolean>(false);
+  const [uploadingItemPhotoIdx, setUploadingItemPhotoIdx] = useState<number | null>(null);
   const getDefaultTermins = (grandTotal: number = 0, baseDueDate?: string): InvoiceTermin[] => {
     const baseDate = baseDueDate ? new Date(baseDueDate) : new Date();
     const t1Due = new Date(baseDate.getTime() + 14 * 86400000).toISOString().split("T")[0];
@@ -2649,6 +2653,8 @@ export default function AdminFinanceERPPage() {
         price: price,
         discount: discount,
         total: Math.max(0, qty * price - discount),
+        image: selected.image || "",
+        description: (selected as any).desc || (selected as any).description || "",
       };
       return { ...prev, items: updated };
     });
@@ -2720,13 +2726,45 @@ export default function AdminFinanceERPPage() {
     });
   };
 
+  // Helper Upload Foto Item Manual SPH (Kompresi Otomatis ~40 KB)
+  const handleUploadItemPhoto = async (idx: number, file: File) => {
+    if (!file) return;
+    try {
+      setUploadingItemPhotoIdx(idx);
+      showToast("Mengompresi foto item ke ~40 KB...");
+      const { file: fileToUpload } = await compressImageFile(file, 40);
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("docType", "quotation_item");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        handleQuotationItemChange(idx, "image", data.url);
+        showToast("✓ Foto item berhasil dilampirkan (~40 KB)!");
+      } else {
+        showToast("Gagal mengunggah foto item.");
+      }
+    } catch (err) {
+      console.error("Error uploading quotation item photo:", err);
+      showToast("Terjadi kesalahan saat memproses foto item.");
+    } finally {
+      setUploadingItemPhotoIdx(null);
+    }
+  };
+
   // Handler Quotation Form Dynamic Items
   const handleAddQuotationItem = () => {
     setQuotationForm((prev) => ({
       ...prev,
       items: [
         ...prev.items,
-        { id: String(Date.now()), productId: "", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0 },
+        { id: String(Date.now()), productId: "", productName: "", qty: 1, unit: "Unit", price: 0, discount: 0, total: 0, image: "", description: "" },
       ],
     }));
   };
@@ -12812,14 +12850,80 @@ export default function AdminFinanceERPPage() {
                             ))}
                           </select>
                         </div>
-                        <input
-                          type="text"
-                          required
-                          placeholder="Nama barang & spesifikasi teknis..."
-                          value={it.productName}
-                          onChange={(e) => handleQuotationItemChange(idx, "productName", e.target.value)}
-                          className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-1 focus:ring-indigo-500"
-                        />
+                        <div className="flex items-center gap-1.5">
+                          {/* Tombol Upload & Thumbnail Foto Item Manual (~40 KB) */}
+                          <div className="relative shrink-0">
+                            <input
+                              type="file"
+                              id={`item-photo-${idx}`}
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleUploadItemPhoto(idx, f);
+                                e.target.value = "";
+                              }}
+                            />
+                            {it.image ? (
+                              <div className="relative group w-8 h-8 rounded-lg overflow-hidden border border-indigo-300 bg-white shadow-xs">
+                                <img
+                                  src={it.image}
+                                  alt="Foto Item"
+                                  className="w-full h-full object-cover"
+                                />
+                                <label
+                                  htmlFor={`item-photo-${idx}`}
+                                  title="Klik untuk ganti foto (~40 KB)"
+                                  className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity text-[8px] font-bold"
+                                >
+                                  <Camera className="w-3.5 h-3.5" />
+                                </label>
+                              </div>
+                            ) : (
+                              <label
+                                htmlFor={`item-photo-${idx}`}
+                                title="Lampirkan foto produk/brosur (otomatis kompres ke ~40 KB)"
+                                className={`w-8 h-8 rounded-lg border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                  uploadingItemPhotoIdx === idx
+                                    ? "bg-amber-50 border-amber-400 text-amber-600 animate-pulse"
+                                    : "bg-white hover:bg-indigo-50 border-slate-300 hover:border-indigo-400 text-slate-400 hover:text-indigo-600 shadow-xs"
+                                }`}
+                              >
+                                {uploadingItemPhotoIdx === idx ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Camera className="w-3.5 h-3.5" />
+                                )}
+                              </label>
+                            )}
+                          </div>
+
+                          <input
+                            type="text"
+                            required
+                            placeholder="Nama barang & spesifikasi teknis..."
+                            value={it.productName}
+                            onChange={(e) => handleQuotationItemChange(idx, "productName", e.target.value)}
+                            className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </div>
+
+                        {/* Indikator Status Foto Lampiran */}
+                        {it.image && (
+                          <div className="flex items-center justify-between text-[9px] text-emerald-600 font-semibold px-0.5">
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                              Foto Lampiran Terpasang (~40 KB)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleQuotationItemChange(idx, "image", "")}
+                              className="text-slate-400 hover:text-red-500 hover:underline cursor-pointer"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        )}
                         {/* Live Stock Badge */}
                         {(() => {
                           const info = getProductStockInfo(it.productId || it.productName, quotationForm.warehouseId);
