@@ -2751,21 +2751,25 @@
     - Membuat file rute `src/app/api/finance/print/route.ts` yang menangani permintaan `GET(req)`.
     - Mengambil parameter query `doc` (`invoice`, `bast`, `delivery`, `photos`) dan `no` (nomor invoice/dokumen).
     - Membaca data transaksi faktur, rekening bank resmi, dan pengaturan kop surat resmi langsung dari `dstech_finance_erp.json`.
-  - [x] **Langkah 2 (Desain Lembar Cetak Dokumen A4 Responsif)**:
+  - [x] **Langkah 2 (Desain Lembar Cetak Dokumen A4 Responsif & Kalibrasi Kop Surat Full Bleed)**:
     - Merender HTML dokumen cetak A4 yang tajam dan presisi:
       - **Faktur Penjualan (`doc=invoice`)**: Rincian produk, harga, diskon, PPN, grand total, terbilang rupiah, rekening bank resmi, dan tanda tangan sah.
       - **Berita Acara (`doc=bast`)**: Pernyataan resmi serah terima barang/jasa, spesifikasi, dan pengesahan dua belah pihak.
       - **Surat Jalan (`doc=delivery`)**: Alamat pengiriman, kuantitas item barang, paraf gudang, pengemudi, dan penerima.
       - **Dokumentasi Foto (`doc=photos`)**: Grid foto fisik pekerjaan lapangan, part pengganti, dan pengesahan pelaksana.
+    - **Kalibrasi Kop Surat Resmi Utuh A4**:
+      - Menggunakan background full bleed A4 (`width: 210mm; min-height: 297mm; inset-0; object-fit: fill`) agar gambar kop surat resmi (baik base64 maupun file jpg) membentang utuh dari ujung kepala kertas hingga kaki footer tanpa terpotong atau gepeng.
+      - Mengatur margin konten `padding-top: 120px` dan `padding-bottom: 90px` sehingga seluruh teks judul dokumen, tabel, dan tanda tangan berada persis di bawah garis batas kop surat resmi.
+      - Menyediakan tombol saklar `[✓] Kop Surat Resmi` di toolbar atas agar kop surat dapat diaktifkan atau dinonaktifkan secara dinamis saat mencetak ke blanko fisik.
     - Dilengkapi toolbar atas (khusus layar, otomatis tersembunyi saat dicetak / `print:hidden`):
       - Tombol **🖨️ Cetak (Print)** untuk memicu dialog cetak browser langsung.
       - Tombol **⬇️ Unduh PDF** (didukung library `html2pdf.js` client-side).
       - Tab Bar Navigasi Dokumen Terkait agar klien dapat beralih melihat Faktur, BAST, Surat Jalan, atau Foto Dokumentasi dengan 1 klik.
   - [x] **Langkah 3 (Validasi Kompilasi, Pengujian Lokal, & Deployment)**:
     - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` sukses 47/47 rute (rute `/api/finance/print` terdaftar sebagai dynamic route).
-    - Pengujian HTTP lokal untuk ke-4 jenis dokumen menghasilkan Status 200 OK.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
+    - Build Next.js `npm run build` sukses 47/47 rute.
+    - Pengujian HTTP lokal & live domain menghasilkan Status 200 OK dengan gambar kop surat ter-render utuh dan presisi.
+    - Push ke GitHub repository `rm23nm/dstech-smart` commit `850683e`.
     - Deploy ke live server VPS PM2 `dstech-main`.
 
 ---
