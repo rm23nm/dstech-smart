@@ -2672,55 +2672,75 @@
 ### 90. Tugas: Pembuatan Fitur & Tombol Cetak Lembar Laporan Dokumentasi Foto Proyek / Pekerjaan
 - **Permintaan Pengguna**:
   *"tombol cetak laporan dokumentasinya belum ada"*
-- **Status**: Sedang Dikerjakan (In Progress)
-- **Konteks & Kebutuhan Solusi**:
-  - Pada Manajemen Proyek / Pekerjaan Lapangan, sistem sudah memiliki modal upload dan galeri dokumentasi foto progres pekerjaan (Sebelum / Progress / Selesai).
-  - Namun di modal tersebut belum disediakan tombol **Cetak Laporan Dokumentasi** (Print / Cetak Lembar A4 Berkop resmi yang memuat metadata proyek, nama klien, tanggal pengerjaan, galeri foto dokumentasi dengan keterangan/catatan, serta blok pengesahan tanda tangan Project Manager dan Klien).
-- **Rencana Penyelesaian Step-by-Step**:
-  - [ ] **Langkah 1 (Cadangan Backup)**: Backup file target yang menangani dokumentasi proyek ke `_backup/`.
-  - [ ] **Langkah 2 (Inspeksi Modal Dokumentasi Proyek)**:
-    - Telusuri file modal dokumentasi proyek (di `src/app/admin/finance/page.tsx` atau komponen proyek terkait).
-    - Tambahkan tombol **🖨️ Cetak Laporan Dokumentasi** di toolbar modal dokumentasi.
-  - [ ] **Langkah 3 (Pembuatan Lembar Pratinjau Cetak Laporan Dokumentasi A4)**:
-    - Desain layout lembar cetak A4 profesional:
-      - Header: Kop Surat Resmi PT / Non-PT (otomatis sinkron).
-      - Judul Dokumen: `LAPORAN DOKUMENTASI PROGRES PEKERJAAN & INSTALASI`.
-      - Tabel Informasi Proyek: Kode PRJ, Nama Proyek, Klien/Instansi, Lokasi Pemasangan, Tanggal Dokumentasi, Status Proyek.
-      - Galeri Foto Dokumentasi: Grid 2 kolom rapi berisi gambar foto, kategori fase (Sebelum / Progress / Selesai), dan catatan keterangan foto.
-      - Lembar Pengesahan: Tanda Tangan Project Manager (Pelaksana) dan PIC Klien (Pemberi Tugas).
-      - CSS Print Media Query `@media print` agar pas pada 1 atau beberapa halaman A4.
-  - [ ] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
-    - Jalankan `npx tsc --noEmit`.
-    - Jalankan `npm run build` lokal.
+- **Status**: Selesai & Terverifikasi
+- **Akar Masalah**:
+  Meskipun modal pratinjau lembar cetak A4 dokumentasi foto sudah dibangun di backend/state, tombol pemicu langsung untuk mencetak dokumentasi foto belum disematkan pada baris tabel Penjualan (`sales`), di samping tombol BAST dan Surat Jalan, serta belum ada tombol cepat di Action Bar pratinjau Faktur.
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Salin cadangan file ke `_backup/`.
+  - [x] **Langkah 2 (Penyematan Tombol di Tabel Penjualan)**:
+    - Menambahkan tombol ungu `📸 Dokumentasi` dengan badge jumlah foto di jajaran tombol dokumen cetak utama (di samping tombol BAST dan Surat Jalan) pada tabel penjualan.
+  - [x] **Langkah 3 (Penyematan Tombol di Action Bar Faktur)**:
+    - Menambahkan tombol cepat `📸 Cetak Dokumentasi` di toolbar pratinjau Faktur Penjualan (`selectedInvoiceForPrint`) agar saat admin membuka faktur, dapat langsung membuka lembar cetak dokumentasi foto faktur tersebut.
+  - [x] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
+    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
+    - Build Next.js `npm run build` sukses 46/46 rute.
+    - Push ke GitHub repository `rm23nm/dstech-smart` commit `43667e6`.
+    - Deploy ke live server VPS PM2 `dstech-main` (PID 302351, online).
+
+---
+
+### 91. Tugas: Penyertaan Tautan Link Download Lengkap (Invoice, BAST, Surat Jalan, dan Laporan Dokumentasi) serta Penambahan Nama PIC Personal pada Pesan WhatsApp
+- **Permintaan Pengguna**:
+  1. *"saat mengirimkan invoice, tombol link download invoice, BAST, Surat Jalan dan Laporan Dokumentasi belum ada. sebaiknya langsung ditambahkan agar client bisa langsung download"*
+  2. *"pada format kirim pesannya, tolong tambahkan juga PIC dari perusahaannya kalau memang terisi. agar lebih personal"*
+- **Status**: Selesai & Terverifikasi
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_doc_links_and_pic_wa`.
+  - [x] **Langkah 2 (Penambahan PIC Personal pada Sapaan WhatsApp & Email)**:
+    - Menambahkan field `recipientPic` pada state `sendDocModal` dan interface `SaleInvoice`.
+    - Mengambil nama PIC otomatis dari data transaksi penjualan (`sale.customerPic || sale.picName`) atau mencocokkannya dengan master klien (`clients.find(...)?.pic`).
+    - Memperbarui format pembuka pesan WhatsApp agar menyapa langsung PIC:
+      `*Yth. Bapak/Ibu [Nama PIC]*`
+      `*[Nama Perusahaan Klien]*`
+      sehingga pesan terasa jauh lebih personal, formal, dan santun.
+    - Menampilkan badge info `👤 PIC: [Nama PIC]` di dalam kartu ringkasan penerima pada modal kirim WhatsApp.
+  - [x] **Langkah 3 (Penyertaan 4 Tautan Download Dokumen Resmi di Modal Kirim WhatsApp)**:
+    - Menambahkan blok visual ungu korporat premium **"Tautan Download Dokumen Resmi Klien"** di modal kirim yang memuat 4 kartu dokumen:
+      1. 📄 Faktur Penjualan (Invoice)
+      2. 📝 Berita Acara Serah Terima (BAST)
+      3. 🚚 Surat Jalan Material (Delivery Order)
+      4. 📸 Laporan Foto Dokumentasi & Part
+    - Masing-masing kartu dilengkapi tombol cepat:
+      - `Salin` (Copy link URL dokumen ke clipboard dengan feedback toast)
+      - `Buka / Unduh` (Membuka langsung lembar dokumen cetak di tab baru)
+  - [x] **Langkah 4 (Penyertaan 4 Tautan Berkas Lengkap di Draf Teks WhatsApp)**:
+    - Mengintegrasikan ke-4 URL dokumen resmi langsung ke dalam draf pesan WhatsApp (`waText`) di bawah detail nilai dan legalitas invoice, sehingga klien yang menerima WhatsApp bisa langsung mengklik tautan untuk melihat atau mengunduh berkas lengkap tanpa repot.
+  - [x] **Langkah 5 (Akses Cepat dari Toolbar Pratinjau Faktur)**:
+    - Menambahkan tombol hijau emerald `💬 Kirim WA` di samping tombol `📸 Cetak Dokumentasi` pada Action Bar pratinjau Faktur Penjualan (`selectedInvoiceForPrint`).
+  - [x] **Langkah 6 (Fitur Approval Dokumentasi Foto Digital)**:
+    - Menambahkan tombol `✍️ Approval Dokumentasi` pada toolbar lembar cetak dokumentasi foto (`selectedInvoiceForPhotoPrint`).
+    - Menyediakan modal otorisasi tanda tangan digital pelaksana teknis (`isDocApprovalModalOpen`) dengan 3 mode: gores layar langsung (canvas ungu), tanda tangan master, atau upload gambar PNG.
+    - Menampilkan tanda tangan digital dan status verifikasi sah di blok tanda tangan fisik lembar cetak dokumentasi A4.
+  - [x] **Langkah 7 (Validasi Kompilasi, Build, & Deployment)**:
+    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
+    - Build Next.js `npm run build` sukses 46/46 rute.
     - Push ke GitHub repository `rm23nm/dstech-smart`.
     - Deploy ke live server VPS PM2 `dstech-main`.
 
 ---
 
-### 91. Tugas: Penyertaan Tautan Link Download Lengkap (Invoice, BAST, Surat Jalan, dan Laporan Dokumentasi) pada Modal Kirim WhatsApp
+### 92. Tugas: Dukungan Multi-PIC dalam 1 Perusahaan / Klien untuk Fleksibilitas Penawaran ke Berbagai Divisi / User
 - **Permintaan Pengguna**:
-  *"saat mengirimkan invoice, tombol link download invoice, BAST, Surat Jalan dan Laporan Dokumentasi belum ada. sebaiknya langsung ditambahkan agar client bisa langsung download"*
+  *"apakah saya bisa input nama client dengan PIC yang berbeda pada 1 perusahaan? kalau memang tidak bisa, tolong buat agar bisa, kerena nantinya dalam 1 perusahaan kita memiliki tujuan penawaran berbeda-beda user"*
 - **Status**: Antrian Pekerjaan Selanjutnya (Queued)
-- **Konteks & Kebutuhan Solusi**:
-  - Saat admin membuka modal Kirim WhatsApp Invoice (`isSendInvoiceModalOpen`), template pesan WA dan opsi kirim harus menyediakan link unduh langsung (direct download link) untuk:
-    1. Faktur Penjualan (Invoice PDF)
-    2. Berita Acara Serah Terima (BAST PDF)
-    3. Surat Jalan Material (Delivery Order PDF)
-    4. Laporan Dokumentasi Progres Pekerjaan
-  - Dengan demikian, saat pesan WhatsApp dikirimkan ke klien, klien dapat langsung mengklik tautan download resmi masing-masing dokumen tanpa perlu meminta dokumen satu per satu secara manual.
-- **Rencana Penyelesaian Step-by-Step**:
-  - [ ] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/finance/page.tsx` ke `_backup/`.
-  - [ ] **Langkah 2 (Pembuatan Endpoint / Link URL Cetak Dokumen Publik)**:
-    - Sediakan URL cetak/unduh langsung untuk setiap jenis dokumen berdasarkan `saleId` atau `invoiceNo`.
-  - [ ] **Langkah 3 (Integrasi Template Pesan WhatsApp & Tombol Link di Modal Kirim)**:
-    - Tambahkan tombol-tombol pintasan link cepat di modal kirim.
-    - Sisipkan rincian link download lengkap ke dalam draft teks pesan WhatsApp.
-  - [ ] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
-    - Validasi TypeScript, build Next.js, git push, dan deploy VPS.
+- **Analisis Kebutuhan**:
+  - Dalam operasional B2B, 1 perusahaan/instansi klien (misal: PT. Indocement, PT. Krakatau Steel) memiliki banyak PIC yang berbeda-beda tergantung divisi/departemen (contoh: PIC IT untuk CCTV, PIC GA untuk Akses Kontrol, PIC Procurement untuk Penagihan).
+  - Saat ini formulir input klien atau transaksi mungkin membatasi nama perusahaan unik atau belum menyediakan pemilihan/input nama PIC yang dinamis per penawaran.
+  - Solusi: Sediakan input nama PIC dan jabatan/bagian PIC yang fleksibel pada master klien serta pada saat membuat Penawaran (Quotation) / Faktur, sehingga untuk perusahaan yang sama bisa ditujukan kepada PIC yang berbeda-beda tanpa terblokir sistem.
 
 ---
 
-### 92. Catatan Penting
+### 93. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

@@ -208,6 +208,8 @@ interface SaleInvoice {
   businessEntity?: "PT" | "NON_PT";
   projectId?: string;
   projectName?: string;
+  customerPic?: string;
+  picName?: string;
   photos?: ProjectPhoto[];
 }
 
@@ -837,6 +839,18 @@ export default function AdminFinanceERPPage() {
   const deliveryCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const [isDeliveryDrawing, setIsDeliveryDrawing] = useState<boolean>(false);
   const [hasDeliveryDrawn, setHasDeliveryDrawn] = useState<boolean>(false);
+
+  // Laporan Foto Dokumentasi Approval States
+  const [isDocApprovalModalOpen, setIsDocApprovalModalOpen] = useState<boolean>(false);
+  const [docApprovalCoordinatorName, setDocApprovalCoordinatorName] = useState<string>("Ahmad Romadhoni");
+  const [docApprovalCoordinatorTitle, setDocApprovalCoordinatorTitle] = useState<string>("Project Coordinator / Teknisi Pelaksana");
+  const [docApprovalMode, setDocApprovalMode] = useState<"canvas" | "upload" | "master">("canvas");
+  const [docApprovalUploadedSignature, setDocApprovalUploadedSignature] = useState<string>("");
+  const [docApprovalSignatureImage, setDocApprovalSignatureImage] = useState<string>("");
+  const [docApprovalDate, setDocApprovalDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const docCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const [isDocDrawing, setIsDocDrawing] = useState<boolean>(false);
+  const [hasDocDrawn, setHasDocDrawn] = useState<boolean>(false);
 
   const handleOpenDeliveryModal = (sale: SaleInvoice) => {
     const invClean = sale.invoiceNumber ? sale.invoiceNumber.replace(/^INV-/, "") : "001";
@@ -1764,6 +1778,7 @@ export default function AdminFinanceERPPage() {
     docTitle: string;
     docNumber: string;
     recipientName: string;
+    recipientPic?: string;
     recipientOrg?: string;
     recipientPhone: string;
     recipientEmail?: string;
@@ -1784,6 +1799,7 @@ export default function AdminFinanceERPPage() {
     docTitle: "Surat Penawaran Harga (SPH)",
     docNumber: "",
     recipientName: "",
+    recipientPic: "",
     recipientOrg: "",
     recipientPhone: "",
     recipientEmail: "",
@@ -1819,6 +1835,7 @@ export default function AdminFinanceERPPage() {
     docTitle: string;
     docNumber: string;
     recipientName: string;
+    recipientPic?: string;
     recipientOrg?: string;
     recipientPhone?: string;
     recipientEmail?: string;
@@ -1841,6 +1858,7 @@ export default function AdminFinanceERPPage() {
       docTitle: params.docTitle,
       docNumber: params.docNumber,
       recipientName: params.recipientName,
+      recipientPic: params.recipientPic || "",
       recipientOrg: params.recipientOrg || "",
       recipientPhone: params.recipientPhone || "",
       recipientEmail: params.recipientEmail || "",
@@ -1863,15 +1881,28 @@ export default function AdminFinanceERPPage() {
 
   const generateDocShareContent = (doc: typeof sendDocModal) => {
     const companyName = "PT. DSTech Smart Perkasa";
-    const portalUrl = "https://dstechsmart.com";
+    const portalUrl = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
 
-    // Format WA Text
-    let waText = `*Yth. ${doc.recipientName || "Bapak/Ibu"}*\n`;
-    if (doc.recipientOrg && doc.recipientOrg !== doc.recipientName) {
-      waText += `*${doc.recipientOrg}*\n\n`;
+    // Format WA Text dengan PIC yang lebih personal jika terisi
+    let waText = "";
+    if (doc.recipientPic && doc.recipientPic.trim() !== "") {
+      waText += `*Yth. Bapak/Ibu ${doc.recipientPic.trim()}*\n`;
+      if (doc.recipientOrg && doc.recipientOrg !== doc.recipientPic) {
+        waText += `*${doc.recipientOrg}*\n\n`;
+      } else if (doc.recipientName && doc.recipientName !== doc.recipientPic) {
+        waText += `*${doc.recipientName}*\n\n`;
+      } else {
+        waText += `\n`;
+      }
     } else {
-      waText += `\n`;
+      waText += `*Yth. ${doc.recipientName || "Bapak/Ibu"}*\n`;
+      if (doc.recipientOrg && doc.recipientOrg !== doc.recipientName) {
+        waText += `*${doc.recipientOrg}*\n\n`;
+      } else {
+        waText += `\n`;
+      }
     }
+
     waText += `Dengan hormat,\nBerikut kami sampaikan dokumen resmi *${doc.docTitle}* dari *${companyName}*:\n\n`;
     waText += `📋 *Dokumen:* ${doc.docTitle}\n`;
     waText += `🔢 *Nomor:* ${doc.docNumber}\n`;
@@ -1894,16 +1925,26 @@ export default function AdminFinanceERPPage() {
     if (doc.approvalStatus) {
       waText += `🛡️ *Status Legalitas:* ${doc.approvalStatus}\n`;
     }
+
+    // Jika Dokumen adalah Faktur (Invoice), sertakan Tautan Unduh Langsung Berkas Lengkap
     if (doc.docType === "Invoice") {
+      const encodedNo = encodeURIComponent(doc.docNumber);
+      waText += `\n📥 *Tautan Unduh & Cetak Berkas Resmi Pekerjaan:*\n`;
+      waText += `📄 *1. Faktur Penjualan (Invoice):*\n${portalUrl}/api/finance/print?doc=invoice&no=${encodedNo}\n\n`;
+      waText += `📝 *2. Berita Acara Serah Terima (BAST):*\n${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n\n`;
+      waText += `🚚 *3. Surat Jalan Material (Delivery Order):*\n${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n\n`;
+      waText += `📸 *4. Laporan Foto Dokumentasi & Part:*\n${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n`;
+
       waText += `\n💳 *Rekening Resmi Pembayaran Transfer:*\n`;
       const defaultBank = bankAccounts.find((b) => b.isDefault) || bankAccounts[0];
       if (defaultBank) {
         waText += `• ${defaultBank.bankName}: ${defaultBank.accountNumber} a/n ${defaultBank.accountHolder} (${defaultBank.branch})\n`;
       }
+    } else {
+      waText += `\nDokumen resmi ber-kop surat dan tanda tangan sah dapat dilihat/diunduh melalui portal resmi kami:\n🌐 ${portalUrl}\n\n`;
     }
 
-    waText += `\nDokumen resmi ber-kop surat dan tanda tangan sah dapat dilihat/diunduh melalui portal resmi kami:\n🌐 ${portalUrl}\n\n`;
-    waText += `Apabila ada pertanyaan lebih lanjut atau konfirmasi teknis, silakan hubungi tim kami melalui pesan ini.\n\n`;
+    waText += `\nApabila ada pertanyaan lebih lanjut atau konfirmasi teknis, silakan hubungi tim kami melalui pesan ini.\n\n`;
     waText += `Terima kasih atas kepercayaan dan kerjasamanya.\n\n`;
     waText += `_Salam hangat,_\n*${companyName}*\n_Security System & IT Infrastructure Solutions_`;
 
@@ -4124,6 +4165,76 @@ export default function AdminFinanceERPPage() {
 
     setIsDeliveryApprovalModalOpen(false);
     showToast("Tanda tangan & otorisasi Petugas Gudang berhasil disimpan pada Surat Jalan!");
+  };
+
+  // Laporan Foto Dokumentasi Canvas Handlers
+  const startDocDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = docCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    setIsDocDrawing(true);
+    setHasDocDrawn(true);
+    const rect = canvas.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    ctx.beginPath();
+    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+  };
+
+  const drawDoc = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDocDrawing) return;
+    const canvas = docCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#581c87"; // Tinta Ungu Korporat DSTech
+    ctx.lineTo(clientX - rect.left, clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const stopDocDrawing = () => {
+    setIsDocDrawing(false);
+  };
+
+  const clearDocCanvas = () => {
+    const canvas = docCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasDocDrawn(false);
+  };
+
+  const handleOpenDocApprovalModal = () => {
+    if (selectedInvoiceForPhotoPrint) {
+      setDocApprovalCoordinatorName(selectedInvoiceForPhotoPrint.salesPerson || "Ahmad Romadhoni");
+    }
+    setDocApprovalMode("canvas");
+    setHasDocDrawn(false);
+    setIsDocApprovalModalOpen(true);
+  };
+
+  const handleSaveDocApproval = () => {
+    let sigImg = "";
+    if (docApprovalMode === "canvas" && docCanvasRef.current && hasDocDrawn) {
+      sigImg = docCanvasRef.current.toDataURL("image/png");
+    } else if (docApprovalMode === "upload") {
+      sigImg = docApprovalUploadedSignature;
+    } else if (docApprovalMode === "master") {
+      sigImg = financeSettings.masterSignatureUrl || "";
+    }
+
+    setDocApprovalSignatureImage(sigImg);
+    setDocApprovalDate(new Date().toISOString().split("T")[0]);
+    setIsDocApprovalModalOpen(false);
+    showToast("Tanda tangan otorisasi berhasil disahkan pada Laporan Dokumentasi Foto!");
   };
 
   // BAST Project Manager Canvas Handlers
@@ -6952,6 +7063,7 @@ export default function AdminFinanceERPPage() {
                                   docTitle: sale.invoiceType === "DP" ? `Faktur Uang Muka (DP ${sale.dpPercentage}%)` : "Faktur Penjualan (Sale Invoice)",
                                   docNumber: sale.invoiceNumber,
                                   recipientName: sale.customerName,
+                                  recipientPic: sale.customerPic || sale.picName || (clients.find(c => c.name.toLowerCase() === sale.customerName.toLowerCase())?.pic) || "",
                                   recipientPhone: sale.customerPhone,
                                   date: sale.date,
                                   dueDate: sale.dueDate,
@@ -6980,6 +7092,7 @@ export default function AdminFinanceERPPage() {
                                   docTitle: sale.invoiceType === "DP" ? `Faktur Uang Muka (DP ${sale.dpPercentage}%)` : "Faktur Penjualan (Sale Invoice)",
                                   docNumber: sale.invoiceNumber,
                                   recipientName: sale.customerName,
+                                  recipientPic: sale.customerPic || sale.picName || (clients.find(c => c.name.toLowerCase() === sale.customerName.toLowerCase())?.pic) || "",
                                   recipientPhone: sale.customerPhone,
                                   date: sale.date,
                                   dueDate: sale.dueDate,
@@ -11349,6 +11462,39 @@ export default function AdminFinanceERPPage() {
                       {selectedInvoiceForPrint.photos.length}
                     </span>
                   )}
+                </button>
+
+                {/* Tombol Kirim Faktur & Berkas via WhatsApp */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const inv = selectedInvoiceForPrint;
+                    handleOpenSendDocModal({
+                      docType: "Invoice",
+                      docTitle: inv.invoiceType === "DP" ? `Faktur Uang Muka (DP ${inv.dpPercentage}%)` : "Faktur Penjualan (Sale Invoice)",
+                      docNumber: inv.invoiceNumber,
+                      recipientName: inv.customerName,
+                      recipientPic: inv.customerPic || inv.picName || (clients.find(c => c.name.toLowerCase() === inv.customerName.toLowerCase())?.pic) || "",
+                      recipientOrg: inv.customerName,
+                      recipientPhone: inv.customerPhone,
+                      date: inv.date,
+                      dueDate: inv.dueDate,
+                      subject: inv.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${inv.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
+                      grandTotal: inv.invoiceType === "DP" ? (inv.dpAmount || inv.grandTotal) : inv.grandTotal,
+                      subtotal: inv.subtotal,
+                      discount: inv.discount,
+                      discountLabel: inv.discountLabel,
+                      paymentStatus: inv.paymentStatus,
+                      paymentMethod: inv.paymentMethod,
+                      approvalStatus: inv.approvalStatus,
+                      initialTab: "whatsapp",
+                    });
+                  }}
+                  title="Kirim Faktur beserta Tautan Lengkap (BAST, Surat Jalan, Dokumentasi) via WhatsApp"
+                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow cursor-pointer transition-all"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>Kirim WA</span>
                 </button>
 
                 <button
@@ -20975,6 +21121,196 @@ export default function AdminFinanceERPPage() {
         </div>
       )}
 
+      {/* MODAL OTORISASI & TANDA TANGAN DIGITAL DOKUMENTASI FOTO PEKERJAAN */}
+      {isDocApprovalModalOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsDocApprovalModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto border border-purple-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-purple-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-purple-700">
+                  <PenTool className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-sm">Otorisasi &amp; Tanda Tangan Laporan Dokumentasi</h3>
+                  <p className="text-[10px] text-purple-700 font-bold">Pengesahan Fisik Pekerjaan Lapangan (Pelaksana Teknis / PM)</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDocApprovalModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Nama Project Manager / Teknisi</label>
+                  <input
+                    type="text"
+                    value={docApprovalCoordinatorName}
+                    onChange={(e) => setDocApprovalCoordinatorName(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none font-semibold"
+                    placeholder="Contoh: Ahmad Romadhoni"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Jabatan / Tanggung Jawab</label>
+                  <input
+                    type="text"
+                    value={docApprovalCoordinatorTitle}
+                    onChange={(e) => setDocApprovalCoordinatorTitle(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-purple-400 focus:outline-none"
+                    placeholder="Contoh: Project Coordinator / Teknisi Pelaksana"
+                  />
+                </div>
+              </div>
+
+              {/* Pilihan Metode Tanda Tangan */}
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1.5">Metode Tanda Tangan:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDocApprovalMode("canvas")}
+                    className={`py-1.5 px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1 border transition-all cursor-pointer ${
+                      docApprovalMode === "canvas"
+                        ? "bg-purple-50 border-purple-400 text-purple-700 shadow-xs"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>✍️ Gores Layar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDocApprovalMode("master")}
+                    className={`py-1.5 px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1 border transition-all cursor-pointer ${
+                      docApprovalMode === "master"
+                        ? "bg-purple-50 border-purple-400 text-purple-700 shadow-xs"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>🛡️ TTD Master</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDocApprovalMode("upload")}
+                    className={`py-1.5 px-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1 border transition-all cursor-pointer ${
+                      docApprovalMode === "upload"
+                        ? "bg-purple-50 border-purple-400 text-purple-700 shadow-xs"
+                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span>📁 Upload PNG</span>
+                  </button>
+                </div>
+              </div>
+
+              {docApprovalMode === "canvas" ? (
+                /* Canvas Tanda Tangan Interaktif */
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-500">Bubuhkan goresan tanda tangan / paraf pada kotak di bawah:</span>
+                    <button
+                      type="button"
+                      onClick={clearDocCanvas}
+                      className="text-purple-600 hover:text-purple-800 font-bold text-[11px] flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Hapus Goresan</span>
+                    </button>
+                  </div>
+                  <div className="border-2 border-dashed border-purple-200 rounded-2xl bg-purple-50/20 p-1 flex items-center justify-center relative shadow-inner">
+                    <canvas
+                      ref={docCanvasRef}
+                      width={440}
+                      height={160}
+                      onMouseDown={startDocDrawing}
+                      onMouseMove={drawDoc}
+                      onMouseUp={stopDocDrawing}
+                      onMouseLeave={stopDocDrawing}
+                      onTouchStart={startDocDrawing}
+                      onTouchMove={drawDoc}
+                      onTouchEnd={stopDocDrawing}
+                      className="cursor-crosshair bg-white rounded-xl touch-none w-full max-w-full h-40"
+                    />
+                    {!hasDocDrawn && !docApprovalSignatureImage && (
+                      <div className="absolute pointer-events-none text-slate-300 text-xs italic select-none">
+                        (Tanda tangani / paraf di sini...)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : docApprovalMode === "master" ? (
+                <div className="p-4 bg-purple-50/50 rounded-2xl border border-purple-200 text-center space-y-2">
+                  <span className="text-xs font-bold text-purple-900 block">Tanda Tangan Master Perusahaan</span>
+                  {financeSettings.masterSignatureUrl ? (
+                    <div className="h-24 flex items-center justify-center bg-white rounded-xl border border-purple-100 p-2">
+                      <img src={financeSettings.masterSignatureUrl} alt="Master TTD" className="max-h-20 object-contain" />
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic">Belum ada file tanda tangan master. Silakan upload di Site Settings.</p>
+                  )}
+                </div>
+              ) : (
+                /* Area Upload File Tanda Tangan */
+                <div className="space-y-2">
+                  <label className="block text-[10px] text-slate-500">
+                    Pilih file gambar tanda tangan / paraf (format PNG transparan disarankan):
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          setDocApprovalUploadedSignature(event.target?.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-purple-100 file:text-purple-700 hover:file:bg-purple-200 cursor-pointer"
+                  />
+                  {docApprovalUploadedSignature && (
+                    <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center h-24">
+                      <img src={docApprovalUploadedSignature} alt="Pratinjau Tanda Tangan" className="max-h-20 object-contain" />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsDocApprovalModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveDocApproval}
+                className="px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all hover:scale-105"
+              >
+                <Check className="w-4 h-4" />
+                <span>Sah &amp; Simpan Tanda Tangan Dokumentasi</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isPayInvoiceModalOpen && selectedInvoiceForPayment && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
@@ -22922,6 +23258,11 @@ export default function AdminFinanceERPPage() {
               <div>
                 <span className="text-[10px] text-slate-400 block">Penerima / Klien / Vendor:</span>
                 <span className="font-bold text-slate-800">{sendDocModal.recipientName}</span>
+                {sendDocModal.recipientPic && (
+                  <span className="text-[10px] font-bold text-purple-700 block">
+                    👤 PIC: {sendDocModal.recipientPic}
+                  </span>
+                )}
                 {sendDocModal.recipientOrg && sendDocModal.recipientOrg !== sendDocModal.recipientName && (
                   <span className="text-[10px] text-slate-500 block">{sendDocModal.recipientOrg}</span>
                 )}
@@ -22938,6 +23279,130 @@ export default function AdminFinanceERPPage() {
                 ) : null}
               </div>
             </div>
+
+            {/* Tombol Tautan Download Dokumen Cepat untuk Klien */}
+            {sendDocModal.docType === "Invoice" && (
+              <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-purple-950 flex items-center gap-1.5">
+                    <Download className="w-4 h-4 text-purple-700" />
+                    <span>Tautan Download Dokumen Resmi Klien:</span>
+                  </span>
+                  <span className="text-[10px] text-purple-700 font-bold">Siap Kirim / Akses Langsung</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  {/* Link 1: Faktur */}
+                  {(() => {
+                    const portal = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
+                    const enc = encodeURIComponent(sendDocModal.docNumber);
+                    const invUrl = `${portal}/api/finance/print?doc=invoice&no=${enc}`;
+                    const bastUrl = `${portal}/api/finance/print?doc=bast&no=${enc}`;
+                    const doUrl = `${portal}/api/finance/print?doc=delivery&no=${enc}`;
+                    const photoUrl = `${portal}/api/finance/print?doc=photos&no=${enc}`;
+
+                    return (
+                      <>
+                        <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                          <span className="text-[10px] font-black text-slate-800 block truncate">📄 Faktur</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyContent(invUrl, "Link Faktur Penjualan")}
+                              className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                              title="Salin Link Faktur"
+                            >
+                              <Copy className="w-2.5 h-2.5" />
+                              <span>Salin</span>
+                            </button>
+                            <a
+                              href={invUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                              title="Buka / Unduh Lembar Faktur"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                          <span className="text-[10px] font-black text-slate-800 block truncate">📝 BAST</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyContent(bastUrl, "Link Berita Acara (BAST)")}
+                              className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                              title="Salin Link BAST"
+                            >
+                              <Copy className="w-2.5 h-2.5" />
+                              <span>Salin</span>
+                            </button>
+                            <a
+                              href={bastUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                              title="Buka / Unduh Lembar BAST"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                          <span className="text-[10px] font-black text-slate-800 block truncate">🚚 Surat Jalan</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyContent(doUrl, "Link Surat Jalan")}
+                              className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                              title="Salin Link Surat Jalan"
+                            >
+                              <Copy className="w-2.5 h-2.5" />
+                              <span>Salin</span>
+                            </button>
+                            <a
+                              href={doUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                              title="Buka / Unduh Lembar Surat Jalan"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                          <span className="text-[10px] font-black text-slate-800 block truncate">📸 Dokumentasi</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyContent(photoUrl, "Link Laporan Dokumentasi Foto")}
+                              className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                              title="Salin Link Dokumentasi Foto"
+                            >
+                              <Copy className="w-2.5 h-2.5" />
+                              <span>Salin</span>
+                            </button>
+                            <a
+                              href={photoUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                              title="Buka / Unduh Lembar Dokumentasi Foto"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
 
             {/* Tab Selector: WhatsApp vs Email */}
             <div className="flex rounded-2xl p-1 bg-slate-100 border border-slate-200/80">
@@ -24158,6 +24623,21 @@ export default function AdminFinanceERPPage() {
                 >
                   {invoicePhotoLetterhead ? "✓ Kop Surat Aktif" : "Kop Surat Nonaktif"}
                 </button>
+
+                {/* Tombol Approval Dokumentasi Foto */}
+                <button
+                  type="button"
+                  onClick={handleOpenDocApprovalModal}
+                  title="Otorisasi & Tanda Tangan Digital Project Manager / Teknisi pada Laporan Dokumentasi"
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all border ${
+                    docApprovalSignatureImage
+                      ? "bg-purple-100 text-purple-800 border-purple-300 hover:bg-purple-200"
+                      : "bg-purple-600 hover:bg-purple-700 text-white border-purple-600 shadow-md animate-pulse"
+                  }`}
+                >
+                  <PenTool className="w-3.5 h-3.5" />
+                  <span>{docApprovalSignatureImage ? `✓ Disahkan: ${docApprovalCoordinatorName}` : "✍️ Approval Dokumentasi"}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => {
@@ -24388,11 +24868,20 @@ export default function AdminFinanceERPPage() {
                       {selectedInvoiceForPhotoPrint.businessEntity === "NON_PT" ? "DSTECH SMART SOLUTION" : "PT DSTECH SMART PERKASA"}
                     </span>
                     <div className="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+                      {docApprovalSignatureImage ? (
+                        <img
+                          src={docApprovalSignatureImage}
+                          alt="Tanda Tangan Pelaksana"
+                          className="h-16 max-w-[150px] object-contain pointer-events-none z-10"
+                        />
+                      ) : (
+                        <span className="text-[10px] text-slate-300 italic">( Tanda Tangan Pelaksana )</span>
+                      )}
                       {financeSettings.masterStampUrl ? (
                         <img
                           src={financeSettings.masterStampUrl}
                           alt="Cap Resmi"
-                          className="h-16 opacity-75 pointer-events-none"
+                          className="h-16 opacity-75 pointer-events-none absolute right-4"
                         />
                       ) : (
                         <div className="print-stamp-circle absolute right-4 w-12 h-12 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[5px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
@@ -24403,12 +24892,18 @@ export default function AdminFinanceERPPage() {
                     </div>
                     <div className="pt-1">
                       <p className="font-black text-slate-900 underline text-xs">
-                        ( {selectedInvoiceForPhotoPrint.salesPerson || "Ahmad Romadhoni"} )
+                        ( {docApprovalCoordinatorName || selectedInvoiceForPhotoPrint.salesPerson || "Ahmad Romadhoni"} )
                       </p>
-                      <p className="text-[10px] text-slate-500">Project Coordinator / Teknisi Pelaksana</p>
-                      <p className="text-[8px] font-mono text-slate-400 mt-0.5">
-                        [VERIFIKASI SISTEM: DST-INV-PHOTO-{selectedInvoiceForPhotoPrint.id.slice(-6)}]
-                      </p>
+                      <p className="text-[10px] text-slate-500">{docApprovalCoordinatorTitle || "Project Coordinator / Teknisi Pelaksana"}</p>
+                      {docApprovalSignatureImage ? (
+                        <p className="text-[8px] font-mono text-purple-700 font-bold mt-0.5">
+                          ✓ DISAHKAN DIGITAL: {docApprovalDate}
+                        </p>
+                      ) : (
+                        <p className="text-[8px] font-mono text-slate-400 mt-0.5">
+                          [VERIFIKASI SISTEM: DST-INV-PHOTO-{selectedInvoiceForPhotoPrint.id.slice(-6)}]
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
