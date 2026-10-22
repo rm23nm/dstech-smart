@@ -2649,7 +2649,78 @@
 
 ---
 
-### 89. Catatan Penting
+### 89. Tugas: Pembersihan & Penghapusan Tombol Pengaturan Rekening Bank dan Kop Surat dari Toolbar Halaman Keuangan
+- **Permintaan Pengguna**:
+  *"pada halaman keuangannya belum dihapus masih ada muncul Rekening bank dan Kop Surat"*
+- **Status**: Selesai & Terverifikasi
+- **Akar Masalah**:
+  Setelah seluruh manajemen Rekening Bank dan Kop Surat dipindahkan secara terpusat ke menu **Site Settings (`/admin/settings`)**, tombol pintasan "Rekening Bank" dan "Kop Surat" sebelumnya masih ada di toolbar tabel penjualan (`sales`) dan toolbar transaksi kas, sehingga terjadi redundansi menu.
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Salin `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_remove_bank_and_letterhead_buttons`.
+  - [x] **Langkah 2 (Penghapusan Tombol Toolbar)**:
+    - Menghapus tombol "Rekening Bank" dan "Kop Surat" dari toolbar tabel Penjualan (`sales`).
+    - Menghapus tombol "Rekening Bank" dari toolbar Arus Kas Operasional.
+    - Menghapus tombol "Kop Surat" dan "Rekening" dari Action Bar pratinjau faktur.
+  - [x] **Langkah 3 (Validasi Kompilasi, Build, & Deployment)**:
+    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
+    - Build Next.js `npm run build` sukses 46/46 rute.
+    - Push ke GitHub repository `rm23nm/dstech-smart` commit `7ad8e55`.
+    - Deploy ke live server VPS PM2 `dstech-main` (PID 300909, online).
+
+---
+
+### 90. Tugas: Pembuatan Fitur & Tombol Cetak Lembar Laporan Dokumentasi Foto Proyek / Pekerjaan
+- **Permintaan Pengguna**:
+  *"tombol cetak laporan dokumentasinya belum ada"*
+- **Status**: Sedang Dikerjakan (In Progress)
+- **Konteks & Kebutuhan Solusi**:
+  - Pada Manajemen Proyek / Pekerjaan Lapangan, sistem sudah memiliki modal upload dan galeri dokumentasi foto progres pekerjaan (Sebelum / Progress / Selesai).
+  - Namun di modal tersebut belum disediakan tombol **Cetak Laporan Dokumentasi** (Print / Cetak Lembar A4 Berkop resmi yang memuat metadata proyek, nama klien, tanggal pengerjaan, galeri foto dokumentasi dengan keterangan/catatan, serta blok pengesahan tanda tangan Project Manager dan Klien).
+- **Rencana Penyelesaian Step-by-Step**:
+  - [ ] **Langkah 1 (Cadangan Backup)**: Backup file target yang menangani dokumentasi proyek ke `_backup/`.
+  - [ ] **Langkah 2 (Inspeksi Modal Dokumentasi Proyek)**:
+    - Telusuri file modal dokumentasi proyek (di `src/app/admin/finance/page.tsx` atau komponen proyek terkait).
+    - Tambahkan tombol **🖨️ Cetak Laporan Dokumentasi** di toolbar modal dokumentasi.
+  - [ ] **Langkah 3 (Pembuatan Lembar Pratinjau Cetak Laporan Dokumentasi A4)**:
+    - Desain layout lembar cetak A4 profesional:
+      - Header: Kop Surat Resmi PT / Non-PT (otomatis sinkron).
+      - Judul Dokumen: `LAPORAN DOKUMENTASI PROGRES PEKERJAAN & INSTALASI`.
+      - Tabel Informasi Proyek: Kode PRJ, Nama Proyek, Klien/Instansi, Lokasi Pemasangan, Tanggal Dokumentasi, Status Proyek.
+      - Galeri Foto Dokumentasi: Grid 2 kolom rapi berisi gambar foto, kategori fase (Sebelum / Progress / Selesai), dan catatan keterangan foto.
+      - Lembar Pengesahan: Tanda Tangan Project Manager (Pelaksana) dan PIC Klien (Pemberi Tugas).
+      - CSS Print Media Query `@media print` agar pas pada 1 atau beberapa halaman A4.
+  - [ ] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
+    - Jalankan `npx tsc --noEmit`.
+    - Jalankan `npm run build` lokal.
+    - Push ke GitHub repository `rm23nm/dstech-smart`.
+    - Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 91. Tugas: Penyertaan Tautan Link Download Lengkap (Invoice, BAST, Surat Jalan, dan Laporan Dokumentasi) pada Modal Kirim WhatsApp
+- **Permintaan Pengguna**:
+  *"saat mengirimkan invoice, tombol link download invoice, BAST, Surat Jalan dan Laporan Dokumentasi belum ada. sebaiknya langsung ditambahkan agar client bisa langsung download"*
+- **Status**: Antrian Pekerjaan Selanjutnya (Queued)
+- **Konteks & Kebutuhan Solusi**:
+  - Saat admin membuka modal Kirim WhatsApp Invoice (`isSendInvoiceModalOpen`), template pesan WA dan opsi kirim harus menyediakan link unduh langsung (direct download link) untuk:
+    1. Faktur Penjualan (Invoice PDF)
+    2. Berita Acara Serah Terima (BAST PDF)
+    3. Surat Jalan Material (Delivery Order PDF)
+    4. Laporan Dokumentasi Progres Pekerjaan
+  - Dengan demikian, saat pesan WhatsApp dikirimkan ke klien, klien dapat langsung mengklik tautan download resmi masing-masing dokumen tanpa perlu meminta dokumen satu per satu secara manual.
+- **Rencana Penyelesaian Step-by-Step**:
+  - [ ] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/finance/page.tsx` ke `_backup/`.
+  - [ ] **Langkah 2 (Pembuatan Endpoint / Link URL Cetak Dokumen Publik)**:
+    - Sediakan URL cetak/unduh langsung untuk setiap jenis dokumen berdasarkan `saleId` atau `invoiceNo`.
+  - [ ] **Langkah 3 (Integrasi Template Pesan WhatsApp & Tombol Link di Modal Kirim)**:
+    - Tambahkan tombol-tombol pintasan link cepat di modal kirim.
+    - Sisipkan rincian link download lengkap ke dalam draft teks pesan WhatsApp.
+  - [ ] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
+    - Validasi TypeScript, build Next.js, git push, dan deploy VPS.
+
+---
+
+### 92. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

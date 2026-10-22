@@ -6920,6 +6920,21 @@ export default function AdminFinanceERPPage() {
                               <span className="hidden xl:inline">Surat Jalan</span>
                             </button>
 
+                            {/* Tombol Cetak Laporan Dokumentasi Foto */}
+                            <button
+                              onClick={() => setSelectedInvoiceForPhotoPrint(sale)}
+                              title="Cetak Laporan Dokumentasi Foto & Pergantian Part Resmi (A4)"
+                              className="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                            >
+                              <Camera className="w-3.5 h-3.5" />
+                              <span className="hidden xl:inline">Dokumentasi</span>
+                              {sale.photos && sale.photos.length > 0 && (
+                                <span className="ml-0.5 px-1 rounded-full bg-purple-200 text-purple-800 text-[8.5px] font-black">
+                                  {sale.photos.length}
+                                </span>
+                              )}
+                            </button>
+
                             {/* Cetak Faktur Resmi Kop DSTech */}
                             <button
                               onClick={() => handleOpenPrintInvoice(sale)}
@@ -11319,6 +11334,22 @@ export default function AdminFinanceERPPage() {
                     <span>+ Input Bayar</span>
                   </button>
                 )}
+
+                {/* Tombol Cetak Lampiran Dokumentasi Foto Cepat */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedInvoiceForPhotoPrint(selectedInvoiceForPrint)}
+                  title="Buka Lembar Cetak Laporan Dokumentasi Foto & Part Faktur Ini"
+                  className="px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs flex items-center gap-1.5 shadow cursor-pointer transition-all"
+                >
+                  <Camera className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Cetak Dokumentasi</span>
+                  {selectedInvoiceForPrint.photos && selectedInvoiceForPrint.photos.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-purple-200 text-purple-900 text-[9px] font-black">
+                      {selectedInvoiceForPrint.photos.length}
+                    </span>
+                  )}
+                </button>
 
                 <button
                   type="button"
