@@ -2556,23 +2556,23 @@
 ### 86. Tugas: Menghilangkan Logo Kotak Biru "DSP" dan Header Teks Bawaan pada Lembar Cetak Dokumen (Surat Jalan & BAST) Saat Menggunakan Kop Surat Resmi Bergambar
 - **Permintaan Pengguna**:
   *"untuk menghilangkan DSP biru yang seperti logo bagaimana caranya?"*
-- **Status**: Sedang Dikerjakan (In Progress)
+- **Status**: Selesai & Terverifikasi
 - **Akar Masalah**:
   Pada dokumen cetak Surat Jalan (Delivery Order) dan Berita Acara Serah Terima (BAST), terdapat header bawaan HTML berupa kotak biru bertuliskan `DSP` (`bg-dstech-blue text-white shadow`) dan teks perusahaan `PT. DSTECH SMART PERKASA`. Ketika pengguna telah mengaktifkan Kop Surat Resmi Bergambar (`letterheadEnabled && letterheadUrl`), gambar kop surat sudah memiliki logo resmi dan kop teks sendiri, sehingga kotak biru "DSP" bawaan ini menjadi tumpang-tindih (dobel/redundant) di bawah kop surat bergambar.
-- **Rencana Penyelesaian Step-by-Step**:
-  - [ ] **Langkah 1 (Cadangan Backup)**: Membuat salinan cadangan file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_remove_dsp_logo_box`.
-  - [ ] **Langkah 2 (Menambahkan State & Kontrol Saklar Sembunyikan Logo DSP / Header Bawaan)**:
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Membuat salinan cadangan file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_remove_dsp_logo_box`.
+  - [x] **Langkah 2 (Menambahkan State & Kontrol Saklar Sembunyikan Logo DSP / Header Bawaan)**:
     - Menambahkan konfigurasi `hideDefaultHeader` pada state `deliveryConfig` (Surat Jalan) dan `bastConfig` (BAST) dengan default otomatis `true` jika Kop Surat Bergambar aktif.
-    - Menambahkan tombol saklar cepat di toolbar pratinjau Surat Jalan & BAST (`Logo DSP: Sembunyi / Tampil`) dengan ikon interaktif.
+    - Menambahkan tombol saklar cepat di toolbar pratinjau Surat Jalan & BAST (`Logo DSP: Sembunyi / Tampil`) dengan ikon interaktif `Eye`/`EyeOff`.
     - Menambahkan opsi checkbox pada panel edit Surat Jalan & BAST: *"Sembunyikan Logo DSP & Header Bawaan (Rekomendasi saat menggunakan Kop Surat Bergambar)"*.
-  - [ ] **Langkah 3 (Penyempurnaan Render Dokumen Cetak Surat Jalan & BAST)**:
+  - [x] **Langkah 3 (Penyempurnaan Render Dokumen Cetak Surat Jalan & BAST)**:
     - Jika `hideDefaultHeader` aktif: sembunyikan kotak biru `DSP` dan teks PT bawaan, lalu render judul dokumen (`SURAT JALAN MATERIAL (DELIVERY ORDER)` / `BERITA ACARA SERAH TERIMA (BAST)`), No Dokumen, Ref Faktur, dan Tanggal secara bersih, rapi, dan proporsional tepat di bawah margin kop surat bergambar.
     - Jika `hideDefaultHeader` tidak aktif: tampilkan header default lengkap dengan kotak biru DSP.
-  - [ ] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
+  - [x] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
     - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` berhasil.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+    - Build Next.js `npm run build` berhasil 46/46 routes.
+    - Push ke GitHub repository `rm23nm/dstech-smart` commit `6eb63d4`.
+    - Deploy ke live server VPS PM2 `dstech-main` (PID 290078).
     - Berikan penjelasan langkah dan cara penggunaan kepada pengguna.
 
 ---
