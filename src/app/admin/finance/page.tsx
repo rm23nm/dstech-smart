@@ -6694,28 +6694,6 @@ export default function AdminFinanceERPPage() {
                   <option value="Belum Lunas">Belum Lunas</option>
                 </select>
 
-                {/* Tombol Pengaturan Rekening Bank DSTech */}
-                <button
-                  type="button"
-                  onClick={() => setIsBankAccountsModalOpen(true)}
-                  title="Kelola Rekening Bank Perusahaan DSTech"
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <Landmark className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="hidden xl:inline">Rekening Bank</span>
-                </button>
-
-                {/* Tombol Pengaturan Kop Surat */}
-                <button
-                  type="button"
-                  onClick={handleOpenSettingsModal}
-                  title="Atur Background Kop Surat Resmi Faktur"
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <FileText className="w-3.5 h-3.5 text-dstech-blue" />
-                  <span className="hidden xl:inline">Kop Surat</span>
-                </button>
-
                 {/* Tombol Form Input Utama */}
                 <button
                   type="button"
@@ -8710,17 +8688,6 @@ export default function AdminFinanceERPPage() {
                     <option value="TUNAI">Kas Tunai / Petty Cash</option>
                   </select>
                 </div>
-
-                {/* Tombol Kelola Rekening Bank */}
-                <button
-                  type="button"
-                  onClick={() => setIsBankAccountsModalOpen(true)}
-                  className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-dstech-blue font-bold text-xs flex items-center gap-1 border border-blue-200 cursor-pointer transition-colors"
-                  title="Kelola Rekening Bank Resmi"
-                >
-                  <Landmark className="w-3.5 h-3.5" />
-                  <span className="hidden xl:inline">Rekening Bank</span>
-                </button>
 
                 {/* Tombol Form Input Utama */}
                 <button
@@ -11308,26 +11275,6 @@ export default function AdminFinanceERPPage() {
                 Format Faktur Resmi PT. DSTech Smart Perkasa
               </span>
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleOpenSettingsModal}
-                  title="Ganti Background Kop Surat"
-                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <FileText className="w-3.5 h-3.5 text-dstech-blue" />
-                  <span>Kop Surat</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsBankAccountsModalOpen(true)}
-                  title="Atur Nomor Rekening"
-                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <Landmark className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Rekening</span>
-                </button>
-
                 {/* Format Resmi 2 Halaman */}
                 <div className="px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 bg-purple-50 text-purple-700 border border-purple-200 shadow-sm">
                   <Layers className="w-3.5 h-3.5 text-purple-600" />
