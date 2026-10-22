@@ -1926,9 +1926,17 @@ export default function AdminFinanceERPPage() {
       waText += `🛡️ *Status Legalitas:* ${doc.approvalStatus}\n`;
     }
 
+    // Deteksi tangguh jenis dokumen (SPH / Quotation vs Invoice / Faktur)
+    const dt = (doc.docType || "").toUpperCase();
+    const docNo = (doc.docNumber || "").toUpperCase();
+    const docTitle = (doc.docTitle || "").toLowerCase();
+
+    const isInvoice = dt === "INVOICE" || dt.includes("FAKTUR") || docNo.startsWith("INV");
+    const isSph = dt === "SPH" || dt === "QUOTATION" || docTitle.includes("penawaran") || docTitle.includes("sph") || docNo.startsWith("SPH");
+    const encodedNo = encodeURIComponent(doc.docNumber || "");
+
     // Jika Dokumen adalah Faktur (Invoice), sertakan Tautan Unduh Langsung Berkas Lengkap
-    if (doc.docType === "Invoice") {
-      const encodedNo = encodeURIComponent(doc.docNumber);
+    if (isInvoice) {
       waText += `\n📥 *Tautan Unduh & Cetak Berkas Resmi Pekerjaan:*\n`;
       waText += `📄 *1. Faktur Penjualan (Invoice):*\n${portalUrl}/api/finance/print?doc=invoice&no=${encodedNo}\n\n`;
       waText += `📝 *2. Berita Acara Serah Terima (BAST):*\n${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n\n`;
@@ -1940,12 +1948,11 @@ export default function AdminFinanceERPPage() {
       if (defaultBank) {
         waText += `• ${defaultBank.bankName}: ${defaultBank.accountNumber} a/n ${defaultBank.accountHolder} (${defaultBank.branch})\n`;
       }
-    } else if (doc.docType === "SPH") {
-      const encodedNo = encodeURIComponent(doc.docNumber);
-      waText += `\n📥 *Tautan Unduh & Cetak Berkas Resmi Penawaran:*\n`;
-      waText += `📄 *Surat Penawaran Harga (SPH):*\n${portalUrl}/api/finance/print?doc=sph&no=${encodedNo}\n`;
+    } else if (isSph) {
+      waText += `\n📥 *Tautan Unduh Berkas Resmi Surat Penawaran Harga (SPH):*\n`;
+      waText += `📄 *Dokumen SPH & Brosur Gambar Produk:*\n${portalUrl}/api/finance/print?doc=sph&no=${encodedNo}\n`;
     } else {
-      waText += `\nDokumen resmi ber-kop surat dan tanda tangan sah dapat dilihat/diunduh melalui portal resmi kami:\n🌐 ${portalUrl}\n\n`;
+      waText += `\n📥 *Tautan Unduh Dokumen Resmi:*\n${portalUrl}/api/finance/print?doc=${encodeURIComponent((doc.docType || "document").toLowerCase())}&no=${encodedNo}\n`;
     }
 
     waText += `\nApabila ada pertanyaan lebih lanjut atau konfirmasi teknis, silakan hubungi tim kami melalui pesan ini.\n\n`;
@@ -1965,11 +1972,19 @@ export default function AdminFinanceERPPage() {
     if (doc.paymentStatus) emailBody += `• Status Pembayaran: ${doc.paymentStatus}\n`;
     if (doc.approvalStatus) emailBody += `• Pengesahan Direksi: ${doc.approvalStatus}\n`;
 
-    if (doc.docType === "Invoice") {
-      emailBody += `\nInstruksi Pembayaran Transfer Rekening Perusahaan:\n`;
+    if (isInvoice) {
+      emailBody += `\nUnduh Berkas Resmi Pekerjaan:\n`;
+      emailBody += `• Faktur Penjualan: ${portalUrl}/api/finance/print?doc=invoice&no=${encodedNo}\n`;
+      emailBody += `• Berita Acara (BAST): ${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n`;
+      emailBody += `• Surat Jalan: ${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n`;
+      emailBody += `• Foto Dokumentasi: ${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n\n`;
+      emailBody += `Instruksi Pembayaran Transfer Rekening Perusahaan:\n`;
       bankAccounts.filter((b) => b.status === "Aktif").forEach((acc) => {
         emailBody += `- Bank: ${acc.bankName} | No. Rek: ${acc.accountNumber} | a/n: ${acc.accountHolder} (${acc.branch})\n`;
       });
+    } else if (isSph) {
+      emailBody += `\nUnduh Berkas Resmi Surat Penawaran Harga (SPH):\n`;
+      emailBody += `• Dokumen SPH & Brosur Gambar Produk: ${portalUrl}/api/finance/print?doc=sph&no=${encodedNo}\n`;
     }
 
     emailBody += `\nDokumen lengkap telah disahkan secara digital oleh Direksi PT. DSTech Smart Perkasa.\n`;
@@ -23409,7 +23424,7 @@ export default function AdminFinanceERPPage() {
             )}
 
             {/* Tombol Tautan Download Dokumen Cepat untuk SPH / Penawaran */}
-            {sendDocModal.docType === "SPH" && (
+            {(sendDocModal.docType?.toUpperCase() === "SPH" || sendDocModal.docType?.toUpperCase() === "QUOTATION" || (sendDocModal.docNumber || "").toUpperCase().startsWith("SPH") || (sendDocModal.docTitle || "").toLowerCase().includes("penawaran")) && (
               <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/90 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
