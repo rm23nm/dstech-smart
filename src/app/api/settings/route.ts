@@ -3,6 +3,49 @@ import fs from "fs";
 import path from "path";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_settings.json");
+const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
+
+const DEFAULT_BANK_ACCOUNTS = [
+  {
+    id: "dstech_bank_2",
+    bankName: "Bank BCA",
+    accountNumber: "295-074-0321",
+    accountHolder: "PT. DSTech Smart Perkasa",
+    branch: "KCU Cilegon",
+    isDefault: true,
+    status: "Aktif",
+    entityType: "PT"
+  }
+];
+
+const DEFAULT_LETTERHEAD_SETTINGS = {
+  letterheadUrl: "/kop_surat_dstech.jpg",
+  letterheadUrl_PT: "/kop_surat_dstech.jpg",
+  letterheadEnabled_PT: true,
+  letterheadEnabled: true,
+  watermarkOpacity: 0.15,
+  watermarkOpacity_PT: 0.15,
+  signerName: "RAMADHANI ST",
+  signerName_PT: "RAMADHANI ST",
+  signerTitle: "Direktur",
+  signerTitle_PT: "Direktur",
+  masterSignatureUrl: "",
+  masterStampUrl: "",
+  letterheadPaddingTop: 80,
+  letterheadPaddingTop_PT: 80,
+  letterheadPaddingBottom: 75,
+  letterheadPaddingBottom_PT: 75,
+  letterheadFitMode: "fill",
+
+  // Non-PT
+  letterheadUrl_NON_PT: "",
+  letterheadEnabled_NON_PT: false,
+  watermarkOpacity_NON_PT: 0.15,
+  letterheadPaddingTop_NON_PT: 80,
+  letterheadPaddingBottom_NON_PT: 75,
+  signerName_NON_PT: "RAMADHANI ST",
+  signerTitle_NON_PT: "Owner / Pengelola Usaha"
+};
 
 const DEFAULT_SETTINGS = {
   companyName: "PT. DSTech Smart Perkasa",
@@ -19,21 +62,46 @@ const DEFAULT_SETTINGS = {
   instagram: "https://instagram.com/dstechsmart",
   facebook: "https://facebook.com/dstechsmart",
   linkedin: "https://linkedin.com/company/dstechsmart",
+  bankAccounts: DEFAULT_BANK_ACCOUNTS,
+  letterheadSettings: DEFAULT_LETTERHEAD_SETTINGS,
   updatedAt: "2026-10-18T22:00:00.000Z"
 };
 
 function readSettings(): any {
   try {
+    let settings = DEFAULT_SETTINGS;
     if (fs.existsSync(DATA_FILE)) {
       const data = fs.readFileSync(DATA_FILE, "utf-8");
-      return JSON.parse(data);
+      settings = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+    } else {
+      const dir = path.dirname(DATA_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(DATA_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2), "utf-8");
     }
-    const dir = path.dirname(DATA_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+
+    // Sinkronkan data awal dari dstech_finance_erp.json jika belum ada di settings
+    if (fs.existsSync(FINANCE_FILE)) {
+      try {
+        const financeData = JSON.parse(fs.readFileSync(FINANCE_FILE, "utf-8"));
+        if (!settings.bankAccounts || settings.bankAccounts.length === 0) {
+          if (financeData.bank_accounts && financeData.bank_accounts.length > 0) {
+            settings.bankAccounts = financeData.bank_accounts;
+          }
+        }
+        if (!settings.letterheadSettings || !settings.letterheadSettings.letterheadUrl) {
+          if (financeData.settings) {
+            settings.letterheadSettings = {
+              ...DEFAULT_LETTERHEAD_SETTINGS,
+              ...financeData.settings,
+            };
+          }
+        }
+      } catch (e) {
+        console.error("Gagal membaca initial finance file:", e);
+      }
     }
-    fs.writeFileSync(DATA_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2), "utf-8");
-    return DEFAULT_SETTINGS;
+
+    return settings;
   } catch (err) {
     console.error("Error reading dstech_settings.json:", err);
     return DEFAULT_SETTINGS;
@@ -47,6 +115,31 @@ function writeSettings(settings: any): boolean {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(DATA_FILE, JSON.stringify(settings, null, 2), "utf-8");
+
+    // Sinkronkan bankAccounts dan letterheadSettings ke dstech_finance_erp.json
+    if (fs.existsSync(FINANCE_FILE)) {
+      try {
+        const financeData = JSON.parse(fs.readFileSync(FINANCE_FILE, "utf-8"));
+        let changed = false;
+        if (settings.bankAccounts) {
+          financeData.bank_accounts = settings.bankAccounts;
+          changed = true;
+        }
+        if (settings.letterheadSettings) {
+          financeData.settings = {
+            ...(financeData.settings || {}),
+            ...settings.letterheadSettings,
+          };
+          changed = true;
+        }
+        if (changed) {
+          fs.writeFileSync(FINANCE_FILE, JSON.stringify(financeData, null, 2), "utf-8");
+        }
+      } catch (fErr) {
+        console.error("Gagal sinkronisasi ke finance file:", fErr);
+      }
+    }
+
     return true;
   } catch (err) {
     console.error("Error writing dstech_settings.json:", err);
@@ -90,6 +183,8 @@ export async function POST(request: Request) {
       instagram: body.instagram !== undefined ? body.instagram : current.instagram,
       facebook: body.facebook !== undefined ? body.facebook : current.facebook,
       linkedin: body.linkedin !== undefined ? body.linkedin : current.linkedin,
+      bankAccounts: body.bankAccounts !== undefined ? body.bankAccounts : current.bankAccounts,
+      letterheadSettings: body.letterheadSettings !== undefined ? body.letterheadSettings : current.letterheadSettings,
       updatedAt: new Date().toISOString(),
     };
 

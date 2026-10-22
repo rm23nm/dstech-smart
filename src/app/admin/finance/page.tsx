@@ -21778,6 +21778,20 @@ export default function AdminFinanceERPPage() {
               </button>
             </div>
 
+            {/* Banner Pengaturan Pusat Site Settings */}
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs text-blue-900">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-dstech-blue shrink-0" />
+                <span>Pengaturan Rekening Bank kini terintegrasi secara terpusat di menu <strong>Site Settings</strong>.</span>
+              </div>
+              <a
+                href="/admin/settings"
+                className="px-3 py-1 rounded-xl bg-dstech-blue text-white font-bold text-[11px] shrink-0 hover:bg-blue-700 transition-colors shadow-xs"
+              >
+                Buka Site Settings →
+              </a>
+            </div>
+
             {/* Filter Tab Entitas Rekening */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl w-fit border border-slate-200">
@@ -22099,6 +22113,20 @@ export default function AdminFinanceERPPage() {
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+
+            {/* Banner Pengaturan Pusat Site Settings */}
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-3 flex items-center justify-between gap-3 text-xs text-purple-900">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-purple-700 shrink-0" />
+                <span>Pengaturan Kop Surat kini terintegrasi secara terpusat di menu <strong>Site Settings</strong>.</span>
+              </div>
+              <a
+                href="/admin/settings"
+                className="px-3 py-1 rounded-xl bg-purple-700 text-white font-bold text-[11px] shrink-0 hover:bg-purple-800 transition-colors shadow-xs"
+              >
+                Buka Site Settings →
+              </a>
             </div>
 
             {/* Tab Pemilihan Entitas Bisnis (PT vs Non-PT) */}
