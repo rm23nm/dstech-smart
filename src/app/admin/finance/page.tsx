@@ -6638,26 +6638,63 @@ export default function AdminFinanceERPPage() {
                               {sale.paymentStatus}
                             </span>
                             {sale.approvalStatus === "Disetujui & Sah" ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApprovalModal(sale)}
+                                title="Faktur sudah disetujui & sah digital. Klik untuk melihat / memperbarui tanda tangan digital"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-all cursor-pointer"
+                              >
                                 <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                                Sah Digital
-                              </span>
+                                <span>Sah Digital</span>
+                              </button>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                                <Clock className="w-3 h-3 text-amber-500" />
-                                Menunggu Approval
-                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApprovalModal(sale)}
+                                title="Klik di sini untuk Approval & Tanda Tangan Digital Direktur pada faktur ini"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-black bg-amber-400 hover:bg-amber-500 text-slate-950 border border-amber-500 shadow-2xs transition-all cursor-pointer animate-pulse"
+                              >
+                                <PenTool className="w-3 h-3" />
+                                <span>Approval Faktur</span>
+                              </button>
                             )}
                           </div>
                         </td>
                         <td className="p-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
+                            {/* Tombol Utama Input Pembayaran Klien */}
+                            {sale.remainingAmount > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPayInvoice(sale)}
+                                title={
+                                  sale.invoiceType === "Termin"
+                                    ? `Input Pembayaran Termin (${sale.termins?.find((t) => t.id === sale.activeTerminId)?.name || "Aktif"})`
+                                    : sale.invoiceType === "DP"
+                                    ? ((Number(sale.dpPaidAmount) || 0) >= (Number(sale.dpAmount) || 0)
+                                        ? "Input Pembayaran Pelunasan Sisa Kontrak"
+                                        : `Input Pembayaran DP (${sale.dpPercentage || 50}%)`)
+                                    : "Input Penerimaan Pembayaran dari Klien (Pelunasan / Cicilan Kas Masuk)"
+                                }
+                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer hover:scale-105 shrink-0"
+                              >
+                                <CreditCard className="w-3.5 h-3.5" />
+                                <span>Input Bayar</span>
+                              </button>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Lunas</span>
+                              </span>
+                            )}
+
                             {/* Approval & Tanda Tangan Digital */}
                             <button
+                              type="button"
                               onClick={() => handleOpenApprovalModal(sale)}
                               title={
                                 sale.approvalStatus === "Disetujui & Sah"
-                                  ? `Disetujui & Sah oleh ${sale.approvedBy || "Direktur"} (Klik untuk atur ulang / tanda tangani)`
+                                  ? `Disetujui & Sah oleh ${sale.approvedBy || "Direktur"} (Klik untuk kelola tanda tangan)`
                                   : "Approval & Tanda Tangan Digital Direktur"
                               }
                               className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
@@ -6668,33 +6705,6 @@ export default function AdminFinanceERPPage() {
                             >
                               <PenTool className="w-4 h-4" />
                             </button>
-
-                            {/* Terima Pembayaran / Bayar DP / Bayar Termin */}
-                            {sale.remainingAmount > 0 ? (
-                              <button
-                                onClick={() => handleOpenPayInvoice(sale)}
-                                title={
-                                  sale.invoiceType === "Termin"
-                                    ? `Terima Pembayaran Termin (${sale.termins?.find((t) => t.id === sale.activeTerminId)?.name || "Aktif"})`
-                                    : sale.invoiceType === "DP"
-                                    ? ((Number(sale.dpPaidAmount) || 0) >= (Number(sale.dpAmount) || 0)
-                                        ? "Terima Pembayaran Pelunasan Sisa Kontrak"
-                                        : `Terima Pembayaran DP (${sale.dpPercentage || 50}%)`)
-                                    : "Terima Pembayaran Faktur"
-                                }
-                                className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                              >
-                                <CreditCard className="w-4 h-4" />
-                              </button>
-                            ) : (
-                              <button
-                                disabled
-                                title="Faktur Sudah Lunas"
-                                className="p-2 rounded-xl bg-slate-100 text-slate-300 cursor-not-allowed"
-                              >
-                                <CheckCircle2 className="w-4 h-4" />
-                              </button>
-                            )}
 
                             {/* Tombol Khusus Tagih Pelunasan untuk Faktur DP */}
                             {sale.invoiceType === "DP" && sale.remainingAmount > 0 && (
@@ -11131,6 +11141,45 @@ export default function AdminFinanceERPPage() {
                   <Layers className="w-3.5 h-3.5 text-purple-600" />
                   <span>Format Resmi 2 Halaman</span>
                 </div>
+
+                {/* Tombol Approval Cepat di Toolbar Cetak */}
+                {selectedInvoiceForPrint.approvalStatus !== "Disetujui & Sah" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inv = selectedInvoiceForPrint;
+                      setSelectedInvoiceForPrint(null);
+                      handleOpenApprovalModal(inv);
+                    }}
+                    title="Approval & Tanda Tangan Digital Direktur pada faktur ini"
+                    className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow cursor-pointer animate-pulse"
+                  >
+                    <PenTool className="w-3.5 h-3.5" />
+                    <span>Approval Faktur</span>
+                  </button>
+                ) : (
+                  <div className="px-3 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm">
+                    <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Sah Digital</span>
+                  </div>
+                )}
+
+                {/* Tombol Input Bayar Cepat di Toolbar Cetak */}
+                {selectedInvoiceForPrint.remainingAmount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inv = selectedInvoiceForPrint;
+                      setSelectedInvoiceForPrint(null);
+                      handleOpenPayInvoice(inv);
+                    }}
+                    title="Catat Pembayaran Masuk dari Klien"
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>+ Input Bayar</span>
+                  </button>
+                )}
 
                 <button
                   type="button"

@@ -73,6 +73,7 @@
 - **2026-10-22**: Perbaikan Bug Upload Foto Faktur & Proyek (Penyelarasan Body Payload/Updates PUT API), Isolasi Cetak Lembar Kwitansi & Lampiran Foto A4 (Pencegahan Kebocoran Tampilan Dashboard Utama saat Print), serta Penomoran Otomatis Faktur Dinamis Mengikuti Tanggal Pilihan Pengguna (INV-DSTECH-YYYYMM-XXX). Memperbaiki akar masalah gagal simpan foto dokumentasi faktur pada `handleUploadInvoicePhoto` di mana backend API menolak `payload` karena hanya menerima `updates`, menyertakan `isReceiptModalOpen` dan `selectedInvoiceForPhotoPrint` ke `isAnyPrintModalOpen` agar modal kwitansi dan cetak foto bersih tanpa dashboard utama, serta memperbarui logika nomor faktur otomatis agar sinkron dengan tahun dan bulan dari tanggal yang dipilih pengguna (misal 2026-03-13 menghasilkan INV-DSTECH-202603-XXX). Lolos kompilasi TypeScript 0 error dan lolos build Next.js.
 - **2026-10-22**: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Seluruh 5 Modul ERP Keuangan (Penjualan & Faktur, Pembelian & PO, Retur Barang, Laporan Laba Rugi, dan Buku Arus Kas). Mengimplementasikan top control bar seragam dengan preset periode (Semua Tanggal, Hari Ini, Bulan Ini, Bulan Lalu, Tahun Ini, Rentang Kustom dengan Date Picker Mulai-Selesai), dropdown sortir tanggal & nominal (Tanggal Terbaru, Tanggal Terlama, Nominal Tertinggi/Terendah, Nama A-Z), input pencarian interaktif, dan penempatan berdampingan tepat di sebelah tombol Form Input utama masing-masing modul. Laba Rugi mengkalkulasi pendapatan, HPP, beban operasional, dan laba bersih secara dinamis sesuai periode terpilih. Lolos validasi TypeScript 0 error dan build Next.js sukses.
 - **2026-10-22**: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Modul Manajemen Proyek (Projects). Mengimplementasikan top control bar seragam pada tab Manajemen Proyek dengan preset periode (Semua Tanggal, Hari Ini, Bulan Ini, Bulan Lalu, Tahun Ini, Rentang Kustom dengan Date Picker Mulai-Selesai), dropdown sortir tanggal & nilai kontrak (Tanggal Mulai Terbaru/Terlama, Nilai Kontrak Tertinggi/Terendah, Nama Proyek A-Z), filter status proyek (In Progress, Completed, Planning, On Hold), input pencarian multi-field (nomor PRJ, nama proyek, klien, PIC, deskripsi), serta kartu ringkasan KPI dan grid kartu proyek yang tersaring dinamis, ditempatkan rapi berdampingan dengan tombol `+ Buat Proyek Baru`. Lolos validasi TypeScript 0 error dan build Next.js sukses.
+- **2026-10-22**: Peningkatan Akses & Visibilitas Approval Faktur Digital dan Tombol Input Pembayaran Pelunasan / Cicilan Klien pada Modul Penjualan & Invoicing (`sales`). Mengatasi kebingungan pengguna: (1) Mengubah status 'Menunggu Approval' pada tabel faktur menjadi tombol aksi interaktif berwarna kuning animasi halus bertuliskan 'Approval Faktur' yang bisa langsung diklik untuk memunculkan modal tanda tangan digital direktur; (2) Menyediakan tombol aksi utama berlabel tegas warna hijau emerald '+ Input Bayar' pada setiap faktur yang belum lunas (dilengkapi modal pencatatan nominal, tanggal bayar, metode/rekening bank penerima, dan bukti transfer); (3) Menyediakan tombol cepat 'Approval Faktur' dan '+ Input Bayar' langsung di toolbar atas modal cetak/pratinjau faktur. Lolos validasi TypeScript 0 error dan build Next.js sukses.
 
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
@@ -2512,7 +2513,27 @@
 
 ---
 
-### 84. Catatan Penting
+### 84. Tugas: Penjelasan & Peningkatan Visibilitas Fitur Approval Faktur Digital dan Tombol Input Pembayaran Pelunasan / Cicilan Klien
+- **Permintaan Pengguna**:
+  *"untuk aproval fakturnya belum ada, kemudian jika client sudah bayar bagai mana cara melakukan penginputannya?"*
+- **Status**: Selesai & Terverifikasi
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Membuat backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_approval_payment_ui`.
+  - [x] **Langkah 2 (Peningkatan Akses & Penanda Visual Approval Faktur)**:
+    - Di kolom status tabel faktur (`activeTab === "sales"`), ubah badge `Menunggu Approval` menjadi tombol aksi interaktif berwarna kuning mencolok dengan teks `Approval Faktur` yang dapat diklik langsung untuk memunculkan modal tanda tangan digital direktur (`handleOpenApprovalModal(sale)`).
+    - Berikan label teks dan tooltip jelas pada tombol approval di kolom aksi.
+  - [x] **Langkah 3 (Peningkatan Akses & Penanda Visual Input Pembayaran Klien)**:
+    - Di kolom aksi tabel faktur, jika faktur belum lunas (`remainingAmount > 0`), jadikan tombol pembayaran sebagai tombol berlabel teks hijau emerald `+ Input Bayar` (`CreditCard`) agar admin langsung mengenali dan dapat mencatat pembayaran (nominal, tanggal bayar, rekening bank penerima, dan bukti transfer).
+    - Di header toolbar modal pratinjau faktur (`selectedInvoiceForPrint`), sediakan tombol cepat `Approval Faktur` dan `Input Pembayaran Klien` agar dapat diakses langsung saat melihat dokumen faktur.
+  - [x] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
+    - Kompilasi TypeScript `npx tsc --noEmit` lolos 100% (0 error).
+    - Build Next.js `npm run build` sukses 46/46 rute.
+    - Push ke GitHub repository `rm23nm/dstech-smart`.
+    - Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 85. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
