@@ -2583,36 +2583,58 @@
   2. *"untuk aproval surat jalan pastinya berbeda, karena dia punya petugas masing-masing. namun saya belum menemukan cara untuk imput aprovalnya"*
   3. *"Gudang & Logistik DSTech ganti dengan nama Gudang & Logistik PT. Dstech Smart Perkasa kalau PT dan non PT Gudang & Logistik DSTECH SMART"*
   4. *"kalau bisa untuk Faktur, BAST, Surat jalan itu memiliki USer yang aprove masing-masing. karena tidak mungkin 1 orang yang sama"*
-- **Status**: Sedang Dikerjakan (In Progress)
+- **Status**: Selesai & Terverifikasi
 - **Akar Masalah & Kebutuhan Solusi**:
   1. **Faktur & Lampiran**: Merupakan dokumen legalitas keuangan yang disahkan oleh Direktur / Manajer Keuangan. Tanda tangan digital Direktur pada Halaman 1 kini telah tersinkronisasi ke Lampiran Halaman 2.
   2. **BAST (Berita Acara Serah Terima)**: Merupakan dokumen teknis lapangan serah terima fisik pekerjaan, yang diotorisasi oleh Project Manager / Site Engineer (Pihak I) dan Klien (Pihak II). Perlu disediakan tombol & modal **Approval BAST** mandiri (nama penyerah, jabatan, tanda tangan digital/upload).
   3. **Surat Jalan (Delivery Order)**: Merupakan dokumen ekspedisi logistik barang, yang diotorisasi oleh Petugas Gudang / Logistik DSTech (Pihak Penyerah), Supir (Pihak Pembawa), dan Mandor/PIC Lapangan (Pihak Penerima). Perlu disediakan tombol & modal **Approval Petugas Gudang** mandiri.
   4. **Entitas Dinamis**: Penamaan di Surat Jalan harus otomatis mengikuti jenis entitas transaksi: jika PT menjadi `Gudang & Logistik PT. DSTech Smart Perkasa`, jika Non-PT menjadi `Gudang & Logistik DSTECH SMART`.
-- **Rencana Penyelesaian Step-by-Step**:
+- **Rincian Penyelesaian Step-by-Step**:
   - [x] **Langkah 1 (Cadangan Backup)**: Membuat salinan cadangan file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_sync_approval_and_do_staff_sig`.
   - [x] **Langkah 2 (Sinkronisasi Tanda Tangan Approval Faktur ke Lampiran Halaman 2)**:
     - Di Lampiran Faktur (Halaman 2), render gambar tanda tangan digital (`selectedInvoiceForPrint.signatureImage`) dan stempel bulat resmi agar identik dengan Halaman 1.
-  - [ ] **Langkah 3 (Approval Mandiri BAST - Project Manager / Otoritas Lapangan)**:
-    - Menambahkan state `bastSignatureImage`, `bastSignerName`, `bastSignerTitle`.
-    - Menyediakan tombol aksi `✍️ Approval BAST` di toolbar dan panel edit BAST.
-    - Membangun Modal Tanda Tangan Digital BAST (Canvas Pad goresan tangan / upload tanda tangan digital Project Manager).
+  - [x] **Langkah 3 (Approval Mandiri BAST - Project Manager / Otoritas Lapangan)**:
+    - Menambahkan state `bastSignatureImage`, `bastApprovalDate`, dan state modal otorisasi BAST.
+    - Menyediakan tombol aksi cepat ungu `✍️ Approval BAST` di toolbar dan panel edit BAST.
+    - Membangun Modal Tanda Tangan Digital BAST lengkap dengan Canvas Pad (goresan langsung di layar dengan tinta ungu korporat) dan opsi upload berkas PNG transparan, nama Project Manager, dan jabatan otorisator.
     - Menampilkan tanda tangan digital Project Manager pada Pihak I BAST.
-  - [ ] **Langkah 4 (Approval Mandiri Surat Jalan - Petugas Gudang & Logistik + Entitas PT/Non-PT)**:
-    - Menambahkan tombol aksi `✍️ Approval Petugas Gudang` di toolbar dan panel edit Surat Jalan.
-    - Membangun Modal Tanda Tangan Digital Petugas Logistik Gudang (Canvas Pad / upload tanda tangan).
+  - [x] **Langkah 4 (Approval Mandiri Surat Jalan - Petugas Gudang & Logistik + Entitas PT/Non-PT)**:
+    - Menambahkan tombol aksi cepat amber `✍️ Approval Petugas Gudang` di toolbar dan panel edit Surat Jalan.
+    - Membangun Modal Tanda Tangan Digital Petugas Logistik Gudang (Canvas Pad / upload tanda tangan, nama petugas gudang, dan jabatan pengeluaran QC & Logistik).
     - Menampilkan tanda tangan digital petugas logistik gudang di Blok 1 Surat Jalan ("YANG MENYERAHKAN").
-    - Menyesuaikan penamaan penyerah di Surat Jalan: jika PT -> `Gudang & Logistik PT. DSTech Smart Perkasa`, jika Non-PT -> `Gudang & Logistik DSTECH SMART`.
-  - [ ] **Langkah 5 (Validasi Kompilasi, Build, & Deployment)**:
+    - Menyesuaikan penamaan penyerah di Surat Jalan otomatis mengikuti jenis entitas: jika transaksi PT -> `Gudang & Logistik PT. DSTech Smart Perkasa`, jika transaksi Non-PT -> `Gudang & Logistik DSTECH SMART`.
+  - [x] **Langkah 5 (Validasi Kompilasi, Build, & Deployment)**:
     - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` berhasil.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+    - Build Next.js `npm run build` berhasil 46/46 rute.
+    - Push ke GitHub repository `rm23nm/dstech-smart` commit `029aa0f`.
+    - Deploy ke live server VPS PM2 `dstech-main` (online).
     - Memberikan panduan penggunaan kepada pengguna.
 
 ---
 
-### 88. Catatan Penting
+### 88. Tugas: Pemindahan & Integrasi Pengaturan Rekening Bank dan Kop Surat ke Menu Site Setting (`/admin/settings`)
+- **Permintaan Pengguna**:
+  *"pengaturan Rekening Bank dan Kop surat belum dipindahkan ke Site setting"*
+- **Status**: Antrian Pekerjaan Selanjutnya (Queued)
+- **Konteks & Analisis Masalah**:
+  - Saat ini, pengaturan Rekening Bank (BCA, Mandiri, BSI, dll.) dan Kop Surat Dokumen (Upload Gambar Kop Surat, Mode Bleed/Cover/Contain, Padding Atas/Bawah) masih berada di dalam modal pengaturan lokal Keuangan (`isSettingsModalOpen` di `/admin/finance`).
+  - Pengguna menghendaki pengaturan terpusat (Master Data Perusahaan) berada di halaman **Site Settings** (`/admin/settings`) agar konfigurasi rekening bank dan kop surat resmi perusahaan dapat dikelola secara sentral dari satu menu master settings dan otomatis disinkronkan ke seluruh modul yang membutuhkan (Keuangan, Faktur, Surat Jalan, BAST, Penawaran/SPH).
+- **Rencana Penyelesaian Step-by-Step**:
+  - [ ] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/settings/page.tsx` dan `src/app/admin/finance/page.tsx` ke folder `_backup/`.
+  - [ ] **Langkah 2 (Inspeksi & Desain UI di Site Settings)**:
+    - Buka `src/app/admin/settings/page.tsx`.
+    - Tambahkan Tab / Bagian khusus: **"Informasi Rekening Bank Perusahaan"** (Daftar Akun Bank, No Rekening, Atas Nama, Cabang, Status Aktif) dan **"Kop Surat Resmi Perusahaan"** (Upload Gambar Kop Surat Resmi, Preview A4, Margin Padding Top/Bottom, Mode Tampilan Bleed/Contain/Cover).
+  - [ ] **Langkah 3 (Sinkronisasi Data Master ke Keuangan)**:
+    - Pastikan data rekening bank dan kop surat yang tersimpan di Site Settings tersinkronisasi ke API `/api/settings` atau database `dstech_settings` sehingga modul Keuangan (`/admin/finance`) membaca data master dari Site Settings.
+  - [ ] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
+    - Jalankan `npx tsc --noEmit` untuk verifikasi TypeScript.
+    - Jalankan `npm run build` lokal.
+    - Push ke GitHub repository `rm23nm/dstech-smart`.
+    - Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
