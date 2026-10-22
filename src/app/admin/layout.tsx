@@ -25,6 +25,7 @@ import {
   Scale,
   Wrench,
   Warehouse,
+  CalendarCheck,
 } from "lucide-react";
 
 interface SearchResult {
@@ -36,6 +37,9 @@ interface SearchResult {
 
 const SEARCH_CATALOG: SearchResult[] = [
   { title: "Dashboard Overview", category: "Navigasi", url: "/admin", desc: "Ringkasan metrik omset, stok, dan partner" },
+  { title: "Rekap Absensi Karyawan & Teknisi", category: "Operasional", url: "/admin/attendance", desc: "Pantau presensi masuk/pulang, titik GPS Google Maps, dan riwayat kehadiran" },
+  { title: "Persetujuan Lembur Teknisi (Overtime)", category: "Operasional", url: "/admin/attendance", desc: "Verifikasi dan persetujuan pengajuan jam lembur teknisi proyek lapangan" },
+  { title: "Cetak Rekap Presensi Bulanan", category: "Operasional", url: "/admin/attendance", desc: "Unduh dan cetak rekap absensi staf resmi ber-Kop Surat DSTech" },
   { title: "Jadwal & Tiket Maintenance", category: "Operasional", url: "/admin/maintenance", desc: "Kelola jadwal kunjungan rutin, servis darurat CCTV, dan penugasan teknisi lapangan" },
   { title: "Surat Tugas & BAST Maintenance", category: "Operasional", url: "/admin/maintenance", desc: "Cetak Berita Acara Kunjungan Pemeliharaan & SPK Teknisi ber-Kop Surat DSTech" },
   { title: "Keuangan & ERP Dashboard", category: "Keuangan", url: "/admin/finance", desc: "Ringkasan finansial, omset penjualan, pembelian PO, laba rugi, dan arus kas" },
@@ -149,6 +153,12 @@ export default function AdminLayout({
       href: "/admin/maintenance",
       icon: Wrench,
       active: pathname.startsWith("/admin/maintenance"),
+    },
+    {
+      label: "Rekap Absensi Staf",
+      href: "/admin/attendance",
+      icon: CalendarCheck,
+      active: pathname.startsWith("/admin/attendance"),
     },
     {
       label: "Manajemen Stok & Gudang",
