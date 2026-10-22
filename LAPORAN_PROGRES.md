@@ -2774,7 +2774,38 @@
 
 ---
 
-### 95. Catatan Penting
+### 95. Tugas: Penyertaan Tautan Unduh SPH pada Pesan WhatsApp dan Lampiran Gambar Brosur Item Produk yang Ditawarkan
+- **Permintaan Pengguna**:
+  1. *"pada sph,belumada link download penawarannya di pesan"*
+  2. *"kemudian SPHnya tolong buat lamoiran untuk Item gambar yang ditawarkan"*
+- **Status**: Selesai & Terverifikasi
+- **Rincian Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_sph_link_share` dan `src/app/api/finance/print/route.ts` ke `_backup/route.ts.bak_sph_print`.
+  - [x] **Langkah 2 (Penyertaan Tautan SPH di Pesan WhatsApp & Modal Kirim)**:
+    - Di fungsi `generateDocShareContent`, jika `doc.docType === "SPH"`, otomatis menyertakan link unduh resmi SPH:
+      ```text
+      📥 *Tautan Unduh & Cetak Berkas Resmi Penawaran:*
+      📄 *Surat Penawaran Harga (SPH):*
+      https://dstechsmart.com/api/finance/print?doc=sph&no=[NO_SPH]
+      ```
+    - Di modal kirim dokumen (`sendDocModal.isOpen`), menyediakan blok kartu ungu **Tautan Dokumen Penawaran Resmi (SPH)** lengkap dengan tombol `Salin Link` dan tombol `Buka SPH`.
+  - [x] **Langkah 3 (Dukungan Route Handler Publik `/api/finance/print?doc=sph`)**:
+    - Menambahkan logika pencarian data penawaran di `data.quotations` berdasarkan nomor SPH atau ID.
+    - Menampilkan dokumen Surat Penawaran Harga (SPH) resmi PT. DSTech Smart Perkasa ber-kop surat resmi (A4 Full Bleed).
+    - Membaca katalog produk (`dstech_products.json`) untuk mencocokkan foto dan deskripsi spesifikasi teknis dari setiap item yang ditawarkan.
+  - [x] **Langkah 4 (Pembuatan Lembar Lampiran Gambar Produk yang Ditawarkan)**:
+    - Menambahkan **Lembar 2 (Lampiran Foto & Spesifikasi Produk Penawaran)** yang memuat grid kartu foto produk berkualitas tinggi, nama perangkat, kuantiti penawaran, deskripsi spesifikasi teknis, dan harga satuan unit.
+    - Dilengkapi saklar `[✓] Kop Surat Resmi`, tombol `🖨️ Cetak (Print)`, dan tombol `⬇️ Unduh PDF SPH`.
+  - [x] **Langkah 5 (Validasi Kompilasi, Pengujian Lokal, & Deployment)**:
+    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
+    - Build Next.js `npm run build` sukses 47/47 rute.
+    - Pengujian HTTP lokal untuk endpoint SPH (`doc=sph`) mengembalikan Status 200 OK dengan konten Surat Penawaran dan Lampiran Foto.
+    - Push ke GitHub repository `rm23nm/dstech-smart`.
+    - Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 96. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.

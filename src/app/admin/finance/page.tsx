@@ -1940,6 +1940,10 @@ export default function AdminFinanceERPPage() {
       if (defaultBank) {
         waText += `• ${defaultBank.bankName}: ${defaultBank.accountNumber} a/n ${defaultBank.accountHolder} (${defaultBank.branch})\n`;
       }
+    } else if (doc.docType === "SPH") {
+      const encodedNo = encodeURIComponent(doc.docNumber);
+      waText += `\n📥 *Tautan Unduh & Cetak Berkas Resmi Penawaran:*\n`;
+      waText += `📄 *Surat Penawaran Harga (SPH):*\n${portalUrl}/api/finance/print?doc=sph&no=${encodedNo}\n`;
     } else {
       waText += `\nDokumen resmi ber-kop surat dan tanda tangan sah dapat dilihat/diunduh melalui portal resmi kami:\n🌐 ${portalUrl}\n\n`;
     }
@@ -23398,6 +23402,56 @@ export default function AdminFinanceERPPage() {
                           </div>
                         </div>
                       </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Tombol Tautan Download Dokumen Cepat untuk SPH / Penawaran */}
+            {sendDocModal.docType === "SPH" && (
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
+                    <Download className="w-4 h-4 text-indigo-700" />
+                    <span>Tautan Dokumen Penawaran Resmi (SPH):</span>
+                  </span>
+                  <span className="text-[10px] text-indigo-700 font-bold">Siap Kirim ke Klien</span>
+                </div>
+                <div className="pt-1">
+                  {(() => {
+                    const portal = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
+                    const enc = encodeURIComponent(sendDocModal.docNumber);
+                    const sphUrl = `${portal}/api/finance/print?doc=sph&no=${enc}`;
+
+                    return (
+                      <div className="p-2.5 bg-white rounded-xl border border-indigo-200 shadow-2xs flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="text-xs font-black text-slate-800 block truncate">📄 Surat Penawaran Harga (SPH)</span>
+                          <span className="text-[10px] text-slate-400 font-mono block truncate">{sendDocModal.docNumber}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyContent(sphUrl, "Link Surat Penawaran Harga (SPH)")}
+                            className="py-1.5 px-3 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            title="Salin Link SPH"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>Salin Link</span>
+                          </button>
+                          <a
+                            href={sphUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="py-1.5 px-3 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            title="Buka / Unduh Lembar Surat Penawaran Harga"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Buka SPH</span>
+                          </a>
+                        </div>
+                      </div>
                     );
                   })()}
                 </div>

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
+const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
 
 function readFinanceData() {
   try {
@@ -13,7 +14,18 @@ function readFinanceData() {
   } catch (err) {
     console.error("Error reading dstech_finance_erp.json:", err);
   }
-  return { sales: [], bank_accounts: [], settings: {} };
+  return { sales: [], quotations: [], bank_accounts: [], settings: {} };
+}
+
+function readProducts(): any[] {
+  try {
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      return JSON.parse(fs.readFileSync(PRODUCTS_FILE, "utf-8"));
+    }
+  } catch (err) {
+    console.error("Error reading dstech_products.json:", err);
+  }
+  return [];
 }
 
 function formatRupiah(num: number): string {
@@ -44,10 +56,413 @@ export async function GET(req: Request) {
 
   const data = readFinanceData();
   const sales: any[] = data.sales || [];
+  const quotations: any[] = data.quotations || [];
   const bankAccounts: any[] = data.bank_accounts || [];
   const settings: any = data.settings || {};
+  const products: any[] = readProducts();
 
-  // Cari faktur berdasarkan nomor faktur atau ID
+  // Pengaturan Kop Surat & Info Perusahaan Resmi
+  const letterheadUrl = settings.letterheadUrl || "/kop_surat_dstech.jpg";
+  const letterheadEnabled = settings.letterheadEnabled !== false;
+  const masterStampUrl = settings.masterStampUrl || "";
+  const defaultBank = bankAccounts.find((b) => b.isDefault) || bankAccounts[0] || {
+    bankName: "BCA (Bank Central Asia)",
+    accountNumber: "8691-888-299",
+    accountHolder: "PT. DSTECH SMART PERKASA",
+    branch: "KCP Sudirman"
+  };
+
+  // -------------------------------------------------------------
+  // DOKUMEN TIPE SPH / QUOTATION (SURAT PENAWARAN HARGA)
+  // -------------------------------------------------------------
+  if (docType === "sph" || docType === "quotation") {
+    const sph = quotations.find((q) => {
+      if (!docNo) return false;
+      if (q.quotationNumber && q.quotationNumber.toLowerCase() === docNo.toLowerCase()) return true;
+      if (q.id && q.id.toLowerCase() === docNo.toLowerCase()) return true;
+      return false;
+    }) || quotations[0];
+
+    if (!sph) {
+      const errorHtml = `
+        <!DOCTYPE html>
+        <html lang="id">
+        <head>
+          <meta charset="UTF-8">
+          <title>SPH Tidak Ditemukan - DSTech Smart</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+        </head>
+        <body class="bg-slate-50 min-h-screen flex items-center justify-center p-4 font-sans">
+          <div class="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-xl border border-slate-200 space-y-4">
+            <div class="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold">⚠️</div>
+            <h1 class="text-xl font-black text-slate-900">Surat Penawaran Tidak Ditemukan</h1>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Nomor SPH <strong>"${docNo || "-"}"</strong> tidak ditemukan dalam sistem kami.
+            </p>
+            <div class="pt-2">
+              <a href="https://dstechsmart.com" class="inline-block px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow hover:bg-indigo-700 transition">
+                Kembali ke Beranda
+              </a>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+      return new NextResponse(errorHtml, { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    }
+
+    const signerName = sph.approvedBy || settings.signerName || "RAMADHANI ST";
+    const signerTitle = sph.approvedTitle || settings.signerTitle || "Direktur";
+    const signatureImage = sph.signatureImage || settings.masterSignatureUrl || "";
+    const terbilangRupiah = angkaKeTerbilang(sph.grandTotal) + " Rupiah";
+
+    // Lengkapi foto/gambar item produk dari katalog
+    const itemsWithImages = (sph.items || []).map((it: any) => {
+      let img = it.image || it.imageUrl || "";
+      let desc = it.description || it.desc || "";
+      if (!img || !desc) {
+        const matched = products.find((p: any) => {
+          if (it.productId && p.id === it.productId) return true;
+          if (p.name && it.productName && p.name.trim().toLowerCase() === it.productName.trim().toLowerCase()) return true;
+          return false;
+        });
+        if (matched) {
+          if (!img && matched.image) img = matched.image;
+          if (!desc && matched.desc) desc = matched.desc;
+        }
+      }
+      return {
+        ...it,
+        image: img || "/portfolio-residential.png",
+        description: desc || "Perangkat teknologi keamanan & infrastruktur IT berkualitas prima dengan jaminan garansi resmi PT. DSTech Smart Perkasa."
+      };
+    });
+
+    const documentTitle = `Surat Penawaran Harga - ${sph.quotationNumber}`;
+
+    const sphHtml = `
+      <!DOCTYPE html>
+      <html lang="id">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>${documentTitle} - PT. DSTech Smart Perkasa</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+        <style>
+          @page { size: A4 portrait; margin: 0; }
+          @media print {
+            body { background: white !important; padding: 0 !important; margin: 0 !important; }
+            .print-hidden { display: none !important; }
+            .print-sheet {
+              box-shadow: none !important;
+              border: none !important;
+              margin: 0 !important;
+              width: 210mm !important;
+              min-height: 297mm !important;
+              page-break-after: always;
+            }
+          }
+        </style>
+      </head>
+      <body class="bg-slate-100 text-slate-900 font-sans min-h-screen py-4 sm:py-8 px-2 sm:px-4">
+        
+        <!-- Action Toolbar -->
+        <div class="max-w-[210mm] mx-auto mb-4 bg-white rounded-2xl p-4 shadow-md border border-slate-200 flex flex-wrap items-center justify-between gap-3 print-hidden">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow">
+              SPH
+            </div>
+            <div>
+              <h1 class="font-black text-sm sm:text-base text-slate-900">${documentTitle}</h1>
+              <p class="text-[11px] text-slate-500">PT. DSTech Smart Perkasa • Surat Penawaran Harga Resmi</p>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100">
+              <input
+                type="checkbox"
+                id="toggle-letterhead"
+                ${letterheadEnabled ? 'checked' : ''}
+                onchange="toggleLetterhead(this.checked)"
+                class="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+              />
+              <span>Kop Surat Resmi</span>
+            </label>
+
+            <button
+              type="button"
+              onclick="downloadAsPdf()"
+              class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer"
+            >
+              <span>⬇️ Unduh PDF SPH</span>
+            </button>
+            <button
+              type="button"
+              onclick="window.print()"
+              class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer"
+            >
+              <span>🖨️ Cetak (Print)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- LEMBAR 1: SURAT PENGANTAR PENAWARAN HARGA -->
+        <div
+          id="print-sheet-sph"
+          class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8"
+          style="width: 210mm; min-height: 297mm; max-width: 100%; box-sizing: border-box;"
+        >
+          <!-- Background Kop Surat -->
+          <img
+            id="letterhead-bg-sph-1"
+            src="${letterheadUrl}"
+            alt="Kop Surat"
+            class="letterhead-bg absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+            style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${letterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+          />
+
+          <div
+            class="content-wrapper relative z-10 space-y-4"
+            style="padding-top: ${letterheadEnabled ? '120px' : '30px'}; padding-bottom: ${letterheadEnabled ? '90px' : '30px'}; padding-left: 45px; padding-right: 45px;"
+          >
+            <!-- Judul & Nomor SPH -->
+            <div class="flex justify-between items-start pb-4 border-b border-slate-300">
+              <div>
+                <h2 class="text-xl font-black text-slate-900 tracking-wider uppercase">SURAT PENAWARAN HARGA (SPH)</h2>
+                <p class="text-xs font-mono font-bold text-indigo-700 mt-0.5">NOMOR: ${sph.quotationNumber}</p>
+                <div class="mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  STATUS: ${sph.approvalStatus || 'RESMI DITERBITKAN'}
+                </div>
+              </div>
+              <div class="text-right text-xs space-y-1">
+                <p><span class="text-slate-400">Tanggal:</span> <strong class="text-slate-800">${sph.date}</strong></p>
+                <p><span class="text-slate-400">Masa Berlaku:</span> <strong class="text-amber-800">s/d ${sph.validUntil || '-'}</strong></p>
+                <p><span class="text-slate-400">Lampiran:</span> <strong class="text-slate-800">Rincian Harga &amp; Brosur Gambar</strong></p>
+              </div>
+            </div>
+
+            <!-- Perihal & Info Penerima -->
+            <div class="py-3 border-b border-slate-200 grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">KEPADA YTH:</span>
+                <p class="font-black text-slate-900 text-sm mt-0.5">${sph.customerName}</p>
+                ${sph.customerOrg && sph.customerOrg !== sph.customerName ? `<p class="font-bold text-indigo-700">${sph.customerOrg}</p>` : ''}
+                <p class="text-slate-600 mt-0.5 leading-relaxed text-[11px]">${sph.customerAddress || 'Lokasi Klien'}</p>
+                <p class="text-slate-500 text-[11px] mt-0.5">Telp/WA: ${sph.customerPhone || '-'}</p>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">PERIHAL PENGAJUAN:</span>
+                <p class="font-black text-indigo-900 text-sm mt-0.5 leading-snug">${sph.subject || 'Pengadaan & Instalasi Sistem Teknologi Keamanan'}</p>
+                <p class="text-slate-500 text-[10px] mt-1.5 leading-relaxed">
+                  Bersama surat ini, kami menyampaikan proposal penawaran harga pengadaan unit perangkat dan jasa instalasi profesional dengan spesifikasi terbaik.
+                </p>
+              </div>
+            </div>
+
+            <!-- Ringkasan Rincian Penawaran -->
+            <p class="text-xs text-slate-700 leading-relaxed">
+              Dengan hormat,<br/>
+              Berdasarkan kebutuhan sistem di lokasi Bapak/Ibu, berikut kami ajukan penawaran harga untuk paket pengadaan sistem dengan rincian akumulasi sebagai berikut:
+            </p>
+
+            <table class="w-full text-xs border border-slate-300 mt-2">
+              <thead class="bg-slate-100 font-bold text-slate-800">
+                <tr>
+                  <th class="border border-slate-300 p-2 text-center w-10">No</th>
+                  <th class="border border-slate-300 p-2 text-left">Deskripsi Paket / Perangkat</th>
+                  <th class="border border-slate-300 p-2 text-center w-16">Qty</th>
+                  <th class="border border-slate-300 p-2 text-right w-28">Harga Satuan</th>
+                  <th class="border border-slate-300 p-2 text-right w-28">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsWithImages.map((item: any, idx: number) => `
+                  <tr>
+                    <td class="border border-slate-300 p-2 text-center">${idx + 1}</td>
+                    <td class="border border-slate-300 p-2 font-bold text-slate-900">
+                      ${item.productName || item.name}
+                    </td>
+                    <td class="border border-slate-300 p-2 text-center font-semibold">${item.qty} ${item.unit || ''}</td>
+                    <td class="border border-slate-300 p-2 text-right">${formatRupiah(item.price)}</td>
+                    <td class="border border-slate-300 p-2 text-right font-bold text-slate-900">${formatRupiah(item.total || item.qty * item.price)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+
+            <!-- Kalkulasi Subtotal & Terbilang -->
+            <div class="grid grid-cols-2 gap-4 mt-2 pt-2 border-t border-slate-200 text-xs">
+              <div class="space-y-2">
+                <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <span class="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">TOTAL TERBILANG:</span>
+                  <p class="font-bold italic text-slate-800 text-[11px] mt-0.5">"# ${terbilangRupiah} #"</p>
+                </div>
+                ${sph.terms ? `
+                  <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[10px] text-slate-600">
+                    <span class="font-bold text-slate-800 block uppercase">Syarat &amp; Ketentuan:</span>
+                    <p class="whitespace-pre-line mt-0.5 leading-relaxed">${sph.terms}</p>
+                  </div>
+                ` : ''}
+              </div>
+
+              <div class="space-y-1 text-right">
+                <div class="flex justify-between py-0.5 text-slate-600">
+                  <span>Subtotal Penawaran:</span>
+                  <span class="font-bold text-slate-900">${formatRupiah(sph.subtotal)}</span>
+                </div>
+                ${sph.discount && sph.discount > 0 ? `
+                  <div class="flex justify-between py-0.5 text-red-600">
+                    <span>${sph.discountLabel || 'Diskon Khusus Negosiasi'}:</span>
+                    <span class="font-bold">-${formatRupiah(sph.discount)}</span>
+                  </div>
+                ` : ''}
+                ${sph.taxAmount && sph.taxAmount > 0 ? `
+                  <div class="flex justify-between py-0.5 text-slate-600">
+                    <span>PPN (${sph.taxRate || 11}%):</span>
+                    <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
+                  </div>
+                ` : ''}
+                <div class="flex justify-between py-1 border-t-2 border-slate-800 text-sm font-black text-slate-900">
+                  <span>Grand Total Penawaran:</span>
+                  <span class="text-indigo-700">${formatRupiah(sph.grandTotal)}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tanda Tangan Pengesahan -->
+            <div class="grid grid-cols-2 gap-8 pt-4 mt-4 border-t border-slate-200 text-center">
+              <div>
+                <span class="text-[10px] text-slate-500 block mb-1">Persetujuan Klien (PO / Konfirmasi):</span>
+                <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
+                  <span class="text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap Klien )</span>
+                </div>
+                <p class="font-bold text-slate-900 text-xs mt-1 underline">${sph.customerName}</p>
+                <p class="text-[10px] text-slate-500">${sph.customerOrg || 'Klien / Pemesan'}</p>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-500 block mb-1">Hormat Kami,</span>
+                <span class="font-bold text-slate-900 text-xs block">PT. DSTECH SMART PERKASA</span>
+                <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+                  ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-16 object-contain z-10" />` : ""}
+                  ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-16 opacity-75 absolute right-4" />` : ""}
+                </div>
+                <p class="font-black text-slate-900 text-xs mt-1 underline">( ${signerName} )</p>
+                <p class="text-[10px] text-slate-500">${signerTitle}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- LEMBAR 2: LAMPIRAN FOTO & BROSUR GAMBAR ITEM YANG DITAWARKAN -->
+        <div
+          class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800"
+          style="width: 210mm; min-height: 297mm; max-width: 100%; box-sizing: border-box;"
+        >
+          <!-- Background Kop Surat -->
+          <img
+            id="letterhead-bg-sph-2"
+            src="${letterheadUrl}"
+            alt="Kop Surat"
+            class="letterhead-bg absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+            style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${letterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+          />
+
+          <div
+            class="content-wrapper relative z-10 space-y-4"
+            style="padding-top: ${letterheadEnabled ? '120px' : '30px'}; padding-bottom: ${letterheadEnabled ? '90px' : '30px'}; padding-left: 45px; padding-right: 45px;"
+          >
+            <div class="text-center pb-4 border-b border-slate-300">
+              <h2 class="text-lg font-black tracking-widest text-slate-900 uppercase">LAMPIRAN FOTO &amp; SPESIFIKASI PRODUK PENAWARAN</h2>
+              <p class="text-xs font-bold text-slate-600 tracking-wider">Nomor SPH: ${sph.quotationNumber}</p>
+              <p class="text-[11px] text-slate-500 mt-0.5">Klien: ${sph.customerOrg || sph.customerName} | Tanggal: ${sph.date}</p>
+            </div>
+
+            <!-- Grid Kartu Foto & Spesifikasi Item -->
+            <div class="grid grid-cols-2 gap-4 pt-2">
+              ${itemsWithImages.map((item: any, idx: number) => `
+                <div class="border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/90 shadow-2xs flex flex-col justify-between">
+                  <div>
+                    <div class="h-44 bg-white flex items-center justify-center p-2 border-b border-slate-100 overflow-hidden">
+                      <img
+                        src="${item.image}"
+                        alt="${item.productName || item.name}"
+                        class="max-h-full max-w-full object-contain"
+                        onerror="this.src='/portfolio-residential.png'"
+                      />
+                    </div>
+                    <div class="p-3 space-y-1">
+                      <div class="flex items-center justify-between gap-1">
+                        <span class="text-[10px] font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
+                          Item #${idx + 1}
+                        </span>
+                        <span class="text-[10px] font-bold text-slate-700">
+                          Qty: ${item.qty} ${item.unit || 'Unit'}
+                        </span>
+                      </div>
+                      <p class="font-black text-slate-900 text-xs mt-1 leading-snug">
+                        ${item.productName || item.name}
+                      </p>
+                      <p class="text-[10px] text-slate-500 leading-relaxed line-clamp-3">
+                        ${item.description}
+                      </p>
+                    </div>
+                  </div>
+                  <div class="p-2.5 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-[11px]">
+                    <span class="text-slate-500 font-semibold">Harga Satuan:</span>
+                    <span class="font-bold text-slate-900">${formatRupiah(item.price)}</span>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+
+            <!-- Footer Lampiran -->
+            <div class="pt-6 border-t border-slate-200 text-center text-[10px] text-slate-400">
+              Seluruh spesifikasi perangkat di atas terjamin keasliannya dan bergaransi resmi PT. DSTech Smart Perkasa.
+            </div>
+          </div>
+        </div>
+
+        <script>
+          function toggleLetterhead(enabled) {
+            document.querySelectorAll('.letterhead-bg').forEach(function(el) {
+              el.style.display = enabled ? 'block' : 'none';
+            });
+            document.querySelectorAll('.content-wrapper').forEach(function(el) {
+              el.style.paddingTop = enabled ? '120px' : '30px';
+              el.style.paddingBottom = enabled ? '90px' : '30px';
+            });
+          }
+
+          function downloadAsPdf() {
+            const element = document.body;
+            const opt = {
+              margin:       0,
+              filename:     '${documentTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf',
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2, useCORS: true },
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
+          }
+        </script>
+      </body>
+      </html>
+    `;
+
+    return new NextResponse(sphHtml, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "public, max-age=60, s-maxage=60",
+      },
+    });
+  }
+
+  // -------------------------------------------------------------
+  // DOKUMEN TIPE FAKTUR / BAST / SURAT JALAN / FOTO PEKERJAAN
+  // -------------------------------------------------------------
   const sale = sales.find((s) => {
     if (!docNo) return false;
     if (s.invoiceNumber && s.invoiceNumber.toLowerCase() === docNo.toLowerCase()) return true;
@@ -61,7 +476,6 @@ export async function GET(req: Request) {
       <html lang="id">
       <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Dokumen Tidak Ditemukan - DSTech Smart</title>
         <script src="https://cdn.tailwindcss.com"></script>
       </head>
@@ -70,7 +484,7 @@ export async function GET(req: Request) {
           <div class="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold">⚠️</div>
           <h1 class="text-xl font-black text-slate-900">Dokumen Tidak Ditemukan</h1>
           <p class="text-xs text-slate-500 leading-relaxed">
-            Nomor dokumen <strong>"${docNo || "-"}"</strong> tidak ditemukan dalam sistem kami atau telah diarsipkan.
+            Nomor dokumen <strong>"${docNo || "-"}"</strong> tidak ditemukan dalam sistem kami.
           </p>
           <div class="pt-2">
             <a href="https://dstechsmart.com" class="inline-block px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow hover:bg-indigo-700 transition">
@@ -87,19 +501,9 @@ export async function GET(req: Request) {
     });
   }
 
-  // Pengaturan Kop Surat & Info Perusahaan Resmi
-  const letterheadUrl = settings.letterheadUrl || "/kop_surat_dstech.jpg";
-  const letterheadEnabled = settings.letterheadEnabled !== false;
   const signerName = sale.approvedBy || settings.signerName || "RAMADHANI ST";
   const signerTitle = sale.approvedTitle || settings.signerTitle || "Direktur";
-  const masterStampUrl = settings.masterStampUrl || "";
   const signatureImage = sale.signatureImage || settings.masterSignatureUrl || "";
-  const defaultBank = bankAccounts.find((b) => b.isDefault) || bankAccounts[0] || {
-    bankName: "BCA (Bank Central Asia)",
-    accountNumber: "8691-888-299",
-    accountHolder: "PT. DSTECH SMART PERKASA",
-    branch: "KCP Sudirman"
-  };
 
   // Navigasi Tab Dokumen Terkait
   const encNo = encodeURIComponent(sale.invoiceNumber);
