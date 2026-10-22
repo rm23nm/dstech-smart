@@ -440,8 +440,8 @@ export async function GET(req: Request) {
             const opt = {
               margin:       0,
               filename:     '${documentTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf',
-              image:        { type: 'jpeg', quality: 0.98 },
-              html2canvas:  { scale: 2, useCORS: true },
+              image:        { type: 'jpeg', quality: 0.65 },
+              html2canvas:  { scale: 1.5, useCORS: true },
               jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
             html2pdf().set(opt).from(element).save();
@@ -1015,8 +1015,8 @@ export async function GET(req: Request) {
           const opt = {
             margin:       0,
             filename:     '${documentTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf',
-            image:        { type: 'jpeg', quality: 0.98 },
-            html2canvas:  { scale: 2, useCORS: true },
+            image:        { type: 'jpeg', quality: 0.65 },
+            html2canvas:  { scale: 1.5, useCORS: true },
             jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
           };
           html2pdf().set(opt).from(element).save();

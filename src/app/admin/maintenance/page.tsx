@@ -524,6 +524,99 @@ export default function MaintenancePage() {
     }
   };
 
+  // Helper Kompresi Foto Lampiran Maintenance (Target Maksimal ~40 KB)
+  const compressMaintenancePhoto = async (
+    file: File,
+    maxTargetSizeKb = 40,
+    initialMaxWidth = 840,
+    initialMaxHeight = 1120
+  ): Promise<File> => {
+    if (!file.type.startsWith("image/")) return file;
+
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (e) => {
+        const img = document.createElement("img");
+        img.src = e.target?.result as string;
+        img.onload = async () => {
+          let curWidth = img.width;
+          let curHeight = img.height;
+
+          if (curWidth > initialMaxWidth || curHeight > initialMaxHeight) {
+            if (curWidth / initialMaxWidth > curHeight / initialMaxHeight) {
+              curHeight = Math.round((curHeight * initialMaxWidth) / curWidth);
+              curWidth = initialMaxWidth;
+            } else {
+              curWidth = Math.round((curWidth * initialMaxHeight) / curHeight);
+              curHeight = initialMaxHeight;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return resolve(file);
+
+          const maxSizeBytes = maxTargetSizeKb * 1024;
+          let bestBlob: Blob | null = null;
+          const testQualities = [0.70, 0.58, 0.45, 0.35, 0.26, 0.20];
+          let currentW = curWidth;
+          let currentH = curHeight;
+
+          for (let step = 0; step < testQualities.length; step++) {
+            canvas.width = currentW;
+            canvas.height = currentH;
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, currentW, currentH);
+            ctx.drawImage(img, 0, 0, currentW, currentH);
+
+            const q = testQualities[step];
+            const blob: Blob | null = await new Promise((res) => {
+              canvas.toBlob((b) => res(b), "image/jpeg", q);
+            });
+
+            if (blob) {
+              bestBlob = blob;
+              if (blob.size <= maxSizeBytes) break;
+            }
+          }
+
+          if (bestBlob && bestBlob.size > maxSizeBytes) {
+            for (let downscale = 0; downscale < 4; downscale++) {
+              currentW = Math.round(currentW * 0.80);
+              currentH = Math.round(currentH * 0.80);
+              if (currentW < 240) break;
+
+              canvas.width = currentW;
+              canvas.height = currentH;
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(0, 0, currentW, currentH);
+              ctx.drawImage(img, 0, 0, currentW, currentH);
+
+              for (const q of [0.38, 0.25, 0.18]) {
+                const blob: Blob | null = await new Promise((res) => {
+                  canvas.toBlob((b) => res(b), "image/jpeg", q);
+                });
+                if (blob) {
+                  bestBlob = blob;
+                  if (blob.size <= maxSizeBytes) break;
+                }
+              }
+              if (bestBlob && bestBlob.size <= maxSizeBytes) break;
+            }
+          }
+
+          if (!bestBlob) return resolve(file);
+
+          const cleanName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+          resolve(new File([bestBlob], cleanName, { type: "image/jpeg", lastModified: Date.now() }));
+        };
+        img.onerror = () => resolve(file);
+      };
+      reader.onerror = () => resolve(file);
+    });
+  };
+
   // Upload Photo File via /api/upload
   const handleUploadPhotoFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -531,8 +624,10 @@ export default function MaintenancePage() {
 
     try {
       setIsUploadingPhoto(true);
+      const fileToUpload = await compressMaintenancePhoto(file, 40);
+
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", fileToUpload);
       fd.append("docType", "maintenance_photo");
 
       const res = await fetch("/api/upload", {

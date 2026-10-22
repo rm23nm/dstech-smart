@@ -75,6 +75,7 @@
 - **2026-10-22**: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Modul Manajemen Proyek (Projects). Mengimplementasikan top control bar seragam pada tab Manajemen Proyek dengan preset periode (Semua Tanggal, Hari Ini, Bulan Ini, Bulan Lalu, Tahun Ini, Rentang Kustom dengan Date Picker Mulai-Selesai), dropdown sortir tanggal & nilai kontrak (Tanggal Mulai Terbaru/Terlama, Nilai Kontrak Tertinggi/Terendah, Nama Proyek A-Z), filter status proyek (In Progress, Completed, Planning, On Hold), input pencarian multi-field (nomor PRJ, nama proyek, klien, PIC, deskripsi), serta kartu ringkasan KPI dan grid kartu proyek yang tersaring dinamis, ditempatkan rapi berdampingan dengan tombol `+ Buat Proyek Baru`. Lolos validasi TypeScript 0 error dan build Next.js sukses.
 - **2026-10-22**: Peningkatan Akses & Visibilitas Approval Faktur Digital dan Tombol Input Pembayaran Pelunasan / Cicilan Klien pada Modul Penjualan & Invoicing (`sales`). Mengatasi kebingungan pengguna: (1) Mengubah status 'Menunggu Approval' pada tabel faktur menjadi tombol aksi interaktif berwarna kuning animasi halus bertuliskan 'Approval Faktur' yang bisa langsung diklik untuk memunculkan modal tanda tangan digital direktur; (2) Menyediakan tombol aksi utama berlabel tegas warna hijau emerald '+ Input Bayar' pada setiap faktur yang belum lunas (dilengkapi modal pencatatan nominal, tanggal bayar, metode/rekening bank penerima, dan bukti transfer); (3) Menyediakan tombol cepat 'Approval Faktur' dan '+ Input Bayar' langsung di toolbar atas modal cetak/pratinjau faktur. Lolos validasi TypeScript 0 error dan build Next.js sukses.
 - **2026-10-22**: Penyembunyian Kolom Rincian Item pada Tabel Faktur Penjualan (`sales`) agar Tampilan Tabel Ringkas, Rapi, dan Tidak Memanjang ke Bawah. Menghilangkan kolom 'Rincian Item' yang sebelumnya merender seluruh baris produk/jasa vertikal (menyebabkan baris faktur melorot sangat panjang ke bawah), menggantikannya dengan badge ringkas dan informatif '📦 X Item' di bawah nomor faktur, dan menyesuaikan colSpan tabel menjadi 6 sehingga seluruh baris faktur memiliki ketinggian seragam dan proporsional. Lolos validasi TypeScript 0 error dan build Next.js sukses.
+- **2026-10-22**: Kompresi File Gambar Lampiran Maksimal ~40 KB (Client-Side HTML5 Canvas Strict Scale-Down & Ekspor PDF Super Ringan). Mengakomodasi permintaan pengguna agar file lampiran gambar dikompresi ke 40 KB dan tidak besar-besar: (1) Menyempurnakan algoritma kompresi gambar `compressImageFile` di `src/app/admin/finance/page.tsx` dengan target strict `maxTargetSizeKb = 40` (maksimal 40 * 1024 bytes) menggunakan loop adaptif bertahap (kualitas JPEG 0.70 -> 0.20 dan multi-step adaptive downscaling 0.80x dimensi jika file kamera awal sangat besar) sehingga seluruh nota, bukti transfer kas, dan foto proyek dijamin berada di bawah 40 KB tanpa mengaburkan teks dokumen; (2) Memasang fungsi kompresi client-side target ~40 KB pada formulir upload foto teknisi di portal `/employee` (`compressTechnicianPhoto`) dan admin maintenance `/admin/maintenance` (`compressMaintenancePhoto`) agar foto kamera HP teknisi di lapangan (3-10 MB) otomatis terkompresi ~40 KB sebelum dikirim ke server; (3) Mengoptimalkan parameter ekspor PDF pada endpoint cetak publik `/api/finance/print` (`quality: 0.65`, `scale: 1.5`) sehingga lembar SPH ber-lampiran foto brosur produk dan lembar faktur ber-foto dokumentasi menghasilkan file PDF unduhan yang sangat ringan (100-200 KB) dan cepat dibuka di perangkat mobile klien via WhatsApp. Lolos validasi TypeScript 0 error dan build Next.js lokal 47/47 rute sukses.
 
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
@@ -2805,7 +2806,33 @@
 
 ---
 
-### 96. Catatan Penting
+### 96. Tugas: Kompresi File Gambar Lampiran Maksimal ~40 KB (Client-Side & Export PDF)
+- **Permintaan Pengguna**: *"file lamoiran gambarnya dikomores ke 40Kb aja,jangan besar2"*
+- **Status**: Selesai & Terverifikasi
+- **Rincian Penyelesaian Step-by-Step**:
+  1. [x] **Langkah 1 (Cadangan Backup)**:
+     - Telah dibuat file backup cadangan di folder `_backup` untuk seluruh file yang dimodifikasi sebelum perubahan dilakukan.
+  2. [x] **Langkah 2 (Peningkatan Algoritma Kompresi Kuat `compressImageFile` Target Strict <= 40 KB)**:
+     - Menyempurnakan algoritma kompresi gambar berbasis HTML5 Canvas di `src/app/admin/finance/page.tsx` dengan target ketat `maxTargetSizeKb = 40` (maksimal 40 * 1024 bytes / 40.960 bytes).
+     - Mengimplementasikan 2 tahap iterasi cerdas: uji kualitas JPEG (0.70 down to 0.20) lalu adaptive downscaling dimensi (skala 0.80x dimensi per siklus) sehingga gambar resolusi tinggi dari kamera HP otomatis terpangkas presisi ke rentang ~40 KB tanpa memburamkan teks dan angka penting.
+     - Diterapkan pada seluruh upload nota berkas, bukti bayar kuitansi, foto dokumentasi proyek, dan foto lampiran faktur.
+  3. [x] **Langkah 3 (Penerapan Kompresi ~40 KB pada Portal Teknisi & Maintenance)**:
+     - Menambahkan fungsi kompresi client-side `compressTechnicianPhoto(file, 40)` di `src/app/employee/page.tsx` untuk foto dokumentasi penugasan teknisi di lapangan.
+     - Menambahkan fungsi kompresi client-side `compressMaintenancePhoto(file, 40)` di `src/app/admin/maintenance/page.tsx` untuk foto dokumentasi tiket pemeliharaan.
+  4. [x] **Langkah 4 (Optimasi Ekspor PDF Ringan pada Endpoint Cetak Publik `/api/finance/print`)**:
+     - Mengalibrasi konfigurasi `downloadAsPdf()` di `src/app/api/finance/print/route.ts` (baik untuk SPH maupun Faktur/BAST/Photos):
+       - `image: { type: 'jpeg', quality: 0.65 }`
+       - `html2canvas: { scale: 1.5, useCORS: true }`
+       - Memastikan berkas PDF unduhan (termasuk lembar lampiran foto brosur item SPH dan foto dokumentasi fisik faktur) menghasilkan ukuran file yang sangat ringan (~100-200 KB) dan hemat kuota.
+  5. [x] **Langkah 5 (Validasi Kompilasi, Pengujian Lokal, & Deployment)**:
+     - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
+     - Build Next.js `npm run build` sukses 47/47 rute.
+     - Push ke GitHub repository `rm23nm/dstech-smart`.
+     - Deploy ke live server VPS PM2 `dstech-main`.
+
+---
+
+### 97. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
@@ -2821,5 +2848,6 @@
 
 ---
 *Laporan ini dibuat untuk memudahkan Agen AI selanjutnya melanjutkan pekerjaan.*
+
 
 

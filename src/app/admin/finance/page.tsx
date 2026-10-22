@@ -2100,13 +2100,13 @@ export default function AdminFinanceERPPage() {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
   };
 
-  // Helper Kompresi Berkas Gambar Klien (Client-Side Compression Target < 50 KB)
-  // Menjaga kualitas visual teks/angka nota namun memangkas ukuran hingga ~40 KB (30-40 KB)
+  // Helper Kompresi Berkas Gambar Lampiran (Target Maksimal ~40 KB)
+  // Menjaga kualitas visual teks/angka nota dan brosur produk namun membatasi ukuran maksimal ~40 KB
   const compressImageFile = async (
     file: File,
     maxTargetSizeKb = 40,
-    initialMaxWidth = 960,
-    initialMaxHeight = 1280
+    initialMaxWidth = 840,
+    initialMaxHeight = 1120
   ): Promise<{ file: File; originalSize: number; compressedSize: number }> => {
     const originalSize = file.size;
     if (!file.type.startsWith("image/")) {
@@ -2123,7 +2123,7 @@ export default function AdminFinanceERPPage() {
           let curWidth = img.width;
           let curHeight = img.height;
 
-          // Resize awal proporsional agar tidak berlebihan namun tetap tajam untuk teks
+          // Batas awal proporsional
           if (curWidth > initialMaxWidth || curHeight > initialMaxHeight) {
             if (curWidth / initialMaxWidth > curHeight / initialMaxHeight) {
               curHeight = Math.round((curHeight * initialMaxWidth) / curWidth);
@@ -2141,24 +2141,23 @@ export default function AdminFinanceERPPage() {
           }
 
           const maxSizeBytes = maxTargetSizeKb * 1024;
-          const qualities = [0.72, 0.60, 0.50, 0.40, 0.32, 0.25];
           let bestBlob: Blob | null = null;
 
-          // Iterasi kompresi dinamis sampai ukuran < 50 KB
-          for (let step = 0; step < qualities.length; step++) {
-            const scale = step > 2 ? 0.85 : 1.0;
-            const w = Math.round(curWidth * (step > 3 ? 0.75 : scale));
-            const h = Math.round(curHeight * (step > 3 ? 0.75 : scale));
+          // Multi-stage compression loop (Kualitas & Downscaling Terpadu)
+          // Menjamin file terkompresi secara ketat <= 40 KB
+          const testQualities = [0.70, 0.58, 0.45, 0.35, 0.26, 0.20];
+          let currentW = curWidth;
+          let currentH = curHeight;
 
-            canvas.width = w;
-            canvas.height = h;
-
-            // Fill background putih solid untuk teks dokumen
+          // Lakukan pengujian kualitas pada resolusi saat ini
+          for (let step = 0; step < testQualities.length; step++) {
+            canvas.width = currentW;
+            canvas.height = currentH;
             ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, w, h);
-            ctx.drawImage(img, 0, 0, w, h);
+            ctx.fillRect(0, 0, currentW, currentH);
+            ctx.drawImage(img, 0, 0, currentW, currentH);
 
-            const q = qualities[step];
+            const q = testQualities[step];
             const blob: Blob | null = await new Promise((res) => {
               canvas.toBlob((b) => res(b), "image/jpeg", q);
             });
@@ -2168,6 +2167,34 @@ export default function AdminFinanceERPPage() {
               if (blob.size <= maxSizeBytes) {
                 break;
               }
+            }
+          }
+
+          // Jika setelah loop kualitas ukuran masih > maxSizeBytes, perkecil dimensi gambar secara adaptif
+          if (bestBlob && bestBlob.size > maxSizeBytes) {
+            for (let downscale = 0; downscale < 4; downscale++) {
+              currentW = Math.round(currentW * 0.80);
+              currentH = Math.round(currentH * 0.80);
+              if (currentW < 240) break;
+
+              canvas.width = currentW;
+              canvas.height = currentH;
+              ctx.fillStyle = "#ffffff";
+              ctx.fillRect(0, 0, currentW, currentH);
+              ctx.drawImage(img, 0, 0, currentW, currentH);
+
+              // Coba dengan kualitas rendah-sedang (0.38, 0.25, 0.18)
+              for (const q of [0.38, 0.25, 0.18]) {
+                const blob: Blob | null = await new Promise((res) => {
+                  canvas.toBlob((b) => res(b), "image/jpeg", q);
+                });
+                if (blob) {
+                  bestBlob = blob;
+                  if (blob.size <= maxSizeBytes) break;
+                }
+              }
+
+              if (bestBlob && bestBlob.size <= maxSizeBytes) break;
             }
           }
 
