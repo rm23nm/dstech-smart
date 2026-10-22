@@ -3,7 +3,8 @@
 import React, { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Phone, Mail, MapPin, Send, MessageCircle, Clock, Globe, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
+import { Phone, Mail, MapPin, Send, MessageCircle, Clock, Globe, CheckCircle2, AlertCircle, Loader2, Navigation, ExternalLink, Smartphone } from 'lucide-react'
+
 
 export default function ContactPage() {
   const [name, setName] = useState('')
@@ -210,26 +211,58 @@ export default function ContactPage() {
                </div>
             </div>
 
-            {/* Google Map Embed */}
-            <div className="aspect-video w-full rounded-3xl bg-slate-100 border-2 border-slate-100 relative overflow-hidden shadow-md">
-               <iframe 
-                 src="https://maps.google.com/maps?q=Perumahan%20Bukit%20Cilegon%20Asri%2C%20Bagendung%2C%20Cilegon&t=&z=14&ie=UTF8&iwloc=&output=embed"
-                 width="100%" 
-                 height="100%" 
-                 style={{ border: 0 }} 
-                 allowFullScreen={false} 
-                 loading="lazy" 
-                 referrerPolicy="no-referrer-when-downgrade"
-                 title="Peta Lokasi PT. DSTech Smart Perkasa"
-                 className="w-full h-full object-cover"
-               ></iframe>
+            {/* Google Map Embed & Lokasi Kantor */}
+            <div className="space-y-4">
+               <div className="aspect-video w-full rounded-3xl bg-slate-100 border-2 border-slate-200 relative overflow-hidden shadow-lg">
+                  <iframe 
+                    src="https://www.google.com/maps/embed?origin=mfe&pb=!1m3!2m1!1sPT.+DSTech+Smart+Perkasa+Perumahan+Bukit+Cilegon+Asri+Bagendung+Cilegon!6i15!3m1!1sid!5m1!1sid"
+                    width="100%" 
+                    height="100%" 
+                    style={{ border: 0 }} 
+                    allowFullScreen={true} 
+                    loading="lazy" 
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title="Peta Lokasi Kantor PT. DSTech Smart Perkasa"
+                    className="w-full h-full object-cover"
+                  ></iframe>
+               </div>
+
+               {/* Quick Info & Tombol Buka di Google Maps */}
+               <div className="p-4 bg-blue-50/80 rounded-2xl border border-blue-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5 text-slate-700">
+                     <Navigation className="w-4 h-4 text-dstech-blue shrink-0" />
+                     <div>
+                        <p className="font-bold text-slate-900">Koordinat Peta Kantor Pusat</p>
+                        <p className="text-[11px] text-slate-500 font-mono">Perumahan Bukit Cilegon Asri Blok DB No. 19, Bagendung, Cilegon</p>
+                     </div>
+                  </div>
+                  <a
+                    href="https://maps.google.com/?q=Perumahan+Bukit+Cilegon+Asri+Blok+DB+No.+19+Bagendung+Cilegon"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm"
+                  >
+                     <span>Buka Petunjuk Arah (Maps)</span>
+                     <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+               </div>
             </div>
          </div>
       </main>
 
       {/* Footer */}
       <footer className="py-12 bg-slate-900 text-center">
-         <Image src="/logo.png" alt="Logo" width={140} height={40} className="mx-auto brightness-200 opacity-60 mb-6" />
+         <Image src="/logo.png" alt="Logo" width={140} height={40} className="mx-auto brightness-200 opacity-60 mb-5" />
+         <div className="flex justify-center mb-6">
+            <a 
+              href="/dstech-smart-app.apk" 
+              download="dstech-smart-app.apk"
+              className="inline-flex items-center gap-2 text-xs font-bold text-emerald-400 bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/30 px-4 py-2 rounded-xl transition-all shadow-sm"
+            >
+               <Smartphone className="w-4 h-4 text-emerald-400" />
+               <span>Download Aplikasi Android (6.2 MB)</span>
+            </a>
+         </div>
          <p className="text-white/40 text-xs font-bold tracking-wider">
            &copy; {new Date().getFullYear()} PT. DSTech Smart Perkasa. Seluruh Hak Cipta Dilindungi.
          </p>
