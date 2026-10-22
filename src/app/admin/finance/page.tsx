@@ -6537,16 +6537,15 @@ export default function AdminFinanceERPPage() {
                     <th className="p-3">No. Faktur</th>
                     <th className="p-3">Pelanggan / Klien</th>
                     <th className="p-3">Tanggal & Tempo</th>
-                    <th className="p-3">Rincian Item</th>
                     <th className="p-3">Grand Total</th>
-                    <th className="p-3">Status Bayar</th>
+                    <th className="p-3">Status Bayar & Approval</th>
                     <th className="p-3 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredAndSortedSales.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-slate-400">
+                      <td colSpan={6} className="p-8 text-center text-slate-400">
                         <FileText className="w-10 h-10 mx-auto text-slate-300 mb-2" />
                         <p className="font-bold text-slate-600">Tidak ada Faktur Penjualan yang sesuai filter</p>
                         <p className="text-xs text-slate-400 mt-0.5">Coba ubah kata kunci pencarian, rentang tanggal, atau filter status di atas.</p>
@@ -6567,6 +6566,10 @@ export default function AdminFinanceERPPage() {
                                 🏢 PT
                               </span>
                             )}
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200 inline-flex items-center gap-1" title={`${sale.items.length} item rincian barang/jasa`}>
+                              <Package className="w-2.5 h-2.5 text-slate-500" />
+                              {sale.items.length} Item
+                            </span>
                             {sale.invoiceType === "DP" && (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800 uppercase tracking-wider">
                                 DP {sale.dpPercentage || 50}%
@@ -6587,15 +6590,6 @@ export default function AdminFinanceERPPage() {
                         <td className="p-3 text-slate-500 whitespace-nowrap">
                           <p className="font-medium">{sale.date}</p>
                           <p className="text-[10px] text-slate-400">Tempo: {sale.dueDate}</p>
-                        </td>
-                        <td className="p-3">
-                          <div className="space-y-1">
-                            {sale.items.map((it, idx) => (
-                              <p key={idx} className="text-[11px] text-slate-700 font-medium">
-                                • {it.productName} ({it.qty} {it.unit})
-                              </p>
-                            ))}
-                          </div>
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <p className="font-black text-slate-900">{formatRupiah(sale.grandTotal)}</p>
