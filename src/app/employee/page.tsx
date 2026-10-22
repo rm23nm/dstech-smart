@@ -411,11 +411,11 @@ export default function EmployeeDashboard() {
       (err) => {
         let errorMsg = "Gagal mengambil titik GPS.";
         if (err.code === 1) {
-          errorMsg = "Izin lokasi browser ditolak. Menampilkan peta koordinat kantor DSTech.";
+          errorMsg = "Izin akses lokasi perangkat/browser belum diizinkan. Koordinat kantor DSTech digunakan sebagai acuan.";
         } else if (err.code === 2) {
-          errorMsg = "Posisi GPS tidak ditemukan. Menampilkan peta koordinat kantor DSTech.";
+          errorMsg = "Sinyal GPS perangkat tidak terdeteksi. Menampilkan koordinat kantor DSTech.";
         } else if (err.code === 3) {
-          errorMsg = "Waktu deteksi GPS habis. Menampilkan peta koordinat kantor DSTech.";
+          errorMsg = "Waktu deteksi GPS habis. Menampilkan koordinat kantor DSTech.";
         }
         if (mode === "checkin") {
           setIsDetectingCheckInGps(false);
@@ -3371,9 +3371,14 @@ export default function EmployeeDashboard() {
                   <span>Sinyal GPS Akurat Terkunci (Akurasi: ±{checkInCoords.accuracy}m)</span>
                 </div>
               ) : gpsErrorCheckIn ? (
-                <div className="flex items-center gap-2 text-amber-800 font-medium bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>{gpsErrorCheckIn}</span>
+                <div className="space-y-1.5 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-amber-900">
+                  <div className="flex items-start gap-2 text-xs font-semibold">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span>{gpsErrorCheckIn}</span>
+                  </div>
+                  <p className="text-[10px] text-amber-700/90 pl-6 leading-tight">
+                    💡 <strong>Tips:</strong> Jika di browser (Chrome/Edge), ketuk ikon gembok 🔒 di samping kiri alamat web &gt; <em>Izin</em> &gt; <em>Lokasi</em> &gt; pilih <em>Izinkan</em>, lalu ketuk tombol <strong>Deteksi Ulang GPS</strong> di atas.
+                  </p>
                 </div>
               ) : (
                 <p className="text-slate-500 text-[11px]">
@@ -3527,9 +3532,14 @@ export default function EmployeeDashboard() {
                   <span>Sinyal GPS Pulang Terkunci (Akurasi: ±{checkOutCoords.accuracy}m)</span>
                 </div>
               ) : gpsErrorCheckOut ? (
-                <div className="flex items-center gap-2 text-amber-800 font-medium bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>{gpsErrorCheckOut}</span>
+                <div className="space-y-1.5 bg-amber-50 p-2.5 rounded-xl border border-amber-200 text-amber-900">
+                  <div className="flex items-start gap-2 text-xs font-semibold">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span>{gpsErrorCheckOut}</span>
+                  </div>
+                  <p className="text-[10px] text-amber-700/90 pl-6 leading-tight">
+                    💡 <strong>Tips:</strong> Jika di browser (Chrome/Edge), ketuk ikon gembok 🔒 di samping kiri alamat web &gt; <em>Izin</em> &gt; <em>Lokasi</em> &gt; pilih <em>Izinkan</em>, lalu ketuk tombol <strong>Deteksi Ulang GPS</strong> di atas.
+                  </p>
                 </div>
               ) : (
                 <p className="text-slate-500 text-[11px]">
