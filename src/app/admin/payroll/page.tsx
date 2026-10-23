@@ -71,6 +71,14 @@ interface PayrollRecord {
   approvedBy?: string;
   approvedAt?: string;
   recordedInCashFlow?: boolean;
+  dailyRate?: number;
+  positionTier?: string;
+}
+
+interface PositionRateItem {
+  name: string;
+  dailyRate: number;
+  overtimeRate: number;
 }
 
 interface PayrollSettings {
@@ -83,6 +91,12 @@ interface PayrollSettings {
   cutoffEndDay: number;
   autoGenerateEnabled: boolean;
   defaultPaymentMethod: string;
+  dailyRatesByPosition?: {
+    helper: PositionRateItem;
+    skill: PositionRateItem;
+    senior: PositionRateItem;
+    lead: PositionRateItem;
+  };
 }
 
 interface PayrollSummary {
@@ -121,6 +135,12 @@ export default function AdminPayrollPage() {
     cutoffEndDay: 20,
     autoGenerateEnabled: true,
     defaultPaymentMethod: "Transfer Bank BCA",
+    dailyRatesByPosition: {
+      helper: { name: "Helper / Asisten Teknisi", dailyRate: 150000, overtimeRate: 25000 },
+      skill: { name: "Teknisi Skill / Ahli", dailyRate: 175000, overtimeRate: 30000 },
+      senior: { name: "Teknisi Senior / Specialist", dailyRate: 200000, overtimeRate: 35000 },
+      lead: { name: "Lead / Foreman Lapangan", dailyRate: 225000, overtimeRate: 40000 },
+    },
   });
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -172,6 +192,8 @@ export default function AdminPayrollPage() {
     notes: string;
     status: "Draft" | "Disetujui" | "Dibayarkan";
     recordInCashFlow: boolean;
+    dailyRate?: number;
+    positionTier?: string;
   }>({
     isEdit: false,
     slipNumber: "",
@@ -180,15 +202,17 @@ export default function AdminPayrollPage() {
     employeeName: "",
     employeeRole: "Teknisi Lapangan",
     bankAccount: "",
-    baseSalary: 4200000,
+    baseSalary: 3850000,
+    dailyRate: 175000,
+    positionTier: "skill",
     presenceDays: 22,
     presenceRate: 50000,
-    presenceAllowance: 1100000,
+    presenceAllowance: 0,
     overtimeHours: 0,
     overtimeRate: 30000,
     overtimePay: 0,
-    positionAllowance: 400000,
-    transportAllowance: 400000,
+    positionAllowance: 0,
+    transportAllowance: 300000,
     bonusProject: 0,
     bonusPerformance: 0,
     bpjsDeduction: 150000,
@@ -491,6 +515,8 @@ export default function AdminPayrollPage() {
       notes: p.notes || "",
       status: p.status,
       recordInCashFlow: false,
+      dailyRate: p.dailyRate || 175000,
+      positionTier: p.positionTier || "skill",
     });
     setIsFormModalOpen(true);
   };
@@ -1020,7 +1046,26 @@ export default function AdminPayrollPage() {
 
                       <td className="py-4 px-4">
                         <div className="font-bold text-slate-900">{p.employeeName}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">{p.employeeRole}</div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                          <span className="text-[11px] text-slate-600 font-medium">{p.employeeRole}</span>
+                          {p.dailyRate ? (
+                            <span
+                              className={`inline-block px-1.5 py-0.5 text-[9px] font-black rounded ${
+                                p.dailyRate <= 150000
+                                  ? "bg-cyan-100 text-cyan-800 border border-cyan-300"
+                                  : p.dailyRate <= 175000
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                  : "bg-purple-100 text-purple-800 border border-purple-300"
+                              }`}
+                            >
+                              {formatRupiah(p.dailyRate)}/hr
+                            </span>
+                          ) : p.positionTier ? (
+                            <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold rounded bg-slate-100 text-slate-600">
+                              {p.positionTier}
+                            </span>
+                          ) : null}
+                        </div>
                         <div className="text-[10px] text-slate-400 mt-0.5">{p.bankAccount}</div>
                       </td>
 
@@ -1332,6 +1377,240 @@ export default function AdminPayrollPage() {
                 </div>
               </div>
 
+              {/* Seksi Tambahan: Tarif Gaji Harian Berdasarkan Posisi / Keahlian Jabatan */}
+              <div className="bg-gradient-to-br from-slate-50 to-blue-50/40 p-4 rounded-2xl border border-blue-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-dstech-blue inline-block"></span>
+                    Tarif Harian Berdasarkan Posisi / Keahlian Jabatan
+                  </label>
+                  <span className="text-[10px] text-dstech-blue font-bold bg-white px-2.5 py-0.5 rounded-full border border-blue-100 shadow-xs">
+                    Skema Standar DSTech
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Atur tarif upah harian dan lembur acuan untuk Helper (150rb), Teknisi Skill (175rb), Senior (200rb), dan Lead/Foreman (225rb).
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {/* Helper */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">👷‍♂️ Helper / Asisten</span>
+                      <span className="text-[10px] font-bold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded">Helper</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Tarif/Hari (Rp):</label>
+                        <input
+                          type="number"
+                          value={settings.dailyRatesByPosition?.helper?.dailyRate || 150000}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setSettings({
+                              ...settings,
+                              dailyRatesByPosition: {
+                                ...settings.dailyRatesByPosition!,
+                                helper: {
+                                  name: "Helper / Asisten Teknisi",
+                                  dailyRate: val,
+                                  overtimeRate: settings.dailyRatesByPosition?.helper?.overtimeRate || 25000,
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-black text-xs text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Lembur/Jam (Rp):</label>
+                        <input
+                          type="number"
+                          value={settings.dailyRatesByPosition?.helper?.overtimeRate || 25000}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setSettings({
+                              ...settings,
+                              dailyRatesByPosition: {
+                                ...settings.dailyRatesByPosition!,
+                                helper: {
+                                  name: "Helper / Asisten Teknisi",
+                                  dailyRate: settings.dailyRatesByPosition?.helper?.dailyRate || 150000,
+                                  overtimeRate: val,
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs text-slate-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Teknisi Skill */}
+                  <div className="bg-white p-3 rounded-xl border border-emerald-200/80 space-y-2 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-emerald-900">⚡ Teknisi Skill / Ahli</span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Skill</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Tarif/Hari (Rp):</label>
+                        <input
+                          type="number"
+                          value={settings.dailyRatesByPosition?.skill?.dailyRate || 175000}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setSettings({
+                              ...settings,
+                              dailyRatesByPosition: {
+                                ...settings.dailyRatesByPosition!,
+                                skill: {
+                                  name: "Teknisi Skill / Ahli",
+                                  dailyRate: val,
+                                  overtimeRate: settings.dailyRatesByPosition?.skill?.overtimeRate || 30000,
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-black text-xs text-emerald-700"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Lembur/Jam (Rp):</label>
+                        <input
+                          type="number"
+                          value={settings.dailyRatesByPosition?.skill?.overtimeRate || 30000}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setSettings({
+                              ...settings,
+                              dailyRatesByPosition: {
+                                ...settings.dailyRatesByPosition!,
+                                skill: {
+                                  name: "Teknisi Skill / Ahli",
+                                  dailyRate: settings.dailyRatesByPosition?.skill?.dailyRate || 175000,
+                                  overtimeRate: val,
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs text-slate-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Teknisi Senior */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">🎯 Teknisi Senior</span>
+                      <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">Senior</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Tarif/Hari (Rp):</label>
+                        <input
+                          type="number"
+                          value={settings.dailyRatesByPosition?.senior?.dailyRate || 200000}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setSettings({
+                              ...settings,
+                              dailyRatesByPosition: {
+                                ...settings.dailyRatesByPosition!,
+                                senior: {
+                                  name: "Teknisi Senior / Specialist",
+                                  dailyRate: val,
+                                  overtimeRate: settings.dailyRatesByPosition?.senior?.overtimeRate || 35000,
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-black text-xs text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Lembur/Jam (Rp):</label>
+                        <input
+                          type="number"
+                          value={settings.dailyRatesByPosition?.senior?.overtimeRate || 35000}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setSettings({
+                              ...settings,
+                              dailyRatesByPosition: {
+                                ...settings.dailyRatesByPosition!,
+                                senior: {
+                                  name: "Teknisi Senior / Specialist",
+                                  dailyRate: settings.dailyRatesByPosition?.senior?.dailyRate || 200000,
+                                  overtimeRate: val,
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs text-slate-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lead / Foreman */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-slate-800">👑 Lead / Foreman</span>
+                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">Lead</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Tarif/Hari (Rp):</label>
+                        <input
+                          type="number"
+                          value={settings.dailyRatesByPosition?.lead?.dailyRate || 225000}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setSettings({
+                              ...settings,
+                              dailyRatesByPosition: {
+                                ...settings.dailyRatesByPosition!,
+                                lead: {
+                                  name: "Lead / Foreman Lapangan",
+                                  dailyRate: val,
+                                  overtimeRate: settings.dailyRatesByPosition?.lead?.overtimeRate || 40000,
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-black text-xs text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Lembur/Jam (Rp):</label>
+                        <input
+                          type="number"
+                          value={settings.dailyRatesByPosition?.lead?.overtimeRate || 40000}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setSettings({
+                              ...settings,
+                              dailyRatesByPosition: {
+                                ...settings.dailyRatesByPosition!,
+                                lead: {
+                                  name: "Lead / Foreman Lapangan",
+                                  dailyRate: settings.dailyRatesByPosition?.lead?.dailyRate || 225000,
+                                  overtimeRate: val,
+                                },
+                              },
+                            });
+                          }}
+                          className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs text-slate-700"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
@@ -1548,47 +1827,207 @@ export default function AdminPayrollPage() {
                 </div>
               </div>
 
-              {/* Seksi 2: Gaji Pokok, Kehadiran, dan Lembur */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-4">
-                <h4 className="text-xs font-black text-slate-700 uppercase tracking-wider">
-                  Komponen Pendapatan Utama
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Seksi 2: Pilihan Tingkatan Posisi & Komponen Upah Utama */}
+              <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-dstech-blue inline-block"></span>
+                    Komponen Upah Pokok & Tarif Tingkat Jabatan
+                  </h4>
+                  <span className="text-[10px] text-slate-500 font-bold">
+                    Pilih preset tingkat keahlian atau input manual
+                  </span>
+                </div>
+
+                {/* Quick Preset Buttons */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rate = settings.dailyRatesByPosition?.helper?.dailyRate || 150000;
+                      const ot = settings.dailyRatesByPosition?.helper?.overtimeRate || 25000;
+                      setFormData({
+                        ...formData,
+                        positionTier: "helper",
+                        dailyRate: rate,
+                        baseSalary: (formData.presenceDays || 0) * rate,
+                        presenceRate: 0,
+                        presenceAllowance: 0,
+                        overtimeRate: ot,
+                        overtimePay: (formData.overtimeHours || 0) * ot,
+                        employeeRole: formData.employeeRole || "Helper / Asisten Teknisi",
+                      });
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      formData.positionTier === "helper" || formData.dailyRate === 150000
+                        ? "border-cyan-500 bg-cyan-50 text-cyan-950 font-bold shadow-xs"
+                        : "border-slate-200 bg-white hover:bg-slate-100/80 text-slate-700"
+                    }`}
+                  >
+                    <div className="text-[11px] font-black">👷‍♂️ Helper</div>
+                    <div className="text-xs font-black text-cyan-800 mt-0.5">Rp 150.000<span className="text-[10px] font-normal">/hr</span></div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Lembur: 25rb/jam</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rate = settings.dailyRatesByPosition?.skill?.dailyRate || 175000;
+                      const ot = settings.dailyRatesByPosition?.skill?.overtimeRate || 30000;
+                      setFormData({
+                        ...formData,
+                        positionTier: "skill",
+                        dailyRate: rate,
+                        baseSalary: (formData.presenceDays || 0) * rate,
+                        presenceRate: 0,
+                        presenceAllowance: 0,
+                        overtimeRate: ot,
+                        overtimePay: (formData.overtimeHours || 0) * ot,
+                        employeeRole: formData.employeeRole || "Teknisi Skill / Ahli",
+                      });
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      formData.positionTier === "skill" || formData.dailyRate === 175000
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-950 font-bold shadow-xs"
+                        : "border-slate-200 bg-white hover:bg-slate-100/80 text-slate-700"
+                    }`}
+                  >
+                    <div className="text-[11px] font-black">⚡ Teknisi Skill</div>
+                    <div className="text-xs font-black text-emerald-800 mt-0.5">Rp 175.000<span className="text-[10px] font-normal">/hr</span></div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Lembur: 30rb/jam</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rate = settings.dailyRatesByPosition?.senior?.dailyRate || 200000;
+                      const ot = settings.dailyRatesByPosition?.senior?.overtimeRate || 35000;
+                      setFormData({
+                        ...formData,
+                        positionTier: "senior",
+                        dailyRate: rate,
+                        baseSalary: (formData.presenceDays || 0) * rate,
+                        presenceRate: 0,
+                        presenceAllowance: 0,
+                        overtimeRate: ot,
+                        overtimePay: (formData.overtimeHours || 0) * ot,
+                        employeeRole: formData.employeeRole || "Teknisi Senior",
+                      });
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      formData.positionTier === "senior" || formData.dailyRate === 200000
+                        ? "border-purple-500 bg-purple-50 text-purple-950 font-bold shadow-xs"
+                        : "border-slate-200 bg-white hover:bg-slate-100/80 text-slate-700"
+                    }`}
+                  >
+                    <div className="text-[11px] font-black">🎯 Teknisi Senior</div>
+                    <div className="text-xs font-black text-purple-800 mt-0.5">Rp 200.000<span className="text-[10px] font-normal">/hr</span></div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Lembur: 35rb/jam</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        positionTier: "staff",
+                        dailyRate: 0,
+                        baseSalary: 4000000,
+                        presenceAllowance: (formData.presenceDays || 0) * 25000,
+                        presenceRate: 25000,
+                        overtimeRate: 30000,
+                      });
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all ${
+                      formData.positionTier === "staff"
+                        ? "border-blue-500 bg-blue-50 text-blue-950 font-bold shadow-xs"
+                        : "border-slate-200 bg-white hover:bg-slate-100/80 text-slate-700"
+                    }`}
+                  >
+                    <div className="text-[11px] font-black">🏢 Staf Kantor</div>
+                    <div className="text-xs font-black text-blue-800 mt-0.5">Gaji Bulanan</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Pokok + Uang Hadir</div>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Gaji Pokok / Upah Harian (Rp)</label>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Tarif Upah Harian (Rp/Hari)
+                    </label>
                     <input
                       type="number"
-                      value={formData.baseSalary}
-                      onChange={(e) => setFormData({ ...formData, baseSalary: Number(e.target.value) })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-black"
+                      value={formData.dailyRate || 0}
+                      onChange={(e) => {
+                        const rate = Number(e.target.value);
+                        setFormData({
+                          ...formData,
+                          dailyRate: rate,
+                          baseSalary: rate > 0 ? (formData.presenceDays || 0) * rate : formData.baseSalary,
+                        });
+                      }}
+                      placeholder="Contoh: 150000 atau 175000"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-black text-dstech-blue bg-white"
                     />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      Helper 150rb | Skill 175rb | Senior 200rb
+                    </span>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Jumlah Hadir (Hari)</label>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Jumlah Hadir Kerja (Hari)
+                    </label>
                     <input
                       type="number"
                       value={formData.presenceDays}
                       onChange={(e) => {
                         const days = Number(e.target.value);
+                        const rate = formData.dailyRate || 0;
                         setFormData({
                           ...formData,
                           presenceDays: days,
-                          presenceAllowance: days * formData.presenceRate,
+                          baseSalary: rate > 0 ? days * rate : formData.baseSalary,
+                          presenceAllowance: rate > 0 ? 0 : days * (formData.presenceRate || 25000),
                         });
                       }}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white"
                     />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      {formData.dailyRate && formData.dailyRate > 0
+                        ? `Otomatis: ${formData.presenceDays} hr x ${formatRupiah(formData.dailyRate)}`
+                        : "Hari kerja hadir"}
+                    </span>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Uang Kehadiran (Rp)</label>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Total Gaji Pokok / Upah (Rp)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.baseSalary}
+                      onChange={(e) => setFormData({ ...formData, baseSalary: Number(e.target.value) })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-black text-slate-900 bg-white"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      Total pokok hasil kehadiran / bulanan
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Uang Kehadiran (Rp)
+                    </label>
                     <input
                       type="number"
                       value={formData.presenceAllowance}
                       onChange={(e) => setFormData({ ...formData, presenceAllowance: Number(e.target.value) })}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-black text-emerald-600"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-black text-emerald-600 bg-white"
                     />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">
+                      {formData.dailyRate && formData.dailyRate > 0 ? "Khusus staf bulanan (harian = 0)" : "Tunjangan kehadiran bulanan"}
+                    </span>
                   </div>
 
                   <div>
@@ -1860,8 +2299,16 @@ export default function AdminPayrollPage() {
                     1. Penerimaan (Earnings)
                   </div>
                   <div className="p-4 space-y-2.5">
-                    <div className="flex justify-between">
-                      <span className="text-slate-600">Gaji Pokok / Upah Pokok:</span>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-slate-600 block">Gaji Pokok / Upah Pokok:</span>
+                        {selectedSlipForPrint.dailyRate && selectedSlipForPrint.dailyRate > 0 ? (
+                          <span className="text-[10px] text-slate-500 font-semibold block">
+                            ({selectedSlipForPrint.presenceDays || 0} Hari Kerja x {formatRupiah(selectedSlipForPrint.dailyRate)})
+                            {selectedSlipForPrint.positionTier ? ` • Grade: ${selectedSlipForPrint.positionTier.toUpperCase()}` : ""}
+                          </span>
+                        ) : null}
+                      </div>
                       <span className="font-bold">{formatRupiah(selectedSlipForPrint.baseSalary)}</span>
                     </div>
                     <div className="flex justify-between">

@@ -8,6 +8,12 @@ const CONTRACTS_FILE = path.join(process.cwd(), "src", "data", "dstech_contracts
 const USERS_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
 const ATTENDANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_attendance.json");
 
+export interface PositionDailyRate {
+  name: string;
+  dailyRate: number;
+  overtimeRate: number;
+}
+
 interface PayrollSettings {
   standardOvertimeRate: number;
   standardPresenceRate: number;
@@ -18,6 +24,7 @@ interface PayrollSettings {
   cutoffEndDay: number; // Tanggal akhir cut-off (contoh: 20 bulan berjalan)
   autoGenerateEnabled: boolean;
   defaultPaymentMethod: string;
+  dailyRatesByPosition?: Record<string, PositionDailyRate>;
 }
 
 const DEFAULT_SETTINGS: PayrollSettings = {
@@ -30,7 +37,56 @@ const DEFAULT_SETTINGS: PayrollSettings = {
   cutoffEndDay: 20,
   autoGenerateEnabled: true,
   defaultPaymentMethod: "Transfer Bank BCA",
+  dailyRatesByPosition: {
+    helper: { name: "Helper / Asisten Teknisi", dailyRate: 150000, overtimeRate: 25000 },
+    skill: { name: "Teknisi Skill / Ahli", dailyRate: 175000, overtimeRate: 30000 },
+    senior: { name: "Teknisi Senior / Specialist", dailyRate: 200000, overtimeRate: 35000 },
+    lead: { name: "Lead / Foreman Lapangan", dailyRate: 225000, overtimeRate: 40000 },
+  },
 };
+
+export function resolveDailyRateForPosition(
+  roleOrPosition: string,
+  settings?: PayrollSettings
+): { dailyRate: number; overtimeRate: number; tierKey: string; tierName: string } {
+  const rates = settings?.dailyRatesByPosition || DEFAULT_SETTINGS.dailyRatesByPosition!;
+  const text = (roleOrPosition || "").toLowerCase();
+
+  if (text.includes("helper") || text.includes("asisten") || text.includes("kenek") || text.includes("pembantu")) {
+    return {
+      dailyRate: rates.helper?.dailyRate || 150000,
+      overtimeRate: rates.helper?.overtimeRate || 25000,
+      tierKey: "helper",
+      tierName: "Helper (Rp 150.000/hari)",
+    };
+  }
+
+  if (text.includes("lead") || text.includes("foreman") || text.includes("mandor") || text.includes("supervisor")) {
+    return {
+      dailyRate: rates.lead?.dailyRate || 225000,
+      overtimeRate: rates.lead?.overtimeRate || 40000,
+      tierKey: "lead",
+      tierName: "Lead / Foreman (Rp 225.000/hari)",
+    };
+  }
+
+  if (text.includes("senior") || text.includes("spesialis") || text.includes("specialist") || text.includes("ahli madya")) {
+    return {
+      dailyRate: rates.senior?.dailyRate || 200000,
+      overtimeRate: rates.senior?.overtimeRate || 35000,
+      tierKey: "senior",
+      tierName: "Senior (Rp 200.000/hari)",
+    };
+  }
+
+  // Default untuk Teknisi Skill / Lapangan (175.000)
+  return {
+    dailyRate: rates.skill?.dailyRate || 175000,
+    overtimeRate: rates.skill?.overtimeRate || 30000,
+    tierKey: "skill",
+    tierName: "Teknisi Skill (Rp 175.000/hari)",
+  };
+}
 
 function readPayrollData() {
   try {
@@ -311,6 +367,11 @@ export async function POST(request: Request) {
         let otherDeduction = 0;
         let bankAccount = emp.bankAccount || "-";
 
+        // Deteksi rate harian berdasarkan posisi/jabatan
+        const positionRateInfo = resolveDailyRateForPosition(emp.role, data.defaultSettings);
+        let appliedDailyRate = positionRateInfo.dailyRate;
+        let positionTier = positionRateInfo.tierName;
+
         // Sesuaikan dengan skema kontrak jika ada
         if (emp.contract && emp.contract.salaryScheme) {
           const scheme = emp.contract.salaryScheme;
@@ -319,13 +380,15 @@ export async function POST(request: Request) {
             positionAllowance = Number(scheme.staffScheme.positionAllowance || positionAllowance);
             transportAllowance = Number(scheme.staffScheme.transportAllowance || transportAllowance);
             bpjsDeduction = Number(scheme.staffScheme.bpjsAllowance || bpjsDeduction);
+            positionTier = "Staf Bulanan";
           } else if (scheme.dailyScheme) {
             if (scheme.dailyScheme.dailyRateType === "TYPE_1_FULL_DAY") {
-              const dailyRate = Number(scheme.dailyScheme.dailyRate || 200000);
+              const dailyRate = Number(scheme.dailyScheme.dailyRate || positionRateInfo.dailyRate);
+              appliedDailyRate = dailyRate;
               baseSalary = presenceDays * dailyRate;
               presenceRate = 0;
               presenceAllowance = 0;
-              overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || overtimeRate);
+              overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || positionRateInfo.overtimeRate);
               overtimePay = overtimeHours * overtimeRate;
               positionAllowance = 0;
             } else if (scheme.dailyScheme.dailyRateType === "TYPE_2_HOURLY") {
@@ -336,8 +399,17 @@ export async function POST(request: Request) {
               overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || 40000);
               overtimePay = overtimeHours * overtimeRate;
               positionAllowance = 0;
+              positionTier = "Teknisi Jam-jaman (Tipe 2)";
             }
           }
+        } else if (emp.role && (emp.role.toLowerCase().includes("teknisi") || emp.role.toLowerCase().includes("helper"))) {
+          appliedDailyRate = positionRateInfo.dailyRate;
+          baseSalary = presenceDays * appliedDailyRate;
+          presenceRate = 0;
+          presenceAllowance = 0;
+          overtimeRate = positionRateInfo.overtimeRate;
+          overtimePay = overtimeHours * overtimeRate;
+          positionAllowance = 0;
         }
 
         const totalGross = baseSalary + presenceAllowance + overtimePay + positionAllowance + transportAllowance + bonusProject + bonusPerformance;
@@ -372,6 +444,8 @@ export async function POST(request: Request) {
               totalGross,
               totalDeductions,
               takeHomePay,
+              dailyRate: appliedDailyRate,
+              positionTier,
             };
             updatedCount++;
           } else {
@@ -407,9 +481,11 @@ export async function POST(request: Request) {
             totalGross,
             totalDeductions,
             takeHomePay,
+            dailyRate: appliedDailyRate,
+            positionTier,
             status: "Draft",
             paymentMethod: data.defaultSettings.defaultPaymentMethod || "Transfer Bank BCA",
-            notes: `Auto-generated gaji periode ${monthStr} berdasarkan kehadiran (${presenceDays} hari) & lembur (${overtimeHours} jam)`,
+            notes: `Auto-generated gaji periode ${monthStr} (${positionTier}): ${presenceDays} hari kerja x Rp ${appliedDailyRate.toLocaleString("id-ID")}`,
             approvedBy: "System Auto-Payroll",
             approvedAt: now.toISOString(),
             recordedInCashFlow: false,
@@ -534,6 +610,8 @@ export async function POST(request: Request) {
       employeeRole: body.employeeRole || "Teknisi Lapangan",
       bankAccount: body.bankAccount || "-",
       baseSalary,
+      dailyRate: body.dailyRate ? Number(body.dailyRate) : undefined,
+      positionTier: body.positionTier || undefined,
       presenceDays,
       presenceRate,
       presenceAllowance,
@@ -600,6 +678,8 @@ export async function PUT(request: Request) {
     if (body.employeeName !== undefined) payroll.employeeName = body.employeeName;
     if (body.employeeRole !== undefined) payroll.employeeRole = body.employeeRole;
     if (body.bankAccount !== undefined) payroll.bankAccount = body.bankAccount;
+    if (body.dailyRate !== undefined) payroll.dailyRate = Number(body.dailyRate);
+    if (body.positionTier !== undefined) payroll.positionTier = body.positionTier;
     if (body.baseSalary !== undefined) payroll.baseSalary = Number(body.baseSalary);
     if (body.presenceDays !== undefined) payroll.presenceDays = Number(body.presenceDays);
     if (body.presenceRate !== undefined) payroll.presenceRate = Number(body.presenceRate);

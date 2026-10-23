@@ -1358,9 +1358,101 @@ export default function ContractsPage() {
                     {/* Form Input Detail Tipe 1 */}
                     {formData.dailyRateType === "TYPE_1_FULL_DAY" && (
                       <div className="bg-amber-50/40 p-5 rounded-2xl border border-amber-200 space-y-4">
-                        <span className="text-xs font-black text-amber-900 uppercase tracking-wider block">
-                          Parameter Upah Tipe 1 (Harian Dibayar Penuh)
-                        </span>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                          <span className="text-xs font-black text-amber-900 uppercase tracking-wider block">
+                            Parameter Upah Tipe 1 (Harian Dibayar Penuh)
+                          </span>
+                          <span className="text-[10px] text-amber-700 font-bold">
+                            Preset Tingkat Jabatan Teknisi
+                          </span>
+                        </div>
+
+                        {/* Quick Preset Buttons for Daily Rate */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                dailyRate: 150000,
+                                overtimeHourlyRate: 25000,
+                                position: formData.position.includes("Helper") ? formData.position : "Helper / Asisten Teknisi",
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all ${
+                              formData.dailyRate === 150000
+                                ? "border-cyan-500 bg-cyan-100/70 text-cyan-950 font-bold shadow-xs"
+                                : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
+                            }`}
+                          >
+                            <div className="text-[11px] font-black">👷‍♂️ Helper</div>
+                            <div className="text-xs font-black text-cyan-800 mt-0.5">Rp 150.000<span className="text-[10px] font-normal">/hr</span></div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">OT: 25rb/jam</div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                dailyRate: 175000,
+                                overtimeHourlyRate: 30000,
+                                position: formData.position.includes("Skill") ? formData.position : "Teknisi Skill / Ahli",
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all ${
+                              formData.dailyRate === 175000
+                                ? "border-emerald-500 bg-emerald-100/70 text-emerald-950 font-bold shadow-xs"
+                                : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
+                            }`}
+                          >
+                            <div className="text-[11px] font-black">⚡ Teknisi Skill</div>
+                            <div className="text-xs font-black text-emerald-800 mt-0.5">Rp 175.000<span className="text-[10px] font-normal">/hr</span></div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">OT: 30rb/jam</div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                dailyRate: 200000,
+                                overtimeHourlyRate: 35000,
+                                position: formData.position.includes("Senior") ? formData.position : "Teknisi Senior",
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all ${
+                              formData.dailyRate === 200000
+                                ? "border-purple-500 bg-purple-100/70 text-purple-950 font-bold shadow-xs"
+                                : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
+                            }`}
+                          >
+                            <div className="text-[11px] font-black">🎯 Senior</div>
+                            <div className="text-xs font-black text-purple-800 mt-0.5">Rp 200.000<span className="text-[10px] font-normal">/hr</span></div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">OT: 35rb/jam</div>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData({
+                                ...formData,
+                                dailyRate: 225000,
+                                overtimeHourlyRate: 40000,
+                                position: formData.position.includes("Lead") ? formData.position : "Lead / Foreman Lapangan",
+                              });
+                            }}
+                            className={`p-2.5 rounded-xl border text-left transition-all ${
+                              formData.dailyRate === 225000
+                                ? "border-indigo-500 bg-indigo-100/70 text-indigo-950 font-bold shadow-xs"
+                                : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
+                            }`}
+                          >
+                            <div className="text-[11px] font-black">👑 Foreman</div>
+                            <div className="text-xs font-black text-indigo-800 mt-0.5">Rp 225.000<span className="text-[10px] font-normal">/hr</span></div>
+                            <div className="text-[10px] text-slate-500 mt-0.5">OT: 40rb/jam</div>
+                          </button>
+                        </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
