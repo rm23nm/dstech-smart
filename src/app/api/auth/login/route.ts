@@ -56,6 +56,24 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validasi Masa Berlaku Akun (Expired Check)
+    if (user.expiresAt) {
+      const expiryDate = new Date(user.expiresAt);
+      if (!user.expiresAt.includes("T")) {
+        expiryDate.setHours(23, 59, 59, 999);
+      }
+      if (new Date() > expiryDate) {
+        const dateFormatted = user.expiresAt.split("T")[0];
+        return NextResponse.json(
+          {
+            success: false,
+            message: `Akses Ditolak: Masa berlaku akun Anda telah berakhir (Kedaluwarsa pada ${dateFormatted}). Silakan hubungi Administrator untuk perpanjangan masa kontrak atau izin akses sistem.`,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // Validasi Password
     const storedPassword = user.password || "dstech123";
     if (storedPassword !== cleanPassword) {

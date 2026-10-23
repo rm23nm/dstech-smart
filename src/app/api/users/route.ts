@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
+const CONTRACTS_FILE = path.join(process.cwd(), "src", "data", "dstech_contracts.json");
 
 const DEFAULT_USERS = [
   {
@@ -13,6 +14,7 @@ const DEFAULT_USERS = [
     password: "M4m4cantik@MAMA344",
     phone: "081287654321",
     status: "ACTIVE",
+    expiresAt: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z"
   },
@@ -24,56 +26,74 @@ const DEFAULT_USERS = [
     password: "admin123",
     phone: "081298765432",
     status: "ACTIVE",
+    expiresAt: null,
     createdAt: "2026-01-10T08:00:00.000Z",
     updatedAt: "2026-01-10T08:00:00.000Z"
-  },
-  {
-    id: "dstech_usr_3",
-    name: "Teknisi Hendra",
-    email: "hendra@dstechsmart.com",
-    role: "EMPLOYEE",
-    password: "teknisi123",
-    phone: "085712345678",
-    status: "ACTIVE",
-    createdAt: "2026-02-01T09:00:00.000Z",
-    updatedAt: "2026-02-01T09:00:00.000Z"
-  },
-  {
-    id: "dstech_usr_4",
-    name: "Ahmad Rizky (Mitra Cilegon)",
-    email: "ahmad.rizky@gmail.com",
-    role: "AFFILIATE",
-    password: "mitra123",
-    phone: "087811223344",
-    status: "ACTIVE",
-    createdAt: "2026-02-15T10:00:00.000Z",
-    updatedAt: "2026-02-15T10:00:00.000Z"
-  },
-  {
-    id: "dstech_usr_5",
-    name: "PT. Krakatau Posco",
-    email: "procurement@krakatauposco.co.id",
-    role: "CLIENT",
-    password: "klien123",
-    phone: "0254391234",
-    status: "ACTIVE",
-    createdAt: "2026-03-01T11:00:00.000Z",
-    updatedAt: "2026-03-01T11:00:00.000Z"
   }
 ];
 
+function syncContractsWithUsers(users: any[]): boolean {
+  try {
+    if (!fs.existsSync(CONTRACTS_FILE)) return false;
+    const contractsData = JSON.parse(fs.readFileSync(CONTRACTS_FILE, "utf-8"));
+    const contracts = contractsData.contracts || [];
+    let updated = false;
+
+    for (const contract of contracts) {
+      if (!contract.employeeEmail) continue;
+      const email = contract.employeeEmail.trim().toLowerCase();
+      const existing = users.find((u) => u.email && u.email.trim().toLowerCase() === email);
+
+      if (!existing) {
+        users.push({
+          id: `dstech_usr_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+          name: contract.employeeName,
+          email: email,
+          role: "EMPLOYEE",
+          password: "dstech123",
+          phone: contract.employeePhone || "",
+          status: "ACTIVE",
+          expiresAt: contract.endDate || null,
+          contractId: contract.id,
+          position: contract.position || "Teknisi Lapangan",
+          createdAt: contract.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        updated = true;
+      } else {
+        if (!existing.expiresAt && contract.endDate) {
+          existing.expiresAt = contract.endDate;
+          existing.contractId = contract.id;
+          updated = true;
+        }
+      }
+    }
+    return updated;
+  } catch (err) {
+    console.error("Error syncing contracts to users:", err);
+    return false;
+  }
+}
+
 function readUsers(): any[] {
   try {
+    let users: any[] = [];
     if (fs.existsSync(DATA_FILE)) {
       const data = fs.readFileSync(DATA_FILE, "utf-8");
-      return JSON.parse(data);
+      users = JSON.parse(data);
+    } else {
+      const dir = path.dirname(DATA_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(DATA_FILE, JSON.stringify(DEFAULT_USERS, null, 2), "utf-8");
+      users = DEFAULT_USERS;
     }
-    const dir = path.dirname(DATA_FILE);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+
+    if (syncContractsWithUsers(users)) {
+      writeUsers(users);
     }
-    fs.writeFileSync(DATA_FILE, JSON.stringify(DEFAULT_USERS, null, 2), "utf-8");
-    return DEFAULT_USERS;
+    return users;
   } catch (err) {
     console.error("Error reading dstech_users.json:", err);
     return DEFAULT_USERS;
@@ -136,7 +156,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, role, phone, status, password } = body;
+    const { name, email, role, phone, status, password, expiresAt } = body;
 
     if (!name || !email) {
       return NextResponse.json(
@@ -163,6 +183,7 @@ export async function POST(request: Request) {
       password: password && password.trim() ? password.trim() : "dstech123",
       phone: phone ? phone.trim() : "",
       status: status || "ACTIVE",
+      expiresAt: expiresAt || null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -196,7 +217,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, email, role, phone, status, password } = body;
+    const { id, name, email, role, phone, status, password, expiresAt } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -236,6 +257,7 @@ export async function PUT(request: Request) {
       password: password && password.trim() ? password.trim() : users[index].password,
       phone: phone !== undefined ? phone.trim() : users[index].phone,
       status: status !== undefined ? status : users[index].status,
+      expiresAt: expiresAt !== undefined ? expiresAt : users[index].expiresAt,
       updatedAt: new Date().toISOString(),
     };
 
