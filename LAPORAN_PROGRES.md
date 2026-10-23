@@ -84,7 +84,10 @@
 - **2026-10-23**: Sistem Manajemen Kontrak Kerja & Perekrutan Karyawan Baru (Tugas 101). Menyiapkan modul `/admin/contracts` lengkap dengan data store terisolasi `dstech_contracts.json` (prefix `dstech_contract_`), dukungan kontrak Staf (Bulanan/Tahunan) dan Teknisi (Tipe 1: Flat Harian Penuh, Tipe 2: Hourly Rate + Rumus Lembur Pengali 1.5x - 3.0x), generator cetak Surat Perjanjian Kerja Waktu Tertentu (PKWT) resmi A4 ber-Kop Surat DSTech dan dual signatures, serta tombol download PDF A4. Lolos verifikasi build dan deploy live.
 - **2026-10-23**: Integrasi Otomatis Kontrak Kerja ke User Management & Fitur Masa Berlaku Akun / User Expiry (Tugas 103). Menyelesaikan masalah staf dummy kontrak kerja (`Teknisi Hendra`, `Ikhsan Maulidi`, `Marshanda Salwa Agustina`) yang sebelumnya belum muncul di User Management dengan membuat fungsi auto-sync `syncContractsWithUsers()` di backend `src/app/api/users/route.ts`. Menambahkan atribut `expiresAt` pada skema master user, kontrol masa berlaku fleksibel (Permanen, +1 Bulan, +3 Bulan, +6 Bulan, +1 Tahun, serta Date Picker kustom) pada modal Tambah & Edit User di `/admin/users`, badge status masa berlaku (🟢 Permanen, 🟡 Sisa X Hari, 🔴 Kedaluwarsa), serta pencekalan login ketat di `/api/auth/login` (status HTTP 403 Forbidden dengan pesan penolakan ramah jika akun telah melewati batas tanggal masa berlaku). Lolos validasi TypeScript (0 error), build 51 rute sukses, commit `43e4ea4`, dan deploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-23**: Format Tampilan Sisa Masa Berlaku Kontrak Kerja Lebih Eksplisit & Validasi Generator Slip Auto-Payroll (Tugas 106 & 107). Memperbaiki kalkulasi sisa durasi kontrak kerja di tabel `/admin/contracts` agar menampilkan format lengkap yang mudah dipahami: `🟢 Aktif • Sisa X Bulan Y Hari (Z Hari lagi s/d [Tanggal Selesai])` sehingga tidak membingungkan pengguna yang mengira durasi kontrak 12 bulan dihitung sebagai 69 hari. Memvalidasi generator auto-payroll di `/api/payroll` agar staf bulanan tidak menduplikasi uang kehadiran (`presenceAllowance = 0`) dan teknisi harian dikalikan presensi kehadiran secara akurat. Lolos verifikasi build lokal, push GitHub `173857d`, dan live VPS PM2 `dstech-main`.
-- **2026-10-23**: Penambahan Skema Tipe 3: 'Bulanan Dibayar Penuh (Flat Monthly Salary)' pada Kontrak Kerja & Auto-Payroll (Tugas 108). Menambahkan pilihan kartu ketiga yang sejajar di form modal kontrak kerja (`/admin/contracts`): (1) Tipe 1: Harian Dibayar Penuh (Flat Daily Rate), (2) Tipe 2: Bayaran Jam + Pengali Lembur (Hourly Rate & Multiplier), dan (3) Tipe 3: Bulanan Dibayar Penuh (Flat Monthly Salary) untuk teknisi dan staf bulanan tetap. Dilengkapi input Gaji Pokok, Tunjangan Jabatan, Transport, BPJS, dan Tarif Lembur Opsional. Memperbarui kolom "Skema Pembayaran" pada tabel kontrak dengan badge biru `Tipe 3: Bulanan Penuh` serta memperbarui generator auto-payroll `/api/payroll` agar skema Tipe 3 dibayarkan penuh tanpa pengali hari hadir harian (`presenceAllowance = 0`). Lolos uji kompilasi TypeScript 0 error, build lokal 52 routes sukses, push ke GitHub `a6c1a0a`, dan live deploy sukses di VPS PM2 `dstech-main` (PID 570767).
+- **2026-10-23**: Pembenahan Tuntas Kamera Absensi WebRTC, Penghapusan Total Fitur Upload Galeri (Anti-Manipulasi), dan Pemasangan Widget Presensi Mandiri Admin & Superadmin (Tugas 126).
+  1. **WebRTC Kamera Live & Anti Layar Hitam**: Memperbaiki arsitektur streaming video pada `src/app/employee/page.tsx` dengan auto-attach stream saat modal/komponen kamera terpasang di DOM (`video.srcObject = stream` & `video.play()`), atribut video mobile (`playsInline`, `autoPlay`, `muted`, `webkit-playsinline="true"`), penanganan izin kamera browser yang ramah, serta multi-fallback constraint sensor video.
+  2. **Penghapusan Total Fitur Upload Galeri**: Menghapus seluruh elemen `<input type="file" ...>`, ref file picker, dan tombol "Kamera HP / Perangkat" dari portal `/employee` demi mencegah manipulasi foto galeri. Presensi kini murni 100% wajib jepretan kamera langsung (snapshot canvas).
+  3. **Presensi Mandiri Admin & Superadmin**: Membangun Widget Presensi Mandiri interaktif di Dashboard Utama `/admin` (`src/app/admin/page.tsx`) dan meng-upgrade tombol presensi di `/admin/attendance/page.tsx` dengan modal kamera live WebRTC + flip kamera depan/belakang + deteksi otomatis GPS satelit, serta mengaktifkan sesi login admin di portal `/employee`. Lolos build lokal 52 rute, di-push ke GitHub commit `6c4a169`, dan sukses di-deploy ke server live VPS PM2 `dstech-main`.
 - **2026-10-23**: [SEDANG BERJALAN] Sistem Pengaturan Kuota Cuti Tahunan, Izin, dan Sakit pada Kontrak Kerja, Portal Karyawan, dan Penggajian (Tugas 109).
   *Permintaan User*: "untuk cuti dan izin, sakit sepertinya belum ada settingannya"
   *Rencana Step-by-Step Pengerjaan*:
@@ -108,11 +111,118 @@
   8. [ ] Deploy ke Live VPS via `deploy_live.js` (PM2 `dstech-main`).
   9. [ ] Uji coba & verifikasi fungsionalitas di live website, bersihkan file backup, dan update laporan progres.
 
-- **2026-10-23**: [DALAM ANTRIAN] Sistem Tunjangan Transportasi & Tunjangan Makan 2 Metode (Pemberian Full Bulanan vs Hitungan Harian Kehadiran) pada Kontrak & Penggajian (Tugas 110).
-  *Permintaan User*: "untuk tunjangan transportasi, ada 2 metode, 1. pemberian full dan ke-2 pemberian hitungan perhari. harus ditambahkan kedalam kontrak. jadi kalau hitungan harian jika dia tidak masuk maka tidak diberikan. untuk tunjangan makan juga sama"
-  *Status*: Menunggu penyelesaian Task 109 selesai live 100%, setelah itu langsung dikerjakan.
+- **2026-10-23**: Perbaikan Cetak Slip Gaji Resmi A4 (/admin/attendance & /admin/payroll) (Tugas 115).
+  *Permintaan User*: "prinan slip gaji masih ngawur"
+  *Penyelesaian*: Memperbaiki isolasi CSS cetak slip gaji pada modal preview slip gaji resmi A4. Menghilangkan latar belakang gelap backdrop yang melayang (`print-modal-backdrop` di-reset ke transparan, tanpa fixed overlay, tanpa shadow hitam), menghapus padding dan border tebal modal (`print-modal-box` di-reset ke padding 0, border none, max-width full), mengunci lembar slip gaji (`print-document-sheet print-single-sheet`) agar pas di 1 lembar A4 portrait (margin 0, page-break-after avoid), serta menyembunyikan elemen navigasi dan tombol cetak saat window.print() dipicu. Validasi kompilasi lokal berhasil 100%, di-push ke GitHub commit `7e90f7c`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
 
+- **2026-10-23**: Formulir PKWT Pas Foto & KTP, Badge Foto Profil Karyawan, Pengaturan Divisi/Departemen, Auto-Kalkulasi Tanggal Berakhir Kontrak (Durasi Bulan/Tahun), Lightbox KTP, dan Picker & Autocomplete Katalog Produk pada Faktur & SPH (Tugas 116).
+  *Permintaan User*: 
+  1. "pada form perekrutan PKWT, tolong tambahkan form agar bisa upload foto diri dan juga KTP/Identitas. dan pada list data karyawan munculkan foto dari karyawan tersebut pada namanya"
+  2. "cara mengatur divisi atau ketegori staf bagai mana, karena belum ada?"
+  3. "ketika saya membuat PKWT, jika saya mengisi durasi dari kontrak misalnya 3 bulan. bisakah untuk tanggal berakhirnya langsung ditambahkan secara otomatis dari tanggal mulai kontrak. begitu juga yang tahunan"
+  4. "bagai mana caranya agar saya bisa membuat aplikasi managemen ini menjadi aplikasi multi tenan, nantinya kita satukan dalam aplkasi pos.dstechsmart.com sehingga aplikasi ini menjadi 1 dengan aplikasi tersebut. sehingga saya bisa menerapkan biaya berlangganan atas aplikasi ini kepada client."
+  *Penyelesaian*:
+  1. Backend API `/api/contracts/route.ts`: Menambahkan properti `photoUrl`, `idCardUrl`, dan `department` pada handler POST dan PUT dengan prefix `dstech_`.
+  2. Formulir Modal PKWT: Menambahkan sub-panel Upload Pas Foto 3x4 (preview bulat + ganti/hapus) dan Upload KTP/Identitas (preview kartu horizontal + ganti/hapus) terintegrasi dengan `/api/upload` (fallback DataURL).
+  3. Divisi & Departemen: Menambahkan konstanta `OFFICIAL_DEPARTMENTS` (Operasional Lapangan, Integrasi Sistem, Pengawasan Proyek, Keuangan & Administrasi, IT & Server, Sales & Marketing, Logistik Gudang) dengan dropdown selector resmi + input divisi kustom, serta pemetaan otomatis divisi pada setiap preset jabatan resmi.
+  4. Auto-Calculate Tanggal Berakhir Kontrak: Membuat fungsi `calculateEndDateFromDuration(startDate, months)` yang otomatis menghitung tanggal selesai kontrak berdasarkan durasi (misal: 1 Okt 2026 + 3 bulan -> 31 Des 2026) lengkap dengan 5 tombol preset durasi instan (1 Bln, 3 Bln, 6 Bln, 12 Bln / 1 Thn, 24 Bln / 2 Thn).
+  5. Tabel Kontrak Karyawan: Menampilkan avatar foto profil asli (fallback inisial berwarna), badge divisi di bawah jabatan, tombol cepat preview KTP `[🪪 KTP]`, modal Lightbox pratinjau KTP resolusi besar, serta dropdown filter divisi di toolbar atas.
+  6. Modul Keuangan (/admin/finance): Menambahkan tombol "📦 Pilih dari List / Master" yang memicu modal Katalog Picker Interaktif lengkap dengan pencarian real-time dan filter kategori, serta datalist autocomplete `dstech_global_product_datalist` pada input nama barang di Faktur Penjualan Baru, Penawaran SPH, dan Edit Faktur sehingga admin dapat memilih item dari master katalog maupun mengetik barang kustom secara fleksibel.
+- **2026-10-23**: Modal Katalog Picker Produk & Auto-Fill Gambar Produk pada Form Faktur Penjualan Baru (/admin/finance) (Tugas 117).
+  *Permintaan User*: 
+  1. "ini masih belum bisa ditambahkan barang ari listproduk yang disimpan. hanya bisa manual produk"
+  2. "pada penginputan faktur baru, saat memilih produk, jika dklik, list nya muncul dibelakang form saat ini. bukan form yang sekarang."
+  *Penyelesaian*:
+  1. Menyesuaikan z-index Modal Katalog Picker Produk menjadi `z-[200]` agar tampil di atas modal Buat Faktur Baru (`z-50`) tanpa tertutup backdrop.
+  2. Memperbaiki parsing data produk dari `/api/products` agar mendukung format respons variatif (`pd.data`, `pd.products`, atau array langsung).
+  3. Mengaktifkan preview gambar produk dan autofill harga ke repeater barang faktur penjualan.
+  *Status*: Selesai, lolos build lokal, dipush ke GitHub (commit `77adbed`), dan live di VPS PM2 `dstech-main`.
 
+- **2026-10-23**: Pencarian & Autocomplete Nama Klien pada Form SPH (/admin/finance) (Tugas 118).
+  *Permintaan User*: "untuk pencarian nama client pada form SPH belum ada"
+  *Penyelesaian*:
+  1. Menambahkan state `quotationClientSearchQuery` untuk pencarian instan nama klien, PIC, kota, instansi, atau nomor telepon.
+  2. Membangun sub-panel Quick Select Client dengan Live Search Bar berikon kaca pembesar dan tombol reset 'X', dropdown select yang terfilter secara dinamis, dan badge indikator klien terhubung dengan tombol "Lepas Tautan".
+  3. Menambahkan tombol aksi cepat `+ Tambah Klien Baru` di dalam form SPH yang langsung memicu modal registrasi klien jika klien belum ada di master data.
+  4. Menambahkan `datalist` autocomplete (`quotation_client_names_datalist`) pada input teks `customerName` serta deteksi auto-match nama klien untuk otomatis mengisi `customerOrg`, `customerPhone`, dan `customerAddress`.
+  *Status*: Selesai, lolos build lokal, dipush ke GitHub (commit `ac9af3b`), dan live di VPS PM2 `dstech-main`.
+
+- **2026-10-23**: [SELESAI] Upload Foto per Item Faktur Penjualan & PO Supplier (< 20 KB) dan Pengaturan Default Filter Sortir Proyek "In Progress" (/admin/finance) (Tugas 125).
+  *Permintaan User*: 
+  1. "untuk yang manual, pada faktur dan PO, tolong tambahkan juga upload foto peritem sama seperti SPH, ukuran konversinya harus dibawah 20kb saja"
+  2. "lanjutkan, dan untuk defaultnya sortir projec setkan ke inprogres saja, jangan semua. agar tidak banyak yang muncul"
+  *Penyelesaian*:
+  1. Menyesuaikan logika kompresi otomatis foto `compressImageFile` dengan target ukuran ketat < 20 KB (menggunakan resolusi proporsional dan kualitas awal 0.55 serta loop penurunan bertahap).
+  2. Memperbarui handler dan UI upload foto pada SPH (`quotationForm`) ke batas baru < 20 KB.
+  3. Menambahkan UI interaktif upload foto item per baris (file input, camera trigger, live thumbnail, hover ganti foto, status terpasang < 20 KB, dan tombol hapus) pada formulir Buat Faktur Penjualan (`saleForm.items`) dan Edit Faktur Penjualan (`editingSale.items`).
+  4. Menambahkan UI interaktif upload foto item per baris pada formulir Buat PO Supplier (`poForm.items`) dan Edit PO Supplier (`editPoForm.items`).
+  5. Mengubah nilai awal state `projectFilterStatus` dari `"ALL"` menjadi `"In Progress"`, sehingga saat admin membuka tab Proyek langsung menampilkan proyek yang sedang aktif tanpa harus memfilter manual.
+  6. Fix z-index modal Master Proyek dari `z-[70]` menjadi `z-[120]` agar tidak tertutup oleh modal Faktur/PO.
+  7. Fix TypeScript error: `setPoForm` reset baris 5623 kurang `taxRate: 12, taxType: "exclude"`.
+  8. Fix TypeScript error: `setEditPoForm` di `handleOpenEditPo` kurang `taxRate: po.taxRate ?? 12, taxType: po.taxType ?? "exclude"`.
+  9. Fix TypeScript error: `afterDiscount` tidak dideklarasikan di `/api/finance/route.ts` baris 942 — ditambahkan `const afterDiscount = Math.max(0, subtotal - discount)`.
+  10. Lolos build lokal (`npm run build`, 52 routes), commit ke GitHub (`22d6191`), dan di-deploy sukses ke server live VPS PM2 `dstech-main` (PID 652753).
+  *Status*: Selesai 100%.
+
+- **2026-10-23**: [SELESAI] Penambahan Opsi Pajak INCLUDE (Termasuk Pajak) & EXCLUDE (Belum Termasuk Pajak) pada Penawaran (SPH), Faktur Penjualan, dan Purchase Order (PO Supplier) (/admin/finance) (Tugas 126).
+  *Permintaan User*: 
+  "pada penawaran (SPH, Faktur penjualan, dan juga PO, hanya ada pilihan pajak Exclude, sedngkan pajak include tidak ada pilihannya. tolong tambahkan fiturnya"
+  *Penyelesaian*:
+  1. [x] Analisis struktur state & perhitungan pajak pada SPH (`quotationForm`), Faktur (`saleForm`, `editingSale`), dan PO Supplier (`poForm`, `editPoForm`).
+  2. [x] Merancang formula perhitungan standar akuntansi Indonesia:
+     - **Pajak Exclude (Tambah)**: `DPP = Subtotal - Diskon`; `PPN = DPP * (Tarif / 100)`; `Grand Total = DPP + PPN`.
+     - **Pajak Include (Sudah Termasuk Pajak)**: `Grand Total = Subtotal - Diskon`; `DPP = Grand Total / (1 + Tarif / 100)`; `PPN = Grand Total - DPP`.
+  3. [x] Backup file `src/app/admin/finance/page.tsx` ke folder `_backup/page.finance.task126.bak`.
+  4. [x] Menambahkan field `taxType: "exclude" | "include"` dan fungsi re-kalkulasi turunan otomatis pada seluruh form transaksi:
+     - SPH / Penawaran Harga (`quotationForm`, `calculateQuotationTotals`)
+     - Buat Faktur Penjualan Baru (`saleForm`, `calculateSaleDerivedTotals`)
+     - Edit Faktur Penjualan (`editingSale`, `calculateEditSaleDerivedTotals`)
+     - Buat Purchase Order / PO Supplier (`poForm`, `calculatePoTotals`)
+     - Edit Purchase Order / PO Supplier (`editPoForm`, `calculateEditPoTotals`)
+  5. [x] Menambahkan kontrol UI interaktif dropdown pilihan Model PPN:
+     - "Exclude (Tambah Pajak)"
+     - "Include (Sudah Termasuk Pajak)"
+     berdampingan dengan tarif PPN (0%, 11%, 12%) pada seluruh form (SPH, Buat Faktur, Edit Faktur, Buat PO, dan Edit PO).
+  6. [x] Memperbarui payload API backend create dan update:
+     - `taxRate` dan `taxType` diteruskan pada `handleCreatePoSubmit` dan `handleSaveEditPo` ke API backend.
+     - `taxRate` dan `taxType` terintegrasi pada pembuatan & pengeditan Faktur Penjualan.
+  7. [x] Memperbarui template cetak cetak PDF / slip invoice (`/api/finance/print` dan modal cetak) agar menampilkan label keterangan jelas:
+     - "PPN (12% Exclude)" atau "PPN (12% Include - Termasuk Pajak)" sehingga dokumen legal, transparan, dan valid untuk perpajakan.
+  8. [x] Validasi build lokal (`npm run build`) berhasil 100% tanpa error TypeScript (52/52 routes lolos).
+  9. [x] Bersihkan file cadangan `_backup/`.
+  10. [x] Commit dan push ke repository GitHub (`rm23nm/dstech-smart`), lalu deploy langsung ke server live VPS PM2 `dstech-main`.
+  *Status*: Selesai 100%.
+
+- **2026-10-23**: [ANTRIAN / SEDANG DIKERJAKAN] Penambahan Opsi Pajak "PPN 12% (11/12)" (PMK 131/2024: Tarif 12% DPP 11/12) pada SPH, Faktur Penjualan, dan Purchase Order (PO Supplier) (/admin/finance) (Tugas 127).
+  *Permintaan User*: 
+  "PPN 12% (11/12) nya tidak ada,"
+  *Rencana Step-by-Step Pengerjaan*:
+  1. [ ] Konfirmasi ke user melalui interaksi modal klarifikasi: Pengguna memilih opsi baru "PPN 12% (11/12)" sesuai PMK 131/2024 (Tarif PPN 12% dengan DPP 11/12 dari harga jual sehingga PPN efektif 11%), tetap mempertahankan PPN 12% Penuh, PPN 11%, dan Bebas PPN 0%.
+  2. [ ] Backup file target ke direktori `_backup/` sebelum modifikasi:
+     - `_backup/page.finance.task127.bak`
+     - `_backup/route.finance.task127.bak`
+     - `_backup/route.print.task127.bak`
+  3. [ ] Implementasikan opsi nilai `11.12` untuk "PPN 12% (11/12)" pada dropdown tarif PPN di 5 formulir:
+     - Form SPH (Buat & Edit)
+     - Form Faktur Penjualan (Buat)
+     - Form Faktur Penjualan (Edit)
+     - Form Purchase Order / PO Supplier (Buat)
+     - Form Purchase Order / PO Supplier (Edit)
+  4. [ ] Perbarui fungsi perhitungan kalkulasi pajak di frontend:
+     - `calculateQuotationTotals`
+     - `calculateSaleDerivedTotals`
+     - `calculateEditSaleDerivedTotals`
+     - `calculatePoTotals`
+     - `calculateEditPoTotals`
+     Rumus PPN 12% (11/12):
+     - Model Exclude: DPP = (11/12) * Nilai Jual; PPN (12%) = DPP * 12% = Nilai Jual * 11%; Total = Nilai Jual + PPN.
+     - Model Include: Nilai Jual = DPP + PPN; Total = Nilai Jual; PPN = Total - (Total / 1.11); DPP = Total / 1.11.
+  5. [ ] Perbarui backend `/api/finance/route.ts` pada kalkulasi PO, Faktur, dan SPH agar mendukung `taxRate === 11.12`.
+  6. [ ] Perbarui format teks label tampilan PPN (misal: "PPN (12% (11/12) Exclude)") di modal pratinjau cetak dan endpoint cetak resmi `/api/finance/print/route.ts`.
+  7. [ ] Jalankan pengujian build lokal (`npm run build`) dan pastikan 100% bebas error TypeScript.
+  8. [ ] Bersihkan file cadangan `_backup/`.
+  9. [ ] Push pembaruan ke GitHub dan deploy ke server VPS live.
+  10. [ ] Perbarui status Tugas 127 menjadi [SELESAI].
 
 
 
@@ -3270,20 +3380,20 @@
   *"kemudian terkait antara kehadiran pada kontrak dengan absensi, harus bisa sinkron jamnya, agar bisa kita atur telat dan tepatwaktu"*
 - **Status**: ✅ **Selesai (Completed & Live)**
 - **Penyebab Masalah / Analisis Kebutuhan**:
-  - Konfigurasi jam masuk kerja (`startTime`, contoh: 08:00) dan jam pulang kerja (`endTime`, contoh: 17:00) yang telah diatur pada Kontrak Kerja karyawan (`workSchedule`) sebelumnya belum terhubung dengan evaluasi status presensi.
-  - Sebelumnya, status absensi masuk di backend hanya membedakan lokasi radius ("Tepat Waktu (Kantor)" vs "Hadir Lapangan"), tanpa membandingkan jam check-in aktual karyawan terhadap jam kerja yang diperjanjikan di kontrak PKWT.
-- **Tindakan Perbaikan & Implementasi**:
-  1. [x] **Backend Helper Kontrak Kerja di API Absensi** (`src/app/api/employee/attendance/route.ts`):
-     - Menambahkan fungsi `getEmployeeContractSchedule(employeeName)` yang membaca langsung file kontrak PKWT aktif (`dstech_contracts.json`).
-     - Mengambil parameter jam masuk (`startTime`), jam pulang (`endTime`), dan jenis hari kerja (`workDaysType`).
-  2. [x] **Evaluasi Otomatis Keterlambatan saat Check-in**:
-     - Sistem menghitung selisih menit antara waktu check-in aktual dan batas jam masuk kontrak (`nowTotalMinutes - schedTotalMinutes`).
-     - Diterapkan batas toleransi keterlambatan resmi sebesar 5 menit.
-     - Jika karyawan check-in melebihi batas toleransi, status kehadiran otomatis ditetapkan menjadi **`Terlambat (Xm)`** (contoh: `Terlambat (25m)`).
-     - Jika check-in tepat waktu atau lebih awal: status **`Tepat Waktu`** (area kantor) atau **`Hadir Lapangan`** (area proyek).
-  3. [x] **Visualisasi Status Terlambat di Dashboard Admin Absensi** (`src/app/admin/attendance/page.tsx`):
-     - Memperbarui fungsi `renderStatusBadge` untuk menangani status `Terlambat (Xm)`.
-     - Ditampilkan dalam badge merah khas dengan ikon jam `Clock` dan durasi keterlambatan yang presisi.
+  - Konfigurasi jam masuk kerja (`startTime`, contoh: 08:00) yang telah diatur pada Kontrak Kerja karyawan (`workSchedule.startTime`) perlu dibaca langsung oleh modul Absensi Kehadiran (`/api/employee/attendance`).
+  - Ketika karyawan melakukan presensi Masuk (Check-In), sistem secara otomatis membandingkan jam check-in saat ini dengan `startTime` dari kontrak kerja aktif karyawan:
+    - Toleransi keterlambatan (grace period): 5 menit.
+    - Jika `nowTotalMinutes - schedTotalMinutes > 5`: status absensi otomatis diset menjadi `Terlambat (Xm)` (misal: `Terlambat (15m)`).
+    - Jika dalam toleransi atau lebih awal: status absensi adalah `Tepat Waktu`.
+  - Di dashboard admin absensi (`/admin/attendance`), status `Terlambat (Xm)` ditampilkan dengan visual badge peringatan merah terang (`bg-rose-50 text-rose-700 border-rose-200`) sehingga kedisiplinan kerja terpantau jelas.
+- **Rencana Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`attendance_page_task114.tsx`, `attendance_route_task114.ts`).
+  - [x] **Langkah 2**: Tambahkan helper `getEmployeeContractSchedule` di `src/app/api/employee/attendance/route.ts` yang membaca `workSchedule.startTime` dari kontrak aktif di `dstech_contracts.json`.
+  - [x] **Langkah 3**: Implementasikan kalkulasi keterlambatan dengan grace period 5 menit pada handler Check-In. Jika terlambat, catat `status: "Terlambat (${diffMinutes}m)"`.
+  - [x] **Langkah 4**: Perbarui `renderStatusBadge` di `src/app/admin/attendance/page.tsx` untuk menampilkan badge merah untuk status yang diawali `Terlambat`.
+  - [x] **Langkah 5**: Validasi lokal dengan `npm run build` di folder `dstech-smart` (sukses Turbopack).
+  - [x] **Langkah 6**: Push commit `e70209d` ke GitHub via `push_with_native_git.js`.
+  - [x] **Langkah 7**: Deploy live ke VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
 
 ---
 
@@ -3294,216 +3404,338 @@
 - **Penyebab Masalah / Analisis Kebutuhan**:
   - Pada entitas Master Proyek (`ProjectItem`), belum ada atribut untuk mencatat siapa saja personil / teknisi / helper yang ditugaskan dalam menangani proyek tersebut.
   - Pengguna membutuhkan fleksibilitas penugasan multi-personil (misal 5, 10, atau berapa pun teknisi yang dibutuhkan) yang bersumber dari master kontrak PKWT karyawan yang masih aktif.
-  - Penugasan ini perlu menyertakan peran spesifik di lapangan (Lead Technician, Teknisi Skill/Senior, Helper/Asisten, HSE/Safety Officer, Supervisor Proyek, Drafter/Admin Lapangan).
-  - Penugasan pada proyek ini harus terhubung langsung ke modul Presensi Absensi Kerja (`/employee` dan `/admin/attendance`):
-    1. Karyawan saat presensi masuk (Check-in) dapat memilih proyek aktif di mana mereka ditugaskan.
-    2. Admin absensi dapat memantau dan memfilter rekap kehadiran personil per proyek tertentu.
-- **Rincian Langkah Pelaksanaan yang Diselesaikan**:
-  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/admin/finance/page.tsx`, `src/app/api/finance/route.ts`, `src/app/employee/page.tsx`, `src/app/admin/attendance/page.tsx`, `src/app/api/employee/attendance/route.ts`) ke folder `_backup/`.
-  - [x] **Langkah 2**: Tambahkan interface `ProjectAssignedEmployee` dan perluas tipe `ProjectItem` serta `projectForm` di `src/app/admin/finance/page.tsx`:
-    ```ts
-    export interface ProjectAssignedEmployee {
-      employeeId: string;
-      employeeName: string;
-      position: string;
-      roleInProject: string;
-      contractNumber?: string;
-      phone?: string;
-      assignedDate?: string;
-      notes?: string;
-    }
-    ```
+  - Penugasan ini menyertakan peran spesifik di lapangan (Lead Technician, Teknisi Skill/Senior, Helper/Asisten, HSE/Safety Officer, Supervisor Proyek, Drafter/Admin Lapangan).
+  - Penugasan pada proyek ini terhubung langsung ke modul Presensi Absensi Kerja (`/employee` dan `/admin/attendance`):
+    1. Karyawan saat presensi masuk (Check-in) dan keluar (Check-out) dapat memilih proyek aktif di mana mereka ditugaskan (dengan tanda khusus `⭐ [Tim Anda: Peran]`).
+    2. Admin absensi dapat memantau penugasan proyek pada setiap record absensi dan memfilter rekap kehadiran personil per proyek tertentu.
+- **Rencana Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`finance_page_task114.tsx`, `finance_route_task114.ts`, `employee_page_task114.tsx`, `attendance_page_task114.tsx`, `attendance_route_task114.ts`) di `_backup/`.
+  - [x] **Langkah 2**: Tambahkan interface `ProjectAssignedEmployee` dan perluas tipe `ProjectItem` serta `projectForm` di `src/app/admin/finance/page.tsx`.
   - [x] **Langkah 3**: Perbarui backend API `src/app/api/finance/route.ts` pada action `project` (POST & PUT) untuk menyimpan array `assignedEmployees`.
   - [x] **Langkah 4**: Perbarui UI modal Tambah/Edit Master Proyek (`isProjectModalOpen`) di `finance/page.tsx`:
-    - Mengambil data kontrak PKWT aktif via `fetch('/api/contracts')`.
-    - Sub-panel interaktif penugasan tim karyawan: Dropdown karyawan PKWT aktif + peran dalam proyek (Lead Technician, Teknisi Skill, Helper, dll.) + tombol "+ Tambah Tim".
-    - Validasi anti-duplikasi anggota tim dalam satu proyek.
-    - Tabel daftar anggota tim dengan nomor urut, nama, jabatan PKWT, nomor kontrak, peran proyek, dan tombol hapus/keluarkan.
-    - Counter dinamis total personil tim (misal: "10 Orang Ditugaskan").
-  - [x] **Langkah 5**: Tampilkan badge jumlah tim bertugas pada kartu proyek (`{prj.assignedEmployees?.length || 0} Personil PKWT`) dan tambahkan tab khusus **"Tim Personil PKWT"** pada modal Dossier & Analisis Finansial Proyek di `/admin/finance`.
-  - [x] **Langkah 6**: Integrasikan dengan Portal Karyawan / Teknisi (`src/app/employee/page.tsx` & `/api/employee/attendance`):
-    - Memuat daftar proyek aktif dari `/api/finance`.
-    - Pada modal Check-In dan Check-Out, disediakan dropdown **"Terkait Penugasan Proyek (Sesuai Tim PKWT)"**:
-      - Otomatis menandai proyek di mana karyawan terdaftar sebagai tim (`⭐ [Tim Anda: Teknisi Skill] PRJ-...`).
-    - Menyimpan `projectId`, `projectName`, dan `projectRole` pada log absensi.
-    - Baris riwayat absensi teknisi menampilkan badge proyek penugasan.
-  - [x] **Langkah 7**: Integrasikan dengan Dashboard Admin Absensi (`src/app/admin/attendance/page.tsx`):
-    - Tambahkan filter dropdown cepat per proyek (`filterProject`).
-    - Menampilkan badge nama proyek dan peran PKWT pada kolom nama karyawan di tabel absensi.
-  - [x] **Langkah 8**: Validasi lokal dengan `npm run build` di folder `dstech-smart` (sukses 52 routes, 0 error).
-  - [x] **Langkah 9**: Push ke repositori GitHub via `push_with_native_git.js` (Commit: `e70209d`).
-  - [x] **Langkah 10**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js`, restart PM2 `dstech-main` (online), verifikasi live API HTTP 200 OK, dan bersihkan file cadangan `_backup/`.
+    - Mengambil data kontrak PKWT aktif dari `/api/contracts`.
+    - Sub-panel interaktif penugasan tim karyawan: Dropdown karyawan PKWT aktif + peran dalam proyek + catatan + pencegahan anggota duplikat + tombol "+ Tambah Anggota Tim".
+    - Tabel daftar anggota tim dengan badge peran, nama, jabatan PKWT, nomor kontrak, tanggal penugasan, dan tombol hapus/keluarkan.
+    - Counter total personil tim (misal: "10 Personil Ditugaskan").
+  - [x] **Langkah 5**: Tampilkan daftar tim yang bertugas pada kartu proyek dan tab khusus "Tim Personil PKWT" pada modal dossier proyek di `/admin/finance`.
+  - [x] **Langkah 6**: Integrasikan dengan modul Absensi Teknisi (`src/app/employee/page.tsx`, `src/app/api/employee/attendance/route.ts`, dan `src/app/admin/attendance/page.tsx`):
+    - Tambahkan dropdown seleksi proyek saat presensi masuk/pulang karyawan.
+    - Simpan `projectId`, `projectName`, `projectRole` pada log presensi.
+    - Sediakan filter proyek pada halaman admin absensi dan badge proyek pada daftar absensi.
+  - [x] **Langkah 7**: Validasi lokal dengan `npm run build` di folder `dstech-smart` (52 routes lulus tanpa error).
+  - [x] **Langkah 8**: Push ke repositori GitHub via `push_with_native_git.js` (commit `e70209d`).
+  - [x] **Langkah 9**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [x] **Langkah 10**: Verifikasi di server live (HTTP 200 OK) dan bersihkan file cadangan `_backup/`.
 
 ---
 
-- **2026-10-23 (Task 115)**: Perbaikan Tampilan Cetak / Print Slip Gaji Karyawan Resmi A4 Agar Pas Penuh Tanpa Latar Belakang Gelap / Mengambang (**SELESAI 100% & LIVE**).
-- **Latar Belakang / Permasalahan**:
-  - Pengguna melaporkan *"prinan slip gaji masih ngawur"* dan melampirkan screenshot pratinjau cetak browser (Chrome Print Dialog).
-  - Pada pratinjau cetak, lembar slip gaji tercetak di tengah halaman dengan latar belakang overlay gelap/abu-abu pekat (`bg-slate-900/70` / `bg-slate-950/70`), elemen dashboard di belakangnya ikut tertampil, dan dokumen slip mengecil melayang di tengah kertas A4.
-  - Penyebab: Modal cetak slip gaji di `src/app/admin/attendance/page.tsx` dan `src/app/admin/payroll/page.tsx` belum menerapkan kelas isolasi cetak standar CSS universal (`print-modal-backdrop`, `print-modal-box`, `print-document-sheet print-single-sheet`).
-  - Selain itu, saat dialog cetak terbuka, nama dokumen PDF yang disarankan browser belum disinkronkan secara profesional dengan `document.title` (`SLIP_GAJI_DSTECH_[NOMOR]_[NAMA]`).
-- **Rincian Langkah Pelaksanaan yang Diselesaikan**:
-  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/admin/attendance/page.tsx` dan `src/app/admin/payroll/page.tsx`) ke folder `_backup/`.
-  - [x] **Langkah 2**: Perbarui struktur modal cetak slip gaji di `src/app/admin/attendance/page.tsx`:
-    - Menambahkan kelas `print-modal-backdrop` pada overlay container modal.
-    - Menambahkan kelas `print-modal-box` pada container pembungkus card putih modal.
-    - Menambahkan kelas `print-document-sheet print-single-sheet` pada `#print-salary-slip-sheet` dengan `print:p-0 print:border-none print:shadow-none print:rounded-none print:py-6`.
-    - Memasang dynamic `document.title` saat tombol Cetak diklik agar nama berkas PDF otomatis tersimpan rapi standar `SLIP_GAJI_DSTECH_[NOMOR]_[NAMA]`.
-  - [x] **Langkah 3**: Perbarui struktur modal cetak slip gaji di `src/app/admin/payroll/page.tsx` dengan standarisasi yang sama persis (`print-modal-backdrop`, `print-modal-box`, `print-document-sheet print-single-sheet`, dynamic `document.title` pada modal Slip Gaji dan modal Rekap Bulanan).
-  - [x] **Langkah 4**: Uji build lokal (`npm run build`) di folder `dstech-smart` (sukses 52 routes, 0 error).
-  - [x] **Langkah 5**: Push ke repositori GitHub via `push_with_native_git.js` (Commit: `7e90f7c`).
-  - [x] **Langkah 6**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js`, restart PM2 `dstech-main` (PID 599082 online), verifikasi live API HTTP 200 OK, dan bersihkan folder `_backup/`.
+### 115. Tugas: Dropdown Terintegrasi PIC Lapangan (PKWT) & Master Klien pada Form Proyek serta Reposisi Tab Tim Personil PKWT ke Posisi 2 pada Dossier Proyek
+- **Permintaan Pengguna**:
+  1. *"PIC lapangan harus diambil dari staf PKWT, jangan di tulis manual"*
+  2. *"Nama Klien / Customer: juga sama"*
+  3. *"Untuk Menu Tim Personil dan PKWT sebaiknya di ubah posisi ke Posisi 2. jadi ada disamping P&L & Ringkasan Proyek. agar ber urutan untuk tahapannya"*
+- **Status**: ✅ **Selesai (Completed & Live)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada formulir modal Tambah/Edit Master Proyek (`isProjectModalOpen`), field **PIC Lapangan** (`picProject`) dan **Nama Klien / Customer** (`clientName`) sebelumnya berupa kolom teks input manual (`<input type="text">`).
+  - Pengguna menginstruksikan bahwa PIC Lapangan wajib dipilih dari staf berkontrak PKWT aktif (`availableContracts`) agar terstandarisasi dan tidak ada salah ketik.
+  - Begitu pula dengan Nama Klien / Customer harus dipilih langsung dari master klien terdaftar (`clients`) dari database finansial ERP.
+  - Pada modal Dossier Detail Finansial Proyek (`selectedProjectForDetail`), tab navigasi perlu direposisi sehingga tab **"Tim Personil PKWT"** berada di **Posisi 2** (tepat di samping tab **"P&L & Ringkasan Proyek"**) agar alur tahapan manajemen proyek berjalan berurutan secara logis (1. Ringkasan & P&L ➔ 2. Tim Personil PKWT ➔ 3. Faktur Penjualan ➔ 4. Belanja Material ➔ 5. Kas Lapangan ➔ 6. Foto Dokumentasi).
+- **Rencana Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat cadangan (backup) file `src/app/admin/finance/page.tsx` ke folder `_backup/`.
+  - [x] **Langkah 2**: Ubah input field PIC Lapangan pada modal master proyek menjadi dropdown `<select>` yang membaca `availableContracts` (karyawan PKWT aktif).
+  - [x] **Langkah 3**: Ubah input field Nama Klien / Customer pada modal master proyek menjadi dropdown `<select>` yang membaca master `clients` dan mengikat `clientId` serta `clientName`.
+  - [x] **Langkah 4**: Reposisi tab "Tim Personil PKWT" pada modal Dossier Proyek ke Posisi 2 (tepat setelah "P&L & Ringkasan Proyek").
+  - [x] **Langkah 5**: Validasi lokal dengan `npm run build` di folder `dstech-smart` (sukses 52 routes lulus Turbopack).
+  - [x] **Langkah 6**: Push perubahan ke repositori GitHub via `push_with_native_git.js` (commit `8ed40ee`).
+  - [x] **Langkah 7**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main` (PID 596156 online).
+  - [x] **Langkah 8**: Verifikasi di server live (HTTP 200 OK) dan bersihkan file cadangan `_backup/`.
 
 ---
 
-- **2026-10-23 (Task 116)**: Penyempurnaan Form Perekrutan PKWT (Upload Foto Diri & KTP, Avatar Karyawan pada List, Pengaturan Divisi & Kategori Staf, serta Auto-Calculate Tanggal Berakhir Kontrak dari Durasi) & Panduan Multi-Tenant SaaS POS (**Sedang Dikerjakan**).
-- **Latar Belakang / Permasalahan**:
-  - Permintaan pengguna (berantai):
-    1. *"pada form perekrutan PKWT, tolong tambahkan form agar bisa upload foto diri dan juga KTP/Identitas. dan pada list data karyawan munculkan foto dari karyawan tersebut pada namanya"*
-    2. *"cara mengatur divisi atau ketegori staf bagai mana, karena belum ada?"*
-    3. *"ketika saya membuat PKWT, jika saya mengisi durasi dari kontrak misalnya 3 bulan. bisakah untuk tanggal berakhirnya langsung ditambahkan secara otomatis dari tanggal mulai kontrak. begitu juga yang tahunan"*
-    4. *"bagai mana caranya agar saya bisa membuat aplikasi managemen ini menjadi aplikasi multi tenan, nantinya kita satukan dalam aplkasi pos.dstechsmart.com sehingga aplikasi ini menjadi 1 dengan aplikasi tersebut. sehingga saya bisa menerapkan biaya berlangganan atas aplikasi ini kepada client."*
-- **Rincian Langkah Pelaksanaan (Step-by-Step)**:
-  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/admin/contracts/page.tsx`, `src/app/api/contracts/route.ts`) ke folder `_backup/`.
-  - [x] **Langkah 2**: Perluas tipe data `DstechContract` di frontend & API backend:
-    - `photoUrl?: string` (Foto Profil / Pas Foto Diri Karyawan).
-    - `idCardUrl?: string` (Foto KTP / Kartu Identitas Resmi Karyawan).
-    - `department?: string` (Divisi / Departemen Kerja: IT & Security, Operasional Lapangan, Keuangan & Administrasi, Sales & Marketing, Logistik, dll.).
-  - [x] **Langkah 3**: Fitur Upload Foto Diri & Foto KTP di Modal Form PKWT:
-    - Upload Pas Foto Diri (3x4) dengan preview bulat, tombol ganti, dan hapus foto.
-    - Upload Foto KTP dengan preview horizontal, tombol ganti, dan hapus foto.
-    - Penanganan upload via `/api/upload` (disediakan fallback DataURL jika offline).
-  - [x] **Langkah 4**: Pengaturan Divisi / Departemen & Kategori Staf:
-    - Selector Divisi / Departemen dengan preset korporat DSTech + opsi input manual kustom.
-    - Switch Kategori: "Teknisi Lapangan" (Harian/Lembur) vs "Staf Kantor / Admin" (Gaji Bulanan Tetap).
-    - Menampilkan badge Divisi pada tabel daftar kontrak dan dropdown filter Divisi di toolbar.
-  - [x] **Langkah 5**: Otomatisasi Perhitungan Tanggal Selesai Kontrak (`endDate`):
-    - Helper fungsi penambah bulan/tahun otomatis (`calculateEndDateFromDuration`): saat `startDate` atau `durationMonths` diubah, `endDate` otomatis terkalkulasi (misal: mulai 1 Oktober 2026 + 3 bulan -> berakhir 31 Desember 2026; durasi 12 bulan -> 1 tahun penuh).
-    - Tombol cepat preset durasi: "1 Bulan", "3 Bulan (Standar)", "6 Bulan", "1 Tahun (12 Bln)", "2 Tahun (24 Bln)".
-  - [x] **Langkah 6**: Tampilan Avatar Foto Karyawan & Preview KTP di List Tabel:
-    - Kolom Nama Karyawan menampilkan foto avatar asli (atau inisial jika belum ada foto).
-    - Tombol badge "🪪 KTP" dengan modal lightbox preview untuk melihat kartu identitas karyawan resolusi tinggi.
-  - [x] **Langkah 7**: Validasi build lokal (`npm run build`), push ke GitHub via `push_with_native_git.js` (commit `cef872a`), deploy ke live VPS via `deploy_live.js`, restart PM2 `dstech-main` (PID 604262), uji live respon HTTP 200 OK, dan bersihkan folder `_backup/`.
-  - [x] **Langkah 8**: Memberikan penjelasan komprehensif arsitektur Multi-Tenant SaaS terpadu dengan `pos.dstechsmart.com` dan strategi skema langganan klien tanpa mengganggu sistem POS mandiri yang sudah berjalan.
-
-**Status**: Selesai 100% & Live di VPS (`https://dstechsmart.com/admin/contracts`)
+### 116. Tugas: Quick-Add & Pencarian Real-Time Klien serta Master Proyek pada Modal Penawaran (SPH) & Faktur Penjualan
+- **Permintaan Pengguna**:
+  1. *"saat membuat penawaran dan Faktur, sebaiknya jika di daftar list tidak ada client yang ditemukan. maka ada tombol tambah yang langsung bisa input data didalam menu tersebut. kemudian tolong tambahkan juga pencariannya. agar mudah mencari nama client"*
+  2. *"pada tautkan ke Master Proyek juga sama"*
+- **Status**: 🟡 **Sedang Dikerjakan (In Progress)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada pembuatan Surat Penawaran Harga (SPH) dan Faktur Penjualan (`isNewQuotationModalOpen`, `isEditQuotationModalOpen`, `isNewSaleModalOpen`), daftar Klien dan Master Proyek yang tersedia saat ini menggunakan tag `<select>` native panjang tanpa filter pencarian teks. Jika jumlah klien/proyek banyak, mencari nama klien/proyek membutuhkan waktu scrolling yang lama.
+  - Selain itu, jika klien yang dituju atau proyek baru belum terdaftar di database, pengguna harus membatalkan pembuatan SPH/Faktur, berpindah menu ke Direktori Klien atau Master Proyek, membuat datanya, lalu kembali lagi dari awal.
+  - Solusi yang dibutuhkan:
+    1. **Pencarian Real-Time Klien**: Input filter teks pencarian langsung di atas dropdown seleksi klien pada modal SPH dan Faktur.
+    2. **Tombol "+ Tambah Klien Baru"**: Tombol langsung di header selector klien yang membuka modal input klien baru (dengan `z-[70]` di atas modal SPH/Faktur). Saat disimpan, klien baru langsung terpilih otomatis (*auto-selected*) pada formulir SPH/Faktur yang sedang aktif tanpa kehilangan data item yang sudah diisi.
+    3. **Pencarian Real-Time Master Proyek**: Input filter teks pencarian langsung di atas dropdown alokasi proyek pada modal SPH dan Faktur.
+    4. **Tombol "+ Buat Proyek Baru"**: Tombol langsung di header selector proyek yang membuka modal Buat Master Proyek Baru (dengan `z-[70]`). Saat disimpan, proyek baru langsung otomatis tertaut pada SPH/Faktur.
+- **Rencana Langkah Pelaksanaan**:
+  - [ ] **Langkah 1**: Buat cadangan (backup) file `src/app/admin/finance/page.tsx` ke folder `_backup/`.
+  - [ ] **Langkah 2**: Tambahkan state filter pencarian klien dan proyek untuk SPH dan Faktur (`quotationClientSearchQuery`, `quotationProjectSearchQuery`, `saleClientSearchQuery`, `saleProjectSearchQuery`).
+  - [ ] **Langkah 3**: Sesuaikan z-index modal Klien (`isClientModalOpen`) dan modal Proyek (`isProjectModalOpen`) ke `z-[70]` agar dapat muncul di atas modal SPH/Faktur (`z-50`).
+  - [ ] **Langkah 4**: Pasang input pencarian real-time dan tombol `+ Tambah Klien Baru` pada formulir SPH dan Faktur.
+  - [ ] **Langkah 5**: Pasang input pencarian real-time dan tombol `+ Buat Proyek Baru` pada formulir SPH dan Faktur.
+  - [ ] **Langkah 6**: Sambungkan handler `handleSaveClientSubmit` dan `handleSaveProjectSubmit` agar melakukan auto-select data baru ke SPH/Faktur yang sedang aktif.
+  - [ ] **Langkah 7**: Validasi lokal dengan `npm run build` di folder `dstech-smart`.
+  - [ ] **Langkah 8**: Push ke repositori GitHub via `push_with_native_git.js`.
+  - [ ] **Langkah 9**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [ ] **Langkah 10**: Verifikasi di server live dan bersihkan file cadangan `_backup/`.
 
 ---
 
-- **2026-10-23 (Task 117)**: Modul Pusat Pelaporan Eksekutif & Keuangan Proyek (Laba Rugi per Project, Rekap Penjualan Klien per Bulan & Tahun, Rekap Belanja Pengadaan Barang Proyek, dan Rekap Kegiatan Proyek 1 Bulan & 1 Tahun) (**Sedang Dikerjakan**).
-- **Latar Belakang / Permasalahan**:
-  - Permintaan pengguna:
-    1. *"terkait dengan laporan apakah bisa di terapkan juga untuk penarikan laporan laba rugi per Project? kemudian laporan dari faktur penjualan perklient dalam bulan dan tahun. laporan pembelian barang dan kebutuhan project."*
-    2. *"kemudian saya juga ingin kamu buatkan laporan untuk menarik kegiatan project selama 1 bulan dan 1 tahun"*
-- **Rincian Langkah Pelaksanaan (Step-by-Step)**:
-  - [x] **Langkah 1**: Catat rencana kerja step-by-step di `LAPORAN_PROGRES.md`.
-  - [ ] **Langkah 2**: Buat backup file `src/app/admin/finance/page.tsx` ke folder `_backup/`.
-  - [ ] **Langkah 3**: Kembangkan Sub-Modul 1: Laporan Laba Rugi per Project (Project P&L Statement) di `/admin/finance`:
-    - Switcher Mode: Laba Rugi Konsolidasian Global vs Khusus per Proyek.
-    - Kalkulasi dinamis: Pendapatan Faktur Proyek dikurangi Belanja Material PO Proyek dikurangi Beban Upah Teknisi = Laba Bersih & % Margin Proyek.
-  - [ ] **Langkah 4**: Kembangkan Sub-Modul 2: Laporan Penjualan per Klien (Client Revenue & Receivables):
-    - Filter Klien (Semua atau Klien Tertentu), Filter Bulan (Jan - Des / Semua), dan Filter Tahun.
-    - Rekapitulasi total tagihan, pembayaran diterima, sisa piutang, dan status pelunasan.
-  - [ ] **Langkah 5**: Kembangkan Sub-Modul 3: Laporan Pembelian Barang & Kebutuhan Proyek (Procurement & Material Spending):
-    - Rekapitulasi belanja barang dari supplier (kamera, kabel, switch, dll.) terpilah per peruntukan proyek vs stok gudang.
-    - Filter supplier, bulan, dan tahun.
-  - [ ] **Langkah 6**: Kembangkan Sub-Modul 4: Laporan Rekap Kegiatan Proyek (Project Activity & Milestone Report):
-    - Mengintegrasikan data kegiatan dan penugasan proyek dari `dstech_employee_tasks`.
-    - Filter periode penarikan: Rentang 1 Bulan tertentu atau Rekapitulasi 1 Tahun Penuh.
-    - Filter status proyek (Selesai/BAST, Progres Pengerjaan, Terjadwal), filter Klien, dan Teknisi PIC.
-    - Rangkuman lingkup pekerjaan teknis, material terpasang, tanggal eksekusi, dan dokumentasi lapangan.
-  - [x] **Sub-Tugas 117.1**: Tombol Cepat `+ Tambah Proyek Baru` pada Form Faktur Penjualan & SPH:
-    - Menambahkan tombol `+ Tambah Proyek Baru` tepat di samping selector proyek pada modal Faktur Penjualan Baru, modal Surat Penawaran Harga (SPH), dan modal Edit Faktur Penjualan.
-    - Saat proyek baru disimpan, otomatis memilih proyek tersebut ke dalam formulir yang sedang aktif tanpa harus menutup atau me-refresh halaman.
-    - Status: **Selesai 100% & Live di VPS** (Commit `4b8bca8`, PM2 PID 631209).
-  - [ ] **Sub-Tugas 117.2**: Peningkatan Pemilihan Barang dari List / Katalog Produk pada Faktur & SPH:
-    - Menambahkan tombol mencolok `[📦 Pilih dari Katalog Produk / Gudang]` di samping tombol `[+ Tambah Baris]`.
-    - Modal Picker Produk: Pencarian cepat nama/kategori produk, tampilan foto/thumbnail, sisa stok gudang aktif, harga jual satuan, dan tombol `+ Masukkan ke Faktur`.
-    - Autocomplete Datalist: Saat admin mengetik di kolom nama barang, langsung muncul opsi produk dari database sehingga nama, harga, dan unit terisi otomatis tanpa harus mengetik manual.
-  - [ ] **Langkah 7**: Buat Template Cetak A4 Standar Korporat ber-Kop Surat Resmi PT. DSTech Smart Perkasa untuk masing-masing ke-4 instrumen laporan tersebut.
-  - [ ] **Langkah 8**: Uji validasi build lokal (`npm run build`), pastikan 0 error, lalu bersihkan folder `_backup/`.
-  - [ ] **Langkah 9**: Push ke remote GitHub repository via `push_with_native_git.js` dan deploy ke live VPS via `deploy_live.js`.
+### 117. Tugas: Fitur Pemotongan Tunjangan (Uang Makan & Transport) Akibat Keterlambatan Hadir (Sinkronisasi Absensi ke Payroll)
+- **Permintaan Pengguna**:
+  - *"bisakah dibuatkan fitur pemotongan pada tunjangan seperti uang makan dan transport apa bila terlambat hadir"*
+- **Status**: ⏳ **Dalam Antrean (Queued - Menunggu Penyelesaian Task 116)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada sistem absensi (Task 113), keterlambatan kehadiran dihitung otomatis terhadap jam masuk kerja pada kontrak PKWT (`workSchedule.startTime`) dengan toleransi 5 menit dan menghasilkan status `Terlambat (Xm)`.
+  - Pengguna menginginkan adanya aturan dan perhitungan pemotongan pada komponen tunjangan kehadiran (terutama tunjangan uang makan dan tunjangan transport) apabila karyawan terlambat hadir:
+    - Opsi konfigurasi pemotongan (misal: pemotongan per menit / nominal tetap per kejadian terlambat / pemotongan persentase tunjangan harian).
+    - Terintegrasi saat generate payroll atau slip gaji bulanan sehingga data potongan keterlambatan terakumulasi secara otomatis dan transparan.
+- **Rencana Langkah Pelaksanaan**:
+  - Akan dikerjakan segera setelah Task 116 selesai, diuji, dan live di server.
 
 ---
 
-- **2026-10-23 (Task 118 - ANTRIAN)**: Fitur CRM Sales Pipeline & Up-Selling (Tahapan Sales: Leads -> Prospek -> Calon Prospek -> Deal -> Closing & Kontrak Up-Selling) (**Antrian Pekerjaan**).
-- **Latar Belakang / Permasalahan**:
-  - Permintaan pengguna: *"saya ingin kamu menambahkan saya sebuah fitur up selling, seperti tahapan proses salles, mulai dari leads, prospek, calon prospek,deal, dan closing. kemudian saya juga butuh complen handeling agar bisa ditangani sepenuhnya."*
-- **Rencana Rincian Pelaksanaan (Step-by-Step)**:
-  - [ ] **Langkah 1**: Desain tabel database CRM dengan prefix `dstech_crm_leads` dan `dstech_crm_pipeline`.
-  - [ ] **Langkah 2**: Buat tahapan funnel: `1. Leads` -> `2. Prospek` -> `3. Calon Prospek (Qualified)` -> `4. Negosiasi / Deal` -> `5. Closing (Won / Lost)`.
-  - [ ] **Langkah 3**: Fitur Up-Selling & Cross-Selling:
-    - Rekomendasi upgrade paket produk, penambahan titik perangkat (CCTV/Access Gate/Smart Home), perpanjangan garansi maintenance tahunan, atau paket bundling saat status Deal/Closing.
-    - Riwayat penawaran tambahan dan potensi kenaikan nilai kontrak (Contract Value Uplift).
-  - [ ] **Langkah 4**: Tampilan visual Kanban Board (Drag-and-Drop) dan List View di menu `/admin/crm` atau `/admin/sales`.
-  - [ ] **Langkah 5**: Konversi 1-klik: Lead Deal/Closing dapat langsung dikonversi menjadi Surat Penawaran Harga (SPH) atau Faktur Penjualan Resmi di `/admin/finance`.
+### 118. Tugas: Perbaikan Isolasi Cetak Print Slip Gaji A4 (Isolasi Backdrop Gelap & Tampilan Pas Penuh)
+- **Permintaan Pengguna**:
+  - *"prinan slip gaji masih ngawur"*
+- **Status**: ✅ **Selesai (Completed & Live)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Saat mencetak slip gaji dari `/admin/payroll` atau modal detail slip gaji di `/admin/attendance`, modal wrapper memiliki backdrop gelap semi-transparan (`fixed inset-0 bg-black/70`) yang ikut tercetak di atas lembar A4, menyebabkan cetakan tampak mengambang dengan latar belakang abu-abu/gelap.
+  - Lembar slip gaji belum menggunakan isolasi cetak penuh standar A4 (`print:fixed print:inset-0 print:p-0 print:m-0 print:bg-white print:z-[999999]`).
+- **Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat cadangan file `src/app/admin/payroll/page.tsx` dan `src/app/admin/attendance/page.tsx` ke `_backup/`.
+  - [x] **Langkah 2**: Tambahkan kelas isolasi cetak CSS `@media print` pada wrapper modal slip gaji dan lembar cetak A4.
+  - [x] **Langkah 3**: Sembunyikan elemen non-cetak (tombol aksi, backdrop gelap, header close) dengan `print:hidden`.
+  - [x] **Langkah 4**: Validasi lokal dengan `npm run build` di folder `dstech-smart`.
+  - [x] **Langkah 5**: Push ke GitHub repository via `push_with_native_git.js` (commit `7e90f7c`).
+  - [x] **Langkah 6**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [x] **Langkah 7**: Verifikasi di server live (HTTP 200 OK).
 
 ---
 
-- **2026-10-23 (Task 119 - ANTRIAN)**: Modul Manajemen Penanganan Komplain Pelanggan Terpadu (Complaint Handling & Service Ticketing System) (**Antrian Pekerjaan**).
-- **Latar Belakang / Permasalahan**:
-  - Memastikan seluruh keluhan, kendala teknis, atau komplain pelanggan tertangani sepenuhnya dari hulu ke hilir dengan tracking SLA dan dokumentasi transparan.
-- **Rencana Rincian Pelaksanaan (Step-by-Step)**:
-  - [ ] **Langkah 1**: Desain tabel database complaint ticket dengan prefix `dstech_crm_complaints` / `dstech_tickets`.
-  - [ ] **Langkah 2**: Formulir Pelaporan Komplain: Pemilihan Klien/Pelanggan, Referensi Proyek / No Faktur Terkait, Kategori Kendala (Jaringan, CCTV/Perangkat, Aplikasi POS, Tagihan, Layanan Lapangan), dan Tingkat Urgensi (Rendah, Sedang, Tinggi, Darurat SLA).
-  - [ ] **Langkah 3**: Alur Penanganan Komplain Penuh (*End-to-End Handling Lifecycle*):
-    - `Tiket Baru (Open)` -> `Ditinjau & Penugasan PIC (Assigned)` -> `Investigasi & Analisa Masalah` -> `Tindakan Perbaikan / Kunjungan Lapangan (In Progress)` -> `Menunggu Konfirmasi Klien (Pending Client)` -> `Terselesaikan (Resolved)` -> `Ditutup & Rating CSAT (Closed)`.
-  - [ ] **Langkah 4**: Riwayat Tindakan Teknis (*Audit Trail*), foto bukti penyelesaian, dan notifikasi WhatsApp otomatis ke pelanggan saat tiket diperbarui/selesai.
-  - [ ] **Langkah 5**: Dashboard Analitik Komplain: Response Time SLA, Tingkat Penyelesaian Masalah, dan Rekapitulasi per Kategori.
+### 119. Tugas: Upload Pas Foto Diri & KTP pada Form PKWT, Foto Profil pada List Karyawan, Pengaturan Divisi/Departemen, & Auto-Calculate Tanggal Berakhir Kontrak
+- **Permintaan Pengguna**:
+  1. *"pada form perekrutan PKWT, tolong tambahkan form agar bisa upload foto diri dan juga KTP/Identitas. dan pada list data karyawan munculkan foto dari karyawan tersebut pada namanya"*
+  2. *"cara mengatur divisi atau ketegori staf bagai mana, karena belum ada?"*
+  3. *"ketika saya membuat PKWT, jika saya mengisi durasi dari kontrak misalnya 3 bulan. bisakah untuk tanggal berakhirnya langsung ditambahkan secara otomatis dari tanggal mulai kontrak. begitu juga yang tahunan"*
+- **Status**: ✅ **Selesai (Completed & Terverifikasi Build Lokal)**
+- **Penyebab Masalah & Solusi**:
+  1. **Upload Pas Foto & KTP**:
+     - Form PKWT sebelumnya belum memiliki media penyimpanan berkas identitas calon karyawan.
+     - Ditambahkan dropzone upload pas foto 3x4 (dengan preview avatar bulat, indikator status, ganti & hapus) serta dropzone upload foto KTP/Identitas (preview horizontal, zoom popup modal, ganti & hapus).
+     - Menggunakan endpoint `/api/upload` dengan fallback DataURL jika koneksi offline/gagal.
+  2. **Tampilan Foto Karyawan & KTP di List PKWT**:
+     - Kolom "Nama Karyawan" kini menampilkan avatar foto profil asli (dengan fallback inisial elegan), badge divisi departemen di bawah nama jabatan, dan tombol cepat `[🪪 KTP]` untuk membuka modal lightbox pratinjau kartu KTP ukuran penuh.
+  3. **Pengaturan Divisi / Departemen**:
+     - Disediakan konstanta resmi `OFFICIAL_DEPARTMENTS` (Operasional Lapangan, Integrasi Sistem, Pengawasan Proyek, Keuangan & Administrasi, IT & Server, Sales & Marketing, Logistik) dengan opsi input divisi kustom.
+     - Setiap preset jabatan otomatis terpetakan ke divisinya masing-masing.
+     - Ditambahkan dropdown filter divisi pada toolbar atas tabel kontrak.
+  4. **Auto-Calculate Tanggal Berakhir Kontrak**:
+     - Dibuat fungsi helper `calculateEndDateFromDuration(startDate, months)`.
+     - Saat tanggal mulai atau durasi bulan diubah, tanggal berakhir (`endDate`) langsung terkalkulasi secara otomatis (misal: 1 Okt 2026 + 3 bulan -> 31 Des 2026).
+     - Disediakan tombol preset durasi cepat: `1 Bln`, `3 Bln`, `6 Bln`, `12 Bln (1 Thn)`, `24 Bln (2 Thn)`.
+- **Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat cadangan file `src/app/admin/contracts/page.tsx` dan `src/app/api/contracts/route.ts` ke `_backup/`.
+  - [x] **Langkah 2**: Perluas tipe data `DstechContract` & skema API `/api/contracts` dengan field `photoUrl`, `idCardUrl`, dan `department`.
+  - [x] **Langkah 3**: Buat konstanta `OFFICIAL_DEPARTMENTS` dan helper `calculateEndDateFromDuration`.
+  - [x] **Langkah 4**: Pasang UI dropzone upload pas foto dan KTP pada modal Form PKWT.
+  - [x] **Langkah 5**: Pasang selector divisi & auto-calculate durasi + tombol preset pada modal Form PKWT.
+  - [x] **Langkah 6**: Render avatar foto karyawan, badge divisi, dan tombol popup KTP pada tabel daftar kontrak.
+  - [x] **Langkah 7**: Pasang modal Lightbox pratinjau KTP (`previewKtpModal`) dan filter divisi pada toolbar.
+  - [x] **Langkah 8**: Tampilkan pas foto dan KTP pada modal Detail Kontrak.
+  - [x] **Langkah 9**: Validasi kompilasi lokal `npm run build` (lulus 100% 52 routes Next.js Turbopack).
+  - [x] **Langkah 10**: Push ke GitHub via `push_with_native_git.js`.
+  - [x] **Langkah 11**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [x] **Langkah 12**: Verifikasi live API dan bersihkan file cadangan `_backup/`.
 
 ---
 
-### 87. BLUEPRINT PERENCANAAN MASA DEPAN: INTEGRASI MULTI-TENANT SAAS POS & SISTEM LANGGANAN (FUTURE ROADMAP)
-*(Status: Disimpan & Dimatangkan dalam Perencanaan. TIDAK BOLEH diterapkan ke kode/database sebelum disetujui pengguna secara khusus)*
-
-- **Latar Belakang & Tujuan**:
-  - Menyatukan aplikasi manajemen `dstechsmart.com` dengan aplikasi kasir/point-of-sale `pos.dstechsmart.com` menjadi satu ekosistem SaaS (Software as a Service) komersial.
-  - Memungkinkan PT. DSTech Smart Perkasa menjual layanan POS & manajemen bisnis kepada klien eksternal dengan sistem biaya berlangganan berkala (bulanan/tahunan).
-  - **Prinsip Utama**: Menjaga aplikasi POS eksisting tetap mandiri dan aman 100% tanpa risiko gangguan operasional atau perubahan data mendadak.
-
-- **Rencana Arsitektur Teknis**:
-  1. **Tingkat 1 - Isolasi Data Tenant (Data Isolation)**:
-     - *Tenant Eksisting (DSTech Internal)*: Tetap menggunakan database POS mandiri saat ini.
-     - *Tenant Klien Baru*: Menggunakan skema isolasi via kolom `tenant_id` berindeks tinggi atau database dedicated per-cluster (`dstech_pos_tenant_[id]`), sehingga data kasir, produk, dan transaksi antar klien 100% terpisah secara logis dan aman.
-  2. **Tingkat 2 - Subdomain & Routing Terpadu**:
-     - Setiap klien yang berlangganan mendapatkan alamat kasir mandiri: `[nama-toko].pos.dstechsmart.com`.
-     - Nginx Reverse Proxy membaca header Host subdomain dan meneruskannya ke engine multi-tenant.
-  3. **Tingkat 3 - Skema Tier Paket Berlangganan (Subscription Models)**:
-     - **Paket Starter (UMKM / Toko Kecil - Rp 49.000 / Bulan)**:
-       - 1 Outlet / Cabang.
-       - 1 Akun Kasir.
-       - Maksimal 500 Master Produk.
-       - Cetak Struk Kasir Bluetooth / Thermal 58mm & 80mm.
-       - Laporan Penjualan Harian.
-     - **Paket Pro (Bisnis Berkembang - Rp 99.000 / Bulan)**:
-       - 2 Outlet / Cabang.
-       - Multi-Kasir & Manajemen Shift Karyawan.
-       - Produk Unlimited + Manajemen Stok Gudang Real-Time.
-       - Laporan Laba Rugi, Piutang Pelanggan, & Riwayat Kas Masuk/Keluar.
-       - Cetak Surat Jalan & Faktur Resmi.
-     - **Paket Enterprise (Bisnis Besar / Chain Store - Rp 199.000 / Bulan)**:
-       - Multi-Cabang & Multi-Gudang Tanpa Batas.
-       - Integrasi Presensi GPS Karyawan & Slip Gaji (DSTech HR).
-       - Integrasi WhatsApp Notifikasi Faktur & Laporan Otomatis ke Owner.
-       - Akses API & Bantuan Support Prioritas 24/7.
-  4. **Tingkat 4 - Engine Billing & Pembayaran Berulang (Recurring Payment)**:
-     - Integrasi Payment Gateway (Midtrans / Xendit / QRIS Otomatis).
-     - Fitur Auto-Invoice Langganan: terbit 7 hari sebelum masa aktif berakhir via WhatsApp & Email.
-     - Masa Tenggang (*Grace Period*): 3 hari setelah jatuh tempo sebelum pembatasan akses kasir.
-  5. **Tingkat 5 - Portal Navigasi Terpadu (Single Sign-On / App Switcher)**:
-     - Menu cepat di header dashboard `dstechsmart.com`: *"Buka Kasir POS"*, *"Panel Pelanggan SaaS"*, dan *"Kelola Langganan Toko"*.
-     - Pengguna cukup satu kali login untuk mengakses modul manajemen dan modul kasir POS sesuai lisensi aktif.
-
-- **Checklist Kesiapan Sebelum Eksekusi Fisik**:
-  - [ ] Validasi source code & arsitektur aplikasi `pos.dstechsmart.com` (apakah Node.js, Laravel, Next.js, dsb.).
-  - [ ] Pembuatan skema sandbox/staging terpisah untuk uji coba multi-tenant tanpa menyentuh server live POS.
-  - [ ] Konfirmasi penetapan harga dan gateway pembayaran resmi yang dipilih oleh Direktur/Manajemen.
-  - [ ] Persetujuan eksplisit dari pengguna sebelum penerapan pertama kali.
+### 121. Tugas: Perbaikan Tumpukan Modal (Z-Index Layering) Saat Membuka Dokumen Faktur, SPH, dan Nota dari Modal Dossier Proyek (/admin/finance)
+- **Status**: ✅ **Selesai 100% & Live di VPS**
+- **Penyebab Masalah**:
+  - Modal Dossier Proyek (`selectedProjectForDossier`) memiliki `z-index: 50`.
+  - Saat pengguna menekan tombol "Lihat Dokumen" / "Cetak" Faktur Penjualan (`selectedInvoiceForPrint`) atau Surat Penawaran Harga SPH (`selectedQuotationForPrint`) dari dalam tab Faktur atau tab SPH di Dossier Proyek, modal cetak tersebut juga menggunakan `z-50`.
+  - Akibatnya, modal dokumen cetak tertutup di belakang modal dossier proyek sehingga pengguna tidak dapat melihat atau mencetak fakturnya.
+  - Hal yang sama terjadi pada modal Buat/Edit SPH (`isNewQuotationModalOpen`) dan lightbox preview lampiran nota (`previewAttachment` menggunakan `z-60` arbitrary non-Tailwind standard).
+- **Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat backup file `src/app/admin/finance/page.tsx` ke `_backup/page.finance.tsx.bak`.
+  - [x] **Langkah 2**: Tingkatkan `z-index` modal cetak Faktur (`selectedInvoiceForPrint`), modal Buat/Edit Faktur (`isNewInvoiceModalOpen || isEditInvoiceModalOpen`), modal Buat/Edit SPH (`isNewQuotationModalOpen || isEditQuotationModalOpen`), dan modal cetak SPH (`selectedQuotationForPrint`) menjadi `z-[70]`.
+  - [x] **Langkah 3**: Tingkatkan `z-index` modal Lightbox Bukti Nota (`previewAttachment`) menjadi `z-[90]` agar selalu tampil di lapisan paling depan dari seluruh tumpukan modal.
+  - [x] **Langkah 4**: Validasi lokal dengan `npm run build` di folder `dstech-smart` (berhasil 100% tanpa error).
+  - [x] **Langkah 5**: Push ke GitHub via `push_with_native_git.js` (commit `a1f6fe4`).
+  - [x] **Langkah 6**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan reload PM2 `dstech-main` (PID 624450).
+  - [x] **Langkah 7**: Hapus file backup `_backup/page.finance.tsx.bak`.
 
 ---
 
+### 122. Konsultasi Arsitektur: Transformasi Aplikasi Manajemen Menjadi Multi-Tenant SaaS & Penyatuan dengan POS (pos.dstechsmart.com)
+- **Pertanyaan Pengguna**:
+  - *"bagai mana caranya agar saya bisa membuat aplikasi managemen ini menjadi aplikasi multi tenan, nantinya kita satukan dalam aplkasi pos.dstechsmart.com sehingga aplikasi ini menjadi 1 dengan aplikasi tersebut. sehingga saya bisa menerapkan biaya berlangganan atas aplikasi ini kepada client."*
+- **Status**: 📝 **Selesai Dijelaskan (Blueprint & Panduan Lengkap Tersedia)**
 
-### 88. Catatan Penting
+---
+
+### 123. Tugas: Penambahan Tombol Tambah Supplier Baru Langsung di Dalam Formulir Purchase Order (PO)
+- **Permintaan Pengguna**:
+  - *"tolong tambahkan tombol tambah suplayer didalamnya"* (disertai screenshot modal Buat Purchase Order).
+- **Status**: 🔄 **Sedang Deploy ke Live VPS**
+- **Penyebab Masalah / Kebutuhan**:
+  - Pada modal Buat PO Baru (`isNewPoModalOpen`) dan Edit PO (`isEditPoModalOpen`), pengguna memilih supplier dari dropdown Master Data Supplier.
+  - Namun jika supplier/vendor belum terdaftar, pengguna harus membatalkan atau menutup modal PO dan berpindah ke tab Supplier untuk menambahkan data vendor baru.
+  - Pengguna membutuhkan tombol aksi cepat "+ Tambah Supplier" langsung di dalam modal PO, yang membuka formulir pendaftaran supplier baru di layer teratas tanpa menghilangkan input data PO yang sudah diketik, lalu otomatis memilih supplier tersebut ke formulir PO setelah disimpan.
+- **Rencana Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Buat cadangan file `src/app/admin/finance/page.tsx` ke `_backup/page.finance.po_supplier.tsx.bak`.
+  2. [x] **Langkah 2**: Tambahkan state pelacak pemanggil modal supplier (`supplierModalCaller: "PO_CREATE" | "PO_EDIT" | null`) di `src/app/admin/finance/page.tsx`.
+  3. [x] **Langkah 3**: Pasang tombol "+ Tambah Supplier Baru" pada box selector supplier di modal Buat PO (`isNewPoModalOpen`) dan modal Edit PO (`isEditPoModalOpen`).
+  4. [x] **Langkah 4**: Naikkan `z-index` modal tambah/edit supplier (`isSupplierModalOpen`) ke `z-[80]` agar tampil mulus di atas modal PO (`z-[70]`).
+  5. [x] **Langkah 5**: Perbarui fungsi simpan supplier (`handleSaveSupplierSubmit`) agar saat berhasil disimpan dari modal PO, data supplier baru otomatis terpilih ke `poForm` / `editPoForm` dan modal supplier tertutup kembali ke modal PO.
+  6. [x] **Langkah 6**: Validasi kompilasi lokal via `npm run build` (sukses 100% tanpa error).
+  7. [ ] **Langkah 7**: Push ke remote repository via `push_with_native_git.js`.
+  8. [ ] **Langkah 8**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  9. [ ] **Langkah 9**: Verifikasi di live website dan bersihkan file cadangan `_backup/`.
+
+### 88. Tugas 116: Formulir PKWT Foto Diri & KTP, Badge Karyawan, Divisi/Kategori Staf, Auto-Kalkulasi Durasi Kontrak, dan Picker Katalog Produk pada Finance
+**Permintaan User**:
+1. "pada form perekrutan PKWT, tolong tambahkan form agar bisa upload foto diri dan juga KTP/Identitas. dan pada list data karyawan munculkan foto dari karyawan tersebut pada namanya"
+2. "cara mengatur divisi atau ketegori staf bagai mana, karena belum ada?"
+3. "ketika saya membuat PKWT, jika saya mengisi durasi dari kontrak misalnya 3 bulan. bisakah untuk tanggal berakhirnya langsung ditambahkan secara otomatis dari tanggal mulai kontrak. begitu juga yang tahunan"
+4. "bagai mana caranya agar saya bisa membuat aplikasi managemen ini menjadi aplikasi multi tenan, nantinya kita satukan dalam aplkasi pos.dstechsmart.com sehingga aplikasi ini menjadi 1 dengan aplikasi tersebut. sehingga saya bisa menerapkan biaya berlangganan atas aplikasi ini kepada client."
+
+**Status**: Selesai 100% (Build Lolos & Siap Deploy Live)
+
+**Langkah-langkah yang Telah Dikerjakan**:
+1. [x] **Langkah 1**: Buat cadangan file `src/app/admin/contracts/page.tsx`, `src/app/api/contracts/route.ts`, dan `src/app/admin/finance/page.tsx` ke dalam folder `_backup/`.
+2. [x] **Langkah 2**: Perluas model data `DstechContract` dan handler API `/api/contracts/route.ts` dengan atribut `photoUrl`, `idCardUrl`, dan `department`.
+3. [x] **Langkah 3**: Buat komponen Upload Pas Foto 3x4 (preview bulat + ganti/hapus) dan Upload KTP/Identitas (preview kartu horizontal + ganti/hapus) terintegrasi ke `/api/upload` (fallback DataURL).
+4. [x] **Langkah 4**: Tambahkan Master Divisi Resmi (`OFFICIAL_DEPARTMENTS`) dengan selector dropdown + input custom divisi, serta petakan divisi otomatis pada preset jabatan resmi (`OFFICIAL_POSITION_PRESETS`).
+5. [x] **Langkah 5**: Implementasikan auto-calculate `endDate` dari `startDate` dan `durationMonths` (`calculateEndDateFromDuration`) lengkap dengan 5 tombol preset durasi instan (1 Bln, 3 Bln, 6 Bln, 12 Bln / 1 Thn, 24 Bln / 2 Thn).
+6. [x] **Langkah 6**: Tampilkan avatar foto profil asli (fallback inisial berwarna), badge divisi di bawah jabatan, tombol aksi cepat preview KTP `[🪪 KTP]`, dan modal Lightbox KTP resolusi besar pada tabel daftar kontrak karyawan.
+7. [x] **Langkah 7**: Sempurnakan formulir Faktur Penjualan dan Penawaran SPH di `/admin/finance` dengan tombol "📦 Pilih dari List / Master" yang membuka modal Katalog Picker interaktif serta datalist autocomplete `dstech_global_product_datalist` pada input nama barang.
+8. [x] **Langkah 8**: Validasi kompilasi lokal `npm run build` (lulus 100%, 52 routes sukses).
+9. [x] **Langkah 9**: Push kode ke GitHub repository `rm23nm/dstech-smart` via `push_with_native_git.js`.
+10. [x] **Langkah 10**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+
+---
+
+### 124. Tugas: Fitur Pencarian Real-Time & Autocomplete Nama Klien pada Formulir Penawaran SPH (Surat Penawaran Harga)
+- **Permintaan Pengguna**:
+  - *"untuk pencarian nama client pada form SPH belum ada"* (disertai tangkapan layar modal Buat/Edit SPH saat membuka dropdown Klien yang panjang).
+- **Status**: ✅ **SELESAI (DONE & LIVE DEPLOYED)** (Commit `5dfa153`)
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada formulir SPH (`isNewQuotationModalOpen` dan `isEditQuotationModalOpen`), pemilihan klien sebelumnya hanya berupa elemen `<select>` HTML standar tanpa search box / filter kata kunci.
+  - Ketika data klien sudah banyak, admin kesulitan menemukan klien yang diinginkan karena harus scroll manual daftar panjang tanpa fitur pencarian.
+  - Selain itu, pada input manual `customerName` ("Nama Klien / PIC Penerima") belum ada autocomplete datalist atau tombol pencarian cepat ke master klien.
+  - Pengguna membutuhkan fitur pencarian real-time nama klien, PIC, instansi, kota, atau nomor WhatsApp pada box pemilih klien SPH, chip/card hasil pencarian instan yang bisa langsung diklik, tombol `+ Tambah Klien Baru` langsung di dalam form SPH tanpa menutup modal SPH, serta datalist autocomplete pada input nama klien.
+- **Rencana Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Buat backup file `src/app/admin/finance/page.tsx` ke `_backup/page.finance.client_search_sph.tsx.bak`.
+  2. [x] **Langkah 2**: Tambahkan input pencarian real-time berikon `Search` di dalam card selector klien SPH (`quotationClientSearchQuery`) dengan tombol reset `(X)` dan counter hasil pencarian yang cocok.
+  3. [x] **Langkah 3**: Integrasikan hasil pencarian klien yang cocok secara dinamis pada dropdown `<select>` dan sajikan quick results card list interaktif yang bisa diklik 1 sentuhan untuk langsung auto-fill seluruh data klien (`customerName`, `customerOrg`, `customerPhone`, `customerAddress`, `clientId`).
+  4. [x] **Langkah 4**: Pasang tombol "+ Tambah Klien Baru" di header selector klien SPH yang membuka modal master klien di layer `z-[80]` tanpa menutup form SPH.
+  5. [x] **Langkah 5**: Pasang `<datalist id="quotation_client_datalist">` pada input `Nama Klien / PIC Penerima` dengan deteksi auto-match saat nama klien diketik manual.
+  6. [x] **Langkah 6**: Terapkan juga fitur pencarian klien serupa pada formulir Faktur Penjualan (`saleClientSearchQuery`) untuk konsistensi pengalaman pengguna.
+  7. [x] **Langkah 7**: Jalankan uji kompilasi lokal `npm run build` untuk memastikan 0 error TypeScript / linting (lulus 52/52 routes).
+  8. [x] **Langkah 8**: Push ke GitHub `rm23nm/dstech-smart` menggunakan `push_with_native_git.js` (commit `5dfa153`).
+  9. [x] **Langkah 9**: Deploy ke VPS live 157.66.34.199 menggunakan `deploy_live.js` dan restart PM2 `dstech-main` (PID 643254 online).
+  10. [x] **Langkah 10**: Bersihkan file backup `_backup/` dan konfirmasi hasil ke pengguna.
+
+---
+
+### 125. Tugas: Penambahan Opsi Tarif PPN 12% (11/12) & PPN 12% (Penuh) Serta Sinkronisasi Pajak PO ke Database
+- **Permintaan Pengguna**:
+  - *"tambahkan pada pilihan PPN 12% ada 2 pilihan 12% (11/12) dan PPN 12%"*
+- **Status**: ✅ **SELESAI (DONE & LIVE DEPLOYED)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Sesuai regulasi perpajakan PMK terkait tarif PPN 12% dengan dasar pengenaan pajak (DPP) nilai lain 11/12 (efektif setara 11% dari nilai kontrak/DPP), pengguna memerlukan 2 varian tarif PPN 12%:
+    1. **PPN 12% (11/12)**: Menghitung pajak dengan proporsi (11/12) x 12% (efektif 11%).
+    2. **PPN 12% (Penuh)**: Menghitung tarif normal 12% penuh.
+  - Opsi ini harus tersedia secara seragam di seluruh form transaksi:
+    - Faktur Penjualan (`saleForm` & `editingSale`)
+    - Surat Penawaran Harga / SPH (`quotationForm`)
+    - Purchase Order / PO Supplier (`poForm` & `editPoForm`)
+    - Seluruh lembar cetak dokumen resmi (Invoice Penjualan, SPH, dan PO)
+  - Selain itu, payload API pembuatan PO (`handleCreatePoSubmit`) dan simpan edit PO (`handleSaveEditPo`) diperbaiki dengan menambahkan `taxRate` dan `taxType` agar data pajak PO tersimpan utuh di database fisik.
+- **Rencana Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Buat backup file cadangan `src/app/admin/finance/page.tsx` ke `_backup/page.finance.ppn_12_fraction.tsx.bak`.
+  2. [x] **Langkah 2**: Tambahkan opsi `<option value={11.12}>PPN 12% (11/12)</option>` dan opsi `<option value={12}>PPN 12% (Penuh)</option>` di samping Bebas PPN (0%) dan PPN 11% pada seluruh form (Faktur Penjualan, SPH, dan PO).
+  3. [x] **Langkah 3**: Perbarui logika kalkulasi pajak pada seluruh helper:
+     - Jika `taxRate === 11.12`:
+       - Model Exclude: DPP = subtotal setelah diskon, Pajak PPN = `round((11 / 12) * 0.12 * DPP)` (efektif 11% dari DPP)
+       - Model Include: DPP = `round(total / 1.11)`, Pajak PPN = `total - DPP`
+     - Perbarui fungsi `calculateTotals`, `calculateQuotationTotals`, `calculatePoTotals`, `calculateEditSaleDerivedTotals`, dan `calculateEditPoTotals`.
+  4. [x] **Langkah 4**: Perbarui tampilan label persentase PPN di ringkasan form dan modal pratinjau cetak resmi:
+     - Tampilkan teks `12% (11/12)` jika `taxRate === 11.12`
+     - Terapkan di modal cetak Invoice Penjualan (Halaman 1 & Halaman 2), modal cetak SPH (Halaman 1 & Halaman 2), dan modal cetak Purchase Order Supplier.
+  5. [x] **Langkah 5**: Tambahkan `taxRate` dan `taxType` ke payload API Create PO (`handleCreatePoSubmit`) dan Edit PO (`handleSaveEditPo`) agar data pajak tersimpan ke database.
+  6. [x] **Langkah 6**: Validasi kompilasi build lokal `npm run build` (lulus 100%, 52 static routes sukses tanpa error).
+  7. [x] **Langkah 7**: Push kode ke GitHub `rm23nm/dstech-smart` via `push_with_native_git.js`.
+  8. [x] **Langkah 8**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  9. [x] **Langkah 9**: Bersihkan file backup `_backup/` dan buat laporan lengkap ke pengguna.
+
+---
+
+### 126. Tugas: Perbaikan Akses Kamera Langsung (WebRTC) di HP, Penghapusan Total Fitur Upload Foto Galeri pada Presensi, dan Penyediaan Fitur Presensi Mandiri Admin & Superadmin
+- **Permintaan Pengguna**:
+  - *"saat absensi, ketika buka kamera tidak bisa. kemudian untuk rool admin dan superadmin, mereka harus absen dimana?karena didalam dasbord superadmin tidak disediakan"*
+  - *"untuk absen, jangan ada fitur upload foto, karena ini sangat berbahaya, bisa memanipulasi, wajib gunakan kamera saja. namun penggunaan kameranya masih belum bisa terbuka di HP"*
+- **Status**: ⏳ **SEDANG DIKERJAKAN (IN PROGRESS)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  1. **Kamera Tidak Terbuka di HP (Mobile WebRTC)**:
+     - Logika `startCamera` menggunakan batasan `width: { ideal: 640 }, height: { ideal: 480 }` yang pada perangkat HP dengan orientasi portrait sering memicu `OverconstrainedError` atau kegagalan inisiasi sensor kamera depan.
+     - Timing render React: saat `isCameraActive` bernilai `false`, elemen `<video ref={videoRef}>` belum ada di DOM. Ketika `getUserMedia` resolve, `videoRef.current` masih `null`. Karena tidak ada `useEffect` atau callback ref yang memasangkan stream ke `video.srcObject` setelah komponen ter-mount, video tetap hitam / blank.
+     - Kurang atribut penting untuk streaming video mobile: `playsInline`, `webkit-playsinline`, serta penanganan `onloadedmetadata` untuk pemanggilan `video.play()`.
+     - Penanganan fallback izin kamera belum memberikan panduan jelas jika izin ditolak oleh browser pengguna.
+  2. **Penghapusan Fitur Upload Foto**:
+     - Pengguna menegaskan bahwa opsi upload foto dari file/galeri sangat berbahaya karena membuka celah manipulasi foto selfie yang sudah ada di galeri ponsel.
+     - Seluruh input file `<input type="file" ...>` dan tombol upload foto galeri harus dihapus total, dan sistem WAJIB HANYA menggunakan tangkapan kamera langsung (Live WebRTC Camera Stream -> Snapshot Canvas).
+  3. **Tempat Presensi Role Admin & Superadmin**:
+     - Pengguna dengan peran Superadmin dan Admin saat login diarahkan ke `/admin`.
+     - Di Dashboard Admin (`/admin`), belum tersedia widget/kartu presensi mandiri.
+     - Di menu Rekap Absensi (`/admin/attendance`), tombol presensi sebelumnya hanya mencatat teks tanpa kamera selfie.
+     - Solusi: Sediakan **Widget Presensi Mandiri (Self Attendance)** ber-kamera langsung (live selfie snapshot) + GPS satelit langsung di Dashboard Admin (`/admin`) serta di menu Rekap Absensi (`/admin/attendance`), dan aktifkan sesi admin (`dstech_admin_auth`) di portal `/employee` sebagai alternatif.
+- **Rencana Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Buat cadangan file `src/app/employee/page.tsx`, `src/app/admin/page.tsx`, dan `src/app/admin/attendance/page.tsx` ke dalam folder `_backup/`.
+  2. [x] **Langkah 2**: Hapus seluruh elemen input file galeri/upload (`fileInputCheckInRef`, `fileInputCheckOutRef`, `<input type="file" ...>`, dan tombol "Kamera HP / Perangkat") di `src/app/employee/page.tsx` untuk menutup celah manipulasi foto dari galeri.
+  3. [x] **Langkah 3**: Perbaiki arsitektur kamera WebRTC di `src/app/employee/page.tsx`:
+     - Buat `useEffect` yang memantau `cameraStream` dan elemen `<video>` sehingga saat stream diperoleh dan elemen ter-mount, `video.srcObject = stream` dan `video.play()` langsung terpasang otomatis tanpa layar hitam.
+     - Tambahkan atribut `playsInline`, `autoPlay`, `muted`, dan `webkit-playsinline="true"`.
+     - Gunakan multi-fallback constraints: coba `{ video: { facingMode: "user" }, audio: false }`, jika gagal coba `{ video: { facingMode: { ideal: "user" } }, audio: false }`, dan terakhir `{ video: true, audio: false }`.
+     - Sediakan tombol switch kamera (depan/belakang) dan penanganan pesan error yang informatif jika izin kamera browser ditolak.
+  4. [x] **Langkah 4**: Bangun Widget Presensi Mandiri Admin & Superadmin di Dashboard Utama `/admin` (`src/app/admin/page.tsx`):
+     - Kartu Status Kehadiran Hari Ini (Jam Masuk, Jam Pulang, Lokasi GPS Satelit, Foto Selfie).
+     - Tombol "Presensi Masuk (Check-In)" dan "Presensi Pulang (Check-Out)" ber-kamera live.
+     - Modal interaktif kamera langsung WebRTC + GPS satelit untuk admin & superadmin tanpa upload galeri.
+  5. [x] **Langkah 5**: Perbarui tombol presensi di `/admin/attendance/page.tsx` agar juga membuka modal presensi live kamera WebRTC & GPS yang sama.
+  6. [x] **Langkah 6**: Validasi kompilasi lokal `npm run build` hingga bebas error (seluruh 52 rute sukses terkompilasi).
+  7. [x] **Langkah 7**: Push kode ke repository GitHub `rm23nm/dstech-smart` via `push_with_native_git.js` (commit `6c4a169`).
+  8. [x] **Langkah 8**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main` (PID 664702 online).
+  9. [x] **Langkah 9**: Bersihkan file cadangan sementara di folder `_backup/`.
+
+- **Hasil Pengujian & Verifikasi**:
+  - **Portal Karyawan (`/employee`)**: Opsi upload galeri telah dimusnahkan. Saat klik "Check-In / Check-Out", kamera WebRTC aktif secara instan dengan frame bundar, preview real-time live, tombol flip kamera depan/belakang, deteksi koordinat GPS satelit akurat, tombol "Jepret Foto Wajah Sekarang", dan tombol konfirmasi presensi.
+  - **Dashboard Admin & Superadmin (`/admin`)**: Telah terpasang kartu presensi mandiri eksklusif di bagian atas dashboard dengan identitas admin aktif, waktu kerja hari ini, status check-in/out, tombol "Check-In Live Kamera", dan modal WebRTC kamera langsung + GPS satelit.
+  - **Menu Kelola Absensi (`/admin/attendance`)**: Tombol check-in mandiri admin telah di-upgrade dengan modal verifikasi live kamera WebRTC + GPS satelit yang sama.
+  - **Live Server**: Build Next.js 16.2.2 lolos 52 rute produksi, PM2 `dstech-main` restart sukses dan online di `https://dstechsmart.com`.
+
+---
+
+### 127. Tugas (Antrian Berikutnya): Fitur Role User Manager & Granular Permissions Matrix (Hak Akses Menu: Lihat, Edit, Cetak, Kirim, Hapus)
+- **Permintaan Pengguna**:
+  - *"saya ingin ada fitur Rool user manager. untuk memanage karyawan mana saja yang bisa membuka menu-menu tertentu untuk dilihat, edit, cetak. kirim, hapus dan lainnya"*
+- **Status**: 📋 **TERCATAT DALAM ANTRIAN (QUEUED - Dikerjakan setelah Tugas 126 Selesai)**
+- **Analisis Kebutuhan Awal**:
+  - Sistem membutuhkan modul Manajemen Hak Akses Pengguna (Role & Permission Manager) pada `/admin/users`:
+    - Pengaturan granular per menu (Keuangan/ERP, Jadwal Maintenance, Rekap Absensi, Penggajian, Kontrak Kerja, Stok Gudang, Produk, Portofolio, KMS, dll.).
+    - Matriks izin aksi spesifik per menu:
+      1. `view` (Hak melihat menu / halaman)
+      2. `create` (Hak menambah data baru)
+      3. `edit` (Hak mengubah data)
+      4. `delete` (Hak menghapus data)
+      5. `print` (Hak mencetak PDF / lembar resmi / nota / laporan / invoice / SPK / kontrak) - *Penekanan khusus user: "tambah lagi cetak"*
+      6. `send` (Hak mengirim dokumen via WhatsApp / Email)
+    - Penyimpanan permission di skema user ber-prefix `dstech_users` (kolom/properti `permissions`).
+    - Proteksi navigasi sidebar dan tombol aksi di setiap halaman sesuai permission pengguna yang sedang login.
+
+---
+
+### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
