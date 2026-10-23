@@ -159,6 +159,7 @@ export interface ProjectItem {
   startDate: string;
   targetEndDate?: string;
   actualEndDate?: string;
+  endDate?: string;
   picProject?: string;
   description?: string;
   assignedEmployees?: ProjectAssignedEmployee[];
@@ -221,6 +222,8 @@ interface SaleInvoice {
   businessEntity?: "PT" | "NON_PT";
   projectId?: string;
   projectName?: string;
+  subject?: string;
+  clientId?: string;
   customerPic?: string;
   picName?: string;
   photos?: ProjectPhoto[];
@@ -357,6 +360,7 @@ interface PurchaseOrder {
   businessEntity?: "PT" | "NON_PT";
   projectId?: string;
   projectName?: string;
+  subject?: string;
 }
 
 interface SalesReturn {
@@ -612,11 +616,40 @@ export default function AdminFinanceERPPage() {
   const [returnEndDate, setReturnEndDate] = useState<string>("");
   const [returnSortBy, setReturnSortBy] = useState<string>("date_desc");
 
-  // Laporan Laba Rugi / P&L
+  // Pusat Pelaporan Eksekutif & Laba Rugi (Executive Reporting Suite)
+  const [executiveReportSubTab, setExecutiveReportSubTab] = useState<
+    "pnl" | "client_sales" | "project_procurement" | "project_activity"
+  >("pnl");
+
+  // Sub-Laporan 1: Laporan Laba Rugi (Global vs Per Project)
+  const [pnlReportMode, setPnlReportMode] = useState<"GLOBAL" | "PROJECT">("GLOBAL");
+  const [pnlSelectedProjectId, setPnlSelectedProjectId] = useState<string>("ALL");
   const [pnlSearchQuery, setPnlSearchQuery] = useState<string>("");
   const [pnlDateFilter, setPnlDateFilter] = useState<DateFilterPeriod>("THIS_MONTH");
   const [pnlStartDate, setPnlStartDate] = useState<string>("");
   const [pnlEndDate, setPnlEndDate] = useState<string>("");
+
+  // Sub-Laporan 2: Laporan Penjualan per Klien (Bulan & Tahun)
+  const [clientSalesFilterClientId, setClientSalesFilterClientId] = useState<string>("ALL");
+  const [clientSalesFilterMonth, setClientSalesFilterMonth] = useState<string>("ALL");
+  const [clientSalesFilterYear, setClientSalesFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [isClientSalesPrintModalOpen, setIsClientSalesPrintModalOpen] = useState<boolean>(false);
+
+  // Sub-Laporan 3: Laporan Pembelian & Belanja Kebutuhan Proyek
+  const [procurementFilterSupplier, setProcurementFilterSupplier] = useState<string>("ALL");
+  const [procurementFilterProject, setProcurementFilterProject] = useState<string>("ALL");
+  const [procurementFilterMonth, setProcurementFilterMonth] = useState<string>("ALL");
+  const [procurementFilterYear, setProcurementFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [isProcurementPrintModalOpen, setIsProcurementPrintModalOpen] = useState<boolean>(false);
+
+  // Sub-Laporan 4: Laporan Rekap Kegiatan Proyek (1 Bulan & 1 Tahun)
+  const [employeeTasks, setEmployeeTasks] = useState<any[]>([]);
+  const [activityReportPeriodType, setActivityReportPeriodType] = useState<"MONTH" | "YEAR">("MONTH");
+  const [activityFilterMonth, setActivityFilterMonth] = useState<string>((new Date().getMonth() + 1).toString());
+  const [activityFilterYear, setActivityFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [activityFilterStatus, setActivityFilterStatus] = useState<string>("ALL");
+  const [activityFilterClient, setActivityFilterClient] = useState<string>("ALL");
+  const [isActivityPrintModalOpen, setIsActivityPrintModalOpen] = useState<boolean>(false);
 
   // Buku Arus Kas / Cash Flow
   const [cashSearchQuery, setCashSearchQuery] = useState<string>("");
@@ -2481,11 +2514,20 @@ export default function AdminFinanceERPPage() {
   const fetchFinanceData = async () => {
     try {
       setIsLoading(true);
-      const [res, prodRes, contractRes] = await Promise.all([
+      const [res, prodRes, contractRes, tasksRes] = await Promise.all([
         fetch("/api/finance"),
         fetch("/api/products"),
         fetch("/api/contracts"),
+        fetch("/api/employee/tasks"),
       ]);
+      if (tasksRes && tasksRes.ok) {
+        const tData = await tasksRes.json();
+        if (Array.isArray(tData)) {
+          setEmployeeTasks(tData);
+        } else if (tData && Array.isArray(tData.tasks)) {
+          setEmployeeTasks(tData.tasks);
+        }
+      }
       if (contractRes && contractRes.ok) {
         const cData = await contractRes.json();
         if (cData && Array.isArray(cData.contracts)) {
@@ -3375,6 +3417,388 @@ export default function AdminFinanceERPPage() {
       periodLabel,
     };
   }, [sales, purchases, cashFlow, selectedEntity, pnlDateFilter, pnlStartDate, pnlEndDate]);
+
+  // 1. Hook Kalkulasi: Laba Rugi per Project (Project P&L Statement)
+  const projectPnlCalculation = useMemo(() => {
+    const availableProjectList = projects.map((p) => ({
+      id: p.id,
+      code: p.projectCode || p.id,
+      name: p.projectName,
+      clientName: p.clientName,
+      contractValue: Number(p.contractValue) || 0,
+    }));
+
+    const activeProject =
+      projects.find((p) => p.id === pnlSelectedProjectId || p.projectName === pnlSelectedProjectId) || null;
+
+    const projectSales = sales.filter((s) => {
+      if (pnlSelectedProjectId === "ALL") return true;
+      if (activeProject) {
+        return (
+          s.projectId === activeProject.id ||
+          (s.projectName && s.projectName.toLowerCase() === activeProject.projectName.toLowerCase()) ||
+          (s.customerName &&
+            activeProject.clientName &&
+            s.customerName.toLowerCase() === activeProject.clientName.toLowerCase()) ||
+          (s.subject && s.subject.toLowerCase().includes(activeProject.projectName.toLowerCase()))
+        );
+      }
+      return (
+        s.projectId === pnlSelectedProjectId ||
+        (s.projectName && s.projectName.toLowerCase().includes(pnlSelectedProjectId.toLowerCase())) ||
+        (s.subject && s.subject.toLowerCase().includes(pnlSelectedProjectId.toLowerCase()))
+      );
+    });
+
+    const projectPurchases = purchases.filter((p) => {
+      if (pnlSelectedProjectId === "ALL") return true;
+      if (activeProject) {
+        return (
+          (p.projectName && p.projectName.toLowerCase() === activeProject.projectName.toLowerCase()) ||
+          (p.notes && p.notes.toLowerCase().includes(activeProject.projectName.toLowerCase()))
+        );
+      }
+      return (
+        (p.projectName && p.projectName.toLowerCase().includes(pnlSelectedProjectId.toLowerCase())) ||
+        (p.notes && p.notes.toLowerCase().includes(pnlSelectedProjectId.toLowerCase()))
+      );
+    });
+
+    const projectExpenses = cashFlow.filter((c) => {
+      if (c.type !== "OUT") return false;
+      if (pnlSelectedProjectId === "ALL") return true;
+      if (activeProject) {
+        return (
+          (c.projectId && c.projectId === activeProject.id) ||
+          (c.projectName && c.projectName.toLowerCase().includes(activeProject.projectName.toLowerCase())) ||
+          (c.description && c.description.toLowerCase().includes(activeProject.projectName.toLowerCase())) ||
+          (c.reference && c.reference.toLowerCase().includes(activeProject.projectName.toLowerCase()))
+        );
+      }
+      return (
+        (c.projectName && c.projectName.toLowerCase().includes(pnlSelectedProjectId.toLowerCase())) ||
+        (c.description && c.description.toLowerCase().includes(pnlSelectedProjectId.toLowerCase()))
+      );
+    });
+
+    const revenue =
+      projectSales.reduce((acc, s) => acc + (Number(s.grandTotal) || 0), 0) ||
+      (activeProject ? Number(activeProject.contractValue) || 0 : 0);
+    const materialCost = projectPurchases.reduce((acc, p) => acc + (Number(p.grandTotal) || 0), 0);
+    const grossProfit = revenue - materialCost;
+    const operationalCost = projectExpenses.reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+    const netProfit = grossProfit - operationalCost;
+    const marginPercent = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+
+    return {
+      availableProjectList,
+      activeProject,
+      projectSales,
+      projectPurchases,
+      projectExpenses,
+      revenue,
+      materialCost,
+      grossProfit,
+      operationalCost,
+      netProfit,
+      marginPercent: Math.round(marginPercent * 10) / 10,
+    };
+  }, [projects, sales, purchases, cashFlow, pnlSelectedProjectId]);
+
+  // 2. Hook Kalkulasi: Laporan Penjualan per Klien (Bulan & Tahun)
+  const clientSalesReportCalculation = useMemo(() => {
+    const monthsList = [
+      { num: "1", name: "Januari" },
+      { num: "2", name: "Februari" },
+      { num: "3", name: "Maret" },
+      { num: "4", name: "April" },
+      { num: "5", name: "Mei" },
+      { num: "6", name: "Juni" },
+      { num: "7", name: "Juli" },
+      { num: "8", name: "Agustus" },
+      { num: "9", name: "September" },
+      { num: "10", name: "Oktober" },
+      { num: "11", name: "November" },
+      { num: "12", name: "Desember" },
+    ];
+
+    const filtered = sales.filter((s) => {
+      const matchEntity = selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity;
+      if (!matchEntity) return false;
+
+      if (clientSalesFilterClientId !== "ALL") {
+        const matchClient =
+          s.clientId === clientSalesFilterClientId ||
+          (s.customerName &&
+            s.customerName.toLowerCase().includes(clientSalesFilterClientId.toLowerCase()));
+        if (!matchClient) return false;
+      }
+
+      if (s.date) {
+        const parts = s.date.slice(0, 10).split("-");
+        const y = parts[0];
+        const m = parseInt(parts[1], 10).toString();
+        if (clientSalesFilterYear && y !== clientSalesFilterYear) return false;
+        if (clientSalesFilterMonth !== "ALL" && m !== clientSalesFilterMonth) return false;
+      }
+      return true;
+    });
+
+    const totalInvoices = filtered.length;
+    const totalRevenue = filtered.reduce((acc, s) => acc + (Number(s.grandTotal) || 0), 0);
+    const totalPaid = filtered.reduce((acc, s) => acc + (Number(s.paidAmount) || 0), 0);
+    const totalReceivable = Math.max(0, totalRevenue - totalPaid);
+
+    const clientMap: Record<
+      string,
+      { clientName: string; count: number; total: number; paid: number; remaining: number }
+    > = {};
+    filtered.forEach((s) => {
+      const cName = s.customerName || "Klien Umum";
+      if (!clientMap[cName]) {
+        clientMap[cName] = { clientName: cName, count: 0, total: 0, paid: 0, remaining: 0 };
+      }
+      clientMap[cName].count += 1;
+      clientMap[cName].total += Number(s.grandTotal) || 0;
+      clientMap[cName].paid += Number(s.paidAmount) || 0;
+      clientMap[cName].remaining += Math.max(
+        0,
+        (Number(s.grandTotal) || 0) - (Number(s.paidAmount) || 0)
+      );
+    });
+
+    const activeClientObj = clients.find((c) => c.id === clientSalesFilterClientId) || null;
+    const activeMonthObj = monthsList.find((m) => m.num === clientSalesFilterMonth) || null;
+    const periodLabel = `${
+      clientSalesFilterMonth !== "ALL" && activeMonthObj ? activeMonthObj.name + " " : ""
+    }${clientSalesFilterYear || "Semua Tahun"}`;
+
+    return {
+      filteredSales: filtered,
+      totalInvoices,
+      totalRevenue,
+      totalPaid,
+      totalReceivable,
+      clientBreakdown: Object.values(clientMap),
+      activeClientObj,
+      periodLabel,
+      monthsList,
+    };
+  }, [
+    sales,
+    clients,
+    selectedEntity,
+    clientSalesFilterClientId,
+    clientSalesFilterMonth,
+    clientSalesFilterYear,
+  ]);
+
+  // 3. Hook Kalkulasi: Laporan Pembelian & Belanja Kebutuhan Proyek
+  const procurementReportCalculation = useMemo(() => {
+    const monthsList = [
+      { num: "1", name: "Januari" },
+      { num: "2", name: "Februari" },
+      { num: "3", name: "Maret" },
+      { num: "4", name: "April" },
+      { num: "5", name: "Mei" },
+      { num: "6", name: "Juni" },
+      { num: "7", name: "Juli" },
+      { num: "8", name: "Agustus" },
+      { num: "9", name: "September" },
+      { num: "10", name: "Oktober" },
+      { num: "11", name: "November" },
+      { num: "12", name: "Desember" },
+    ];
+
+    const filtered = purchases.filter((p) => {
+      const matchEntity = selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity;
+      if (!matchEntity) return false;
+
+      if (procurementFilterSupplier !== "ALL") {
+        if (
+          !p.supplierName ||
+          !p.supplierName.toLowerCase().includes(procurementFilterSupplier.toLowerCase())
+        ) {
+          return false;
+        }
+      }
+
+      if (procurementFilterProject !== "ALL") {
+        const matchPrj =
+          (p.projectName &&
+            p.projectName.toLowerCase().includes(procurementFilterProject.toLowerCase())) ||
+          (p.notes && p.notes.toLowerCase().includes(procurementFilterProject.toLowerCase()));
+        if (!matchPrj) return false;
+      }
+
+      if (p.date) {
+        const parts = p.date.slice(0, 10).split("-");
+        const y = parts[0];
+        const m = parseInt(parts[1], 10).toString();
+        if (procurementFilterYear && y !== procurementFilterYear) return false;
+        if (procurementFilterMonth !== "ALL" && m !== procurementFilterMonth) return false;
+      }
+      return true;
+    });
+
+    const totalOrders = filtered.length;
+    const totalCost = filtered.reduce((acc, p) => acc + (Number(p.grandTotal) || 0), 0);
+    const totalPaid = filtered
+      .filter((p) => p.status === "Lunas" || p.status === "Selesai")
+      .reduce((acc, p) => acc + (Number(p.grandTotal) || 0), 0);
+    const totalPayable = Math.max(0, totalCost - totalPaid);
+
+    const supplierMap: Record<string, { supplierName: string; count: number; total: number }> = {};
+    filtered.forEach((p) => {
+      const sName = p.supplierName || "Supplier Umum";
+      if (!supplierMap[sName]) {
+        supplierMap[sName] = { supplierName: sName, count: 0, total: 0 };
+      }
+      supplierMap[sName].count += 1;
+      supplierMap[sName].total += Number(p.grandTotal) || 0;
+    });
+
+    const activeMonthObj = monthsList.find((m) => m.num === procurementFilterMonth) || null;
+    const periodLabel = `${
+      procurementFilterMonth !== "ALL" && activeMonthObj ? activeMonthObj.name + " " : ""
+    }${procurementFilterYear || "Semua Tahun"}`;
+
+    return {
+      filteredPurchases: filtered,
+      totalOrders,
+      totalCost,
+      totalPaid,
+      totalPayable,
+      supplierBreakdown: Object.values(supplierMap),
+      periodLabel,
+      monthsList,
+    };
+  }, [
+    purchases,
+    suppliers,
+    selectedEntity,
+    procurementFilterSupplier,
+    procurementFilterProject,
+    procurementFilterMonth,
+    procurementFilterYear,
+  ]);
+
+  // 4. Hook Kalkulasi: Laporan Rekap Kegiatan Proyek (1 Bulan & 1 Tahun)
+  const projectActivityReportCalculation = useMemo(() => {
+    const monthsList = [
+      { num: "1", name: "Januari" },
+      { num: "2", name: "Februari" },
+      { num: "3", name: "Maret" },
+      { num: "4", name: "April" },
+      { num: "5", name: "Mei" },
+      { num: "6", name: "Juni" },
+      { num: "7", name: "Juli" },
+      { num: "8", name: "Agustus" },
+      { num: "9", name: "September" },
+      { num: "10", name: "Oktober" },
+      { num: "11", name: "November" },
+      { num: "12", name: "Desember" },
+    ];
+
+    const combinedActivities = [
+      ...projects.map((p) => ({
+        id: p.id,
+        code: p.projectCode || p.id,
+        title: p.projectName,
+        client: p.clientName,
+        location: p.clientAddress || "Lokasi Proyek",
+        pic: p.picProject || "Teknisi Lapangan",
+        date: p.startDate || p.createdAt || "",
+        endDate: p.targetEndDate || p.actualEndDate || p.endDate || "",
+        status:
+          p.status === "Completed"
+            ? "Completed"
+            : p.status === "In Progress"
+            ? "In Progress"
+            : "Scheduled",
+        scope: p.description ? [p.description] : ["Instalasi & Integrasi Sistem"],
+        equipment: ["Perangkat Sesuai Kontrak SPK"],
+        source: "PROJECTS",
+      })),
+      ...employeeTasks.map((t) => ({
+        id: t.id,
+        code: t.ticketNumber || t.id,
+        title: t.title,
+        client: t.client,
+        location: t.location || "Lokasi Lapangan",
+        pic: t.technician || "Teknisi Lapangan",
+        date: t.date || "",
+        endDate: t.deadline || "",
+        status:
+          t.status === "Completed"
+            ? "Completed"
+            : t.status === "In Progress"
+            ? "In Progress"
+            : "Scheduled",
+        scope: Array.isArray(t.scope) ? t.scope : [t.scope || "Pekerjaan Lapangan"],
+        equipment: Array.isArray(t.equipment) ? t.equipment : [t.equipment || "Material Terpasang"],
+        source: "TASKS",
+      })),
+    ];
+
+    const filtered = combinedActivities.filter((item) => {
+      if (item.date) {
+        const parts = item.date.slice(0, 10).split("-");
+        const y = parts[0];
+        const m = parseInt(parts[1], 10).toString();
+
+        if (activityReportPeriodType === "MONTH") {
+          if (activityFilterYear && y !== activityFilterYear) return false;
+          if (activityFilterMonth && m !== activityFilterMonth) return false;
+        } else {
+          if (activityFilterYear && y !== activityFilterYear) return false;
+        }
+      }
+
+      if (activityFilterStatus !== "ALL" && item.status !== activityFilterStatus) {
+        return false;
+      }
+
+      if (activityFilterClient !== "ALL") {
+        if (!item.client || !item.client.toLowerCase().includes(activityFilterClient.toLowerCase())) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    const totalActivities = filtered.length;
+    const completedCount = filtered.filter((a) => a.status === "Completed").length;
+    const inProgressCount = filtered.filter((a) => a.status === "In Progress").length;
+    const scheduledCount = filtered.filter((a) => a.status === "Scheduled").length;
+    const successRate = totalActivities > 0 ? Math.round((completedCount / totalActivities) * 100) : 0;
+
+    const activeMonthObj = monthsList.find((m) => m.num === activityFilterMonth) || null;
+    const periodTitle =
+      activityReportPeriodType === "MONTH"
+        ? `Rekapitulasi 1 Bulan: ${activeMonthObj?.name || ""} ${activityFilterYear}`
+        : `Rekapitulasi 1 Tahun Penuh: Tahun ${activityFilterYear}`;
+
+    return {
+      filteredActivities: filtered,
+      totalActivities,
+      completedCount,
+      inProgressCount,
+      scheduledCount,
+      successRate,
+      periodTitle,
+      monthsList,
+    };
+  }, [
+    projects,
+    employeeTasks,
+    activityReportPeriodType,
+    activityFilterMonth,
+    activityFilterYear,
+    activityFilterStatus,
+    activityFilterClient,
+  ]);
 
   // Hook Filter & Sort: Buku Arus Kas
   const filteredAndSortedCashFlow = useMemo(() => {
@@ -8743,184 +9167,1092 @@ export default function AdminFinanceERPPage() {
           </div>
         )}
 
-        {/* TAB 4: LAPORAN LABA RUGI (INCOME STATEMENT / P&L) */}
+        {/* TAB 4: PUSAT PELAPORAN EKSEKUTIF & LABA RUGI (EXECUTIVE REPORTING CENTER) */}
         {activeTab === "pl_report" && (
           <div className="space-y-6">
-            {/* Top Control Bar Laporan Laba Rugi */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
-              {/* Pencarian Pos / Akun / Keterangan */}
-              <div className="relative flex-1 min-w-[240px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                <input
-                  type="text"
-                  placeholder="Cari rincian akun pendapatan, HPP, atau beban pengeluaran..."
-                  value={pnlSearchQuery}
-                  onChange={(e) => setPnlSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-8 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50"
-                />
-                {pnlSearchQuery && (
-                  <button
-                    onClick={() => setPnlSearchQuery("")}
-                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* Kelompok Filter Periode Tanggal Laba Rugi & Aksi Cetak */}
+            {/* SUB-TAB NAVIGATOR 4 PILAR LAPORAN EKSEKUTIF */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
               <div className="flex flex-wrap items-center gap-2">
-                {/* Filter Periode Tanggal */}
-                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
-                  <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span className="text-slate-400 font-semibold shrink-0">Periode:</span>
-                  <select
-                    value={pnlDateFilter}
-                    onChange={(e) => setPnlDateFilter(e.target.value as DateFilterPeriod)}
-                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
-                  >
-                    <option value="THIS_MONTH">📆 Bulan Ini ({new Date().toLocaleString("id-ID", { month: "long" })})</option>
-                    <option value="LAST_MONTH">⏪ Bulan Lalu</option>
-                    <option value="THIS_YEAR">🗓️ Tahun Ini ({new Date().getFullYear()})</option>
-                    <option value="ALL">📅 Semua Riwayat (All Time)</option>
-                    <option value="CUSTOM">🎯 Rentang Kustom...</option>
-                  </select>
+                <button
+                  type="button"
+                  onClick={() => setExecutiveReportSubTab("pnl")}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                    executiveReportSubTab === "pnl"
+                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span>Laba Rugi (P&L)</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[10px]">
+                    {pnlReportMode === "GLOBAL" ? "Global" : "Per Project"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExecutiveReportSubTab("client_sales")}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                    executiveReportSubTab === "client_sales"
+                      ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Penjualan per Klien</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[10px]">
+                    {clientSalesReportCalculation.totalInvoices} INV
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExecutiveReportSubTab("project_procurement")}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                    executiveReportSubTab === "project_procurement"
+                      ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>Pembelian & Belanja Proyek</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[10px]">
+                    {procurementReportCalculation.totalOrders} PO
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExecutiveReportSubTab("project_activity")}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+                    executiveReportSubTab === "project_activity"
+                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  <span>Rekap Kegiatan Proyek (1 Bln / 1 Thn)</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-white/20 text-[10px]">
+                    {projectActivityReportCalculation.totalActivities} Keg
+                  </span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-500 font-bold hidden md:inline">
+                  Pusat Laporan Eksekutif PT. DSTech Smart Perkasa
+                </span>
+              </div>
+            </div>
+
+            {/* ========================================================================= */}
+            {/* SUB-MODUL 1: LAPORAN LABA RUGI (GLOBAL & PER PROJECT) */}
+            {/* ========================================================================= */}
+            {executiveReportSubTab === "pnl" && (
+              <div className="space-y-6">
+                {/* Mode Selector & Filter Bar Laba Rugi */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+                  {/* Toggle Mode: Global vs Per Project */}
+                  <div className="flex items-center gap-2 p-1 bg-slate-100 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setPnlReportMode("GLOBAL")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                        pnlReportMode === "GLOBAL"
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      🌐 Global Perusahaan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPnlReportMode("PROJECT")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                        pnlReportMode === "PROJECT"
+                          ? "bg-emerald-600 text-white shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      🏗️ Khusus per Project
+                    </button>
+                  </div>
+
+                  {/* Filter Khusus Mode Project: Dropdown Project */}
+                  {pnlReportMode === "PROJECT" && (
+                    <div className="flex items-center gap-2 flex-1 min-w-[280px]">
+                      <span className="text-xs font-bold text-slate-600 shrink-0">Pilih Proyek:</span>
+                      <select
+                        value={pnlSelectedProjectId}
+                        onChange={(e) => setPnlSelectedProjectId(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500/20"
+                      >
+                        <option value="ALL">-- Seluruh Proyek Lapangan Terpadu --</option>
+                        {projects.map((prj) => (
+                          <option key={prj.id} value={prj.id}>
+                            [{prj.projectCode || "PRJ"}] {prj.projectName} - {prj.clientName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Pencarian (Hanya di mode Global) */}
+                  {pnlReportMode === "GLOBAL" && (
+                    <div className="relative flex-1 min-w-[220px]">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+                      <input
+                        type="text"
+                        placeholder="Cari rincian akun pendapatan atau beban..."
+                        value={pnlSearchQuery}
+                        onChange={(e) => setPnlSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-8 py-1.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50"
+                      />
+                    </div>
+                  )}
+
+                  {/* Filter Periode Tanggal Laba Rugi & Aksi Cetak */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {pnlReportMode === "GLOBAL" && (
+                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                        <Calendar className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span className="text-slate-400 font-semibold shrink-0">Periode:</span>
+                        <select
+                          value={pnlDateFilter}
+                          onChange={(e) => setPnlDateFilter(e.target.value as DateFilterPeriod)}
+                          className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                        >
+                          <option value="THIS_MONTH">📆 Bulan Ini ({new Date().toLocaleString("id-ID", { month: "long" })})</option>
+                          <option value="LAST_MONTH">⏪ Bulan Lalu</option>
+                          <option value="THIS_YEAR">🗓️ Tahun Ini ({new Date().getFullYear()})</option>
+                          <option value="ALL">📅 Semua Riwayat (All Time)</option>
+                          <option value="CUSTOM">🎯 Rentang Kustom...</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Tombol Unduh PDF */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPnlPrintModalOpen(true);
+                        setTimeout(() => {
+                          handleDownloadPdf(
+                            "#print-pnl-sheet",
+                            `LAPORAN_LABA_RUGI_${pnlReportMode === "PROJECT" ? "PROYEK" : "PERUSAHAAN"}_${(pnlReportMode === "PROJECT" ? projectPnlCalculation.activeProject?.projectName || "ALL" : pnlReportCalculation.periodLabel).replace(/[\s/]/g, "_")}.pdf`
+                          );
+                        }, 500);
+                      }}
+                      disabled={isDownloadingPdf}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all disabled:opacity-50"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{isDownloadingPdf ? "Memproses..." : "Download PDF"}</span>
+                    </button>
+
+                    {/* Tombol Pratinjau Cetak Resmi A4 */}
+                    <button
+                      type="button"
+                      onClick={() => setIsPnlPrintModalOpen(true)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Cetak A4</span>
+                    </button>
+                  </div>
                 </div>
 
-                {/* Input Rentang Kustom jika dipilih */}
-                {pnlDateFilter === "CUSTOM" && (
-                  <div className="flex items-center gap-1.5 bg-emerald-50/80 border border-emerald-200 rounded-xl px-2.5 py-1 text-xs">
-                    <input
-                      type="date"
-                      value={pnlStartDate}
-                      onChange={(e) => setPnlStartDate(e.target.value)}
-                      className="bg-white border border-emerald-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
-                      title="Tanggal Mulai"
-                    />
-                    <span className="text-emerald-600 font-black">s/d</span>
-                    <input
-                      type="date"
-                      value={pnlEndDate}
-                      onChange={(e) => setPnlEndDate(e.target.value)}
-                      className="bg-white border border-emerald-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
-                      title="Tanggal Selesai"
-                    />
+                {/* TAMPILAN 1.A: LABA RUGI KHUSUS PER PROJECT */}
+                {pnlReportMode === "PROJECT" ? (
+                  <div className="space-y-6">
+                    {/* Ringkasan KPI Proyek */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                      <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Nilai Kontrak / Omset</p>
+                        <p className="text-base font-black text-blue-700 mt-1">
+                          {formatRupiah(projectPnlCalculation.revenue)}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {projectPnlCalculation.projectSales.length} Faktur Tagihan
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Biaya Material PO (HPP)</p>
+                        <p className="text-base font-black text-amber-700 mt-1">
+                          {formatRupiah(projectPnlCalculation.materialCost)}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {projectPnlCalculation.projectPurchases.length} PO Belanja Barang
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Laba Kotor (Gross)</p>
+                        <p className="text-base font-black text-slate-800 mt-1">
+                          {formatRupiah(projectPnlCalculation.grossProfit)}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Omset - Belanja Material</p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Beban Lapangan & Teknisi</p>
+                        <p className="text-base font-black text-rose-700 mt-1">
+                          {formatRupiah(projectPnlCalculation.operationalCost)}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Operasional Proyek</p>
+                      </div>
+
+                      <div className={`p-4 rounded-2xl border shadow-2xs ${projectPnlCalculation.netProfit >= 0 ? "bg-emerald-50 border-emerald-200" : "bg-rose-50 border-rose-200"}`}>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-bold text-slate-600 uppercase">Laba Bersih Proyek</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${projectPnlCalculation.netProfit >= 0 ? "bg-emerald-200 text-emerald-800" : "bg-rose-200 text-rose-800"}`}>
+                            {projectPnlCalculation.marginPercent}% Margin
+                          </span>
+                        </div>
+                        <p className={`text-base font-black mt-1 ${projectPnlCalculation.netProfit >= 0 ? "text-emerald-800" : "text-rose-800"}`}>
+                          {formatRupiah(projectPnlCalculation.netProfit)}
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Profit Bersih Realisasi</p>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Rincian Laba Rugi Proyek */}
+                    <div className="p-6 rounded-3xl bg-slate-900 text-white space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono font-bold">
+                              LAPORAN P&L PROYEK
+                            </span>
+                            <h3 className="text-lg font-black tracking-wide text-white">
+                              {projectPnlCalculation.activeProject ? projectPnlCalculation.activeProject.projectName : "Laba Rugi Proyek Lapangan Terpadu"}
+                            </h3>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1">
+                            Klien: <strong className="text-slate-200">{projectPnlCalculation.activeProject?.clientName || "Semua Klien"}</strong> • PIC: {projectPnlCalculation.activeProject?.picProject || "Teknisi Lapangan"}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-400">Status Proyek</p>
+                          <span className="inline-block px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs font-bold">
+                            {projectPnlCalculation.activeProject?.status || "Aktif"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Detail Pendapatan vs Belanja Material vs Biaya Operasional */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+                        {/* Kolom Kiri: Pemasukan Faktur Proyek */}
+                        <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/10">
+                          <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                            <span className="font-black text-blue-400 flex items-center gap-1.5">
+                              <Receipt className="w-4 h-4" /> 1. Pendapatan / Faktur Tagihan Proyek
+                            </span>
+                            <span className="font-black text-white">{formatRupiah(projectPnlCalculation.revenue)}</span>
+                          </div>
+                          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                            {projectPnlCalculation.projectSales.length > 0 ? (
+                              projectPnlCalculation.projectSales.map((s) => (
+                                <div key={s.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5 text-slate-300">
+                                  <div>
+                                    <p className="font-bold text-white">{s.invoiceNumber}</p>
+                                    <p className="text-[10px] text-slate-400">{s.subject || "Pekerjaan Instalasi"}</p>
+                                  </div>
+                                  <span className="font-mono font-bold text-emerald-400">{formatRupiah(s.grandTotal)}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-slate-400 text-center py-4 italic">Belum ada faktur tagihan yang dikaitkan ke proyek ini.</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Kolom Kanan: Pengeluaran PO Material & Biaya Lapangan */}
+                        <div className="space-y-3 bg-white/5 p-4 rounded-2xl border border-white/10">
+                          <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                            <span className="font-black text-amber-400 flex items-center gap-1.5">
+                              <ShoppingCart className="w-4 h-4" /> 2. Pengeluaran Belanja Material & Kas Lapangan
+                            </span>
+                            <span className="font-black text-rose-400">
+                              ({formatRupiah(projectPnlCalculation.materialCost + projectPnlCalculation.operationalCost)})
+                            </span>
+                          </div>
+                          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                            {projectPnlCalculation.projectPurchases.map((p) => (
+                              <div key={p.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5 text-slate-300">
+                                <div>
+                                  <p className="font-bold text-white">{p.poNumber} • {p.supplierName}</p>
+                                  <p className="text-[10px] text-slate-400">Material CCTV/Jaringan: {p.items?.length || 1} Item</p>
+                                </div>
+                                <span className="font-mono font-bold text-amber-300">({formatRupiah(p.grandTotal)})</span>
+                              </div>
+                            ))}
+                            {projectPnlCalculation.projectExpenses.map((c) => (
+                              <div key={c.id} className="flex items-center justify-between p-2 rounded-xl bg-white/5 text-slate-300">
+                                <div>
+                                  <p className="font-bold text-white">Kas: {c.category || "Operasional"}</p>
+                                  <p className="text-[10px] text-slate-400">{c.description}</p>
+                                </div>
+                                <span className="font-mono font-bold text-rose-300">({formatRupiah(c.amount)})</span>
+                              </div>
+                            ))}
+                            {projectPnlCalculation.projectPurchases.length === 0 && projectPnlCalculation.projectExpenses.length === 0 && (
+                              <p className="text-slate-400 text-center py-4 italic">Belum ada catatan pembelian material/kas khusus proyek ini.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Baris Hasil Laba Bersih Proyek */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-900 border border-emerald-500/40 flex items-center justify-between text-base font-black text-white shadow-xl">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                          <span>HASIL AKHIR: LABA BERSIH PROYEK (NET PROFIT)</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-2xl font-black text-emerald-400 font-mono">
+                            {formatRupiah(projectPnlCalculation.netProfit)}
+                          </span>
+                          <p className="text-[10px] text-emerald-300 font-normal">
+                            Margin Efisiensi: <strong>{projectPnlCalculation.marginPercent}%</strong> dari total nilai kontrak
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* TAMPILAN 1.B: LABA RUGI GLOBAL PERUSAHAAN (KONSOLIDASI) */
+                  <div className="p-6 rounded-3xl bg-slate-900 text-white space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
+                      <div>
+                        <h3 className="text-lg font-black tracking-wide">
+                          Laporan Laba Rugi Komprehensif Perusahaan (Income Statement)
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          Periode: {pnlReportCalculation.periodLabel} • {selectedEntity === "NON_PT" ? "DSTech Smart (Non-PT)" : selectedEntity === "PT" ? "PT. DSTech Smart Perkasa" : "Konsolidasi Seluruh Entitas"}
+                        </p>
+                      </div>
+                      <div className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold font-mono">
+                        {pnlReportCalculation.scopedSales.length} Faktur Penjualan • {pnlReportCalculation.scopedPurchases.length} PO Belanja
+                      </div>
+                    </div>
+
+                    {/* P&L Breakdown Table */}
+                    <div className="space-y-4 text-xs font-medium">
+                      {/* 1. Pendapatan */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm font-black text-blue-400 border-b border-white/10 pb-1">
+                          <span>1. PENDAPATAN OPERASIONAL</span>
+                          <span>{formatRupiah(pnlReportCalculation.totalRevenue)}</span>
+                        </div>
+                        <div className="pl-4 space-y-1 text-slate-300">
+                          <div className="flex items-center justify-between">
+                            <span>• Penjualan Perangkat CCTV, Access Control, IoT & Jaringan ({pnlReportCalculation.scopedSales.length} Transaksi)</span>
+                            <span>{formatRupiah(pnlReportCalculation.totalRevenue)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 2. HPP */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm font-black text-amber-400 border-b border-white/10 pb-1">
+                          <span>2. HARGA POKOK PENJUALAN (HPP & BELANJA STOK)</span>
+                          <span>({formatRupiah(pnlReportCalculation.totalHpp)})</span>
+                        </div>
+                        <div className="pl-4 space-y-1 text-slate-300">
+                          <div className="flex items-center justify-between">
+                            <span>• Pembelian Stok Kamera IP, NVR, Storage & Aksesoris ({pnlReportCalculation.scopedPurchases.length} Order)</span>
+                            <span>({formatRupiah(pnlReportCalculation.totalHpp)})</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* LABA KOTOR */}
+                      <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between text-sm font-black text-white">
+                        <span>LABA KOTOR (GROSS PROFIT)</span>
+                        <span className="text-emerald-400">{formatRupiah(pnlReportCalculation.grossProfit)}</span>
+                      </div>
+
+                      {/* 3. Beban Operasional */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm font-black text-red-400 border-b border-white/10 pb-1">
+                          <span>3. BEBAN OPERASIONAL & UMUM</span>
+                          <span>({formatRupiah(pnlReportCalculation.totalExpenses)})</span>
+                        </div>
+                        <div className="pl-4 space-y-1.5 text-slate-300">
+                          {expenses
+                            .filter((exp) => !pnlSearchQuery || exp.category.toLowerCase().includes(pnlSearchQuery.toLowerCase()))
+                            .map((exp) => (
+                              <div key={exp.id} className="flex items-center justify-between">
+                                <span>• {exp.category}</span>
+                                <span>({formatRupiah(exp.amount)})</span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+
+                      {/* LABA BERSIH */}
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 to-emerald-900 border border-emerald-500/40 flex items-center justify-between text-base font-black text-white shadow-xl">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                          <span>LABA BERSIH USAHA (NET OPERATING PROFIT)</span>
+                        </div>
+                        <span className="text-xl font-black text-emerald-400 font-mono">
+                          {formatRupiah(pnlReportCalculation.netProfit)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
-
-                {/* Tombol Unduh PDF */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsPnlPrintModalOpen(true);
-                    setTimeout(() => {
-                      handleDownloadPdf(
-                        "#print-pnl-sheet",
-                        `LAPORAN_LABA_RUGI_${selectedEntity === "NON_PT" ? "NON_PT" : "PT"}_${pnlReportCalculation.periodLabel.replace(/[\s/]/g, "_")}.pdf`
-                      );
-                    }, 500);
-                  }}
-                  disabled={isDownloadingPdf}
-                  title="Unduh Berkas PDF Laporan Laba Rugi Langsung"
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all disabled:opacity-50"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
-                </button>
-
-                {/* Tombol Pratinjau Cetak Resmi A4 */}
-                <button
-                  type="button"
-                  onClick={() => setIsPnlPrintModalOpen(true)}
-                  className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Pratinjau Cetak Resmi A4</span>
-                </button>
               </div>
-            </div>
+            )}
 
-            <div className="p-6 rounded-3xl bg-slate-900 text-white space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
-                <div>
-                  <h3 className="text-lg font-black tracking-wide">
-                    Laporan Laba Rugi Komprehensif (Income Statement)
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Periode: {pnlReportCalculation.periodLabel} • {selectedEntity === "NON_PT" ? "DSTech Smart (Non-PT)" : selectedEntity === "PT" ? "PT. DSTech Smart Perkasa" : "Konsolidasi Seluruh Entitas"}
-                  </p>
-                </div>
-                <div className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold font-mono">
-                  {pnlReportCalculation.scopedSales.length} Faktur Penjualan • {pnlReportCalculation.scopedPurchases.length} PO Belanja
-                </div>
-              </div>
+            {/* ========================================================================= */}
+            {/* SUB-MODUL 2: LAPORAN PENJUALAN PER KLIEN (BULAN & TAHUN) */}
+            {/* ========================================================================= */}
+            {executiveReportSubTab === "client_sales" && (
+              <div className="space-y-6">
+                {/* Control Bar Filter Penjualan Klien */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                    {/* Filter Klien */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                      <Users className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="text-slate-400 font-semibold shrink-0">Klien:</span>
+                      <select
+                        value={clientSalesFilterClientId}
+                        onChange={(e) => setClientSalesFilterClientId(e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs max-w-[180px]"
+                      >
+                        <option value="ALL">👥 Semua Klien</option>
+                        {clients.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-              {/* P&L Breakdown Table */}
-              <div className="space-y-4 text-xs font-medium">
-                {/* 1. Pendapatan */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm font-black text-blue-400 border-b border-white/10 pb-1">
-                    <span>1. PENDAPATAN OPERASIONAL</span>
-                    <span>{formatRupiah(pnlReportCalculation.totalRevenue)}</span>
-                  </div>
-                  <div className="pl-4 space-y-1 text-slate-300">
-                    <div className="flex items-center justify-between">
-                      <span>• Penjualan Perangkat CCTV, Access Control, IoT & Jaringan ({pnlReportCalculation.scopedSales.length} Transaksi)</span>
-                      <span>{formatRupiah(pnlReportCalculation.totalRevenue)}</span>
+                    {/* Filter Bulan */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                      <Calendar className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <span className="text-slate-400 font-semibold shrink-0">Bulan:</span>
+                      <select
+                        value={clientSalesFilterMonth}
+                        onChange={(e) => setClientSalesFilterMonth(e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                      >
+                        <option value="ALL">Semua Bulan (1 Tahun)</option>
+                        {clientSalesReportCalculation.monthsList.map((m) => (
+                          <option key={m.num} value={m.num}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filter Tahun */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                      <span className="text-slate-400 font-semibold shrink-0">Tahun:</span>
+                      <select
+                        value={clientSalesFilterYear}
+                        onChange={(e) => setClientSalesFilterYear(e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                      >
+                        {["2024", "2025", "2026", "2027"].map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                </div>
 
-                {/* 2. HPP */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm font-black text-amber-400 border-b border-white/10 pb-1">
-                    <span>2. HARGA POKOK PENJUALAN (HPP & BELANJA STOK)</span>
-                    <span>({formatRupiah(pnlReportCalculation.totalHpp)})</span>
-                  </div>
-                  <div className="pl-4 space-y-1 text-slate-300">
-                    <div className="flex items-center justify-between">
-                      <span>• Pembelian Stok Kamera IP, NVR, Storage & Aksesoris ({pnlReportCalculation.scopedPurchases.length} Order)</span>
-                      <span>({formatRupiah(pnlReportCalculation.totalHpp)})</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* LABA KOTOR */}
-                <div className="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between text-sm font-black text-white">
-                  <span>LABA KOTOR (GROSS PROFIT)</span>
-                  <span className="text-emerald-400">{formatRupiah(pnlReportCalculation.grossProfit)}</span>
-                </div>
-
-                {/* 3. Beban Operasional */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm font-black text-red-400 border-b border-white/10 pb-1">
-                    <span>3. BEBAN OPERASIONAL & UMUM</span>
-                    <span>({formatRupiah(pnlReportCalculation.totalExpenses)})</span>
-                  </div>
-                  <div className="pl-4 space-y-1.5 text-slate-300">
-                    {expenses
-                      .filter((exp) => !pnlSearchQuery || exp.category.toLowerCase().includes(pnlSearchQuery.toLowerCase()))
-                      .map((exp) => (
-                        <div key={exp.id} className="flex items-center justify-between">
-                          <span>• {exp.category}</span>
-                          <span>({formatRupiah(exp.amount)})</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-
-                {/* LABA BERSIH */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950 to-emerald-900 border border-emerald-500/40 flex items-center justify-between text-base font-black text-white shadow-xl">
+                  {/* Tombol Cetak / PDF */}
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                    <span>LABA BERSIH USAHA (NET OPERATING PROFIT)</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsClientSalesPrintModalOpen(true);
+                        setTimeout(() => {
+                          handleDownloadPdf(
+                            "#print-client-sales-sheet",
+                            `REKAP_PENJUALAN_KLIEN_${(clientSalesReportCalculation.activeClientObj?.name || "SEMUA_KLIEN").replace(/[\s/]/g, "_")}_${clientSalesReportCalculation.periodLabel.replace(/[\s/]/g, "_")}.pdf`
+                          );
+                        }, 500);
+                      }}
+                      disabled={isDownloadingPdf}
+                      className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all disabled:opacity-50"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{isDownloadingPdf ? "Memproses..." : "Download PDF"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsClientSalesPrintModalOpen(true)}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Cetak Rekap Klien A4</span>
+                    </button>
                   </div>
-                  <span className="text-xl font-black text-emerald-400">
-                    {formatRupiah(pnlReportCalculation.netProfit)}
-                  </span>
+                </div>
+
+                {/* Metrik Ringkasan Penjualan Klien */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Jumlah Faktur Terbit</p>
+                    <p className="text-xl font-black text-slate-800 mt-1">
+                      {clientSalesReportCalculation.totalInvoices} <span className="text-xs text-slate-400 font-normal">Faktur</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Periode: {clientSalesReportCalculation.periodLabel}</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Total Omset Penjualan</p>
+                    <p className="text-xl font-black text-blue-700 mt-1">
+                      {formatRupiah(clientSalesReportCalculation.totalRevenue)}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Nilai Transaksi Kontrak</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-emerald-800 uppercase">Total Terbayar (Kas Masuk)</p>
+                    <p className="text-xl font-black text-emerald-700 mt-1">
+                      {formatRupiah(clientSalesReportCalculation.totalPaid)}
+                    </p>
+                    <p className="text-[10px] text-emerald-600 mt-0.5">Pembayaran Telah Diterima</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-rose-800 uppercase">Sisa Piutang Klien</p>
+                    <p className="text-xl font-black text-rose-700 mt-1">
+                      {formatRupiah(clientSalesReportCalculation.totalReceivable)}
+                    </p>
+                    <p className="text-[10px] text-rose-600 mt-0.5">Belum Terbayar / Menunggu Jatuh Tempo</p>
+                  </div>
+                </div>
+
+                {/* Tabel Rincian Faktur Penjualan Klien */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">
+                        Rincian Tagihan Faktur Penjualan Klien
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Klien: <strong className="text-slate-800">{clientSalesReportCalculation.activeClientObj?.name || "Semua Klien"}</strong> • Periode: {clientSalesReportCalculation.periodLabel}
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                      {clientSalesReportCalculation.filteredSales.length} Faktur Ditemukan
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3">No. Faktur</th>
+                          <th className="px-4 py-3">Tanggal</th>
+                          <th className="px-4 py-3">Nama Klien / Instansi</th>
+                          <th className="px-4 py-3">Perihal / Proyek</th>
+                          <th className="px-4 py-3 text-right">Nilai Tagihan</th>
+                          <th className="px-4 py-3 text-right">Terbayar</th>
+                          <th className="px-4 py-3 text-right">Sisa Piutang</th>
+                          <th className="px-4 py-3 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {clientSalesReportCalculation.filteredSales.map((inv) => {
+                          const remaining = Math.max(0, (Number(inv.grandTotal) || 0) - (Number(inv.paidAmount) || 0));
+                          const isLunas = remaining === 0;
+                          return (
+                            <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="px-4 py-3 font-mono font-bold text-blue-700">{inv.invoiceNumber}</td>
+                              <td className="px-4 py-3 text-slate-600">{inv.date}</td>
+                              <td className="px-4 py-3 font-bold text-slate-900">{inv.customerName}</td>
+                              <td className="px-4 py-3 text-slate-600 max-w-xs truncate">{inv.subject || inv.projectName || "-"}</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">{formatRupiah(inv.grandTotal)}</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-emerald-600">{formatRupiah(inv.paidAmount || 0)}</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-rose-600">{formatRupiah(remaining)}</td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                  isLunas
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : (inv.paidAmount || 0) > 0
+                                    ? "bg-blue-100 text-blue-800"
+                                    : "bg-amber-100 text-amber-800"
+                                }`}>
+                                  {isLunas ? "LUNAS" : (inv.paidAmount || 0) > 0 ? "DP BERJALAN" : "BELUM BAYAR"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {clientSalesReportCalculation.filteredSales.length === 0 && (
+                          <tr>
+                            <td colSpan={8} className="text-center py-8 text-slate-400 italic">
+                              Tidak ada data faktur penjualan pada filter klien dan periode ini.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* SUB-MODUL 3: LAPORAN PEMBELIAN & BELANJA KEBUTUHAN PROYEK */}
+            {/* ========================================================================= */}
+            {executiveReportSubTab === "project_procurement" && (
+              <div className="space-y-6">
+                {/* Control Bar Filter Pembelian */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                    {/* Filter Supplier */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                      <Truck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="text-slate-400 font-semibold shrink-0">Supplier:</span>
+                      <select
+                        value={procurementFilterSupplier}
+                        onChange={(e) => setProcurementFilterSupplier(e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs max-w-[180px]"
+                      >
+                        <option value="ALL">📦 Semua Supplier</option>
+                        {suppliers.map((s) => (
+                          <option key={s.id} value={s.name}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filter Proyek */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                      <Briefcase className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="text-slate-400 font-semibold shrink-0">Peruntukan:</span>
+                      <select
+                        value={procurementFilterProject}
+                        onChange={(e) => setProcurementFilterProject(e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs max-w-[180px]"
+                      >
+                        <option value="ALL">Semua Kebutuhan Proyek / Gudang</option>
+                        {projects.map((p) => (
+                          <option key={p.id} value={p.projectName}>
+                            {p.projectName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filter Bulan */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                      <Calendar className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="text-slate-400 font-semibold shrink-0">Bulan:</span>
+                      <select
+                        value={procurementFilterMonth}
+                        onChange={(e) => setProcurementFilterMonth(e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                      >
+                        <option value="ALL">Semua Bulan</option>
+                        {procurementReportCalculation.monthsList.map((m) => (
+                          <option key={m.num} value={m.num}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filter Tahun */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                      <span className="text-slate-400 font-semibold shrink-0">Tahun:</span>
+                      <select
+                        value={procurementFilterYear}
+                        onChange={(e) => setProcurementFilterYear(e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                      >
+                        {["2024", "2025", "2026", "2027"].map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Tombol Cetak / PDF */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProcurementPrintModalOpen(true);
+                        setTimeout(() => {
+                          handleDownloadPdf(
+                            "#print-procurement-sheet",
+                            `REKAP_PEMBELIAN_PROYEK_${(procurementFilterSupplier !== "ALL" ? procurementFilterSupplier : "SEMUA_SUPPLIER").replace(/[\s/]/g, "_")}_${procurementReportCalculation.periodLabel.replace(/[\s/]/g, "_")}.pdf`
+                          );
+                        }, 500);
+                      }}
+                      disabled={isDownloadingPdf}
+                      className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all disabled:opacity-50"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{isDownloadingPdf ? "Memproses..." : "Download PDF"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsProcurementPrintModalOpen(true)}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Cetak Rekap Belanja A4</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Metrik Ringkasan Pengadaan */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Total Pesanan PO Terbit</p>
+                    <p className="text-xl font-black text-slate-800 mt-1">
+                      {procurementReportCalculation.totalOrders} <span className="text-xs text-slate-400 font-normal">Purchase Orders</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Periode: {procurementReportCalculation.periodLabel}</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Total Nilai Belanja Pengadaan</p>
+                    <p className="text-xl font-black text-amber-700 mt-1">
+                      {formatRupiah(procurementReportCalculation.totalCost)}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Material & Komponen Proyek</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-emerald-800 uppercase">Status Pelunasan Supplier</p>
+                    <p className="text-xl font-black text-emerald-700 mt-1">
+                      {formatRupiah(procurementReportCalculation.totalPaid)}
+                    </p>
+                    <p className="text-[10px] text-emerald-600 mt-0.5">Telah Lunas Dibayarkan</p>
+                  </div>
+                </div>
+
+                {/* Tabel Rincian Belanja Pengadaan Barang Proyek */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">
+                        Rincian Purchase Order (PO) & Belanja Material Proyek
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Supplier: <strong className="text-slate-800">{procurementFilterSupplier !== "ALL" ? procurementFilterSupplier : "Semua Supplier"}</strong> • Periode: {procurementReportCalculation.periodLabel}
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                      {procurementReportCalculation.filteredPurchases.length} Purchase Order
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3">No. PO</th>
+                          <th className="px-4 py-3">Tanggal</th>
+                          <th className="px-4 py-3">Nama Supplier / Vendor</th>
+                          <th className="px-4 py-3">Peruntukan Proyek / Catatan</th>
+                          <th className="px-4 py-3">Rincian Barang</th>
+                          <th className="px-4 py-3 text-right">Total Biaya</th>
+                          <th className="px-4 py-3 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {procurementReportCalculation.filteredPurchases.map((po) => (
+                          <tr key={po.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="px-4 py-3 font-mono font-bold text-amber-700">{po.poNumber}</td>
+                            <td className="px-4 py-3 text-slate-600">{po.date}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{po.supplierName}</td>
+                            <td className="px-4 py-3 text-slate-600">{po.projectName || po.notes || "Kebutuhan Gudang"}</td>
+                            <td className="px-4 py-3 text-slate-500 max-w-xs">
+                              {po.items && po.items.length > 0 ? (
+                                <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+                                  {po.items.slice(0, 3).map((it, idx) => (
+                                    <li key={idx}>
+                                      {it.productName} ({it.qty} {it.unit || "unit"})
+                                    </li>
+                                  ))}
+                                  {po.items.length > 3 && <li>+{po.items.length - 3} item lainnya...</li>}
+                                </ul>
+                              ) : (
+                                "Perangkat CCTV & Komponen"
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono font-bold text-slate-900">
+                              {formatRupiah(po.grandTotal)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                po.status === "Lunas" || po.status === "Selesai"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}>
+                                {po.status || "DIPROSES"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {procurementReportCalculation.filteredPurchases.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="text-center py-8 text-slate-400 italic">
+                              Tidak ada data pembelian barang yang cocok dengan filter yang dipilih.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ========================================================================= */}
+            {/* SUB-MODUL 4: LAPORAN REKAP KEGIATAN PROYEK (1 BULAN & 1 TAHUN) */}
+            {/* ========================================================================= */}
+            {executiveReportSubTab === "project_activity" && (
+              <div className="space-y-6">
+                {/* Control Bar Filter Rekap Kegiatan Proyek */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
+                  <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                    {/* Mode Periode: 1 Bulan vs 1 Tahun */}
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setActivityReportPeriodType("MONTH")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                          activityReportPeriodType === "MONTH"
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        📆 Rekap 1 Bulan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActivityReportPeriodType("YEAR")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                          activityReportPeriodType === "YEAR"
+                            ? "bg-indigo-600 text-white shadow-xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        🗓️ Rekap 1 Tahun Penuh
+                      </button>
+                    </div>
+
+                    {/* Jika Mode 1 Bulan: Pilih Bulan */}
+                    {activityReportPeriodType === "MONTH" && (
+                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                        <Calendar className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                        <span className="text-slate-400 font-semibold shrink-0">Bulan:</span>
+                        <select
+                          value={activityFilterMonth}
+                          onChange={(e) => setActivityFilterMonth(e.target.value)}
+                          className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                        >
+                          {projectActivityReportCalculation.monthsList.map((m) => (
+                            <option key={m.num} value={m.num}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Pilih Tahun */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                      <span className="text-slate-400 font-semibold shrink-0">Tahun:</span>
+                      <select
+                        value={activityFilterYear}
+                        onChange={(e) => setActivityFilterYear(e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                      >
+                        {["2024", "2025", "2026", "2027"].map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filter Status */}
+                    <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                      <span className="text-slate-400 font-semibold shrink-0">Status:</span>
+                      <select
+                        value={activityFilterStatus}
+                        onChange={(e) => setActivityFilterStatus(e.target.value)}
+                        className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer text-xs"
+                      >
+                        <option value="ALL">Semua Status</option>
+                        <option value="Completed">✓ Selesai (Completed)</option>
+                        <option value="In Progress">⚡ Sedang Dikerjakan</option>
+                        <option value="Scheduled">⏳ Terjadwal</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Tombol Cetak / PDF */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsActivityPrintModalOpen(true);
+                        setTimeout(() => {
+                          handleDownloadPdf(
+                            "#print-activity-sheet",
+                            `REKAP_KEGIATAN_PROYEK_${projectActivityReportCalculation.periodTitle.replace(/[\s/:]/g, "_")}.pdf`
+                          );
+                        }, 500);
+                      }}
+                      disabled={isDownloadingPdf}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-all disabled:opacity-50"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>{isDownloadingPdf ? "Memproses..." : "Download PDF"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsActivityPrintModalOpen(true)}
+                      className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-xs transition-all"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Cetak Rekap Proyek A4</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Metrik Ringkasan Kegiatan Proyek */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase">Total Kegiatan Proyek</p>
+                    <p className="text-xl font-black text-slate-800 mt-1">
+                      {projectActivityReportCalculation.totalActivities} <span className="text-xs text-slate-400 font-normal">Proyek</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{projectActivityReportCalculation.periodTitle}</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-emerald-800 uppercase">Proyek Selesai 100%</p>
+                    <p className="text-xl font-black text-emerald-700 mt-1">
+                      {projectActivityReportCalculation.completedCount} <span className="text-xs text-emerald-600 font-normal">Selesai / BAST</span>
+                    </p>
+                    <p className="text-[10px] text-emerald-600 mt-0.5">Telah Serah Terima</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-blue-50 border border-blue-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-blue-800 uppercase">Sedang Dikerjakan</p>
+                    <p className="text-xl font-black text-blue-700 mt-1">
+                      {projectActivityReportCalculation.inProgressCount} <span className="text-xs text-blue-600 font-normal">Di Lapangan</span>
+                    </p>
+                    <p className="text-[10px] text-blue-600 mt-0.5">Dalam Proses Eksekusi</p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 shadow-2xs">
+                    <p className="text-[10px] font-bold text-indigo-800 uppercase">Tingkat Keberhasilan</p>
+                    <p className="text-xl font-black text-indigo-700 mt-1">
+                      {projectActivityReportCalculation.successRate}%
+                    </p>
+                    <p className="text-[10px] text-indigo-600 mt-0.5">Completion Rate Proyek</p>
+                  </div>
+                </div>
+
+                {/* Tabel Rekapitulasi Kegiatan Proyek */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-black text-slate-900">
+                        Buku Rekapitulasi Kegiatan & Realisasi Proyek
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        {projectActivityReportCalculation.periodTitle}
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+                      {projectActivityReportCalculation.filteredActivities.length} Penugasan Proyek
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="px-4 py-3">Kode / Tiket</th>
+                          <th className="px-4 py-3">Nama Kegiatan & Proyek</th>
+                          <th className="px-4 py-3">Klien & Lokasi</th>
+                          <th className="px-4 py-3">Teknisi PIC</th>
+                          <th className="px-4 py-3">Tanggal Pelaksanaan</th>
+                          <th className="px-4 py-3">Lingkup Pekerjaan Lapangan</th>
+                          <th className="px-4 py-3 text-center">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium">
+                        {projectActivityReportCalculation.filteredActivities.map((act) => (
+                          <tr key={act.id} className="hover:bg-slate-50/80 transition-colors">
+                            <td className="px-4 py-3 font-mono font-bold text-indigo-700">{act.code}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">{act.title}</td>
+                            <td className="px-4 py-3 text-slate-600">
+                              <p className="font-bold text-slate-800">{act.client || "Klien DSTech"}</p>
+                              <p className="text-[10px] text-slate-400">{act.location}</p>
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-slate-800">{act.pic}</td>
+                            <td className="px-4 py-3 text-slate-600 font-mono text-[11px]">
+                              {act.date ? act.date.slice(0, 10) : "-"}
+                              {act.endDate ? ` s/d ${act.endDate.slice(0, 10)}` : ""}
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 max-w-xs">
+                              {act.scope && act.scope.length > 0 ? (
+                                <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+                                  {act.scope.slice(0, 2).map((sc: string, idx: number) => (
+                                    <li key={idx}>{sc}</li>
+                                  ))}
+                                  {act.scope.length > 2 && <li>+{act.scope.length - 2} poin pekerjaan lainnya...</li>}
+                                </ul>
+                              ) : (
+                                "Pemasangan dan pengujian perangkat"
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                act.status === "Completed"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : act.status === "In Progress"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}>
+                                {act.status === "Completed" ? "SELESAI / BAST" : act.status === "In Progress" ? "BERJALAN" : "TERJADWAL"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {projectActivityReportCalculation.filteredActivities.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="text-center py-8 text-slate-400 italic">
+                              Tidak ada data kegiatan proyek pada rentang waktu ini.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -20077,13 +21409,17 @@ export default function AdminFinanceERPPage() {
                 {/* Judul Laporan */}
                 <div className="text-center space-y-1 border-b border-slate-200 pb-3">
                   <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-                    LAPORAN LABA RUGI KOMPREHENSIF (INCOME STATEMENT)
+                    {pnlReportMode === "PROJECT" ? "LAPORAN LABA RUGI REALISASI PROYEK" : "LAPORAN LABA RUGI KOMPREHENSIF (INCOME STATEMENT)"}
                   </span>
                   <h2 className="text-base font-black text-slate-900 tracking-tight mt-1">
-                    PERIODE BERJALAN OKTOBER 2026
+                    {pnlReportMode === "PROJECT"
+                      ? (projectPnlCalculation.activeProject?.projectName || "Seluruh Proyek Lapangan Terpadu")
+                      : `PERIODE BERJALAN ${pnlReportCalculation.periodLabel.toUpperCase()}`}
                   </h2>
                   <p className="text-[11px] text-slate-500">
-                    Buku Besar Keuangan {selectedEntity === "NON_PT" ? "DSTech Smart (Usaha Mandiri Non-PT)" : "PT. DSTech Smart Perkasa"} • Mata Uang: Indonesian Rupiah (IDR)
+                    {pnlReportMode === "PROJECT"
+                      ? `Klien: ${projectPnlCalculation.activeProject?.clientName || "Klien DSTech"} • PIC: ${projectPnlCalculation.activeProject?.picProject || "Teknisi"} • Entitas: ${selectedEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}`
+                      : `Buku Besar Keuangan ${selectedEntity === "NON_PT" ? "DSTech Smart (Usaha Mandiri Non-PT)" : "PT. DSTech Smart Perkasa"} • Mata Uang: Indonesian Rupiah (IDR)`}
                   </p>
                 </div>
 
@@ -20097,53 +21433,113 @@ export default function AdminFinanceERPPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200">
-                      {/* 1. Pendapatan */}
-                      <tr className="bg-blue-50/50 font-bold text-blue-900">
-                        <td className="p-2.5">1. PENDAPATAN OPERASIONAL USAHA</td>
-                        <td className="p-2.5 text-right text-blue-900 font-black">{formatRupiah(displaySummary.totalSalesRevenue)}</td>
-                      </tr>
-                      <tr className="text-slate-600 text-[11px]">
-                        <td className="p-2 pl-6">• Pendapatan Penjualan Perangkat CCTV, Access Control, IoT & Jaringan</td>
-                        <td className="p-2 text-right">{formatRupiah(displaySummary.totalSalesRevenue)}</td>
-                      </tr>
+                      {pnlReportMode === "PROJECT" ? (
+                        <>
+                          {/* 1. Pendapatan Proyek */}
+                          <tr className="bg-blue-50/50 font-bold text-blue-900">
+                            <td className="p-2.5">1. PENDAPATAN FAKTUR TAGIHAN PROYEK</td>
+                            <td className="p-2.5 text-right text-blue-900 font-black">{formatRupiah(projectPnlCalculation.revenue)}</td>
+                          </tr>
+                          {projectPnlCalculation.projectSales.map((s) => (
+                            <tr key={s.id} className="text-slate-600 text-[11px]">
+                              <td className="p-2 pl-6">• {s.invoiceNumber} - {s.subject || s.projectName || "Pekerjaan Proyek"}</td>
+                              <td className="p-2 text-right">{formatRupiah(s.grandTotal)}</td>
+                            </tr>
+                          ))}
 
-                      {/* 2. HPP */}
-                      <tr className="bg-amber-50/50 font-bold text-amber-900">
-                        <td className="p-2.5">2. HARGA POKOK PENJUALAN (HPP / COGS)</td>
-                        <td className="p-2.5 text-right text-amber-900 font-black">({formatRupiah(displaySummary.totalPurchasesCost)})</td>
-                      </tr>
-                      <tr className="text-slate-600 text-[11px]">
-                        <td className="p-2 pl-6">• Pembelian Barang Dagang & Komponen Proyek dari Supplier Resmi</td>
-                        <td className="p-2 text-right">({formatRupiah(displaySummary.totalPurchasesCost)})</td>
-                      </tr>
+                          {/* 2. HPP Material Proyek */}
+                          <tr className="bg-amber-50/50 font-bold text-amber-900">
+                            <td className="p-2.5">2. HARGA POKOK MATERIAL (PO PEMBELIAN BARANG)</td>
+                            <td className="p-2.5 text-right text-amber-900 font-black">({formatRupiah(projectPnlCalculation.materialCost)})</td>
+                          </tr>
+                          {projectPnlCalculation.projectPurchases.map((p) => (
+                            <tr key={p.id} className="text-slate-600 text-[11px]">
+                              <td className="p-2 pl-6">• {p.poNumber} - {p.supplierName} ({p.items?.length || 1} Item)</td>
+                              <td className="p-2 text-right">({formatRupiah(p.grandTotal)})</td>
+                            </tr>
+                          ))}
 
-                      {/* LABA KOTOR */}
-                      <tr className="bg-slate-100 font-black text-slate-900 border-t border-b border-slate-300">
-                        <td className="p-2.5 uppercase tracking-wide">LABA KOTOR (GROSS PROFIT)</td>
-                        <td className={`p-2.5 text-right text-sm ${displaySummary.grossProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                          {formatRupiah(displaySummary.grossProfit)}
-                        </td>
-                      </tr>
+                          {/* LABA KOTOR PROYEK */}
+                          <tr className="bg-slate-100 font-black text-slate-900 border-t border-b border-slate-300">
+                            <td className="p-2.5 uppercase tracking-wide">LABA KOTOR PROYEK (GROSS PROFIT)</td>
+                            <td className={`p-2.5 text-right text-sm ${projectPnlCalculation.grossProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                              {formatRupiah(projectPnlCalculation.grossProfit)}
+                            </td>
+                          </tr>
 
-                      {/* 3. Beban Operasional */}
-                      <tr className="bg-rose-50/50 font-bold text-rose-900">
-                        <td className="p-2.5">3. BEBAN OPERASIONAL (OPERATIONAL EXPENSES)</td>
-                        <td className="p-2.5 text-right text-rose-900 font-black">({formatRupiah(displaySummary.totalOperatingExpenses)})</td>
-                      </tr>
-                      <tr className="text-slate-600 text-[11px]">
-                        <td className="p-2 pl-6">• Beban Operasional, Gaji Teknisi, Utilitas Kantor & Transportasi</td>
-                        <td className="p-2 text-right">({formatRupiah(displaySummary.totalOperatingExpenses)})</td>
-                      </tr>
+                          {/* 3. Beban Operasional & Lapangan */}
+                          <tr className="bg-rose-50/50 font-bold text-rose-900">
+                            <td className="p-2.5">3. BEBAN OPERASIONAL LAPANGAN & UPAH TEKNISI</td>
+                            <td className="p-2.5 text-right text-rose-900 font-black">({formatRupiah(projectPnlCalculation.operationalCost)})</td>
+                          </tr>
+                          {projectPnlCalculation.projectExpenses.map((c) => (
+                            <tr key={c.id} className="text-slate-600 text-[11px]">
+                              <td className="p-2 pl-6">• Kas: {c.description}</td>
+                              <td className="p-2 text-right">({formatRupiah(c.amount)})</td>
+                            </tr>
+                          ))}
 
-                      {/* LABA BERSIH OPERASIONAL */}
-                      <tr className="bg-emerald-50/80 font-black text-emerald-950 border-t-2 border-slate-900 text-sm">
-                        <td className="p-3 uppercase tracking-wide">
-                          LABA BERSIH USAHA (NET OPERATING PROFIT)
-                        </td>
-                        <td className={`p-3 text-right text-base ${displaySummary.netProfit >= 0 ? "text-emerald-700 font-black" : "text-rose-600 font-black"}`}>
-                          {formatRupiah(displaySummary.netProfit)}
-                        </td>
-                      </tr>
+                          {/* LABA BERSIH PROYEK */}
+                          <tr className="bg-emerald-50/80 font-black text-emerald-950 border-t-2 border-slate-900 text-sm">
+                            <td className="p-3 uppercase tracking-wide">
+                              LABA BERSIH REALISASI PROYEK (NET PROFIT)
+                            </td>
+                            <td className={`p-3 text-right text-base ${projectPnlCalculation.netProfit >= 0 ? "text-emerald-700 font-black" : "text-rose-600 font-black"}`}>
+                              {formatRupiah(projectPnlCalculation.netProfit)}
+                            </td>
+                          </tr>
+                        </>
+                      ) : (
+                        <>
+                          {/* 1. Pendapatan Global */}
+                          <tr className="bg-blue-50/50 font-bold text-blue-900">
+                            <td className="p-2.5">1. PENDAPATAN OPERASIONAL USAHA</td>
+                            <td className="p-2.5 text-right text-blue-900 font-black">{formatRupiah(pnlReportCalculation.totalRevenue)}</td>
+                          </tr>
+                          <tr className="text-slate-600 text-[11px]">
+                            <td className="p-2 pl-6">• Pendapatan Penjualan Perangkat CCTV, Access Control, IoT & Jaringan ({pnlReportCalculation.scopedSales.length} Faktur)</td>
+                            <td className="p-2 text-right">{formatRupiah(pnlReportCalculation.totalRevenue)}</td>
+                          </tr>
+
+                          {/* 2. HPP Global */}
+                          <tr className="bg-amber-50/50 font-bold text-amber-900">
+                            <td className="p-2.5">2. HARGA POKOK PENJUALAN (HPP / COGS)</td>
+                            <td className="p-2.5 text-right text-amber-900 font-black">({formatRupiah(pnlReportCalculation.totalHpp)})</td>
+                          </tr>
+                          <tr className="text-slate-600 text-[11px]">
+                            <td className="p-2 pl-6">• Pembelian Barang Dagang & Komponen Proyek dari Supplier Resmi ({pnlReportCalculation.scopedPurchases.length} PO)</td>
+                            <td className="p-2 text-right">({formatRupiah(pnlReportCalculation.totalHpp)})</td>
+                          </tr>
+
+                          {/* LABA KOTOR */}
+                          <tr className="bg-slate-100 font-black text-slate-900 border-t border-b border-slate-300">
+                            <td className="p-2.5 uppercase tracking-wide">LABA KOTOR (GROSS PROFIT)</td>
+                            <td className={`p-2.5 text-right text-sm ${pnlReportCalculation.grossProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                              {formatRupiah(pnlReportCalculation.grossProfit)}
+                            </td>
+                          </tr>
+
+                          {/* 3. Beban Operasional */}
+                          <tr className="bg-rose-50/50 font-bold text-rose-900">
+                            <td className="p-2.5">3. BEBAN OPERASIONAL (OPERATIONAL EXPENSES)</td>
+                            <td className="p-2.5 text-right text-rose-900 font-black">({formatRupiah(pnlReportCalculation.totalExpenses)})</td>
+                          </tr>
+                          <tr className="text-slate-600 text-[11px]">
+                            <td className="p-2 pl-6">• Beban Operasional, Gaji Teknisi, Utilitas Kantor & Transportasi</td>
+                            <td className="p-2 text-right">({formatRupiah(pnlReportCalculation.totalExpenses)})</td>
+                          </tr>
+
+                          {/* LABA BERSIH OPERASIONAL */}
+                          <tr className="bg-emerald-50/80 font-black text-emerald-950 border-t-2 border-slate-900 text-sm">
+                            <td className="p-3 uppercase tracking-wide">
+                              LABA BERSIH USAHA (NET OPERATING PROFIT)
+                            </td>
+                            <td className={`p-3 text-right text-base ${pnlReportCalculation.netProfit >= 0 ? "text-emerald-700 font-black" : "text-rose-600 font-black"}`}>
+                              {formatRupiah(pnlReportCalculation.netProfit)}
+                            </td>
+                          </tr>
+                        </>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -20153,19 +21549,23 @@ export default function AdminFinanceERPPage() {
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-500 uppercase font-bold">Gross Margin</p>
                     <p className="text-xs font-black text-slate-800">
-                      {displaySummary.totalSalesRevenue > 0 ? ((displaySummary.grossProfit / displaySummary.totalSalesRevenue) * 100).toFixed(1) : 0}%
+                      {pnlReportMode === "PROJECT"
+                        ? `${projectPnlCalculation.revenue > 0 ? ((projectPnlCalculation.grossProfit / projectPnlCalculation.revenue) * 100).toFixed(1) : 0}%`
+                        : `${pnlReportCalculation.totalRevenue > 0 ? ((pnlReportCalculation.grossProfit / pnlReportCalculation.totalRevenue) * 100).toFixed(1) : 0}%`}
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-500 uppercase font-bold">Net Profit Margin</p>
                     <p className="text-xs font-black text-emerald-600">
-                      {displaySummary.totalSalesRevenue > 0 ? ((displaySummary.netProfit / displaySummary.totalSalesRevenue) * 100).toFixed(1) : 0}%
+                      {pnlReportMode === "PROJECT"
+                        ? `${projectPnlCalculation.marginPercent}%`
+                        : `${pnlReportCalculation.totalRevenue > 0 ? ((pnlReportCalculation.netProfit / pnlReportCalculation.totalRevenue) * 100).toFixed(1) : 0}%`}
                     </p>
                   </div>
                   <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
                     <p className="text-[10px] text-slate-500 uppercase font-bold">Status Keuangan</p>
-                    <p className={`text-xs font-black ${displaySummary.netProfit >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                      {displaySummary.netProfit >= 0 ? "SURPLUS LABA" : "DEFISIT"}
+                    <p className={`text-xs font-black ${(pnlReportMode === "PROJECT" ? projectPnlCalculation.netProfit : pnlReportCalculation.netProfit) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                      {(pnlReportMode === "PROJECT" ? projectPnlCalculation.netProfit : pnlReportCalculation.netProfit) >= 0 ? "SURPLUS LABA" : "DEFISIT"}
                     </p>
                   </div>
                 </div>
@@ -20215,6 +21615,433 @@ export default function AdminFinanceERPPage() {
                       </p>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 2: CETAK LEMBAR REKAP PENJUALAN PER KLIEN (A4 FORMAT) */}
+      {/* ========================================================================= */}
+      {isClientSalesPrintModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
+          onClick={() => setIsClientSalesPrintModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-blue-600" />
+                Rekapitulasi Faktur Penjualan Klien — Dokumen Resmi A4
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-client-sales-sheet",
+                      `REKAP_PENJUALAN_${(clientSalesReportCalculation.activeClientObj?.name || "KLIEN").replace(/[\s/]/g, "_")}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `REKAP_PENJUALAN_KLIEN_${clientSalesReportCalculation.periodLabel.replace(/[\s/]/g, "_")}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setIsClientSalesPrintModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* A4 PRINT CONTAINER: REKAP PENJUALAN KLIEN */}
+            <div
+              id="print-client-sales-sheet"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 py-8 space-y-4 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+            >
+              <div className="text-center space-y-1 border-b border-slate-200 pb-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                  REKAPITULASI FAKTUR PENJUALAN KLIEN
+                </span>
+                <h2 className="text-base font-black text-slate-900 tracking-tight mt-1">
+                  {clientSalesReportCalculation.activeClientObj?.name || "SELURUH KLIEN & REKANAN BISNIS"}
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Periode Penarikan: <strong>{clientSalesReportCalculation.periodLabel}</strong> • PT. DSTech Smart Perkasa
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-center my-3">
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold">Total Omset Penjualan</p>
+                  <p className="text-xs font-black text-blue-700">{formatRupiah(clientSalesReportCalculation.totalRevenue)}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <p className="text-[10px] text-emerald-700 uppercase font-bold">Total Kas Masuk</p>
+                  <p className="text-xs font-black text-emerald-700">{formatRupiah(clientSalesReportCalculation.totalPaid)}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200">
+                  <p className="text-[10px] text-rose-700 uppercase font-bold">Sisa Piutang Klien</p>
+                  <p className="text-xs font-black text-rose-700">{formatRupiah(clientSalesReportCalculation.totalReceivable)}</p>
+                </div>
+              </div>
+
+              <div className="border border-slate-300 rounded-xl overflow-hidden text-xs">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-900 text-white font-bold text-[10px] uppercase tracking-wider">
+                    <tr>
+                      <th className="p-2.5">No. Faktur</th>
+                      <th className="p-2.5">Tanggal</th>
+                      <th className="p-2.5">Klien / Perihal</th>
+                      <th className="p-2.5 text-right">Nilai Tagihan</th>
+                      <th className="p-2.5 text-right">Terbayar</th>
+                      <th className="p-2.5 text-right">Sisa Piutang</th>
+                      <th className="p-2.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 font-medium">
+                    {clientSalesReportCalculation.filteredSales.map((inv) => {
+                      const remaining = Math.max(0, (Number(inv.grandTotal) || 0) - (Number(inv.paidAmount) || 0));
+                      return (
+                        <tr key={inv.id}>
+                          <td className="p-2 font-mono font-bold text-blue-700">{inv.invoiceNumber}</td>
+                          <td className="p-2 text-slate-600">{inv.date}</td>
+                          <td className="p-2">
+                            <p className="font-bold text-slate-900">{inv.customerName}</p>
+                            <p className="text-[10px] text-slate-500">{inv.subject || "-"}</p>
+                          </td>
+                          <td className="p-2 text-right font-mono font-bold">{formatRupiah(inv.grandTotal)}</td>
+                          <td className="p-2 text-right font-mono text-emerald-600">{formatRupiah(inv.paidAmount || 0)}</td>
+                          <td className="p-2 text-right font-mono text-rose-600">{formatRupiah(remaining)}</td>
+                          <td className="p-2 text-center text-[10px] font-bold">
+                            {remaining === 0 ? "LUNAS" : (inv.paidAmount || 0) > 0 ? "DP BERJALAN" : "BELUM BAYAR"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200 text-center">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Dibuat Oleh,</p>
+                  <p className="text-xs font-bold text-slate-800">Finance & Billing Department</p>
+                  <div className="h-10"></div>
+                  <p className="font-bold text-xs text-slate-900">( Staff Administrasi Piutang )</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Mengetahui & Menyetujui,</p>
+                  <p className="text-xs font-bold text-slate-800">PT. DSTech Smart Perkasa</p>
+                  <div className="h-10"></div>
+                  <p className="font-bold text-xs text-slate-900">( {financeSettings.signerName || "H. Agus Supriyadi, S.T."} )</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 3: CETAK LEMBAR REKAP PEMBELIAN & BELANJA PROYEK (A4 FORMAT) */}
+      {/* ========================================================================= */}
+      {isProcurementPrintModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
+          onClick={() => setIsProcurementPrintModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <ShoppingCart className="w-4 h-4 text-amber-600" />
+                Rekapitulasi Pembelian & Pengadaan Barang Proyek — Dokumen Resmi A4
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-procurement-sheet",
+                      `REKAP_PEMBELIAN_${(procurementFilterSupplier !== "ALL" ? procurementFilterSupplier : "SUPPLIER").replace(/[\s/]/g, "_")}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `REKAP_PEMBELIAN_PROYEK_${procurementReportCalculation.periodLabel.replace(/[\s/]/g, "_")}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setIsProcurementPrintModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* A4 PRINT CONTAINER: REKAP PEMBELIAN PROYEK */}
+            <div
+              id="print-procurement-sheet"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 py-8 space-y-4 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+            >
+              <div className="text-center space-y-1 border-b border-slate-200 pb-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                  LAPORAN PENGADAAN & BELANJA MATERIAL PROYEK
+                </span>
+                <h2 className="text-base font-black text-slate-900 tracking-tight mt-1">
+                  {procurementFilterSupplier !== "ALL" ? `SUPPLIER: ${procurementFilterSupplier}` : "SELURUH SUPPLIER & PENGADAAN PROYEK"}
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Periode Penarikan: <strong>{procurementReportCalculation.periodLabel}</strong> • PT. DSTech Smart Perkasa
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-center my-3">
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold">Total Nilai Belanja</p>
+                  <p className="text-xs font-black text-amber-700">{formatRupiah(procurementReportCalculation.totalCost)}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <p className="text-[10px] text-emerald-700 uppercase font-bold">Lunas Terbayar</p>
+                  <p className="text-xs font-black text-emerald-700">{formatRupiah(procurementReportCalculation.totalPaid)}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200">
+                  <p className="text-[10px] text-rose-700 uppercase font-bold">Hutang Supplier Berjalan</p>
+                  <p className="text-xs font-black text-rose-700">{formatRupiah(procurementReportCalculation.totalPayable)}</p>
+                </div>
+              </div>
+
+              <div className="border border-slate-300 rounded-xl overflow-hidden text-xs">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-900 text-white font-bold text-[10px] uppercase tracking-wider">
+                    <tr>
+                      <th className="p-2.5">No. PO</th>
+                      <th className="p-2.5">Tanggal</th>
+                      <th className="p-2.5">Supplier</th>
+                      <th className="p-2.5">Peruntukan Proyek</th>
+                      <th className="p-2.5">Rincian Barang</th>
+                      <th className="p-2.5 text-right">Total Biaya</th>
+                      <th className="p-2.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 font-medium">
+                    {procurementReportCalculation.filteredPurchases.map((po) => (
+                      <tr key={po.id}>
+                        <td className="p-2 font-mono font-bold text-amber-700">{po.poNumber}</td>
+                        <td className="p-2 text-slate-600">{po.date}</td>
+                        <td className="p-2 font-bold text-slate-900">{po.supplierName}</td>
+                        <td className="p-2 text-slate-600">{po.projectName || po.notes || "Kebutuhan Gudang"}</td>
+                        <td className="p-2 text-slate-500 text-[11px]">
+                          {po.items && po.items.length > 0
+                            ? po.items.map((i) => `${i.productName} (${i.qty})`).join(", ")
+                            : "Material CCTV"}
+                        </td>
+                        <td className="p-2 text-right font-mono font-bold">{formatRupiah(po.grandTotal)}</td>
+                        <td className="p-2 text-center text-[10px] font-bold">{po.status || "DIPROSES"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200 text-center">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Dipersiapkan Oleh,</p>
+                  <p className="text-xs font-bold text-slate-800">Procurement & Logistik</p>
+                  <div className="h-10"></div>
+                  <p className="font-bold text-xs text-slate-900">( Staf Pengadaan Barang )</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Mengetahui & Menyetujui,</p>
+                  <p className="text-xs font-bold text-slate-800">PT. DSTech Smart Perkasa</p>
+                  <div className="h-10"></div>
+                  <p className="font-bold text-xs text-slate-900">( {financeSettings.signerName || "H. Agus Supriyadi, S.T."} )</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL 4: CETAK LEMBAR REKAP KEGIATAN PROYEK 1 BULAN & 1 TAHUN (A4 FORMAT) */}
+      {/* ========================================================================= */}
+      {isActivityPrintModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
+          onClick={() => setIsActivityPrintModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Briefcase className="w-4 h-4 text-indigo-600" />
+                Laporan Rekapitulasi Kegiatan & Realisasi Proyek — Dokumen Resmi A4
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-activity-sheet",
+                      `REKAP_KEGIATAN_PROYEK_${projectActivityReportCalculation.periodTitle.replace(/[\s/:]/g, "_")}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `REKAP_KEGIATAN_PROYEK_${projectActivityReportCalculation.periodTitle.replace(/[\s/:]/g, "_")}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak / Simpan PDF</span>
+                </button>
+                <button
+                  onClick={() => setIsActivityPrintModalOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer hover:bg-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* A4 PRINT CONTAINER: REKAP KEGIATAN PROYEK */}
+            <div
+              id="print-activity-sheet"
+              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 py-8 space-y-4 text-slate-800 overflow-hidden shadow-sm print-document-sheet"
+            >
+              <div className="text-center space-y-1 border-b border-slate-200 pb-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+                  BUKU REKAPITULASI KEGIATAN & REALISASI PROYEK
+                </span>
+                <h2 className="text-base font-black text-slate-900 tracking-tight mt-1">
+                  {projectActivityReportCalculation.periodTitle.toUpperCase()}
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Divisi Operasional & Rekayasa Lapangan • PT. DSTech Smart Perkasa
+                </p>
+              </div>
+
+              <div className="grid grid-cols-4 gap-3 text-center my-3">
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold">Total Proyek</p>
+                  <p className="text-xs font-black text-slate-800">{projectActivityReportCalculation.totalActivities}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <p className="text-[10px] text-emerald-700 uppercase font-bold">Selesai 100%</p>
+                  <p className="text-xs font-black text-emerald-700">{projectActivityReportCalculation.completedCount}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-200">
+                  <p className="text-[10px] text-blue-700 uppercase font-bold">Sedang Dikerjakan</p>
+                  <p className="text-xs font-black text-blue-700">{projectActivityReportCalculation.inProgressCount}</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-200">
+                  <p className="text-[10px] text-indigo-700 uppercase font-bold">Completion Rate</p>
+                  <p className="text-xs font-black text-indigo-700">{projectActivityReportCalculation.successRate}%</p>
+                </div>
+              </div>
+
+              <div className="border border-slate-300 rounded-xl overflow-hidden text-xs">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-900 text-white font-bold text-[10px] uppercase tracking-wider">
+                    <tr>
+                      <th className="p-2.5">Kode / Tiket</th>
+                      <th className="p-2.5">Nama Kegiatan Proyek</th>
+                      <th className="p-2.5">Klien & Lokasi</th>
+                      <th className="p-2.5">PIC Lapangan</th>
+                      <th className="p-2.5">Periode / Tanggal</th>
+                      <th className="p-2.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 font-medium">
+                    {projectActivityReportCalculation.filteredActivities.map((act) => (
+                      <tr key={act.id}>
+                        <td className="p-2 font-mono font-bold text-indigo-700">{act.code}</td>
+                        <td className="p-2 font-bold text-slate-900">{act.title}</td>
+                        <td className="p-2">
+                          <p className="font-bold text-slate-800">{act.client || "Klien DSTech"}</p>
+                          <p className="text-[10px] text-slate-500">{act.location}</p>
+                        </td>
+                        <td className="p-2 text-slate-700 font-semibold">{act.pic}</td>
+                        <td className="p-2 font-mono text-[11px] text-slate-600">
+                          {act.date ? act.date.slice(0, 10) : "-"}
+                          {act.endDate ? ` s/d ${act.endDate.slice(0, 10)}` : ""}
+                        </td>
+                        <td className="p-2 text-center text-[10px] font-bold">
+                          {act.status === "Completed" ? "SELESAI / BAST" : act.status === "In Progress" ? "BERJALAN" : "TERJADWAL"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-200 text-center">
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Dibuat Oleh (Koordinator Lapangan),</p>
+                  <p className="text-xs font-bold text-slate-800">Project & Technical Operations</p>
+                  <div className="h-10"></div>
+                  <p className="font-bold text-xs text-slate-900">( Project Manager Lapangan )</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase">Mengetahui & Mengesahkan (Direksi),</p>
+                  <p className="text-xs font-bold text-slate-800">PT. DSTech Smart Perkasa</p>
+                  <div className="h-10"></div>
+                  <p className="font-bold text-xs text-slate-900">( {financeSettings.signerName || "H. Agus Supriyadi, S.T."} )</p>
                 </div>
               </div>
             </div>

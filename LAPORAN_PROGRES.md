@@ -3390,6 +3390,34 @@
 
 ---
 
+- **2026-10-23 (Task 117)**: Modul Pusat Pelaporan Eksekutif & Keuangan Proyek (Laba Rugi per Project, Rekap Penjualan Klien per Bulan & Tahun, Rekap Belanja Pengadaan Barang Proyek, dan Rekap Kegiatan Proyek 1 Bulan & 1 Tahun) (**Sedang Dikerjakan**).
+- **Latar Belakang / Permasalahan**:
+  - Permintaan pengguna:
+    1. *"terkait dengan laporan apakah bisa di terapkan juga untuk penarikan laporan laba rugi per Project? kemudian laporan dari faktur penjualan perklient dalam bulan dan tahun. laporan pembelian barang dan kebutuhan project."*
+    2. *"kemudian saya juga ingin kamu buatkan laporan untuk menarik kegiatan project selama 1 bulan dan 1 tahun"*
+- **Rincian Langkah Pelaksanaan (Step-by-Step)**:
+  - [x] **Langkah 1**: Catat rencana kerja step-by-step di `LAPORAN_PROGRES.md`.
+  - [ ] **Langkah 2**: Buat backup file `src/app/admin/finance/page.tsx` ke folder `_backup/`.
+  - [ ] **Langkah 3**: Kembangkan Sub-Modul 1: Laporan Laba Rugi per Project (Project P&L Statement) di `/admin/finance`:
+    - Switcher Mode: Laba Rugi Konsolidasian Global vs Khusus per Proyek.
+    - Kalkulasi dinamis: Pendapatan Faktur Proyek dikurangi Belanja Material PO Proyek dikurangi Beban Upah Teknisi = Laba Bersih & % Margin Proyek.
+  - [ ] **Langkah 4**: Kembangkan Sub-Modul 2: Laporan Penjualan per Klien (Client Revenue & Receivables):
+    - Filter Klien (Semua atau Klien Tertentu), Filter Bulan (Jan - Des / Semua), dan Filter Tahun.
+    - Rekapitulasi total tagihan, pembayaran diterima, sisa piutang, dan status pelunasan.
+  - [ ] **Langkah 5**: Kembangkan Sub-Modul 3: Laporan Pembelian Barang & Kebutuhan Proyek (Procurement & Material Spending):
+    - Rekapitulasi belanja barang dari supplier (kamera, kabel, switch, dll.) terpilah per peruntukan proyek vs stok gudang.
+    - Filter supplier, bulan, dan tahun.
+  - [ ] **Langkah 6**: Kembangkan Sub-Modul 4: Laporan Rekap Kegiatan Proyek (Project Activity & Milestone Report):
+    - Mengintegrasikan data kegiatan dan penugasan proyek dari `dstech_employee_tasks`.
+    - Filter periode penarikan: Rentang 1 Bulan tertentu atau Rekapitulasi 1 Tahun Penuh.
+    - Filter status proyek (Selesai/BAST, Progres Pengerjaan, Terjadwal), filter Klien, dan Teknisi PIC.
+    - Rangkuman lingkup pekerjaan teknis, material terpasang, tanggal eksekusi, dan dokumentasi lapangan.
+  - [ ] **Langkah 7**: Buat Template Cetak A4 Standar Korporat ber-Kop Surat Resmi PT. DSTech Smart Perkasa untuk masing-masing ke-4 instrumen laporan tersebut.
+  - [ ] **Langkah 8**: Uji validasi build lokal (`npm run build`), pastikan 0 error, lalu bersihkan folder `_backup/`.
+  - [ ] **Langkah 9**: Push ke remote GitHub repository via `push_with_native_git.js` dan deploy ke live VPS via `deploy_live.js`.
+
+---
+
 ### 87. BLUEPRINT PERENCANAAN MASA DEPAN: INTEGRASI MULTI-TENANT SAAS POS & SISTEM LANGGANAN (FUTURE ROADMAP)
 *(Status: Disimpan & Dimatangkan dalam Perencanaan. TIDAK BOLEH diterapkan ke kode/database sebelum disetujui pengguna secara khusus)*
 
