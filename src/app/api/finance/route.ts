@@ -724,12 +724,22 @@ export async function POST(request: Request) {
       let computedTaxAmount = 0;
       let computedGrandTotal = subtotal;
       if (taxRate > 0) {
-        if (taxType === "include") {
-          computedTaxAmount = Math.round(subtotal - (subtotal / (1 + taxRate / 100)));
-          computedGrandTotal = subtotal;
+        if (taxRate === 11.12) {
+          if (taxType === "include") {
+            computedTaxAmount = Math.round(subtotal - (subtotal / 1.11));
+            computedGrandTotal = subtotal;
+          } else {
+            computedTaxAmount = Math.round(subtotal * 0.11);
+            computedGrandTotal = subtotal + computedTaxAmount;
+          }
         } else {
-          computedTaxAmount = Math.round((subtotal * taxRate) / 100);
-          computedGrandTotal = subtotal + computedTaxAmount;
+          if (taxType === "include") {
+            computedTaxAmount = Math.round(subtotal - (subtotal / (1 + taxRate / 100)));
+            computedGrandTotal = subtotal;
+          } else {
+            computedTaxAmount = Math.round((subtotal * taxRate) / 100);
+            computedGrandTotal = subtotal + computedTaxAmount;
+          }
         }
       }
       const taxAmount = payload.taxAmount !== undefined ? Number(payload.taxAmount) : computedTaxAmount;
@@ -942,12 +952,22 @@ export async function POST(request: Request) {
       let computedTaxAmount = 0;
       let computedGrandTotal = afterDiscount;
       if (taxRate > 0) {
-        if (taxType === "include") {
-          computedTaxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
-          computedGrandTotal = afterDiscount;
+        if (taxRate === 11.12) {
+          if (taxType === "include") {
+            computedTaxAmount = Math.round(afterDiscount - (afterDiscount / 1.11));
+            computedGrandTotal = afterDiscount;
+          } else {
+            computedTaxAmount = Math.round(afterDiscount * 0.11);
+            computedGrandTotal = afterDiscount + computedTaxAmount;
+          }
         } else {
-          computedTaxAmount = Math.round((afterDiscount * taxRate) / 100);
-          computedGrandTotal = afterDiscount + computedTaxAmount;
+          if (taxType === "include") {
+            computedTaxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+            computedGrandTotal = afterDiscount;
+          } else {
+            computedTaxAmount = Math.round((afterDiscount * taxRate) / 100);
+            computedGrandTotal = afterDiscount + computedTaxAmount;
+          }
         }
       }
       const taxAmount = payload.taxAmount !== undefined ? Number(payload.taxAmount) : computedTaxAmount;
@@ -1391,12 +1411,22 @@ export async function PUT(request: Request) {
         let taxAmount = 0;
         let grandTotal = subtotal;
         if (taxRate > 0) {
-          if (taxType === "include") {
-            taxAmount = Math.round(subtotal - (subtotal / (1 + taxRate / 100)));
-            grandTotal = subtotal;
+          if (taxRate === 11.12) {
+            if (taxType === "include") {
+              taxAmount = Math.round(subtotal - (subtotal / 1.11));
+              grandTotal = subtotal;
+            } else {
+              taxAmount = Math.round(subtotal * 0.11);
+              grandTotal = subtotal + taxAmount;
+            }
           } else {
-            taxAmount = Math.round((subtotal * taxRate) / 100);
-            grandTotal = subtotal + taxAmount;
+            if (taxType === "include") {
+              taxAmount = Math.round(subtotal - (subtotal / (1 + taxRate / 100)));
+              grandTotal = subtotal;
+            } else {
+              taxAmount = Math.round((subtotal * taxRate) / 100);
+              grandTotal = subtotal + taxAmount;
+            }
           }
         }
         data.purchases[index].subtotal = subtotal;
@@ -1453,12 +1483,22 @@ export async function PUT(request: Request) {
         let taxAmount = 0;
         let grandTotal = afterDiscount;
         if (taxRate > 0) {
-          if (taxType === "include") {
-            taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
-            grandTotal = afterDiscount;
+          if (taxRate === 11.12) {
+            if (taxType === "include") {
+              taxAmount = Math.round(afterDiscount - (afterDiscount / 1.11));
+              grandTotal = afterDiscount;
+            } else {
+              taxAmount = Math.round(afterDiscount * 0.11);
+              grandTotal = afterDiscount + taxAmount;
+            }
           } else {
-            taxAmount = Math.round((afterDiscount * taxRate) / 100);
-            grandTotal = afterDiscount + taxAmount;
+            if (taxType === "include") {
+              taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+              grandTotal = afterDiscount;
+            } else {
+              taxAmount = Math.round((afterDiscount * taxRate) / 100);
+              grandTotal = afterDiscount + taxAmount;
+            }
           }
         }
         data.quotations[index].subtotal = subtotal;

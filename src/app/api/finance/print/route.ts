@@ -320,7 +320,7 @@ export async function GET(req: Request) {
                 ` : ''}
                 ${sph.taxAmount && sph.taxAmount > 0 ? `
                   <div class="flex justify-between py-0.5 text-slate-600">
-                    <span>PPN (${sph.taxRate || 11}%):</span>
+                    <span>${sph.taxRate === 11.12 ? 'PPN (12% (11/12))' : `PPN (${sph.taxRate || 11}%)`}${sph.taxType === 'include' ? ' Include' : ''}:</span>
                     <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
                   </div>
                 ` : ''}
@@ -832,7 +832,7 @@ export async function GET(req: Request) {
           ` : ''}
           ${sale.taxAmount && sale.taxAmount > 0 ? `
             <div class="flex justify-between py-0.5 text-slate-600">
-              <span>PPN (${sale.taxRate || 11}%):</span>
+              <span>${sale.taxRate === 11.12 ? 'PPN (12% (11/12))' : `PPN (${sale.taxRate || 11}%)`}${sale.taxType === 'include' ? ' Include' : ''}:</span>
               <span class="font-bold text-slate-900">${formatRupiah(sale.taxAmount)}</span>
             </div>
           ` : ''}

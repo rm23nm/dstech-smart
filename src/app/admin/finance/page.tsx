@@ -2851,12 +2851,22 @@ export default function AdminFinanceERPPage() {
     let taxAmount = 0;
     let grandTotal = afterDiscount;
     if (taxRate > 0) {
-      if (taxType === "include") {
-        taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
-        grandTotal = afterDiscount;
+      if (taxRate === 11.12) {
+        if (taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / 1.11));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round(afterDiscount * 0.11);
+          grandTotal = afterDiscount + taxAmount;
+        }
       } else {
-        taxAmount = Math.round((afterDiscount * taxRate) / 100);
-        grandTotal = afterDiscount + taxAmount;
+        if (taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round((afterDiscount * taxRate) / 100);
+          grandTotal = afterDiscount + taxAmount;
+        }
       }
     }
     return { afterDiscount, taxAmount, grandTotal };
@@ -3320,12 +3330,22 @@ export default function AdminFinanceERPPage() {
     let taxAmount = 0;
     let grandTotal = afterDiscount;
     if (taxRate > 0) {
-      if (quotationForm.taxType === "include") {
-        taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
-        grandTotal = afterDiscount;
+      if (taxRate === 11.12) {
+        if (quotationForm.taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / 1.11));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round(afterDiscount * 0.11);
+          grandTotal = afterDiscount + taxAmount;
+        }
       } else {
-        taxAmount = Math.round((afterDiscount * taxRate) / 100);
-        grandTotal = afterDiscount + taxAmount;
+        if (quotationForm.taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round((afterDiscount * taxRate) / 100);
+          grandTotal = afterDiscount + taxAmount;
+        }
       }
     }
     return { subtotal, discountVal, afterDiscount, taxAmount, grandTotal };
@@ -4432,12 +4452,22 @@ export default function AdminFinanceERPPage() {
     let taxAmount = 0;
     let grandTotal = afterDiscount;
     if (taxRate > 0) {
-      if (saleForm.taxType === "include") {
-        taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
-        grandTotal = afterDiscount;
+      if (taxRate === 11.12) {
+        if (saleForm.taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / 1.11));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round(afterDiscount * 0.11);
+          grandTotal = afterDiscount + taxAmount;
+        }
       } else {
-        taxAmount = Math.round((afterDiscount * taxRate) / 100);
-        grandTotal = afterDiscount + taxAmount;
+        if (saleForm.taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round((afterDiscount * taxRate) / 100);
+          grandTotal = afterDiscount + taxAmount;
+        }
       }
     }
     const dpAmount =
@@ -5620,12 +5650,22 @@ export default function AdminFinanceERPPage() {
     let taxAmount = 0;
     let grandTotal = afterDiscount;
     if (taxRate > 0) {
-      if (taxType === "include") {
-        taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
-        grandTotal = afterDiscount;
+      if (taxRate === 11.12) {
+        if (taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / 1.11));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round(afterDiscount * 0.11);
+          grandTotal = afterDiscount + taxAmount;
+        }
       } else {
-        taxAmount = Math.round((afterDiscount * taxRate) / 100);
-        grandTotal = afterDiscount + taxAmount;
+        if (taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round((afterDiscount * taxRate) / 100);
+          grandTotal = afterDiscount + taxAmount;
+        }
       }
     }
     return { subtotal, discountVal, afterDiscount, taxAmount, grandTotal };
@@ -5802,12 +5842,22 @@ export default function AdminFinanceERPPage() {
     let taxAmount = 0;
     let grandTotal = afterDiscount;
     if (taxRate > 0) {
-      if (taxType === "include") {
-        taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
-        grandTotal = afterDiscount;
+      if (taxRate === 11.12) {
+        if (taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / 1.11));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round(afterDiscount * 0.11);
+          grandTotal = afterDiscount + taxAmount;
+        }
       } else {
-        taxAmount = Math.round((afterDiscount * taxRate) / 100);
-        grandTotal = afterDiscount + taxAmount;
+        if (taxType === "include") {
+          taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+          grandTotal = afterDiscount;
+        } else {
+          taxAmount = Math.round((afterDiscount * taxRate) / 100);
+          grandTotal = afterDiscount + taxAmount;
+        }
       }
     }
     return { subtotal, afterDiscount, taxAmount, grandTotal };
@@ -12891,7 +12941,8 @@ export default function AdminFinanceERPPage() {
                         >
                           <option value={0}>Bebas PPN (0%)</option>
                           <option value={11}>PPN 11%</option>
-                          <option value={12}>PPN 12% (Standar)</option>
+                          <option value={11.12}>PPN 12% (11/12)</option>
+                          <option value={12}>PPN 12% (Penuh)</option>
                         </select>
                       </div>
                       <div>
@@ -12926,7 +12977,7 @@ export default function AdminFinanceERPPage() {
                       )}
                       <div className="flex items-center justify-between text-slate-300">
                         <span>
-                          Nominal Pajak PPN ({saleForm.taxRate}% {saleForm.taxType === "include" ? "Include" : "Exclude"}):
+                          Nominal Pajak PPN ({saleForm.taxRate === 11.12 ? "12% (11/12)" : `${saleForm.taxRate}%`} {saleForm.taxType === "include" ? "Include" : "Exclude"}):
                         </span>
                         <span className="font-bold">{formatRupiah(taxAmount)}</span>
                       </div>
@@ -14374,7 +14425,7 @@ export default function AdminFinanceERPPage() {
                       </>
                     )}
                     <div className="flex items-center justify-between text-slate-600">
-                      <span>PPN ({selectedInvoiceForPrint.taxRate}%{(selectedInvoiceForPrint as any).taxType === "include" ? " Include" : ""}):</span>
+                      <span>PPN ({selectedInvoiceForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedInvoiceForPrint.taxRate}%`}{(selectedInvoiceForPrint as any).taxType === "include" ? " Include" : ""}):</span>
                       <span className="font-bold text-slate-900">{formatRupiah(selectedInvoiceForPrint.taxAmount)}</span>
                     </div>
                     <div className="border-t-2 border-slate-900 pt-2 flex items-center justify-between text-sm font-black text-slate-900">
@@ -14637,7 +14688,7 @@ export default function AdminFinanceERPPage() {
                         </div>
                       )}
                       <div className="flex items-center justify-between text-slate-600">
-                        <span>PPN ({selectedInvoiceForPrint.taxRate}%{(selectedInvoiceForPrint as any).taxType === "include" ? " Include" : ""}):</span>
+                        <span>PPN ({selectedInvoiceForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedInvoiceForPrint.taxRate}%`}{(selectedInvoiceForPrint as any).taxType === "include" ? " Include" : ""}):</span>
                         <span className="font-bold text-slate-900">{formatRupiah(selectedInvoiceForPrint.taxAmount)}</span>
                       </div>
                       <div className="border-t-2 border-slate-900 pt-1.5 flex items-center justify-between text-xs font-black text-slate-900">
@@ -15590,7 +15641,8 @@ export default function AdminFinanceERPPage() {
                         >
                           <option value={0}>Bebas PPN (0%)</option>
                           <option value={11}>PPN 11%</option>
-                          <option value={12}>PPN 12% (Standar)</option>
+                          <option value={11.12}>PPN 12% (11/12)</option>
+                          <option value={12}>PPN 12% (Penuh)</option>
                         </select>
                       </div>
                       <div>
@@ -15625,7 +15677,7 @@ export default function AdminFinanceERPPage() {
                       )}
                       <div className="flex items-center justify-between text-slate-300">
                         <span>
-                          Pajak Pertambahan Nilai ({quotationForm.taxRate}% {quotationForm.taxType === "include" ? "Include" : "Exclude"}):
+                          Pajak Pertambahan Nilai ({quotationForm.taxRate === 11.12 ? "12% (11/12)" : `${quotationForm.taxRate}%`} {quotationForm.taxType === "include" ? "Include" : "Exclude"}):
                         </span>
                         <span className="font-bold">{formatRupiah(taxAmount)}</span>
                       </div>
@@ -16407,7 +16459,7 @@ export default function AdminFinanceERPPage() {
                       </>
                     )}
                     <div className="flex items-center justify-between text-slate-600">
-                      <span>PPN ({selectedQuotationForPrint.taxRate}%{(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}):</span>
+                      <span>PPN ({selectedQuotationForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedQuotationForPrint.taxRate}%`}{(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}):</span>
                       <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.taxAmount)}</span>
                     </div>
                     <div className="border-t-2 border-indigo-950 pt-2 flex items-center justify-between text-sm font-black text-slate-900">
@@ -16646,7 +16698,7 @@ export default function AdminFinanceERPPage() {
                         </div>
                       )}
                       <div className="flex items-center justify-between text-slate-600">
-                        <span>PPN ({selectedQuotationForPrint.taxRate}%{(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}):</span>
+                        <span>PPN ({selectedQuotationForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedQuotationForPrint.taxRate}%`}{(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}):</span>
                         <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.taxAmount)}</span>
                       </div>
                       <div className="border-t-2 border-indigo-950 pt-1.5 flex items-center justify-between text-xs font-black text-slate-900">
@@ -19657,7 +19709,8 @@ export default function AdminFinanceERPPage() {
                         >
                           <option value={0}>Bebas PPN (0%)</option>
                           <option value={11}>PPN 11%</option>
-                          <option value={12}>PPN 12% (Standar)</option>
+                          <option value={11.12}>PPN 12% (11/12)</option>
+                          <option value={12}>PPN 12% (Penuh)</option>
                         </select>
                       </div>
                       <div>
@@ -19678,7 +19731,7 @@ export default function AdminFinanceERPPage() {
                     </div>
                     {(poForm.taxRate ?? 12) > 0 && (
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>PPN Masukan ({poForm.taxRate ?? 12}% {(poForm.taxType || "exclude") === "include" ? "Include" : "Exclude"}):</span>
+                        <span>PPN Masukan ({(poForm.taxRate ?? 12) === 11.12 ? "12% (11/12)" : `${poForm.taxRate ?? 12}%`} {(poForm.taxType || "exclude") === "include" ? "Include" : "Exclude"}):</span>
                         <span className="font-bold">{formatRupiah(taxAmount)}</span>
                       </div>
                     )}
@@ -20155,7 +20208,8 @@ export default function AdminFinanceERPPage() {
                         >
                           <option value={0}>Bebas PPN (0%)</option>
                           <option value={11}>PPN 11%</option>
-                          <option value={12}>PPN 12% (Standar)</option>
+                          <option value={11.12}>PPN 12% (11/12)</option>
+                          <option value={12}>PPN 12% (Penuh)</option>
                         </select>
                       </div>
                       <div>
@@ -20176,7 +20230,7 @@ export default function AdminFinanceERPPage() {
                     </div>
                     {(editPoForm.taxRate ?? 12) > 0 && (
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>PPN Masukan ({editPoForm.taxRate ?? 12}% {(editPoForm.taxType || "exclude") === "include" ? "Include" : "Exclude"}):</span>
+                        <span>PPN Masukan ({(editPoForm.taxRate ?? 12) === 11.12 ? "12% (11/12)" : `${editPoForm.taxRate ?? 12}%`} {(editPoForm.taxType || "exclude") === "include" ? "Include" : "Exclude"}):</span>
                         <span className="font-bold">{formatRupiah(taxAmount)}</span>
                       </div>
                     )}
@@ -20697,7 +20751,7 @@ export default function AdminFinanceERPPage() {
                       <span className="font-bold text-slate-900">{formatRupiah(selectedPoForPrint.subtotal)}</span>
                     </div>
                     <div className="flex justify-between py-1 text-slate-600 border-b border-slate-100">
-                      <span>PPN Masukan ({selectedPoForPrint.taxRate ?? 12}%{(selectedPoForPrint as any).taxType === "include" ? " Include" : ""}):</span>
+                      <span>PPN Masukan ({(selectedPoForPrint.taxRate ?? 12) === 11.12 ? "12% (11/12)" : `${selectedPoForPrint.taxRate ?? 12}%`}{(selectedPoForPrint as any).taxType === "include" ? " Include" : ""}):</span>
                       <span className="font-bold text-slate-900">{formatRupiah(selectedPoForPrint.taxAmount)}</span>
                     </div>
                     <div className="flex justify-between py-2 text-sm font-black text-slate-900 border-t-2 border-slate-900">
@@ -25645,7 +25699,8 @@ export default function AdminFinanceERPPage() {
                     >
                       <option value={0}>Bebas PPN (0%)</option>
                       <option value={11}>PPN 11%</option>
-                      <option value={12}>PPN 12% (Standar)</option>
+                      <option value={11.12}>PPN 12% (11/12)</option>
+                      <option value={12}>PPN 12% (Penuh)</option>
                     </select>
                   </div>
                   <div>
@@ -25677,7 +25732,7 @@ export default function AdminFinanceERPPage() {
                 </div>
                 <div className="flex items-center justify-between text-slate-300">
                   <span>
-                    Nominal Pajak PPN ({editingSale.taxRate}% {editingSale.taxType === "include" ? "Include" : "Exclude"}):
+                    Nominal Pajak PPN ({editingSale.taxRate === 11.12 ? "12% (11/12)" : `${editingSale.taxRate}%`} {editingSale.taxType === "include" ? "Include" : "Exclude"}):
                   </span>
                   <span className="font-bold">{formatRupiah(editingSale.taxAmount)}</span>
                 </div>
