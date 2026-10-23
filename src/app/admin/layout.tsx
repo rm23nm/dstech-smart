@@ -26,6 +26,7 @@ import {
   Wrench,
   Warehouse,
   CalendarCheck,
+  FileSignature,
 } from "lucide-react";
 
 interface SearchResult {
@@ -37,6 +38,7 @@ interface SearchResult {
 
 const SEARCH_CATALOG: SearchResult[] = [
   { title: "Dashboard Overview", category: "Navigasi", url: "/admin", desc: "Ringkasan metrik omset, stok, dan partner" },
+  { title: "Kontrak Kerja & Rekrutmen", category: "Operasional", url: "/admin/contracts", desc: "Kelola kontrak kerja staf bulanan/tahunan dan teknisi harian (Tipe 1 & 2), cetak PKWT resmi A4" },
   { title: "Rekap Absensi Karyawan & Teknisi", category: "Operasional", url: "/admin/attendance", desc: "Pantau presensi masuk/pulang, titik GPS Google Maps, dan riwayat kehadiran" },
   { title: "Download Laporan Absensi (Excel & PDF)", category: "Operasional", url: "/admin/attendance", desc: "Unduh file CSV/Excel dan cetak lembar rekapitulasi kehadiran A4 resmi" },
   { title: "Kalkulator Gaji & Slip Gaji (Payroll)", category: "Keuangan", url: "/admin/attendance", desc: "Hitung otomatis gaji pokok, upah lembur, uang kehadiran, dan cetak slip gaji A4" },
@@ -161,6 +163,12 @@ export default function AdminLayout({
       href: "/admin/attendance",
       icon: CalendarCheck,
       active: pathname.startsWith("/admin/attendance"),
+    },
+    {
+      label: "Kontrak Kerja & Rekrutmen",
+      href: "/admin/contracts",
+      icon: FileSignature,
+      active: pathname.startsWith("/admin/contracts"),
     },
     {
       label: "Manajemen Stok & Gudang",
