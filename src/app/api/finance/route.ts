@@ -408,7 +408,8 @@ export async function POST(request: Request) {
         discountType: payload.discountType || "fixed",
         discountPercent: Number(payload.discountPercent) || 0,
         discountLabel: payload.discountLabel || "Diskon Khusus Negosiasi Proyek",
-        taxRate: Number(payload.taxRate) || 11,
+        taxRate: payload.taxRate !== undefined ? Number(payload.taxRate) : 12,
+        taxType: payload.taxType || "exclude",
         taxAmount: Number(payload.taxAmount) || 0,
         grandTotal,
         paymentMethod: payload.paymentMethod || `Transfer ${getDefaultBankAccountLabel(data)}`,
@@ -718,9 +719,21 @@ export async function POST(request: Request) {
         0
       );
       const subtotal = Number(payload.subtotal) || computedSubtotal;
-      const taxRate = payload.taxRate !== undefined ? Number(payload.taxRate) : 11;
-      const taxAmount = Number(payload.taxAmount) || Math.round((subtotal * taxRate) / 100);
-      const grandTotal = Number(payload.grandTotal) || subtotal + taxAmount;
+      const taxRate = payload.taxRate !== undefined ? Number(payload.taxRate) : 12;
+      const taxType = payload.taxType || "exclude";
+      let computedTaxAmount = 0;
+      let computedGrandTotal = subtotal;
+      if (taxRate > 0) {
+        if (taxType === "include") {
+          computedTaxAmount = Math.round(subtotal - (subtotal / (1 + taxRate / 100)));
+          computedGrandTotal = subtotal;
+        } else {
+          computedTaxAmount = Math.round((subtotal * taxRate) / 100);
+          computedGrandTotal = subtotal + computedTaxAmount;
+        }
+      }
+      const taxAmount = payload.taxAmount !== undefined ? Number(payload.taxAmount) : computedTaxAmount;
+      const grandTotal = payload.grandTotal !== undefined ? Number(payload.grandTotal) : computedGrandTotal;
 
       const newPurchase = {
         id: `dstech_po_${Date.now()}`,
@@ -731,6 +744,8 @@ export async function POST(request: Request) {
         expectedDelivery: payload.expectedDelivery || new Date().toISOString().split("T")[0],
         items: items,
         subtotal: subtotal,
+        taxRate: taxRate,
+        taxType: taxType,
         taxAmount: taxAmount,
         grandTotal: grandTotal,
         status: payload.status || "Draf",
@@ -922,9 +937,21 @@ export async function POST(request: Request) {
       const subtotal = items.reduce((acc: number, curr: any) => acc + (Number(curr.total) || 0), 0);
       const discount = Number(payload.discount) || 0;
       const afterDiscount = Math.max(0, subtotal - discount);
-      const taxRate = isNonPt ? 0 : Number(payload.taxRate) || 0;
-      const taxAmount = taxRate > 0 ? Math.round((afterDiscount * taxRate) / 100) : 0;
-      const grandTotal = afterDiscount + taxAmount;
+      const taxRate = isNonPt ? 0 : Number(payload.taxRate !== undefined ? payload.taxRate : 12);
+      const taxType = payload.taxType || "exclude";
+      let computedTaxAmount = 0;
+      let computedGrandTotal = afterDiscount;
+      if (taxRate > 0) {
+        if (taxType === "include") {
+          computedTaxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+          computedGrandTotal = afterDiscount;
+        } else {
+          computedTaxAmount = Math.round((afterDiscount * taxRate) / 100);
+          computedGrandTotal = afterDiscount + computedTaxAmount;
+        }
+      }
+      const taxAmount = payload.taxAmount !== undefined ? Number(payload.taxAmount) : computedTaxAmount;
+      const grandTotal = payload.grandTotal !== undefined ? Number(payload.grandTotal) : computedGrandTotal;
 
       const dateStr = payload.date || new Date().toISOString().split("T")[0];
       const validityDays = Number(payload.validityDays) || 14;
@@ -950,6 +977,7 @@ export async function POST(request: Request) {
         discountLabel: payload.discountLabel || "Diskon Khusus Negosiasi Proyek",
         revision: Number(payload.revision) || 0,
         taxRate: taxRate,
+        taxType: taxType,
         taxAmount: taxAmount,
         grandTotal: grandTotal,
         terms: payload.terms || "1. Harga sudah termasuk instalasi, kabel pelindung, dan pengujian kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan pemeliharaan teknis 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak diterbitkan.",
@@ -1082,7 +1110,8 @@ export async function POST(request: Request) {
         discountPercent: Number(sph.discountPercent) || 0,
         discountLabel: sph.discountLabel || "Diskon Khusus Negosiasi Proyek",
         revision: Number(sph.revision) || 0,
-        taxRate: sph.taxRate,
+        taxRate: sph.taxRate !== undefined ? sph.taxRate : 12,
+        taxType: (sph as any).taxType || "exclude",
         taxAmount: sph.taxAmount,
         grandTotal: grandTotal,
         paymentMethod: `Transfer ${getDefaultBankAccountLabel(data)}`,
@@ -1350,18 +1379,29 @@ export async function PUT(request: Request) {
         ...updates,
       };
 
-      if (updates.items) {
+      if (updates.items || updates.taxRate !== undefined || updates.taxType !== undefined) {
         const items = data.purchases[index].items || [];
         const subtotal = items.reduce(
           (acc: number, curr: any) =>
             acc + (Number(curr.total) || Number(curr.qty) * Number(curr.price) || 0),
           0
         );
-        const taxRate = updates.taxRate !== undefined ? Number(updates.taxRate) : 11;
-        const taxAmount = taxRate > 0 ? Math.round((subtotal * taxRate) / 100) : 0;
+        const taxRate = data.purchases[index].taxRate !== undefined ? Number(data.purchases[index].taxRate) : 12;
+        const taxType = data.purchases[index].taxType || "exclude";
+        let taxAmount = 0;
+        let grandTotal = subtotal;
+        if (taxRate > 0) {
+          if (taxType === "include") {
+            taxAmount = Math.round(subtotal - (subtotal / (1 + taxRate / 100)));
+            grandTotal = subtotal;
+          } else {
+            taxAmount = Math.round((subtotal * taxRate) / 100);
+            grandTotal = subtotal + taxAmount;
+          }
+        }
         data.purchases[index].subtotal = subtotal;
         data.purchases[index].taxAmount = taxAmount;
-        data.purchases[index].grandTotal = subtotal + taxAmount;
+        data.purchases[index].grandTotal = grandTotal;
       }
 
       writeFinanceData(data);
@@ -1403,16 +1443,27 @@ export async function PUT(request: Request) {
         ...updates,
       };
 
-      if (updates.items || updates.discount !== undefined || updates.taxRate !== undefined) {
+      if (updates.items || updates.discount !== undefined || updates.taxRate !== undefined || updates.taxType !== undefined) {
         const items = data.quotations[index].items || [];
         const subtotal = items.reduce((acc: number, curr: any) => acc + (Number(curr.total) || 0), 0);
         const discount = Number(data.quotations[index].discount) || 0;
         const afterDiscount = Math.max(0, subtotal - discount);
         const taxRate = Number(data.quotations[index].taxRate) || 0;
-        const taxAmount = taxRate > 0 ? Math.round((afterDiscount * taxRate) / 100) : 0;
+        const taxType = (data.quotations[index] as any).taxType || "exclude";
+        let taxAmount = 0;
+        let grandTotal = afterDiscount;
+        if (taxRate > 0) {
+          if (taxType === "include") {
+            taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+            grandTotal = afterDiscount;
+          } else {
+            taxAmount = Math.round((afterDiscount * taxRate) / 100);
+            grandTotal = afterDiscount + taxAmount;
+          }
+        }
         data.quotations[index].subtotal = subtotal;
         data.quotations[index].taxAmount = taxAmount;
-        data.quotations[index].grandTotal = afterDiscount + taxAmount;
+        data.quotations[index].grandTotal = grandTotal;
       }
 
       writeFinanceData(data);

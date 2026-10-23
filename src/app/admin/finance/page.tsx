@@ -195,6 +195,7 @@ interface SaleInvoice {
   discountLabel?: string;
   revision?: number;
   taxRate: number;
+  taxType?: "exclude" | "include";
   taxAmount: number;
   grandTotal: number;
   paymentMethod: string;
@@ -266,6 +267,7 @@ interface Quotation {
   discountLabel?: string;
   revision?: number;
   taxRate: number;
+  taxType?: "exclude" | "include";
   taxAmount: number;
   grandTotal: number;
   terms: string;
@@ -348,6 +350,8 @@ interface PurchaseOrder {
   expectedDelivery: string;
   items: PurchaseItem[];
   subtotal: number;
+  taxRate?: number;
+  taxType?: "exclude" | "include";
   taxAmount: number;
   grandTotal: number;
   status: "Draf" | "Dalam Pengiriman" | "Diterima & Lunas" | "Dibatalkan" | string;
@@ -720,6 +724,8 @@ export default function AdminFinanceERPPage() {
     status: string;
     paymentStatus: string;
     warehouseId: string;
+    taxRate: number;
+    taxType: "exclude" | "include";
     notes: string;
     items: PurchaseItem[];
     businessEntity: "PT" | "NON_PT";
@@ -735,6 +741,8 @@ export default function AdminFinanceERPPage() {
     status: "Draf",
     paymentStatus: "Hutang Usaha",
     warehouseId: "dstech_wh_1",
+    taxRate: 12,
+    taxType: "exclude",
     notes: "",
     items: [],
     businessEntity: "PT",
@@ -1651,6 +1659,7 @@ export default function AdminFinanceERPPage() {
     revision: number;
     isRevision?: boolean;
     taxRate: number;
+    taxType: "exclude" | "include";
     terms: string;
     notes: string;
     businessEntity: "PT" | "NON_PT";
@@ -1676,7 +1685,8 @@ export default function AdminFinanceERPPage() {
     discountLabel: "Diskon Khusus Negosiasi Proyek",
     revision: 0,
     isRevision: false,
-    taxRate: 11,
+    taxRate: 12,
+    taxType: "exclude",
     terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
     notes: "",
     businessEntity: "PT",
@@ -1705,6 +1715,7 @@ export default function AdminFinanceERPPage() {
     discountPercent: number;
     discountLabel: string;
     taxRate: number;
+    taxType: "exclude" | "include";
     paidAmount: number;
     notes: string;
     businessEntity: "PT" | "NON_PT";
@@ -1733,7 +1744,8 @@ export default function AdminFinanceERPPage() {
     discountType: "fixed",
     discountPercent: 0,
     discountLabel: "Diskon Khusus Negosiasi Proyek",
-    taxRate: 11,
+    taxRate: 12,
+    taxType: "exclude",
     paidAmount: 0,
     notes: "",
     businessEntity: "PT",
@@ -1758,6 +1770,8 @@ export default function AdminFinanceERPPage() {
     expectedDelivery: string;
     paymentStatus: string;
     items: PurchaseItem[];
+    taxRate: number;
+    taxType: "exclude" | "include";
     notes: string;
     businessEntity: "PT" | "NON_PT";
     projectId?: string;
@@ -1771,6 +1785,8 @@ export default function AdminFinanceERPPage() {
     items: [
       { id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
     ],
+    taxRate: 12,
+    taxType: "exclude",
     notes: "",
     businessEntity: "PT",
     projectId: "",
@@ -3272,8 +3288,18 @@ export default function AdminFinanceERPPage() {
         : Number(quotationForm.discount || 0);
     const afterDiscount = Math.max(0, subtotal - discountVal);
     const isNonPt = quotationForm.businessEntity === "NON_PT";
-    const taxAmount = isNonPt ? 0 : (afterDiscount * Number(quotationForm.taxRate || 0)) / 100;
-    const grandTotal = afterDiscount + taxAmount;
+    const taxRate = isNonPt ? 0 : Number(quotationForm.taxRate || 0);
+    let taxAmount = 0;
+    let grandTotal = afterDiscount;
+    if (taxRate > 0) {
+      if (quotationForm.taxType === "include") {
+        taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+        grandTotal = afterDiscount;
+      } else {
+        taxAmount = Math.round((afterDiscount * taxRate) / 100);
+        grandTotal = afterDiscount + taxAmount;
+      }
+    }
     return { subtotal, discountVal, afterDiscount, taxAmount, grandTotal };
   };
 
@@ -3330,6 +3356,7 @@ export default function AdminFinanceERPPage() {
             discountLabel: quotationForm.discountLabel || "Diskon Khusus Negosiasi Proyek",
             revision: 0,
             taxRate: Number(quotationForm.taxRate) || 0,
+            taxType: quotationForm.taxType || "exclude",
             taxAmount,
             grandTotal,
             terms: quotationForm.terms,
@@ -3366,7 +3393,8 @@ export default function AdminFinanceERPPage() {
           discountLabel: "Diskon Khusus Negosiasi Proyek",
           revision: 0,
           isRevision: false,
-          taxRate: 11,
+          taxRate: 12,
+          taxType: "exclude",
           terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
           notes: "",
           businessEntity: "PT",
@@ -3400,7 +3428,8 @@ export default function AdminFinanceERPPage() {
       discountLabel: q.discountLabel || "Diskon Khusus Negosiasi Proyek",
       revision: q.revision || 0,
       isRevision: false,
-      taxRate: q.taxRate || 0,
+      taxRate: q.taxRate !== undefined ? q.taxRate : 12,
+      taxType: (q as any).taxType || "exclude",
       terms: q.terms,
       notes: q.notes || "",
       businessEntity: q.businessEntity || "PT",
@@ -3443,6 +3472,7 @@ export default function AdminFinanceERPPage() {
             discountLabel: quotationForm.discountLabel || "Diskon Khusus Negosiasi Proyek",
             revision: targetRevision,
             taxRate: Number(quotationForm.taxRate) || 0,
+            taxType: quotationForm.taxType || "exclude",
             taxAmount,
             grandTotal,
             terms: quotationForm.terms,
@@ -4370,8 +4400,18 @@ export default function AdminFinanceERPPage() {
         : Number(saleForm.discount || 0);
     const afterDiscount = Math.max(0, subtotal - discountVal);
     const isNonPt = saleForm.businessEntity === "NON_PT";
-    const taxAmount = isNonPt ? 0 : (afterDiscount * Number(saleForm.taxRate || 0)) / 100;
-    const grandTotal = afterDiscount + taxAmount;
+    const taxRate = isNonPt ? 0 : Number(saleForm.taxRate || 0);
+    let taxAmount = 0;
+    let grandTotal = afterDiscount;
+    if (taxRate > 0) {
+      if (saleForm.taxType === "include") {
+        taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+        grandTotal = afterDiscount;
+      } else {
+        taxAmount = Math.round((afterDiscount * taxRate) / 100);
+        grandTotal = afterDiscount + taxAmount;
+      }
+    }
     const dpAmount =
       saleForm.invoiceType === "DP"
         ? saleForm.dpAmount > 0
@@ -4430,6 +4470,7 @@ export default function AdminFinanceERPPage() {
             discountPercent: Number(saleForm.discountPercent) || 0,
             discountLabel: saleForm.discountLabel || "Diskon Khusus Negosiasi Proyek",
             taxRate: Number(saleForm.taxRate),
+            taxType: saleForm.taxType || "exclude",
             taxAmount,
             grandTotal,
             paidAmount: Number(saleForm.paidAmount),
@@ -4491,7 +4532,8 @@ export default function AdminFinanceERPPage() {
           discountType: "fixed",
           discountPercent: 0,
           discountLabel: "Diskon Khusus Negosiasi Proyek",
-          taxRate: 11,
+          taxRate: 12,
+          taxType: "exclude",
           paidAmount: 0,
           notes: "",
           businessEntity: "PT",
@@ -5585,6 +5627,8 @@ export default function AdminFinanceERPPage() {
           expectedDelivery: new Date(Date.now() + 3 * 86400000).toISOString().split("T")[0],
           paymentStatus: "Hutang Usaha",
           items: [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
+          taxRate: 12,
+          taxType: "exclude",
           notes: "",
           businessEntity: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
           projectId: "",
@@ -5612,6 +5656,8 @@ export default function AdminFinanceERPPage() {
       status: po.status,
       paymentStatus: po.paymentStatus,
       warehouseId: po.warehouseId || "dstech_wh_1",
+      taxRate: po.taxRate ?? 12,
+      taxType: po.taxType ?? "exclude",
       notes: po.notes || "",
       items:
         po.items && po.items.length > 0
@@ -11880,7 +11926,7 @@ export default function AdminFinanceERPPage() {
                       ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
                       : "bg-blue-100 text-blue-800 border border-blue-200"
                   }`}>
-                    {saleForm.businessEntity === "NON_PT" ? "Non-PKP / 0% PPN (Bebas PPN)" : "PKP / PPN 11% Resmi PT"}
+                    {saleForm.businessEntity === "NON_PT" ? "Non-PKP / 0% PPN (Bebas PPN)" : "PKP / PPN 12% Resmi PT"}
                   </span>
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -11889,7 +11935,7 @@ export default function AdminFinanceERPPage() {
                       setSaleForm((prev) => ({
                         ...prev,
                         businessEntity: "PT",
-                        taxRate: prev.taxRate === 0 ? 11 : prev.taxRate,
+                        taxRate: prev.taxRate === 0 ? 12 : prev.taxRate,
                       }));
                     }}
                     className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
@@ -12769,16 +12815,31 @@ export default function AdminFinanceERPPage() {
                       </div>
                     </div>
 
-                    {/* PPN Input */}
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">Tarif Pajak PPN (%):</label>
-                      <input
-                        type="number"
-                        min={0}
-                        value={saleForm.taxRate}
-                        onChange={(e) => setSaleForm({ ...saleForm, taxRate: Number(e.target.value) })}
-                        className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
-                      />
+                    {/* PPN Selector & Model */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Tarif Pajak PPN (%):</label>
+                        <select
+                          value={saleForm.taxRate}
+                          onChange={(e) => setSaleForm({ ...saleForm, taxRate: Number(e.target.value) })}
+                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                        >
+                          <option value={0}>Bebas PPN (0%)</option>
+                          <option value={11}>PPN 11%</option>
+                          <option value={12}>PPN 12% (Standar)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Model PPN:</label>
+                        <select
+                          value={saleForm.taxType || "exclude"}
+                          onChange={(e) => setSaleForm({ ...saleForm, taxType: e.target.value as "exclude" | "include" })}
+                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                        >
+                          <option value="exclude">Exclude (Tambah)</option>
+                          <option value="include">Include (Sudah Termasuk)</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Rincian Transparan */}
@@ -12799,7 +12860,9 @@ export default function AdminFinanceERPPage() {
                         </>
                       )}
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>Nominal Pajak PPN ({saleForm.taxRate}%):</span>
+                        <span>
+                          Nominal Pajak PPN ({saleForm.taxRate}% {saleForm.taxType === "include" ? "Include" : "Exclude"}):
+                        </span>
                         <span className="font-bold">{formatRupiah(taxAmount)}</span>
                       </div>
                     </div>
@@ -15451,18 +15514,31 @@ export default function AdminFinanceERPPage() {
                       </div>
                     )}
 
-                    {/* PPN Selector */}
-                    <div>
-                      <label className="text-[10px] text-slate-400 block mb-1">Tarif Pajak PPN (%):</label>
-                      <select
-                        value={quotationForm.taxRate}
-                        onChange={(e) => setQuotationForm({ ...quotationForm, taxRate: Number(e.target.value) })}
-                        className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
-                      >
-                        <option value={0}>Bebas PPN (0%)</option>
-                        <option value={11}>PPN 11% (Standar)</option>
-                        <option value={12}>PPN 12%</option>
-                      </select>
+                    {/* PPN Selector & Model */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Tarif Pajak PPN (%):</label>
+                        <select
+                          value={quotationForm.taxRate}
+                          onChange={(e) => setQuotationForm({ ...quotationForm, taxRate: Number(e.target.value) })}
+                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                        >
+                          <option value={0}>Bebas PPN (0%)</option>
+                          <option value={11}>PPN 11%</option>
+                          <option value={12}>PPN 12% (Standar)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 block mb-1">Model PPN:</label>
+                        <select
+                          value={quotationForm.taxType || "exclude"}
+                          onChange={(e) => setQuotationForm({ ...quotationForm, taxType: e.target.value as "exclude" | "include" })}
+                          className="w-full p-1.5 rounded-lg bg-slate-800 border border-slate-700 text-white text-xs font-bold"
+                        >
+                          <option value="exclude">Exclude (Tambah)</option>
+                          <option value="include">Include (Sudah Termasuk)</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Rincian Transparan */}
@@ -15483,7 +15559,9 @@ export default function AdminFinanceERPPage() {
                         </>
                       )}
                       <div className="flex items-center justify-between text-slate-300">
-                        <span>Pajak Pertambahan Nilai ({quotationForm.taxRate}%):</span>
+                        <span>
+                          Pajak Pertambahan Nilai ({quotationForm.taxRate}% {quotationForm.taxType === "include" ? "Include" : "Exclude"}):
+                        </span>
                         <span className="font-bold">{formatRupiah(taxAmount)}</span>
                       </div>
                     </div>
@@ -16909,7 +16987,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL MASTER PROYEK (TAMBAH / EDIT PROYEK) */}
       {isProjectModalOpen && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsProjectModalOpen(false)}
         >
           <div
