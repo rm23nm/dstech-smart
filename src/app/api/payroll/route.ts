@@ -282,13 +282,18 @@ export async function POST(request: Request) {
       const paymentDate = body.paymentDate || `${monthStr}-${String(data.defaultSettings.autoPaydayDay || 25).padStart(2, "0")}`;
       const overwrite = body.overwriteExisting === true;
 
+      // Hitung rentang awal dan akhir bulan periode yang diminta
+      const [yearStr, mStr] = monthStr.split("-");
+      const yearNum = parseInt(yearStr, 10);
+      const monthNum = parseInt(mStr, 10);
+      const lastDayOfMonth = new Date(yearNum, monthNum, 0).getDate();
+      const monthStartDate = `${monthStr}-01`;
+      const monthEndDate = `${monthStr}-${String(lastDayOfMonth).padStart(2, "0")}`;
+
       const contracts = readContracts();
-      const users = readUsers();
       const attendanceData = readAttendanceData();
 
-      // Kumpulkan staf yang berhak menerima gaji:
-      // Prioritas 1: Karyawan berstatus aktif di kontrak
-      // Prioritas 2: User aktif ber-role staff atau technician yang belum ada di kontrak
+      // Kumpulkan kandidat karyawan yang memiliki kontrak aktif & sah pada bulan periode
       const employeeCandidates: Array<{
         name: string;
         role: string;
@@ -296,27 +301,43 @@ export async function POST(request: Request) {
         contract?: any;
       }> = [];
 
+      const skippedExpiredContracts: Array<{
+        name: string;
+        contractNumber: string;
+        endDate: string;
+        reason: string;
+      }> = [];
+
       contracts.forEach((c: any) => {
-        if (c.status === "ACTIVE" || !c.status) {
+        const isStatusActive = (c.status || "ACTIVE") === "ACTIVE";
+        const startDate = c.startDate || "2000-01-01";
+        const endDate = c.endDate || "2099-12-31";
+
+        // Kontrak harus aktif dan rentang tanggalnya harus mencakup bulan periode
+        const isExpired = endDate < monthStartDate;
+        const isNotStartedYet = startDate > monthEndDate;
+        const isValidForPeriod = isStatusActive && !isExpired && !isNotStartedYet;
+
+        if (isValidForPeriod) {
           employeeCandidates.push({
             name: c.employeeName,
             role: c.position || "Staf Operasional",
             bankAccount: c.employeePhone ? `Transfer Bank (HP: ${c.employeePhone})` : "-",
             contract: c,
           });
-        }
-      });
-
-      users.forEach((u: any) => {
-        if (
-          (u.role === "technician" || u.role === "staff") &&
-          !employeeCandidates.some((ec) => ec.name.toLowerCase() === u.name.toLowerCase())
-        ) {
-          employeeCandidates.push({
-            name: u.name,
-            role: u.role === "technician" ? "Teknisi Lapangan" : "Staf Kantor",
-            bankAccount: u.phone ? `Transfer Rekening / ${u.phone}` : "-",
-            contract: null,
+        } else if (isExpired) {
+          skippedExpiredContracts.push({
+            name: c.employeeName,
+            contractNumber: c.contractNumber || c.id,
+            endDate: c.endDate,
+            reason: `Kontrak berakhir pada ${c.endDate} (belum ada perpanjangan kontrak untuk ${monthStr})`,
+          });
+        } else if (isNotStartedYet) {
+          skippedExpiredContracts.push({
+            name: c.employeeName,
+            contractNumber: c.contractNumber || c.id,
+            endDate: c.endDate,
+            reason: `Kontrak baru berlaku mulai ${c.startDate}`,
           });
         }
       });
@@ -557,15 +578,21 @@ export async function POST(request: Request) {
 
       writePayrollData(data);
 
+      const expiredNote =
+        skippedExpiredContracts.length > 0
+          ? ` (${skippedExpiredContracts.length} karyawan tidak diproses karena kontrak belum diperpanjang)`
+          : "";
+
       return NextResponse.json({
         success: true,
-        message: `Auto-payroll bulan ${monthStr} berhasil dijalankan: ${generatedCount} slip baru diterbitkan, ${updatedCount} diperbarui, ${skippedCount} dilewati (sudah ada).`,
+        message: `Auto-payroll bulan ${monthStr} berhasil dijalankan: ${generatedCount} slip baru diterbitkan, ${updatedCount} diperbarui, ${skippedCount} dilewati${expiredNote}.`,
         summary: {
           month: monthStr,
           generatedCount,
           updatedCount,
           skippedCount,
-          totalEmployees: employeeCandidates.length,
+          totalEligibleEmployees: employeeCandidates.length,
+          skippedExpiredContracts,
         },
       });
     }

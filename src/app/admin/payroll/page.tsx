@@ -428,6 +428,38 @@ export default function AdminPayrollPage() {
     });
   }, [payrollList, searchQuery]);
 
+  // Preview sinkronisasi kontrak aktif vs kadaluarsa untuk bulan auto-generate yang dipilih
+  const autoGenContractsPreview = useMemo(() => {
+    if (!autoGenMonth) return { eligible: [], expired: [] };
+    const [yStr, mStr] = autoGenMonth.split("-");
+    const yNum = parseInt(yStr, 10);
+    const mNum = parseInt(mStr, 10);
+    const lastDay = new Date(yNum, mNum, 0).getDate();
+    const monthStart = `${autoGenMonth}-01`;
+    const monthEnd = `${autoGenMonth}-${String(lastDay).padStart(2, "0")}`;
+
+    const eligible: any[] = [];
+    const expired: any[] = [];
+
+    contracts.forEach((c: any) => {
+      const isStatusActive = (c.status || "ACTIVE") === "ACTIVE";
+      const startDate = c.startDate || "2000-01-01";
+      const endDate = c.endDate || "2099-12-31";
+      const isPast = endDate < monthStart;
+      const isFuture = startDate > monthEnd;
+
+      if (isStatusActive && !isPast && !isFuture) {
+        eligible.push(c);
+      } else if (isPast) {
+        expired.push({ ...c, expiredReason: `Kontrak berakhir pada ${c.endDate}` });
+      } else if (isFuture) {
+        expired.push({ ...c, expiredReason: `Kontrak baru aktif mulai ${c.startDate}` });
+      }
+    });
+
+    return { eligible, expired };
+  }, [autoGenMonth, contracts]);
+
   // Bulk Select Toggle
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -1965,6 +1997,77 @@ export default function AdminPayrollPage() {
                 />
               </div>
 
+              {/* LIVE PREVIEW VALIDITAS KONTRAK KERJA PADA PERIODE TERPILIH */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span className="flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5 text-dstech-blue" />
+                    Sinkronisasi Kontrak Periode ({autoGenMonth}):
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Hanya kontrak sah & aktif yang diproses
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  {/* Karyawan Layak Berkontrak */}
+                  <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-emerald-800">Kontrak Aktif</span>
+                      <span className="px-1.5 py-0.2 text-[10px] font-black bg-emerald-200/70 text-emerald-900 rounded-full">
+                        {autoGenContractsPreview.eligible.length} Karyawan
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-emerald-700 leading-tight">
+                      Masa berlaku kontrak mencakup periode {autoGenMonth}.
+                    </p>
+                    {autoGenContractsPreview.eligible.length > 0 && (
+                      <div className="mt-2 space-y-0.5">
+                        {autoGenContractsPreview.eligible.map((c: any) => (
+                          <div key={c.id} className="text-[10px] text-emerald-900 font-semibold truncate flex items-center gap-1">
+                            <span>•</span> {c.employeeName}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Karyawan Kontrak Berakhir / Perlu Perpanjangan */}
+                  <div className="p-3 bg-rose-50/80 border border-rose-200 rounded-xl">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-rose-800">Kontrak Berakhir</span>
+                      <span className="px-1.5 py-0.2 text-[10px] font-black bg-rose-200/70 text-rose-900 rounded-full">
+                        {autoGenContractsPreview.expired.length} Karyawan
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-rose-700 leading-tight">
+                      Tidak diproses otomatis (butuh perpanjangan PKWT).
+                    </p>
+                    {autoGenContractsPreview.expired.length > 0 ? (
+                      <div className="mt-2 space-y-1">
+                        {autoGenContractsPreview.expired.map((c: any) => (
+                          <div key={c.id} className="text-[10px] text-rose-900 font-medium leading-tight">
+                            <span className="font-bold block">• {c.employeeName}</span>
+                            <span className="text-[9px] text-rose-600 block pl-2">
+                              {c.expiredReason}
+                            </span>
+                          </div>
+                        ))}
+                        <Link
+                          href="/admin/contracts"
+                          target="_blank"
+                          className="inline-flex items-center gap-1 text-[10px] text-blue-600 font-bold hover:underline mt-1 pt-1 border-t border-rose-200/60"
+                        >
+                          Perpanjang Kontrak di Menu Kontrak →
+                        </Link>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 italic block mt-1">Tidak ada kontrak expired</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-2">
                 <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold text-slate-700 select-none">
                   <input
@@ -2100,14 +2203,50 @@ export default function AdminPayrollPage() {
                       const rateDesc = isStaf
                         ? `Bulanan Rp ${Number(c.salaryScheme?.staffScheme?.baseSalary || 4200000).toLocaleString("id-ID")}`
                         : `Harian Rp ${Number(c.salaryScheme?.dailyScheme?.dailyRate || 175000).toLocaleString("id-ID")}/hr`;
+
+                      // Evaluasi masa berlaku kontrak terhadap bulan penggajian yang dipilih
+                      const formMonthStart = `${formData.month}-01`;
+                      const isExpired = c.endDate && c.endDate < formMonthStart;
+                      const statusTag = isExpired
+                        ? ` [⚠️ KONTRAK BERAKHIR ${c.endDate}]`
+                        : ` [✅ Aktif s.d ${c.endDate}]`;
+
                       return (
-                        <option key={c.id} value={c.id}>
-                          {c.employeeName} — {c.position} ({rateDesc})
+                        <option
+                          key={c.id}
+                          value={c.id}
+                          className={isExpired ? "text-rose-600 font-semibold" : "text-slate-800"}
+                        >
+                          {c.employeeName} — {c.position} ({rateDesc}){statusTag}
                         </option>
                       );
                     })}
                   </select>
-                  <span className="text-[10px] text-slate-500 mt-1 block">
+
+                  {/* Banner Peringatan Jika Kontrak Karyawan Expired pada Bulan yang Dipilih */}
+                  {(() => {
+                    const matched = contracts.find(
+                      (c) => c.employeeName?.trim().toLowerCase() === formData.employeeName?.trim().toLowerCase()
+                    );
+                    if (!matched) return null;
+                    const formMonthStart = `${formData.month}-01`;
+                    if (matched.endDate && matched.endDate < formMonthStart) {
+                      return (
+                        <div className="mt-2.5 p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2 text-rose-800 text-xs">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold">Peringatan Sinkronisasi Kontrak:</span> Kontrak kerja <strong>{matched.employeeName}</strong> telah berakhir pada <strong>{matched.endDate}</strong> dan belum diperpanjang untuk periode <strong>{formData.month}</strong>.
+                            <div className="text-[10px] text-rose-600 mt-0.5">
+                              Slip gaji manual tetap dapat diterbitkan, namun sangat dianjurkan untuk memperbarui/memperpanjang kontrak di <Link href="/admin/contracts" target="_blank" className="underline font-bold text-blue-700">Menu Kontrak Kerja</Link> agar legalitas gaji sah.
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  <span className="text-[10px] text-slate-500 mt-1.5 block">
                     Memilih karyawan otomatis menyelaraskan: Jabatan, Tarif Harian/Pokok Bulanan, Tarif Lembur, Tunjangan Transport & Makan (Full vs Harian), serta Rekening Bank.
                   </span>
                 </div>
