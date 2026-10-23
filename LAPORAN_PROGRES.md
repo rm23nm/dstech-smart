@@ -3412,9 +3412,44 @@
     - Filter periode penarikan: Rentang 1 Bulan tertentu atau Rekapitulasi 1 Tahun Penuh.
     - Filter status proyek (Selesai/BAST, Progres Pengerjaan, Terjadwal), filter Klien, dan Teknisi PIC.
     - Rangkuman lingkup pekerjaan teknis, material terpasang, tanggal eksekusi, dan dokumentasi lapangan.
+  - [x] **Sub-Tugas 117.1**: Tombol Cepat `+ Tambah Proyek Baru` pada Form Faktur Penjualan & SPH:
+    - Menambahkan tombol `+ Tambah Proyek Baru` tepat di samping selector proyek pada modal Faktur Penjualan Baru, modal Surat Penawaran Harga (SPH), dan modal Edit Faktur Penjualan.
+    - Saat proyek baru disimpan, otomatis memilih proyek tersebut ke dalam formulir yang sedang aktif tanpa harus menutup atau me-refresh halaman.
+    - Status: **Selesai 100% & Live di VPS** (Commit `4b8bca8`, PM2 PID 631209).
+  - [ ] **Sub-Tugas 117.2**: Peningkatan Pemilihan Barang dari List / Katalog Produk pada Faktur & SPH:
+    - Menambahkan tombol mencolok `[📦 Pilih dari Katalog Produk / Gudang]` di samping tombol `[+ Tambah Baris]`.
+    - Modal Picker Produk: Pencarian cepat nama/kategori produk, tampilan foto/thumbnail, sisa stok gudang aktif, harga jual satuan, dan tombol `+ Masukkan ke Faktur`.
+    - Autocomplete Datalist: Saat admin mengetik di kolom nama barang, langsung muncul opsi produk dari database sehingga nama, harga, dan unit terisi otomatis tanpa harus mengetik manual.
   - [ ] **Langkah 7**: Buat Template Cetak A4 Standar Korporat ber-Kop Surat Resmi PT. DSTech Smart Perkasa untuk masing-masing ke-4 instrumen laporan tersebut.
   - [ ] **Langkah 8**: Uji validasi build lokal (`npm run build`), pastikan 0 error, lalu bersihkan folder `_backup/`.
   - [ ] **Langkah 9**: Push ke remote GitHub repository via `push_with_native_git.js` dan deploy ke live VPS via `deploy_live.js`.
+
+---
+
+- **2026-10-23 (Task 118 - ANTRIAN)**: Fitur CRM Sales Pipeline & Up-Selling (Tahapan Sales: Leads -> Prospek -> Calon Prospek -> Deal -> Closing & Kontrak Up-Selling) (**Antrian Pekerjaan**).
+- **Latar Belakang / Permasalahan**:
+  - Permintaan pengguna: *"saya ingin kamu menambahkan saya sebuah fitur up selling, seperti tahapan proses salles, mulai dari leads, prospek, calon prospek,deal, dan closing. kemudian saya juga butuh complen handeling agar bisa ditangani sepenuhnya."*
+- **Rencana Rincian Pelaksanaan (Step-by-Step)**:
+  - [ ] **Langkah 1**: Desain tabel database CRM dengan prefix `dstech_crm_leads` dan `dstech_crm_pipeline`.
+  - [ ] **Langkah 2**: Buat tahapan funnel: `1. Leads` -> `2. Prospek` -> `3. Calon Prospek (Qualified)` -> `4. Negosiasi / Deal` -> `5. Closing (Won / Lost)`.
+  - [ ] **Langkah 3**: Fitur Up-Selling & Cross-Selling:
+    - Rekomendasi upgrade paket produk, penambahan titik perangkat (CCTV/Access Gate/Smart Home), perpanjangan garansi maintenance tahunan, atau paket bundling saat status Deal/Closing.
+    - Riwayat penawaran tambahan dan potensi kenaikan nilai kontrak (Contract Value Uplift).
+  - [ ] **Langkah 4**: Tampilan visual Kanban Board (Drag-and-Drop) dan List View di menu `/admin/crm` atau `/admin/sales`.
+  - [ ] **Langkah 5**: Konversi 1-klik: Lead Deal/Closing dapat langsung dikonversi menjadi Surat Penawaran Harga (SPH) atau Faktur Penjualan Resmi di `/admin/finance`.
+
+---
+
+- **2026-10-23 (Task 119 - ANTRIAN)**: Modul Manajemen Penanganan Komplain Pelanggan Terpadu (Complaint Handling & Service Ticketing System) (**Antrian Pekerjaan**).
+- **Latar Belakang / Permasalahan**:
+  - Memastikan seluruh keluhan, kendala teknis, atau komplain pelanggan tertangani sepenuhnya dari hulu ke hilir dengan tracking SLA dan dokumentasi transparan.
+- **Rencana Rincian Pelaksanaan (Step-by-Step)**:
+  - [ ] **Langkah 1**: Desain tabel database complaint ticket dengan prefix `dstech_crm_complaints` / `dstech_tickets`.
+  - [ ] **Langkah 2**: Formulir Pelaporan Komplain: Pemilihan Klien/Pelanggan, Referensi Proyek / No Faktur Terkait, Kategori Kendala (Jaringan, CCTV/Perangkat, Aplikasi POS, Tagihan, Layanan Lapangan), dan Tingkat Urgensi (Rendah, Sedang, Tinggi, Darurat SLA).
+  - [ ] **Langkah 3**: Alur Penanganan Komplain Penuh (*End-to-End Handling Lifecycle*):
+    - `Tiket Baru (Open)` -> `Ditinjau & Penugasan PIC (Assigned)` -> `Investigasi & Analisa Masalah` -> `Tindakan Perbaikan / Kunjungan Lapangan (In Progress)` -> `Menunggu Konfirmasi Klien (Pending Client)` -> `Terselesaikan (Resolved)` -> `Ditutup & Rating CSAT (Closed)`.
+  - [ ] **Langkah 4**: Riwayat Tindakan Teknis (*Audit Trail*), foto bukti penyelesaian, dan notifikasi WhatsApp otomatis ke pelanggan saat tiket diperbarui/selesai.
+  - [ ] **Langkah 5**: Dashboard Analitik Komplain: Response Time SLA, Tingkat Penyelesaian Masalah, dan Rekapitulasi per Kategori.
 
 ---
 

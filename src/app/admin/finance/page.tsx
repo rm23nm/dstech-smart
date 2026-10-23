@@ -601,6 +601,12 @@ export default function AdminFinanceERPPage() {
   const [pendingMaintenanceTicketId, setPendingMaintenanceTicketId] = useState<string | null>(null);
   const [isNewPoModalOpen, setIsNewPoModalOpen] = useState<boolean>(false);
 
+  // Modal Pemilih Produk / Katalog Picker Cepat
+  const [isProductCatalogPickerOpen, setIsProductCatalogPickerOpen] = useState<boolean>(false);
+  const [productPickerTarget, setProductPickerTarget] = useState<"sale" | "quotation" | "edit_sale">("sale");
+  const [productPickerSearch, setProductPickerSearch] = useState<string>("");
+  const [productPickerCategory, setProductPickerCategory] = useState<string>("ALL");
+
   // Pembelian / Purchases
   const [poSearchQuery, setPoSearchQuery] = useState<string>("");
   const [poStatusFilter, setPoStatusFilter] = useState<string>("Semua");
@@ -2772,6 +2778,117 @@ export default function AdminFinanceERPPage() {
     });
   };
 
+  // Handler Buka Modal Katalog Picker
+  const handleOpenProductCatalogPicker = (target: "sale" | "quotation" | "edit_sale") => {
+    setProductPickerTarget(target);
+    setProductPickerSearch("");
+    setProductPickerCategory("ALL");
+    setIsProductCatalogPickerOpen(true);
+  };
+
+  // Handler Masukkan Produk dari Modal Picker ke Dokumen Aktif
+  const handleInsertProductFromPicker = (selected: ProductCatalogItem) => {
+    const price = Number(selected.price) || 0;
+    const unit = selected.unit || "Unit";
+
+    if (productPickerTarget === "sale") {
+      setSaleForm((prev) => {
+        const items = [...prev.items];
+        if (items.length === 1 && !items[0].productName.trim() && items[0].price === 0) {
+          items[0] = {
+            ...items[0],
+            productId: selected.id,
+            productName: selected.name,
+            unit: unit,
+            price: price,
+            qty: 1,
+            total: price,
+          };
+        } else {
+          items.push({
+            id: Date.now().toString(),
+            productId: selected.id,
+            productName: selected.name,
+            unit: unit,
+            qty: 1,
+            price: price,
+            total: price,
+          });
+        }
+        return { ...prev, items };
+      });
+      showToast(`✓ "${selected.name}" dimasukkan ke Faktur!`);
+    } else if (productPickerTarget === "quotation") {
+      setQuotationForm((prev) => {
+        const items = [...prev.items];
+        if (items.length === 1 && !items[0].productName.trim() && items[0].price === 0) {
+          items[0] = {
+            ...items[0],
+            productId: selected.id,
+            productName: selected.name,
+            unit: unit,
+            price: price,
+            qty: 1,
+            discount: 0,
+            total: price,
+            image: selected.image || "",
+            description: (selected as any).desc || (selected as any).description || "",
+          };
+        } else {
+          items.push({
+            id: Date.now().toString(),
+            productId: selected.id,
+            productName: selected.name,
+            unit: unit,
+            qty: 1,
+            price: price,
+            discount: 0,
+            total: price,
+            image: selected.image || "",
+            description: (selected as any).desc || (selected as any).description || "",
+          });
+        }
+        return { ...prev, items };
+      });
+      showToast(`✓ "${selected.name}" dimasukkan ke Penawaran (SPH)!`);
+    } else if (productPickerTarget === "edit_sale" && editingSale) {
+      const items = [...editingSale.items];
+      if (items.length === 1 && !items[0].productName.trim() && items[0].price === 0) {
+        items[0] = {
+          ...items[0],
+          productId: selected.id,
+          productName: selected.name,
+          unit: unit,
+          price: price,
+          qty: 1,
+          total: price,
+        };
+      } else {
+        items.push({
+          id: Date.now().toString(),
+          productId: selected.id,
+          productName: selected.name,
+          unit: unit,
+          qty: 1,
+          price: price,
+          total: price,
+        });
+      }
+      const subtotal = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+      const afterDiscount = Math.max(0, subtotal - Number(editingSale.discount || 0));
+      const taxAmount = (afterDiscount * Number(editingSale.taxRate || 0)) / 100;
+      const grandTotal = afterDiscount + taxAmount;
+      setEditingSale({
+        ...editingSale,
+        items,
+        subtotal,
+        taxAmount,
+        grandTotal,
+      });
+      showToast(`✓ "${selected.name}" dimasukkan ke Faktur!`);
+    }
+  };
+
   // Handler Sale Form Dynamic Items
   const handleAddSaleItem = () => {
     setSaleForm((prev) => ({
@@ -2795,7 +2912,18 @@ export default function AdminFinanceERPPage() {
     setSaleForm((prev) => {
       const updated = [...prev.items];
       const item = { ...updated[idx], [field]: val };
-      if (field === "qty" || field === "price") {
+      // Smart Auto-fill saat user memilih/mengetik nama produk dari list
+      if (field === "productName") {
+        const found = products.find(
+          (p) => p.name.trim().toLowerCase() === String(val).trim().toLowerCase()
+        );
+        if (found) {
+          item.productId = found.id;
+          item.unit = found.unit || "Unit";
+          item.price = Number(found.price) || item.price;
+        }
+      }
+      if (field === "qty" || field === "price" || field === "productName") {
         item.total = Number(item.qty || 0) * Number(item.price || 0);
       }
       updated[idx] = item;
@@ -2858,7 +2986,18 @@ export default function AdminFinanceERPPage() {
     setQuotationForm((prev) => {
       const updated = [...prev.items];
       const item = { ...updated[idx], [field]: val };
-      if (field === "qty" || field === "price" || field === "discount") {
+      if (field === "productName") {
+        const found = products.find(
+          (p) => p.name.trim().toLowerCase() === String(val).trim().toLowerCase()
+        );
+        if (found) {
+          item.productId = found.id;
+          item.unit = found.unit || "Unit";
+          item.price = Number(found.price) || item.price;
+          if (found.image && !item.image) item.image = found.image;
+        }
+      }
+      if (field === "qty" || field === "price" || field === "discount" || field === "productName") {
         const itemGross = Number(item.qty || 0) * Number(item.price || 0);
         item.total = Math.max(0, itemGross - Number(item.discount || 0));
       }
@@ -4202,7 +4341,17 @@ export default function AdminFinanceERPPage() {
     if (!editingSale) return;
     const updated = [...editingSale.items];
     const item = { ...updated[idx], [field]: val };
-    if (field === "qty" || field === "price") {
+    if (field === "productName") {
+      const found = products.find(
+        (p) => p.name.trim().toLowerCase() === String(val).trim().toLowerCase()
+      );
+      if (found) {
+        item.productId = found.id;
+        item.unit = found.unit || "Unit";
+        item.price = Number(found.price) || item.price;
+      }
+    }
+    if (field === "qty" || field === "price" || field === "productName") {
       item.total = Number(item.qty || 0) * Number(item.price || 0);
     }
     updated[idx] = item;
@@ -11929,37 +12078,48 @@ export default function AdminFinanceERPPage() {
 
               {/* Items Table Repeater */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
-                <div className="flex items-center justify-between">
-                  <label className="font-black text-slate-800 uppercase tracking-wider text-[11px]">
-                    Daftar Produk / Jasa yang Dijual ({saleForm.items.length})
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="font-black text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-dstech-blue" />
+                    <span>Daftar Produk / Jasa yang Dijual ({saleForm.items.length})</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleAddSaleItem}
-                    className="text-dstech-blue font-bold text-xs hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Tambah Baris</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenProductCatalogPicker("sale")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs shadow-sm transition-all cursor-pointer hover:scale-105 active:scale-95"
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      <span>📦 Pilih dari List / Katalog Produk</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddSaleItem}
+                      className="text-dstech-blue font-bold text-xs hover:bg-blue-100 flex items-center gap-1 cursor-pointer bg-blue-50 px-2.5 py-1.5 rounded-xl border border-blue-200 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Tambah Baris Manual</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                   {saleForm.items.map((it, idx) => (
                     <div
                       key={it.id}
                       className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
                     >
                       <div className="col-span-5 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] text-slate-500 font-bold">Produk / Jasa</span>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[10px] text-slate-600 font-bold">Produk / Jasa:</span>
                           <select
                             onChange={(e) => {
                               if (e.target.value) handleSelectProductForSale(idx, e.target.value);
                             }}
-                            defaultValue=""
-                            className="text-[9px] bg-blue-50 hover:bg-blue-100 text-dstech-blue font-bold border border-blue-200 rounded px-1.5 py-0.5 max-w-[190px] truncate cursor-pointer"
+                            value={it.productId || ""}
+                            className="text-[10px] bg-white hover:bg-blue-50 text-dstech-blue font-black border border-blue-300 rounded-lg px-2 py-0.5 max-w-[210px] truncate cursor-pointer shadow-2xs"
                           >
-                            <option value="">⚡ Pilih Katalog ({products.length})</option>
+                            <option value="">📋 Pilih List Master ({products.length})</option>
                             {products.map((p) => (
                               <option key={p.id} value={p.id}>
                                 [{p.category}] {p.name} - {formatRupiah(p.price)}
@@ -11970,10 +12130,11 @@ export default function AdminFinanceERPPage() {
                         <input
                           type="text"
                           required
-                          placeholder="Nama Barang / Jasa..."
+                          list="dstech_global_product_datalist"
+                          placeholder="Pilih dari list master atau ketik nama barang..."
                           value={it.productName}
                           onChange={(e) => handleSaleItemChange(idx, "productName", e.target.value)}
-                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none"
                         />
                         {/* Live Stock Badge */}
                         {(() => {
@@ -14357,19 +14518,29 @@ export default function AdminFinanceERPPage() {
 
               {/* Items Repeater */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <label className="font-black text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
                     <Package className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Daftar Barang & Jasa Teknis ({quotationForm.items.length} Item)</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleAddQuotationItem}
-                    className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Tambah Baris</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenProductCatalogPicker("quotation")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs shadow-sm transition-all cursor-pointer hover:scale-105 active:scale-95"
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      <span>📦 Pilih dari List / Katalog Produk</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddQuotationItem}
+                      className="px-2.5 py-1.5 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors border border-indigo-200"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Tambah Baris Manual</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
@@ -14379,16 +14550,16 @@ export default function AdminFinanceERPPage() {
                       className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
                     >
                       <div className="col-span-5 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[9px] text-slate-500 font-bold">Deskripsi Produk / Jasa</label>
+                        <div className="flex items-center justify-between gap-1">
+                          <label className="text-[10px] text-slate-600 font-bold">Deskripsi Produk / Jasa:</label>
                           <select
                             onChange={(e) => {
                               if (e.target.value) handleSelectProductForQuotation(idx, e.target.value);
                             }}
-                            defaultValue=""
-                            className="text-[9px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200 rounded px-1.5 py-0.5 max-w-[190px] truncate cursor-pointer"
+                            value={it.productId || ""}
+                            className="text-[10px] bg-white hover:bg-indigo-50 text-indigo-700 font-black border border-indigo-300 rounded-lg px-2 py-0.5 max-w-[210px] truncate cursor-pointer shadow-2xs"
                           >
-                            <option value="">⚡ Pilih Katalog ({products.length})</option>
+                            <option value="">📋 Pilih List Master ({products.length})</option>
                             {products.map((p) => (
                               <option key={p.id} value={p.id}>
                                 [{p.category}] {p.name} - {formatRupiah(p.price)}
@@ -14447,10 +14618,11 @@ export default function AdminFinanceERPPage() {
                           <input
                             type="text"
                             required
-                            placeholder="Nama barang & spesifikasi teknis..."
+                            list="dstech_global_product_datalist"
+                            placeholder="Pilih dari list master atau ketik nama barang..."
                             value={it.productName}
                             onChange={(e) => handleQuotationItemChange(idx, "productName", e.target.value)}
-                            className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-1 focus:ring-indigo-500"
+                            className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                           />
                         </div>
 
@@ -24275,17 +24447,28 @@ export default function AdminFinanceERPPage() {
               {/* Items Table Repeater */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between">
-                  <label className="font-black text-slate-800 uppercase tracking-wider text-[11px]">
-                    Daftar Produk / Jasa ({editingSale.items.length})
+                  <label className="font-black text-slate-800 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Daftar Produk / Jasa ({editingSale.items.length})</span>
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleAddEditSaleItem}
-                    className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold text-xs flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Tambah Baris</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenProductCatalogPicker("edit_sale")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs shadow-sm transition-all cursor-pointer hover:scale-105 active:scale-95"
+                    >
+                      <Package className="w-3.5 h-3.5" />
+                      <span>📦 Pilih dari List / Master</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddEditSaleItem}
+                      className="px-2.5 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-xs flex items-center gap-1 cursor-pointer transition-colors border border-emerald-200"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Tambah Baris</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
@@ -24295,16 +24478,16 @@ export default function AdminFinanceERPPage() {
                       className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
                     >
                       <div className="col-span-5 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] text-slate-500 font-bold">Produk / Jasa</span>
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[10px] text-slate-600 font-bold">Produk / Jasa:</span>
                           <select
                             onChange={(e) => {
                               if (e.target.value) handleSelectProductForEditSale(idx, e.target.value);
                             }}
-                            defaultValue=""
-                            className="text-[9px] bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold border border-amber-200 rounded px-1.5 py-0.5 max-w-[190px] truncate cursor-pointer"
+                            value={it.productId || ""}
+                            className="text-[10px] bg-white hover:bg-amber-50 text-amber-800 font-black border border-amber-300 rounded-lg px-2 py-0.5 max-w-[210px] truncate cursor-pointer shadow-2xs"
                           >
-                            <option value="">⚡ Pilih Katalog ({products.length})</option>
+                            <option value="">📋 Pilih List Master ({products.length})</option>
                             {products.map((p) => (
                               <option key={p.id} value={p.id}>
                                 [{p.category}] {p.name} - {formatRupiah(p.price)}
@@ -24315,9 +24498,11 @@ export default function AdminFinanceERPPage() {
                         <input
                           type="text"
                           required
+                          list="dstech_global_product_datalist"
+                          placeholder="Pilih dari list master atau ketik nama produk..."
                           value={it.productName}
                           onChange={(e) => handleEditSaleItemChange(idx, "productName", e.target.value)}
-                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                         />
                         {/* Live Stock Badge */}
                         {(() => {
