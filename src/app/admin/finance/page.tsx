@@ -2541,9 +2541,16 @@ export default function AdminFinanceERPPage() {
           setAvailableContracts(cData.contracts);
         }
       }
-      if (prodRes.ok) {
+      if (prodRes && prodRes.ok) {
         const pd = await prodRes.json();
-        if (pd.data) setProducts(pd.data);
+        const pList = Array.isArray(pd)
+          ? pd
+          : Array.isArray(pd.products)
+          ? pd.products
+          : Array.isArray(pd.data)
+          ? pd.data
+          : [];
+        setProducts(pList);
       }
       if (res.ok) {
         const d = await res.json();
@@ -27666,6 +27673,143 @@ export default function AdminFinanceERPPage() {
           </div>
         </div>
       )}
+      {/* ====== MODAL KATALOG PICKER PRODUK — z-[200] tampil di atas semua modal ====== */}
+      {isProductCatalogPickerOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+          style={{ background: "rgba(15,23,42,0.75)", backdropFilter: "blur(4px)" }}
+          onClick={() => setIsProductCatalogPickerOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden border border-slate-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-t-3xl">
+              <div className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-white" />
+                <h3 className="text-white font-black text-sm">
+                  Pilih Produk / Jasa dari Master Katalog
+                </h3>
+                <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                  {products.length} Item
+                </span>
+              </div>
+              <button
+                onClick={() => setIsProductCatalogPickerOpen(false)}
+                className="text-white hover:text-emerald-100 transition-colors cursor-pointer p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search & Filter */}
+            <div className="px-4 py-3 border-b border-slate-100 flex flex-wrap items-center gap-2 bg-slate-50">
+              <div className="flex-1 relative min-w-[200px]">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari nama produk / jasa..."
+                  value={productPickerSearch}
+                  onChange={(e) => setProductPickerSearch(e.target.value)}
+                  autoFocus
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+              <select
+                value={productPickerCategory}
+                onChange={(e) => setProductPickerCategory(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">Semua Kategori</option>
+                {Array.from(new Set(products.map((p) => p.category))).map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Product List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {(() => {
+                const filtered = products.filter((p) => {
+                  const matchSearch = !productPickerSearch || p.name.toLowerCase().includes(productPickerSearch.toLowerCase());
+                  const matchCat = productPickerCategory === "ALL" || p.category === productPickerCategory;
+                  return matchSearch && matchCat;
+                });
+                if (filtered.length === 0) {
+                  return (
+                    <div className="text-center py-12 text-slate-400">
+                      <Package className="w-12 h-12 mx-auto mb-3 opacity-40" />
+                      <p className="text-sm font-semibold">Tidak ada produk ditemukan</p>
+                      <p className="text-xs mt-1">Coba kata kunci lain atau tambahkan produk di menu Inventori</p>
+                    </div>
+                  );
+                }
+                return filtered.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      handleInsertProductFromPicker(p);
+                      setIsProductCatalogPickerOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white hover:bg-emerald-50 hover:border-emerald-300 transition-all text-left cursor-pointer group shadow-sm"
+                  >
+                    {p.image ? (
+                      <img
+                        src={p.image}
+                        alt={p.name}
+                        className="w-12 h-12 rounded-xl object-cover border border-slate-200 flex-shrink-0"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                        <Package className="w-6 h-6 text-emerald-600" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-black text-slate-900 truncate group-hover:text-emerald-700">
+                        {p.name}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          {p.category}
+                        </span>
+                        <span className="text-[10px] text-slate-500">
+                          {p.unit || "Unit"} • Stok: {p.stock ?? "—"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-black text-emerald-700">
+                        {formatRupiah(Number(p.price) || 0)}
+                      </p>
+                      <span className="text-[10px] text-slate-400">/{p.unit || "Unit"}</span>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 group-hover:bg-emerald-600 flex items-center justify-center transition-colors flex-shrink-0">
+                      <Plus className="w-4 h-4 text-emerald-600 group-hover:text-white" />
+                    </div>
+                  </button>
+                ));
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 rounded-b-3xl flex items-center justify-between">
+              <p className="text-xs text-slate-500">
+                Klik produk untuk langsung menambahkan ke dokumen
+              </p>
+              <button
+                onClick={() => setIsProductCatalogPickerOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ====== END MODAL KATALOG PICKER ====== */}
     </div>
   );
 }
