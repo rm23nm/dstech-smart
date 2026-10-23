@@ -377,10 +377,14 @@ export async function POST(request: Request) {
           const scheme = emp.contract.salaryScheme;
           if (scheme.staffScheme) {
             baseSalary = Number(scheme.staffScheme.baseSalary || baseSalary);
-            positionAllowance = Number(scheme.staffScheme.positionAllowance || positionAllowance);
-            transportAllowance = Number(scheme.staffScheme.transportAllowance || transportAllowance);
-            bpjsDeduction = Number(scheme.staffScheme.bpjsAllowance || bpjsDeduction);
-            positionTier = "Staf Bulanan";
+            positionAllowance = Number(scheme.staffScheme.positionAllowance !== undefined ? scheme.staffScheme.positionAllowance : 500000);
+            transportAllowance = Number(scheme.staffScheme.transportAllowance !== undefined ? scheme.staffScheme.transportAllowance : 400000);
+            bpjsDeduction = Number(scheme.staffScheme.bpjsAllowance !== undefined ? scheme.staffScheme.bpjsAllowance : bpjsDeduction);
+            // STAF BULANAN: Gaji pokok sudah mencakup kehadiran bulanan tetap, TIDAK diduplikasi
+            presenceRate = 0;
+            presenceAllowance = 0;
+            appliedDailyRate = 0;
+            positionTier = "Staf Bulanan (Tetap)";
           } else if (scheme.dailyScheme) {
             if (scheme.dailyScheme.dailyRateType === "TYPE_1_FULL_DAY") {
               const dailyRate = Number(scheme.dailyScheme.dailyRate || positionRateInfo.dailyRate);
@@ -388,17 +392,19 @@ export async function POST(request: Request) {
               baseSalary = presenceDays * dailyRate;
               presenceRate = 0;
               presenceAllowance = 0;
+              positionAllowance = 0;
+              transportAllowance = Number(scheme.dailyScheme.transportAllowance || 0);
               overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || positionRateInfo.overtimeRate);
               overtimePay = overtimeHours * overtimeRate;
-              positionAllowance = 0;
             } else if (scheme.dailyScheme.dailyRateType === "TYPE_2_HOURLY") {
               const hourlyRate = Number(scheme.dailyScheme.hourlyRate || 30000);
               baseSalary = presenceDays * 8 * hourlyRate;
               presenceRate = 0;
               presenceAllowance = 0;
+              positionAllowance = 0;
+              transportAllowance = 0;
               overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || 40000);
               overtimePay = overtimeHours * overtimeRate;
-              positionAllowance = 0;
               positionTier = "Teknisi Jam-jaman (Tipe 2)";
             }
           }
@@ -407,9 +413,10 @@ export async function POST(request: Request) {
           baseSalary = presenceDays * appliedDailyRate;
           presenceRate = 0;
           presenceAllowance = 0;
+          positionAllowance = 0;
+          transportAllowance = 0;
           overtimeRate = positionRateInfo.overtimeRate;
           overtimePay = overtimeHours * overtimeRate;
-          positionAllowance = 0;
         }
 
         const totalGross = baseSalary + presenceAllowance + overtimePay + positionAllowance + transportAllowance + bonusProject + bonusPerformance;

@@ -89,6 +89,123 @@ export interface DstechContract {
   updatedAt?: string;
 }
 
+export interface OfficialPositionPreset {
+  id: string;
+  label: string;
+  positionName: string;
+  category: "STAFF" | "TECHNICIAN";
+  payrollScheme: "DAILY" | "MONTHLY";
+  contractType: "DAILY" | "MONTHLY" | "YEARLY";
+  dailyRate?: number;
+  overtimeHourlyRate?: number;
+  baseSalary?: number;
+  positionAllowance?: number;
+  transportAllowance?: number;
+  bpjsAllowance?: number;
+  notes?: string;
+}
+
+export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
+  {
+    id: "helper",
+    label: "👷‍♂️ Helper / Asisten Teknisi (Rp 150.000 / hari)",
+    positionName: "Helper / Asisten Teknisi Lapangan",
+    category: "TECHNICIAN",
+    payrollScheme: "DAILY",
+    contractType: "DAILY",
+    dailyRate: 150000,
+    overtimeHourlyRate: 25000,
+    notes: "Upah harian Helper Rp 150.000/hari kerja & lembur Rp 25.000/jam",
+  },
+  {
+    id: "skill",
+    label: "⚡ Teknisi Skill / Ahli Lapangan (Rp 175.000 / hari)",
+    positionName: "Teknisi Skill Instalasi & Integrasi",
+    category: "TECHNICIAN",
+    payrollScheme: "DAILY",
+    contractType: "DAILY",
+    dailyRate: 175000,
+    overtimeHourlyRate: 30000,
+    notes: "Upah harian Teknisi Skill Rp 175.000/hari kerja & lembur Rp 30.000/jam",
+  },
+  {
+    id: "senior",
+    label: "🎯 Teknisi Senior / Specialist (Rp 200.000 / hari)",
+    positionName: "Teknisi Senior / Specialist CCTV & Smart Home",
+    category: "TECHNICIAN",
+    payrollScheme: "DAILY",
+    contractType: "DAILY",
+    dailyRate: 200000,
+    overtimeHourlyRate: 35000,
+    notes: "Upah harian Teknisi Senior Rp 200.000/hari kerja & lembur Rp 35.000/jam",
+  },
+  {
+    id: "foreman",
+    label: "👑 Lead / Foreman Lapangan (Rp 225.000 / hari)",
+    positionName: "Lead / Foreman Lapangan",
+    category: "TECHNICIAN",
+    payrollScheme: "DAILY",
+    contractType: "DAILY",
+    dailyRate: 225000,
+    overtimeHourlyRate: 40000,
+    notes: "Upah harian Lead/Foreman Rp 225.000/hari kerja & lembur Rp 40.000/jam",
+  },
+  {
+    id: "staff_admin",
+    label: "💼 Staf Administrasi & Keuangan (Gaji Bulanan)",
+    positionName: "Staf Administrasi & Keuangan",
+    category: "STAFF",
+    payrollScheme: "MONTHLY",
+    contractType: "YEARLY",
+    baseSalary: 4200000,
+    positionAllowance: 500000,
+    transportAllowance: 400000,
+    bpjsAllowance: 150000,
+    notes: "Gaji bulanan tetap staf kantor (tidak dikalikan harian)",
+  },
+  {
+    id: "staff_it",
+    label: "💻 Staf IT Support & Networking (Gaji Bulanan)",
+    positionName: "Staf IT Support & Networking",
+    category: "STAFF",
+    payrollScheme: "MONTHLY",
+    contractType: "YEARLY",
+    baseSalary: 4500000,
+    positionAllowance: 500000,
+    transportAllowance: 400000,
+    bpjsAllowance: 150000,
+    notes: "Gaji bulanan staf IT tetap",
+  },
+  {
+    id: "staff_spv",
+    label: "🏢 Supervisor / Koordinator Operasional (Gaji Bulanan)",
+    positionName: "Supervisor / Koordinator Operasional",
+    category: "STAFF",
+    payrollScheme: "MONTHLY",
+    contractType: "YEARLY",
+    baseSalary: 5500000,
+    positionAllowance: 750000,
+    transportAllowance: 500000,
+    bpjsAllowance: 150000,
+    notes: "Gaji bulanan manajerial/supervisor",
+  },
+  {
+    id: "custom",
+    label: "✍️ Posisi Kustom (Input Manual Bebas)",
+    positionName: "",
+    category: "TECHNICIAN",
+    payrollScheme: "DAILY",
+    contractType: "DAILY",
+    dailyRate: 175000,
+    overtimeHourlyRate: 30000,
+    baseSalary: 4000000,
+    positionAllowance: 500000,
+    transportAllowance: 400000,
+    bpjsAllowance: 150000,
+    notes: "Posisi kustom",
+  },
+];
+
 export default function ContractsPage() {
   const [contracts, setContracts] = useState<DstechContract[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +230,9 @@ export default function ContractsPage() {
     employeePhone: "",
     employeeEmail: "",
     employeeAddress: "",
-    position: "Teknisi Instalasi CCTV & Smart Home",
+    selectedRolePresetId: "skill",
+    position: "Teknisi Skill Instalasi & Integrasi",
+    payrollSchemeType: "DAILY" as "DAILY" | "MONTHLY",
     employeeCategory: "TECHNICIAN" as "STAFF" | "TECHNICIAN",
     contractType: "DAILY" as "DAILY" | "MONTHLY" | "YEARLY",
     startDate: new Date().toISOString().split("T")[0],
@@ -128,7 +247,7 @@ export default function ContractsPage() {
     bpjsAllowance: 150000,
     // Technician Daily Scheme
     dailyRateType: "TYPE_1_FULL_DAY" as "TYPE_1_FULL_DAY" | "TYPE_2_HOURLY",
-    dailyRate: 200000,
+    dailyRate: 175000,
     overtimeHourlyRate: 30000,
     hourlyRate: 30000,
     normalHoursPerDay: 8,
@@ -181,14 +300,76 @@ export default function ContractsPage() {
     fetchContracts();
   }, []);
 
-  // Helper date difference in days
+  // Helper sisa hari kalender dinormalisasi ke midnight (00:00:00) agar akurat
   const getDaysRemaining = (endDateStr: string) => {
     try {
-      const end = new Date(endDateStr).getTime();
-      const now = new Date().getTime();
-      return Math.ceil((end - now) / (1000 * 60 * 60 * 24));
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const endParts = endDateStr.split("-").map(Number);
+      const end = new Date(endParts[0], endParts[1] - 1, endParts[2]).getTime();
+      return Math.ceil((end - today) / (1000 * 60 * 60 * 24));
     } catch {
       return 0;
+    }
+  };
+
+  // Helper detail status sisa waktu kontrak kerja (format ramah pengguna)
+  const getContractTimeInfo = (startDateStr: string, endDateStr: string) => {
+    try {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const endParts = endDateStr.split("-").map(Number);
+      const end = new Date(endParts[0], endParts[1] - 1, endParts[2]).getTime();
+      const diffDays = Math.ceil((end - today) / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= 0) {
+        return {
+          daysRemaining: diffDays,
+          isExpired: true,
+          isExpiringSoon: false,
+          badgeText: "Kedaluwarsa",
+          badgeColor: "bg-rose-100 text-rose-700 border-rose-200",
+          descText: `Masa kontrak telah berakhir (${endDateStr})`,
+        };
+      }
+
+      const months = Math.floor(diffDays / 30);
+      const extraDays = diffDays % 30;
+      let durationRemaining = "";
+      if (months > 0) {
+        durationRemaining = `${months} Bulan${extraDays > 0 ? ` ${extraDays} Hari` : ""}`;
+      } else {
+        durationRemaining = `${diffDays} Hari`;
+      }
+
+      if (diffDays <= 30) {
+        return {
+          daysRemaining: diffDays,
+          isExpired: false,
+          isExpiringSoon: true,
+          badgeText: `Segera Berakhir • Sisa ${diffDays} Hari`,
+          badgeColor: "bg-amber-100 text-amber-800 border-amber-200",
+          descText: `Sisa ${diffDays} hari lagi s/d ${endDateStr}`,
+        };
+      }
+
+      return {
+        daysRemaining: diffDays,
+        isExpired: false,
+        isExpiringSoon: false,
+        badgeText: `Aktif • Sisa ${durationRemaining}`,
+        badgeColor: "bg-emerald-100 text-emerald-800 border-emerald-200",
+        descText: `Sisa ${diffDays} hari lagi s/d ${endDateStr}`,
+      };
+    } catch {
+      return {
+        daysRemaining: 0,
+        isExpired: true,
+        isExpiringSoon: false,
+        badgeText: "Status Tidak Diketahui",
+        badgeColor: "bg-slate-100 text-slate-700 border-slate-200",
+        descText: "-",
+      };
     }
   };
 
@@ -268,7 +449,9 @@ export default function ContractsPage() {
       employeePhone: "",
       employeeEmail: "",
       employeeAddress: "",
-      position: "Teknisi Instalasi CCTV & Smart Home",
+      selectedRolePresetId: "skill",
+      position: "Teknisi Skill Instalasi & Integrasi",
+      payrollSchemeType: "DAILY",
       employeeCategory: "TECHNICIAN",
       contractType: "DAILY",
       startDate: today.toISOString().split("T")[0],
@@ -281,7 +464,7 @@ export default function ContractsPage() {
       transportAllowance: 400000,
       bpjsAllowance: 150000,
       dailyRateType: "TYPE_1_FULL_DAY",
-      dailyRate: 200000,
+      dailyRate: 175000,
       overtimeHourlyRate: 30000,
       hourlyRate: 30000,
       normalHoursPerDay: 8,
@@ -290,7 +473,7 @@ export default function ContractsPage() {
       weekendMultiplier: 2.0,
       directorName: "RAMADHANI, ST",
       directorTitle: "Direktur Utama",
-      notes: "Kontrak kerja baru teknisi lapangan sistem harian.",
+      notes: "Kontrak kerja baru teknisi lapangan sistem harian (Teknisi Skill Rp 175.000/hari).",
       createLoginAccount: true,
       loginPassword: "",
     });
@@ -301,6 +484,17 @@ export default function ContractsPage() {
   const handleOpenEditModal = (item: DstechContract) => {
     const daily = item.salaryScheme?.dailyScheme;
     const staff = item.salaryScheme?.staffScheme;
+    const isDaily = !!daily || item.employeeCategory === "TECHNICIAN" && item.contractType === "DAILY";
+
+    // Detect preset id
+    let matchedPreset = "custom";
+    const posLower = (item.position || "").toLowerCase();
+    if (posLower.includes("helper")) matchedPreset = "helper";
+    else if (posLower.includes("skill") || posLower.includes("instalasi")) matchedPreset = "skill";
+    else if (posLower.includes("senior") || posLower.includes("spesialis")) matchedPreset = "senior";
+    else if (posLower.includes("foreman") || posLower.includes("lead")) matchedPreset = "foreman";
+    else if (posLower.includes("administrasi") || posLower.includes("keuangan")) matchedPreset = "staff_admin";
+    else if (posLower.includes("it") || posLower.includes("network")) matchedPreset = "staff_it";
 
     setFormData({
       id: item.id,
@@ -310,7 +504,9 @@ export default function ContractsPage() {
       employeePhone: item.employeePhone || "",
       employeeEmail: item.employeeEmail || "",
       employeeAddress: item.employeeAddress || "",
+      selectedRolePresetId: matchedPreset,
       position: item.position,
+      payrollSchemeType: isDaily ? "DAILY" : "MONTHLY",
       employeeCategory: item.employeeCategory,
       contractType: item.contractType,
       startDate: item.startDate,
@@ -318,12 +514,12 @@ export default function ContractsPage() {
       durationMonths: item.durationMonths,
       workLocation: item.workLocation,
       status: item.status,
-      baseSalary: staff?.baseSalary || 4000000,
+      baseSalary: staff?.baseSalary || 4200000,
       positionAllowance: staff?.positionAllowance || 500000,
       transportAllowance: staff?.transportAllowance || 400000,
       bpjsAllowance: staff?.bpjsAllowance || 150000,
       dailyRateType: daily?.dailyRateType || "TYPE_1_FULL_DAY",
-      dailyRate: daily?.dailyRate || 200000,
+      dailyRate: daily?.dailyRate || 175000,
       overtimeHourlyRate: daily?.overtimeHourlyRate || 30000,
       hourlyRate: daily?.hourlyRate || 30000,
       normalHoursPerDay: daily?.normalHoursPerDay || 8,
@@ -367,19 +563,18 @@ export default function ContractsPage() {
       setSaving(true);
       const isEdit = !!formData.id;
 
-      // Build Salary Scheme based on Category & Contract Type
+      // Build Salary Scheme based on Explicit Payroll Scheme Type
       let salaryScheme: any = {};
-      if (formData.employeeCategory === "STAFF" || formData.contractType === "MONTHLY" || formData.contractType === "YEARLY") {
+      if (formData.payrollSchemeType === "MONTHLY") {
         salaryScheme.staffScheme = {
           baseSalary: Number(formData.baseSalary || 0),
           positionAllowance: Number(formData.positionAllowance || 0),
           transportAllowance: Number(formData.transportAllowance || 0),
           bpjsAllowance: Number(formData.bpjsAllowance || 0),
-          notes: "Gaji bulanan staf tetap / kontrak",
+          notes: "Gaji bulanan tetap staf / karyawan (tidak dikalikan hari hadir di auto-payroll)",
         };
-      }
-
-      if (formData.employeeCategory === "TECHNICIAN" && formData.contractType === "DAILY") {
+      } else {
+        // DAILY RATE
         salaryScheme.dailyScheme = {
           dailyRateType: formData.dailyRateType,
           dailyRate: Number(formData.dailyRate || 0),
@@ -853,6 +1048,7 @@ export default function ContractsPage() {
                   const days = getDaysRemaining(item.endDate);
                   const isExpiring = item.status === "ACTIVE" && days > 0 && days <= 30;
                   const isExpired = days <= 0 || item.status === "EXPIRED";
+                  const timeInfo = getContractTimeInfo(item.startDate, item.endDate);
 
                   const daily = item.salaryScheme?.dailyScheme;
                   const staff = item.salaryScheme?.staffScheme;
@@ -951,21 +1147,21 @@ export default function ContractsPage() {
                       {/* Status & Sisa Waktu */}
                       <td className="py-4 px-4">
                         <div className="space-y-1">
-                          {isExpired ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-700 uppercase flex items-center gap-1 w-fit">
+                          {timeInfo.isExpired ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-700 border border-rose-200 uppercase flex items-center gap-1 w-fit shadow-xs">
                               <AlertCircle className="w-3 h-3" /> Kedaluwarsa
                             </span>
-                          ) : isExpiring ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 uppercase flex items-center gap-1 w-fit">
-                              <Clock className="w-3 h-3" /> Sisa {days} Hari
+                          ) : timeInfo.isExpiringSoon ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200 uppercase flex items-center gap-1 w-fit shadow-xs">
+                              <Clock className="w-3 h-3 text-amber-600 animate-pulse" /> {timeInfo.badgeText}
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 uppercase flex items-center gap-1 w-fit">
-                              <CheckCircle2 className="w-3 h-3" /> Aktif ({days} Hari)
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase flex items-center gap-1 w-fit shadow-xs">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {timeInfo.badgeText}
                             </span>
                           )}
-                          <span className="text-[10px] text-slate-400 block">
-                            Mulai: {item.startDate}
+                          <span className="text-[10px] text-slate-500 font-medium block">
+                            {timeInfo.descText}
                           </span>
                         </div>
                       </td>
@@ -1127,16 +1323,152 @@ export default function ContractsPage() {
                 </div>
               </div>
 
-              {/* BAGIAN 2: PENEMPATAN & KATEGORI */}
+              {/* BAGIAN 2: PENEMPATAN, STATUS PENGGAJIAN & JABATAN */}
               <div className="space-y-4 pt-4 border-t border-slate-100">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Briefcase className="w-4 h-4 text-blue-500" /> 2. Kategori Karyawan & Jabatan
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Briefcase className="w-4 h-4 text-blue-500" /> 2. Status Penggajian & Jabatan Karyawan
+                  </h3>
+                  <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
+                    Standar Penggajian DSTech
+                  </span>
+                </div>
+
+                {/* 1. Pemilih Status Sistem Penggajian (Harian vs Bulanan) */}
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                    Tentukan Sistem Status Penggajian <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          payrollSchemeType: "DAILY",
+                          employeeCategory: "TECHNICIAN",
+                          contractType: "DAILY",
+                          dailyRate: formData.dailyRate || 175000,
+                          overtimeHourlyRate: formData.overtimeHourlyRate || 30000,
+                        });
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                        formData.payrollSchemeType === "DAILY"
+                          ? "border-amber-500 bg-amber-50/70 shadow-xs"
+                          : "border-slate-200 hover:border-slate-300 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-black text-amber-900 flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                          🟢 Sistem Gaji Harian (Daily Rate)
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
+                          Helper / Teknisi Skill
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-snug">
+                        Upah dihitung dari kehadiran riil dikalikan tarif harian posisi (Helper 150rb, Skill 175rb, Senior 200rb).
+                      </p>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          payrollSchemeType: "MONTHLY",
+                          employeeCategory: "STAFF",
+                          contractType: "YEARLY",
+                          baseSalary: formData.baseSalary || 4200000,
+                          positionAllowance: formData.positionAllowance || 500000,
+                          transportAllowance: formData.transportAllowance || 400000,
+                          bpjsAllowance: formData.bpjsAllowance || 150000,
+                        });
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
+                        formData.payrollSchemeType === "MONTHLY"
+                          ? "border-blue-500 bg-blue-50/70 shadow-xs"
+                          : "border-slate-200 hover:border-slate-300 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-black text-blue-900 flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                          🔵 Sistem Gaji Bulanan (Monthly Salary)
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-200 text-blue-900">
+                          Staf Kantor / Tetap
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-snug">
+                        Gaji pokok tetap per bulan sesuai kontrak (tidak dikalikan hari hadir di auto-payroll).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Pilihan Jabatan Resmi & Tarif Standar */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Pilihan Jabatan & Standar Tarif Resmi <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={formData.selectedRolePresetId}
+                      onChange={(e) => {
+                        const pid = e.target.value;
+                        const preset = OFFICIAL_POSITION_PRESETS.find((p) => p.id === pid);
+                        if (preset) {
+                          setFormData({
+                            ...formData,
+                            selectedRolePresetId: pid,
+                            position: preset.positionName || formData.position,
+                            payrollSchemeType: preset.payrollScheme,
+                            employeeCategory: preset.category,
+                            contractType: preset.contractType,
+                            dailyRate: preset.dailyRate ?? formData.dailyRate,
+                            overtimeHourlyRate: preset.overtimeHourlyRate ?? formData.overtimeHourlyRate,
+                            baseSalary: preset.baseSalary ?? formData.baseSalary,
+                            positionAllowance: preset.positionAllowance ?? formData.positionAllowance,
+                            transportAllowance: preset.transportAllowance ?? formData.transportAllowance,
+                            bpjsAllowance: preset.bpjsAllowance ?? formData.bpjsAllowance,
+                          });
+                        }
+                      }}
+                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      {OFFICIAL_POSITION_PRESETS.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-[10px] text-slate-500 mt-1 block">
+                      Memilih jabatan otomatis mengisi nama posisi, kategori, dan nominal tarif acuan.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Nama Jabatan / Posisi Kerja Spesifik <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.position}
+                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                      placeholder="Contoh: Helper / Asisten Teknisi CCTV"
+                      className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-800"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-1 block">
+                      Dapat disesuaikan jika ada spesialisasi khusus pada penugasan proyek.
+                    </span>
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Kategori Karyawan <span className="text-rose-500">*</span>
+                      Kategori Divisi
                     </label>
                     <select
                       value={formData.employeeCategory}
@@ -1145,28 +1477,15 @@ export default function ContractsPage() {
                         setFormData({
                           ...formData,
                           employeeCategory: cat,
-                          contractType: cat === "STAFF" ? "MONTHLY" : "DAILY",
+                          contractType: cat === "STAFF" ? "YEARLY" : "DAILY",
+                          payrollSchemeType: cat === "STAFF" ? "MONTHLY" : "DAILY",
                         });
                       }}
                       className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
                     >
-                      <option value="STAFF">Staf Kantor (Administrasi, Finance, IT)</option>
                       <option value="TECHNICIAN">Teknisi Lapangan (CCTV, Smart Home, FO)</option>
+                      <option value="STAFF">Staf Kantor (Administrasi, Finance, IT)</option>
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Jabatan / Posisi Kerja <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.position}
-                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
-                      placeholder="Contoh: Teknisi CCTV & Smart Home"
-                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
-                    />
                   </div>
 
                   <div>
@@ -1178,23 +1497,36 @@ export default function ContractsPage() {
                       onChange={(e) => setFormData({ ...formData, contractType: e.target.value as any })}
                       className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
                     >
-                      {formData.employeeCategory === "STAFF" ? (
+                      {formData.payrollSchemeType === "MONTHLY" ? (
                         <>
                           <option value="MONTHLY">Bulanan (Monthly Contract)</option>
                           <option value="YEARLY">Tahunan (Yearly Contract)</option>
                         </>
                       ) : (
                         <>
-                          <option value="DAILY">Harian (Daily Rate - Proyek)</option>
-                          <option value="MONTHLY">Bulanan (Monthly Field Tech)</option>
-                          <option value="YEARLY">Tahunan (Yearly Senior Tech)</option>
+                          <option value="DAILY">Harian Proyek (Daily Rate)</option>
+                          <option value="MONTHLY">Bulanan Teknisi (Monthly)</option>
+                          <option value="YEARLY">Tahunan Senior (Yearly)</option>
                         </>
                       )}
                     </select>
                   </div>
+
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1">
+                      Durasi Kontrak (Bulan)
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.durationMonths}
+                      onChange={(e) => setFormData({ ...formData, durationMonths: Number(e.target.value) })}
+                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
                       Tanggal Mulai Kontrak
@@ -1220,19 +1552,6 @@ export default function ContractsPage() {
                       className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
                     />
                   </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Durasi Kontrak (Bulan)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.durationMonths}
-                      onChange={(e) => setFormData({ ...formData, durationMonths: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
-                    />
-                  </div>
                 </div>
 
                 <div>
@@ -1243,7 +1562,7 @@ export default function ContractsPage() {
                     type="text"
                     value={formData.workLocation}
                     onChange={(e) => setFormData({ ...formData, workLocation: e.target.value })}
-                    placeholder="Contoh: Kantor Utama Cilegon / Fleksibel Proyek Lapangan"
+                    placeholder="Contoh: Kantor Utama Cilegon / Fleksibel Proyek Lapangan (Sesuai SPK)"
                     className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
                   />
                 </div>
@@ -1251,25 +1570,30 @@ export default function ContractsPage() {
 
               {/* BAGIAN 3: SKEMA PEMBAYARAN & UPAH */}
               <div className="space-y-4 pt-4 border-t border-slate-100">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <DollarSign className="w-4 h-4 text-emerald-500" /> 3. Skema Upah & Kompensasi
+                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-emerald-500" /> 3. Rincian Skema Upah & Kompensasi
                 </h3>
 
-                {/* JIKA STAF KANTOR ATAU KONTRAK BULANAN/TAHUNAN */}
-                {formData.employeeCategory === "STAFF" || formData.contractType === "MONTHLY" || formData.contractType === "YEARLY" ? (
-                  <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 space-y-4">
-                    <span className="text-xs font-black text-blue-900 uppercase tracking-wider block">
-                      Skema Staf Kantor / Kontrak Bulanan & Tahunan
-                    </span>
+                {/* JIKA SISTEM GAJI BULANAN */}
+                {formData.payrollSchemeType === "MONTHLY" ? (
+                  <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-200 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-blue-900 uppercase tracking-wider block">
+                        Rincian Gaji Bulanan Tetap (Staf Kantor)
+                      </span>
+                      <span className="text-[10px] font-bold text-blue-700 bg-white px-2.5 py-0.5 rounded-full border border-blue-200">
+                        Gaji Pokok Tetap Per Bulan
+                      </span>
+                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Gaji Pokok (Rp)</label>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Gaji Pokok (Rp/Bulan)</label>
                         <input
                           type="number"
                           value={formData.baseSalary}
                           onChange={(e) => setFormData({ ...formData, baseSalary: Number(e.target.value) })}
-                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-bold"
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-blue-300 rounded-xl font-bold text-blue-950"
                         />
                       </div>
 
@@ -1294,7 +1618,7 @@ export default function ContractsPage() {
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">BPJS Ketenagakerjaan (Rp)</label>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Potongan BPJS (Rp)</label>
                         <input
                           type="number"
                           value={formData.bpjsAllowance}
@@ -1303,9 +1627,13 @@ export default function ContractsPage() {
                         />
                       </div>
                     </div>
+
+                    <p className="text-[11px] text-blue-800 bg-white/80 p-2.5 rounded-xl border border-blue-100">
+                      💡 Catatan: Karyawan dengan sistem Gaji Bulanan akan menerima Gaji Pokok tetap setiap periode gajian tanpa dikalikan hari hadir harian di generator slip gaji.
+                    </p>
                   </div>
                 ) : (
-                  /* JIKA TEKNISI KONTRAK HARIAN */
+                  /* JIKA SISTEM GAJI HARIAN */
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Pilihan Tipe 1: Harian Dibayar Penuh */}
@@ -1327,7 +1655,7 @@ export default function ContractsPage() {
                           </span>
                         </div>
                         <p className="text-xs text-slate-600">
-                          Teknisi dibayar penuh per hari kerja berdasarkan kehadiran & penyelesaian tugas SPK.
+                          Teknisi dibayar per hari hadir kerja berdasarkan tarif jabatan (Helper Rp 150.000, Skill Rp 175.000).
                         </p>
                       </div>
 
@@ -1363,7 +1691,7 @@ export default function ContractsPage() {
                             Parameter Upah Tipe 1 (Harian Dibayar Penuh)
                           </span>
                           <span className="text-[10px] text-amber-700 font-bold">
-                            Preset Tingkat Jabatan Teknisi
+                            Preset Cepat Tarif Tingkat Jabatan
                           </span>
                         </div>
 
@@ -1376,7 +1704,7 @@ export default function ContractsPage() {
                                 ...formData,
                                 dailyRate: 150000,
                                 overtimeHourlyRate: 25000,
-                                position: formData.position.includes("Helper") ? formData.position : "Helper / Asisten Teknisi",
+                                position: formData.position.includes("Helper") ? formData.position : "Helper / Asisten Teknisi Lapangan",
                               });
                             }}
                             className={`p-2.5 rounded-xl border text-left transition-all ${
@@ -1397,7 +1725,7 @@ export default function ContractsPage() {
                                 ...formData,
                                 dailyRate: 175000,
                                 overtimeHourlyRate: 30000,
-                                position: formData.position.includes("Skill") ? formData.position : "Teknisi Skill / Ahli",
+                                position: formData.position.includes("Skill") ? formData.position : "Teknisi Skill Instalasi & Integrasi",
                               });
                             }}
                             className={`p-2.5 rounded-xl border text-left transition-all ${
@@ -1418,7 +1746,7 @@ export default function ContractsPage() {
                                 ...formData,
                                 dailyRate: 200000,
                                 overtimeHourlyRate: 35000,
-                                position: formData.position.includes("Senior") ? formData.position : "Teknisi Senior",
+                                position: formData.position.includes("Senior") ? formData.position : "Teknisi Senior / Specialist",
                               });
                             }}
                             className={`p-2.5 rounded-xl border text-left transition-all ${
@@ -1439,7 +1767,7 @@ export default function ContractsPage() {
                                 ...formData,
                                 dailyRate: 225000,
                                 overtimeHourlyRate: 40000,
-                                position: formData.position.includes("Lead") ? formData.position : "Lead / Foreman Lapangan",
+                                position: formData.position.includes("Lead") || formData.position.includes("Foreman") ? formData.position : "Lead / Foreman Lapangan",
                               });
                             }}
                             className={`p-2.5 rounded-xl border text-left transition-all ${
@@ -1467,7 +1795,7 @@ export default function ContractsPage() {
                               className="w-full px-3.5 py-2.5 text-xs bg-white border border-amber-300 rounded-xl font-bold text-amber-950"
                             />
                             <span className="text-[10px] text-slate-500 mt-1 block">
-                              Standar DSTech: Rp 150.000 s/d Rp 250.000 per hari kerja.
+                              Standar DSTech: Helper Rp 150rb, Skill Rp 175rb, Senior Rp 200rb, Foreman Rp 225rb.
                             </span>
                           </div>
 
