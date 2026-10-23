@@ -391,36 +391,111 @@ export default function EmployeeDashboard() {
   const [isDetectingCheckOutGps, setIsDetectingCheckOutGps] = useState<boolean>(false);
   const [gpsErrorCheckOut, setGpsErrorCheckOut] = useState<string | null>(null);
 
-  // Wajib Foto Selfie Kamera States & Refs
+  // Wajib Foto Selfie Kamera States & Refs (Kamera Langsung WebRTC Anti-Manipulasi)
   const [selfieCheckInPhoto, setSelfieCheckInPhoto] = useState<string | null>(null);
   const [selfieCheckOutPhoto, setSelfieCheckOutPhoto] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [cameraMode, setCameraMode] = useState<"checkin" | "checkout" | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraLoading, setCameraLoading] = useState<boolean>(false);
+  const [cameraFacing, setCameraFacing] = useState<"user" | "environment">("user");
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
-  const fileInputCheckInRef = useRef<HTMLInputElement | null>(null);
-  const fileInputCheckOutRef = useRef<HTMLInputElement | null>(null);
 
-  // Mulai Kamera Depan Perangkat
-  const startCamera = async (mode: "checkin" | "checkout") => {
+  // Pasang stream secara reaktif setiap kali elemen video terpasang di DOM
+  useEffect(() => {
+    if (isCameraActive && cameraStream && videoRef.current) {
+      const vid = videoRef.current;
+      vid.srcObject = cameraStream;
+      vid.onloadedmetadata = () => {
+        vid.play().catch((e) => console.log("Auto-play live camera error:", e));
+      };
+    }
+  }, [isCameraActive, cameraStream]);
+
+  // Mulai Kamera Langsung Perangkat (Dengan Multi-Fallback untuk HP Android, iPhone & Desktop)
+  const startCamera = async (mode: "checkin" | "checkout", facing: "user" | "environment" = cameraFacing) => {
     try {
+      setCameraError(null);
+      setCameraLoading(true);
       setCameraMode(mode);
       setIsCameraActive(true);
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+
+      // Hentikan stream yang sedang berjalan terlebih dahulu
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+        cameraStreamRef.current = null;
+        setCameraStream(null);
+      }
+
+      if (typeof window === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Browser atau koneksi tidak mendukung akses kamera WebRTC. Pastikan situs dibuka melalui protokol aman HTTPS.");
+      }
+
+      let stream: MediaStream | null = null;
+
+      // Percobaan 1: Coba dengan facingMode yang diminta (default kamera depan 'user')
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facing },
           audio: false,
         });
+      } catch (err1: any) {
+        console.warn("Coba 1 facingMode gagal, mencoba ideal constraint...", err1);
+        try {
+          // Percobaan 2: Coba dengan ideal facingMode
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facing } },
+            audio: false,
+          });
+        } catch (err2: any) {
+          console.warn("Coba 2 ideal facingMode gagal, mencoba generic video: true...", err2);
+          // Percobaan 3: Fallback ke kamera manapun yang tersedia di perangkat
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        }
+      }
+
+      if (stream) {
         cameraStreamRef.current = stream;
+        setCameraStream(stream);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(() => {});
         }
       }
     } catch (err: any) {
-      console.warn("Kamera WebRTC tidak dapat diakses langsung, gunakan tombol input kamera:", err);
+      console.error("Gagal membuka kamera HP/perangkat:", err);
       setIsCameraActive(false);
-      showToast("Kamera browser dibatasi, silakan gunakan tombol 'Ambil Foto Selfie via Kamera HP'");
+      setCameraMode(null);
+      let userFriendlyMsg = "Kamera tidak dapat diakses.";
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        userFriendlyMsg = "Izin kamera ditolak. Silakan berikan izin akses kamera di setelan browser atau ikon gembok URL HP Anda.";
+      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        userFriendlyMsg = "Tidak ditemukan sensor kamera pada perangkat ini.";
+      } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
+        userFriendlyMsg = "Kamera sedang digunakan aplikasi lain (misal WhatsApp/Instagram). Tutup aplikasi tersebut dan coba lagi.";
+      } else if (err.name === "OverconstrainedError") {
+        userFriendlyMsg = "Kamera HP Anda tidak mendukung resolusi yang diminta. Coba gunakan browser Chrome terbaru.";
+      } else if (err.message) {
+        userFriendlyMsg = err.message;
+      }
+      setCameraError(userFriendlyMsg);
+      showToast(userFriendlyMsg);
+    } finally {
+      setCameraLoading(false);
+    }
+  };
+
+  // Balik / Putar Kamera Depan <-> Belakang
+  const switchCamera = () => {
+    const nextFacing = cameraFacing === "user" ? "environment" : "user";
+    setCameraFacing(nextFacing);
+    if (cameraMode) {
+      startCamera(cameraMode, nextFacing);
     }
   };
 
@@ -430,21 +505,30 @@ export default function EmployeeDashboard() {
       cameraStreamRef.current.getTracks().forEach((track: MediaStreamTrack) => track.stop());
       cameraStreamRef.current = null;
     }
+    setCameraStream(null);
     setIsCameraActive(false);
     setCameraMode(null);
+    setCameraLoading(false);
   };
 
-  // Ambil Frame Foto Selfie (Snapshot)
+  // Ambil Frame Foto Selfie Langsung (Canvas Snapshot Anti-Manipulasi)
   const takeSnapshot = (mode: "checkin" | "checkout") => {
     if (!videoRef.current) return;
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 480;
+    canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+
+    // Jika kamera depan, balik gambar agar natural (tidak terbalik cermin)
+    if (cameraFacing === "user") {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.60);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.65);
     if (mode === "checkin") {
       setSelfieCheckInPhoto(dataUrl);
     } else {
@@ -452,23 +536,6 @@ export default function EmployeeDashboard() {
     }
     stopCamera();
     showToast("✓ Foto Selfie Wajah Berhasil Diambil!");
-  };
-
-  // Fallback Ambil Foto via Input Kamera Langsung (Mobile Camera Capture)
-  const handleSelfieFileInput = (e: React.ChangeEvent<HTMLInputElement>, mode: "checkin" | "checkout") => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const dataUrl = ev.target?.result as string;
-      if (mode === "checkin") {
-        setSelfieCheckInPhoto(dataUrl);
-      } else {
-        setSelfieCheckOutPhoto(dataUrl);
-      }
-      showToast("✓ Foto Selfie Wajah Berhasil Diambil!");
-    };
-    reader.readAsDataURL(file);
   };
 
   // Map Preview Modal for attendance history table
@@ -637,7 +704,7 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const rawAuth = localStorage.getItem("dstech_employee_auth");
+        const rawAuth = localStorage.getItem("dstech_employee_auth") || localStorage.getItem("dstech_admin_auth");
         if (rawAuth) {
           const parsed = JSON.parse(rawAuth);
           if (parsed && (parsed.name || parsed.email)) {
@@ -3748,16 +3815,6 @@ export default function EmployeeDashboard() {
                   )}
                 </div>
 
-                {/* Input File Fallback for Mobile Device Camera */}
-                <input
-                  type="file"
-                  ref={fileInputCheckInRef}
-                  accept="image/*"
-                  capture="user"
-                  onChange={(e) => handleSelfieFileInput(e, "checkin")}
-                  className="hidden"
-                />
-
                 {selfieCheckInPhoto ? (
                   <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black group max-h-52 flex items-center justify-center">
                     <img
@@ -3780,54 +3837,80 @@ export default function EmployeeDashboard() {
                   </div>
                 ) : isCameraActive && cameraMode === "checkin" ? (
                   <div className="space-y-2">
-                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-black h-52">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-full object-cover transform -scale-x-100"
-                      />
-                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1">
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-black h-56 flex items-center justify-center">
+                      {cameraLoading ? (
+                        <div className="flex flex-col items-center justify-center gap-2 text-white text-xs">
+                          <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
+                          <span>Menghubungkan ke sensor kamera HP...</span>
+                        </div>
+                      ) : (
+                        <video
+                          ref={(el) => {
+                            videoRef.current = el;
+                            if (el && cameraStream && el.srcObject !== cameraStream) {
+                              el.srcObject = cameraStream;
+                              el.play().catch(() => {});
+                            }
+                          }}
+                          autoPlay
+                          playsInline
+                          muted
+                          webkit-playsinline="true"
+                          className={`w-full h-full object-cover ${cameraFacing === "user" ? "transform -scale-x-100" : ""}`}
+                        />
+                      )}
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1 shadow">
                         <span className="w-1.5 h-1.5 rounded-full bg-white"></span> Live Camera
                       </div>
+                      <button
+                        type="button"
+                        onClick={switchCamera}
+                        title="Balik Kamera (Depan / Belakang)"
+                        className="absolute top-2 right-2 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur transition-all cursor-pointer shadow"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
                     </div>
+
+                    {cameraError && (
+                      <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                        <span>{cameraError}</span>
+                      </div>
+                    )}
+
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => takeSnapshot("checkin")}
-                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer"
+                        disabled={cameraLoading}
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer transition-all active:scale-95"
                       >
-                        <Camera className="w-3.5 h-3.5" />
-                        Jepret Foto Sekarang
+                        <Camera className="w-4 h-4" />
+                        Jepret Foto Selfie Sekarang
                       </button>
                       <button
                         type="button"
                         onClick={stopCamera}
-                        className="py-2 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
+                        className="py-2.5 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
                       >
-                        Batal
+                        Tutup
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <div className="space-y-2 pt-1">
                     <button
                       type="button"
                       onClick={() => startCamera("checkin")}
-                      className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                     >
-                      <Camera className="w-3.5 h-3.5" />
-                      Buka Kamera Live
+                      <Camera className="w-4 h-4" />
+                      <span>Buka Kamera Langsung (Selfie Wajah)</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => fileInputCheckInRef.current?.click()}
-                      className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      Kamera HP / Perangkat
-                    </button>
+                    <p className="text-[10px] text-slate-400 text-center italic">
+                      * Sistem anti-manipulasi: Wajib menggunakan kamera langsung HP tanpa unggah file galeri.
+                    </p>
                   </div>
                 )}
               </div>
@@ -4137,16 +4220,6 @@ export default function EmployeeDashboard() {
                   )}
                 </div>
 
-                {/* Input File Fallback for Mobile Device Camera */}
-                <input
-                  type="file"
-                  ref={fileInputCheckOutRef}
-                  accept="image/*"
-                  capture="user"
-                  onChange={(e) => handleSelfieFileInput(e, "checkout")}
-                  className="hidden"
-                />
-
                 {selfieCheckOutPhoto ? (
                   <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black group max-h-52 flex items-center justify-center">
                     <img
@@ -4169,54 +4242,80 @@ export default function EmployeeDashboard() {
                   </div>
                 ) : isCameraActive && cameraMode === "checkout" ? (
                   <div className="space-y-2">
-                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-black h-52">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-full object-cover transform -scale-x-100"
-                      />
-                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1">
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-black h-56 flex items-center justify-center">
+                      {cameraLoading ? (
+                        <div className="flex flex-col items-center justify-center gap-2 text-white text-xs">
+                          <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
+                          <span>Menghubungkan ke sensor kamera HP...</span>
+                        </div>
+                      ) : (
+                        <video
+                          ref={(el) => {
+                            videoRef.current = el;
+                            if (el && cameraStream && el.srcObject !== cameraStream) {
+                              el.srcObject = cameraStream;
+                              el.play().catch(() => {});
+                            }
+                          }}
+                          autoPlay
+                          playsInline
+                          muted
+                          webkit-playsinline="true"
+                          className={`w-full h-full object-cover ${cameraFacing === "user" ? "transform -scale-x-100" : ""}`}
+                        />
+                      )}
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1 shadow">
                         <span className="w-1.5 h-1.5 rounded-full bg-white"></span> Live Camera
                       </div>
+                      <button
+                        type="button"
+                        onClick={switchCamera}
+                        title="Balik Kamera (Depan / Belakang)"
+                        className="absolute top-2 right-2 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur transition-all cursor-pointer shadow"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
                     </div>
+
+                    {cameraError && (
+                      <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                        <span>{cameraError}</span>
+                      </div>
+                    )}
+
                     <div className="flex gap-2">
                       <button
                         type="button"
                         onClick={() => takeSnapshot("checkout")}
-                        className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer"
+                        disabled={cameraLoading}
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer transition-all active:scale-95"
                       >
-                        <Camera className="w-3.5 h-3.5" />
-                        Jepret Foto Sekarang
+                        <Camera className="w-4 h-4" />
+                        Jepret Foto Selfie Pulang
                       </button>
                       <button
                         type="button"
                         onClick={stopCamera}
-                        className="py-2 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
+                        className="py-2.5 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
                       >
-                        Batal
+                        Tutup
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <div className="space-y-2 pt-1">
                     <button
                       type="button"
                       onClick={() => startCamera("checkout")}
-                      className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                      className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                     >
-                      <Camera className="w-3.5 h-3.5" />
-                      Buka Kamera Live
+                      <Camera className="w-4 h-4" />
+                      <span>Buka Kamera Langsung (Selfie Wajah)</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => fileInputCheckOutRef.current?.click()}
-                      className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      Kamera HP / Perangkat
-                    </button>
+                    <p className="text-[10px] text-slate-400 text-center italic">
+                      * Sistem anti-manipulasi: Wajib menggunakan kamera langsung HP tanpa unggah file galeri.
+                    </p>
                   </div>
                 )}
               </div>

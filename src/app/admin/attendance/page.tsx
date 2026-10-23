@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -232,6 +232,32 @@ export default function AdminAttendancePage() {
     role: "SUPERADMIN",
   });
   const [isSelfCheckingIn, setIsSelfCheckingIn] = useState(false);
+
+  // Kamera WebRTC Presensi Mandiri Admin / Superadmin
+  const [isSelfCameraModalOpen, setIsSelfCameraModalOpen] = useState(false);
+  const [selfCameraMode, setSelfCameraMode] = useState<"checkin" | "checkout">("checkin");
+  const [selfCameraStream, setSelfCameraStream] = useState<MediaStream | null>(null);
+  const [isSelfCameraLoading, setIsSelfCameraLoading] = useState(false);
+  const [selfCameraFacing, setSelfCameraFacing] = useState<"user" | "environment">("user");
+  const [selfCameraError, setSelfCameraError] = useState<string | null>(null);
+  const [selfSelfiePhoto, setSelfSelfiePhoto] = useState<string | null>(null);
+  const selfVideoRef = useRef<HTMLVideoElement | null>(null);
+  const selfCameraStreamRef = useRef<MediaStream | null>(null);
+  const [selfGpsCoords, setSelfGpsCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [selfGpsLocation, setSelfGpsLocation] = useState<string>("Mendeteksi lokasi satelit...");
+  const [isSelfDetectingGps, setIsSelfDetectingGps] = useState(false);
+  const [selfGpsError, setSelfGpsError] = useState<string | null>(null);
+
+  // Hook auto-mount stream ke elemen video
+  useEffect(() => {
+    if (isSelfCameraModalOpen && selfCameraStream && selfVideoRef.current) {
+      const vid = selfVideoRef.current;
+      vid.srcObject = selfCameraStream;
+      vid.onloadedmetadata = () => {
+        vid.play().catch((e) => console.log("Auto-play error:", e));
+      };
+    }
+  }, [isSelfCameraModalOpen, selfCameraStream]);
 
   // Modal States
   const [gpsModal, setGpsModal] = useState<{
@@ -521,8 +547,145 @@ export default function AdminAttendancePage() {
     return overtimeList.filter((o) => o.status === "Menunggu Persetujuan").length;
   }, [overtimeList]);
 
-  // Quick Self Check-In / Check-Out for Superadmin & Admin
-  const handleSelfAttendance = async (mode: "checkin" | "checkout") => {
+  // WebRTC Kamera Mandiri Admin & Superadmin Handlers
+  const startSelfCamera = async (facing: "user" | "environment" = selfCameraFacing) => {
+    try {
+      setSelfCameraError(null);
+      setIsSelfCameraLoading(true);
+
+      if (selfCameraStreamRef.current) {
+        selfCameraStreamRef.current.getTracks().forEach((track) => track.stop());
+        selfCameraStreamRef.current = null;
+        setSelfCameraStream(null);
+      }
+
+      if (typeof window === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Browser tidak mendukung WebRTC kamera atau belum menggunakan HTTPS.");
+      }
+
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: facing },
+          audio: false,
+        });
+      } catch (e1) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: facing } },
+            audio: false,
+          });
+        } catch (e2) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false,
+          });
+        }
+      }
+
+      if (stream) {
+        selfCameraStreamRef.current = stream;
+        setSelfCameraStream(stream);
+        if (selfVideoRef.current) {
+          selfVideoRef.current.srcObject = stream;
+          selfVideoRef.current.play().catch(() => {});
+        }
+      }
+    } catch (err: any) {
+      console.error("Camera error admin attendance:", err);
+      let msg = "Kamera tidak dapat diakses.";
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        msg = "Izin kamera ditolak. Silakan izinkan akses kamera di pengaturan browser Anda.";
+      } else if (err.name === "NotFoundError") {
+        msg = "Sensor kamera tidak ditemukan pada perangkat Anda.";
+      } else if (err.message) {
+        msg = err.message;
+      }
+      setSelfCameraError(msg);
+    } finally {
+      setIsSelfCameraLoading(false);
+    }
+  };
+
+  const switchSelfCamera = () => {
+    const nextFacing = selfCameraFacing === "user" ? "environment" : "user";
+    setSelfCameraFacing(nextFacing);
+    startSelfCamera(nextFacing);
+  };
+
+  const stopSelfCamera = () => {
+    if (selfCameraStreamRef.current) {
+      selfCameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      selfCameraStreamRef.current = null;
+    }
+    setSelfCameraStream(null);
+    setIsSelfCameraLoading(false);
+  };
+
+  const takeSelfSnapshot = () => {
+    if (!selfVideoRef.current) return;
+    const video = selfVideoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    if (selfCameraFacing === "user") {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.65);
+    setSelfSelfiePhoto(dataUrl);
+    stopSelfCamera();
+  };
+
+  const detectSelfGps = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setSelfGpsLocation("Kantor Pusat PT DSTech Smart Perkasa (Cilegon)");
+      setSelfGpsCoords({ lat: -6.031846, lng: 106.037198, accuracy: 15 });
+      return;
+    }
+    setIsSelfDetectingGps(true);
+    setSelfGpsError(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsSelfDetectingGps(false);
+        const { latitude, longitude, accuracy } = pos.coords;
+        setSelfGpsCoords({ lat: latitude, lng: longitude, accuracy: Math.round(accuracy) });
+        setSelfGpsLocation(`Area Kantor (${latitude.toFixed(6)}, ${longitude.toFixed(6)}) - Akurasi ±${Math.round(accuracy)}m`);
+      },
+      (err) => {
+        setIsSelfDetectingGps(false);
+        console.warn("GPS error:", err);
+        setSelfGpsError("GPS tidak terdeteksi, menggunakan koordinat kantor default.");
+        setSelfGpsCoords({ lat: -6.031846, lng: 106.037198, accuracy: 20 });
+        setSelfGpsLocation("Kantor Pusat PT DSTech Smart Perkasa (Cilegon)");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const openSelfAttendanceModal = (mode: "checkin" | "checkout") => {
+    setSelfCameraMode(mode);
+    setSelfSelfiePhoto(null);
+    setSelfCameraError(null);
+    setIsSelfCameraModalOpen(true);
+    detectSelfGps();
+    startSelfCamera("user");
+  };
+
+  const closeSelfAttendanceModal = () => {
+    stopSelfCamera();
+    setIsSelfCameraModalOpen(false);
+    setSelfSelfiePhoto(null);
+  };
+
+  const handleConfirmSelfAttendance = async () => {
+    if (!selfSelfiePhoto) {
+      setToastMsg({ type: "error", text: "Wajib mengambil foto wajah via kamera langsung." });
+      return;
+    }
     setIsSelfCheckingIn(true);
     try {
       const now = new Date();
@@ -532,14 +695,16 @@ export default function AdminAttendancePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: mode === "checkin" ? "checkin" : "checkout",
+          action: selfCameraMode,
           employeeName: currentUser.name,
-          location: "Kantor DSTech Smart Perkasa (Cilegon)",
-          latitude: -6.031846,
-          longitude: 106.037198,
-          accuracy: 10,
-          mapsUrl: "https://www.google.com/maps?q=-6.031846,106.037198",
-          notes: `Presensi langsung via Dashboard Admin oleh ${currentUser.name} (${timeStr})`,
+          location: selfGpsLocation,
+          latitude: selfGpsCoords?.lat || -6.031846,
+          longitude: selfGpsCoords?.lng || 106.037198,
+          accuracy: selfGpsCoords?.accuracy || 10,
+          mapsUrl: selfGpsCoords ? `https://www.google.com/maps?q=${selfGpsCoords.lat},${selfGpsCoords.lng}` : "https://www.google.com/maps?q=-6.031846,106.037198",
+          selfieCheckIn: selfCameraMode === "checkin" ? selfSelfiePhoto : undefined,
+          selfieCheckOut: selfCameraMode === "checkout" ? selfSelfiePhoto : undefined,
+          notes: `Presensi mandiri ${selfCameraMode === "checkin" ? "masuk" : "pulang"} oleh ${currentUser.name} via Kelola Absensi (${timeStr})`,
         }),
       });
 
@@ -547,8 +712,9 @@ export default function AdminAttendancePage() {
       if (resJson.success) {
         setToastMsg({
           type: "success",
-          text: `Presensi ${mode === "checkin" ? "Masuk" : "Pulang"} (${currentUser.name}) berhasil dicatat!`,
+          text: `✓ Presensi ${selfCameraMode === "checkin" ? "Masuk" : "Pulang"} (${currentUser.name}) berhasil diverifikasi!`,
         });
+        closeSelfAttendanceModal();
         fetchData();
       } else {
         setToastMsg({ type: "error", text: resJson.error || "Gagal mencatat presensi" });
@@ -1027,20 +1193,22 @@ export default function AdminAttendancePage() {
 
           <div className="flex items-center gap-2.5 w-full md:w-auto">
             <button
-              onClick={() => handleSelfAttendance("checkin")}
+              type="button"
+              onClick={() => openSelfAttendanceModal("checkin")}
               disabled={isSelfCheckingIn}
-              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition-all cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-600/30 transition-all cursor-pointer active:scale-95"
             >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{isSelfCheckingIn ? "Mencatat..." : "Check-In Saya Sekarang"}</span>
+              <Camera className="w-4 h-4" />
+              <span>Check-In Live Kamera</span>
             </button>
 
             <button
-              onClick={() => handleSelfAttendance("checkout")}
+              type="button"
+              onClick={() => openSelfAttendanceModal("checkout")}
               disabled={isSelfCheckingIn}
-              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 transition-all cursor-pointer"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold border border-slate-700 transition-all cursor-pointer active:scale-95"
             >
-              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <Clock className="w-4 h-4 text-slate-400" />
               <span>Check-Out Pulang</span>
             </button>
           </div>
@@ -3189,6 +3357,184 @@ export default function AdminAttendancePage() {
                 className="flex-1 py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-rose-600/25 transition-all cursor-pointer"
               >
                 {submitting ? "Menghapus..." : "Ya, Hapus"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: PRESENSI MANDIRI SUPERADMIN/ADMIN (LIVE WEBRTC KAMERA & GPS) */}
+      {isSelfCameraModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-100 flex flex-col max-h-[92vh]">
+            {/* Header Modal */}
+            <div className="p-5 sm:p-6 bg-slate-900 text-white flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400">
+                  Verifikasi Wajah & GPS Satelit
+                </span>
+                <h3 className="text-lg font-black text-white">
+                  {selfCameraMode === "checkin" ? "Presensi Masuk (Check-In)" : "Presensi Pulang (Check-Out)"}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {currentUser.name} ({currentUser.role})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeSelfAttendanceModal}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body Modal */}
+            <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
+              {/* Kamera WebRTC Container */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                  <span className="flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-blue-600" />
+                    Kamera Live Wajah (Anti-Manipulasi)
+                  </span>
+                  {selfSelfiePhoto ? (
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" /> Foto Terambil
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                      Wajib Foto Langsung
+                    </span>
+                  )}
+                </div>
+
+                {selfSelfiePhoto ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-black h-60 flex items-center justify-center">
+                    <img src={selfSelfiePhoto} alt="Selfie Preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelfSelfiePhoto(null);
+                          startSelfCamera("user");
+                        }}
+                        className="px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-md cursor-pointer hover:bg-slate-100"
+                      >
+                        Ambil Ulang Foto
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-black h-60 flex items-center justify-center">
+                      {isSelfCameraLoading ? (
+                        <div className="flex flex-col items-center justify-center gap-2 text-white text-xs">
+                          <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
+                          <span>Menghubungkan ke sensor kamera...</span>
+                        </div>
+                      ) : (
+                        <video
+                          ref={(el) => {
+                            selfVideoRef.current = el;
+                            if (el && selfCameraStream && el.srcObject !== selfCameraStream) {
+                              el.srcObject = selfCameraStream;
+                              el.play().catch(() => {});
+                            }
+                          }}
+                          autoPlay
+                          playsInline
+                          muted
+                          webkit-playsinline="true"
+                          className={`w-full h-full object-cover ${selfCameraFacing === "user" ? "transform -scale-x-100" : ""}`}
+                        />
+                      )}
+
+                      <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1 shadow">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white"></span> Live Camera
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={switchSelfCamera}
+                        title="Balik Kamera"
+                        className="absolute top-2 right-2 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur transition-all cursor-pointer shadow"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {selfCameraError && (
+                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                        <span>{selfCameraError}</span>
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={takeSelfSnapshot}
+                      disabled={isSelfCameraLoading}
+                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow cursor-pointer transition-all active:scale-95"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Jepret Foto Selfie Sekarang</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Status Lokasi GPS */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-700 flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                    Lokasi GPS Satelit:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={detectSelfGps}
+                    className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${isSelfDetectingGps ? "animate-spin" : ""}`} />
+                    Refresh GPS
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-relaxed font-mono">
+                  {selfGpsLocation}
+                </p>
+                {selfGpsError && (
+                  <p className="text-[10px] text-amber-600 italic">{selfGpsError}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Modal Actions */}
+            <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeSelfAttendanceModal}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSelfAttendance}
+                disabled={isSelfCheckingIn || !selfSelfiePhoto}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-md cursor-pointer transition-all active:scale-95"
+              >
+                {isSelfCheckingIn ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Menyimpan Presensi...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Konfirmasi Presensi</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
