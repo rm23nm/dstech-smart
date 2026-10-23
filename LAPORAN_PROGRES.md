@@ -69,14 +69,24 @@
 - **2026-10-21**: Modul Manajemen Penjadwalan & Operasional Lapangan Maintenance Mandiri Terpisah (`/admin/maintenance` & `/superadmin/maintenance`). Memisahkan pencatatan dan tata kelola pekerjaan pemeliharaan (Maintenance Rutin Berkala & Tiket Perbaikan/Troubleshooting) dari modul proyek utama agar alur kerja teknisi dan riwayat servis SLA tercatat mandiri tanpa membebani kalkulasi P&L proyek. Dilengkapi navigasi sidebar, tab kalender & daftar jadwal kunjungan, filter status & prioritas tiket, penugasan teknisi PIC, modal terbit surat tugas SPK maintenance, sinkronisasi ke backend `/api/employee/tasks` ber-prefix `dstech_task_`, dan integrasi real-time ke portal mobile teknisi `/employee`.
 - **2026-10-21**: Sistem Otomasi Laporan Foto Dokumentasi & Pergantian Part Siap Cetak Lampiran Faktur Tagihan A4 (Maintenance & Project). Menyediakan sistem pelaporan bukti fisik komprehensif bagi PIC teknisi dan admin: (1) Form upload foto cepat (bisa langsung dari kamera HP teknisi di lapangan atau file galeri) dengan pilihan kategori wajib: `📸 Foto Dokumentasi Pekerjaan` atau `⚙️ Foto Pergantian Part / Sparepart` beserta keterangan/caption rincian tindakan; (2) Galeri foto terstruktur pada tiket maintenance (`/admin/maintenance`), portal teknisi (`/employee`), dan berkas proyek (`/admin/finance` -> Project Dossier); (3) Generator otomatis Lembar Resmi A4 *"Lampiran Laporan Foto Dokumentasi & Pergantian Part"* ber-Kop Surat Resmi PT DSTech Smart Perkasa (`kop_surat_dstech.jpg`), lengkap dengan nomor dokumen legalitas penagihan, data klien & proyek/tiket, tata letak grid foto rapi ber-caption, perbandingan part rusak vs part baru, pernyataan legalitas, serta dual signature block (PIC Pengawas Klien & Project Manager/Teknisi DSTech) siap 1-klik cetak/simpan PDF untuk disandingkan langsung dengan Faktur Tagihan (Invoice) penagihan ke klien. Lolos validasi TypeScript 0 error, pengujian visual browser subagent, push GitHub commit `2d8412b`, dan live deploy sukses di VPS PM2 `dstech-main` (HTTP 200 OK).
 - **2026-10-21**: Pemisahan Independen Kop Surat, Watermark, dan Rekening Bank Perusahaan (PT. DSTech Smart Perkasa vs Non-PT / Toko DStech). Menyediakan kontrol independen penuh di `/admin/finance` untuk masing-masing entitas: (1) Kop surat mandiri PT (`/kop_surat_dstech.jpg`) dan Non-PT (`/kop_surat_toko.jpg`); (2) Slider opasitas watermark terpisah; (3) Rekening bank terisolasi per entitas bisnis; (4) Lembar cetak dokumen keuangan (SPH, Faktur, PO, BAST Retur) otomatis memuat kop surat, watermark, dan legalitas sesuai entitas yang dipilih. Lolos validasi TypeScript, browser subagent, commit git `3fb738d`, dan sukses deploy ke VPS live.
-- **2026-10-21**: Pembaruan Penamaan 'Toko DStech' Menjadi 'DSTech Smart', Penyesuaian Pihak Pelaksana & Stempel Digital BAST Non-PT, serta Penambahan Fitur Upload Langsung Kop Surat. Mengakomodasi 3 permintaan pengguna: (1) Mengganti seluruh label 'Toko DStech' atau 'Non-PT / Toko' menjadi 'DSTech Smart' (atau 'Non-PT / DSTech Smart') di seluruh modul admin (`/admin/categories`, `/admin/products`, `/admin/portfolios`, `/admin/inventory`, `/admin/maintenance`, dan data JSON pendukung); (2) Menyesuaikan pihak pelaksana pada lembar cetak Berita Acara Kunjungan Maintenance A4 (`printable-bast-maintenance`): untuk tiket Non-PT, pihak pelaksana otomatis tertulis 'DSTech Smart', pengantar tidak lagi menyebut 'PT', pengesahan tanda tangan menggunakan 'Teknisi DSTech Smart', dan stempel digital otomatis berganti menjadi stempel bulat ungu bertuliskan 'DSTECH SMART CILEGON' (sedangkan tiket PT tetap menggunakan 'PT. DSTech Smart Perkasa' dan stempel biru); (3) Menyediakan tombol upload kop surat langsung (`<Upload />`) di toolbar pratinjau cetak BAST `/admin/maintenance` sehingga pengguna dapat mengunggah gambar kop surat baru secara instan tanpa harus berpindah halaman, di samping pengaturan permanen di ERP Keuangan `/admin/finance`. Lolos validasi TypeScript (`npx tsc --noEmit` 0 error), disinkronkan ke GitHub repository `rm23nm/dstech-smart`, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
-- **2026-10-22**: Perbaikan Bug Upload Foto Faktur & Proyek (Penyelarasan Body Payload/Updates PUT API), Isolasi Cetak Lembar Kwitansi & Lampiran Foto A4 (Pencegahan Kebocoran Tampilan Dashboard Utama saat Print), serta Penomoran Otomatis Faktur Dinamis Mengikuti Tanggal Pilihan Pengguna (INV-DSTECH-YYYYMM-XXX). Memperbaiki akar masalah gagal simpan foto dokumentasi faktur pada `handleUploadInvoicePhoto` di mana backend API menolak `payload` karena hanya menerima `updates`, menyertakan `isReceiptModalOpen` dan `selectedInvoiceForPhotoPrint` ke `isAnyPrintModalOpen` agar modal kwitansi dan cetak foto bersih tanpa dashboard utama, serta memperbarui logika nomor faktur otomatis agar sinkron dengan tahun dan bulan dari tanggal yang dipilih pengguna (misal 2026-03-13 menghasilkan INV-DSTECH-202603-XXX). Lolos kompilasi TypeScript 0 error dan lolos build Next.js.
-- **2026-10-22**: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Seluruh 5 Modul ERP Keuangan (Penjualan & Faktur, Pembelian & PO, Retur Barang, Laporan Laba Rugi, dan Buku Arus Kas). Mengimplementasikan top control bar seragam dengan preset periode (Semua Tanggal, Hari Ini, Bulan Ini, Bulan Lalu, Tahun Ini, Rentang Kustom dengan Date Picker Mulai-Selesai), dropdown sortir tanggal & nominal (Tanggal Terbaru, Tanggal Terlama, Nominal Tertinggi/Terendah, Nama A-Z), input pencarian interaktif, dan penempatan berdampingan tepat di sebelah tombol Form Input utama masing-masing modul. Laba Rugi mengkalkulasi pendapatan, HPP, beban operasional, dan laba bersih secara dinamis sesuai periode terpilih. Lolos validasi TypeScript 0 error dan build Next.js sukses.
-- **2026-10-22**: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Modul Manajemen Proyek (Projects). Mengimplementasikan top control bar seragam pada tab Manajemen Proyek dengan preset periode (Semua Tanggal, Hari Ini, Bulan Ini, Bulan Lalu, Tahun Ini, Rentang Kustom dengan Date Picker Mulai-Selesai), dropdown sortir tanggal & nilai kontrak (Tanggal Mulai Terbaru/Terlama, Nilai Kontrak Tertinggi/Terendah, Nama Proyek A-Z), filter status proyek (In Progress, Completed, Planning, On Hold), input pencarian multi-field (nomor PRJ, nama proyek, klien, PIC, deskripsi), serta kartu ringkasan KPI dan grid kartu proyek yang tersaring dinamis, ditempatkan rapi berdampingan dengan tombol `+ Buat Proyek Baru`. Lolos validasi TypeScript 0 error dan build Next.js sukses.
-- **2026-10-22**: Peningkatan Akses & Visibilitas Approval Faktur Digital dan Tombol Input Pembayaran Pelunasan / Cicilan Klien pada Modul Penjualan & Invoicing (`sales`). Mengatasi kebingungan pengguna: (1) Mengubah status 'Menunggu Approval' pada tabel faktur menjadi tombol aksi interaktif berwarna kuning animasi halus bertuliskan 'Approval Faktur' yang bisa langsung diklik untuk memunculkan modal tanda tangan digital direktur; (2) Menyediakan tombol aksi utama berlabel tegas warna hijau emerald '+ Input Bayar' pada setiap faktur yang belum lunas (dilengkapi modal pencatatan nominal, tanggal bayar, metode/rekening bank penerima, dan bukti transfer); (3) Menyediakan tombol cepat 'Approval Faktur' dan '+ Input Bayar' langsung di toolbar atas modal cetak/pratinjau faktur. Lolos validasi TypeScript 0 error dan build Next.js sukses.
-- **2026-10-22**: Penyembunyian Kolom Rincian Item pada Tabel Faktur Penjualan (`sales`) agar Tampilan Tabel Ringkas, Rapi, dan Tidak Memanjang ke Bawah. Menghilangkan kolom 'Rincian Item' yang sebelumnya merender seluruh baris produk/jasa vertikal (menyebabkan baris faktur melorot sangat panjang ke bawah), menggantikannya dengan badge ringkas dan informatif '📦 X Item' di bawah nomor faktur, dan menyesuaikan colSpan tabel menjadi 6 sehingga seluruh baris faktur memiliki ketinggian seragam dan proporsional. Lolos validasi TypeScript 0 error dan build Next.js sukses.
-- **2026-10-22**: Kompresi File Gambar Lampiran Maksimal ~40 KB (Client-Side HTML5 Canvas Strict Scale-Down & Ekspor PDF Super Ringan). Mengakomodasi permintaan pengguna agar file lampiran gambar dikompresi ke 40 KB dan tidak besar-besar: (1) Menyempurnakan algoritma kompresi gambar `compressImageFile` di `src/app/admin/finance/page.tsx` dengan target strict `maxTargetSizeKb = 40` (maksimal 40 * 1024 bytes) menggunakan loop adaptif bertahap (kualitas JPEG 0.70 -> 0.20 dan multi-step adaptive downscaling 0.80x dimensi jika file kamera awal sangat besar) sehingga seluruh nota, bukti transfer kas, dan foto proyek dijamin berada di bawah 40 KB tanpa mengaburkan teks dokumen; (2) Memasang fungsi kompresi client-side target ~40 KB pada formulir upload foto teknisi di portal `/employee` (`compressTechnicianPhoto`) dan admin maintenance `/admin/maintenance` (`compressMaintenancePhoto`) agar foto kamera HP teknisi di lapangan (3-10 MB) otomatis terkompresi ~40 KB sebelum dikirim ke server; (3) Mengoptimalkan parameter ekspor PDF pada endpoint cetak publik `/api/finance/print` (`quality: 0.65`, `scale: 1.5`) sehingga lembar SPH ber-lampiran foto brosur produk dan lembar faktur ber-foto dokumentasi menghasilkan file PDF unduhan yang sangat ringan (100-200 KB) dan cepat dibuka di perangkat mobile klien via WhatsApp. Lolos validasi TypeScript 0 error dan build Next.js lokal 47/47 rute sukses.
-- **2026-10-22**: Fitur Lampirkan Foto & Spesifikasi Khusus pada Item Barang yang Di-Input Manual di Formulir SPH (Kompresi Otomatis ~40 KB & Sinkronisasi Lembar 2 Lampiran SPH). Memenuhi kebutuhan pengguna terkait cara melampirkan foto barang/jasa yang di-input manual di luar katalog produk: (1) Menambahkan tombol upload foto interaktif `📷 Foto Item` langsung pada setiap baris item formulir pembuatan dan pengeditan SPH (`quotationForm.items`); (2) Setiap foto yang dipilih pengguna dari galeri/kamera otomatis dikompresi secara ketat ke ukuran target $\le$ 40 KB via `compressImageFile(file, 40)` sebelum diunggah ke server; (3) Menyediakan thumbnail pratinjau mini foto barang di samping input nama produk dengan status visual badge hijau `✓ Foto Lampiran Terpasang (~40 KB)` dan tombol hapus/ganti foto; (4) Menghubungkan URL foto item manual ke generator Lembar 2 (Lampiran Foto & Spesifikasi Produk SPH) di `/api/finance/print?doc=sph` sehingga foto barang manual otomatis dicetak rapi dan jernih dalam kartu katalog lampiran penawaran harga resmi. Lolos kompilasi TypeScript 0 error dan build Next.js lokal 47/47 rute sukses.
+- **2026-10-21**: Pemisahan Total Entitas PT. DSTech Smart Perkasa vs Non-PT / Toko DStech pada Seluruh Modul Operasional (Kategori & Sub-Kategori, Produk, Portofolio Proyek, Stok & Gudang, Jadwal Maintenance) dan Isolasi Mutlak 100% Katalog Website Utama Publik (Hanya Menampilkan Entitas PT). Menuntaskan pemisahan entitas menyeluruh: (1) Manajemen Kategori (`/admin/categories`): Tab filter entitas (Semua, 🏢 PT, 🏪 Non-PT), KPI cards, badge entitas, dan selector entitas pada modal; (2) Manajemen Produk (`/admin/products`): Tab filter entitas, KPI cards, badge entitas, dan selector modal; (3) Portofolio Proyek (`/admin/portfolios`): Tab filter entitas, KPI cards, badge entitas, dan selector modal; (4) Manajemen Stok & Gudang (`/admin/inventory`): Tab filter entitas pada kartu stok real-time, badge entitas produk, dan KPI stok per entitas; (5) Jadwal & Tiket Maintenance (`/admin/maintenance`): Tab filter entitas tiket, badge entitas, selector modal formulir tugas, serta kop surat BAST A4 yang adaptif terhadap entitas tiket; (6) Website Utama Publik (`/`, `/shop`, `ProductSection.tsx`, `PortfolioSection.tsx`): Integrasi filter ketat `?entity=PT&isPublic=true` dan client-side guard `ptOnly` yang menjamin 100% tidak ada produk atau portofolio Non-PT yang bocor ke pengunjung website publik. Lolos validasi kompilasi TypeScript (`npx tsc --noEmit` 0 error), lolos pengujian visual browser subagent di seluruh modul admin dan e-store publik, disinkronkan ke repositori GitHub, dan dideploy sukses ke server live VPS PM2 `dstech-main`.
+- **2026-10-22**: Sinkronisasi Dinamis Identitas Pengguna Login Teknisi di Portal Karyawan & Penghapusan Hardcode 'Ikhsan Maulidi' (Tugas 81). Mengintegrasikan pembacaan sesi otentikasi login `dstech_employee_auth` dari `localStorage` pada `src/app/employee/page.tsx` ke dalam state `currentUser`. Menghilangkan seluruh teks hardcoded 'Ikhsan Maulidi' dan menggantikannya secara dinamis pada: header sapaan (`Halo, {currentUser?.name}!`), profil sidebar & header mobile, sub-header daftar penugasan (`Pekerjaan yang ditugaskan kepada {currentUser?.name}`), tautan koordinasi WhatsApp, serta penamaan pemohon/pelapor permohonan material gudang, presensi, lembur, dan pengumuman. Menyinkronkan akun `RAMADHANI ST` / `rm23nm@dstechsmart.com` (Role: `EMPLOYEE`) di `src/data/dstech_users.json` dan membersihkan fallback hardcode pada API `/api/employee/inventory` & `/api/employee/attendance`. Lolos validasi TypeScript `npx tsc --noEmit` 0 error.
+- **2026-10-22**: Integrasi Hulu-ke-Hilir Maintenance & Operasional Lapangan (Tugas 80). Menghubungkan seluruh siklus pekerjaan servis teknisi dari lapangan hingga penagihan:
+  1. **Sinkronisasi Material Gudang ke Tugas**: Penambahan tombol aksi cepat "📦 Ajukan Material untuk Tugas Ini" langsung dari kartu tiket di portal teknisi `/employee`, auto-fill ID dan judul tugas ke form permohonan material gudang, dan penautan otomatis logistik material yang digunakan pada detail tiket maintenance admin.
+  2. **Pencatatan Barang Rusak / Part Bekas Tarikan Lapangan**: Penyediaan formulir repeater dinamis pencatatan part rusak yang diganti/ditarik dari klien (nama barang, kuantiti, satuan, kondisi kerusakan, dan tindakan/disposisi) pada modal update status teknisi, serta tabel rekapitulasi barang rusak pada detail tiket admin dan lembar cetak BAST A4.
+  3. **Tracking Lokasi Google Maps**: Pendeteksian GPS lokasi kunjungan riil teknisi di lapangan (latitude & longitude) dengan integrasi tombol "🗺️ Buka Navigasi Google Maps" di portal teknisi, badge koordinat GPS di modal detail admin, serta validasi GPS pada lembar BAST resmi.
+  4. **Penerbitan Faktur Penagihan 1-Klik**: Penambahan tombol "🧾 Buat Faktur Penagihan" pada tiket maintenance berstatus *Completed* di kartu tiket dan modal detail `/admin/maintenance`, auto-redirect ke ERP Keuangan `/admin/finance` dengan autofill nama klien, deskripsi pekerjaan tiket, rincian jasa servis, dan pembukaan otomatis modal faktur baru.
+  5. **Auto-Sinkronisasi Dua Arah Faktur & Maintenance**: Saat faktur penjualan berhasil diterbitkan di Keuangan, sistem secara otomatis mengupdate tiket maintenance menjadi status `Sudah Ditagihkan` lengkap dengan nomor faktur resmi (`INV-...`) dan badge visual pada tabel tiket. Lolos kompilasi TypeScript 0 error dan Next.js production build 46/46 routes.
+- **2026-10-22**: Fitur Edit & Hapus Faktur/PO di Dossier Proyek (Tugas 82), Dokumen Cetak Kwitansi Resmi Pembayaran A4 (Tugas 83), dan Upload & Cetak Lampiran Foto Dokumentasi Per-Faktur (Tugas 84).
+  1. **Edit & Hapus Faktur & PO di Dossier Finansial Proyek (Tugas 82)**: Menambahkan tombol aksi lengkap pada tabel Faktur Penjualan dan Purchase Order di modal Dossier Proyek (`/admin/finance` -> Project Dossier): Lihat Dokumen (`Eye`), Kwitansi Resmi (`Receipt`), Foto Faktur (`Camera`), Edit Rincian (`Edit3`), dan Hapus (`Trash2`). Meningkatkan z-index modal edit faktur dan modal edit PO menjadi `z-[70]` sehingga saat dibuka dari dalam modal Dossier Proyek (`z-50`) tampil mulus di lapisan atas tanpa tertutup backdrop.
+  2. **Format & Dokumen Cetak Kwitansi Resmi Pembayaran A4 (Tugas 83)**: Membangun sistem kwitansi sah standar akuntansi Indonesia ber-Kop Surat Resmi (adaptif PT vs Non-PT) untuk Faktur Penjualan (Penerimaan Kas Klien) dan Purchase Order (Pengeluaran Kas Vendor). Dilengkapi auto-terbilang kata rupiah baku (`# Tiga Juta Lima Ratus Ribu Rupiah #`), nomor kwitansi otomatis (`KW/DSP/...` atau `KW-OUT/DSP/...`), kotak nominal angka besar bergaris tegas, tahapan pembayaran (DP, Termin, Pelunasan), metode bayar & rekening bank, pengesahan direksi & stempel resmi, serta tombol cetak printer (`window.print()`) dan download file PDF instan.
+- **2026-10-23**: Penguncian Koordinat GPS Absensi dan Kewajiban Foto Selfie Presensi Teknisi (Tugas 100). Mengunci koordinat GPS saat Check-In / Check-Out agar tidak dapat dimodifikasi ulang ke-2x, mewajibkan aktivasi kamera selfie perangkat real-time, dan memblokir input koordinat manual demi integritas data absensi lapangan. Lolos verifikasi build dan deploy live.
+- **2026-10-23**: Sistem Manajemen Kontrak Kerja & Perekrutan Karyawan Baru (Tugas 101). Menyiapkan modul `/admin/contracts` lengkap dengan data store terisolasi `dstech_contracts.json` (prefix `dstech_contract_`), dukungan kontrak Staf (Bulanan/Tahunan) dan Teknisi (Tipe 1: Flat Harian Penuh, Tipe 2: Hourly Rate + Rumus Lembur Pengali 1.5x - 3.0x), generator cetak Surat Perjanjian Kerja Waktu Tertentu (PKWT) resmi A4 ber-Kop Surat DSTech dan dual signatures, serta tombol download PDF A4. Lolos verifikasi build dan deploy live.
+- **2026-10-23**: Integrasi Otomatis Kontrak Kerja ke User Management & Fitur Masa Berlaku Akun / User Expiry (Tugas 103). Menyelesaikan masalah staf dummy kontrak kerja (`Teknisi Hendra`, `Ikhsan Maulidi`, `Marshanda Salwa Agustina`) yang sebelumnya belum muncul di User Management dengan membuat fungsi auto-sync `syncContractsWithUsers()` di backend `src/app/api/users/route.ts`. Menambahkan atribut `expiresAt` pada skema master user, kontrol masa berlaku fleksibel (Permanen, +1 Bulan, +3 Bulan, +6 Bulan, +1 Tahun, serta Date Picker kustom) pada modal Tambah & Edit User di `/admin/users`, badge status masa berlaku (🟢 Permanen, 🟡 Sisa X Hari, 🔴 Kedaluwarsa), serta pencekalan login ketat di `/api/auth/login` (status HTTP 403 Forbidden dengan pesan penolakan ramah jika akun telah melewati batas tanggal masa berlaku). Lolos validasi TypeScript (0 error), build 51 rute sukses, commit `43e4ea4`, dan deploy sukses ke server live VPS PM2 `dstech-main`.
+
+
+
+
 
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
@@ -2417,446 +2427,551 @@
 
 ---
 
-### 79. Tugas: Penyelarasan Nama Entitas Toko Menjadi 'DSTech Smart', Perbaikan Pihak Pelaksana & Stempel BAST Non-PT, serta Penambahan Fitur Upload Kop Surat
+### 79. Tugas: Penyesuaian Penamaan Non-PT Menjadi "DSTech Smart", Pelaksana BAST Non-PT Mandiri, dan Fitur Unggah Kop Surat
 - **Permintaan Pengguna**:
   1. *"toko DStech ganti dengan Dstech SMart"*
   2. *"punya toko masih memakai pihak pelaksananya PT"*
   3. *"toko juga punya kop surat upload, itu uploadnya dimana?"*
-- **Status**: Selesai & Terverifikasi
+- **Status**: Selesai (Completed & Deployed)
+- **Penyebab & Analisis Masalah**:
+  1. Label entitas Non-PT pada UI tab, badge, selector modal sebelumnya masih menggunakan nama "Toko DStech" atau "Non-PT / Toko". Pengguna menginginkan nama resmi entitas ritel toko diseragamkan menjadi "DSTech Smart".
+  2. Pada lembar cetak Berita Acara Kunjungan Maintenance A4 (`printable-bast-maintenance`), untuk tiket Non-PT, pihak pelaksana, pengantar teks, stempel digital, dan pengesahan tanda tangan teknisi sebelumnya masih tertulis PT. DSTech Smart Perkasa. Ini harus adaptif mengikuti entitas tiket (jika Non-PT menjadi "DSTech Smart").
+  3. Pengguna menanyakan lokasi pengunggahan file gambar kop surat untuk entitas toko/Non-PT.
 - **Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Seluruh file kerja dicadangkan ke `_backup/*.bak_task82` sebelum dilakukan pengeditan.
-  - [x] **Langkah 2 (Penyelarasan Nama Toko -> DSTech Smart)**:
-    - `src/app/admin/categories/page.tsx`: Label filter dan badge `🏪 Non-PT / Toko` diubah menjadi `🏪 Non-PT / DSTech Smart`.
-    - `src/app/admin/products/page.tsx`: Label filter dan badge diubah menjadi `🏪 Non-PT / DSTech Smart`.
-    - `src/app/admin/portfolios/page.tsx`: Label filter dan badge diubah menjadi `🏪 Non-PT / DSTech Smart`.
+  - [x] **Langkah 1**: Backup file cadangan ke folder `_backup/*.bak_task82`.
+  - [x] **Langkah 2 (Pembaruan Label UI di Semua Modul Admin)**:
+    - `src/app/admin/categories/page.tsx`: Tab filter entitas diubah menjadi `🏪 Non-PT / DSTech Smart`, badge dan modal selector menggunakan `Non-PT / DSTech Smart`.
+    - `src/app/admin/products/page.tsx`: Tab filter, badge, dan modal selector menggunakan `Non-PT / DSTech Smart`.
+    - `src/app/admin/portfolios/page.tsx`: Tab filter, badge, dan modal selector menggunakan `Non-PT / DSTech Smart`.
     - `src/app/admin/inventory/page.tsx`: Tab filter stok diubah menjadi `🏪 Non-PT / DSTech Smart`.
-    - `src/app/admin/maintenance/page.tsx`: Tab filter tiket dan selector form diubah menjadi `🏪 Non-PT / DSTech Smart`.
-    - `src/data/dstech_employee_tasks.json`, `src/data/dstech_products.json`, `src/data/dstech_categories.json`: Keterangan dan penamaan lokasi/toko disesuaikan dengan identitas "DSTech Smart".
-  - [x] **Langkah 3 (Pihak Pelaksana & Stempel BAST Maintenance Non-PT)**:
-    - Paragraf pengantar BAST A4: Dibuat dinamis menggunakan `{selectedTaskForPrint.entityType === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}`.
-    - Pihak Pelaksana (Pihak Pertama): Ditulis `DSTech Smart` untuk tiket Non-PT.
-    - Tanda tangan teknisi: `Teknisi DSTech Smart` untuk tiket Non-PT.
-    - Stempel digital BAST A4: Jika Non-PT, menampilkan stempel bulat digital ungu `DSTECH SMART CILEGON`, jika PT menampilkan stempel biru `PT. DSTECH SMART PERKASA CILEGON`.
-  - [x] **Langkah 4 (Fitur Unggah Kop Surat Langsung di Lembar Cetak BAST & Penjelasan Lokasi ERP)**:
-    - Di toolbar modal cetak BAST `/admin/maintenance`, ditambahkan tombol unggah kop surat interaktif `<Upload />` bertuliskan `"Unggah Kop DSTech Smart"` / `"Unggah Kop PT"` dengan input file FileReader base64, penyimpanan instan, dan tombol "Reset Kop".
-    - Lokasi upload permanen di ERP Keuangan (`/admin/finance` -> "Kop Surat & Legalitas" -> Tab "Non-PT" -> "Unggah Kop Non-PT") siap dijelaskan dengan gamblang ke pengguna.
-  - [x] **Langkah 5 (Validasi Kompilasi)**: Menjalankan `npx tsc --noEmit` dan berhasil 0 error.
-  - [x] **Langkah 6 (Sinkronisasi & Deployment)**: Push commit ke GitHub `rm23nm/dstech-smart` dan deploy ke live VPS 157.66.34.199.
+    - `src/app/admin/maintenance/page.tsx`: Tab filter dan modal selector diubah menjadi `🏪 Non-PT / DSTech Smart`.
+    - JSON data (`dstech_products.json`, `dstech_categories.json`, `dstech_employee_tasks.json`): lokasi dan nama kategori disesuaikan ke "DSTech Smart".
+  - [x] **Langkah 3 (Pihak Pelaksana & Stempel Digital BAST Non-PT)**:
+    - Di `src/app/admin/maintenance/page.tsx`:
+      - Header teks BAST A4: `DSTECH SMART` (jika Non-PT).
+      - Pengantar BAST A4: Dinamis `{selectedTaskForPrint.entityType === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}`.
+      - Pihak Pelaksana BAST A4: `DSTech Smart`.
+      - Stempel digital: Jika Non-PT, menggunakan stempel bulat ungu bertuliskan `DSTECH SMART CILEGON`, jika PT menggunakan stempel biru `PT. DSTECH SMART PERKASA CILEGON`.
+      - Tanda tangan pelaksana: `Teknisi DSTech Smart` (jika Non-PT).
+  - [x] **Langkah 4 (Fitur Unggah Kop Surat Langsung & Pusat Dokumen)**:
+    - Di toolbar pratinjau cetak BAST (`/admin/maintenance`): Ditambahkan tombol unggah langsung kop surat bertuliskan `"Unggah Kop DSTech Smart"` / `"Unggah Kop PT"` dengan input file FileReader base64 dan tombol "Reset Kop".
+    - Lokasi terpusat di `/admin/finance`: Menu Keuangan & ERP -> Tombol "Kop Surat & Legalitas" -> Tab "Non-PT" -> Klik "Unggah Kop Non-PT".
+  - [x] **Langkah 5**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error).
+  - [x] **Langkah 6**: Push ke remote GitHub `rm23nm/dstech-smart` via `push_with_native_git.js` (commit `d8f469d`).
+  - [x] **Langkah 7**: Deploy ke live VPS 157.66.34.199, build 46/46 rute sukses, dan restart PM2 `dstech-main`.
 
 ---
 
-### 81. Tugas: Perbaikan Simpan Upload Foto Faktur, Cetak Bersih Lembar Kwitansi A4, dan Penomoran Otomatis Faktur Dinamis Sesuai Tanggal Pilihan
+### 80. Tugas: Integrasi Hulu-ke-Hilir Maintenance (Sinkronisasi Material Penugasan, Pencatatan Barang Rusak/Tarikan Lapangan, Tracking Google Maps Lokasi, dan Penerbitan Faktur Penagihan 1-Klik)
 - **Permintaan Pengguna**:
-  1. *"ketika diupload file gambarnya masih belum bisa"*
-  2. *"ketika diklik cetak pada kuitansi masih muncul seperti ini, bukan file kuitansi yang keluar"*
-  3. *"kemudian jika saya membuat tanggal faktur misalnya di tanggal 03/13/2026, maka pada nomor faktur harus bisa otomatis setkan ke nomor tanggal tersebut, INV-DSTECH-202603-001. jangan INV-DSTECH-202610-001. karena itu akan bentrok dengan tanggalnya"*
-- **Status**: Selesai & Terverifikasi
-- **Akar Masalah**:
-  1. Di `src/app/api/finance/route.ts` pada method `PUT`, backend mengecek `if (!updates) return 400`, sedangkan di frontend `handleUploadInvoicePhoto`, `handleSaveEditPhoto`, dan `handleRemoveInvoicePhoto` mengirimkan properti `payload`, bukan `updates`. Akibatnya request ditolak dengan HTTP 400 dan foto tidak tersimpan.
-  2. Di `src/app/admin/finance/page.tsx`, `isReceiptModalOpen` dan `selectedInvoiceForPhotoPrint` belum dimasukkan ke dalam `isAnyPrintModalOpen`. Akibatnya container dashboard finance utama tidak mendapatkan class `print:hidden`, sehingga dashboard utama ikut tercetak saat klik Print Kwitansi.
-  3. Di pembuatan faktur penjualan backend dan frontend, nomor faktur selalu mengambil bulan dari `new Date().toISOString().slice(0, 7)` (bulan sistem saat ini / Oktober) dan mengabaikan `date` yang dipilih pengguna.
-- **Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Membuat backup file ke `_backup/route.ts.bak_fix_upload` dan `_backup/page.tsx.bak_fix_upload`.
-  - [x] **Langkah 2 (Penyelarasan API PUT)**:
-    - Di `src/app/api/finance/route.ts`: Mengubah pembacaan body menjadi `const updates = body.updates || body.payload;` sehingga fleksibel menerima baik properti `updates` maupun `payload`.
-    - Di `src/app/admin/finance/page.tsx`: Menyertakan properti `updates` dan `payload` keduanya pada `handleUploadInvoicePhoto`, `handleSaveEditPhoto`, `handleRemoveInvoicePhoto`, `handleUploadProjectPhoto`, dan `handleRemoveProjectPhoto`.
-  - [x] **Langkah 3 (Isolasi Cetak Kwitansi & Lampiran Foto A4)**:
-    - Di `src/app/admin/finance/page.tsx`: Memperbarui `isAnyPrintModalOpen` dengan menambahkan `isReceiptModalOpen` dan `selectedInvoiceForPhotoPrint`. Saat modal kwitansi dibuka, seluruh kontainer dashboard keuangan otomatis disembunyikan total (`print:hidden`), menyisakan lembar A4 kwitansi bersih siap cetak atau download PDF.
-  - [x] **Langkah 4 (Penomoran Faktur Dinamis Sesuai Tanggal Pilihan)**:
-    - Di `src/app/api/finance/route.ts`: Menghitung tahun dan bulan dari `payload.date` (contoh `2026-03-13` menghasilkan `202603`), serta memprioritaskan `payload.invoiceNumber` jika diisi secara khusus.
-    - Di `src/app/admin/finance/page.tsx`: Menambahkan helper `generateInvoiceNumberForDate(dateStr, entity)`, input Nomor Faktur di formulir Buat Faktur, dan event handler saat `saleForm.date` diubah agar otomatis memperbarui nomor faktur sesuai bulan yang dipilih (misal `INV-DSTECH-202603-001`).
-  - [x] **Langkah 5 (Validasi Kompilasi & Build)**:
-    - Kompilasi TypeScript `npx tsc --noEmit` lolos 100% (0 error).
-    - Next.js Production Build `npm run build` berhasil mengompilasi 46 dari 46 rute dengan sukses.
-  - [x] **Langkah 6 (Sinkronisasi & Deployment)**: Push commit ke GitHub `rm23nm/dstech-smart` dan deploy ke live VPS 157.66.34.199.
+  1. *"Untuk mantenance, Kebutuhan material perbaikan kenapa tidak langsung sinkron dengan kegiatan penugasan saya. ketika saya update barang, jika ada barang rusak inputnya kemana? apakah harus input keutuhan terpisah, tidak salink ngelink. kemudian setelah selesai, untuk faktur penagihannya bagai mana?"*
+  2. *"kemudian tolong tambahkan juga 1 fitur lagi pada penugasan. adanya fitur Google map lokasi. agar bisa kita trackking lokasi perbaikannya"*
+- **Status**: Selesai (Completed) ✅
+- **Penyebab & Analisis Masalah**:
+  1. **Alur Material Terputus**: Form permintaan barang gudang berada di tab terpisah di `/employee` ("Logistik & Stok") dan teknisi harus memilih manual dropdown proyek. Tidak ada tombol langsung "Minta Material Tugas Ini" pada detail tiket.
+  2. **Ketiadaan Form Barang Rusak/Tarikan**: Pada saat perbaikan, teknisi mengganti part rusak (adaptor korslet, kamera mati, kabel putus) namun sistem belum menyediakan form terstruktur untuk mencatat "Barang Rusak yang Diganti/Ditarik dari Klien", kondisi kerusakan, dan status disposisinya (dibawa ke workshop, diserahkan ke klien, atau scrap).
+  3. **Belum Ada Tracking Google Maps**: Lokasi penugasan teknisi hanya berupa teks alamat biasa tanpa koordinat GPS, tanpa tombol buka Google Maps navigasi, dan tanpa fitur deteksi lokasi real-time.
+  4. **Penagihan Faktur Belum Terhubung**: Saat tiket maintenance selesai (*Completed*), admin harus mengetik manual seluruh item jasa dan sparepart di modul Keuangan `/admin/finance` tanpa adanya tombol 1-klik untuk generate faktur penagihan otomatis.
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Backup file cadangan ke folder `_backup/*.bak_task83`.
+  - [x] **Langkah 2**: Perluas model data dan API tasks (`src/app/api/employee/tasks/route.ts` & JSON) untuk mendukung `latitude`, `longitude`, `googleMapsUrl`, `damagedItems`, `usedMaterials`, `invoiceStatus`, dan `invoiceNumber`.
+  - [x] **Langkah 3**: Perbarui portal Teknisi (`src/app/employee/page.tsx`):
+    - Tombol cepat **"📦 Ajukan Material untuk Tugas Ini"** langsung di kartu dan modal tugas.
+    - Form dinamis **"🛠️ Pencatatan Barang Rusak yang Diganti & Ditarik dari Lokasi Klien"** pada modal update status/laporan tugas.
+    - Tombol **"🗺️ Buka Navigasi Google Maps"** dan tombol **"📍 Ambil Titik Lokasi Sekarang (GPS)"**.
+  - [x] **Langkah 4**: Perbarui portal Admin Maintenance (`src/app/admin/maintenance/page.tsx`):
+    - Tampilan tracking Google Maps dengan link rute interaktif.
+    - Rincian material yang digunakan & barang rusak yang ditarik tampil di detail tugas.
+    - Lembar cetak BAST A4 otomatis mencantumkan tabel part baru dan tabel barang rusak/ditarik.
+    - Tombol aksi 1-klik **"🧾 Buat Faktur Penagihan"** pada tiket *Completed* yang otomatis menyusun faktur penjualan di `/admin/finance`.
+  - [x] **Langkah 5**: Integrasikan dengan modul ERP Keuangan (`src/app/admin/finance/page.tsx` & `/api/finance`):
+    - Auto-fill data klien dan jasa pemeliharaan saat dibuka dengan parameter `fromMaintenance=true`.
+    - Sinkronisasi nomor faktur dan status penagihan kembali ke tiket tugas maintenance saat faktur disimpan.
+  - [x] **Langkah 6**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error).
+  - [x] **Langkah 7**: Validasi produksi Next.js build lokal (`npm run build` lolos 46/46 routes).
+  - [x] **Langkah 8**: Push ke remote GitHub `rm23nm/dstech-smart` dan deploy ke live VPS 157.66.34.199.
 
 ---
 
-### 82. Tugas: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Seluruh 5 Modul ERP Keuangan (Penjualan & Faktur, Pembelian & PO, Retur Barang, Laporan Laba Rugi, dan Buku Arus Kas)
+### 81. Tugas: Sinkronisasi Dinamis Identitas Pengguna Login Teknisi di Portal Karyawan & Penghapusan Hardcode 'Ikhsan Maulidi'
 - **Permintaan Pengguna**:
-  *"tolong tambahkan fitur fillter tanggal dan pencarian nama seperti modul SPH, kedalam Penjualan dan faktur, Pembelian dan PO, Retur Barang, Laporan laba rugi, Buku Arus Kas, disamping tombol form input"*
-- **Status**: Selesai & Terverifikasi
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Membuat backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_filters_all_tabs`.
-  - [x] **Langkah 2 (Helper Filter Tanggal Universal)**:
-    - Menyiapkan fungsi helper `checkDateInRange(dateStr, filterType, startDate, endDate)` yang mendukung filter: `Semua Tanggal`, `Hari Ini`, `Bulan Ini`, `Bulan Lalu`, `Tahun Ini`, serta `Rentang Kustom` (Custom Date Range).
-  - [x] **Langkah 3 (State Manajemen Pencarian, Filter Tanggal, dan Sortir)**:
-    - Modul Penjualan (`sales`): `searchQuery`, `saleDateFilter`, `saleStartDate`, `saleEndDate`, `saleSortBy`.
-    - Modul Pembelian (`purchases`): `poSearchQuery`, `poDateFilter`, `poStartDate`, `poEndDate`, `poSortBy`.
-    - Modul Retur (`returns`): `returnSearchQuery`, `returnDateFilter`, `returnStartDate`, `returnEndDate`, `returnSortBy`.
-    - Modul Laba Rugi (`pl_report`): `pnlSearchQuery`, `pnlDateFilter`, `pnlStartDate`, `pnlEndDate`, serta kalkulasi pendapatan, HPP, beban, dan laba dinamis sesuai rentang tanggal.
-    - Modul Arus Kas (`cash_flow`): `cashSearchQuery`, `cashDateFilter`, `cashStartDate`, `cashEndDate`, `cashSortBy`.
-  - [x] **Langkah 4 (Implementasi Antarmuka Top Control Bar Berdampingan dengan Tombol Form Input)**:
-    - Merancang komponen baris kontrol seragam seperti modul SPH dengan input pencarian interaktif, pemilih preset periode tanggal, input rentang tanggal kustom (jika dipilih), dropdown sortir tanggal, dan tombol form input utama masing-masing modul.
-  - [x] **Langkah 5 (Validasi Kompilasi, Build, & Deployment)**:
-    - Kompilasi TypeScript `npx tsc --noEmit` lolos 100% (0 error).
-    - Next.js Production Build `npm run build` sukses mengompilasi 46 dari 46 rute.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+  *"ini user teknisi masih ngawur, usernya rm23nm@dstechsmart.com saya kasih nama RAMADHANI ST. namun keluarnya Ikhsan Maulidi"*
+- **Status**: Selesai (Completed) ✅
+- **Penyebab & Analisis Masalah**:
+  1. Halaman portal teknisi/karyawan (`src/app/employee/page.tsx`) sebelumnya belum membaca data sesi pengguna (`dstech_employee_auth`) yang disimpan di `localStorage` saat login.
+  2. Header sapaan (`Halo, Ikhsan Maulidi!`), kartu identitas sidebar desktop & header mobile (`Ikhsan Maulidi` & `Teknisi Senior`), sub-header daftar tugas (`Pekerjaan yang ditugaskan kepada Ikhsan Maulidi`), tautan koordinasi WhatsApp (`...saya Ikhsan ingin koordinasi...`), serta nama pelapor pengajuan material/presensi/lembur/pengumuman seluruhnya tertulis statis (hardcoded) sebagai "Ikhsan Maulidi".
+  3. Berkas `dstech_users.json` di lingkungan lokal belum menyinkronkan akun `rm23nm@dstechsmart.com` (Nama: `RAMADHANI ST`, Role: `EMPLOYEE`) yang telah dibuat pengguna di server live.
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Catat analisis penyebab dan rencana step-by-step di `LAPORAN_PROGRES.md`.
+  - [x] **Langkah 2**: Buat backup berkas cadangan `src/app/employee/page.tsx` ke `_backup/employee_page.tsx.bak_task84`.
+  - [x] **Langkah 3**: Sinkronkan berkas pengguna lokal `src/data/dstech_users.json` dengan data live server (menambahkan akun `RAMADHANI ST` / `rm23nm@dstechsmart.com` role `EMPLOYEE`).
+  - [x] **Langkah 4**: Perbarui `src/app/employee/page.tsx` agar membaca session `dstech_employee_auth` dari `localStorage` saat mount:
+    - Simpan ke state `currentUser` (`id`, `name`, `email`, `role`, `phone`).
+    - Ganti header sapaan dinamis: `Halo, {currentUser?.name || "Teknisi"}!`.
+    - Ganti kartu profil sidebar dan mobile dengan nama dan jabatan/role dinamis pengguna yang sedang login.
+    - Ganti sub-header daftar penugasan menjadi dinamis: `Pekerjaan yang ditugaskan kepada {currentUser?.name || "Teknisi"}`.
+    - Ganti teks tautan WhatsApp koordinasi agar dinamis menyebut nama pengguna login.
+    - Hubungkan field `requestedBy`, `employeeName`, dan `author` saat mengajukan material, presensi, lembur, dan pengumuman menggunakan `currentUser?.name`.
+    - Pastikan daftar penugasan fleksibel menampilkan tugas yang relevan bagi teknisi tersebut.
+  - [x] **Langkah 5**: Perbarui fallback di API `/api/employee/inventory/route.ts` dan `/api/employee/attendance/route.ts` agar tidak memaksa teks "Ikhsan Maulidi" jika nama teknisi dikirim dari frontend.
+  - [x] **Langkah 6**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error).
+  - [x] **Langkah 7**: Push ke remote GitHub `rm23nm/dstech-smart` dan deploy ke live VPS 157.66.34.199.
+  - [x] **Langkah 8**: Verifikasi dan perbarui status di `LAPORAN_PROGRES.md`.
 
 ---
 
-### 83. Tugas: Penambahan Fitur Filter Tanggal dan Pencarian Nama Seperti Modul SPH pada Modul Manajemen Proyek (Projects)
+### 82. Tugas: Penambahan Tombol Aksi Lengkap (Edit & Hapus Faktur/PO) pada Modal Dossier Finansial Proyek
 - **Permintaan Pengguna**:
-  *"pada manajemen proyek juga sama"*
-- **Status**: Selesai & Terverifikasi
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Membuat backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_filters_projects`.
-  - [x] **Langkah 2 (State Manajemen Pencarian, Filter Tanggal, dan Sortir Proyek)**:
-    - Modul Manajemen Proyek (`projects`): `projectSearchQuery`, `projectDateFilter`, `projectStartDate`, `projectEndDate`, `projectSortBy`.
-    - Hook `useMemo` untuk `filteredAndSortedProjects` dengan dukungan pencarian multi-field (kode proyek `PRJ-...`, nama proyek, nama klien, PIC teknisi/lapangan, dan deskripsi), filter rentang tanggal mulai proyek/pembuatan, serta opsi sortir (Tanggal Mulai Terbaru/Terlama, Nilai Kontrak Tertinggi/Terendah, Nama Proyek A-Z).
-  - [x] **Langkah 3 (Implementasi Antarmuka Top Control Bar Berdampingan dengan Tombol Form Input)**:
-    - Menempatkan input pencarian interaktif, pemilih preset periode tanggal, input rentang tanggal kustom (jika dipilih), dropdown sortir proyek, dan filter status proyek berdampingan tepat di sebelah tombol form input `+ Buat Proyek Baru`.
-    - Memperbarui kartu ringkasan KPI dan grid kartu proyek agar menampilkan data hasil penyaringan.
-  - [x] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
-    - Kompilasi TypeScript `npx tsc --noEmit` (0 error).
-    - Build Next.js `npm run build` sukses 46/46 rute.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+  *"masih ada kah yang belum diselesaikan?ini masih belum di buat fitur edit faktur dan hapusnya"*
+- **Status**: Sedang Dikerjakan (In Progress)
+- **Penyebab & Analisis Masalah**:
+  1. Pada modal detail Dossier Finansial Proyek (`projectDossierTab === 'sales'`), kolom aksi tabel faktur proyek saat ini hanya menyediakan tombol tunggal `Lihat Faktur` (`Eye`).
+  2. Pengguna yang mengelola proyek di Dossier Finansial tidak dapat mengedit rincian faktur atau menghapus faktur yang salah langsung dari modal proyek, melainkan harus keluar dan mencari manual di tab Faktur Penjualan utama.
+  3. Hal yang sama juga berlaku pada tab `purchases` (PO) di Dossier Proyek yang baru memiliki tombol `Lihat PO` (`Eye`), tanpa tombol Edit dan Hapus PO.
+- **Rencana Pengerjaan Step-by-Step**:
+  - [x] **Langkah 1**: Backup berkas `src/app/admin/finance/page.tsx` ke `_backup/finance_page.tsx.bak_task82_83`.
+  - [ ] **Langkah 2**: Tambahkan tombol **Edit Faktur** (`handleOpenEditSale`) dan tombol **Hapus Faktur** (`handleDeleteSale`) pada setiap baris faktur di modal Dossier Proyek (`projectDossierTab === 'sales'`).
+  - [ ] **Langkah 3**: Tambahkan tombol **Edit PO** (`handleOpenEditPo`) dan tombol **Hapus PO** (`handleDeletePo`) pada setiap baris PO di modal Dossier Proyek (`projectDossierTab === 'purchases'`).
+  - [ ] **Langkah 4**: Verifikasi kesiapan modal Edit Faktur (`isEditSaleModalOpen`) dan modal Edit PO (`isEditPoModalOpen`) agar dapat dipanggil dari dalam modal Dossier tanpa konflik z-index (z-index 60+).
 
 ---
 
-### 84. Tugas: Penjelasan & Peningkatan Visibilitas Fitur Approval Faktur Digital dan Tombol Input Pembayaran Pelunasan / Cicilan Klien
+### 83. Tugas: Pembuatan Fitur & Format Cetak Kwitansi Pembayaran Resmi Perusahaan (Official Payment Receipt A4) untuk Faktur Invoice & Purchase Order (PO)
 - **Permintaan Pengguna**:
-  *"untuk aproval fakturnya belum ada, kemudian jika client sudah bayar bagai mana cara melakukan penginputannya?"*
-- **Status**: Selesai & Terverifikasi
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Membuat backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_approval_payment_ui`.
-  - [x] **Langkah 2 (Peningkatan Akses & Penanda Visual Approval Faktur)**:
-    - Di kolom status tabel faktur (`activeTab === "sales"`), ubah badge `Menunggu Approval` menjadi tombol aksi interaktif berwarna kuning mencolok dengan teks `Approval Faktur` yang dapat diklik langsung untuk memunculkan modal tanda tangan digital direktur (`handleOpenApprovalModal(sale)`).
-    - Berikan label teks dan tooltip jelas pada tombol approval di kolom aksi.
-  - [x] **Langkah 3 (Peningkatan Akses & Penanda Visual Input Pembayaran Klien)**:
-    - Di kolom aksi tabel faktur, jika faktur belum lunas (`remainingAmount > 0`), jadikan tombol pembayaran sebagai tombol berlabel teks hijau emerald `+ Input Bayar` (`CreditCard`) agar admin langsung mengenali dan dapat mencatat pembayaran (nominal, tanggal bayar, rekening bank penerima, dan bukti transfer).
-    - Di header toolbar modal pratinjau faktur (`selectedInvoiceForPrint`), sediakan tombol cepat `Approval Faktur` dan `Input Pembayaran Klien` agar dapat diakses langsung saat melihat dokumen faktur.
-  - [x] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
-    - Kompilasi TypeScript `npx tsc --noEmit` lolos 100% (0 error).
-    - Build Next.js `npm run build` sukses 46/46 rute.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+  *"kemudian setiap faktur invoice membutuhkan kwitansi, termasuk PO"*
+- **Status**: Sedang Dikerjakan (In Progress)
+- **Penyebab & Analisis Masalah**:
+  1. Sistem ERP Keuangan saat ini telah memiliki format dokumen cetak resmi A4 untuk: SPH Penawaran, Faktur Penjualan (DP/Pelunasan/Termin), BAST Proyek, Surat Jalan Pengiriman, PO Supplier, BAST Retur, dan Laporan Laba Rugi.
+  2. Namun, dokumen **Kwitansi / Tanda Terima Pembayaran Sah (Official Payment Receipt)** sebagai bukti hukum sah bahwa uang telah diterima (untuk Faktur Klien) atau uang telah dibayarkan (untuk PO Supplier) belum tersedia template cetaknya di sistem.
+  3. Dokumen Kwitansi resmi memerlukan: Nomor Kwitansi (`KW/DSP/YYYYMM/...` untuk PT dan `KW/DTS/YYYYMM/...` untuk Non-PT), Pihak Pembayar/Penerima, Nominal Uang Angka & Format Terbilang Huruf Indonesia (Auto-Terbilang Rupiah), Peruntukan Pembayaran, Pilihan Termin/DP/Pelunasan, Kop Surat Resmi, serta Pengesahan Tanda Tangan & Cap Stempel Resmi DSTech.
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Periksa file `src/app/admin/finance/page.tsx` pada bagian render modal Dossier Proyek (`projectDossierTab === 'sales'` dan `purchases`).
+  - [x] **Langkah 2**: Tambahkan tombol aksi **Edit Faktur (`Edit3`)** dan **Hapus Faktur (`Trash2`)** di tabel Faktur Penjualan Dossier Proyek yang memicu handler `handleOpenEditSale(sale)` dan `handleDeleteSale(sale.id, sale.invoiceNumber)`.
+  - [x] **Langkah 3**: Tambahkan tombol aksi **Edit PO (`Edit3`)** dan **Hapus PO (`Trash2`)** di tabel Purchase Order Dossier Proyek yang memicu handler `handleOpenEditPo(po)` dan `handleDeletePo(po)`.
+  - [x] **Langkah 4**: Sesuaikan z-index modal Edit Faktur dan modal Edit PO menjadi `z-[70]` agar saat dibuka dari dalam modal Dossier Proyek (`z-50`) tidak tertutup backdrop.
+  - [x] **Langkah 5**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error).
+  - [x] **Langkah 6**: Validasi Next.js build lokal (`npm run build` berhasil 100%).
 
 ---
 
-### 85. Tugas: Menyembunyikan Kolom Rincian Item pada Tabel Faktur Penjualan (Sales) agar Layout Tabel Ringkas dan Rapi
+### 83. Tugas: Pembuatan Format & Dokumen Cetak Kwitansi Resmi Pembayaran A4 (Official Payment Receipt & Voucher) untuk Faktur & Purchase Order
 - **Permintaan Pengguna**:
-  *"AGAR TIDAK MEMANJANG SEPERTI INI KEBAWAH, SEBAIKNYA RIincian item di hidekan saja"*
-- **Status**: Selesai & Terverifikasi
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Membuat backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_hide_sales_items_col`.
-  - [x] **Langkah 2 (Menyembunyikan Kolom Rincian Item)**:
-    - Menghilangkan kolom `<th>Rincian Item</th>` dari header tabel penjualan (`sales`).
-    - Menghilangkan elemen `<td>` daftar item vertikal dari baris tabel penjualan agar tinggi baris kembali normal dan proporsional.
-    - Menambahkan ringkasan jumlah item yang ringkas (`📦 {sale.items.length} Item`) di bawah nomor faktur sebagai informasi jumlah barang tanpa memakan ruang vertikal.
-    - Menyesuaikan `colSpan` pada empty state tabel dari 7 menjadi 6.
-  - [x] **Langkah 3 (Validasi Kompilasi, Build, & Deployment)**:
-    - Kompilasi TypeScript `npx tsc --noEmit` lolos 100% (0 error).
-    - Build Next.js `npm run build` sukses 46/46 rute.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+  *"kemudian setiap faktur invoice membutuhkan kwitansi, termasuk PO"*
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Buat fungsi helper `terbilangRupiah(number)` untuk mengubah angka menjadi kata-kata rupiah bahasa Indonesia yang baku otomatis.
+  - [x] **Langkah 2**: Buat state konfigurasi kwitansi (`selectedReceiptDoc`, `receiptConfig`, `isReceiptModalOpen`, `receiptNumber`, `receiptDate`, `receiptAmount`, `receiptPayer`, dll.) di `finance/page.tsx` yang mendukung dua mode: Kwitansi Penerimaan Faktur Penjualan (dari Klien) dan Kwitansi Pengeluaran Pembayaran PO (ke Supplier/Vendor).
+  - [x] **Langkah 3**: Tambahkan tombol aksi **"🧾 Kwitansi"** (`Receipt`) pada:
+    - Kolom aksi tabel Faktur Penjualan utama (`activeTab === 'sales'`)
+    - Kolom aksi tabel Faktur Penjualan di Dossier Proyek
+    - Kolom aksi tabel Purchase Order utama (`activeTab === 'purchases'`)
+    - Kolom aksi tabel Purchase Order di Dossier Proyek
+  - [x] **Langkah 4**: Bangun antarmuka modal pratinjau lembar cetak standar korporat **"KWITANSI TANDA TERIMA PEMBAYARAN" (A4)** ber-Kop Surat Resmi (adaptif PT vs Non-PT), kotak terbilang huruf, kotak nominal angka besar, instruksi transfer / kas, stempel digital, tanda tangan direksi/keuangan, tombol cetak cetak printer (`window.print()`), dan tombol download langsung PDF (`handleDownloadPdf`).
+  - [x] **Langkah 5**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error).
+  - [x] **Langkah 6**: Validasi Next.js build lokal (`npm run build` sukses 46 rute).
 
 ---
 
-### 86. Tugas: Menghilangkan Logo Kotak Biru "DSP" dan Header Teks Bawaan pada Lembar Cetak Dokumen (Surat Jalan & BAST) Saat Menggunakan Kop Surat Resmi Bergambar
+### 84. Tugas: Fitur Upload & Cetak Lampiran Foto Dokumentasi Khusus Per-Faktur (Invoice Documentation & Part Attachment)
 - **Permintaan Pengguna**:
-  *"untuk menghilangkan DSP biru yang seperti logo bagaimana caranya?"*
-- **Status**: Selesai & Terverifikasi
-- **Akar Masalah**:
-  Pada dokumen cetak Surat Jalan (Delivery Order) dan Berita Acara Serah Terima (BAST), terdapat header bawaan HTML berupa kotak biru bertuliskan `DSP` (`bg-dstech-blue text-white shadow`) dan teks perusahaan `PT. DSTECH SMART PERKASA`. Ketika pengguna telah mengaktifkan Kop Surat Resmi Bergambar (`letterheadEnabled && letterheadUrl`), gambar kop surat sudah memiliki logo resmi dan kop teks sendiri, sehingga kotak biru "DSP" bawaan ini menjadi tumpang-tindih (dobel/redundant) di bawah kop surat bergambar.
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Membuat salinan cadangan file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_remove_dsp_logo_box`.
-  - [x] **Langkah 2 (Menambahkan State & Kontrol Saklar Sembunyikan Logo DSP / Header Bawaan)**:
-    - Menambahkan konfigurasi `hideDefaultHeader` pada state `deliveryConfig` (Surat Jalan) dan `bastConfig` (BAST) dengan default otomatis `true` jika Kop Surat Bergambar aktif.
-    - Menambahkan tombol saklar cepat di toolbar pratinjau Surat Jalan & BAST (`Logo DSP: Sembunyi / Tampil`) dengan ikon interaktif `Eye`/`EyeOff`.
-    - Menambahkan opsi checkbox pada panel edit Surat Jalan & BAST: *"Sembunyikan Logo DSP & Header Bawaan (Rekomendasi saat menggunakan Kop Surat Bergambar)"*.
-  - [x] **Langkah 3 (Penyempurnaan Render Dokumen Cetak Surat Jalan & BAST)**:
-    - Jika `hideDefaultHeader` aktif: sembunyikan kotak biru `DSP` dan teks PT bawaan, lalu render judul dokumen (`SURAT JALAN MATERIAL (DELIVERY ORDER)` / `BERITA ACARA SERAH TERIMA (BAST)`), No Dokumen, Ref Faktur, dan Tanggal secara bersih, rapi, dan proporsional tepat di bawah margin kop surat bergambar.
-    - Jika `hideDefaultHeader` tidak aktif: tampilkan header default lengkap dengan kotak biru DSP.
-  - [x] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
-    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` berhasil 46/46 routes.
-    - Push ke GitHub repository `rm23nm/dstech-smart` commit `6eb63d4`.
-    - Deploy ke live server VPS PM2 `dstech-main` (PID 290078).
-    - Berikan penjelasan langkah dan cara penggunaan kepada pengguna.
+  *"untuk dokumentasi, biasanya setiap penagihan kita membutuhkan upload dokumentasi pekerjaan foto, saya tidak melihat file uploadnya untuk dokumentasi penagihan invoicenya. hanya ada pada project keseluruhan. bukan per invoice"*
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Perluas interface `SaleInvoice` dengan field `photos?: ProjectPhoto[]` di frontend dan backend `/api/finance`.
+  - [x] **Langkah 2**: Tambahkan tombol aksi **"📸 Foto Faktur"** (`Camera`) pada baris faktur di tabel penjualan utama & Dossier Proyek.
+  - [x] **Langkah 3**: Buat modal upload foto dokumentasi & pergantian part khusus per-faktur dengan preview, kategori (Dokumentasi vs Pergantian Part), caption, dan upload otomatis via `/api/upload` (prefix `dstech_invoice_photo`).
+  - [x] **Langkah 4**: Buat generator lembar cetak A4 *"Lampiran Laporan Foto Dokumentasi Penagihan Faktur"* ber-Kop Surat Resmi DSTech yang menautkan langsung ke nomor invoice bersangkutan, lengkap dengan dual signatures pengesahan (Klien & DSP), tombol Print, dan Unduh PDF.
+  - [x] **Langkah 5**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error) dan build lokal sukses.
 
 ---
 
-### 87. Tugas: Pemisahan & Penyediaan Fitur Approval Mandiri Tiap Dokumen (Faktur: Direksi/Keuangan, BAST: Project Manager, Surat Jalan: Logistik Gudang) Beserta Entitas PT / Non-PT
+### 86. Tugas: Penyelarasan Tampilan Kop Surat Full-Width A4 pada Kwitansi Pembayaran & Lampiran Foto Faktur
 - **Permintaan Pengguna**:
-  1. *"setelah diaproval, kenapa tanda tangannya berbeda-beda antara faktur, BAST, lampiran, surat jalan?"*
-  2. *"untuk aproval surat jalan pastinya berbeda, karena dia punya petugas masing-masing. namun saya belum menemukan cara untuk imput aprovalnya"*
-  3. *"Gudang & Logistik DSTech ganti dengan nama Gudang & Logistik PT. Dstech Smart Perkasa kalau PT dan non PT Gudang & Logistik DSTECH SMART"*
-  4. *"kalau bisa untuk Faktur, BAST, Surat jalan itu memiliki USer yang aprove masing-masing. karena tidak mungkin 1 orang yang sama"*
-- **Status**: Selesai & Terverifikasi
-- **Akar Masalah & Kebutuhan Solusi**:
-  1. **Faktur & Lampiran**: Merupakan dokumen legalitas keuangan yang disahkan oleh Direktur / Manajer Keuangan. Tanda tangan digital Direktur pada Halaman 1 kini telah tersinkronisasi ke Lampiran Halaman 2.
-  2. **BAST (Berita Acara Serah Terima)**: Merupakan dokumen teknis lapangan serah terima fisik pekerjaan, yang diotorisasi oleh Project Manager / Site Engineer (Pihak I) dan Klien (Pihak II). Perlu disediakan tombol & modal **Approval BAST** mandiri (nama penyerah, jabatan, tanda tangan digital/upload).
-  3. **Surat Jalan (Delivery Order)**: Merupakan dokumen ekspedisi logistik barang, yang diotorisasi oleh Petugas Gudang / Logistik DSTech (Pihak Penyerah), Supir (Pihak Pembawa), dan Mandor/PIC Lapangan (Pihak Penerima). Perlu disediakan tombol & modal **Approval Petugas Gudang** mandiri.
-  4. **Entitas Dinamis**: Penamaan di Surat Jalan harus otomatis mengikuti jenis entitas transaksi: jika PT menjadi `Gudang & Logistik PT. DSTech Smart Perkasa`, jika Non-PT menjadi `Gudang & Logistik DSTECH SMART`.
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Membuat salinan cadangan file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_sync_approval_and_do_staff_sig`.
-  - [x] **Langkah 2 (Sinkronisasi Tanda Tangan Approval Faktur ke Lampiran Halaman 2)**:
-    - Di Lampiran Faktur (Halaman 2), render gambar tanda tangan digital (`selectedInvoiceForPrint.signatureImage`) dan stempel bulat resmi agar identik dengan Halaman 1.
-  - [x] **Langkah 3 (Approval Mandiri BAST - Project Manager / Otoritas Lapangan)**:
-    - Menambahkan state `bastSignatureImage`, `bastApprovalDate`, dan state modal otorisasi BAST.
-    - Menyediakan tombol aksi cepat ungu `✍️ Approval BAST` di toolbar dan panel edit BAST.
-    - Membangun Modal Tanda Tangan Digital BAST lengkap dengan Canvas Pad (goresan langsung di layar dengan tinta ungu korporat) dan opsi upload berkas PNG transparan, nama Project Manager, dan jabatan otorisator.
-    - Menampilkan tanda tangan digital Project Manager pada Pihak I BAST.
-  - [x] **Langkah 4 (Approval Mandiri Surat Jalan - Petugas Gudang & Logistik + Entitas PT/Non-PT)**:
-    - Menambahkan tombol aksi cepat amber `✍️ Approval Petugas Gudang` di toolbar dan panel edit Surat Jalan.
-    - Membangun Modal Tanda Tangan Digital Petugas Logistik Gudang (Canvas Pad / upload tanda tangan, nama petugas gudang, dan jabatan pengeluaran QC & Logistik).
-    - Menampilkan tanda tangan digital petugas logistik gudang di Blok 1 Surat Jalan ("YANG MENYERAHKAN").
-    - Menyesuaikan penamaan penyerah di Surat Jalan otomatis mengikuti jenis entitas: jika transaksi PT -> `Gudang & Logistik PT. DSTech Smart Perkasa`, jika transaksi Non-PT -> `Gudang & Logistik DSTECH SMART`.
-  - [x] **Langkah 5 (Validasi Kompilasi, Build, & Deployment)**:
-    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` berhasil 46/46 rute.
-    - Push ke GitHub repository `rm23nm/dstech-smart` commit `029aa0f`.
-    - Deploy ke live server VPS PM2 `dstech-main` (online).
-    - Memberikan panduan penggunaan kepada pengguna.
+  *"untuk kuitansi kenapa seperti itu?"* (Kop surat tampak mengecil di tengah lembar A4, bukan membentang penuh dari kiri ke kanan seperti pada Faktur Penjualan).
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Backup file `src/app/admin/finance/page.tsx` ke `_backup/finance_page.tsx.bak_receipt_fix` (Sudah dibuat).
+  - [x] **Langkah 2**: Ubah struktur lembar `#print-receipt-sheet` di `finance/page.tsx`:
+    - Terapkan padding dinamis `paddingTop: cfg.paddingTop`, `paddingBottom: cfg.paddingBottom`, `paddingLeft: 16mm`, `paddingRight: 16mm`.
+    - Pasang layer gambar kop surat penuh `print-letterhead-img` dengan `inset-0 w-full h-full`, `objectFit: fill/cover/bleed`, dan opasitas sesuai entitas dokumen (PT vs Non-PT).
+    - Bungkus seluruh konten kwitansi (judul, nomor, terbilang huruf, peruntukan, metode bayar, kotak total nominal angka, dan dual signature) dalam `<div className="relative z-10 flex flex-col justify-between h-full">`.
+  - [x] **Langkah 3**: Lakukan hal yang sama pada lembar Cetak Lampiran Foto Faktur (`#print-invoice-photos-sheet`) agar kop suratnya juga membentang penuh (full-width) standar korporat.
+  - [x] **Langkah 4**: Uji kompilasi `npx tsc --noEmit` (lolos 0 error).
+  - [x] **Langkah 5**: Uji build lokal `npm run build` (lolos 100% sukses).
+  - [x] **Langkah 6**: Push ke GitHub `rm23nm/dstech-smart` dan deploy ke live VPS 157.66.34.199.
+  - [x] **Langkah 7**: Update status di `LAPORAN_PROGRES.md` dan konfirmasi ke user.
 
 ---
 
-### 88. Tugas: Pemindahan & Integrasi Pengaturan Rekening Bank dan Kop Surat ke Menu Site Setting (`/admin/settings`)
+---
+
+### 87. Tugas: Isolasi Cetak Bersih saat Cetak dari Dalam Modal Dossier Finansial Proyek & Kompresi Foto Cerdas ke 40 KB
 - **Permintaan Pengguna**:
-  *"pengaturan Rekening Bank dan Kop surat belum dipindahkan ke Site setting"*
-- **Status**: Selesai & Terverifikasi
-- **Konteks & Analisis Masalah**:
-  - Sebelumnya pengaturan Rekening Bank dan Kop Surat hanya dapat diakses melalui modal kecil di dalam modul Keuangan (`/admin/finance`).
-  - Pengguna menghendaki pengaturan terpusat (Master Data Perusahaan) berada di halaman **Site Settings** (`/admin/settings`) agar konfigurasi rekening bank dan kop surat resmi perusahaan dapat dikelola secara sentral dari satu menu master settings dan otomatis disinkronkan ke seluruh modul yang membutuhkan (Keuangan, Faktur, Surat Jalan, BAST, Penawaran/SPH).
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/settings/page.tsx`, `src/app/api/settings/route.ts`, dan `src/app/admin/finance/page.tsx` ke folder `_backup/`.
-  - [x] **Langkah 2 (Pengembangan Backend API & Sinkronisasi Dua Arah)**:
-    - Memperluas `src/app/api/settings/route.ts` dengan skema `bankAccounts` dan `letterheadSettings`.
-    - Mengintegrasikan sinkronisasi otomatis dua arah ke file data store `dstech_finance_erp.json` sehingga setiap perubahan di Site Settings langsung ter-update di modul Keuangan secara real-time.
-  - [x] **Langkah 3 (Desain UI Tab Navigasi di Site Settings `/admin/settings`)**:
-    - **Tab 1: 🏢 Profil & Legalitas Perusahaan**: Form identitas PT, NIB, NPWP, WhatsApp CS, email, alamat kantor, Google Maps, dan pratinjau footer website.
-    - **Tab 2: 💳 Master Rekening Bank Resmi**:
-      - Filter tab: 🌐 Semua, 🏢 Khusus PT, 🏬 Khusus Non-PT.
-      - Tombol `+ Tambah Rekening Bank` dengan modal form lengkap (Nama Bank Preset/Custom, Nomor Rekening, Atas Nama, Cabang, Peruntukan Entitas PT/Non-PT/ALL, Status Aktif/Nonaktif, dan Checkbox Rekening Utama).
-      - Grid kartu rekening modern dengan tombol aksi Ubah, Jadikan Utama, dan Hapus.
-    - **Tab 3: 📑 Template Kop Surat Dokumen (PT & Non-PT)**:
-      - Switcher tab entitas: 🏢 Entitas PT vs 🏬 Entitas Non-PT.
-      - Fitur unggah gambar kop surat (PNG / JPG / WebP) dan tombol reset ke berkas bawaan.
-      - Kontrol Margin Lembar Dokumen: Slider Padding Atas (Top Margin) dan Padding Bawah (Bottom Margin).
-      - Pilihan Mode Pemasangan Gambar: Bleed (Full Ujung Kertas), Fill (Pas Lembar), Contain (Proporsional), Cover (Penuh).
-      - Form Pejabat Penandatangan Resmi (Nama & Jabatan Direktur / Owner).
-      - Pratinjau Lembar A4 interaktif real-time dengan dummy invoice untuk menguji kecocokan margin.
-    - **Tab 4: ⚠️ Zona Bahaya**: Pembersihan data transaksi (Clean slate) dengan konfirmasi ketik `RESET`.
-  - [x] **Langkah 4 (Banner & Navigasi di Modul Keuangan `/admin/finance`)**:
-    - Menambahkan banner informatif dengan tombol pintasan `Buka Site Settings →` pada modal Rekening Bank dan modal Kop Surat di halaman Keuangan.
-  - [x] **Langkah 5 (Validasi Kompilasi, Build, & Deployment)**:
-    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` sukses 46/46 rute.
-    - Push ke GitHub repository `rm23nm/dstech-smart` commit `a60e385`.
-    - Deploy ke live server VPS PM2 `dstech-main` (PID 299530, status online).
-    - Berikan konfirmasi dan panduan penggunaan kepada pengguna.
+  1. *"hasil cetak kuitansinya masih belum bisa"* (Di tangkapan layar print preview, modal Dossier Finansial Proyek ikut muncul menutupi lembar cetak karena modal Kwitansi dibuka dari dalam modal Dossier Proyek).
+  2. *"baik, kalau begitu kompres aja ke 40 kb, untuk saat ini berapa KB kompresnya?"* (Menanyakan ukuran kompresi saat ini dan meminta foto dikompresi ke 40 KB).
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Penyebab Masalah**:
+  1. Modal Dossier Finansial Proyek (`selectedProjectForDetail`) dan modal kelola foto (`isInvoicePhotoModalOpen`) sebelumnya tidak memiliki class `print:hidden`. Ketika tombol Kwitansi atau Cetak Faktur diklik dari tabel tab Penjualan/PO di dalam modal Dossier Proyek, modal Dossier Proyek di bawahnya tetap aktif dan ikut ter-render pada layer cetak browser (`window.print()`).
+  2. Pada fitur Upload Foto Dokumentasi & Part Faktur yang baru dibuat, file foto sebelumnya belum melewati fungsi kompresi client-side (masih dikirimkan ukuran asli file kamera HP yang berukuran 2 MB – 6 MB).
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Tambahkan class `print:hidden` pada container backdrop modal Dossier Finansial Proyek (`selectedProjectForDetail`) dan modal kelola foto faktur (`isInvoicePhotoModalOpen`). Sehingga saat user mencetak kuitansi atau dokumen apapun dari dalam dossier proyek, modal proyek otomatis disembunyikan dan hanya lembar kertas A4 kuitansi resmi yang tampil di printer.
+  - [x] **Langkah 2**: Ubah target kompresi gambar default pada `compressImageFile` menjadi **40 KB** (`maxTargetSizeKb = 40`, `initialMaxWidth = 960`, `initialMaxHeight = 1280`) dengan algoritma iterasi Canvas quality step-down (0.72 ➔ 0.60 ➔ 0.50 ➔ 0.40 ➔ 0.32 ➔ 0.25).
+  - [x] **Langkah 3**: Integrasikan kompresi 40 KB ke dalam `handleUploadInvoicePhoto` (Foto Dokumentasi & Part Faktur) dan `handleUploadProjectPhoto` (Foto Proyek), lengkap dengan toast persentase penghematan ukuran.
+  - [x] **Langkah 4**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error) dan build lokal sukses.
+  - [x] **Langkah 5**: Push ke GitHub `rm23nm/dstech-smart` (Commit `069fad7`) dan deploy ke live VPS 157.66.34.199 (PM2 PID `219306`).
+  - [x] **Langkah 6**: Update status di `LAPORAN_PROGRES.md` dan bersihkan backup cadangan sementara.
 
 ---
 
-### 89. Tugas: Pembersihan & Penghapusan Tombol Pengaturan Rekening Bank dan Kop Surat dari Toolbar Halaman Keuangan
+### 89. Tugas: Fitur Multi-Upload Banyak Foto dengan Edit Keterangan & Pengaturan Kategori Cetak Lampiran Faktur
 - **Permintaan Pengguna**:
-  *"pada halaman keuangannya belum dihapus masih ada muncul Rekening bank dan Kop Surat"*
-- **Status**: Selesai & Terverifikasi
-- **Akar Masalah**:
-  Setelah seluruh manajemen Rekening Bank dan Kop Surat dipindahkan secara terpusat ke menu **Site Settings (`/admin/settings`)**, tombol pintasan "Rekening Bank" dan "Kop Surat" sebelumnya masih ada di toolbar tabel penjualan (`sales`) dan toolbar transaksi kas, sehingga terjadi redundansi menu.
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Salin `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_remove_bank_and_letterhead_buttons`.
-  - [x] **Langkah 2 (Penghapusan Tombol Toolbar)**:
-    - Menghapus tombol "Rekening Bank" dan "Kop Surat" dari toolbar tabel Penjualan (`sales`).
-    - Menghapus tombol "Rekening Bank" dari toolbar Arus Kas Operasional.
-    - Menghapus tombol "Kop Surat" dan "Rekening" dari Action Bar pratinjau faktur.
-  - [x] **Langkah 3 (Validasi Kompilasi, Build, & Deployment)**:
-    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` sukses 46/46 rute.
-    - Push ke GitHub repository `rm23nm/dstech-smart` commit `7ad8e55`.
-    - Deploy ke live server VPS PM2 `dstech-main` (PID 300909, online).
+  1. *"untuk foto hanya bisa upload 1 foto, tidak bisa banyak foto dikasih keterangannya"* (Minta dukungan upload banyak foto sekaligus/multi-upload dan bisa memberikan/mengedit keterangan masing-masing foto).
+  2. *"kemudian pada cetakan lampirannya, tolong setkan agar saya bisa memilih foto apa yang mau diupload, misalnya hanya dokumentasi, maka jangan ada pergantian fisik part, kecuali saya memilih keduanya"* (Minta filter/pilihan kategori cetak pada lembar lampiran: jika memilih hanya dokumentasi, seksi pergantian part fisik jangan dimunculkan sama sekali di kertas cetak, begitu pula sebaliknya).
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Buat file cadangan `_backup/finance_page.tsx.bak_task89`.
+  - [x] **Langkah 2**: Perbarui input dan handler upload foto faktur (`handleUploadInvoicePhoto`):
+    - Ditambahkan atribut `multiple` pada `<input type="file" multiple ... />`.
+    - Loop setiap file yang dipilih, dikompresi otomatis satu per satu ke target 40 KB via `compressImageFile(file, 40)`.
+    - Upload batch ke `/api/upload` (prefix `dstech_invoice_photo`) dan digabungkan ke array `sale.photos`.
+    - Tampilkan indikator animasi progres upload multi-foto.
+  - [x] **Langkah 3**: Fitur edit keterangan (caption) dan kategori secara interaktif pada daftar foto yang sudah diunggah:
+    - Ditambahkan tombol `Edit3` di samping tombol hapus pada setiap kartu foto.
+    - Disediakan form inline edit caption dan dropdown ubah kategori (Dokumentasi vs Pergantian Part) dengan tombol Simpan & Batal, langsung tersimpan ke database via `PUT /api/finance`.
+  - [x] **Langkah 4**: Ditambahkan Selector Pilihan Kategori Cetak pada Lembar Lampiran Faktur:
+    - State `printPhotoCategoryFilter: "ALL" | "documentation" | "part_replacement"` (default `"ALL"`).
+    - Bilah tombol selector di header modal cetak lampiran foto:
+      - 🔘 Semua (Dokumentasi & Part)
+      - 📸 Hanya Dokumentasi Pekerjaan
+      - ⚙️ Hanya Pergantian Part Fisik
+    - Kondisi render seksi di lembar `#print-invoice-photos-sheet`: jika memilih Hanya Dokumentasi, seksi Pergantian Part **disembunyikan total 100%** tanpa menyisakan ruang kosong atau placeholder. Judul lembar cetak otomatis menyesuaikan.
+  - [x] **Langkah 5**: Validasi TypeScript (`npx tsc --noEmit` lolos 0 error).
+  - [x] **Langkah 6**: Uji build lokal (`npm run build` sukses 100%).
+  - [x] **Langkah 7**: Push ke GitHub `rm23nm/dstech-smart` (Commit `9e34d6c`) dan deploy ke live VPS 157.66.34.199 (PM2 PID `223130`).
+  - [x] **Langkah 8**: Update status di `LAPORAN_PROGRES.md` dan bersihkan backup cadangan sementara.
 
 ---
 
-### 90. Tugas: Pembuatan Fitur & Tombol Cetak Lembar Laporan Dokumentasi Foto Proyek / Pekerjaan
+### 90. Tugas: Penomoran Otomatis Faktur Dinamis Mengikuti Tanggal Faktur (Tahun & Bulan)
 - **Permintaan Pengguna**:
-  *"tombol cetak laporan dokumentasinya belum ada"*
-- **Status**: Selesai & Terverifikasi
-- **Akar Masalah**:
-  Meskipun modal pratinjau lembar cetak A4 dokumentasi foto sudah dibangun di backend/state, tombol pemicu langsung untuk mencetak dokumentasi foto belum disematkan pada baris tabel Penjualan (`sales`), di samping tombol BAST dan Surat Jalan, serta belum ada tombol cepat di Action Bar pratinjau Faktur.
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Salin cadangan file ke `_backup/`.
-  - [x] **Langkah 2 (Penyematan Tombol di Tabel Penjualan)**:
-    - Menambahkan tombol ungu `📸 Dokumentasi` dengan badge jumlah foto di jajaran tombol dokumen cetak utama (di samping tombol BAST dan Surat Jalan) pada tabel penjualan.
-  - [x] **Langkah 3 (Penyematan Tombol di Action Bar Faktur)**:
-    - Menambahkan tombol cepat `📸 Cetak Dokumentasi` di toolbar pratinjau Faktur Penjualan (`selectedInvoiceForPrint`) agar saat admin membuka faktur, dapat langsung membuka lembar cetak dokumentasi foto faktur tersebut.
-  - [x] **Langkah 4 (Validasi Kompilasi, Build, & Deployment)**:
-    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` sukses 46/46 rute.
-    - Push ke GitHub repository `rm23nm/dstech-smart` commit `43667e6`.
-    - Deploy ke live server VPS PM2 `dstech-main` (PID 302351, online).
+  *"kemudian jika saya membuat tanggal faktur misalnya di tanggal 03/13/2026, maka pada nomor faktur harus bisa otomatis setkan ke nomor tanggal tersebut, INV-DSTECH-202603-001. jangan INV-DSTECH-202610-001. karena itu akan bentrok dengan tanggalnya"*
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Fungsi generator nomor faktur `generateInvoiceNumberForDate(dateStr, entity)` di `src/app/admin/finance/page.tsx` mengekstrak tahun dan bulan dari tanggal yang diinput (`YYYYMM`) baik format PT (`INV-DSTECH-YYYYMM-xxx`) maupun Non-PT (`INV-DTS-YYYYMM-xxx`).
+  - [x] **Langkah 2**: Mengaitkan event `onChange` input Tanggal Faktur (`saleForm.date`) agar secara otomatis meregenerasi dan mengisi kolom Nomor Faktur (`saleForm.invoiceNumber`) sesuai bulan dan tahun baru yang dipilih tanpa bentrok.
+  - [x] **Langkah 3**: Sinkronisasi di backend `src/app/api/finance/route.ts` pada pembuatan faktur baru maupun konversi dari Surat Penawaran Harga (SPH).
+  - [x] **Langkah 4**: Build lokal sukses dan deploy ke server aktif.
 
 ---
 
-### 91. Tugas: Penyertaan Tautan Link Download Lengkap (Invoice, BAST, Surat Jalan, dan Laporan Dokumentasi) serta Penambahan Nama PIC Personal pada Pesan WhatsApp
+### 91. Tugas: Pembuatan Aplikasi Android untuk DStech Smart (dstechsmart.com) Langsung ke Halaman Login
 - **Permintaan Pengguna**:
-  1. *"saat mengirimkan invoice, tombol link download invoice, BAST, Surat Jalan dan Laporan Dokumentasi belum ada. sebaiknya langsung ditambahkan agar client bisa langsung download"*
-  2. *"pada format kirim pesannya, tolong tambahkan juga PIC dari perusahaannya kalau memang terisi. agar lebih personal"*
-- **Status**: Selesai & Terverifikasi
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_doc_links_and_pic_wa`.
-  - [x] **Langkah 2 (Penambahan PIC Personal pada Sapaan WhatsApp & Email)**:
-    - Menambahkan field `recipientPic` pada state `sendDocModal` dan interface `SaleInvoice`.
-    - Mengambil nama PIC otomatis dari data transaksi penjualan (`sale.customerPic || sale.picName`) atau mencocokkannya dengan master klien (`clients.find(...)?.pic`).
-    - Memperbarui format pembuka pesan WhatsApp agar menyapa langsung PIC:
-      `*Yth. Bapak/Ibu [Nama PIC]*`
-      `*[Nama Perusahaan Klien]*`
-      sehingga pesan terasa jauh lebih personal, formal, dan santun.
-    - Menampilkan badge info `👤 PIC: [Nama PIC]` di dalam kartu ringkasan penerima pada modal kirim WhatsApp.
-  - [x] **Langkah 3 (Penyertaan 4 Tautan Download Dokumen Resmi di Modal Kirim WhatsApp)**:
-    - Menambahkan blok visual ungu korporat premium **"Tautan Download Dokumen Resmi Klien"** di modal kirim yang memuat 4 kartu dokumen:
-      1. 📄 Faktur Penjualan (Invoice)
-      2. 📝 Berita Acara Serah Terima (BAST)
-      3. 🚚 Surat Jalan Material (Delivery Order)
-      4. 📸 Laporan Foto Dokumentasi & Part
-    - Masing-masing kartu dilengkapi tombol cepat:
-      - `Salin` (Copy link URL dokumen ke clipboard dengan feedback toast)
-      - `Buka / Unduh` (Membuka langsung lembar dokumen cetak di tab baru)
-  - [x] **Langkah 4 (Penyertaan 4 Tautan Berkas Lengkap di Draf Teks WhatsApp)**:
-    - Mengintegrasikan ke-4 URL dokumen resmi langsung ke dalam draf pesan WhatsApp (`waText`) di bawah detail nilai dan legalitas invoice, sehingga klien yang menerima WhatsApp bisa langsung mengklik tautan untuk melihat atau mengunduh berkas lengkap tanpa repot.
-  - [x] **Langkah 5 (Akses Cepat dari Toolbar Pratinjau Faktur)**:
-    - Menambahkan tombol hijau emerald `💬 Kirim WA` di samping tombol `📸 Cetak Dokumentasi` pada Action Bar pratinjau Faktur Penjualan (`selectedInvoiceForPrint`).
-  - [x] **Langkah 6 (Fitur Approval Dokumentasi Foto Digital)**:
-    - Menambahkan tombol `✍️ Approval Dokumentasi` pada toolbar lembar cetak dokumentasi foto (`selectedInvoiceForPhotoPrint`).
-    - Menyediakan modal otorisasi tanda tangan digital pelaksana teknis (`isDocApprovalModalOpen`) dengan 3 mode: gores layar langsung (canvas ungu), tanda tangan master, atau upload gambar PNG.
-    - Menampilkan tanda tangan digital dan status verifikasi sah di blok tanda tangan fisik lembar cetak dokumentasi A4.
-  - [x] **Langkah 7 (Validasi Kompilasi, Build, & Deployment)**:
-    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` sukses 46/46 rute.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+  *"tolong buatkan sebuah aplikasi android untuk dstechsmart.com, ketika masuk langsung ditujukan ke halaman login"*
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Setup struktur proyek Android lengkap (`dstech-smart-android`) berbasis Gradle 9.1.0 & Android SDK dengan arsitektur WebView modern dan performa tinggi.
+  - [x] **Langkah 2**: Konfigurasi URL tujuan utama langsung diarahkan ke `https://dstechsmart.com/login`.
+  - [x] **Langkah 3**: Fitur & optimasi WebView:
+    - DOM Storage, LocalStorage, Database, dan CookieManager diaktifkan penuh agar sesi login tersimpan permanen dan tidak perlu login ulang saat aplikasi dibuka kembali.
+    - `WebChromeClient` dengan `onShowFileChooser` untuk mendukung upload multi-foto faktur, dokumentasi pekerjaan, dan lampiran SPH langsung dari kamera atau galeri HP.
+    - `WebViewClient` menangani navigasi URL eksternal (WhatsApp `wa.me`, telepon `tel:`, email `mailto:`) agar otomatis membuka aplikasi terkait di HP.
+    - Swipe-to-refresh (`SwipeRefreshLayout`) untuk mempermudah refresh data dengan gestur tarik ke bawah.
+    - Penanganan tombol Back Android (`onBackPressed`) untuk navigasi riwayat halaman web yang mulus serta proteksi tekan 2x untuk keluar.
+  - [x] **Langkah 4**: Branding & Aset:
+    - Integrasi logo resmi PT. Dstech Smart Perkasa sebagai App Icon (`logo_dstech`) dan splash screen.
+  - [x] **Langkah 5**: Konfigurasi `AndroidManifest.xml` (Permission: Internet, Camera, Read/Write Storage untuk upload foto), FileProvider untuk kamera, Gradle wrapper, serta script build APK (`build_android.bat`).
+  - [x] **Langkah 6**: Kompilasi APK sukses 100% (`BUILD SUCCESSFUL`), menghasilkan file APK siap pasang di HP Android: `dstech-smart-app.apk` (ukuran: 6.2 MB).
+  - [x] **Langkah 7**: Update `LAPORAN_PROGRES.md`, sediakan panduan lengkap di `dstech-smart-android/README.md`, dan laporkan ke pengguna.
 
----
-
-### 92. Tugas: Dukungan Multi-PIC dalam 1 Perusahaan / Klien untuk Fleksibilitas Penawaran ke Berbagai Divisi / User
+### 92. Tugas: Penambahan Tautan & Tombol Download Aplikasi Android di Footer Website (dstechsmart.com)
 - **Permintaan Pengguna**:
-  *"apakah saya bisa input nama client dengan PIC yang berbeda pada 1 perusahaan? kalau memang tidak bisa, tolong buat agar bisa, kerena nantinya dalam 1 perusahaan kita memiliki tujuan penawaran berbeda-beda user"*
-- **Status**: Antrian Pekerjaan Selanjutnya (Queued)
-- **Analisis Kebutuhan**:
-  - Dalam operasional B2B, 1 perusahaan/instansi klien (misal: PT. Indocement, PT. Krakatau Steel) memiliki banyak PIC yang berbeda-beda tergantung divisi/departemen (contoh: PIC IT untuk CCTV, PIC GA untuk Akses Kontrol, PIC Procurement untuk Penagihan).
-  - Saat ini formulir input klien atau transaksi mungkin membatasi nama perusahaan unik atau belum menyediakan pemilihan/input nama PIC yang dinamis per penawaran.
-  - Solusi: Sediakan input nama PIC dan jabatan/bagian PIC yang fleksibel pada master klien serta pada saat membuat Penawaran (Quotation) / Faktur, sehingga untuk perusahaan yang sama bisa ditujukan kepada PIC yang berbeda-beda tanpa terblokir sistem.
+  *"pada foother website, tolong tambahkan aplikasi ini untuk didownload"*
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Salin file APK `dstech-smart-app.apk` ke direktori web publik `dstech-smart/public/dstech-smart-app.apk` sehingga dapat langsung diunduh dari URL `/dstech-smart-app.apk`.
+  - [x] **Langkah 2**: Buat file cadangan `_backup/page.tsx.bak_task92` dan `_backup/shop_page.tsx.bak_task92`.
+  - [x] **Langkah 3**: Rancang dan pasang seksi Unduh Aplikasi Android di Footer Beranda Utama (`src/app/page.tsx`):
+    - Kartu unduhan dengan lencana Android & icon smartphone, detail versi (v1.0.0), ukuran (~6.2 MB), dan tombol download langsung (`/dstech-smart-app.apk`).
+    - Tautan cepat di baris navigasi footer bawah (*Bottom Footer Bar*).
+  - [x] **Langkah 4**: Tambahkan tombol download aplikasi Android pada footer Toko E-Store (`src/app/shop/page.tsx`).
+  - [x] **Langkah 5**: Uji validasi TypeScript (`npx tsc --noEmit` lolos 0 error) dan build lokal (`npm run build` sukses 100%).
+  - [x] **Langkah 6**: Push ke GitHub `rm23nm/dstech-smart` (Commit `7f7b05b`) dan deploy ke live server VPS 157.66.34.199 (PM2 PID `516367`).
+  - [x] **Langkah 7**: Update status di `LAPORAN_PROGRES.md` dan bersihkan file cadangan sementara.
 
----
-
-### 94. Tugas: Penyediaan Endpoint Publik Lembar Cetak Dokumen Resmi (`/api/finance/print`) untuk Mengatasi Error 404 pada Tautan WhatsApp
+### 93. Tugas: Perbaikan Peta Koordinat Lokasi Kantor yang Ditolak oleh Browser (X-Frame-Options SAMEORIGIN)
 - **Permintaan Pengguna**:
-  *"seluruh dokumen linknya eror"* (Screenshot menampilkan 404 | This page could not be found pada URL `/api/finance/print?doc=invoice&no=...`)
-- **Status**: Selesai & Terverifikasi
-- **Akar Masalah**:
-  Tautan unduh dokumen publik yang digenerate untuk WhatsApp mengarah ke `https://dstechsmart.com/api/finance/print?doc=...&no=...`. Rute Next.js untuk endpoint ini sebelumnya belum dibuat di folder `src/app/api/finance/print/`, sehingga server Next.js mengembalikan halaman standar 404 Not Found.
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Pembuatan Route Handler Publik)**:
-    - Membuat file rute `src/app/api/finance/print/route.ts` yang menangani permintaan `GET(req)`.
-    - Mengambil parameter query `doc` (`invoice`, `bast`, `delivery`, `photos`) dan `no` (nomor invoice/dokumen).
-    - Membaca data transaksi faktur, rekening bank resmi, dan pengaturan kop surat resmi langsung dari `dstech_finance_erp.json`.
-  - [x] **Langkah 2 (Desain Lembar Cetak Dokumen A4 Responsif & Kalibrasi Kop Surat Full Bleed)**:
-    - Merender HTML dokumen cetak A4 yang tajam dan presisi:
-      - **Faktur Penjualan (`doc=invoice`)**: Rincian produk, harga, diskon, PPN, grand total, terbilang rupiah, rekening bank resmi, dan tanda tangan sah.
-      - **Berita Acara (`doc=bast`)**: Pernyataan resmi serah terima barang/jasa, spesifikasi, dan pengesahan dua belah pihak.
-      - **Surat Jalan (`doc=delivery`)**: Alamat pengiriman, kuantitas item barang, paraf gudang, pengemudi, dan penerima.
-      - **Dokumentasi Foto (`doc=photos`)**: Grid foto fisik pekerjaan lapangan, part pengganti, dan pengesahan pelaksana.
-    - **Kalibrasi Kop Surat Resmi Utuh A4**:
-      - Menggunakan background full bleed A4 (`width: 210mm; min-height: 297mm; inset-0; object-fit: fill`) agar gambar kop surat resmi (baik base64 maupun file jpg) membentang utuh dari ujung kepala kertas hingga kaki footer tanpa terpotong atau gepeng.
-      - Mengatur margin konten `padding-top: 120px` dan `padding-bottom: 90px` sehingga seluruh teks judul dokumen, tabel, dan tanda tangan berada persis di bawah garis batas kop surat resmi.
-      - Menyediakan tombol saklar `[✓] Kop Surat Resmi` di toolbar atas agar kop surat dapat diaktifkan atau dinonaktifkan secara dinamis saat mencetak ke blanko fisik.
-    - Dilengkapi toolbar atas (khusus layar, otomatis tersembunyi saat dicetak / `print:hidden`):
-      - Tombol **🖨️ Cetak (Print)** untuk memicu dialog cetak browser langsung.
-      - Tombol **⬇️ Unduh PDF** (didukung library `html2pdf.js` client-side).
-      - Tab Bar Navigasi Dokumen Terkait agar klien dapat beralih melihat Faktur, BAST, Surat Jalan, atau Foto Dokumentasi dengan 1 klik.
-  - [x] **Langkah 3 (Validasi Kompilasi, Pengujian Lokal, & Deployment)**:
-    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` sukses 47/47 rute.
-    - Pengujian HTTP lokal & live domain menghasilkan Status 200 OK dengan gambar kop surat ter-render utuh dan presisi.
-    - Push ke GitHub repository `rm23nm/dstech-smart` commit `850683e`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+  *"enapa browser ditolak menampilkan peta kordinat kantor?"*
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Penyebab Masalah**:
+  - Pada halaman kontak (`src/app/contact/page.tsx`), tag `<iframe>` menggunakan URL lama: `https://maps.google.com/maps?q=...&output=embed`.
+  - Google Maps saat ini me-redirect URL tersebut dengan kode HTTP `301 Moved Permanently` disertai header keamanan `X-Frame-Options: SAMEORIGIN`.
+  - Browser modern (Chrome, Edge, Firefox, Safari) mendeteksi header `SAMEORIGIN` tersebut pada iframe domain pihak ketiga dan langsung memblokir pemuatan peta dengan pesan error: *"maps.google.com menolak untuk terhubung"* (*refused to connect*).
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Buat file cadangan `_backup/contact_page.tsx.bak_task93`.
+  - [x] **Langkah 2**: Ubah `src` pada `<iframe>` di `src/app/contact/page.tsx` ke URL resmi Google Maps Embed API yang valid (`https://www.google.com/maps/embed?origin=mfe&pb=...`) yang tidak mengembalikan header penolakan iframe (`X-Frame-Options: undefined`, HTTP 200 OK).
+  - [x] **Langkah 3**: Tambahkan kartu navigasi interaktif dengan tombol "Buka Petunjuk Arah di Google Maps" (`target="_blank"`) dan koordinat presisi kantor PT. DSTech Smart Perkasa.
+  - [x] **Langkah 4**: Tambahkan tombol download aplikasi Android pada footer halaman kontak agar konsisten dengan halaman lainnya.
+  - [x] **Langkah 5**: Uji validasi TypeScript (`npx tsc --noEmit` lolos 0 error) dan build lokal (`npm run build` sukses 100%).
+  - [x] **Langkah 6**: Push ke GitHub `rm23nm/dstech-smart` (Commit `56c1af7`) dan deploy ke live server VPS 157.66.34.199 (PM2 PID `517887`).
+  - [x] **Langkah 7**: Update status di `LAPORAN_PROGRES.md` dan bersihkan file cadangan sementara.
 
 ---
 
-### 95. Tugas: Penyertaan Tautan Unduh SPH pada Pesan WhatsApp dan Lampiran Gambar Brosur Item Produk yang Ditawarkan
+### 94. Tugas: Penambahan Modul & Menu Rekapitulasi Absensi Karyawan & Teknisi di Dashboard Superadmin / Admin
 - **Permintaan Pengguna**:
-  1. *"pada sph,belumada link download penawarannya di pesan"*
-  2. *"kemudian SPHnya tolong buat lamoiran untuk Item gambar yang ditawarkan"*
-- **Status**: Selesai & Terverifikasi
-- **Rincian Penyelesaian Step-by-Step**:
-  - [x] **Langkah 1 (Cadangan Backup)**: Backup file `src/app/admin/finance/page.tsx` ke `_backup/page.tsx.bak_sph_link_share` dan `src/app/api/finance/print/route.ts` ke `_backup/route.ts.bak_sph_print`.
-  - [x] **Langkah 2 (Penyertaan Tautan SPH di Pesan WhatsApp & Modal Kirim)**:
-    - Di fungsi `generateDocShareContent`, jika `doc.docType === "SPH"`, otomatis menyertakan link unduh resmi SPH:
-      ```text
-      📥 *Tautan Unduh & Cetak Berkas Resmi Penawaran:*
-      📄 *Surat Penawaran Harga (SPH):*
-      https://dstechsmart.com/api/finance/print?doc=sph&no=[NO_SPH]
-      ```
-    - Di modal kirim dokumen (`sendDocModal.isOpen`), menyediakan blok kartu ungu **Tautan Dokumen Penawaran Resmi (SPH)** lengkap dengan tombol `Salin Link` dan tombol `Buka SPH`.
-  - [x] **Langkah 3 (Dukungan Route Handler Publik `/api/finance/print?doc=sph`)**:
-    - Menambahkan logika pencarian data penawaran di `data.quotations` berdasarkan nomor SPH atau ID.
-    - Menampilkan dokumen Surat Penawaran Harga (SPH) resmi PT. DSTech Smart Perkasa ber-kop surat resmi (A4 Full Bleed).
-    - Membaca katalog produk (`dstech_products.json`) untuk mencocokkan foto dan deskripsi spesifikasi teknis dari setiap item yang ditawarkan.
-  - [x] **Langkah 4 (Pembuatan Lembar Lampiran Gambar Produk yang Ditawarkan)**:
-    - Menambahkan **Lembar 2 (Lampiran Foto & Spesifikasi Produk Penawaran)** yang memuat grid kartu foto produk berkualitas tinggi, nama perangkat, kuantiti penawaran, deskripsi spesifikasi teknis, dan harga satuan unit.
-    - Dilengkapi saklar `[✓] Kop Surat Resmi`, tombol `🖨️ Cetak (Print)`, dan tombol `⬇️ Unduh PDF SPH`.
-  - [x] **Langkah 5 (Validasi Kompilasi, Pengujian Lokal, & Deployment)**:
-    - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-    - Build Next.js `npm run build` sukses 47/47 rute.
-    - Pengujian HTTP lokal untuk endpoint SPH (`doc=sph`) mengembalikan Status 200 OK dengan konten Surat Penawaran dan Lampiran Foto.
-    - Push ke GitHub repository `rm23nm/dstech-smart`.
-    - Deploy ke live server VPS PM2 `dstech-main`.
+  *"pada dasbord superadmin, terkait absensi kita belum ada"*
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Penyebab Masalah**:
+  - Fitur absensi saat ini baru tersedia di portal karyawan/teknisi lapangan (`/employee`), di mana teknisi mencatat kehadiran masuk/pulang dengan GPS Geolocation Google Maps dan mengajukan lembur.
+  - Pada dashboard Superadmin/Admin (`/admin`), belum tersedia modul atau menu "Rekap Absensi Karyawan & Teknisi". Akibatnya, Superadmin dan Admin tidak dapat memantau kehadiran harian teknisi, memverifikasi titik lokasi koordinat Google Maps check-in/out, menyetujui (approve/reject) pengajuan lembur, melakukan input/koreksi absensi manual, maupun mencetak rekapitulasi kehadiran bulanan.
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Buat folder `_backup/` dan backup file `src/app/admin/layout.tsx` serta `src/app/api/employee/attendance/route.ts`.
+  - [x] **Langkah 2**: Tambahkan menu "Rekap Absensi Staf" (dengan icon `CalendarCheck`) di navigasi sidebar Admin (`src/app/admin/layout.tsx`) dan lengkapi `SEARCH_CATALOG` dengan entri pencarian absensi karyawan.
+  - [x] **Langkah 3**: Perluas API endpoint `src/app/api/employee/attendance/route.ts` dengan penanganan:
+    - `POST` action `admin_add`: Input manual data absensi oleh Superadmin/Admin (misal: sakit, cuti, dinas luar, atau lupa absen).
+    - `PUT`: Update data absensi dan persetujuan pengajuan lembur (`approve_overtime` & `reject_overtime`).
+    - `DELETE`: Hapus record absensi atau lembur jika diperlukan koreksi.
+  - [x] **Langkah 4**: Bangun halaman interaktif Admin Absensi `src/app/admin/attendance/page.tsx`:
+    - Ringkasan KPI: Total Hadir, Hadir Lapangan, Tepat Waktu, Lembur Menunggu Persetujuan.
+    - Tab 1: Log Rekap Absensi (Tabel riwayat dengan filter nama karyawan, filter tanggal/bulan, filter status, pencarian, dan badge lokasi terverifikasi GPS).
+    - Tab 2: Pengajuan Lembur Karyawan (Daftar pengajuan lembur lengkap dengan alasan tugas & tombol Setujui / Tolak oleh Superadmin/Admin).
+    - Tab 3: Rekap Disiplin Staf (Akumulasi hari kerja, rasio tepat waktu, presensi lapangan, dan jam lembur sah per karyawan).
+    - Modal Pratinjau Titik GPS: Peta satelit Google Maps embed interaktif + link langsung ke Google Maps koordinat presisi.
+    - Modal Tambah/Koreksi Absensi Manual oleh Admin.
+    - Lembar Cetak Rekapitulasi Absensi A4 resmi ber-Kop Surat DSTech / Download PDF.
+  - [x] **Langkah 5**: Uji validasi TypeScript (`npx tsc --noEmit` lolos 0 error) dan build lokal Next.js (`npm run build` sukses 48 routes).
+  - [x] **Langkah 6**: Push commit ke GitHub `rm23nm/dstech-smart` (Commit `a7624cb`) menggunakan `push_with_native_git.js`.
+  - [x] **Langkah 7**: Deploy ke live server VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main` (PID `519842`, HTTP 200 OK).
+  - [x] **Langkah 8**: Hapus file cadangan sementara di folder `_backup/` dan update status `LAPORAN_PROGRES.md` menjadi Selesai.
 
 ---
 
-### 96. Tugas: Kompresi File Gambar Lampiran Maksimal ~40 KB (Client-Side & Export PDF)
-- **Permintaan Pengguna**: *"file lamoiran gambarnya dikomores ke 40Kb aja,jangan besar2"*
-- **Status**: Selesai & Terverifikasi
-- **Rincian Penyelesaian Step-by-Step**:
-  1. [x] **Langkah 1 (Cadangan Backup)**:
-     - Telah dibuat file backup cadangan di folder `_backup` untuk seluruh file yang dimodifikasi sebelum perubahan dilakukan.
-  2. [x] **Langkah 2 (Peningkatan Algoritma Kompresi Kuat `compressImageFile` Target Strict <= 40 KB)**:
-     - Menyempurnakan algoritma kompresi gambar berbasis HTML5 Canvas di `src/app/admin/finance/page.tsx` dengan target ketat `maxTargetSizeKb = 40` (maksimal 40 * 1024 bytes / 40.960 bytes).
-     - Mengimplementasikan 2 tahap iterasi cerdas: uji kualitas JPEG (0.70 down to 0.20) lalu adaptive downscaling dimensi (skala 0.80x dimensi per siklus) sehingga gambar resolusi tinggi dari kamera HP otomatis terpangkas presisi ke rentang ~40 KB tanpa memburamkan teks dan angka penting.
-     - Diterapkan pada seluruh upload nota berkas, bukti bayar kuitansi, foto dokumentasi proyek, dan foto lampiran faktur.
-  3. [x] **Langkah 3 (Penerapan Kompresi ~40 KB pada Portal Teknisi & Maintenance)**:
-     - Menambahkan fungsi kompresi client-side `compressTechnicianPhoto(file, 40)` di `src/app/employee/page.tsx` untuk foto dokumentasi penugasan teknisi di lapangan.
-     - Menambahkan fungsi kompresi client-side `compressMaintenancePhoto(file, 40)` di `src/app/admin/maintenance/page.tsx` untuk foto dokumentasi tiket pemeliharaan.
-  4. [x] **Langkah 4 (Optimasi Ekspor PDF Ringan pada Endpoint Cetak Publik `/api/finance/print`)**:
-     - Mengalibrasi konfigurasi `downloadAsPdf()` di `src/app/api/finance/print/route.ts` (baik untuk SPH maupun Faktur/BAST/Photos):
-       - `image: { type: 'jpeg', quality: 0.65 }`
-       - `html2canvas: { scale: 1.5, useCORS: true }`
-       - Memastikan berkas PDF unduhan (termasuk lembar lampiran foto brosur item SPH dan foto dokumentasi fisik faktur) menghasilkan ukuran file yang sangat ringan (~100-200 KB) dan hemat kuota.
-  5. [x] **Langkah 5 (Validasi Kompilasi, Pengujian Lokal, & Deployment)**:
-     - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-     - Build Next.js `npm run build` sukses 47/47 rute.
-     - Push ke GitHub repository `rm23nm/dstech-smart`.
-     - Deploy ke live server VPS PM2 `dstech-main`.
+### 95. Tugas: Penanganan Izin Lokasi GPS pada Aplikasi Android WebView & Modal Presensi
+- **Permintaan Pengguna**:
+  *(Tangkapan layar modal Check-in HP Android: "⚠️ Izin lokasi browser ditolak. Menampilkan peta koordinat kantor DSTech.")*
+- **Status**: ✅ **Selesai 100% (Completed)**
+- **Penyebab Masalah**:
+  1. Pada aplikasi Android (`dstech-smart-android`), kelas `MainActivity.kt` belum memanggil `settings.setGeolocationEnabled(true)` dan belum meng-override callback `onGeolocationPermissionsShowPrompt` di `WebChromeClient`. Tanpa callback ini, Android WebView secara default memblokir/menolak seluruh permintaan HTML5 Geolocation API (`navigator.geolocation.getCurrentPosition`).
+  2. Runtime permission Android `ACCESS_FINE_LOCATION` dan `ACCESS_COARSE_LOCATION` belum didaftarkan di launcher izin saat aplikasi berjalan.
+  3. Pada modal presensi web (`src/app/employee/page.tsx`), panduan saat pengguna tidak sengaja memblokir izin lokasi browser perlu dilengkapi tombol pintas edukatif untuk meminta ulang izin lokasi atau memilih preset lokasi penugasan secara mulus.
+- **Rincian Penyelesaian**:
+  - [x] **Langkah 1**: Buat file cadangan `_backup/MainActivity.kt.bak_task95` dan `_backup/employee_page.tsx.bak_task95`.
+  - [x] **Langkah 2**: Perbarui `MainActivity.kt` di `dstech-smart-android`:
+    - Diaktifkan `settings.setGeolocationEnabled(true)` dan `settings.setGeolocationDatabasePath(...)`.
+    - Didaftarkan launcher runtime permission Android untuk `ACCESS_FINE_LOCATION` dan `ACCESS_COARSE_LOCATION`.
+    - Diimplementasikan `WebChromeClient.onGeolocationPermissionsShowPrompt` agar meneruskan izin lokasi dari sistem Android ke WebView.
+  - [x] **Langkah 3**: Kompilasi ulang APK Android `dstech-smart-app.apk` via Gradle (`BUILD SUCCESSFUL in 8s`), salin APK baru (6.23 MB) ke root dan folder `dstech-smart/public/dstech-smart-app.apk`, serta diunggah langsung ke server live VPS via SFTP.
+  - [x] **Langkah 4**: Perbaiki penanganan error GPS di `src/app/employee/page.tsx` agar saat izin belum aktif, terdapat panduan tips visual yang jelas untuk mengaktifkan izin di browser/HP tanpa menghambat pencatatan presensi.
+  - [x] **Langkah 5**: Uji validasi TypeScript (`npx tsc --noEmit` lolos 0 error) dan build lokal Next.js (`npm run build` sukses 48 routes).
+  - [x] **Langkah 6**: Push commit ke GitHub `rm23nm/dstech-smart` (Commit `8a644ef`) dan deploy ke live server VPS 157.66.34.199 (PM2 PID `521515`).
+  - [x] **Langkah 7**: Hapus file cadangan sementara di folder `_backup/` dan laporkan hasil penyelesaian ke pengguna.
 
 ---
 
-### 97. Tugas: Fitur Lampirkan Foto & Spesifikasi pada Item Manual SPH (Kompresi Otomatis ~40 KB)
-- **Permintaan Pengguna**: *"untuk file item yang di input manual,bagai mana cara melampirkan fotonya,"* -> *"ok, lanjutkan"*
-- **Status**: Selesai & Terverifikasi
-- **Rincian Penyelesaian Step-by-Step**:
-  1. [x] **Langkah 1 (Cadangan Backup)**:
-     - Telah dibuat file backup cadangan di folder `_backup` sebelum modifikasi dilakukan.
-  2. [x] **Langkah 2 (Update Interface & State Item SPH)**:
-     - Menambahkan properti `image?: string;` dan `description?: string;` pada `QuotationItem` di `src/app/admin/finance/page.tsx`.
-     - Memperbarui `handleAddQuotationItem` dan `handleSelectProductForQuotation` agar otomatis menyinkronkan properti `image` dan `description`.
-  3. [x] **Langkah 3 (Komponen Upload Foto & Thumbnail pada Form Item SPH)**:
-     - Pada repeater item baris barang `quotationForm.items.map`, menambahkan tombol upload foto `📷 Foto` dengan input file gambar tersembunyi.
-     - Menghubungkan ke fungsi kompresi client-side `compressImageFile(file, 40)` sehingga gambar otomatis terpangkas ringan $\le$ 40 KB sebelum dikirim ke `/api/upload`.
-     - Menyediakan thumbnail pratinjau mini foto barang di samping input nama produk dengan status visual badge hijau `✓ Foto Lampiran Terpasang (~40 KB)` dan tombol hapus/ganti foto.
-  4. [x] **Langkah 4 (Sinkronisasi ke Lembar Lampiran Cetak & PDF SPH `/api/finance/print?doc=sph`)**:
-     - Memastikan generator Lembar 2 (Lampiran Foto & Spesifikasi Produk SPH) di `/api/finance/print/route.ts` memprioritaskan `item.image` manual yang diunggah pengguna sehingga foto perangkat manual langsung tampil pada kartu katalog resmi SPH.
-  5. [x] **Langkah 5 (Validasi Kompilasi, Pengujian Lokal, & Deployment)**:
-     - Validasi TypeScript `npx tsc --noEmit` lolos 0 error.
-     - Build Next.js `npm run build` lokal sukses 47/47 rute.
-     - Push ke GitHub repository `rm23nm/dstech-smart`.
-     - Deploy ke live server VPS PM2 `dstech-main`.
+### 96. Tugas: Sistem Perhitungan Pembayaran Gaji Karyawan, Upah Lembur (Overtime), Bonus & Tunjangan (Payroll & Slip Gaji Terpadu)
+- **Permintaan Pengguna**:
+  *"tolong buat perhitungan pembayaran gaji dan Overtimenya beserta dengan bonus atau tunjangan"*
+- **Status**: ⏳ **Sedang Dikerjakan (In Progress)**
+- **Penyebab & Kebutuhan Fitur**:
+  - Sistem telah memiliki modul absensi harian dan pencatatan lembur teknisi, namun belum memiliki kalkulator perhitungan pembayaran gaji terpadu (*Payroll System*).
+  - Diperlukan fitur penggajian yang secara otomatis menghitung:
+    1. Gaji Pokok karyawan / teknisi.
+    2. Tunjangan Kehadiran / Uang Makan harian yang terhitung otomatis dari hari kehadiran riil absensi GPS.
+    3. Upah Lembur (*Overtime Pay*) yang terhitung otomatis dari jam lembur yang telah disetujui (*Approved Overtime*) dikalikan tarif per jam.
+    4. Tunjangan Jabatan / Operasional Lapangan.
+    5. Bonus Kinerja & Insentif Proyek CCTV / Smart Home.
+    6. Potongan resmi (BPJS Kesehatan/Ketenagakerjaan, pinjaman/kasbon, dsb).
+    7. Total Gaji Bersih (*Take Home Pay*) dengan teks terbilang rupiah otomatis.
+    8. Lembar Cetak Slip Gaji Resmi A4 ber-Kop Surat PT. DSTech Smart Perkasa dan dual tanda tangan sah direktur & staf.
+    9. Integrasi otomatis ke Buku Arus Kas Keluar (*Cash Flow ERP*) saat gaji dibayarkan.
+- **Rencana & Realisasi Penyelesaian Step-by-Step**:
+  - [x] **Langkah 1**: Buat data store terisolasi `src/data/dstech_payroll.json` ber-prefix `dstech_` dengan struktur schema lengkap komponen gaji.
+  - [x] **Langkah 2**: Bangun API Route `src/app/api/payroll/route.ts` (GET, POST, PUT, DELETE, dan sinkronisasi otomatis ke kas keluar ERP).
+  - [x] **Langkah 3**: Buat file cadangan sementara di folder `_backup/` sebelum mengedit file terkait.
+  - [x] **Langkah 4**: Tambahkan Tab "Kalkulator & Slip Gaji (Payroll)" di `/admin/attendance/page.tsx` lengkap dengan:
+    - 4 Kartu KPI Analitik Keuangan Payroll Bulanan.
+    - Kalkulator Form Input Gaji Baru dengan Auto-Kalkulasi kehadiran & lembur sah.
+    - Tabel Daftar Penggajian Karyawan & Filter Periode Bulan.
+    - Modal Detail & Cetak Lembar Slip Gaji Resmi A4 ber-Kop Surat DSTech, format standar korporat, terbilang rupiah otomatis, dual tanda tangan (Karyawan & Direktur Utama).
+    - Tombol Aksi Otorisasi & Pembayaran Gaji (otomatis mencatat pengeluaran kas di buku arus kas ERP).
+  - [x] **Langkah 5**: Tambahkan kata kunci navigasi & pencarian di `SEARCH_CATALOG` `src/app/admin/layout.tsx`.
+- **Status**: ✅ **Selesai Diimplementasikan (Menunggu Verifikasi & Deploy)**
 
 ---
 
-### 98. Catatan Penting
+### 97. Tugas: Fitur Presensi Langsung (Quick Check-In & Check-Out Mandiri) di Dashboard Superadmin & Admin
+- **Permintaan Pengguna**:
+  *"khusus superadmin, tolong buat agar mereka bisa langsung absensi juga didalam dasbord superadmin dan admin untuk user yang roolnya"*
+- **Status**: ✅ **Selesai Diimplementasikan (Menunggu Verifikasi & Deploy)**
+- **Kebutuhan Fitur**:
+  - Menyediakan widget / tombol cepat Check-In (Masuk) & Check-Out (Pulang) mandiri langsung di header dashboard Admin/Superadmin bagi user yang sedang login dengan role `SUPERADMIN` atau `ADMIN`.
+  - Terhubung dengan deteksi lokasi GPS kantor / dinas luar dan langsung tersimpan ke data absensi tanpa perlu berpindah ke portal `/employee`.
+- **Realisasi**:
+  - [x] Menambahkan card widget quick attendance di atas dashboard absensi khusus akun Admin/Superadmin.
+  - [x] Status kehadiran realtime hari ini terpampang jelas.
+  - [x] Tombol Check-In Masuk & Check-Out Pulang langsung menyimpan record ke database presensi `dstech_employee_attendance.json`.
+
+---
+
+### 98. Tugas: Fitur Laporan Absensi & Unduh / Download Lengkap (Excel / CSV & PDF Resmi A4)
+- **Permintaan Pengguna**:
+  *"tolong buat laporan untuk absensinya juga serta buat supaya bisa didownload"*
+- **Status**: ✅ **Selesai 100%**
+- **Kebutuhan Fitur**:
+  - Menyediakan Tab & Halaman Laporan Absensi Khusus ("Laporan & Rekapitulasi Absensi") dengan rangkuman statistik kehadiran dan kedisiplinan staf bulanan.
+  - Fitur Download Spreadsheet Excel / CSV lengkap dengan header, data kehadiran per tanggal, jam masuk, jam pulang, lokasi, koordinat GPS, jam lembur, dan catatan lapangan.
+  - Fitur Cetak / Download PDF Laporan Resmi A4 ber-Kop Surat PT. DSTech Smart Perkasa (NIB, NPWP, Alamat Cilegon, WhatsApp resmi), nomor surat dinas, tabel rekapitulasi kehadiran per staf, dan dual tanda tangan sah (Supervisor Operasional & Direktur Utama).
+  - Tombol aksi download yang jelas, kontras, dan mudah diakses di Header, Filter Bar, dan Tab Laporan.
+- **Realisasi Penyelesaian**:
+  - [x] **Langkah 1**: Backup file `src/app/admin/attendance/page.tsx` ke folder `_backup/attendance_page.tsx.bak_task98`.
+  - [x] **Langkah 2**: Perkaya Tab 4 menjadi "Laporan & Rekapitulasi Absensi" dengan:
+    - Ringkasan KPI Laporan (Total Log Kehadiran, Hadir Lapangan Terverifikasi GPS, Jam Lembur Sah, Rata-rata Kedisiplinan Staf %).
+    - Dua tombol download utama: "Unduh Rekap Excel (.CSV)", "Unduh Log Detail (.CSV)", dan "Cetak / Unduh PDF Laporan Resmi (A4)".
+    - Tabel Matriks Rekapitulasi Karyawan (Nama, Total Masuk, Hadir Kantor, Hadir Lapangan, Jam Lembur Sah, Rasio Disiplin %, Status).
+    - Tabel Rincian Detail Log Absensi Harian Terfilter.
+  - [x] **Langkah 3**: Perbaiki dan sempurnakan Modal Cetak Dokumen Rekap Absensi Resmi A4 (`isPrintModalOpen`):
+    - Nomor Dokumen: `DSTECH/LAP-ABS/{YYYYMM}/{ID}`.
+    - Kop Surat Resmi berlogo DSTech Smart, NIB, NPWP.
+    - Parameter Periode dan Ringkasan Kedisiplinan Tim.
+    - Tabel Resmi Rekapitulasi.
+    - Catatan Rekomendasi Evaluasi Kedisiplinan Karyawan.
+    - Pengesahan & Tanda Tangan Sah: Supervisor Tim & Direktur Utama PT. DSTech Smart Perkasa.
+    - Format CSS cetak `@media print` sempurna untuk A4.
+  - [x] **Langkah 4**: Perbarui `SEARCH_CATALOG` di `src/app/admin/layout.tsx`.
+  - [x] **Langkah 5**: Validasi lokal Next.js (`npx tsc --noEmit` & `npm run build` lolos 0 error).
+  - [x] **Langkah 6**: Commit & push ke GitHub via `push_with_native_git.js` (commit `7c1f4ec`).
+  - [x] **Langkah 7**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` & restart PM2 `dstech-main`.
+  - [x] **Langkah 8**: Verifikasi live `https://dstechsmart.com/admin/attendance` lolos 100%.
+  - [x] **Langkah 9**: Bersihkan file backup `_backup/` dan catat laporan penyelesaian.
+
+---
+
+### 99. Tugas: Penguncian Koordinat GPS Absensi (Immutable Sekali Rekam), Wajib Selfie Foto Kamera, dan Blokir Total Input Manual
+- **Permintaan Pengguna**:
+  *"untuk absensi, tolong kunci agar kordinat absensinya tidak dapat diubah ke-2x, kemudian wajib memakai kordinat dan selfi foto. jangan izinkan input manual"*
+- **Status**: ✅ **Selesai 100%**
+- **Kebutuhan Fitur**:
+  1. **Penguncian Koordinat GPS (Anti-Tamper / Immutable)**:
+     - Koordinat GPS (latitude, longitude, accuracy, Google Maps URL) yang sudah terekam saat Check-In atau Check-Out TIDAK DAPAT DIUBAH / DI-EDIT untuk kedua kalinya, baik oleh user maupun form admin edit (`403 Forbidden: Pelanggaran Integritas`).
+  2. **Wajib Selfie Foto Kamera**:
+     - Setiap melakukan presensi (Masuk maupun Pulang), karyawan/staf WAJIB mengambil foto selfie wajah langsung via kamera perangkat (WebRTC live viewfinder / input capture kamera langsung).
+     - Menampilkan pratinjau kamera selfie real-time dengan tombol jepret foto & fallback mobile capture.
+     - Foto selfie disimpan terisolasi dan tertaut pada catatan absensi (`selfieCheckIn` & `selfieCheckOut`).
+  3. **Blokir Total Input Manual**:
+     - Seluruh input manual lokasi atau dropdown preset bebas koordinat telah dihapus.
+     - Tombol Check-In / Check-Out dinonaktifkan secara otomatis sampai sinyal satelit GPS terkunci sah dan foto selfie wajah berhasil diambil.
+- **Realisasi Penyelesaian**:
+  - [x] **Langkah 1**: Analisis file modul absensi karyawan `src/app/employee/page.tsx`, modal absensi `src/app/admin/attendance/page.tsx`, dan backend API `src/app/api/employee/attendance/route.ts`.
+  - [x] **Langkah 2**: Buat backup file sebelum modifikasi di folder `_backup/`.
+  - [x] **Langkah 3**: Perbarui schema dan API `src/app/api/employee/attendance/route.ts`:
+     - Tolak presensi tanpa koordinat GPS (`latitude`, `longitude`).
+     - Tolak presensi tanpa foto selfie kamera (`selfieCheckIn` / `selfieCheckOut`).
+     - Kunci koordinat GPS secara permanen (`isGpsLocked: true`).
+     - Blokir perubahan koordinat yang sudah terekam di PUT update handler (`403 Forbidden: Pelanggaran Integritas: Koordinat GPS sudah terkunci permanen dan dilarang diubah ke-2x!`).
+  - [x] **Langkah 4**: Perbarui antarmuka portal presensi `src/app/employee/page.tsx`:
+     - Mengintegrasikan live camera viewfinder WebRTC & mobile camera capture fallback dengan auto-kompresi JPEG.
+     - Menghapus dropdown preset koordinat dan menggantinya dengan Banner Status GPS Satelit Terkunci Permanen.
+     - Mengunci tombol submit konfirmasi masuk/pulang sampai kedua syarat sah (GPS satelit + foto selfie) terpenuhi.
+     - Menambahkan thumbnail foto selfie dan modal pratinjau foto wajah terverifikasi pada tabel riwayat absensi.
+  - [x] **Langkah 5**: Perbarui dashboard admin `src/app/admin/attendance/page.tsx`:
+     - Menampilkan thumbnail foto selfie karyawan pada tabel absensi harian dan audit trail.
+     - Menampilkan foto selfie wajah karyawan terverifikasi kamera di dalam modal pratinjau peta satelit Google Maps.
+  - [x] **Langkah 6**: Validasi build lokal lolos sempurna (`npx tsc --noEmit` 0 error & `npm run build` sukses 49 rute statis/dinamis).
+  - [x] **Langkah 7**: Commit & push ke GitHub via `push_with_native_git.js` (commit `64be670`).
+  - [x] **Langkah 8**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` & restart PM2 `dstech-main` (PID `542811`).
+  - [x] **Langkah 9**: Uji coba live HTTP 200 OK (`https://dstechsmart.com/employee` & `https://dstechsmart.com/admin/attendance`) dan bersihkan file backup di `_backup/`.
+
+---
+
+### 100. Tugas: Fitur Kontrak Kerja & Perekrutan Karyawan Baru (Kontrak Tahunan, Bulanan, dan Harian Teknisi)
+- **Permintaan Pengguna**:
+  *"saya ingin kamu buatkan juga fitur kontrak kerja, untuk perekrutan karyawan baru. sistem kerjanya. 1. untuk staf kontrak bisa tahunan dan bulanan. namun untuk teknisi kontrak itu bayarannya biasanya harian, bulanan dan tahunan"*
+- **Status**: ✅ **Selesai 100% (Deployed Live)**
+- **Kebutuhan Fitur**:
+  - Modul Rekrutmen & Manajemen Kontrak Kerja (SPK / Perjanjian Kerja Waktu Tertentu / PKWT) di dashboard Admin & Superadmin (`/admin/contracts`).
+  - Skema Kontrak Fleksibel:
+    1. **Staf Tetap / Kontrak Kantor**: Skema Bulanan atau Tahunan (Gaji Pokok bulanan, tunjangan jabatan, tunjangan kehadiran, BPJS).
+    2. **Teknisi Proyek / Lapangan**: Skema Fleksibel (Harian, Bulanan, atau Tahunan).
+  - Generator Surat Kontrak Kerja Resmi A4 ber-Kop Surat PT. DSTech Smart Perkasa, klausul hak & kewajiban, masa berlaku kontrak, dan dual tanda tangan materai / digital signature.
+
+---
+
+### 101. Tugas: Skema Pembayaran Teknisi Kontrak Harian (Tipe 1: Harian Penuh & Tipe 2: Per Jam + Pengali Lembur)
+- **Permintaan Pengguna**:
+  *"untuk dalam kontrak hariannya biasanya kita memakai 2 Type. hitungan harian dibayar penuh. dan Type ke-2 bayaran jam. untuk lembur biasanya kta pakai pengali"*
+- **Status**: ✅ **Selesai 100% (Deployed Live)**
+- **Kebutuhan Fitur**:
+  - **Tipe 1 (Harian Dibayar Penuh / Flat Daily Rate)**: Teknisi dibayar penuh per hari kerja (misal Rp 150.000 - Rp 250.000 / hari) terlepas dari durasi jam kerja, selama check-in dan menyelesaikan SPK/tugas.
+  - **Tipe 2 (Upah Berdasarkan Jam / Hourly Rate + Overtime Multiplier)**:
+    - Tarif per jam kerja efektif (misal Rp 25.000 / jam).
+    - Rumus Lembur dengan Pengali Resmi (Overtime Multiplier):
+      - Hari Kerja Biasa: Jam lembur ke-1 pengali 1.5x tarif per jam, jam lembur ke-2 dst pengali 2.0x tarif per jam.
+      - Hari Libur / Akhir Pekan: Pengali 2.0x s/d 3.0x tarif per jam.
+  - Lembar Cetak Dokumen Resmi PKWT mencantumkan pasal skema upah teknisi secara transparan sesuai pilihan Tipe 1 atau Tipe 2.
+
+- **Realisasi Penyelesaian**:
+  - [x] **Langkah 1**: Buat data store terisolasi `src/data/dstech_contracts.json` dengan prefix `dstech_contract_` memuat schema kontrak staf dan teknisi (Tipe 1 & Tipe 2).
+  - [x] **Langkah 2**: Buat API Endpoint `src/app/api/contracts/route.ts` yang mendukung `GET`, `POST`, `PUT`, `DELETE` secara terisolasi.
+  - [x] **Langkah 3**: Buat halaman manajemen kontrak kerja di `src/app/admin/contracts/page.tsx` dengan KPI cards, filter kategori (Staf/Teknisi), filter tipe kontrak, modal tambah/rekrut karyawan baru, modal edit, modal perpanjang kontrak, dan integrasi pembuatan user akun otomatis.
+  - [x] **Langkah 4**: Buat generator lembar cetak standar A4 Resmi Surat Perjanjian Kerja Waktu Tertentu (PKWT) ber-Kop Surat Resmi PT. DSTech Smart Perkasa dengan dual tanda tangan dan tombol Download PDF A4.
+  - [x] **Langkah 5**: Tambahkan menu navigasi "Kontrak Kerja & Rekrutmen" di sidebar `src/app/admin/layout.tsx` (dengan backup file terlebih dahulu di `_backup/`).
+  - [x] **Langkah 6**: Validasi kompilasi lokal (`npx tsc --noEmit` 0 error & `npm run build` sukses 51 rute).
+  - [x] **Langkah 7**: Commit & push ke GitHub via `push_with_native_git.js` (commit `a2773a8`).
+  - [x] **Langkah 8**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` (PM2 `dstech-main` PID 545151) dan verifikasi respon HTTP 200 OK.
+  - [x] **Langkah 9**: Bersihkan file cadangan di `_backup/` dan update Laporan Progres.
+
+---
+
+### 102. Tugas: Kunci Lokasi Absensi GPS & Geofencing Staf Tertentu (Wajib Absen di Lokasi Tertentu / Kantor, Tolak Absen Jika di Luar Radius)
+- **Permintaan Pengguna**:
+  *"kemudian saya ingin mengunci staf tertentu hanya bisa absen di lokasi tertentu dengan GPS. misalnya kantor. wajib absen dikantor dan GPS akan memvalidasi. jika berada diluar kantor maka tidak bisa untuk melakukan absen"*
+- **Status**: ⏳ **Antrian Pekerjaan Selanjutnya (Queued)**
+- **Kebutuhan Fitur**:
+  - Konfigurasi Aturan Lokasi Presensi per Karyawan/Staf:
+    - Opsi 1: Fleksibel / Dinas Lapangan (Bebas lokasi di mana pun proyek berada, tetap wajib koordinat GPS satelit & foto selfie).
+    - Opsi 2: Terkunci Lokasi Tertentu (Contoh: Kantor Utama Cilegon, Workshop Serang, atau Titik Proyek Khusus Klien).
+  - Validasi Radius Geofencing (Formula Haversine Satelit):
+    - Jika staf berstatus 'Terkunci Kantor', sistem menghitung jarak riil perangkat ke koordinat kantor (-6.031846, 106.037198).
+    - Jika jarak melebihi batas radius (misal > 100 meter dari kantor), sistem MENOLAK presensi dan menampilkan peringatan: "Presensi Ditolak: Anda berada di luar radius kantor resmi (Jarak: ... meter). Anda wajib berada di area kantor untuk melakukan presensi!"
+  - Pengaturan Geofencing staf dapat diatur oleh Admin / Superadmin di tab Manajemen Karyawan / Absensi.
+
+---
+
+### 103. Tugas: Masa Berlaku Akun Pengguna / User Account Expiry & Integrasi Otomatis Kontrak Kerja ke User Management
+- **Permintaan Pengguna**:
+  1. *"untuk user tolong tambahkan agar bisa expired, sehingga saya dapat mengatur berapa lama mereka dapat akses"*
+  2. *"saya melihat, sudah ada beberapa staf dummy yang ditambahkan pada kontrak kerja. namun kenapa usernya tidak muncul ke user management"*
+- **Status**: ✅ **Selesai 100% (Deployed Live)**
+- **Penyebab Masalah**:
+  - Akun staf/teknisi dummy pada kontrak kerja awal (`Teknisi Hendra` & `Ikhsan Maulidi`) baru tersimpan di `dstech_contracts.json` dan belum disinkronisasikan ke data store pengguna live `dstech_users.json`.
+  - Schema pengguna di `src/app/api/users/route.ts` dan antarmuka `/admin/users` belum memiliki atribut dan visualisasi `expiresAt` (Masa Berlaku Akun).
+  - API autentikasi `/api/auth/login` belum memeriksa batas waktu kedaluwarsa akun (`expiresAt`).
+- **Kebutuhan Fitur**:
+  - Penambahan field `expiresAt` (Tanggal Kedaluwarsa Akun) pada Master Data Pengguna (`dstech_users.json`).
+  - Sinkronisasi otomatis karyawan kontrak (`dstech_contracts.json`) ke User Management (`dstech_users.json`) lengkap dengan `expiresAt = contract.endDate`.
+  - Pilihan Fleksibel Masa Berlaku pada Modal Tambah/Edit User di `/admin/users`:
+    - Akses Selamanya / Tanpa Batas (Permanen).
+    - Batas Waktu Tertentu (Preset 1 Bulan, 3 Bulan, 6 Bulan, 1 Tahun, atau Kalender Tanggal Kustom).
+  - Validasi Otentikasi Ketat di `/api/auth/login`:
+    - Jika tanggal saat ini telah melewati `expiresAt`, tolak login dengan pesan penolakan yang ramah dan tegas: "Akses Ditolak: Masa berlaku akun Anda telah berakhir (Kedaluwarsa pada ...). Silakan hubungi Administrator untuk perpanjangan kontrak kerja."
+  - Indikator Visual di Tabel `/admin/users`:
+    - Badge Masa Berlaku (🟢 Permanen, 🟡 Sisa X Hari, atau 🔴 Kedaluwarsa / Expired).
+
+- **Realisasi Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/api/users/route.ts`, `src/app/api/auth/login/route.ts`, `src/app/admin/users/page.tsx`) di folder `_backup/`.
+  - [x] **Langkah 2**: Perbarui `src/app/api/users/route.ts` agar mendukung atribut `expiresAt` dan auto-sync kontrak kerja yang belum terdaftar di `dstech_users.json`.
+  - [x] **Langkah 3**: Perbarui backend autentikasi `src/app/api/auth/login/route.ts` dengan validasi pencekalan login jika akun telah kedaluwarsa (`expiresAt < now`).
+  - [x] **Langkah 4**: Perbarui antarmuka `src/app/admin/users/page.tsx` dengan kolom "Masa Berlaku Akses", badge hitungan sisa hari, dan kontrol expired date pada Modal Tambah & Edit Pengguna.
+  - [x] **Langkah 5**: Validasi kompilasi lokal (`npx tsc --noEmit` & `npm run build` sukses 51 rute).
+  - [x] **Langkah 6**: Commit & push ke GitHub via `push_with_native_git.js` (commit `43e4ea4`).
+  - [x] **Langkah 7**: Deploy ke live server VPS via `deploy_live.js` (PM2 `dstech-main` PID 548260).
+  - [x] **Langkah 8**: Verifikasi tampilan akun karyawan kontrak di User Management live (`https://dstechsmart.com/admin/users` dan API `/api/users` mengembalikan 6 user aktif termasuk Hendra dan Ikhsan) serta uji coba validasi login.
+  - [x] **Langkah 9**: Bersihkan file backup di `_backup/` dan update Laporan Progres.
+
+---
+
+### 88. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
 - Remote GitHub: `https://github.com/rm23nm/dstech-smart`.
@@ -2872,6 +2987,5 @@
 
 ---
 *Laporan ini dibuat untuk memudahkan Agen AI selanjutnya melanjutkan pekerjaan.*
-
 
 
