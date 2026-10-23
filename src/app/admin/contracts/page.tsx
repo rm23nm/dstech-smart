@@ -92,6 +92,17 @@ export interface DstechContract {
     unpaidLeaveDeduction?: "PRORATE_DAILY" | "NONE";
     specialLeaveNotes?: string;
   };
+  workSchedule?: {
+    workDaysType: "5_DAYS" | "6_DAYS" | "FLEXIBLE_PROJECT";
+    workDaysText: string;
+    dailyWorkingHours: number;
+    weeklyWorkingHours: number;
+    startTime: string;
+    endTime: string;
+    breakStartTime: string;
+    breakEndTime: string;
+    notes?: string;
+  };
   workLocation: string;
   status: "ACTIVE" | "EXPIRED" | "TERMINATED" | "DRAFT";
   signedByFirstParty: {
@@ -128,6 +139,10 @@ export interface OfficialPositionPreset {
   mealMethod?: "FULL_MONTHLY" | "DAILY_PRESENCE";
   mealAmount?: number;
   bpjsAllowance?: number;
+  workDaysType?: "5_DAYS" | "6_DAYS" | "FLEXIBLE_PROJECT";
+  startTime?: string;
+  endTime?: string;
+  dailyWorkingHours?: number;
   notes?: string;
 }
 
@@ -145,6 +160,10 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     transportAmount: 20000,
     mealMethod: "DAILY_PRESENCE",
     mealAmount: 25000,
+    workDaysType: "6_DAYS",
+    startTime: "08:00",
+    endTime: "17:00",
+    dailyWorkingHours: 8,
     notes: "Upah harian Helper Rp 150.000/hari kerja & lembur Rp 25.000/jam",
   },
   {
@@ -160,6 +179,10 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     transportAmount: 20000,
     mealMethod: "DAILY_PRESENCE",
     mealAmount: 25000,
+    workDaysType: "6_DAYS",
+    startTime: "08:00",
+    endTime: "17:00",
+    dailyWorkingHours: 8,
     notes: "Upah harian Teknisi Skill Rp 175.000/hari kerja & lembur Rp 30.000/jam",
   },
   {
@@ -175,6 +198,10 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     transportAmount: 25000,
     mealMethod: "DAILY_PRESENCE",
     mealAmount: 30000,
+    workDaysType: "6_DAYS",
+    startTime: "08:00",
+    endTime: "17:00",
+    dailyWorkingHours: 8,
     notes: "Upah harian Teknisi Senior Rp 200.000/hari kerja & lembur Rp 35.000/jam",
   },
   {
@@ -190,6 +217,10 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     transportAmount: 30000,
     mealMethod: "DAILY_PRESENCE",
     mealAmount: 35000,
+    workDaysType: "6_DAYS",
+    startTime: "08:00",
+    endTime: "17:00",
+    dailyWorkingHours: 8,
     notes: "Upah harian Lead/Foreman Rp 225.000/hari kerja & lembur Rp 40.000/jam",
   },
   {
@@ -204,8 +235,14 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     transportAllowance: 400000,
     mealAllowance: 500000,
     transportMethod: "FULL_MONTHLY",
+    transportAmount: 400000,
     mealMethod: "FULL_MONTHLY",
+    mealAmount: 500000,
     bpjsAllowance: 150000,
+    workDaysType: "5_DAYS",
+    startTime: "08:00",
+    endTime: "17:00",
+    dailyWorkingHours: 8,
     notes: "Gaji bulanan tetap staf kantor (tidak dikalikan harian)",
   },
   {
@@ -220,8 +257,14 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     transportAllowance: 400000,
     mealAllowance: 500000,
     transportMethod: "FULL_MONTHLY",
+    transportAmount: 400000,
     mealMethod: "FULL_MONTHLY",
+    mealAmount: 500000,
     bpjsAllowance: 150000,
+    workDaysType: "5_DAYS",
+    startTime: "08:00",
+    endTime: "17:00",
+    dailyWorkingHours: 8,
     notes: "Gaji bulanan staf IT tetap",
   },
   {
@@ -236,8 +279,14 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     transportAllowance: 500000,
     mealAllowance: 600000,
     transportMethod: "FULL_MONTHLY",
+    transportAmount: 500000,
     mealMethod: "FULL_MONTHLY",
+    mealAmount: 600000,
     bpjsAllowance: 150000,
+    workDaysType: "5_DAYS",
+    startTime: "08:00",
+    endTime: "17:00",
+    dailyWorkingHours: 8,
     notes: "Gaji bulanan manajerial/supervisor",
   },
   {
@@ -248,6 +297,10 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     payrollScheme: "DAILY",
     contractType: "DAILY",
     dailyRate: 175000,
+    workDaysType: "6_DAYS",
+    startTime: "08:00",
+    endTime: "17:00",
+    dailyWorkingHours: 8,
     overtimeHourlyRate: 30000,
     baseSalary: 4000000,
     positionAllowance: 500000,
@@ -321,6 +374,16 @@ export default function ContractsPage() {
     requiresDoctorCertificate: true,
     unpaidLeaveDeduction: "PRORATE_DAILY" as "PRORATE_DAILY" | "NONE",
     specialLeaveNotes: "Cuti tahunan 12 hari/tahun. Izin berbayar 3 hari. Sakit wajib melampirkan Surat Keterangan Dokter.",
+    // Waktu Kerja, Hari Kerja & Jam Istirahat (PP No. 35/2021)
+    workDaysType: "6_DAYS" as "5_DAYS" | "6_DAYS" | "FLEXIBLE_PROJECT",
+    workDaysText: "Senin s.d. Sabtu (6 Hari Kerja)",
+    dailyWorkingHours: 8,
+    weeklyWorkingHours: 40,
+    startTime: "08:00",
+    endTime: "17:00",
+    breakStartTime: "12:00",
+    breakEndTime: "13:00",
+    scheduleNotes: "Waktu kerja normal 8 jam/hari. Istirahat 1 jam (12:00 - 13:00 WIB, khusus Jumat 11:30 - 13:00 WIB). Fleksibel mengikuti SPK lapangan.",
     // First & Second Party
     directorName: "RAMADHANI, ST",
     directorTitle: "Direktur Utama",
@@ -551,6 +614,16 @@ export default function ContractsPage() {
       requiresDoctorCertificate: true,
       unpaidLeaveDeduction: "PRORATE_DAILY",
       specialLeaveNotes: "Cuti tahunan 12 hari/tahun. Izin berbayar 3 hari. Sakit wajib melampirkan Surat Keterangan Dokter.",
+      // Waktu Kerja, Hari Kerja & Jam Istirahat (PP No. 35/2021)
+      workDaysType: "6_DAYS",
+      workDaysText: "Senin s.d. Sabtu (6 Hari Kerja)",
+      dailyWorkingHours: 8,
+      weeklyWorkingHours: 40,
+      startTime: "08:00",
+      endTime: "17:00",
+      breakStartTime: "12:00",
+      breakEndTime: "13:00",
+      scheduleNotes: "Waktu kerja normal 8 jam/hari. Istirahat 1 jam (12:00 - 13:00 WIB, khusus Jumat 11:30 - 13:00 WIB). Fleksibel mengikuti SPK lapangan.",
       directorName: "RAMADHANI, ST",
       directorTitle: "Direktur Utama",
       notes: "Kontrak kerja baru teknisi lapangan sistem harian (Teknisi Skill Rp 175.000/hari).",
@@ -586,6 +659,10 @@ export default function ContractsPage() {
     const activeTransportAmount = item.allowances?.transportAmount ?? staff?.transportAllowance ?? daily?.transportAllowance ?? (activeTransportMethod === "FULL_MONTHLY" ? 400000 : 20000);
     const activeMealMethod = item.allowances?.mealMethod || (item.employeeCategory === "STAFF" || item.contractType === "MONTHLY" || item.contractType === "YEARLY" ? "FULL_MONTHLY" : "DAILY_PRESENCE");
     const activeMealAmount = item.allowances?.mealAmount ?? (activeMealMethod === "FULL_MONTHLY" ? 500000 : 25000);
+
+    // Detect work schedule
+    const ws = item.workSchedule;
+    const defaultWorkDays = item.employeeCategory === "STAFF" ? "5_DAYS" : "6_DAYS";
 
     setFormData({
       id: item.id,
@@ -630,6 +707,16 @@ export default function ContractsPage() {
       requiresDoctorCertificate: item.leavePolicy?.requiresDoctorCertificate ?? true,
       unpaidLeaveDeduction: (item.leavePolicy?.unpaidLeaveDeduction as any) ?? "PRORATE_DAILY",
       specialLeaveNotes: item.leavePolicy?.specialLeaveNotes ?? "Cuti tahunan 12 hari/tahun. Izin berbayar 3 hari. Sakit wajib melampirkan Surat Keterangan Dokter.",
+      // Waktu Kerja & Hari Kerja
+      workDaysType: ws?.workDaysType || defaultWorkDays,
+      workDaysText: ws?.workDaysText || (defaultWorkDays === "5_DAYS" ? "Senin s.d. Jumat (5 Hari Kerja)" : "Senin s.d. Sabtu (6 Hari Kerja)"),
+      dailyWorkingHours: ws?.dailyWorkingHours || 8,
+      weeklyWorkingHours: ws?.weeklyWorkingHours || 40,
+      startTime: ws?.startTime || "08:00",
+      endTime: ws?.endTime || "17:00",
+      breakStartTime: ws?.breakStartTime || "12:00",
+      breakEndTime: ws?.breakEndTime || "13:00",
+      scheduleNotes: ws?.notes || (defaultWorkDays === "5_DAYS" ? "Waktu kerja normal 8 jam/hari. Istirahat 1 jam (12:00 - 13:00 WIB)." : "Waktu kerja normal 8 jam/hari. Istirahat 1 jam (12:00 - 13:00 WIB, khusus Jumat 11:30 - 13:00 WIB). Fleksibel mengikuti SPK lapangan."),
       directorName: item.signedByFirstParty?.name || "RAMADHANI, ST",
       directorTitle: item.signedByFirstParty?.title || "Direktur Utama",
       notes: item.notes || "",
@@ -744,6 +831,17 @@ export default function ContractsPage() {
           specialLeaveNotes: formData.specialLeaveNotes || "",
         },
         workLocation: formData.workLocation,
+        workSchedule: {
+          workDaysType: formData.workDaysType || "5_DAYS",
+          workDaysText: formData.workDaysText || "Senin s.d. Jumat (5 Hari Kerja)",
+          dailyWorkingHours: Number(formData.dailyWorkingHours || 8),
+          weeklyWorkingHours: Number(formData.weeklyWorkingHours || 40),
+          startTime: formData.startTime || "08:00",
+          endTime: formData.endTime || "17:00",
+          breakStartTime: formData.breakStartTime || "12:00",
+          breakEndTime: formData.breakEndTime || "13:00",
+          notes: formData.scheduleNotes || "Istirahat siang 1 jam (khusus Jumat 11:30 - 13:00 WIB untuk ibadah Sholat Jumat).",
+        },
         status: formData.status,
         signedByFirstParty: {
           name: formData.directorName,
@@ -1638,6 +1736,240 @@ export default function ContractsPage() {
                     placeholder="Contoh: Kantor Utama Cilegon / Fleksibel Proyek Lapangan (Sesuai SPK)"
                     className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
                   />
+                </div>
+
+                {/* SUB-PANEL: JADWAL KERJA, HARI KERJA & JAM ISTIRAHAT */}
+                <div className="p-4 bg-gradient-to-br from-indigo-50/70 via-slate-50 to-blue-50/50 rounded-2xl border border-indigo-100/80 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-sm">
+                        <Clock className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                          Jadwal Hari Kerja, Jam Operasional & Waktu Istirahat
+                        </h4>
+                        <p className="text-[10px] text-slate-500">
+                          Konfigurasi resmi yang mengikat secara hukum pada lembar cetak PKWT A4 (Pasal 3).
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/80 px-2.5 py-0.5 rounded-full">
+                      PP No. 35/2021
+                    </span>
+                  </div>
+
+                  {/* PILIHAN MODE HARI KERJA (3 KARTU) */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                    {/* 5 HARI */}
+                    <div
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          workDaysType: "5_DAYS",
+                          workDaysText: "Senin s.d. Jumat (5 Hari Kerja)",
+                          dailyWorkingHours: 8,
+                          weeklyWorkingHours: 40,
+                          startTime: "08:00",
+                          endTime: "17:00",
+                          breakStartTime: "12:00",
+                          breakEndTime: "13:00",
+                        });
+                      }}
+                      className={`cursor-pointer p-3 rounded-xl border text-left transition-all ${
+                        formData.workDaysType === "5_DAYS"
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-200"
+                          : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-black">5 Hari Kerja</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          formData.workDaysType === "5_DAYS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                        }`}>Senin - Jumat</span>
+                      </div>
+                      <p className={`text-[10px] leading-tight ${formData.workDaysType === "5_DAYS" ? "text-indigo-100" : "text-slate-500"}`}>
+                        08:00 - 17:00 WIB (8 jam/hari, istirahat 1 jam). Ideal untuk Staf & Office.
+                      </p>
+                    </div>
+
+                    {/* 6 HARI */}
+                    <div
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          workDaysType: "6_DAYS",
+                          workDaysText: "Senin s.d. Sabtu (6 Hari Kerja)",
+                          dailyWorkingHours: 8,
+                          weeklyWorkingHours: 40,
+                          startTime: "08:00",
+                          endTime: "17:00",
+                          breakStartTime: "12:00",
+                          breakEndTime: "13:00",
+                        });
+                      }}
+                      className={`cursor-pointer p-3 rounded-xl border text-left transition-all ${
+                        formData.workDaysType === "6_DAYS"
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-200"
+                          : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-black">6 Hari Kerja</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          formData.workDaysType === "6_DAYS" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                        }`}>Senin - Sabtu</span>
+                      </div>
+                      <p className={`text-[10px] leading-tight ${formData.workDaysType === "6_DAYS" ? "text-indigo-100" : "text-slate-500"}`}>
+                        08:00 - 17:00 WIB (8 jam/hari, istirahat 1 jam). Operasional teknisi reguler.
+                      </p>
+                    </div>
+
+                    {/* FLEKSIBEL PROYEK */}
+                    <div
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          workDaysType: "FLEXIBLE_PROJECT",
+                          workDaysText: "Fleksibel Proyek Lapangan (Sesuai SPK)",
+                          dailyWorkingHours: 8,
+                          weeklyWorkingHours: 40,
+                          startTime: "08:00",
+                          endTime: "17:00",
+                          breakStartTime: "12:00",
+                          breakEndTime: "13:00",
+                        });
+                      }}
+                      className={`cursor-pointer p-3 rounded-xl border text-left transition-all ${
+                        formData.workDaysType === "FLEXIBLE_PROJECT"
+                          ? "bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-200"
+                          : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-black">Fleksibel Proyek</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                          formData.workDaysType === "FLEXIBLE_PROJECT" ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                        }`}>Sesuai SPK</span>
+                      </div>
+                      <p className={`text-[10px] leading-tight ${formData.workDaysType === "FLEXIBLE_PROJECT" ? "text-indigo-100" : "text-slate-500"}`}>
+                        Jadwal menyesuaikan jadwal shift & target Surat Perintah Kerja lapangan.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* INPUT FORM DETAIL JAM KERJA & ISTIRAHAT */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white p-3.5 rounded-xl border border-indigo-100">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Jam Masuk Kerja <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.startTime}
+                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Jam Pulang Kerja <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.endTime}
+                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Mulai Istirahat Siang
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.breakStartTime}
+                        onChange={(e) => setFormData({ ...formData, breakStartTime: e.target.value })}
+                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-700"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Selesai Istirahat Siang
+                      </label>
+                      <input
+                        type="time"
+                        value={formData.breakEndTime}
+                        onChange={(e) => setFormData({ ...formData, breakEndTime: e.target.value })}
+                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-700"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Keterangan Hari Kerja
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.workDaysText}
+                        onChange={(e) => setFormData({ ...formData, workDaysText: e.target.value })}
+                        placeholder="Contoh: Senin s.d. Jumat (5 Hari Kerja)"
+                        className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-medium text-slate-700"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Durasi Kerja Harian
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="1"
+                          max="24"
+                          value={formData.dailyWorkingHours}
+                          onChange={(e) => setFormData({ ...formData, dailyWorkingHours: Number(e.target.value) })}
+                          className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-bold text-slate-800"
+                        />
+                        <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Jam / Hari</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                        Maksimal Jam Mingguan
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          min="1"
+                          max="60"
+                          value={formData.weeklyWorkingHours}
+                          onChange={(e) => setFormData({ ...formData, weeklyWorkingHours: Number(e.target.value) })}
+                          className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-bold text-slate-800"
+                        />
+                        <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Jam / Minggu</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Catatan Waktu Istirahat & Kebijakan Khusus
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.scheduleNotes}
+                      onChange={(e) => setFormData({ ...formData, scheduleNotes: e.target.value })}
+                      placeholder="Contoh: Istirahat siang 1 jam (khusus Jumat pukul 11:30 - 13:00 WIB untuk ibadah Sholat Jumat)."
+                      className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-medium text-slate-700"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -2688,13 +3020,22 @@ export default function ContractsPage() {
                 {/* PASAL 3 */}
                 <div>
                   <h4 className="font-bold font-sans text-center text-slate-900 mb-1">
-                    PASAL 3: WAKTU KERJA & KEHADIRAN (ABSENSI GPS & SELFIE)
+                    PASAL 3: HARI KERJA, WAKTU KERJA & ISTIRAHAT
                   </h4>
                   <p>
-                    1. PIHAK KEDUA wajib mencatatkan presensi Masuk dan Pulang melalui Sistem Aplikasi DSTech Smart yang dilengkapi dengan validasi koordinat satelit GPS dan jepretan kamera selfie wajah langsung tanpa manipulasi manual.
+                    1. <strong>Hari Kerja Resmi:</strong> Hari kerja operasional bagi PIHAK KEDUA ditetapkan sebanyak <strong>{selectedContract.workSchedule?.workDaysText || (selectedContract.employeeCategory === "STAFF" ? "Senin s.d. Jumat (5 Hari Kerja)" : "Senin s.d. Sabtu (6 Hari Kerja)")}</strong>, atau disesuaikan dengan kebutuhan penugasan proyek lapangan resmi yang diatur dalam Surat Perintah Kerja (SPK).
                   </p>
                   <p>
-                    2. Waktu kerja operasional standar adalah 8 (delapan) jam per hari atau disesuaikan dengan jadwal penugasan lapangan yang disepakati.
+                    2. <strong>Jam Kerja Operasional:</strong> Jam kerja normal dimulai pukul <strong>{selectedContract.workSchedule?.startTime || "08:00"} WIB</strong> sampai dengan pukul <strong>{selectedContract.workSchedule?.endTime || "17:00"} WIB</strong>, dengan waktu kerja efektif <strong>{selectedContract.workSchedule?.dailyWorkingHours || 8} (delapan) jam per hari</strong> dan maksimal <strong>{selectedContract.workSchedule?.weeklyWorkingHours || 40} (empat puluh) jam per minggu</strong> sesuai ketentuan Peraturan Pemerintah No. 35 Tahun 2021.
+                  </p>
+                  <p>
+                    3. <strong>Waktu Istirahat:</strong> PIHAK KEDUA berhak atas waktu istirahat siang selama 1 (satu) jam, yaitu mulai pukul <strong>{selectedContract.workSchedule?.breakStartTime || "12:00"} WIB s.d. {selectedContract.workSchedule?.breakEndTime || "13:00"} WIB</strong> (khusus hari Jumat disesuaikan pukul 11:30 WIB s.d. 13:00 WIB untuk penunaian Ibadah Sholat Jumat). Sesuai ketentuan ketenagakerjaan, waktu istirahat tidak diperhitungkan sebagai jam kerja efektif.
+                  </p>
+                  <p>
+                    4. <strong>Presensi Digital Berbasis Satelit & Kamera:</strong> PIHAK KEDUA wajib mencatatkan presensi Masuk dan Pulang secara mandiri melalui Aplikasi DSTech Smart yang divalidasi dengan koordinat satelit GPS dan foto kamera selfie wajah langsung secara realtime.
+                  </p>
+                  <p>
+                    5. <strong>Kerja Lembur:</strong> Apabila operasional perusahaan atau penyelesaian proyek mendesak mengharuskan bekerja melebihi jam kerja harian normal, pekerjaan tersebut dikategorikan sebagai Kerja Lembur atas persetujuan/perintah tertulis PIHAK PERTAMA dan diperhitungkan kompensasi lemburnya sesuai ketentuan Pasal 4 perjanjian ini.
                   </p>
                 </div>
 
