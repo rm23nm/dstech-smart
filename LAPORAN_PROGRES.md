@@ -3336,24 +3336,55 @@
 
 ---
 
-- **2026-10-23 (Task 115)**: Perbaikan Tampilan Cetak / Print Slip Gaji Karyawan Resmi A4 Agar Pas Penuh Tanpa Latar Belakang Gelap / Mengambang (**Sedang Dikerjakan**).
+- **2026-10-23 (Task 115)**: Perbaikan Tampilan Cetak / Print Slip Gaji Karyawan Resmi A4 Agar Pas Penuh Tanpa Latar Belakang Gelap / Mengambang (**SELESAI 100% & LIVE**).
 - **Latar Belakang / Permasalahan**:
   - Pengguna melaporkan *"prinan slip gaji masih ngawur"* dan melampirkan screenshot pratinjau cetak browser (Chrome Print Dialog).
   - Pada pratinjau cetak, lembar slip gaji tercetak di tengah halaman dengan latar belakang overlay gelap/abu-abu pekat (`bg-slate-900/70` / `bg-slate-950/70`), elemen dashboard di belakangnya ikut tertampil, dan dokumen slip mengecil melayang di tengah kertas A4.
   - Penyebab: Modal cetak slip gaji di `src/app/admin/attendance/page.tsx` dan `src/app/admin/payroll/page.tsx` belum menerapkan kelas isolasi cetak standar CSS universal (`print-modal-backdrop`, `print-modal-box`, `print-document-sheet print-single-sheet`).
   - Selain itu, saat dialog cetak terbuka, nama dokumen PDF yang disarankan browser belum disinkronkan secara profesional dengan `document.title` (`SLIP_GAJI_DSTECH_[NOMOR]_[NAMA]`).
-- **Rincian Langkah Pelaksanaan (Step-by-Step)**:
+- **Rincian Langkah Pelaksanaan yang Diselesaikan**:
   - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/admin/attendance/page.tsx` dan `src/app/admin/payroll/page.tsx`) ke folder `_backup/`.
-  - [ ] **Langkah 2**: Perbarui struktur modal cetak slip gaji di `src/app/admin/attendance/page.tsx`:
-    - Tambahkan kelas `print-modal-backdrop` pada overlay container modal.
-    - Tambahkan kelas `print-modal-box` pada container pembungkus card putih modal.
-    - Tambahkan kelas `print-document-sheet print-single-sheet` pada `#print-salary-slip-sheet`.
-    - Pasang handling `document.title` dinamis saat tombol Cetak diklik agar nama berkas PDF otomatis tersimpan rapi standar `SLIP_GAJI_DSTECH_[NOMOR]_[NAMA]`.
-    - Pastikan styling layout slip (Kop Surat DSP, Data Karyawan, Tabel Penerimaan & Potongan, THP Banner, Dual Signatures) presisi pas 1 halaman A4 portrait (210mm x 297mm) tanpa terpotong dan tanpa halaman kedua kosong.
-  - [ ] **Langkah 3**: Perbarui struktur modal cetak slip gaji di `src/app/admin/payroll/page.tsx` dengan standarisasi yang sama persis (`print-modal-backdrop`, `print-modal-box`, `print-document-sheet print-single-sheet`, dynamic `document.title`).
-  - [ ] **Langkah 4**: Uji build lokal (`npm run build`) untuk memastikan tidak ada error TypeScript maupun sintaks.
-  - [ ] **Langkah 5**: Push ke repositori GitHub via `push_with_native_git.js`.
-  - [ ] **Langkah 6**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js`, restart PM2 `dstech-main`, uji live respon, dan bersihkan folder `_backup/`.
+  - [x] **Langkah 2**: Perbarui struktur modal cetak slip gaji di `src/app/admin/attendance/page.tsx`:
+    - Menambahkan kelas `print-modal-backdrop` pada overlay container modal.
+    - Menambahkan kelas `print-modal-box` pada container pembungkus card putih modal.
+    - Menambahkan kelas `print-document-sheet print-single-sheet` pada `#print-salary-slip-sheet` dengan `print:p-0 print:border-none print:shadow-none print:rounded-none print:py-6`.
+    - Memasang dynamic `document.title` saat tombol Cetak diklik agar nama berkas PDF otomatis tersimpan rapi standar `SLIP_GAJI_DSTECH_[NOMOR]_[NAMA]`.
+  - [x] **Langkah 3**: Perbarui struktur modal cetak slip gaji di `src/app/admin/payroll/page.tsx` dengan standarisasi yang sama persis (`print-modal-backdrop`, `print-modal-box`, `print-document-sheet print-single-sheet`, dynamic `document.title` pada modal Slip Gaji dan modal Rekap Bulanan).
+  - [x] **Langkah 4**: Uji build lokal (`npm run build`) di folder `dstech-smart` (sukses 52 routes, 0 error).
+  - [x] **Langkah 5**: Push ke repositori GitHub via `push_with_native_git.js` (Commit: `7e90f7c`).
+  - [x] **Langkah 6**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js`, restart PM2 `dstech-main` (PID 599082 online), verifikasi live API HTTP 200 OK, dan bersihkan folder `_backup/`.
+
+---
+
+- **2026-10-23 (Task 116)**: Penyempurnaan Form Perekrutan PKWT (Upload Foto Diri & KTP, Avatar Karyawan pada List, Pengaturan Divisi & Kategori Staf, serta Auto-Calculate Tanggal Berakhir Kontrak dari Durasi) & Panduan Multi-Tenant SaaS POS (**Sedang Dikerjakan**).
+- **Latar Belakang / Permasalahan**:
+  - Permintaan pengguna (berantai):
+    1. *"pada form perekrutan PKWT, tolong tambahkan form agar bisa upload foto diri dan juga KTP/Identitas. dan pada list data karyawan munculkan foto dari karyawan tersebut pada namanya"*
+    2. *"cara mengatur divisi atau ketegori staf bagai mana, karena belum ada?"*
+    3. *"ketika saya membuat PKWT, jika saya mengisi durasi dari kontrak misalnya 3 bulan. bisakah untuk tanggal berakhirnya langsung ditambahkan secara otomatis dari tanggal mulai kontrak. begitu juga yang tahunan"*
+    4. *"bagai mana caranya agar saya bisa membuat aplikasi managemen ini menjadi aplikasi multi tenan, nantinya kita satukan dalam aplkasi pos.dstechsmart.com sehingga aplikasi ini menjadi 1 dengan aplikasi tersebut. sehingga saya bisa menerapkan biaya berlangganan atas aplikasi ini kepada client."*
+- **Rincian Langkah Pelaksanaan (Step-by-Step)**:
+  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/admin/contracts/page.tsx`, `src/app/api/contracts/route.ts`) ke folder `_backup/`.
+  - [x] **Langkah 2**: Perluas tipe data `DstechContract` di frontend & API backend:
+    - `photoUrl?: string` (Foto Profil / Pas Foto Diri Karyawan).
+    - `idCardUrl?: string` (Foto KTP / Kartu Identitas Resmi Karyawan).
+    - `department?: string` (Divisi / Departemen Kerja: IT & Security, Operasional Lapangan, Keuangan & Administrasi, Sales & Marketing, Logistik, dll.).
+  - [ ] **Langkah 3**: Fitur Upload Foto Diri & Foto KTP di Modal Form PKWT:
+    - Upload Pas Foto Diri (3x4) dengan preview bulat, tombol ganti, dan hapus foto.
+    - Upload Foto KTP dengan preview horizontal, tombol ganti, dan hapus foto.
+    - Penanganan upload via `/api/upload` (disediakan fallback DataURL jika offline).
+  - [ ] **Langkah 4**: Pengaturan Divisi / Departemen & Kategori Staf:
+    - Selector Divisi / Departemen dengan preset korporat DSTech + opsi input manual kustom.
+    - Switch Kategori: "Teknisi Lapangan" (Harian/Lembur) vs "Staf Kantor / Admin" (Gaji Bulanan Tetap).
+    - Menampilkan badge Divisi pada tabel daftar kontrak.
+  - [ ] **Langkah 5**: Otomatisasi Perhitungan Tanggal Selesai Kontrak (`endDate`):
+    - Helper fungsi penambah bulan/tahun otomatis: saat `startDate` atau `durationMonths` diubah, `endDate` otomatis terkalkulasi (misal: mulai 1 Oktober 2026 + 3 bulan -> berakhir 31 Desember 2026; durasi 12 bulan -> 1 tahun penuh).
+    - Opsi tombol cepat durasi: "1 Bulan", "3 Bulan", "6 Bulan", "1 Tahun (12 Bln)", "2 Tahun (24 Bln)".
+  - [ ] **Langkah 6**: Tampilan Avatar Foto Karyawan & Preview KTP di List Tabel:
+    - Kolom Nama Karyawan menampilkan foto avatar asli (atau inisial jika belum ada foto).
+    - Tombol badge "🪪 KTP" dengan modal lightbox preview untuk melihat kartu identitas karyawan.
+  - [ ] **Langkah 7**: Validasi build lokal (`npm run build`), push ke GitHub via `push_with_native_git.js`, deploy ke live VPS via `deploy_live.js`, uji live respon HTTP 200 OK, dan bersihkan folder `_backup/`.
+  - [ ] **Langkah 8**: Berikan penjelasan arsitektur multi-tenant SaaS terpadu dengan `pos.dstechsmart.com` dan strategi skema langganan klien.
 
 ---
 

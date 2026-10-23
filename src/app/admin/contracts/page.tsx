@@ -37,7 +37,11 @@ import {
   X,
   CalendarCheck,
   Car,
-  Utensils
+  Utensils,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+  ZoomIn
 } from "lucide-react";
 
 export interface DstechContract {
@@ -49,6 +53,9 @@ export interface DstechContract {
   employeeEmail?: string;
   employeeAddress?: string;
   position: string;
+  department?: string;
+  photoUrl?: string;
+  idCardUrl?: string;
   employeeCategory: "STAFF" | "TECHNICIAN";
   contractType: "DAILY" | "MONTHLY" | "YEARLY";
   startDate: string;
@@ -125,6 +132,7 @@ export interface OfficialPositionPreset {
   id: string;
   label: string;
   positionName: string;
+  department?: string;
   category: "STAFF" | "TECHNICIAN";
   payrollScheme: "DAILY" | "MONTHLY";
   contractType: "DAILY" | "MONTHLY" | "YEARLY";
@@ -146,11 +154,32 @@ export interface OfficialPositionPreset {
   notes?: string;
 }
 
+export const OFFICIAL_DEPARTMENTS = [
+  "Divisi Operasional Lapangan & Instalasi",
+  "Divisi Integrasi Sistem & Smart Technology",
+  "Divisi Pengawasan Proyek & Lapangan",
+  "Divisi Keuangan & Administrasi",
+  "Divisi IT, Jaringan & Server",
+  "Divisi Penjualan & Kemitraan Bisnis",
+  "Divisi Logistik, Gudang & Pengadaan",
+];
+
+export const calculateEndDateFromDuration = (startDateStr: string, months: number): string => {
+  if (!startDateStr || !months || months <= 0) return startDateStr;
+  const start = new Date(startDateStr);
+  if (isNaN(start.getTime())) return startDateStr;
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + Number(months));
+  end.setDate(end.getDate() - 1);
+  return end.toISOString().split("T")[0];
+};
+
 export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
   {
     id: "helper",
     label: "👷‍♂️ Helper / Asisten Teknisi (Rp 150.000 / hari)",
     positionName: "Helper / Asisten Teknisi Lapangan",
+    department: "Divisi Operasional Lapangan & Instalasi",
     category: "TECHNICIAN",
     payrollScheme: "DAILY",
     contractType: "DAILY",
@@ -170,6 +199,7 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     id: "skill",
     label: "⚡ Teknisi Skill / Ahli Lapangan (Rp 175.000 / hari)",
     positionName: "Teknisi Skill Instalasi & Integrasi",
+    department: "Divisi Operasional Lapangan & Instalasi",
     category: "TECHNICIAN",
     payrollScheme: "DAILY",
     contractType: "DAILY",
@@ -189,6 +219,7 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     id: "senior",
     label: "🎯 Teknisi Senior / Specialist (Rp 200.000 / hari)",
     positionName: "Teknisi Senior / Specialist CCTV & Smart Home",
+    department: "Divisi Integrasi Sistem & Smart Technology",
     category: "TECHNICIAN",
     payrollScheme: "DAILY",
     contractType: "DAILY",
@@ -208,6 +239,7 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     id: "foreman",
     label: "👑 Lead / Foreman Lapangan (Rp 225.000 / hari)",
     positionName: "Lead / Foreman Lapangan",
+    department: "Divisi Pengawasan Proyek & Lapangan",
     category: "TECHNICIAN",
     payrollScheme: "DAILY",
     contractType: "DAILY",
@@ -227,6 +259,7 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     id: "staff_admin",
     label: "💼 Staf Administrasi & Keuangan (Gaji Bulanan)",
     positionName: "Staf Administrasi & Keuangan",
+    department: "Divisi Keuangan & Administrasi",
     category: "STAFF",
     payrollScheme: "MONTHLY",
     contractType: "YEARLY",
@@ -249,6 +282,7 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     id: "staff_it",
     label: "💻 Staf IT Support & Networking (Gaji Bulanan)",
     positionName: "Staf IT Support & Networking",
+    department: "Divisi IT, Jaringan & Server",
     category: "STAFF",
     payrollScheme: "MONTHLY",
     contractType: "YEARLY",
@@ -271,6 +305,7 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     id: "staff_spv",
     label: "🏢 Supervisor / Koordinator Operasional (Gaji Bulanan)",
     positionName: "Supervisor / Koordinator Operasional",
+    department: "Divisi Keuangan & Administrasi",
     category: "STAFF",
     payrollScheme: "MONTHLY",
     contractType: "YEARLY",
@@ -293,6 +328,7 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     id: "custom",
     label: "✍️ Posisi Kustom (Input Manual Bebas)",
     positionName: "",
+    department: "Divisi Operasional Lapangan & Instalasi",
     category: "TECHNICIAN",
     payrollScheme: "DAILY",
     contractType: "DAILY",
@@ -318,15 +354,23 @@ export default function ContractsPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<"ALL" | "STAFF" | "TECHNICIAN">("ALL");
+  const [filterDepartment, setFilterDepartment] = useState<string>("ALL");
   const [filterType, setFilterType] = useState<"ALL" | "DAILY_1" | "DAILY_2" | "MONTHLY" | "YEARLY">("ALL");
   const [filterStatus, setFilterStatus] = useState<"ALL" | "ACTIVE" | "EXPIRING" | "EXPIRED">("ALL");
 
-  // Modals
+  // Modals & Previews
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<DstechContract | null>(null);
+  const [previewKtpModal, setPreviewKtpModal] = useState<{ isOpen: boolean; employeeName: string; idCardUrl: string } | null>(null);
+
+  // Upload states & refs
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingIdCard, setUploadingIdCard] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const idCardInputRef = useRef<HTMLInputElement>(null);
 
   // Form State for Create/Edit
   const [formData, setFormData] = useState({
@@ -337,13 +381,16 @@ export default function ContractsPage() {
     employeePhone: "",
     employeeEmail: "",
     employeeAddress: "",
+    photoUrl: "",
+    idCardUrl: "",
+    department: "Divisi Operasional Lapangan & Instalasi",
     selectedRolePresetId: "skill",
     position: "Teknisi Skill Instalasi & Integrasi",
     payrollSchemeType: "DAILY" as "DAILY" | "MONTHLY",
     employeeCategory: "TECHNICIAN" as "STAFF" | "TECHNICIAN",
     contractType: "DAILY" as "DAILY" | "MONTHLY" | "YEARLY",
     startDate: new Date().toISOString().split("T")[0],
-    endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+    endDate: calculateEndDateFromDuration(new Date().toISOString().split("T")[0], 3),
     durationMonths: 3,
     workLocation: "Kantor & Proyek Lapangan (Sesuai SPK)",
     status: "ACTIVE" as "ACTIVE" | "EXPIRED" | "TERMINATED" | "DRAFT",
@@ -392,6 +439,84 @@ export default function ContractsPage() {
     createLoginAccount: true,
     loginPassword: "",
   });
+
+  // Upload Handlers
+  const handleUploadPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingPhoto(true);
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("docType", "photo");
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.success && data.url) {
+        setFormData((prev) => ({ ...prev, photoUrl: data.url }));
+        showToast("Pas foto karyawan berhasil diunggah!");
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setFormData((prev) => ({ ...prev, photoUrl: reader.result as string }));
+          showToast("Pas foto karyawan tersimpan (Lokal)!");
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormData((prev) => ({ ...prev, photoUrl: reader.result as string }));
+        showToast("Pas foto karyawan tersimpan!");
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleUploadIdCard = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingIdCard(true);
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("docType", "idCard");
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.success && data.url) {
+        setFormData((prev) => ({ ...prev, idCardUrl: data.url }));
+        showToast("Foto KTP / Identitas berhasil diunggah!");
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setFormData((prev) => ({ ...prev, idCardUrl: reader.result as string }));
+          showToast("Foto KTP tersimpan (Lokal)!");
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormData((prev) => ({ ...prev, idCardUrl: reader.result as string }));
+        showToast("Foto KTP tersimpan!");
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadingIdCard(false);
+    }
+  };
+
+  // Helper Auto-Calculate Tanggal Berakhir dari Preset Durasi
+  const handleSelectDurationPreset = (months: number) => {
+    const newEnd = calculateEndDateFromDuration(formData.startDate, months);
+    setFormData((prev) => ({
+      ...prev,
+      durationMonths: months,
+      contractType: months >= 12 ? "YEARLY" : (prev.employeeCategory === "STAFF" ? "MONTHLY" : "DAILY"),
+      endDate: newEnd,
+    }));
+  };
 
   // Extend Modal Form State
   const [extendData, setExtendData] = useState({
@@ -533,6 +658,10 @@ export default function ContractsPage() {
       if (filterCategory !== "ALL" && item.employeeCategory !== filterCategory) {
         return false;
       }
+      // Department filter
+      if (filterDepartment !== "ALL" && item.department !== filterDepartment) {
+        return false;
+      }
       // Type filter
       if (filterType === "DAILY_1") {
         if (item.salaryScheme?.dailyScheme?.dailyRateType !== "TYPE_1_FULL_DAY") return false;
@@ -559,17 +688,19 @@ export default function ContractsPage() {
         const matchNum = item.contractNumber?.toLowerCase().includes(q);
         const matchPos = item.position?.toLowerCase().includes(q);
         const matchNik = item.employeeNik?.toLowerCase().includes(q);
-        if (!matchName && !matchNum && !matchPos && !matchNik) return false;
+        const matchDept = item.department?.toLowerCase().includes(q);
+        if (!matchName && !matchNum && !matchPos && !matchNik && !matchDept) return false;
       }
       return true;
     });
-  }, [contracts, filterCategory, filterType, filterStatus, searchQuery]);
+  }, [contracts, filterCategory, filterDepartment, filterType, filterStatus, searchQuery]);
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
     const today = new Date();
-    const threeMonthsLater = new Date(today);
-    threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
+    const todayStr = today.toISOString().split("T")[0];
+    const initialMonths = 3;
+    const initialEnd = calculateEndDateFromDuration(todayStr, initialMonths);
 
     setFormData({
       id: "",
@@ -579,14 +710,17 @@ export default function ContractsPage() {
       employeePhone: "",
       employeeEmail: "",
       employeeAddress: "",
+      photoUrl: "",
+      idCardUrl: "",
+      department: "Divisi Operasional Lapangan & Instalasi",
       selectedRolePresetId: "skill",
       position: "Teknisi Skill Instalasi & Integrasi",
       payrollSchemeType: "DAILY",
       employeeCategory: "TECHNICIAN",
       contractType: "DAILY",
-      startDate: today.toISOString().split("T")[0],
-      endDate: threeMonthsLater.toISOString().split("T")[0],
-      durationMonths: 3,
+      startDate: todayStr,
+      endDate: initialEnd,
+      durationMonths: initialMonths,
       workLocation: "Kantor & Proyek Lapangan (Sesuai SPK)",
       status: "ACTIVE",
       baseSalary: 4000000,
@@ -672,6 +806,9 @@ export default function ContractsPage() {
       employeePhone: item.employeePhone || "",
       employeeEmail: item.employeeEmail || "",
       employeeAddress: item.employeeAddress || "",
+      photoUrl: item.photoUrl || "",
+      idCardUrl: item.idCardUrl || "",
+      department: item.department || (item.employeeCategory === "STAFF" ? "Divisi Keuangan & Administrasi" : "Divisi Operasional Lapangan & Instalasi"),
       selectedRolePresetId: matchedPreset,
       position: item.position,
       payrollSchemeType: activeSchemeType,
@@ -809,6 +946,9 @@ export default function ContractsPage() {
         employeePhone: formData.employeePhone,
         employeeEmail: formData.employeeEmail,
         employeeAddress: formData.employeeAddress,
+        photoUrl: formData.photoUrl || "",
+        idCardUrl: formData.idCardUrl || "",
+        department: formData.department || "Divisi Operasional Lapangan & Instalasi",
         position: formData.position,
         employeeCategory: formData.employeeCategory,
         contractType: formData.contractType,
@@ -1225,27 +1365,47 @@ export default function ContractsPage() {
           </div>
         </div>
 
-        {/* Status Filter Sub-bar */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs">
-          <span className="font-bold text-slate-400">Filter Status:</span>
-          {[
-            { id: "ALL", label: "Semua Status" },
-            { id: "ACTIVE", label: "🟢 Aktif Bekerja" },
-            { id: "EXPIRING", label: "🟡 Segera Berakhir (<= 30 Hari)" },
-            { id: "EXPIRED", label: "🔴 Kedaluwarsa / Selesai" },
-          ].map((st) => (
-            <button
-              key={st.id}
-              onClick={() => setFilterStatus(st.id as any)}
-              className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
-                filterStatus === st.id
-                  ? "bg-blue-50 text-blue-700 border border-blue-200"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
+        {/* Status & Department Filter Sub-bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-slate-400">Filter Status:</span>
+            {[
+              { id: "ALL", label: "Semua Status" },
+              { id: "ACTIVE", label: "🟢 Aktif Bekerja" },
+              { id: "EXPIRING", label: "🟡 Segera Berakhir (<= 30 Hari)" },
+              { id: "EXPIRED", label: "🔴 Kedaluwarsa / Selesai" },
+            ].map((st) => (
+              <button
+                key={st.id}
+                onClick={() => setFilterStatus(st.id as any)}
+                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
+                  filterStatus === st.id
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-400 flex items-center gap-1">
+              <Building2 className="w-3.5 h-3.5 text-slate-400" /> Divisi:
+            </span>
+            <select
+              value={filterDepartment}
+              onChange={(e) => setFilterDepartment(e.target.value)}
+              className="px-2.5 py-1 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
             >
-              {st.label}
-            </button>
-          ))}
+              <option value="ALL">Semua Divisi & Unit Kerja</option>
+              {OFFICIAL_DEPARTMENTS.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -1290,21 +1450,65 @@ export default function ContractsPage() {
 
                   return (
                     <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
-                      {/* Nomor & Karyawan */}
+                      {/* Nomor & Karyawan (dengan Pas Foto & Tombol KTP) */}
                       <td className="py-4 px-5">
-                        <div className="space-y-1">
-                          <span className="font-mono text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block">
-                            {item.contractNumber}
-                          </span>
-                          <p className="text-sm font-bold text-slate-900">{item.employeeName}</p>
-                          <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                            {item.employeeNik && <span>NIK: {item.employeeNik}</span>}
-                            {item.employeePhone && <span>WA: {item.employeePhone}</span>}
+                        <div className="flex items-start gap-3">
+                          {/* Pas Foto Avatar */}
+                          <div className="relative shrink-0 mt-0.5">
+                            {item.photoUrl ? (
+                              <img
+                                src={item.photoUrl}
+                                alt={item.employeeName}
+                                className="w-11 h-11 rounded-full object-cover border-2 border-slate-200 shadow-xs"
+                              />
+                            ) : (
+                              <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-sm shadow-xs border-2 border-slate-100">
+                                {item.employeeName
+                                  ? item.employeeName
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .slice(0, 2)
+                                      .join("")
+                                      .toUpperCase()
+                                  : "EM"}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-1 min-w-0">
+                            <span className="font-mono text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 inline-block">
+                              {item.contractNumber}
+                            </span>
+                            <p className="text-sm font-bold text-slate-900 leading-tight">
+                              {item.employeeName}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                              {item.employeeNik && <span>NIK: {item.employeeNik}</span>}
+                              {item.employeePhone && <span>WA: {item.employeePhone}</span>}
+                              
+                              {/* Tombol Cepat Lihat KTP */}
+                              {item.idCardUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewKtpModal({
+                                      isOpen: true,
+                                      employeeName: item.employeeName,
+                                      idCardUrl: item.idCardUrl!,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[10px] border border-indigo-200 transition-colors cursor-pointer shadow-2xs"
+                                  title="Pratinjau Foto KTP / Identitas"
+                                >
+                                  <ZoomIn className="w-3 h-3 text-indigo-600" /> KTP
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Kategori & Jabatan */}
+                      {/* Kategori, Divisi & Jabatan */}
                       <td className="py-4 px-4">
                         <div className="space-y-1">
                           <div className="flex items-center gap-1.5">
@@ -1322,7 +1526,16 @@ export default function ContractsPage() {
                             </span>
                           </div>
                           <p className="font-semibold text-slate-800">{item.position}</p>
-                          <p className="text-[11px] text-slate-400 truncate max-w-xs">{item.workLocation}</p>
+                          <div className="flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50/80 px-2 py-0.5 rounded-md border border-blue-100/70 w-fit">
+                            <Layers className="w-3 h-3 text-blue-500" />
+                            <span>
+                              {item.department ||
+                                (item.employeeCategory === "STAFF"
+                                  ? "Divisi Keuangan & Administrasi"
+                                  : "Divisi Operasional Lapangan & Instalasi")}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 truncate max-w-xs">{item.workLocation}</p>
                         </div>
                       </td>
 
@@ -1488,9 +1701,117 @@ export default function ContractsPage() {
             <form onSubmit={handleSaveContract} className="space-y-6">
               {/* BAGIAN 1: IDENTITAS KARYAWAN */}
               <div className="space-y-4">
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <UserCheck className="w-4 h-4 text-blue-500" /> 1. Data Pribadi Karyawan
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-blue-500" /> 1. Data Pribadi Karyawan & Berkas Identitas
+                  </h3>
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+                    Wajib Dilengkapi
+                  </span>
+                </div>
+
+                {/* AREA UPLOAD FOTO DIRI & KTP */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50/80 rounded-2xl border border-slate-200">
+                  {/* Upload 1: Pas Foto Diri (3x4) */}
+                  <div className="flex items-center gap-4 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+                    <div className="relative shrink-0">
+                      {formData.photoUrl ? (
+                        <div className="relative group">
+                          <img
+                            src={formData.photoUrl}
+                            alt="Pas Foto Karyawan"
+                            className="w-16 h-16 rounded-full object-cover border-2 border-blue-500 shadow-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setFormData((prev) => ({ ...prev, photoUrl: "" }))}
+                            className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-1 hover:bg-rose-600 transition-colors shadow-xs"
+                            title="Hapus Pas Foto"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-blue-50 border-2 border-dashed border-blue-300 flex flex-col items-center justify-center text-blue-500">
+                          <Camera className="w-6 h-6" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-800">Pas Foto Karyawan</p>
+                      <p className="text-[10px] text-slate-500">
+                        Format JPG/PNG, ukuran 3x4 atau formal untuk profil & ID Card.
+                      </p>
+                      <input
+                        type="file"
+                        ref={photoInputRef}
+                        onChange={handleUploadPhoto}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={uploadingPhoto}
+                        onClick={() => photoInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold border border-blue-200 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        {uploadingPhoto ? "Mengunggah..." : formData.photoUrl ? "Ganti Pas Foto" : "Unggah Pas Foto"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Upload 2: Foto KTP / Identitas */}
+                  <div className="flex items-center gap-4 bg-white p-3.5 rounded-xl border border-slate-200 shadow-2xs">
+                    <div className="relative shrink-0">
+                      {formData.idCardUrl ? (
+                        <div className="relative group">
+                          <img
+                            src={formData.idCardUrl}
+                            alt="Foto KTP Karyawan"
+                            className="w-20 h-14 rounded-lg object-cover border-2 border-emerald-500 shadow-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setFormData((prev) => ({ ...prev, idCardUrl: "" }))}
+                            className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white rounded-full p-1 hover:bg-rose-600 transition-colors shadow-xs"
+                            title="Hapus KTP"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-14 rounded-lg bg-emerald-50 border-2 border-dashed border-emerald-300 flex flex-col items-center justify-center text-emerald-600">
+                          <ImageIcon className="w-6 h-6" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <p className="text-xs font-bold text-slate-800">Foto KTP / Identitas</p>
+                      <p className="text-[10px] text-slate-500">
+                        Foto e-KTP / SIM yang terbaca jelas untuk verifikasi kepegawaian.
+                      </p>
+                      <input
+                        type="file"
+                        ref={idCardInputRef}
+                        onChange={handleUploadIdCard}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={uploadingIdCard}
+                        onClick={() => idCardInputRef.current?.click()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold border border-emerald-200 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        {uploadingIdCard ? "Mengunggah..." : formData.idCardUrl ? "Ganti Foto KTP" : "Unggah KTP / Paspor"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -1572,7 +1893,7 @@ export default function ContractsPage() {
                   </span>
                 </div>
 
-                {/* 2. Pilihan Jabatan Resmi & Tarif Standar */}
+                {/* 2. Pilihan Jabatan Resmi & Standar Divisi */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
@@ -1588,6 +1909,7 @@ export default function ContractsPage() {
                             ...formData,
                             selectedRolePresetId: pid,
                             position: preset.positionName || formData.position,
+                            department: preset.department || formData.department,
                             payrollSchemeType: preset.payrollScheme,
                             employeeCategory: preset.category,
                             contractType: preset.contractType,
@@ -1614,7 +1936,7 @@ export default function ContractsPage() {
                       ))}
                     </select>
                     <span className="text-[10px] text-slate-500 mt-1 block">
-                      Memilih jabatan otomatis mengisi nama posisi, kategori, dan nominal tarif acuan.
+                      Memilih jabatan otomatis mengisi nama posisi, divisi, kategori, dan acuan tarif.
                     </span>
                   </div>
 
@@ -1636,10 +1958,28 @@ export default function ContractsPage() {
                   </div>
                 </div>
 
+                {/* Pengaturan Divisi, Kategori & Tipe Kontrak */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1 flex items-center gap-1">
+                      <Layers className="w-3.5 h-3.5 text-blue-500" /> Divisi / Unit Kerja <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      value={formData.department}
+                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
+                    >
+                      {OFFICIAL_DEPARTMENTS.map((dept) => (
+                        <option key={dept} value={dept}>
+                          {dept}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Kategori Divisi
+                      Kategori Karyawan
                     </label>
                     <select
                       value={formData.employeeCategory}
@@ -1650,6 +1990,10 @@ export default function ContractsPage() {
                           employeeCategory: cat,
                           contractType: cat === "STAFF" ? "YEARLY" : "DAILY",
                           payrollSchemeType: cat === "STAFF" ? "MONTHLY" : "DAILY",
+                          department:
+                            cat === "STAFF"
+                              ? "Divisi Keuangan & Administrasi"
+                              : "Divisi Operasional Lapangan & Instalasi",
                         });
                       }}
                       className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800"
@@ -1661,7 +2005,7 @@ export default function ContractsPage() {
 
                   <div>
                     <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Tipe Durasi Kontrak <span className="text-rose-500">*</span>
+                      Tipe Masa Kontrak <span className="text-rose-500">*</span>
                     </label>
                     <select
                       value={formData.contractType}
@@ -1682,47 +2026,121 @@ export default function ContractsPage() {
                       )}
                     </select>
                   </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Durasi Kontrak (Bulan)
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.durationMonths}
-                      onChange={(e) => setFormData({ ...formData, durationMonths: Number(e.target.value) })}
-                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
-                    />
-                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Tanggal Mulai Kontrak
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
-                    />
+                {/* Pengaturan Durasi Kontrak & Auto-Calculate Tanggal Berakhir */}
+                <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100/80 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-blue-600" /> Durasi & Masa Berlaku Kontrak
+                    </span>
+                    <span className="text-[10px] text-blue-700 font-bold bg-blue-100/70 px-2.5 py-0.5 rounded-full">
+                      ✨ Auto-Calculate Tanggal Berakhir
+                    </span>
                   </div>
 
+                  {/* Preset Cepat Durasi Kontrak */}
                   <div>
-                    <label className="text-xs font-bold text-slate-700 block mb-1">
-                      Tanggal Berakhir Kontrak
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-medium"
-                    />
+                    <span className="text-[11px] font-semibold text-slate-600 block mb-1.5">
+                      Pilihan Cepat Durasi Kontrak (Bulan / Tahun):
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { label: "1 Bulan", months: 1 },
+                        { label: "3 Bulan (Standar)", months: 3 },
+                        { label: "6 Bulan", months: 6 },
+                        { label: "1 Tahun (12 Bln)", months: 12 },
+                        { label: "2 Tahun (24 Bln)", months: 24 },
+                      ].map((preset) => {
+                        const isSelected = formData.durationMonths === preset.months;
+                        return (
+                          <button
+                            type="button"
+                            key={preset.months}
+                            onClick={() => handleSelectDurationPreset(preset.months)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                              isSelected
+                                ? "bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-500/30"
+                                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            ⚡ {preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
+
+                  {/* Input Tanggal Mulai, Durasi Bulan, dan Tanggal Berakhir */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Tanggal Mulai Kontrak <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.startDate}
+                        onChange={(e) => {
+                          const newStart = e.target.value;
+                          const newEnd =
+                            formData.durationMonths > 0
+                              ? calculateEndDateFromDuration(newStart, formData.durationMonths)
+                              : formData.endDate;
+                          setFormData({
+                            ...formData,
+                            startDate: newStart,
+                            endDate: newEnd,
+                          });
+                        }}
+                        className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-medium"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Durasi Kontrak (Bulan) <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={formData.durationMonths}
+                        onChange={(e) => {
+                          const m = Math.max(1, Number(e.target.value) || 1);
+                          const newEnd = calculateEndDateFromDuration(formData.startDate, m);
+                          setFormData({
+                            ...formData,
+                            durationMonths: m,
+                            contractType:
+                              m >= 12
+                                ? "YEARLY"
+                                : formData.employeeCategory === "STAFF"
+                                ? "MONTHLY"
+                                : "DAILY",
+                            endDate: newEnd,
+                          });
+                        }}
+                        className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-bold text-blue-700"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Tanggal Berakhir Kontrak <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-xs bg-white border border-blue-300 rounded-xl font-bold text-slate-800"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 italic">
+                    💡 Tanggal berakhir otomatis dihitung berdasarkan Tanggal Mulai + Durasi (Dapat diedit manual jika ada ketentuan proyek khusus).
+                  </p>
                 </div>
 
                 <div>
@@ -3182,6 +3600,76 @@ export default function ContractsPage() {
               <div className="mt-8 pt-3 border-t border-slate-200 text-[9px] text-slate-400 text-center font-sans">
                 Dokumen Surat Perjanjian Kerja Waktu Tertentu (PKWT) ini diterbitkan secara sah dan terekam di Portal Legalitas PT. DSTech Smart Perkasa.
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LIGHTBOX: PRATINJAU KTP / IDENTITAS */}
+      {previewKtpModal?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 overflow-hidden space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <ImageIcon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Dokumen e-KTP / Identitas Resmi
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Atas nama: <strong className="text-slate-800">{previewKtpModal.employeeName}</strong>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {previewKtpModal.idCardUrl && (
+                  <a
+                    href={previewKtpModal.idCardUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                    title="Buka Foto Asli di Tab Baru"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+                <button
+                  onClick={() => setPreviewKtpModal(null)}
+                  className="p-2 text-slate-400 hover:text-slate-600 rounded-xl"
+                  title="Tutup"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Gambar KTP Full Size */}
+            <div className="relative rounded-2xl overflow-hidden bg-slate-900 flex items-center justify-center min-h-[300px] max-h-[70vh] border border-slate-200">
+              {previewKtpModal.idCardUrl ? (
+                <img
+                  src={previewKtpModal.idCardUrl}
+                  alt={`KTP ${previewKtpModal.employeeName}`}
+                  className="max-w-full max-h-[65vh] object-contain rounded-xl shadow-lg"
+                />
+              ) : (
+                <div className="text-center p-8 text-slate-400">
+                  <AlertCircle className="w-10 h-10 mx-auto mb-2 text-slate-500" />
+                  <p className="text-xs">Foto KTP belum diunggah untuk karyawan ini.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
+              <span>Arsip verifikasi tenaga kerja PT. DSTech Smart Perkasa</span>
+              <button
+                type="button"
+                onClick={() => setPreviewKtpModal(null)}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition-colors"
+              >
+                Tutup Pratinjau
+              </button>
             </div>
           </div>
         </div>

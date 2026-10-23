@@ -140,8 +140,11 @@ export async function POST(req: Request) {
       employeeEmail: body.employeeEmail?.trim() || "",
       employeeAddress: body.employeeAddress?.trim() || "",
       position: body.position.trim(),
+      department: body.department?.trim() || (body.employeeCategory === "STAFF" ? "Administrasi & Operasional" : "Teknisi Lapangan"),
       employeeCategory: body.employeeCategory || "TECHNICIAN", // "STAFF" | "TECHNICIAN"
       contractType: body.contractType || "DAILY", // "DAILY" | "MONTHLY" | "YEARLY"
+      photoUrl: body.photoUrl || "",
+      idCardUrl: body.idCardUrl || "",
       startDate: body.startDate,
       endDate: body.endDate,
       durationMonths: Number(body.durationMonths || 1),
