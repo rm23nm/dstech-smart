@@ -1628,6 +1628,30 @@ export default function AdminAttendancePage() {
       {/* TAB 3: KALKULATOR & SLIP GAJI (PAYROLL) */}
       {activeTab === "payroll" && (
         <div className="space-y-6">
+          {/* Banner Menuju Halaman Rekapitulasi Gaji Dedicated */}
+          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 p-6 rounded-3xl text-white shadow-lg shadow-blue-500/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center shrink-0">
+                <DollarSign className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h4 className="font-black text-base tracking-tight">
+                  Dashboard Rekapitulasi Penggajian & Auto Payday (Tanggal 25)
+                </h4>
+                <p className="text-xs text-blue-100 font-medium mt-0.5">
+                  Tersedia modul baru penggajian otomatis terpadu, pengaturan tanggal gajian bulanan, persetujuan & pembayaran massal, serta cetak lembar Rekap Gaji Bulanan resmi A4.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/admin/payroll"
+              className="px-5 py-2.5 rounded-xl bg-white text-slate-900 hover:bg-blue-50 font-black text-xs transition-all shrink-0 shadow-sm flex items-center gap-2"
+            >
+              <span>Buka Rekap Gaji & Auto Payday</span>
+              <ArrowRight className="w-4 h-4 text-dstech-blue" />
+            </Link>
+          </div>
+
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
             <div>
               <h3 className="text-lg font-black text-slate-900">

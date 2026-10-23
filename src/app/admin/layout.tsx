@@ -27,6 +27,7 @@ import {
   Warehouse,
   CalendarCheck,
   FileSignature,
+  Banknote,
 } from "lucide-react";
 
 interface SearchResult {
@@ -41,7 +42,8 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Kontrak Kerja & Rekrutmen", category: "Operasional", url: "/admin/contracts", desc: "Kelola kontrak kerja staf bulanan/tahunan dan teknisi harian (Tipe 1 & 2), cetak PKWT resmi A4" },
   { title: "Rekap Absensi Karyawan & Teknisi", category: "Operasional", url: "/admin/attendance", desc: "Pantau presensi masuk/pulang, titik GPS Google Maps, dan riwayat kehadiran" },
   { title: "Download Laporan Absensi (Excel & PDF)", category: "Operasional", url: "/admin/attendance", desc: "Unduh file CSV/Excel dan cetak lembar rekapitulasi kehadiran A4 resmi" },
-  { title: "Kalkulator Gaji & Slip Gaji (Payroll)", category: "Keuangan", url: "/admin/attendance", desc: "Hitung otomatis gaji pokok, upah lembur, uang kehadiran, dan cetak slip gaji A4" },
+  { title: "Penggajian & Rekap Gaji (Payroll)", category: "Keuangan", url: "/admin/payroll", desc: "Rekapitulasi gaji bulanan staf & teknisi, setting auto payday, cetak slip & rekap A4 resmi" },
+  { title: "Kalkulator Gaji & Slip Gaji (Payroll)", category: "Keuangan", url: "/admin/payroll", desc: "Hitung otomatis gaji pokok, upah lembur, uang kehadiran, dan cetak slip gaji A4" },
   { title: "Persetujuan Lembur Teknisi (Overtime)", category: "Operasional", url: "/admin/attendance", desc: "Verifikasi dan persetujuan pengajuan jam lembur teknisi proyek lapangan" },
   { title: "Cetak Rekap Presensi Bulanan", category: "Operasional", url: "/admin/attendance", desc: "Unduh dan cetak rekap absensi staf resmi ber-Kop Surat DSTech" },
   { title: "Jadwal & Tiket Maintenance", category: "Operasional", url: "/admin/maintenance", desc: "Kelola jadwal kunjungan rutin, servis darurat CCTV, dan penugasan teknisi lapangan" },
@@ -163,6 +165,12 @@ export default function AdminLayout({
       href: "/admin/attendance",
       icon: CalendarCheck,
       active: pathname.startsWith("/admin/attendance"),
+    },
+    {
+      label: "Penggajian & Rekap Gaji",
+      href: "/admin/payroll",
+      icon: Banknote,
+      active: pathname.startsWith("/admin/payroll"),
     },
     {
       label: "Kontrak Kerja & Rekrutmen",

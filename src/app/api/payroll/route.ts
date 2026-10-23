@@ -4,24 +4,49 @@ import path from "path";
 
 const PAYROLL_FILE = path.join(process.cwd(), "src", "data", "dstech_payroll.json");
 const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
+const CONTRACTS_FILE = path.join(process.cwd(), "src", "data", "dstech_contracts.json");
+const USERS_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
+const ATTENDANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_attendance.json");
+
+interface PayrollSettings {
+  standardOvertimeRate: number;
+  standardPresenceRate: number;
+  defaultBpjsDeduction: number;
+  standardTransportAllowance: number;
+  autoPaydayDay: number; // Tanggal gajian default setiap bulan (contoh: 25)
+  cutoffStartDay: number; // Tanggal awal cut-off (contoh: 21 bulan lalu)
+  cutoffEndDay: number; // Tanggal akhir cut-off (contoh: 20 bulan berjalan)
+  autoGenerateEnabled: boolean;
+  defaultPaymentMethod: string;
+}
+
+const DEFAULT_SETTINGS: PayrollSettings = {
+  standardOvertimeRate: 30000,
+  standardPresenceRate: 50000,
+  defaultBpjsDeduction: 150000,
+  standardTransportAllowance: 400000,
+  autoPaydayDay: 25,
+  cutoffStartDay: 21,
+  cutoffEndDay: 20,
+  autoGenerateEnabled: true,
+  defaultPaymentMethod: "Transfer Bank BCA",
+};
 
 function readPayrollData() {
   try {
     if (fs.existsSync(PAYROLL_FILE)) {
-      const data = fs.readFileSync(PAYROLL_FILE, "utf-8");
-      return JSON.parse(data);
+      const data = JSON.parse(fs.readFileSync(PAYROLL_FILE, "utf-8"));
+      return {
+        payrolls: data.payrolls || [],
+        defaultSettings: { ...DEFAULT_SETTINGS, ...(data.defaultSettings || {}) },
+      };
     }
   } catch (err) {
     console.error("Error reading dstech_payroll.json:", err);
   }
   return {
     payrolls: [],
-    defaultSettings: {
-      standardOvertimeRate: 30000,
-      standardPresenceRate: 50000,
-      defaultBpjsDeduction: 150000,
-      standardTransportAllowance: 400000,
-    },
+    defaultSettings: DEFAULT_SETTINGS,
   };
 }
 
@@ -35,14 +60,55 @@ function writePayrollData(data: any) {
   }
 }
 
+function readContracts() {
+  try {
+    if (fs.existsSync(CONTRACTS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CONTRACTS_FILE, "utf-8"));
+      return data.contracts || [];
+    }
+  } catch (err) {
+    console.error("Error reading dstech_contracts.json:", err);
+  }
+  return [];
+}
+
+function readUsers() {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+      return data.users || [];
+    }
+  } catch (err) {
+    console.error("Error reading dstech_users.json:", err);
+  }
+  return [];
+}
+
+function readAttendanceData() {
+  try {
+    if (fs.existsSync(ATTENDANCE_FILE)) {
+      return JSON.parse(fs.readFileSync(ATTENDANCE_FILE, "utf-8"));
+    }
+  } catch (err) {
+    console.error("Error reading dstech_employee_attendance.json:", err);
+  }
+  return { attendance: [], overtime: [] };
+}
+
 function appendToFinanceCashFlow(payrollRecord: any) {
   try {
     if (!fs.existsSync(FINANCE_FILE)) return false;
     const financeData = JSON.parse(fs.readFileSync(FINANCE_FILE, "utf-8"));
     if (!financeData.cash_flow) financeData.cash_flow = [];
 
+    // Cek apakah sudah pernah tercatat sebelumnya untuk menghindari entri ganda
+    const existingIndex = financeData.cash_flow.findIndex(
+      (entry: any) => entry.referenceId === payrollRecord.id
+    );
+    if (existingIndex >= 0) return true;
+
     const cashEntry = {
-      id: `dstech_cash_${Date.now()}`,
+      id: `dstech_cash_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       date: payrollRecord.paymentDate || new Date().toISOString().split("T")[0],
       type: "OUT",
       category: "Gaji & Upah Karyawan",
@@ -68,6 +134,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get("month");
     const employee = searchParams.get("employee");
+    const status = searchParams.get("status");
 
     const data = readPayrollData();
     let result = data.payrolls || [];
@@ -78,12 +145,53 @@ export async function GET(request: Request) {
     if (employee && employee !== "ALL") {
       result = result.filter((p: any) => p.employeeName === employee);
     }
+    if (status && status !== "ALL") {
+      result = result.filter((p: any) => p.status === status);
+    }
+
+    // Hitung ringkasan agregat
+    const totalTakeHomePay = result.reduce((acc: number, curr: any) => acc + (Number(curr.takeHomePay) || 0), 0);
+    const totalGross = result.reduce((acc: number, curr: any) => acc + (Number(curr.totalGross) || 0), 0);
+    const totalDeductions = result.reduce((acc: number, curr: any) => acc + (Number(curr.totalDeductions) || 0), 0);
+    const totalBaseSalary = result.reduce((acc: number, curr: any) => acc + (Number(curr.baseSalary) || 0), 0);
+    const totalPresenceAllowance = result.reduce((acc: number, curr: any) => acc + (Number(curr.presenceAllowance) || 0), 0);
+    const totalOvertimePay = result.reduce((acc: number, curr: any) => acc + (Number(curr.overtimePay) || 0), 0);
+
+    const statusCounts = {
+      draft: result.filter((p: any) => p.status === "Draft").length,
+      disetujui: result.filter((p: any) => p.status === "Disetujui").length,
+      dibayarkan: result.filter((p: any) => p.status === "Dibayarkan").length,
+    };
+
+    const now = new Date();
+    const currentDay = now.getDate();
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const autoDay = data.defaultSettings.autoPaydayDay || 25;
+    const isPaydayToday = currentDay === autoDay;
 
     return NextResponse.json({
       success: true,
       payrolls: result,
       allPayrolls: data.payrolls || [],
       defaultSettings: data.defaultSettings,
+      summary: {
+        totalTakeHomePay,
+        totalGross,
+        totalDeductions,
+        totalBaseSalary,
+        totalPresenceAllowance,
+        totalOvertimePay,
+        totalSlips: result.length,
+        statusCounts,
+        currentDay,
+        currentMonth,
+        isPaydayToday,
+        paydayConfig: {
+          paydayDay: autoDay,
+          cutoffStartDay: data.defaultSettings.cutoffStartDay || 21,
+          cutoffEndDay: data.defaultSettings.cutoffEndDay || 20,
+        },
+      },
     });
   } catch (err) {
     console.error("Error GET payroll:", err);
@@ -97,14 +205,304 @@ export async function POST(request: Request) {
     const data = readPayrollData();
     const now = new Date();
 
+    // ACTION 1: Simpan Konfigurasi Tanggal Gajian Otomatis
+    if (body.action === "save_settings") {
+      data.defaultSettings = {
+        ...data.defaultSettings,
+        ...(body.settings || {}),
+      };
+      writePayrollData(data);
+      return NextResponse.json({
+        success: true,
+        message: "Pengaturan penggajian otomatis berhasil disimpan",
+        defaultSettings: data.defaultSettings,
+      });
+    }
+
+    // ACTION 2: Auto-Generate Penggajian Massal untuk Seluruh Staf/Teknisi
+    if (body.action === "auto_generate") {
+      const monthStr = body.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const cleanMonth = monthStr.replace("-", "");
+      const paymentDate = body.paymentDate || `${monthStr}-${String(data.defaultSettings.autoPaydayDay || 25).padStart(2, "0")}`;
+      const overwrite = body.overwriteExisting === true;
+
+      const contracts = readContracts();
+      const users = readUsers();
+      const attendanceData = readAttendanceData();
+
+      // Kumpulkan staf yang berhak menerima gaji:
+      // Prioritas 1: Karyawan berstatus aktif di kontrak
+      // Prioritas 2: User aktif ber-role staff atau technician yang belum ada di kontrak
+      const employeeCandidates: Array<{
+        name: string;
+        role: string;
+        bankAccount?: string;
+        contract?: any;
+      }> = [];
+
+      contracts.forEach((c: any) => {
+        if (c.status === "ACTIVE" || !c.status) {
+          employeeCandidates.push({
+            name: c.employeeName,
+            role: c.position || "Staf Operasional",
+            bankAccount: c.employeePhone ? `Transfer Bank (HP: ${c.employeePhone})` : "-",
+            contract: c,
+          });
+        }
+      });
+
+      users.forEach((u: any) => {
+        if (
+          (u.role === "technician" || u.role === "staff") &&
+          !employeeCandidates.some((ec) => ec.name.toLowerCase() === u.name.toLowerCase())
+        ) {
+          employeeCandidates.push({
+            name: u.name,
+            role: u.role === "technician" ? "Teknisi Lapangan" : "Staf Kantor",
+            bankAccount: u.phone ? `Transfer Rekening / ${u.phone}` : "-",
+            contract: null,
+          });
+        }
+      });
+
+      let generatedCount = 0;
+      let updatedCount = 0;
+      let skippedCount = 0;
+
+      for (const emp of employeeCandidates) {
+        // Hitung kehadiran riil dalam bulan ini
+        const employeeAttendances = (attendanceData.attendance || []).filter((att: any) => {
+          return (
+            att.employeeName &&
+            att.employeeName.toLowerCase() === emp.name.toLowerCase() &&
+            att.date &&
+            att.date.startsWith(monthStr)
+          );
+        });
+
+        // Hitung jam lembur yang disetujui bulan ini
+        const employeeOvertimes = (attendanceData.overtime || []).filter((ot: any) => {
+          return (
+            ot.employeeName &&
+            ot.employeeName.toLowerCase() === emp.name.toLowerCase() &&
+            ot.status === "Disetujui" &&
+            ot.date &&
+            ot.date.startsWith(monthStr)
+          );
+        });
+
+        const actualPresenceDays = employeeAttendances.length;
+        const actualOvertimeHours = employeeOvertimes.reduce((sum: number, item: any) => sum + (Number(item.hours) || 0), 0);
+
+        // Nilai acuan default
+        let baseSalary = 4200000;
+        let presenceDays = actualPresenceDays > 0 ? actualPresenceDays : 22; // Default 22 jika log belum lengkap
+        let presenceRate = data.defaultSettings.standardPresenceRate || 50000;
+        let presenceAllowance = presenceDays * presenceRate;
+        let overtimeHours = actualOvertimeHours;
+        let overtimeRate = data.defaultSettings.standardOvertimeRate || 30000;
+        let overtimePay = overtimeHours * overtimeRate;
+        let positionAllowance = 400000;
+        let transportAllowance = data.defaultSettings.standardTransportAllowance || 400000;
+        let bonusProject = 0;
+        let bonusPerformance = 0;
+        let bpjsDeduction = data.defaultSettings.defaultBpjsDeduction || 150000;
+        let loanDeduction = 0;
+        let otherDeduction = 0;
+        let bankAccount = emp.bankAccount || "-";
+
+        // Sesuaikan dengan skema kontrak jika ada
+        if (emp.contract && emp.contract.salaryScheme) {
+          const scheme = emp.contract.salaryScheme;
+          if (scheme.staffScheme) {
+            baseSalary = Number(scheme.staffScheme.baseSalary || baseSalary);
+            positionAllowance = Number(scheme.staffScheme.positionAllowance || positionAllowance);
+            transportAllowance = Number(scheme.staffScheme.transportAllowance || transportAllowance);
+            bpjsDeduction = Number(scheme.staffScheme.bpjsAllowance || bpjsDeduction);
+          } else if (scheme.dailyScheme) {
+            if (scheme.dailyScheme.dailyRateType === "TYPE_1_FULL_DAY") {
+              const dailyRate = Number(scheme.dailyScheme.dailyRate || 200000);
+              baseSalary = presenceDays * dailyRate;
+              presenceRate = 0;
+              presenceAllowance = 0;
+              overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || overtimeRate);
+              overtimePay = overtimeHours * overtimeRate;
+              positionAllowance = 0;
+            } else if (scheme.dailyScheme.dailyRateType === "TYPE_2_HOURLY") {
+              const hourlyRate = Number(scheme.dailyScheme.hourlyRate || 30000);
+              baseSalary = presenceDays * 8 * hourlyRate;
+              presenceRate = 0;
+              presenceAllowance = 0;
+              overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || 40000);
+              overtimePay = overtimeHours * overtimeRate;
+              positionAllowance = 0;
+            }
+          }
+        }
+
+        const totalGross = baseSalary + presenceAllowance + overtimePay + positionAllowance + transportAllowance + bonusProject + bonusPerformance;
+        const totalDeductions = bpjsDeduction + loanDeduction + otherDeduction;
+        const takeHomePay = Math.max(0, totalGross - totalDeductions);
+
+        // Periksa apakah slip untuk karyawan ini di bulan ini sudah ada
+        const existingIndex = (data.payrolls || []).findIndex(
+          (p: any) => p.month === monthStr && p.employeeName.toLowerCase() === emp.name.toLowerCase()
+        );
+
+        if (existingIndex >= 0) {
+          if (overwrite) {
+            const existing = data.payrolls[existingIndex];
+            data.payrolls[existingIndex] = {
+              ...existing,
+              paymentDate,
+              baseSalary,
+              presenceDays,
+              presenceRate,
+              presenceAllowance,
+              overtimeHours,
+              overtimeRate,
+              overtimePay,
+              positionAllowance,
+              transportAllowance,
+              bonusProject,
+              bonusPerformance,
+              bpjsDeduction,
+              loanDeduction,
+              otherDeduction,
+              totalGross,
+              totalDeductions,
+              takeHomePay,
+            };
+            updatedCount++;
+          } else {
+            skippedCount++;
+          }
+        } else {
+          // Buat slip baru
+          const countMonth = (data.payrolls || []).filter((p: any) => p.month === monthStr).length + 1;
+          const slipNumber = `SLIP-DSTECH-${cleanMonth}-${String(countMonth).padStart(3, "0")}`;
+
+          const newSlip = {
+            id: `dstech_pay_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            slipNumber,
+            month: monthStr,
+            paymentDate,
+            employeeName: emp.name,
+            employeeRole: emp.role,
+            bankAccount,
+            baseSalary,
+            presenceDays,
+            presenceRate,
+            presenceAllowance,
+            overtimeHours,
+            overtimeRate,
+            overtimePay,
+            positionAllowance,
+            transportAllowance,
+            bonusProject,
+            bonusPerformance,
+            bpjsDeduction,
+            loanDeduction,
+            otherDeduction,
+            totalGross,
+            totalDeductions,
+            takeHomePay,
+            status: "Draft",
+            paymentMethod: data.defaultSettings.defaultPaymentMethod || "Transfer Bank BCA",
+            notes: `Auto-generated gaji periode ${monthStr} berdasarkan kehadiran (${presenceDays} hari) & lembur (${overtimeHours} jam)`,
+            approvedBy: "System Auto-Payroll",
+            approvedAt: now.toISOString(),
+            recordedInCashFlow: false,
+          };
+
+          if (!data.payrolls) data.payrolls = [];
+          data.payrolls.unshift(newSlip);
+          generatedCount++;
+        }
+      }
+
+      writePayrollData(data);
+
+      return NextResponse.json({
+        success: true,
+        message: `Auto-payroll bulan ${monthStr} berhasil dijalankan: ${generatedCount} slip baru diterbitkan, ${updatedCount} diperbarui, ${skippedCount} dilewati (sudah ada).`,
+        summary: {
+          month: monthStr,
+          generatedCount,
+          updatedCount,
+          skippedCount,
+          totalEmployees: employeeCandidates.length,
+        },
+      });
+    }
+
+    // ACTION 3: Pembayaran Massal (Bulk Pay) & Integrasi ke Arus Kas ERP
+    if (body.action === "bulk_pay") {
+      const { ids, month } = body;
+      let targetSlips = data.payrolls || [];
+
+      if (ids && Array.isArray(ids) && ids.length > 0) {
+        targetSlips = targetSlips.filter((p: any) => ids.includes(p.id));
+      } else if (month) {
+        targetSlips = targetSlips.filter((p: any) => p.month === month);
+      }
+
+      let paidCount = 0;
+      targetSlips.forEach((p: any) => {
+        p.status = "Dibayarkan";
+        if (!p.recordedInCashFlow) {
+          const recorded = appendToFinanceCashFlow(p);
+          p.recordedInCashFlow = recorded;
+        }
+        paidCount++;
+      });
+
+      writePayrollData(data);
+
+      return NextResponse.json({
+        success: true,
+        message: `Berhasil menyelesaikan pembayaran ${paidCount} slip gaji & otomatis membukukan ke Buku Arus Kas ERP.`,
+        paidCount,
+      });
+    }
+
+    // ACTION 4: Otorisasi Massal (Bulk Approve)
+    if (body.action === "bulk_approve") {
+      const { ids, month } = body;
+      let targetSlips = data.payrolls || [];
+
+      if (ids && Array.isArray(ids) && ids.length > 0) {
+        targetSlips = targetSlips.filter((p: any) => ids.includes(p.id));
+      } else if (month) {
+        targetSlips = targetSlips.filter((p: any) => p.month === month);
+      }
+
+      let approvedCount = 0;
+      targetSlips.forEach((p: any) => {
+        if (p.status === "Draft") {
+          p.status = "Disetujui";
+          p.approvedBy = body.approvedBy || "Super Admin DSTech";
+          p.approvedAt = now.toISOString();
+          approvedCount++;
+        }
+      });
+
+      writePayrollData(data);
+
+      return NextResponse.json({
+        success: true,
+        message: `Berhasil menyetujui ${approvedCount} slip gaji.`,
+        approvedCount,
+      });
+    }
+
+    // STANDAR: Pembuatan Slip Gaji Satuan
     const monthStr = body.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const cleanMonth = monthStr.replace("-", "");
 
-    // Generate slip number
     const countMonth = (data.payrolls || []).filter((p: any) => p.month === monthStr).length + 1;
     const slipNumber = body.slipNumber || `SLIP-DSTECH-${cleanMonth}-${String(countMonth).padStart(3, "0")}`;
 
-    // Calculation logic
     const baseSalary = Number(body.baseSalary || 0);
     const presenceDays = Number(body.presenceDays || 0);
     const presenceRate = Number(body.presenceRate || 50000);
@@ -128,7 +526,7 @@ export async function POST(request: Request) {
     const takeHomePay = Math.max(0, totalGross - totalDeductions);
 
     const newPayroll = {
-      id: `dstech_pay_${Date.now()}`,
+      id: `dstech_pay_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       slipNumber,
       month: monthStr,
       paymentDate: body.paymentDate || now.toISOString().split("T")[0],
@@ -160,7 +558,6 @@ export async function POST(request: Request) {
       recordedInCashFlow: false,
     };
 
-    // If marked as Dibayarkan and requested to record into cash flow
     if (newPayroll.status === "Dibayarkan" && body.recordInCashFlow) {
       const recorded = appendToFinanceCashFlow(newPayroll);
       newPayroll.recordedInCashFlow = recorded;
@@ -198,7 +595,6 @@ export async function PUT(request: Request) {
       return NextResponse.json({ success: false, error: "Data penggajian tidak ditemukan" }, { status: 404 });
     }
 
-    // Update editable fields
     if (body.month !== undefined) payroll.month = body.month;
     if (body.paymentDate !== undefined) payroll.paymentDate = body.paymentDate;
     if (body.employeeName !== undefined) payroll.employeeName = body.employeeName;
@@ -222,7 +618,7 @@ export async function PUT(request: Request) {
     if (body.notes !== undefined) payroll.notes = body.notes;
     if (body.status !== undefined) payroll.status = body.status;
 
-    // Recalculate
+    // Hitung ulang total
     payroll.totalGross =
       (payroll.baseSalary || 0) +
       (payroll.presenceAllowance || 0) +
@@ -239,7 +635,6 @@ export async function PUT(request: Request) {
 
     payroll.takeHomePay = Math.max(0, payroll.totalGross - payroll.totalDeductions);
 
-    // If status updated to Dibayarkan and not yet recorded into Cash Flow
     if (payroll.status === "Dibayarkan" && !payroll.recordedInCashFlow && body.recordInCashFlow) {
       const recorded = appendToFinanceCashFlow(payroll);
       payroll.recordedInCashFlow = recorded;
