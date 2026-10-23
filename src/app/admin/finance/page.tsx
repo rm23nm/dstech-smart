@@ -1387,7 +1387,7 @@ export default function AdminFinanceERPPage() {
   });
   const [isPublishingPortfolio, setIsPublishingPortfolio] = useState<boolean>(false);
   const [isUploadingPortfolioImg, setIsUploadingPortfolioImg] = useState<boolean>(false);
-  const [projectFilterStatus, setProjectFilterStatus] = useState<string>("ALL");
+  const [projectFilterStatus, setProjectFilterStatus] = useState<string>("In Progress");
   const [projectSearchQuery, setProjectSearchQuery] = useState<string>("");
   const [projectDateFilter, setProjectDateFilter] = useState<DateFilterPeriod>("ALL");
   const [projectStartDate, setProjectStartDate] = useState<string>("");
@@ -2220,8 +2220,8 @@ export default function AdminFinanceERPPage() {
           let bestBlob: Blob | null = null;
 
           // Multi-stage compression loop (Kualitas & Downscaling Terpadu)
-          // Menjamin file terkompresi secara ketat <= 40 KB
-          const testQualities = [0.70, 0.58, 0.45, 0.35, 0.26, 0.20];
+          // Menjamin file terkompresi secara ketat <= maxTargetSizeKb (misal < 20 KB)
+          const testQualities = [0.70, 0.58, 0.45, 0.35, 0.25, 0.18];
           let currentW = curWidth;
           let currentH = curHeight;
 
@@ -2248,10 +2248,10 @@ export default function AdminFinanceERPPage() {
 
           // Jika setelah loop kualitas ukuran masih > maxSizeBytes, perkecil dimensi gambar secara adaptif
           if (bestBlob && bestBlob.size > maxSizeBytes) {
-            for (let downscale = 0; downscale < 4; downscale++) {
-              currentW = Math.round(currentW * 0.80);
-              currentH = Math.round(currentH * 0.80);
-              if (currentW < 240) break;
+            for (let downscale = 0; downscale < 6; downscale++) {
+              currentW = Math.round(currentW * 0.75);
+              currentH = Math.round(currentH * 0.75);
+              if (currentW < 140) break;
 
               canvas.width = currentW;
               canvas.height = currentH;
@@ -2259,8 +2259,8 @@ export default function AdminFinanceERPPage() {
               ctx.fillRect(0, 0, currentW, currentH);
               ctx.drawImage(img, 0, 0, currentW, currentH);
 
-              // Coba dengan kualitas rendah-sedang (0.38, 0.25, 0.18)
-              for (const q of [0.38, 0.25, 0.18]) {
+              // Coba dengan kualitas rendah-sedang (0.35, 0.25, 0.18, 0.12)
+              for (const q of [0.35, 0.25, 0.18, 0.12]) {
                 const blob: Blob | null = await new Promise((res) => {
                   canvas.toBlob((b) => res(b), "image/jpeg", q);
                 });
@@ -3125,13 +3125,13 @@ export default function AdminFinanceERPPage() {
     });
   };
 
-  // Helper Upload Foto Item Manual SPH (Kompresi Otomatis ~40 KB)
+  // Helper Upload Foto Item Manual SPH (Kompresi Otomatis < 20 KB)
   const handleUploadItemPhoto = async (idx: number, file: File) => {
     if (!file) return;
     try {
       setUploadingItemPhotoIdx(idx);
-      showToast("Mengompresi foto item ke ~40 KB...");
-      const { file: fileToUpload } = await compressImageFile(file, 40);
+      showToast("Mengompresi foto item ke < 20 KB...");
+      const { file: fileToUpload } = await compressImageFile(file, 20);
 
       const formData = new FormData();
       formData.append("file", fileToUpload);
@@ -3145,7 +3145,7 @@ export default function AdminFinanceERPPage() {
       const data = await res.json();
       if (res.ok && data.url) {
         handleQuotationItemChange(idx, "image", data.url);
-        showToast("✓ Foto item berhasil dilampirkan (~40 KB)!");
+        showToast("✓ Foto item berhasil dilampirkan (< 20 KB)!");
       } else {
         showToast("Gagal mengunggah foto item.");
       }
@@ -3157,13 +3157,13 @@ export default function AdminFinanceERPPage() {
     }
   };
 
-  // Helper Upload Foto Item Faktur Penjualan (Kompresi Otomatis ~40 KB)
+  // Helper Upload Foto Item Faktur Penjualan (Kompresi Otomatis < 20 KB)
   const handleUploadSaleItemPhoto = async (idx: number, file: File) => {
     if (!file) return;
     try {
       setUploadingItemPhotoIdx(idx);
-      showToast("Mengompresi foto item ke ~40 KB...");
-      const { file: fileToUpload } = await compressImageFile(file, 40);
+      showToast("Mengompresi foto item ke < 20 KB...");
+      const { file: fileToUpload } = await compressImageFile(file, 20);
 
       const formData = new FormData();
       formData.append("file", fileToUpload);
@@ -3177,7 +3177,7 @@ export default function AdminFinanceERPPage() {
       const data = await res.json();
       if (res.ok && data.url) {
         handleSaleItemChange(idx, "image", data.url);
-        showToast("✓ Foto produk faktur berhasil dilampirkan (~40 KB)!");
+        showToast("✓ Foto produk faktur berhasil dilampirkan (< 20 KB)!");
       } else {
         showToast("Gagal mengunggah foto item.");
       }
@@ -3189,13 +3189,13 @@ export default function AdminFinanceERPPage() {
     }
   };
 
-  // Helper Upload Foto Item Purchase Order Supplier (Kompresi Otomatis ~40 KB)
+  // Helper Upload Foto Item Purchase Order Supplier (Kompresi Otomatis < 20 KB)
   const handleUploadPoItemPhoto = async (idx: number, file: File) => {
     if (!file) return;
     try {
       setUploadingItemPhotoIdx(idx);
-      showToast("Mengompresi foto item ke ~40 KB...");
-      const { file: fileToUpload } = await compressImageFile(file, 40);
+      showToast("Mengompresi foto item ke < 20 KB...");
+      const { file: fileToUpload } = await compressImageFile(file, 20);
 
       const formData = new FormData();
       formData.append("file", fileToUpload);
@@ -3209,7 +3209,7 @@ export default function AdminFinanceERPPage() {
       const data = await res.json();
       if (res.ok && data.url) {
         handlePoItemChange(idx, "image", data.url);
-        showToast("✓ Foto produk PO berhasil dilampirkan (~40 KB)!");
+        showToast("✓ Foto produk PO berhasil dilampirkan (< 20 KB)!");
       } else {
         showToast("Gagal mengunggah foto item.");
       }
@@ -4634,6 +4634,37 @@ export default function AdminFinanceERPPage() {
     });
   };
 
+  const handleUploadEditSaleItemPhoto = async (idx: number, file: File) => {
+    if (!file) return;
+    try {
+      setUploadingItemPhotoIdx(idx);
+      showToast("Mengompresi foto item ke < 20 KB...");
+      const { file: fileToUpload } = await compressImageFile(file, 20);
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("docType", "sale_item");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        handleEditSaleItemChange(idx, "image", data.url);
+        showToast("✓ Foto produk faktur berhasil dilampirkan (< 20 KB)!");
+      } else {
+        showToast("Gagal mengunggah foto item.");
+      }
+    } catch (err) {
+      console.error("Error uploading edit sale item photo:", err);
+      showToast("Terjadi kesalahan saat memproses foto item.");
+    } finally {
+      setUploadingItemPhotoIdx(null);
+    }
+  };
+
   const handleAddEditSaleItem = () => {
     if (!editingSale) return;
     setEditingSale({
@@ -5639,8 +5670,8 @@ export default function AdminFinanceERPPage() {
     if (!file) return;
     try {
       setUploadingItemPhotoIdx(idx);
-      showToast("Mengompresi foto item ke ~40 KB...");
-      const { file: fileToUpload } = await compressImageFile(file, 40);
+      showToast("Mengompresi foto item ke < 20 KB...");
+      const { file: fileToUpload } = await compressImageFile(file, 20);
 
       const formData = new FormData();
       formData.append("file", fileToUpload);
@@ -5654,7 +5685,7 @@ export default function AdminFinanceERPPage() {
       const data = await res.json();
       if (res.ok && data.url) {
         handleEditPoItemChange(idx, "image", data.url);
-        showToast("✓ Foto produk PO berhasil dilampirkan (~40 KB)!");
+        showToast("✓ Foto produk PO berhasil dilampirkan (< 20 KB)!");
       } else {
         showToast("Gagal mengunggah foto item.");
       }
@@ -12440,15 +12471,81 @@ export default function AdminFinanceERPPage() {
                             ))}
                           </select>
                         </div>
-                        <input
-                          type="text"
-                          required
-                          list="dstech_global_product_datalist"
-                          placeholder="Pilih dari list master atau ketik nama barang..."
-                          value={it.productName}
-                          onChange={(e) => handleSaleItemChange(idx, "productName", e.target.value)}
-                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none"
-                        />
+                        <div className="flex items-center gap-1.5">
+                          {/* Tombol Upload & Thumbnail Foto Item Manual (< 20 KB) */}
+                          <div className="relative shrink-0">
+                            <input
+                              type="file"
+                              id={`sale-item-photo-${idx}`}
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleUploadSaleItemPhoto(idx, f);
+                                e.target.value = "";
+                              }}
+                            />
+                            {it.image ? (
+                              <div className="relative group w-8 h-8 rounded-lg overflow-hidden border border-blue-300 bg-white shadow-xs">
+                                <img
+                                  src={it.image}
+                                  alt="Foto Item"
+                                  className="w-full h-full object-cover"
+                                />
+                                <label
+                                  htmlFor={`sale-item-photo-${idx}`}
+                                  title="Klik untuk ganti foto (< 20 KB)"
+                                  className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity text-[8px] font-bold"
+                                >
+                                  <Camera className="w-3.5 h-3.5" />
+                                </label>
+                              </div>
+                            ) : (
+                              <label
+                                htmlFor={`sale-item-photo-${idx}`}
+                                title="Lampirkan foto produk (otomatis kompres ke < 20 KB)"
+                                className={`w-8 h-8 rounded-lg border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                  uploadingItemPhotoIdx === idx
+                                    ? "bg-amber-50 border-amber-400 text-amber-600 animate-pulse"
+                                    : "bg-white hover:bg-blue-50 border-slate-300 hover:border-blue-400 text-slate-400 hover:text-dstech-blue shadow-xs"
+                                }`}
+                              >
+                                {uploadingItemPhotoIdx === idx ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Camera className="w-3.5 h-3.5" />
+                                )}
+                              </label>
+                            )}
+                          </div>
+
+                          <input
+                            type="text"
+                            required
+                            list="dstech_global_product_datalist"
+                            placeholder="Pilih dari list master atau ketik nama barang..."
+                            value={it.productName}
+                            onChange={(e) => handleSaleItemChange(idx, "productName", e.target.value)}
+                            className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-2 focus:ring-dstech-blue focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Indikator Status Foto Lampiran */}
+                        {it.image && (
+                          <div className="flex items-center justify-between text-[9px] text-emerald-600 font-semibold px-0.5">
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                              Foto Lampiran Terpasang (&lt; 20 KB)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleSaleItemChange(idx, "image", "")}
+                              className="text-slate-400 hover:text-red-500 hover:underline cursor-pointer"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        )}
                         {/* Live Stock Badge */}
                         {(() => {
                           const info = getProductStockInfo(it.productId || it.productName, saleForm.warehouseId);
@@ -15019,7 +15116,7 @@ export default function AdminFinanceERPPage() {
                           </select>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          {/* Tombol Upload & Thumbnail Foto Item Manual (~40 KB) */}
+                          {/* Tombol Upload & Thumbnail Foto Item Manual (< 20 KB) */}
                           <div className="relative shrink-0">
                             <input
                               type="file"
@@ -15041,7 +15138,7 @@ export default function AdminFinanceERPPage() {
                                 />
                                 <label
                                   htmlFor={`item-photo-${idx}`}
-                                  title="Klik untuk ganti foto (~40 KB)"
+                                  title="Klik untuk ganti foto (< 20 KB)"
                                   className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity text-[8px] font-bold"
                                 >
                                   <Camera className="w-3.5 h-3.5" />
@@ -15050,7 +15147,7 @@ export default function AdminFinanceERPPage() {
                             ) : (
                               <label
                                 htmlFor={`item-photo-${idx}`}
-                                title="Lampirkan foto produk/brosur (otomatis kompres ke ~40 KB)"
+                                title="Lampirkan foto produk/brosur (otomatis kompres ke < 20 KB)"
                                 className={`w-8 h-8 rounded-lg border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
                                   uploadingItemPhotoIdx === idx
                                     ? "bg-amber-50 border-amber-400 text-amber-600 animate-pulse"
@@ -15082,7 +15179,7 @@ export default function AdminFinanceERPPage() {
                           <div className="flex items-center justify-between text-[9px] text-emerald-600 font-semibold px-0.5">
                             <span className="flex items-center gap-1">
                               <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
-                              Foto Lampiran Terpasang (~40 KB)
+                              Foto Lampiran Terpasang (&lt; 20 KB)
                             </span>
                             <button
                               type="button"
@@ -19269,15 +19366,53 @@ export default function AdminFinanceERPPage() {
                           </select>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          {it.image ? (
-                            <div className="relative group w-8 h-8 rounded-lg overflow-hidden border border-amber-300 bg-white shadow-xs shrink-0">
-                              <img
-                                src={it.image}
-                                alt="Foto"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                          ) : null}
+                          {/* Tombol Upload & Thumbnail Foto Item Manual (< 20 KB) */}
+                          <div className="relative shrink-0">
+                            <input
+                              type="file"
+                              id={`po-item-photo-${idx}`}
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleUploadPoItemPhoto(idx, f);
+                                e.target.value = "";
+                              }}
+                            />
+                            {it.image ? (
+                              <div className="relative group w-8 h-8 rounded-lg overflow-hidden border border-amber-300 bg-white shadow-xs">
+                                <img
+                                  src={it.image}
+                                  alt="Foto Item"
+                                  className="w-full h-full object-cover"
+                                />
+                                <label
+                                  htmlFor={`po-item-photo-${idx}`}
+                                  title="Klik untuk ganti foto (< 20 KB)"
+                                  className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity text-[8px] font-bold"
+                                >
+                                  <Camera className="w-3.5 h-3.5" />
+                                </label>
+                              </div>
+                            ) : (
+                              <label
+                                htmlFor={`po-item-photo-${idx}`}
+                                title="Lampirkan foto produk (otomatis kompres ke < 20 KB)"
+                                className={`w-8 h-8 rounded-lg border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                  uploadingItemPhotoIdx === idx
+                                    ? "bg-amber-50 border-amber-400 text-amber-600 animate-pulse"
+                                    : "bg-white hover:bg-amber-50 border-slate-300 hover:border-amber-400 text-slate-400 hover:text-amber-600 shadow-xs"
+                                }`}
+                              >
+                                {uploadingItemPhotoIdx === idx ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Camera className="w-3.5 h-3.5" />
+                                )}
+                              </label>
+                            )}
+                          </div>
+
                           <input
                             type="text"
                             required
@@ -19292,9 +19427,26 @@ export default function AdminFinanceERPPage() {
                                 handleSelectProductForPo(idx, match.id);
                               }
                             }}
-                            className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                            className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs"
                           />
                         </div>
+
+                        {/* Indikator Status Foto Lampiran */}
+                        {it.image && (
+                          <div className="flex items-center justify-between text-[9px] text-emerald-600 font-semibold px-0.5">
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                              Foto Lampiran Terpasang (&lt; 20 KB)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handlePoItemChange(idx, "image", "")}
+                              className="text-slate-400 hover:text-red-500 hover:underline cursor-pointer"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        )}
                       </div>
                       <div className="col-span-2">
                         <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Qty:</label>
@@ -19684,15 +19836,53 @@ export default function AdminFinanceERPPage() {
                             </select>
                           </div>
                           <div className="flex items-center gap-1.5">
-                            {it.image ? (
-                              <div className="relative group w-8 h-8 rounded-lg overflow-hidden border border-amber-300 bg-white shadow-xs shrink-0">
-                                <img
-                                  src={it.image}
-                                  alt="Foto"
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ) : null}
+                            {/* Tombol Upload & Thumbnail Foto Item Manual (< 20 KB) */}
+                            <div className="relative shrink-0">
+                              <input
+                                type="file"
+                                id={`edit-po-item-photo-${idx}`}
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) handleUploadEditPoItemPhoto(idx, f);
+                                  e.target.value = "";
+                                }}
+                              />
+                              {it.image ? (
+                                <div className="relative group w-8 h-8 rounded-lg overflow-hidden border border-amber-300 bg-white shadow-xs">
+                                  <img
+                                    src={it.image}
+                                    alt="Foto Item"
+                                    className="w-full h-full object-cover"
+                                  />
+                                  <label
+                                    htmlFor={`edit-po-item-photo-${idx}`}
+                                    title="Klik untuk ganti foto (< 20 KB)"
+                                    className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity text-[8px] font-bold"
+                                  >
+                                    <Camera className="w-3.5 h-3.5" />
+                                  </label>
+                                </div>
+                              ) : (
+                                <label
+                                  htmlFor={`edit-po-item-photo-${idx}`}
+                                  title="Lampirkan foto produk (otomatis kompres ke < 20 KB)"
+                                  className={`w-8 h-8 rounded-lg border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                    uploadingItemPhotoIdx === idx
+                                      ? "bg-amber-50 border-amber-400 text-amber-600 animate-pulse"
+                                      : "bg-white hover:bg-amber-50 border-slate-300 hover:border-amber-400 text-slate-400 hover:text-amber-600 shadow-xs"
+                                  }`}
+                                >
+                                  {uploadingItemPhotoIdx === idx ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <Camera className="w-3.5 h-3.5" />
+                                  )}
+                                </label>
+                              )}
+                            </div>
+
                             <input
                               type="text"
                               required
@@ -19707,9 +19897,26 @@ export default function AdminFinanceERPPage() {
                                   handleSelectProductForEditPo(idx, match.id);
                                 }
                               }}
-                              className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                              className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs"
                             />
                           </div>
+
+                          {/* Indikator Status Foto Lampiran */}
+                          {it.image && (
+                            <div className="flex items-center justify-between text-[9px] text-emerald-600 font-semibold px-0.5">
+                              <span className="flex items-center gap-1">
+                                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                                Foto Lampiran Terpasang (&lt; 20 KB)
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleEditPoItemChange(idx, "image", "")}
+                                className="text-slate-400 hover:text-red-500 hover:underline cursor-pointer"
+                              >
+                                Hapus
+                              </button>
+                            </div>
+                          )}
                         </div>
                         <div className="col-span-2">
                           <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Qty:</label>
@@ -25044,15 +25251,81 @@ export default function AdminFinanceERPPage() {
                             ))}
                           </select>
                         </div>
-                        <input
-                          type="text"
-                          required
-                          list="dstech_global_product_datalist"
-                          placeholder="Pilih dari list master atau ketik nama produk..."
-                          value={it.productName}
-                          onChange={(e) => handleEditSaleItemChange(idx, "productName", e.target.value)}
-                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                        />
+                        <div className="flex items-center gap-1.5">
+                          {/* Tombol Upload & Thumbnail Foto Item Manual (< 20 KB) */}
+                          <div className="relative shrink-0">
+                            <input
+                              type="file"
+                              id={`edit-sale-item-photo-${idx}`}
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) handleUploadEditSaleItemPhoto(idx, f);
+                                e.target.value = "";
+                              }}
+                            />
+                            {it.image ? (
+                              <div className="relative group w-8 h-8 rounded-lg overflow-hidden border border-blue-300 bg-white shadow-xs">
+                                <img
+                                  src={it.image}
+                                  alt="Foto Item"
+                                  className="w-full h-full object-cover"
+                                />
+                                <label
+                                  htmlFor={`edit-sale-item-photo-${idx}`}
+                                  title="Klik untuk ganti foto (< 20 KB)"
+                                  className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity text-[8px] font-bold"
+                                >
+                                  <Camera className="w-3.5 h-3.5" />
+                                </label>
+                              </div>
+                            ) : (
+                              <label
+                                htmlFor={`edit-sale-item-photo-${idx}`}
+                                title="Lampirkan foto produk (otomatis kompres ke < 20 KB)"
+                                className={`w-8 h-8 rounded-lg border border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+                                  uploadingItemPhotoIdx === idx
+                                    ? "bg-amber-50 border-amber-400 text-amber-600 animate-pulse"
+                                    : "bg-white hover:bg-blue-50 border-slate-300 hover:border-blue-400 text-slate-400 hover:text-dstech-blue shadow-xs"
+                                }`}
+                              >
+                                {uploadingItemPhotoIdx === idx ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Camera className="w-3.5 h-3.5" />
+                                )}
+                              </label>
+                            )}
+                          </div>
+
+                          <input
+                            type="text"
+                            required
+                            list="dstech_global_product_datalist"
+                            placeholder="Pilih dari list master atau ketik nama produk..."
+                            value={it.productName}
+                            onChange={(e) => handleEditSaleItemChange(idx, "productName", e.target.value)}
+                            className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Indikator Status Foto Lampiran */}
+                        {it.image && (
+                          <div className="flex items-center justify-between text-[9px] text-emerald-600 font-semibold px-0.5">
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500" />
+                              Foto Lampiran Terpasang (&lt; 20 KB)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleEditSaleItemChange(idx, "image", "")}
+                              className="text-slate-400 hover:text-red-500 hover:underline cursor-pointer"
+                            >
+                              Hapus
+                            </button>
+                          </div>
+                        )}
                         {/* Live Stock Badge */}
                         {(() => {
                           const info = getProductStockInfo(it.productId || it.productName, editingSale.warehouseId);
