@@ -162,7 +162,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, role, phone, status, password, expiresAt, attendanceLocationLock, officeRadius } = body;
+    const { name, email, role, phone, status, password, expiresAt, attendanceLocationLock, officeRadius, permissions } = body;
 
     if (!name || !email) {
       return NextResponse.json(
@@ -192,6 +192,7 @@ export async function POST(request: Request) {
       expiresAt: expiresAt || null,
       attendanceLocationLock: attendanceLocationLock || "ANY",
       officeRadius: officeRadius ? Number(officeRadius) : 100,
+      permissions: permissions || null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -225,7 +226,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, email, role, phone, status, password, expiresAt, attendanceLocationLock, officeRadius } = body;
+    const { id, name, email, role, phone, status, password, expiresAt, attendanceLocationLock, officeRadius, permissions } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -268,6 +269,7 @@ export async function PUT(request: Request) {
       expiresAt: expiresAt !== undefined ? expiresAt : users[index].expiresAt,
       attendanceLocationLock: attendanceLocationLock !== undefined ? attendanceLocationLock : (users[index].attendanceLocationLock || "ANY"),
       officeRadius: officeRadius !== undefined ? Number(officeRadius) : (users[index].officeRadius || 100),
+      permissions: permissions !== undefined ? permissions : (users[index].permissions || null),
       updatedAt: new Date().toISOString(),
     };
 

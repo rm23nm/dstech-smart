@@ -29,6 +29,7 @@ import {
   FileSignature,
   Banknote,
 } from "lucide-react";
+import { checkUserPermission } from "@/utils/dstech_permissions";
 
 interface SearchResult {
   title: string;
@@ -99,6 +100,20 @@ export default function AdminLayout({
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  // Current Admin User Session
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("dstech_admin_auth");
+      if (raw) {
+        try {
+          setCurrentUser(JSON.parse(raw));
+        } catch {}
+      }
+    }
+  }, []);
+
   // Search filter
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -143,96 +158,123 @@ export default function AdminLayout({
 
   const navLinks = [
     {
+      id: "dashboard",
       label: "Dashboard",
       href: "/admin",
       icon: LayoutDashboard,
       active: pathname === "/admin",
     },
     {
+      id: "finance",
       label: "Keuangan & ERP",
       href: "/admin/finance",
       icon: Scale,
       active: pathname.startsWith("/admin/finance"),
     },
     {
+      id: "maintenance",
       label: "Jadwal & Maintenance",
       href: "/admin/maintenance",
       icon: Wrench,
       active: pathname.startsWith("/admin/maintenance"),
     },
     {
+      id: "attendance",
       label: "Rekap Absensi Staf",
       href: "/admin/attendance",
       icon: CalendarCheck,
       active: pathname.startsWith("/admin/attendance"),
     },
     {
+      id: "payroll",
       label: "Penggajian & Rekap Gaji",
       href: "/admin/payroll",
       icon: Banknote,
       active: pathname.startsWith("/admin/payroll"),
     },
     {
+      id: "contracts",
       label: "Kontrak Kerja & Rekrutmen",
       href: "/admin/contracts",
       icon: FileSignature,
       active: pathname.startsWith("/admin/contracts"),
     },
     {
+      id: "inventory",
       label: "Manajemen Stok & Gudang",
       href: "/admin/inventory",
       icon: Warehouse,
       active: pathname.startsWith("/admin/inventory"),
     },
     {
+      id: "products",
       label: "Product Management",
       href: "/admin/products",
       icon: Package,
       active: pathname.startsWith("/admin/products"),
     },
     {
+      id: "categories",
       label: "Kategori & Sub-Kategori",
       href: "/admin/categories",
       icon: FolderTree,
       active: pathname.startsWith("/admin/categories"),
     },
     {
+      id: "portfolios",
       label: "Portofolio Proyek",
       href: "/admin/portfolios",
       icon: FolderKanban,
       active: pathname.startsWith("/admin/portfolios"),
     },
     {
+      id: "promotions",
       label: "Materi Promosi & Katalog",
       href: "/admin/promotions",
       icon: FileDown,
       active: pathname.startsWith("/admin/promotions"),
     },
     {
+      id: "kms",
       label: "KMS Teknisi (SOP & K3)",
       href: "/admin/kms",
       icon: BookOpen,
       active: pathname.startsWith("/admin/kms"),
     },
     {
+      id: "users",
       label: "User Management",
       href: "/admin/users",
       icon: UserCog,
       active: pathname.startsWith("/admin/users"),
     },
     {
+      id: "partners",
       label: "Affiliate Network",
       href: "/admin/partners",
       icon: Users,
       active: pathname.startsWith("/admin/partners"),
     },
     {
+      id: "settings",
       label: "Site Settings",
       href: "/admin/settings",
       icon: Settings,
       active: pathname.startsWith("/admin/settings"),
     },
   ];
+
+  // Saring menu sidebar berdasarkan hak akses permissions pengguna
+  const visibleNavLinks = navLinks.filter((item) => {
+    if (!currentUser) return true;
+    return checkUserPermission(currentUser.permissions, currentUser.role, item.id, "view");
+  });
+
+  const currentActiveMenu = navLinks.find((item) => item.active);
+  const isAccessDenied =
+    currentUser &&
+    currentActiveMenu &&
+    !checkUserPermission(currentUser.permissions, currentUser.role, currentActiveMenu.id, "view");
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
@@ -248,7 +290,7 @@ export default function AdminLayout({
         </div>
 
         <nav className="flex-1 p-6 space-y-2 overflow-y-auto">
-          {navLinks.map((item) => {
+          {visibleNavLinks.map((item) => {
             const Icon = item.icon;
             const isActive = item.active;
             return (
@@ -310,7 +352,7 @@ export default function AdminLayout({
             </div>
 
             <nav className="flex-1 p-5 space-y-2 overflow-y-auto">
-              {navLinks.map((item) => {
+              {visibleNavLinks.map((item) => {
                 const Icon = item.icon;
                 const isActive = item.active;
                 return (
@@ -449,11 +491,22 @@ export default function AdminLayout({
             {/* Profile Pill */}
             <div className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-slate-100">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-dstech-blue to-indigo-600 flex items-center justify-center text-white font-black text-xs sm:text-sm shadow-md shadow-blue-500/20">
-                AD
+                {currentUser?.name
+                  ? currentUser.name
+                      .split(" ")
+                      .map((n: string) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase()
+                  : "AD"}
               </div>
               <div className="hidden md:block">
-                <p className="text-xs font-black text-slate-900 leading-tight">Admin DSTech</p>
-                <p className="text-[10px] font-bold text-dstech-blue uppercase tracking-wider">Super User</p>
+                <p className="text-xs font-black text-slate-900 leading-tight">
+                  {currentUser?.name || "Admin DSTech"}
+                </p>
+                <p className="text-[10px] font-bold text-dstech-blue uppercase tracking-wider">
+                  {currentUser?.role || "Super User"}
+                </p>
               </div>
             </div>
           </div>
@@ -461,7 +514,41 @@ export default function AdminLayout({
 
         {/* Dynamic Page Content */}
         <div className="p-6 sm:p-10 flex-1">
-          {children}
+          {isAccessDenied ? (
+            <div className="p-8 sm:p-12 text-center max-w-lg mx-auto bg-white rounded-3xl border border-slate-200 shadow-xl my-12 animate-in zoom-in-95 duration-200">
+              <div className="w-16 h-16 rounded-3xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-5 border border-rose-200 shadow-sm">
+                <AlertTriangle className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-2">Akses Menu Dibatasi</h2>
+              <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+                Akun Anda (<strong className="text-slate-800">{currentUser?.name || "Pengguna"}</strong>) belum diberikan izin (Permission: View) untuk membuka halaman <strong className="text-slate-800">{currentActiveMenu?.label}</strong>.
+              </p>
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 mb-6 text-left text-xs space-y-1.5 text-slate-600">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Pengguna:</span>
+                  <span className="font-bold text-slate-800">{currentUser?.email}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Role:</span>
+                  <span className="font-bold text-slate-800">{currentUser?.role}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Status Akses:</span>
+                  <span className="font-bold text-rose-600">Dibatasi Administrator</span>
+                </div>
+              </div>
+              <div className="flex gap-3 justify-center">
+                <Link
+                  href="/admin"
+                  className="px-6 py-3 rounded-2xl bg-dstech-blue text-white font-bold text-xs uppercase tracking-wider hover:bg-blue-800 transition-all shadow-lg shadow-blue-500/20"
+                >
+                  Kembali ke Dashboard
+                </Link>
+              </div>
+            </div>
+          ) : (
+            children
+          )}
         </div>
       </main>
 

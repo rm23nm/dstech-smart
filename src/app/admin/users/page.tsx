@@ -28,7 +28,22 @@ import {
   Building,
   Navigation,
   MapPin,
+  Printer,
+  Send,
+  Sliders,
+  Check,
 } from "lucide-react";
+import {
+  UserPermissions,
+  DSTECH_SYSTEM_MENUS,
+  ACTION_LABELS,
+  PERMISSION_PRESETS,
+  PermissionAction,
+  getDefaultPermissionsByRole,
+  createFullPermissions,
+  createEmptyPermissions,
+  summarizePermissions,
+} from "@/utils/dstech_permissions";
 
 interface UserItem {
   id: string;
@@ -43,6 +58,7 @@ interface UserItem {
   officeRadius?: number;
   contractId?: string;
   position?: string;
+  permissions?: UserPermissions | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -104,6 +120,14 @@ export default function AdminUsersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserItem | null>(null);
+
+  // Permissions Modal States
+  const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
+  const [permissionUser, setPermissionUser] = useState<UserItem | null>(null);
+  const [editingPermissions, setEditingPermissions] = useState<UserPermissions>({});
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false);
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>("ALL");
+  const [permissionSearch, setPermissionSearch] = useState<string>("");
 
   // Form states
   const [formName, setFormName] = useState("");
@@ -195,6 +219,186 @@ export default function AdminUsersPage() {
   const openDeleteModal = (u: UserItem) => {
     setSelectedUser(u);
     setIsDeleteModalOpen(true);
+  };
+
+  // Open Permissions Modal
+  const openPermissionsModal = (u: UserItem) => {
+    setPermissionUser(u);
+    const base: UserPermissions = u.permissions
+      ? JSON.parse(JSON.stringify(u.permissions))
+      : getDefaultPermissionsByRole(u.role);
+
+    // Pastikan seluruh menu dari master ada di object
+    for (const m of DSTECH_SYSTEM_MENUS) {
+      if (!base[m.id]) {
+        base[m.id] = {
+          view: false,
+          create: false,
+          edit: false,
+          delete: false,
+          print: false,
+          send: false,
+        };
+      }
+    }
+    setEditingPermissions(base);
+    setActiveCategoryFilter("ALL");
+    setPermissionSearch("");
+    setIsPermissionsModalOpen(true);
+  };
+
+  // Toggle satu aksi per menu
+  const togglePermission = (menuId: string, action: PermissionAction) => {
+    setEditingPermissions((prev) => {
+      const current = prev[menuId] || {
+        view: false,
+        create: false,
+        edit: false,
+        delete: false,
+        print: false,
+        send: false,
+      };
+      const newVal = !current[action];
+      const updatedMenu = { ...current, [action]: newVal };
+
+      // Logika cascading:
+      // 1. Jika create/edit/delete/print/send dinyalakan, maka view harus otomatis menyala
+      if (newVal && action !== "view") {
+        updatedMenu.view = true;
+      }
+      // 2. Jika view dimatikan, matikan seluruh aksi lainnya
+      if (!newVal && action === "view") {
+        updatedMenu.create = false;
+        updatedMenu.edit = false;
+        updatedMenu.delete = false;
+        updatedMenu.print = false;
+        updatedMenu.send = false;
+      }
+      return { ...prev, [menuId]: updatedMenu };
+    });
+  };
+
+  // Toggle semua aksi di 1 baris menu
+  const toggleAllActionsForMenu = (menuId: string) => {
+    setEditingPermissions((prev) => {
+      const current = prev[menuId] || {
+        view: false,
+        create: false,
+        edit: false,
+        delete: false,
+        print: false,
+        send: false,
+      };
+      const allChecked =
+        current.view &&
+        current.create &&
+        current.edit &&
+        current.delete &&
+        current.print &&
+        current.send;
+      const nextVal = !allChecked;
+      return {
+        ...prev,
+        [menuId]: {
+          view: nextVal,
+          create: nextVal,
+          edit: nextVal,
+          delete: nextVal,
+          print: nextVal,
+          send: nextVal,
+        },
+      };
+    });
+  };
+
+  // Toggle satu kolom aksi untuk seluruh menu
+  const toggleActionColumnAll = (action: PermissionAction) => {
+    setEditingPermissions((prev) => {
+      const allChecked = DSTECH_SYSTEM_MENUS.every((m) => prev[m.id]?.[action]);
+      const nextVal = !allChecked;
+      const updated: UserPermissions = { ...prev };
+      for (const m of DSTECH_SYSTEM_MENUS) {
+        if (!updated[m.id]) {
+          updated[m.id] = {
+            view: false,
+            create: false,
+            edit: false,
+            delete: false,
+            print: false,
+            send: false,
+          };
+        }
+        updated[m.id] = { ...updated[m.id], [action]: nextVal };
+        if (nextVal && action !== "view") {
+          updated[m.id].view = true;
+        }
+        if (!nextVal && action === "view") {
+          updated[m.id] = {
+            view: false,
+            create: false,
+            edit: false,
+            delete: false,
+            print: false,
+            send: false,
+          };
+        }
+      }
+      return updated;
+    });
+  };
+
+  // Terapkan preset cepat
+  const applyPreset = (presetId: string) => {
+    const p = PERMISSION_PRESETS.find((x) => x.id === presetId);
+    if (p) {
+      setEditingPermissions(p.getPermissions());
+      showToast("success", `Preset diterapkan: ${p.name}`);
+    }
+  };
+
+  // Simpan Hak Akses ke Database via API
+  const handleSavePermissions = async () => {
+    if (!permissionUser) return;
+    try {
+      setIsSavingPermissions(true);
+      const res = await fetch("/api/users", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: permissionUser.id,
+          permissions: editingPermissions,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast("success", `Hak akses & permissions untuk ${permissionUser.name} berhasil disimpan!`);
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === permissionUser.id ? { ...u, permissions: editingPermissions } : u
+          )
+        );
+        // Sinkronisasi local auth jika admin mengedit izin akun sendiri
+        if (typeof window !== "undefined") {
+          const authRaw = localStorage.getItem("dstech_admin_auth");
+          if (authRaw) {
+            try {
+              const authParsed = JSON.parse(authRaw);
+              if (authParsed.id === permissionUser.id || authParsed.email === permissionUser.email) {
+                authParsed.permissions = editingPermissions;
+                localStorage.setItem("dstech_admin_auth", JSON.stringify(authParsed));
+              }
+            } catch {}
+          }
+        }
+        setIsPermissionsModalOpen(false);
+      } else {
+        showToast("error", json.message || "Gagal menyimpan hak akses pengguna.");
+      }
+    } catch (err) {
+      showToast("error", "Terjadi kesalahan jaringan saat menyimpan hak akses.");
+    } finally {
+      setIsSavingPermissions(false);
+    }
   };
 
   // Submit Add User
@@ -500,6 +704,7 @@ export default function AdminUsersPage() {
               <tr>
                 <th className="py-5 px-6">Pengguna & Kontak</th>
                 <th className="py-5 px-6">Peran (Role)</th>
+                <th className="py-5 px-6">Hak Akses Menu</th>
                 <th className="py-5 px-6">Nomor Telepon/WA</th>
                 <th className="py-5 px-6">Status Akun</th>
                 <th className="py-5 px-6">Masa Berlaku Akses</th>
@@ -511,14 +716,14 @@ export default function AdminUsersPage() {
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400 text-sm">
+                  <td colSpan={9} className="py-16 text-center text-slate-400 text-sm">
                     <div className="w-6 h-6 border-2 border-dstech-blue border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                     Memuat daftar pengguna...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-16 text-center text-slate-400 text-sm">
+                  <td colSpan={9} className="py-16 text-center text-slate-400 text-sm">
                     Tidak ditemukan data pengguna yang cocok.
                   </td>
                 </tr>
@@ -573,6 +778,40 @@ export default function AdminUsersPage() {
                           {roleMeta.label}
                         </span>
                         <p className="text-[10px] text-slate-400 mt-1">{roleMeta.desc}</p>
+                      </td>
+
+                      {/* Hak Akses Menu & Permissions */}
+                      <td className="py-4 px-6">
+                        {(() => {
+                          const summary = summarizePermissions(user.permissions, user.role);
+                          return (
+                            <div className="space-y-1.5">
+                              <span
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border ${
+                                  summary.isFull
+                                    ? "bg-purple-50 text-purple-700 border-purple-200"
+                                    : summary.viewCount > 0
+                                    ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                                    : "bg-slate-100 text-slate-500 border-slate-200"
+                                }`}
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>{summary.activeLabel}</span>
+                              </span>
+                              <div>
+                                <button
+                                  type="button"
+                                  onClick={() => openPermissionsModal(user)}
+                                  className="inline-flex items-center gap-1 text-[11px] font-bold text-dstech-blue hover:text-blue-800 transition-colors cursor-pointer group/btn"
+                                  title="Atur Hak Akses Menu & Aksi Granular"
+                                >
+                                  <Key className="w-3 h-3 group-hover/btn:scale-110 transition-transform text-amber-500" />
+                                  <span className="underline decoration-dotted underline-offset-2">Kelola Izin & Aksi</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Phone */}
@@ -692,6 +931,14 @@ export default function AdminUsersPage() {
                       {/* Actions */}
                       <td className="py-4 px-6 text-right">
                         <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openPermissionsModal(user)}
+                            className="p-2 rounded-xl text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 transition-all cursor-pointer"
+                            title="Kelola Hak Akses & Matriks Izin (Role User Manager)"
+                          >
+                            <ShieldCheck className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => openEditModal(user)}
                             className="p-2 rounded-xl text-slate-400 hover:text-dstech-blue hover:bg-blue-50 transition-all cursor-pointer"
@@ -1393,6 +1640,294 @@ export default function AdminUsersPage() {
                   <span>Ya, Hapus</span>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Matriks Hak Akses & Role User Manager */}
+      {isPermissionsModalOpen && permissionUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/70 backdrop-blur-md">
+          <div
+            className="fixed inset-0"
+            onClick={() => !isSavingPermissions && setIsPermissionsModalOpen(false)}
+          />
+          <div className="relative bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-100 z-10 animate-in zoom-in-95 duration-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-indigo-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-600/25 shrink-0">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900">
+                      Matriks Hak Akses & Permissions
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200">
+                      Role Manager
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <span className="font-bold text-slate-800 text-sm">{permissionUser.name}</span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-xs text-slate-500 font-mono">{permissionUser.email}</span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                      Role: {ROLE_CONFIG[permissionUser.role]?.label || permissionUser.role}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsPermissionsModalOpen(false)}
+                disabled={isSavingPermissions}
+                className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-all cursor-pointer self-end sm:self-center shrink-0"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Presets Bar */}
+            <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 shrink-0">
+                <Sliders className="w-4 h-4 text-indigo-600" />
+                <span className="text-xs font-black uppercase tracking-wider text-slate-600">
+                  Preset Cepat:
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+                {PERMISSION_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => applyPreset(preset.id)}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border border-slate-200 hover:border-indigo-300 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                    title={preset.desc}
+                  >
+                    <span>{preset.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Filter Tabs & Search */}
+            <div className="px-5 py-3 border-b border-slate-100 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                {["ALL", "Operasional", "Keuangan", "Katalog & Produk", "Sistem & Legalitas"].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setActiveCategoryFilter(cat)}
+                    className={`px-3 py-1 text-xs font-bold rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                      activeCategoryFilter === cat
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {cat === "ALL" ? "Semua (15 Menu)" : cat}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari nama menu..."
+                  value={permissionSearch}
+                  onChange={(e) => setPermissionSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Table Permissions Matrix */}
+            <div className="flex-1 overflow-y-auto overflow-x-auto p-4 sm:p-5">
+              <table className="w-full text-left text-sm border-separate border-spacing-0">
+                <thead>
+                  <tr className="bg-slate-100/80 text-[11px] font-black text-slate-500 uppercase tracking-wider sticky top-0 z-10 backdrop-blur-xs">
+                    <th className="py-3 px-4 rounded-l-xl border-y border-l border-slate-200 min-w-[240px]">
+                      Menu & Halaman
+                    </th>
+                    {(["view", "create", "edit", "delete", "print", "send"] as PermissionAction[]).map((act) => (
+                      <th
+                        key={act}
+                        className="py-3 px-2 text-center border-y border-slate-200 min-w-[85px]"
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase border ${ACTION_LABELS[act].badge}`}
+                          >
+                            {ACTION_LABELS[act].label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleActionColumnAll(act)}
+                            className="text-[9px] text-slate-400 hover:text-indigo-600 hover:underline cursor-pointer"
+                            title={`Nyalakan / Matikan semua kolom ${ACTION_LABELS[act].label}`}
+                          >
+                            Semua
+                          </button>
+                        </div>
+                      </th>
+                    ))}
+                    <th className="py-3 px-4 text-center rounded-r-xl border-y border-r border-slate-200 min-w-[100px]">
+                      Aksi Cepat
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {DSTECH_SYSTEM_MENUS.filter((m) => {
+                    const matchCat =
+                      activeCategoryFilter === "ALL" || m.category === activeCategoryFilter;
+                    const matchSearch =
+                      !permissionSearch.trim() ||
+                      m.name.toLowerCase().includes(permissionSearch.toLowerCase()) ||
+                      m.desc.toLowerCase().includes(permissionSearch.toLowerCase());
+                    return matchCat && matchSearch;
+                  }).map((menu) => {
+                    const perm = editingPermissions[menu.id] || {
+                      view: false,
+                      create: false,
+                      edit: false,
+                      delete: false,
+                      print: false,
+                      send: false,
+                    };
+                    const isRowFull =
+                      perm.view &&
+                      perm.create &&
+                      perm.edit &&
+                      perm.delete &&
+                      perm.print &&
+                      perm.send;
+
+                    return (
+                      <tr
+                        key={menu.id}
+                        className={`hover:bg-slate-50/80 transition-colors ${
+                          perm.view ? "bg-white" : "bg-slate-50/30 opacity-70"
+                        }`}
+                      >
+                        {/* Menu Info */}
+                        <td className="py-3.5 px-4 border-b border-slate-100">
+                          <div className="flex items-start gap-3">
+                            <div
+                              className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-xs font-black transition-colors ${
+                                perm.view
+                                  ? "bg-indigo-100 text-indigo-700 border border-indigo-200"
+                                  : "bg-slate-100 text-slate-400"
+                              }`}
+                            >
+                              {menu.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
+                                <span>{menu.name}</span>
+                                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                                  {menu.category}
+                                </span>
+                              </p>
+                              <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">
+                                {menu.desc}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Actions Checkboxes */}
+                        {(["view", "create", "edit", "delete", "print", "send"] as PermissionAction[]).map((act) => {
+                          const isChecked = Boolean(perm[act]);
+                          return (
+                            <td
+                              key={act}
+                              className="py-3.5 px-2 text-center border-b border-slate-100"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => togglePermission(menu.id, act)}
+                                className={`w-8 h-8 rounded-xl border flex items-center justify-center mx-auto transition-all cursor-pointer ${
+                                  isChecked
+                                    ? act === "delete"
+                                      ? "bg-rose-600 border-rose-600 text-white shadow-xs"
+                                      : act === "print"
+                                      ? "bg-purple-600 border-purple-600 text-white shadow-xs"
+                                      : act === "send"
+                                      ? "bg-teal-600 border-teal-600 text-white shadow-xs"
+                                      : "bg-indigo-600 border-indigo-600 text-white shadow-xs"
+                                    : "bg-white border-slate-300 text-transparent hover:border-indigo-400"
+                                }`}
+                                title={`${ACTION_LABELS[act].label} - ${menu.name}`}
+                              >
+                                <Check className={`w-4 h-4 stroke-[3] ${isChecked ? "opacity-100" : "opacity-0"}`} />
+                              </button>
+                            </td>
+                          );
+                        })}
+
+                        {/* Toggle Row All */}
+                        <td className="py-3.5 px-4 text-center border-b border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => toggleAllActionsForMenu(menu.id)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
+                              isRowFull
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                                : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                            }`}
+                          >
+                            {isRowFull ? "Semua Aktif" : "Centang Semua"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
+                <p className="text-xs text-slate-600 font-medium">
+                  {(() => {
+                    const summary = summarizePermissions(editingPermissions, permissionUser.role);
+                    return (
+                      <span>
+                        Total menu aktif: <strong className="text-slate-900 font-bold">{summary.viewCount}</strong> dari {summary.totalMenus} menu sistem.
+                      </span>
+                    );
+                  })()}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  disabled={isSavingPermissions}
+                  onClick={() => setIsPermissionsModalOpen(false)}
+                  className="px-5 py-2.5 rounded-2xl border border-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider hover:bg-slate-100 transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  disabled={isSavingPermissions}
+                  onClick={handleSavePermissions}
+                  className="px-6 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/25 flex items-center gap-2 transition-all cursor-pointer"
+                >
+                  {isSavingPermissions ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-4 h-4" />
+                  )}
+                  <span>Simpan Hak Akses Pengguna</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
