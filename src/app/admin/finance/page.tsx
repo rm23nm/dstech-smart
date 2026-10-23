@@ -1430,6 +1430,13 @@ export default function AdminFinanceERPPage() {
   const [selectedQuotationForConvert, setSelectedQuotationForConvert] = useState<Quotation | null>(null);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState<boolean>(false);
   const [uploadingItemPhotoIdx, setUploadingItemPhotoIdx] = useState<number | null>(null);
+
+  // Search Filter States for Client & Project in Quotation & Sale Modals
+  const [quotationClientSearchQuery, setQuotationClientSearchQuery] = useState<string>("");
+  const [quotationProjectSearchQuery, setQuotationProjectSearchQuery] = useState<string>("");
+  const [saleClientSearchQuery, setSaleClientSearchQuery] = useState<string>("");
+  const [saleProjectSearchQuery, setSaleProjectSearchQuery] = useState<string>("");
+
   const getDefaultTermins = (grandTotal: number = 0, baseDueDate?: string): InvoiceTermin[] => {
     const baseDate = baseDueDate ? new Date(baseDueDate) : new Date();
     const t1Due = new Date(baseDate.getTime() + 14 * 86400000).toISOString().split("T")[0];
@@ -5416,9 +5423,32 @@ export default function AdminFinanceERPPage() {
           }),
         });
         if (res.ok) {
+          const resJson = await res.json().catch(() => null);
+          const newClient = resJson?.data;
           showToast(`Klien baru ${clientForm.name} berhasil ditambahkan!`);
           setIsClientModalOpen(false);
           fetchFinanceData();
+
+          // Auto-select into Quotation if open
+          if (isNewQuotationModalOpen || isEditQuotationModalOpen) {
+            setQuotationForm((prev) => ({
+              ...prev,
+              clientId: newClient?.id || prev.clientId,
+              customerName: newClient?.name || clientForm.name,
+              customerPhone: newClient?.phone || clientForm.phone || prev.customerPhone,
+              customerAddress: newClient?.address ? `${newClient.address}, ${newClient.city || ""}` : (clientForm.address || prev.customerAddress),
+            }));
+          }
+
+          // Auto-select into Sale Invoice if open
+          if (isNewSaleModalOpen) {
+            setSaleForm((prev) => ({
+              ...prev,
+              customerName: newClient?.name || clientForm.name,
+              customerPhone: newClient?.phone || clientForm.phone || prev.customerPhone,
+              customerAddress: newClient?.address ? `${newClient.address}, ${newClient.city || ""}` : (clientForm.address || prev.customerAddress),
+            }));
+          }
         } else {
           showToast("Gagal menambahkan klien");
         }
@@ -5706,9 +5736,35 @@ export default function AdminFinanceERPPage() {
           }),
         });
         if (res.ok) {
+          const resJson = await res.json().catch(() => null);
+          const newProject = resJson?.data;
           showToast(`Proyek baru ${projectForm.projectName} berhasil ditambahkan!`);
           setIsProjectModalOpen(false);
           fetchFinanceData();
+
+          // Auto-select into Quotation if open
+          if (isNewQuotationModalOpen || isEditQuotationModalOpen) {
+            setQuotationForm((prev) => ({
+              ...prev,
+              projectId: newProject?.id || prev.projectId,
+              projectName: newProject?.projectName || projectForm.projectName,
+              customerName: !prev.customerName && (newProject?.clientName || projectForm.clientName)
+                ? (newProject?.clientName || projectForm.clientName)
+                : prev.customerName,
+            }));
+          }
+
+          // Auto-select into Sale Invoice if open
+          if (isNewSaleModalOpen) {
+            setSaleForm((prev) => ({
+              ...prev,
+              projectId: newProject?.id || prev.projectId,
+              projectName: newProject?.projectName || projectForm.projectName,
+              customerName: !prev.customerName && (newProject?.clientName || projectForm.clientName)
+                ? (newProject?.clientName || projectForm.clientName)
+                : prev.customerName,
+            }));
+          }
         } else {
           showToast("Gagal menambahkan proyek");
         }
@@ -14385,7 +14441,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL 4: MASTER DATA - TAMBAH / EDIT KLIEN */}
       {isClientModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsClientModalOpen(false)}
         >
           <div
@@ -14735,7 +14791,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL MASTER PROYEK (TAMBAH / EDIT PROYEK) */}
       {isProjectModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsProjectModalOpen(false)}
         >
           <div

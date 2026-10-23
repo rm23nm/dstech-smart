@@ -2752,8 +2752,8 @@ export default function AdminPayrollPage() {
 
       {/* ================= MODAL 4: CETAK SLIP GAJI INDIVIDUAL A4 RESMI ================= */}
       {selectedSlipForPrint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-4xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto">
+        <div className="print-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="print-modal-box bg-white w-full max-w-4xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto my-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 print:hidden">
               <div className="flex items-center gap-2">
                 <Printer className="w-5 h-5 text-dstech-blue" />
@@ -2763,15 +2763,22 @@ export default function AdminPayrollPage() {
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 rounded-xl bg-dstech-blue text-white font-bold text-xs hover:bg-blue-600 flex items-center gap-2 shadow-sm"
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `SLIP_GAJI_DSTECH_${selectedSlipForPrint.slipNumber}_${(selectedSlipForPrint.employeeName || "").replace(/[^a-zA-Z0-9]/g, "_")}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-dstech-blue text-white font-bold text-xs hover:bg-blue-600 flex items-center gap-2 shadow-sm cursor-pointer"
                 >
                   <Printer className="w-4 h-4" />
                   <span>Cetak Sekarang</span>
                 </button>
                 <button
                   onClick={() => setSelectedSlipForPrint(null)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -2779,7 +2786,7 @@ export default function AdminPayrollPage() {
             </div>
 
             {/* Template Cetak Slip Gaji Resmi Ber-Kop DSTech */}
-            <div className="mt-6 p-8 border border-slate-200 rounded-2xl bg-white text-slate-900 font-sans print:border-none print:p-0">
+            <div id="print-payroll-slip-sheet" className="print-document-sheet print-single-sheet mt-6 p-8 print:mt-0 print:p-0 print:border-none print:shadow-none print:rounded-none border border-slate-200 rounded-2xl bg-white text-slate-900 font-sans print:py-6">
               {/* Header Kop Surat */}
               <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
                 <div className="flex items-center gap-4">
@@ -2955,8 +2962,8 @@ export default function AdminPayrollPage() {
 
       {/* ================= MODAL 5: CETAK LEMBAR REKAP PENGGAJIAN BULANAN RESMI A4 ================= */}
       {isRecapPrintModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-5xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto">
+        <div className="print-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="print-modal-box bg-white w-full max-w-5xl rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto my-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 print:hidden">
               <div className="flex items-center gap-2">
                 <Printer className="w-5 h-5 text-dstech-blue" />
@@ -2966,15 +2973,22 @@ export default function AdminPayrollPage() {
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => window.print()}
-                  className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 flex items-center gap-2 shadow-sm"
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `REKAP_PAYROLL_DSTECH_${filterMonth !== "ALL" ? filterMonth : "SEMUA"}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 flex items-center gap-2 shadow-sm cursor-pointer"
                 >
                   <Printer className="w-4 h-4" />
                   <span>Cetak Lembar Rekap</span>
                 </button>
                 <button
                   onClick={() => setIsRecapPrintModalOpen(false)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -2982,7 +2996,7 @@ export default function AdminPayrollPage() {
             </div>
 
             {/* Lembar Rekapitulasi Ber-Kop Surat DSTech */}
-            <div className="mt-6 p-8 border border-slate-200 rounded-2xl bg-white text-slate-900 font-sans print:border-none print:p-0">
+            <div id="print-payroll-recap-sheet" className="print-document-sheet print-single-sheet mt-6 p-8 print:mt-0 print:p-0 print:border-none print:shadow-none print:rounded-none border border-slate-200 rounded-2xl bg-white text-slate-900 font-sans print:py-6">
               {/* Header Kop */}
               <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-6">
                 <div className="flex items-center gap-4">

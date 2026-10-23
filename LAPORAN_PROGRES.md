@@ -3336,6 +3336,27 @@
 
 ---
 
+- **2026-10-23 (Task 115)**: Perbaikan Tampilan Cetak / Print Slip Gaji Karyawan Resmi A4 Agar Pas Penuh Tanpa Latar Belakang Gelap / Mengambang (**Sedang Dikerjakan**).
+- **Latar Belakang / Permasalahan**:
+  - Pengguna melaporkan *"prinan slip gaji masih ngawur"* dan melampirkan screenshot pratinjau cetak browser (Chrome Print Dialog).
+  - Pada pratinjau cetak, lembar slip gaji tercetak di tengah halaman dengan latar belakang overlay gelap/abu-abu pekat (`bg-slate-900/70` / `bg-slate-950/70`), elemen dashboard di belakangnya ikut tertampil, dan dokumen slip mengecil melayang di tengah kertas A4.
+  - Penyebab: Modal cetak slip gaji di `src/app/admin/attendance/page.tsx` dan `src/app/admin/payroll/page.tsx` belum menerapkan kelas isolasi cetak standar CSS universal (`print-modal-backdrop`, `print-modal-box`, `print-document-sheet print-single-sheet`).
+  - Selain itu, saat dialog cetak terbuka, nama dokumen PDF yang disarankan browser belum disinkronkan secara profesional dengan `document.title` (`SLIP_GAJI_DSTECH_[NOMOR]_[NAMA]`).
+- **Rincian Langkah Pelaksanaan (Step-by-Step)**:
+  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/admin/attendance/page.tsx` dan `src/app/admin/payroll/page.tsx`) ke folder `_backup/`.
+  - [ ] **Langkah 2**: Perbarui struktur modal cetak slip gaji di `src/app/admin/attendance/page.tsx`:
+    - Tambahkan kelas `print-modal-backdrop` pada overlay container modal.
+    - Tambahkan kelas `print-modal-box` pada container pembungkus card putih modal.
+    - Tambahkan kelas `print-document-sheet print-single-sheet` pada `#print-salary-slip-sheet`.
+    - Pasang handling `document.title` dinamis saat tombol Cetak diklik agar nama berkas PDF otomatis tersimpan rapi standar `SLIP_GAJI_DSTECH_[NOMOR]_[NAMA]`.
+    - Pastikan styling layout slip (Kop Surat DSP, Data Karyawan, Tabel Penerimaan & Potongan, THP Banner, Dual Signatures) presisi pas 1 halaman A4 portrait (210mm x 297mm) tanpa terpotong dan tanpa halaman kedua kosong.
+  - [ ] **Langkah 3**: Perbarui struktur modal cetak slip gaji di `src/app/admin/payroll/page.tsx` dengan standarisasi yang sama persis (`print-modal-backdrop`, `print-modal-box`, `print-document-sheet print-single-sheet`, dynamic `document.title`).
+  - [ ] **Langkah 4**: Uji build lokal (`npm run build`) untuk memastikan tidak ada error TypeScript maupun sintaks.
+  - [ ] **Langkah 5**: Push ke repositori GitHub via `push_with_native_git.js`.
+  - [ ] **Langkah 6**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js`, restart PM2 `dstech-main`, uji live respon, dan bersihkan folder `_backup/`.
+
+---
+
 
 ### 88. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).

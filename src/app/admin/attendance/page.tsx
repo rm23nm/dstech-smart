@@ -2779,8 +2779,8 @@ export default function AdminAttendancePage() {
 
       {/* MODAL 3: CETAK SLIP GAJI RESMI A4 */}
       {selectedSlipForPrint && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-10 shadow-2xl border border-slate-200 relative">
+        <div className="print-modal-backdrop fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm overflow-y-auto">
+          <div className="print-modal-box bg-white rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-10 shadow-2xl border border-slate-200 relative my-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-200 mb-6 print:hidden">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-orange-600" />
@@ -2790,7 +2790,14 @@ export default function AdminAttendancePage() {
               </div>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `SLIP_GAJI_DSTECH_${selectedSlipForPrint.slipNumber}_${(selectedSlipForPrint.employeeName || "").replace(/[^a-zA-Z0-9]/g, "_")}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
                   className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold shadow-md shadow-orange-500/20 flex items-center gap-2 cursor-pointer"
                 >
                   <Printer className="w-4 h-4" />
@@ -2806,7 +2813,10 @@ export default function AdminAttendancePage() {
             </div>
 
             {/* A4 Sheet */}
-            <div id="print-salary-slip-sheet" className="p-8 border border-slate-200 rounded-2xl bg-white text-slate-900 space-y-6">
+            <div
+              id="print-salary-slip-sheet"
+              className="print-document-sheet print-single-sheet p-8 print:p-0 print:border-none print:shadow-none print:rounded-none border border-slate-200 rounded-2xl bg-white text-slate-900 space-y-6 flex flex-col justify-between print:py-6"
+            >
               {/* Header Kop Surat */}
               <div className="flex items-center justify-between pb-4 border-b-2 border-slate-900">
                 <div className="flex items-center gap-4">
