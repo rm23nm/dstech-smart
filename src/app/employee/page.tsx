@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -144,11 +144,13 @@ interface AttendanceLog {
   longitude?: number | null;
   accuracy?: number | null;
   mapsUrl?: string | null;
+  selfieCheckIn?: string | null;
   checkOutLocation?: string | null;
   checkOutLat?: number | null;
   checkOutLng?: number | null;
   checkOutAccuracy?: number | null;
   checkOutMapsUrl?: string | null;
+  selfieCheckOut?: string | null;
   status: string;
   notes: string;
 }
@@ -323,8 +325,8 @@ export default function EmployeeDashboard() {
   interface GeoCoords {
     lat: number;
     lng: number;
-    accuracy?: number;
-    source: "gps" | "preset";
+    accuracy?: number | null;
+    source: "gps" | "preset" | "unlocked";
   }
 
   // Predefined location coordinates (Banten / Cilegon area)
@@ -338,28 +340,108 @@ export default function EmployeeDashboard() {
   };
 
   const [isCheckInModalOpen, setIsCheckInModalOpen] = useState<boolean>(false);
-  const [checkInLocation, setCheckInLocation] = useState<string>("Kantor DSTech Cilegon");
+  const [checkInLocation, setCheckInLocation] = useState<string>("Lokasi GPS Satelit");
   const [checkInNotes, setCheckInNotes] = useState<string>("");
   const [checkInCoords, setCheckInCoords] = useState<GeoCoords>({
-    lat: -6.031846,
-    lng: 106.037198,
-    accuracy: 10,
-    source: "preset",
+    lat: 0,
+    lng: 0,
+    accuracy: null,
+    source: "unlocked",
   });
   const [isDetectingCheckInGps, setIsDetectingCheckInGps] = useState<boolean>(false);
   const [gpsErrorCheckIn, setGpsErrorCheckIn] = useState<string | null>(null);
 
   const [isCheckOutModalOpen, setIsCheckOutModalOpen] = useState<boolean>(false);
-  const [checkOutLocation, setCheckOutLocation] = useState<string>("Kantor DSTech Cilegon");
+  const [checkOutLocation, setCheckOutLocation] = useState<string>("Lokasi GPS Satelit");
   const [checkOutSummary, setCheckOutSummary] = useState<string>("");
   const [checkOutCoords, setCheckOutCoords] = useState<GeoCoords>({
-    lat: -6.031846,
-    lng: 106.037198,
-    accuracy: 10,
-    source: "preset",
+    lat: 0,
+    lng: 0,
+    accuracy: null,
+    source: "unlocked",
   });
   const [isDetectingCheckOutGps, setIsDetectingCheckOutGps] = useState<boolean>(false);
   const [gpsErrorCheckOut, setGpsErrorCheckOut] = useState<string | null>(null);
+
+  // Wajib Foto Selfie Kamera States & Refs
+  const [selfieCheckInPhoto, setSelfieCheckInPhoto] = useState<string | null>(null);
+  const [selfieCheckOutPhoto, setSelfieCheckOutPhoto] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
+  const [cameraMode, setCameraMode] = useState<"checkin" | "checkout" | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const fileInputCheckInRef = useRef<HTMLInputElement | null>(null);
+  const fileInputCheckOutRef = useRef<HTMLInputElement | null>(null);
+
+  // Mulai Kamera Depan Perangkat
+  const startCamera = async (mode: "checkin" | "checkout") => {
+    try {
+      setCameraMode(mode);
+      setIsCameraActive(true);
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+        cameraStreamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+      }
+    } catch (err: any) {
+      console.warn("Kamera WebRTC tidak dapat diakses langsung, gunakan tombol input kamera:", err);
+      setIsCameraActive(false);
+      showToast("Kamera browser dibatasi, silakan gunakan tombol 'Ambil Foto Selfie via Kamera HP'");
+    }
+  };
+
+  // Matikan Kamera
+  const stopCamera = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track: MediaStreamTrack) => track.stop());
+      cameraStreamRef.current = null;
+    }
+    setIsCameraActive(false);
+    setCameraMode(null);
+  };
+
+  // Ambil Frame Foto Selfie (Snapshot)
+  const takeSnapshot = (mode: "checkin" | "checkout") => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 480;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.60);
+    if (mode === "checkin") {
+      setSelfieCheckInPhoto(dataUrl);
+    } else {
+      setSelfieCheckOutPhoto(dataUrl);
+    }
+    stopCamera();
+    showToast("✓ Foto Selfie Wajah Berhasil Diambil!");
+  };
+
+  // Fallback Ambil Foto via Input Kamera Langsung (Mobile Camera Capture)
+  const handleSelfieFileInput = (e: React.ChangeEvent<HTMLInputElement>, mode: "checkin" | "checkout") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      if (mode === "checkin") {
+        setSelfieCheckInPhoto(dataUrl);
+      } else {
+        setSelfieCheckOutPhoto(dataUrl);
+      }
+      showToast("✓ Foto Selfie Wajah Berhasil Diambil!");
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Map Preview Modal for attendance history table
   const [previewMapData, setPreviewMapData] = useState<{
@@ -371,9 +453,18 @@ export default function EmployeeDashboard() {
     mapsUrl: string;
   } | null>(null);
 
+  // Photo Selfie Preview Modal
+  const [previewPhotoModal, setPreviewPhotoModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    photoUrl: string;
+    time: string;
+    location: string;
+  } | null>(null);
+
   const detectGpsLocation = (mode: "checkin" | "checkout") => {
     if (typeof window === "undefined" || !navigator.geolocation) {
-      const err = "Browser perangkat tidak mendukung Geolocation GPS.";
+      const err = "Browser perangkat tidak mendukung Geolocation GPS satelit.";
       if (mode === "checkin") setGpsErrorCheckIn(err);
       else setGpsErrorCheckOut(err);
       showToast(err);
@@ -400,23 +491,17 @@ export default function EmployeeDashboard() {
           setCheckInCoords(coords);
           setIsDetectingCheckInGps(false);
           setCheckInLocation(`GPS Satelit (${coords.lat}, ${coords.lng})`);
-          showToast(`Sinyal GPS terhubung ke Google Maps! Akurasi: ±${coords.accuracy}m`);
+          showToast(`✓ Sinyal GPS satelit terkunci sah! Akurasi: ±${coords.accuracy}m`);
         } else {
           setCheckOutCoords(coords);
           setIsDetectingCheckOutGps(false);
           setCheckOutLocation(`GPS Satelit (${coords.lat}, ${coords.lng})`);
-          showToast(`Sinyal GPS Pulang terhubung! Akurasi: ±${coords.accuracy}m`);
+          showToast(`✓ Sinyal GPS Pulang terkunci sah! Akurasi: ±${coords.accuracy}m`);
         }
       },
       (err) => {
-        let errorMsg = "Gagal mengambil titik GPS.";
-        if (err.code === 1) {
-          errorMsg = "Izin akses lokasi perangkat/browser belum diizinkan. Koordinat kantor DSTech digunakan sebagai acuan.";
-        } else if (err.code === 2) {
-          errorMsg = "Sinyal GPS perangkat tidak terdeteksi. Menampilkan koordinat kantor DSTech.";
-        } else if (err.code === 3) {
-          errorMsg = "Waktu deteksi GPS habis. Menampilkan koordinat kantor DSTech.";
-        }
+        const errorMsg =
+          "Izin akses GPS wajib diizinkan untuk absensi. Pengisian lokasi manual dilarang oleh manajemen!";
         if (mode === "checkin") {
           setIsDetectingCheckInGps(false);
           setGpsErrorCheckIn(errorMsg);
@@ -461,11 +546,15 @@ export default function EmployeeDashboard() {
   };
 
   const openCheckInModal = () => {
+    setCheckInCoords({ lat: 0, lng: 0, accuracy: null, source: "unlocked" });
+    setSelfieCheckInPhoto(null);
     setIsCheckInModalOpen(true);
     detectGpsLocation("checkin");
   };
 
   const openCheckOutModal = () => {
+    setCheckOutCoords({ lat: 0, lng: 0, accuracy: null, source: "unlocked" });
+    setSelfieCheckOutPhoto(null);
     setIsCheckOutModalOpen(true);
     detectGpsLocation("checkout");
   };
@@ -1178,6 +1267,14 @@ export default function EmployeeDashboard() {
   // Handler Check-In
   const handleCheckIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checkInCoords.source !== "gps" || !checkInCoords.lat || !checkInCoords.lng) {
+      showToast("Presensi Masuk DITOLAK: Sinyal GPS Satelit wajib aktif & terkunci sah! Input manual dilarang.");
+      return;
+    }
+    if (!selfieCheckInPhoto) {
+      showToast("Presensi Masuk DITOLAK: Wajib mengambil foto selfie wajah via kamera perangkat!");
+      return;
+    }
     try {
       const res = await fetch("/api/employee/attendance", {
         method: "POST",
@@ -1190,6 +1287,7 @@ export default function EmployeeDashboard() {
           longitude: checkInCoords.lng,
           accuracy: checkInCoords.accuracy || 10,
           mapsUrl: `https://www.google.com/maps?q=${checkInCoords.lat},${checkInCoords.lng}`,
+          selfieCheckIn: selfieCheckInPhoto,
           notes: checkInNotes,
         }),
       });
@@ -1197,8 +1295,12 @@ export default function EmployeeDashboard() {
       if (res.ok) {
         const d = await res.json();
         setAttendanceLogs((prev) => [d.data, ...prev.filter((p) => p.date !== d.data.date)]);
-        showToast("Absen Masuk terhubung ke Google Maps! Selamat bekerja.");
+        showToast("✓ Absen Masuk berhasil terverifikasi GPS & Foto Selfie!");
+        stopCamera();
         setIsCheckInModalOpen(false);
+      } else {
+        const errJson = await res.json().catch(() => null);
+        showToast(errJson?.error || "Gagal mencatat presensi masuk");
       }
     } catch {
       showToast("Gagal mencatat presensi");
@@ -1208,6 +1310,14 @@ export default function EmployeeDashboard() {
   // Handler Check-Out
   const handleCheckOut = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (checkOutCoords.source !== "gps" || !checkOutCoords.lat || !checkOutCoords.lng) {
+      showToast("Presensi Pulang DITOLAK: Sinyal GPS Satelit pulang wajib aktif & terkunci! Input manual dilarang.");
+      return;
+    }
+    if (!selfieCheckOutPhoto) {
+      showToast("Presensi Pulang DITOLAK: Wajib mengambil foto selfie wajah pulang via kamera perangkat!");
+      return;
+    }
     try {
       const res = await fetch("/api/employee/attendance", {
         method: "POST",
@@ -1220,6 +1330,7 @@ export default function EmployeeDashboard() {
           longitude: checkOutCoords.lng,
           accuracy: checkOutCoords.accuracy || 10,
           mapsUrl: `https://www.google.com/maps?q=${checkOutCoords.lat},${checkOutCoords.lng}`,
+          selfieCheckOut: selfieCheckOutPhoto,
           notes: checkOutSummary,
         }),
       });
@@ -1227,8 +1338,12 @@ export default function EmployeeDashboard() {
       if (res.ok) {
         const d = await res.json();
         setAttendanceLogs((prev) => [d.data, ...prev.filter((p) => p.date !== d.data.date)]);
-        showToast("Absen Pulang terverifikasi Google Maps! Terima kasih.");
+        showToast("✓ Absen Pulang berhasil terverifikasi GPS & Foto Selfie!");
+        stopCamera();
         setIsCheckOutModalOpen(false);
+      } else {
+        const errJson = await res.json().catch(() => null);
+        showToast(errJson?.error || "Gagal mencatat presensi pulang");
       }
     } catch {
       showToast("Gagal mencatat presensi pulang");
@@ -2402,8 +2517,60 @@ export default function EmployeeDashboard() {
                           {attendanceLogs.map((att) => (
                             <tr key={att.id} className="hover:bg-slate-50/80 transition-colors">
                               <td className="p-3 font-bold text-slate-900">{att.date}</td>
-                              <td className="p-3 text-green-600 font-black">{att.checkIn}</td>
-                              <td className="p-3 text-slate-700 font-bold">{att.checkOut}</td>
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-green-600 font-black">{att.checkIn}</span>
+                                  {att.selfieCheckIn && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setPreviewPhotoModal({
+                                          isOpen: true,
+                                          title: `Foto Selfie Masuk (${att.date})`,
+                                          photoUrl: att.selfieCheckIn!,
+                                          time: `Jam Masuk: ${att.checkIn}`,
+                                          location: att.location,
+                                        })
+                                      }
+                                      className="relative w-7 h-7 rounded-full overflow-hidden border-2 border-emerald-500 shadow-sm hover:scale-110 transition-transform cursor-pointer shrink-0"
+                                      title="Lihat Foto Selfie Masuk"
+                                    >
+                                      <img
+                                        src={att.selfieCheckIn}
+                                        alt="Selfie In"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-700 font-bold">{att.checkOut}</span>
+                                  {att.selfieCheckOut && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setPreviewPhotoModal({
+                                          isOpen: true,
+                                          title: `Foto Selfie Pulang (${att.date})`,
+                                          photoUrl: att.selfieCheckOut!,
+                                          time: `Jam Pulang: ${att.checkOut}`,
+                                          location: att.checkOutLocation || att.location,
+                                        })
+                                      }
+                                      className="relative w-7 h-7 rounded-full overflow-hidden border-2 border-blue-500 shadow-sm hover:scale-110 transition-transform cursor-pointer shrink-0"
+                                      title="Lihat Foto Selfie Pulang"
+                                    >
+                                      <img
+                                        src={att.selfieCheckOut}
+                                        alt="Selfie Out"
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
                               <td className="p-3 text-slate-600">
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-1.5 font-bold text-slate-800">
@@ -3388,23 +3555,141 @@ export default function EmployeeDashboard() {
             </div>
 
             <form onSubmit={handleCheckIn} className="space-y-4 text-xs">
+              {/* Status Koordinat GPS Satelit Terkunci */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Pilih Titik Lokasi Presensi:</label>
-                <select
-                  value={checkInLocation}
-                  onChange={(e) => handleLocationPresetChange(e.target.value, "checkin")}
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 focus:ring-2 focus:ring-green-500 focus:outline-none"
-                >
-                  <option value="Kantor DSTech Cilegon">Kantor DSTech Smart Perkasa (Cilegon Banten)</option>
-                  <option value="Kawasan Industri Krakatau Posco">Lokasi Proyek: PT. Krakatau Posco</option>
-                  <option value="RS Kurnia Cilegon">Lokasi Proyek: RS Kurnia Cilegon</option>
-                  <option value="Perumahan Metro Royal">Lokasi Proyek: Metro Royal Cilegon</option>
-                  <option value="Hotel Pesona Merak">Lokasi Proyek: Hotel Pesona Merak</option>
-                  <option value="Area Lapangan / Dinas Luar">Area Lapangan Lainnya (Dinas Luar)</option>
-                  {checkInCoords.source === "gps" && (
-                    <option value={checkInLocation}>{checkInLocation}</option>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Koordinat Posisi GPS Satelit (Terkunci Otomatis):
+                </label>
+                <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <MapPin className="w-4 h-4 text-dstech-red shrink-0" />
+                    <div>
+                      <p className="font-black text-slate-900 text-xs">
+                        {checkInCoords.source === "gps"
+                          ? `GPS Satelit (${checkInCoords.lat.toFixed(6)}, ${checkInCoords.lng.toFixed(6)})`
+                          : "Menunggu sinyal GPS satelit terkunci..."}
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        {checkInCoords.source === "gps"
+                          ? `Akurasi: ±${checkInCoords.accuracy} meter • Terkunci Permanen (Anti-Tamper)`
+                          : "Input manual dilarang oleh sistem demi validitas absensi"}
+                      </p>
+                    </div>
+                  </div>
+                  {checkInCoords.source === "gps" ? (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-green-100 text-green-700 border border-green-200 flex items-center gap-1 shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                      GPS Terkunci
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                      Wajib Kunci GPS
+                    </span>
                   )}
-                </select>
+                </div>
+              </div>
+
+              {/* Kamera Selfie Wajah Wajib */}
+              <div className="space-y-2.5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                    <Camera className="w-4 h-4 text-dstech-blue" />
+                    Foto Wajah Selfie (Wajib Kamera):
+                  </span>
+                  {selfieCheckInPhoto ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 flex items-center gap-1 border border-emerald-200">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Foto Terverifikasi
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                      Wajib Foto Selfie
+                    </span>
+                  )}
+                </div>
+
+                {/* Input File Fallback for Mobile Device Camera */}
+                <input
+                  type="file"
+                  ref={fileInputCheckInRef}
+                  accept="image/*"
+                  capture="user"
+                  onChange={(e) => handleSelfieFileInput(e, "checkin")}
+                  className="hidden"
+                />
+
+                {selfieCheckInPhoto ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black group max-h-52 flex items-center justify-center">
+                    <img
+                      src={selfieCheckInPhoto}
+                      alt="Selfie Check-In"
+                      className="w-full h-48 object-cover rounded-xl"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelfieCheckInPhoto(null);
+                          startCamera("checkin");
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 shadow cursor-pointer"
+                      >
+                        Ambil Ulang Foto
+                      </button>
+                    </div>
+                  </div>
+                ) : isCameraActive && cameraMode === "checkin" ? (
+                  <div className="space-y-2">
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-black h-52">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover transform -scale-x-100"
+                      />
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white"></span> Live Camera
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => takeSnapshot("checkin")}
+                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        Jepret Foto Sekarang
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="py-2 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => startCamera("checkin")}
+                      className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      Buka Kamera Live
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputCheckInRef.current?.click()}
+                      className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Kamera HP / Perangkat
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Google Maps Live Embed */}
@@ -3415,37 +3700,39 @@ export default function EmployeeDashboard() {
                     Pratinjau Posisi Google Maps:
                   </span>
                   <span className="font-mono text-slate-500 text-[10px]">
-                    {checkInCoords.lat.toFixed(5)}, {checkInCoords.lng.toFixed(5)}
+                    {checkInCoords.lat ? `${checkInCoords.lat.toFixed(5)}, ${checkInCoords.lng.toFixed(5)}` : "0, 0"}
                   </span>
                 </div>
 
                 <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative bg-slate-100">
                   <iframe
-                    src={`https://maps.google.com/maps?q=${checkInCoords.lat},${checkInCoords.lng}&hl=id&z=16&output=embed`}
+                    src={`https://maps.google.com/maps?q=${checkInCoords.lat || -6.031846},${checkInCoords.lng || 106.037198}&hl=id&z=16&output=embed`}
                     className="w-full h-44 border-0"
                     loading="lazy"
                     title="Google Maps Check-In Preview"
                   />
                 </div>
 
-                <div className="flex items-center justify-between pt-1">
-                  <a
-                    href={`https://www.google.com/maps?q=${checkInCoords.lat},${checkInCoords.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold underline"
-                  >
-                    Buka Titik Ini di Aplikasi Google Maps <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <span className="text-[10px] text-slate-400">Google Maps Live Sync</span>
-                </div>
+                {checkInCoords.source === "gps" && (
+                  <div className="flex items-center justify-between pt-1">
+                    <a
+                      href={`https://www.google.com/maps?q=${checkInCoords.lat},${checkInCoords.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold underline"
+                    >
+                      Buka Titik Ini di Aplikasi Google Maps <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <span className="text-[10px] text-slate-400">Google Maps Live Sync</span>
+                  </div>
+                )}
               </div>
 
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Catatan Lapangan (Opsional):</label>
                 <input
                   type="text"
-                  placeholder="Contoh: Langsung menuju lokasi pabrik untuk penarikan kabel"
+                  placeholder="Contoh: Menuju lokasi pabrik untuk instalasi kabel"
                   value={checkInNotes}
                   onChange={(e) => setCheckInNotes(e.target.value)}
                   className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-green-500 focus:outline-none"
@@ -3455,15 +3742,23 @@ export default function EmployeeDashboard() {
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsCheckInModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                  onClick={() => {
+                    stopCamera();
+                    setIsCheckInModalOpen(false);
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   id="btn-submit-checkin"
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 shadow-md flex items-center gap-1.5 cursor-pointer"
+                  disabled={checkInCoords.source !== "gps" || !selfieCheckInPhoto}
+                  className={`px-5 py-2.5 rounded-xl font-bold shadow-md flex items-center gap-1.5 transition-all ${
+                    checkInCoords.source === "gps" && selfieCheckInPhoto
+                      ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                      : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-75"
+                  }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   Konfirmasi Check-In Sekarang
@@ -3549,23 +3844,141 @@ export default function EmployeeDashboard() {
             </div>
 
             <form onSubmit={handleCheckOut} className="space-y-4 text-xs">
+              {/* Status Koordinat GPS Satelit Pulang Terkunci */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Titik Lokasi Selesai Kerja:</label>
-                <select
-                  value={checkOutLocation}
-                  onChange={(e) => handleLocationPresetChange(e.target.value, "checkout")}
-                  className="w-full p-3 rounded-xl border border-slate-200 bg-white font-bold text-slate-900 focus:ring-2 focus:ring-slate-900 focus:outline-none"
-                >
-                  <option value="Kantor DSTech Cilegon">Kantor DSTech Smart Perkasa (Cilegon Banten)</option>
-                  <option value="Kawasan Industri Krakatau Posco">Lokasi Proyek: PT. Krakatau Posco</option>
-                  <option value="RS Kurnia Cilegon">Lokasi Proyek: RS Kurnia Cilegon</option>
-                  <option value="Perumahan Metro Royal">Lokasi Proyek: Metro Royal Cilegon</option>
-                  <option value="Hotel Pesona Merak">Lokasi Proyek: Hotel Pesona Merak</option>
-                  <option value="Area Lapangan / Dinas Luar">Area Lapangan Lainnya (Dinas Luar)</option>
-                  {checkOutCoords.source === "gps" && (
-                    <option value={checkOutLocation}>{checkOutLocation}</option>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Koordinat Posisi Pulang Satelit (Terkunci Otomatis):
+                </label>
+                <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <MapPin className="w-4 h-4 text-dstech-blue shrink-0" />
+                    <div>
+                      <p className="font-black text-slate-900 text-xs">
+                        {checkOutCoords.source === "gps"
+                          ? `GPS Satelit (${checkOutCoords.lat.toFixed(6)}, ${checkOutCoords.lng.toFixed(6)})`
+                          : "Menunggu sinyal GPS satelit posisi pulang terkunci..."}
+                      </p>
+                      <p className="text-[10px] text-slate-500">
+                        {checkOutCoords.source === "gps"
+                          ? `Akurasi: ±${checkOutCoords.accuracy} meter • Terkunci Permanen (Anti-Tamper)`
+                          : "Input manual dilarang oleh sistem"}
+                      </p>
+                    </div>
+                  </div>
+                  {checkOutCoords.source === "gps" ? (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200 flex items-center gap-1 shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" />
+                      GPS Terkunci
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 shrink-0">
+                      Wajib Kunci GPS
+                    </span>
                   )}
-                </select>
+                </div>
+              </div>
+
+              {/* Kamera Selfie Pulang Wajib */}
+              <div className="space-y-2.5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                    <Camera className="w-4 h-4 text-slate-700" />
+                    Foto Wajah Selfie Pulang (Wajib Kamera):
+                  </span>
+                  {selfieCheckOutPhoto ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 flex items-center gap-1 border border-emerald-200">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Foto Terverifikasi
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                      Wajib Foto Selfie
+                    </span>
+                  )}
+                </div>
+
+                {/* Input File Fallback for Mobile Device Camera */}
+                <input
+                  type="file"
+                  ref={fileInputCheckOutRef}
+                  accept="image/*"
+                  capture="user"
+                  onChange={(e) => handleSelfieFileInput(e, "checkout")}
+                  className="hidden"
+                />
+
+                {selfieCheckOutPhoto ? (
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black group max-h-52 flex items-center justify-center">
+                    <img
+                      src={selfieCheckOutPhoto}
+                      alt="Selfie Check-Out"
+                      className="w-full h-48 object-cover rounded-xl"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelfieCheckOutPhoto(null);
+                          startCamera("checkout");
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 shadow cursor-pointer"
+                      >
+                        Ambil Ulang Foto
+                      </button>
+                    </div>
+                  </div>
+                ) : isCameraActive && cameraMode === "checkout" ? (
+                  <div className="space-y-2">
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-black h-52">
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
+                        className="w-full h-full object-cover transform -scale-x-100"
+                      />
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white"></span> Live Camera
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => takeSnapshot("checkout")}
+                        className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        Jepret Foto Sekarang
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopCamera}
+                        className="py-2 px-3 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => startCamera("checkout")}
+                      className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      Buka Kamera Live
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputCheckOutRef.current?.click()}
+                      className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Kamera HP / Perangkat
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Google Maps Live Embed */}
@@ -3576,30 +3989,32 @@ export default function EmployeeDashboard() {
                     Pratinjau Posisi Google Maps:
                   </span>
                   <span className="font-mono text-slate-500 text-[10px]">
-                    {checkOutCoords.lat.toFixed(5)}, {checkOutCoords.lng.toFixed(5)}
+                    {checkOutCoords.lat ? `${checkOutCoords.lat.toFixed(5)}, ${checkOutCoords.lng.toFixed(5)}` : "0, 0"}
                   </span>
                 </div>
 
                 <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm relative bg-slate-100">
                   <iframe
-                    src={`https://maps.google.com/maps?q=${checkOutCoords.lat},${checkOutCoords.lng}&hl=id&z=16&output=embed`}
+                    src={`https://maps.google.com/maps?q=${checkOutCoords.lat || -6.031846},${checkOutCoords.lng || 106.037198}&hl=id&z=16&output=embed`}
                     className="w-full h-44 border-0"
                     loading="lazy"
                     title="Google Maps Check-Out Preview"
                   />
                 </div>
 
-                <div className="flex items-center justify-between pt-1">
-                  <a
-                    href={`https://www.google.com/maps?q=${checkOutCoords.lat},${checkOutCoords.lng}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold underline"
-                  >
-                    Buka Titik Ini di Aplikasi Google Maps <ExternalLink className="w-3 h-3" />
-                  </a>
-                  <span className="text-[10px] text-slate-400">Google Maps Live Sync</span>
-                </div>
+                {checkOutCoords.source === "gps" && (
+                  <div className="flex items-center justify-between pt-1">
+                    <a
+                      href={`https://www.google.com/maps?q=${checkOutCoords.lat},${checkOutCoords.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-bold underline"
+                    >
+                      Buka Titik Ini di Aplikasi Google Maps <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <span className="text-[10px] text-slate-400">Google Maps Live Sync</span>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -3620,15 +4035,23 @@ export default function EmployeeDashboard() {
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsCheckOutModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold"
+                  onClick={() => {
+                    stopCamera();
+                    setIsCheckOutModalOpen(false);
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   id="btn-submit-checkout"
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 shadow-md flex items-center gap-1.5 cursor-pointer"
+                  disabled={checkOutCoords.source !== "gps" || !selfieCheckOutPhoto}
+                  className={`px-5 py-2.5 rounded-xl font-bold shadow-md flex items-center gap-1.5 transition-all ${
+                    checkOutCoords.source === "gps" && selfieCheckOutPhoto
+                      ? "bg-slate-900 hover:bg-slate-800 text-white cursor-pointer"
+                      : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-75"
+                  }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   Simpan & Check-Out Pulang
@@ -3692,7 +4115,56 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
-      {/* MODAL 6: Ajukan Lembur */}
+      {/* QUICK MODAL: Pratinjau Foto Selfie Presensi */}
+      {previewPhotoModal?.isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setPreviewPhotoModal(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-left">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  Foto Wajah Terverifikasi Kamera
+                </span>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">{previewPhotoModal.title}</h3>
+                <p className="text-xs text-slate-500 font-medium">{previewPhotoModal.time}</p>
+              </div>
+              <button
+                onClick={() => setPreviewPhotoModal(null)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-md bg-black">
+              <img
+                src={previewPhotoModal.photoUrl}
+                alt="Selfie Presensi"
+                className="w-full h-72 object-cover"
+              />
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600 font-medium text-left">
+              <p className="font-bold text-slate-800">Lokasi Presensi:</p>
+              <p className="truncate">{previewPhotoModal.location}</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setPreviewPhotoModal(null)}
+              className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 cursor-pointer"
+            >
+              Tutup Pratinjau
+            </button>
+          </div>
+        </div>
+      )}
       {isOvertimeModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"

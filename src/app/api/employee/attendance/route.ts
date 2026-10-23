@@ -50,17 +50,45 @@ export async function POST(request: Request) {
 
     if (action === "checkin") {
       const { location, notes, latitude, longitude, accuracy, mapsUrl } = body;
+      const selfieCheckIn = body.selfieCheckIn || body.selfiePhoto || null;
+
+      // 1. Validasi Wajib Koordinat GPS (Input manual dilarang!)
+      if (latitude === undefined || latitude === null || longitude === undefined || longitude === null || latitude === "" || longitude === "") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Presensi Masuk DITOLAK: Sinyal GPS satelit wajib aktif dan terdeteksi akurat. Input manual lokasi dilarang!",
+          },
+          { status: 400 }
+        );
+      }
+
+      // 2. Validasi Wajib Foto Selfie (kecuali bypass superadmin via dashboard admin)
+      if (!selfieCheckIn && !body.isSuperAdminBypass) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Presensi Masuk DITOLAK: Wajib mengambil foto selfie wajah langsung via kamera perangkat!",
+          },
+          { status: 400 }
+        );
+      }
+
       const existingToday = data.attendance.find((a: any) => a.date === dateStr);
       const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
 
       if (existingToday) {
-        existingToday.checkIn = timeStr;
-        existingToday.location = location || existingToday.location || "Kantor DSTech Smart Perkasa (Cilegon)";
-        if (latitude && longitude) {
-          existingToday.latitude = latitude;
-          existingToday.longitude = longitude;
+        existingToday.checkIn = existingToday.checkIn || timeStr;
+        // PENGUNCIAN KOORDINAT (IMMUTABLE): Jika koordinat masuk sudah terekam, kunci dan jangan ubah ke-2x!
+        if (!existingToday.latitude || !existingToday.longitude) {
+          existingToday.latitude = Number(latitude);
+          existingToday.longitude = Number(longitude);
           existingToday.accuracy = accuracy || null;
           existingToday.mapsUrl = computedMapsUrl;
+          existingToday.location = location || `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`;
+        }
+        if (!existingToday.selfieCheckIn && selfieCheckIn) {
+          existingToday.selfieCheckIn = selfieCheckIn;
         }
         if (notes) existingToday.notes = notes;
       } else {
@@ -70,13 +98,15 @@ export async function POST(request: Request) {
           employeeName: body.employeeName || "Teknisi Lapangan",
           checkIn: timeStr,
           checkOut: "-",
-          location: location || "Kantor DSTech Smart Perkasa (Cilegon)",
-          latitude: latitude || null,
-          longitude: longitude || null,
+          location: location || `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`,
+          latitude: Number(latitude),
+          longitude: Number(longitude),
           accuracy: accuracy || null,
           mapsUrl: computedMapsUrl,
+          selfieCheckIn,
           status: location?.toLowerCase().includes("kantor") ? "Tepat Waktu" : "Hadir Lapangan",
-          notes: notes || "Absen masuk via portal teknisi (Google Maps Verified)",
+          notes: notes || "Absen masuk via GPS & Kamera Selfie terverifikasi",
+          isGpsLocked: true,
         };
         data.attendance.unshift(newRecord);
         if (data.monthlyStats) data.monthlyStats.presenceDays += 1;
@@ -85,24 +115,52 @@ export async function POST(request: Request) {
       writeAttendance(data);
       return NextResponse.json({
         success: true,
-        message: `Presensi Masuk berhasil dicatat (${timeStr})`,
+        message: `Presensi Masuk terverifikasi GPS & Foto Selfie berhasil dicatat (${timeStr})`,
         data: data.attendance[0],
       });
     }
 
     if (action === "checkout") {
       const { notes, location, latitude, longitude, accuracy, mapsUrl } = body;
+      const selfieCheckOut = body.selfieCheckOut || body.selfiePhoto || null;
+
+      // 1. Validasi Wajib Koordinat GPS Pulang (Input manual dilarang!)
+      if (latitude === undefined || latitude === null || longitude === undefined || longitude === null || latitude === "" || longitude === "") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Presensi Pulang DITOLAK: Sinyal GPS satelit posisi pulang wajib aktif. Input manual dilarang!",
+          },
+          { status: 400 }
+        );
+      }
+
+      // 2. Validasi Wajib Foto Selfie Pulang (kecuali bypass superadmin)
+      if (!selfieCheckOut && !body.isSuperAdminBypass) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Presensi Pulang DITOLAK: Wajib mengambil foto selfie pulang langsung via kamera perangkat!",
+          },
+          { status: 400 }
+        );
+      }
+
       const existingToday = data.attendance.find((a: any) => a.date === dateStr);
       const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
 
       if (existingToday) {
         existingToday.checkOut = timeStr;
-        if (location) existingToday.checkOutLocation = location;
-        if (latitude && longitude) {
-          existingToday.checkOutLat = latitude;
-          existingToday.checkOutLng = longitude;
+        // PENGUNCIAN KOORDINAT PULANG: Jika sudah terekam, kunci dan jangan ubah ke-2x!
+        if (!existingToday.checkOutLat || !existingToday.checkOutLng) {
+          existingToday.checkOutLat = Number(latitude);
+          existingToday.checkOutLng = Number(longitude);
           existingToday.checkOutAccuracy = accuracy || null;
           existingToday.checkOutMapsUrl = computedMapsUrl;
+          existingToday.checkOutLocation = location || `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`;
+        }
+        if (!existingToday.selfieCheckOut && selfieCheckOut) {
+          existingToday.selfieCheckOut = selfieCheckOut;
         }
         if (notes) existingToday.notes = `${existingToday.notes ? existingToday.notes + " | " : ""}Laporan Pulang: ${notes}`;
       } else {
@@ -112,14 +170,16 @@ export async function POST(request: Request) {
           employeeName: body.employeeName || "Teknisi Lapangan",
           checkIn: "08:00 WIB",
           checkOut: timeStr,
-          location: location || "Kantor DSTech Smart Perkasa (Cilegon)",
-          checkOutLocation: location || "Kantor DSTech Smart Perkasa (Cilegon)",
-          checkOutLat: latitude || null,
-          checkOutLng: longitude || null,
+          location: `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`,
+          checkOutLocation: location || `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`,
+          checkOutLat: Number(latitude),
+          checkOutLng: Number(longitude),
           checkOutAccuracy: accuracy || null,
           checkOutMapsUrl: computedMapsUrl,
+          selfieCheckOut,
           status: "Hadir",
-          notes: notes || "Absen pulang via portal teknisi",
+          notes: notes || "Absen pulang via GPS & Kamera Selfie terverifikasi",
+          isGpsLocked: true,
         };
         data.attendance.unshift(newRecord);
       }
@@ -127,7 +187,7 @@ export async function POST(request: Request) {
       writeAttendance(data);
       return NextResponse.json({
         success: true,
-        message: `Presensi Pulang berhasil dicatat (${timeStr})`,
+        message: `Presensi Pulang terverifikasi GPS & Foto Selfie berhasil dicatat (${timeStr})`,
         data: data.attendance[0],
       });
     }
@@ -274,6 +334,27 @@ export async function PUT(request: Request) {
         return NextResponse.json({ success: false, error: "Catatan absensi tidak ditemukan" }, { status: 404 });
       }
 
+      // INTEGRITY CHECK: KUNCI KOORDINAT AGAR TIDAK DAPAT DIUBAH KE-2X
+      if (att.latitude && body.latitude !== undefined && Number(body.latitude) !== Number(att.latitude)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Pelanggaran Integritas: Koordinat GPS Masuk sudah terkunci permanen dan dilarang diubah ke-2x!",
+          },
+          { status: 403 }
+        );
+      }
+
+      if (att.checkOutLat && body.checkOutLat !== undefined && Number(body.checkOutLat) !== Number(att.checkOutLat)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Pelanggaran Integritas: Koordinat GPS Pulang sudah terkunci permanen dan dilarang diubah ke-2x!",
+          },
+          { status: 403 }
+        );
+      }
+
       if (body.employeeName) att.employeeName = body.employeeName;
       if (body.date) att.date = body.date;
       if (body.checkIn) att.checkIn = body.checkIn;
@@ -281,18 +362,21 @@ export async function PUT(request: Request) {
       if (body.location) att.location = body.location;
       if (body.status) att.status = body.status;
       if (body.notes !== undefined) att.notes = body.notes;
-      if (body.latitude !== undefined) att.latitude = body.latitude ? Number(body.latitude) : null;
-      if (body.longitude !== undefined) att.longitude = body.longitude ? Number(body.longitude) : null;
-      if (body.mapsUrl !== undefined) att.mapsUrl = body.mapsUrl;
+      // Hanya izinkan mengisi koordinat jika sebelumnya memang kosong
+      if (!att.latitude && body.latitude) att.latitude = Number(body.latitude);
+      if (!att.longitude && body.longitude) att.longitude = Number(body.longitude);
+      if (!att.mapsUrl && body.mapsUrl) att.mapsUrl = body.mapsUrl;
       if (body.checkOutLocation !== undefined) att.checkOutLocation = body.checkOutLocation;
-      if (body.checkOutLat !== undefined) att.checkOutLat = body.checkOutLat ? Number(body.checkOutLat) : null;
-      if (body.checkOutLng !== undefined) att.checkOutLng = body.checkOutLng ? Number(body.checkOutLng) : null;
-      if (body.checkOutMapsUrl !== undefined) att.checkOutMapsUrl = body.checkOutMapsUrl;
+      if (!att.checkOutLat && body.checkOutLat) att.checkOutLat = Number(body.checkOutLat);
+      if (!att.checkOutLng && body.checkOutLng) att.checkOutLng = Number(body.checkOutLng);
+      if (!att.checkOutMapsUrl && body.checkOutMapsUrl) att.checkOutMapsUrl = body.checkOutMapsUrl;
+      if (body.selfieCheckIn && !att.selfieCheckIn) att.selfieCheckIn = body.selfieCheckIn;
+      if (body.selfieCheckOut && !att.selfieCheckOut) att.selfieCheckOut = body.selfieCheckOut;
 
       writeAttendance(data);
       return NextResponse.json({
         success: true,
-        message: "Catatan absensi berhasil diperbarui",
+        message: "Catatan absensi berhasil diperbarui (Koordinat GPS terkunci permanen)",
         data: att,
       });
     }

@@ -62,6 +62,7 @@ interface AttendanceRecord {
   longitude?: number | null;
   accuracy?: number | null;
   mapsUrl?: string | null;
+  selfieCheckIn?: string | null;
   status: string;
   notes?: string;
   checkOutLocation?: string;
@@ -69,6 +70,8 @@ interface AttendanceRecord {
   checkOutLng?: number | null;
   checkOutAccuracy?: number | null;
   checkOutMapsUrl?: string | null;
+  selfieCheckOut?: string | null;
+  isGpsLocked?: boolean;
 }
 
 interface OvertimeRecord {
@@ -213,6 +216,7 @@ export default function AdminAttendancePage() {
     lng: number | null;
     accuracy?: number | null;
     mapsUrl?: string | null;
+    selfiePhoto?: string | null;
   }>({
     isOpen: false,
     title: "",
@@ -221,6 +225,7 @@ export default function AdminAttendancePage() {
     locationName: "",
     lat: null,
     lng: null,
+    selfiePhoto: null,
   });
 
   const [formModal, setFormModal] = useState<{
@@ -1234,10 +1239,39 @@ export default function AdminAttendancePage() {
 
                         <td className="py-4 px-6">
                           <div className="space-y-1">
-                            <p className="font-extrabold text-emerald-600 flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5 text-emerald-500" />
-                              {item.checkIn || "-"}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-extrabold text-emerald-600 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-emerald-500" />
+                                {item.checkIn || "-"}
+                              </p>
+                              {item.selfieCheckIn && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setGpsModal({
+                                      isOpen: true,
+                                      title: "Verifikasi Presensi & Wajah Masuk",
+                                      employeeName: item.employeeName,
+                                      timeStr: `${item.date} • ${item.checkIn}`,
+                                      locationName: item.location,
+                                      lat: item.latitude || null,
+                                      lng: item.longitude || null,
+                                      accuracy: item.accuracy,
+                                      mapsUrl: item.mapsUrl,
+                                      selfiePhoto: item.selfieCheckIn,
+                                    })
+                                  }
+                                  className="relative w-6 h-6 rounded-full overflow-hidden border-2 border-emerald-500 shadow-sm hover:scale-110 transition-transform cursor-pointer shrink-0"
+                                  title="Lihat Foto Selfie Masuk"
+                                >
+                                  <img
+                                    src={item.selfieCheckIn}
+                                    alt="Foto Masuk"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </button>
+                              )}
+                            </div>
                             <p className="text-[11px] text-slate-500 line-clamp-1 flex items-center gap-1">
                               <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                               <span className="truncate max-w-[180px]">{item.location || "Kantor DSTech Cilegon"}</span>
@@ -1255,6 +1289,7 @@ export default function AdminAttendancePage() {
                                     lng: item.longitude || null,
                                     accuracy: item.accuracy,
                                     mapsUrl: item.mapsUrl,
+                                    selfiePhoto: item.selfieCheckIn || null,
                                   })
                                 }
                                 className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-blue-50/80 px-2 py-0.5 rounded-md"
@@ -1268,16 +1303,67 @@ export default function AdminAttendancePage() {
 
                         <td className="py-4 px-6">
                           <div className="space-y-1">
-                            <p className={`font-extrabold flex items-center gap-1.5 ${item.checkOut && item.checkOut !== "-" ? "text-slate-800" : "text-slate-400"}`}>
-                              <Clock className="w-3.5 h-3.5 text-slate-400" />
-                              {item.checkOut || "-"}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className={`font-extrabold flex items-center gap-1.5 ${item.checkOut && item.checkOut !== "-" ? "text-slate-800" : "text-slate-400"}`}>
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                {item.checkOut || "-"}
+                              </p>
+                              {item.selfieCheckOut && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setGpsModal({
+                                      isOpen: true,
+                                      title: "Verifikasi Presensi & Wajah Pulang",
+                                      employeeName: item.employeeName,
+                                      timeStr: `${item.date} • ${item.checkOut}`,
+                                      locationName: item.checkOutLocation || item.location,
+                                      lat: item.checkOutLat || item.latitude || null,
+                                      lng: item.checkOutLng || item.longitude || null,
+                                      accuracy: item.checkOutAccuracy,
+                                      mapsUrl: item.checkOutMapsUrl || item.mapsUrl,
+                                      selfiePhoto: item.selfieCheckOut,
+                                    })
+                                  }
+                                  className="relative w-6 h-6 rounded-full overflow-hidden border-2 border-blue-500 shadow-sm hover:scale-110 transition-transform cursor-pointer shrink-0"
+                                  title="Lihat Foto Selfie Pulang"
+                                >
+                                  <img
+                                    src={item.selfieCheckOut}
+                                    alt="Foto Pulang"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </button>
+                              )}
+                            </div>
                             {item.checkOutLocation && (
                               <p className="text-[11px] text-slate-500 line-clamp-1 flex items-center gap-1">
                                 <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                                 <span className="truncate max-w-[180px]">{item.checkOutLocation}</span>
                               </p>
                             )}
+                            {item.checkOutLat && item.checkOutLng ? (
+                              <button
+                                onClick={() =>
+                                  setGpsModal({
+                                    isOpen: true,
+                                    title: "Titik Lokasi Check-Out Pulang",
+                                    employeeName: item.employeeName,
+                                    timeStr: `${item.date} • ${item.checkOut}`,
+                                    locationName: item.checkOutLocation || item.location,
+                                    lat: item.checkOutLat ?? null,
+                                    lng: item.checkOutLng ?? null,
+                                    accuracy: item.checkOutAccuracy,
+                                    mapsUrl: item.checkOutMapsUrl,
+                                    selfiePhoto: item.selfieCheckOut || null,
+                                  })
+                                }
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 hover:text-slate-900 hover:underline cursor-pointer bg-slate-100 px-2 py-0.5 rounded-md"
+                              >
+                                <Navigation className="w-3 h-3" />
+                                <span>Peta Pulang</span>
+                              </button>
+                            ) : null}
                           </div>
                         </td>
 
@@ -2028,6 +2114,7 @@ export default function AdminAttendancePage() {
                                   lng: item.longitude || null,
                                   accuracy: item.accuracy,
                                   mapsUrl: item.mapsUrl,
+                                  selfiePhoto: item.selfieCheckIn || null,
                                 })
                               }
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors cursor-pointer"
@@ -2077,6 +2164,27 @@ export default function AdminAttendancePage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {gpsModal.selfiePhoto && (
+              <div className="mb-4 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-3.5 shadow-sm">
+                <div className="relative w-16 h-16 rounded-xl overflow-hidden border-2 border-emerald-500 shadow-sm shrink-0 bg-black">
+                  <img
+                    src={gpsModal.selfiePhoto}
+                    alt="Selfie Presensi"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="text-xs">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-black text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    Foto Wajah Selfie Sah (Kamera Perangkat)
+                  </span>
+                  <p className="text-slate-600 text-[11px] font-medium mt-1 leading-snug">
+                    Foto wajah asli karyawan terverifikasi saat presensi bersamaan dengan penguncian titik koordinat satelit GPS ini.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="w-full h-72 rounded-2xl overflow-hidden border border-slate-200 relative mb-4 bg-slate-100">
               {gpsModal.lat && gpsModal.lng ? (
