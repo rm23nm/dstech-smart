@@ -11315,7 +11315,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL 1: BUAT FAKTUR PENJUALAN BARU */}
       {isNewSaleModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsNewSaleModalOpen(false)}
         >
           <div
@@ -12590,7 +12590,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL 2: CATAT KAS MASUK / KELUAR */}
       {isNewCashModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsNewCashModalOpen(false)}
         >
           <div
@@ -12962,7 +12962,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL 3: CETAK FAKTUR PENJUALAN RESMI (PRINT PREVIEW) */}
       {selectedInvoiceForPrint && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
           onClick={() => setSelectedInvoiceForPrint(null)}
         >
           <div
@@ -13963,7 +13963,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL SPH: BUAT / EDIT SURAT PENAWARAN HARGA (QUOTATION) */}
       {(isNewQuotationModalOpen || isEditQuotationModalOpen) && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => {
             setIsNewQuotationModalOpen(false);
             setIsEditQuotationModalOpen(false);
@@ -15166,7 +15166,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL 3.5: CETAK & PRATINJAU SURAT PENAWARAN HARGA RESMI (SPH BER-KOP DSTECH) */}
       {selectedQuotationForPrint && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
           onClick={() => setSelectedQuotationForPrint(null)}
         >
           <div
@@ -26286,7 +26286,7 @@ export default function AdminFinanceERPPage() {
       {/* LIGHTBOX PREVIEW BUKTI NOTA / DOKUMEN FOTO UKURAN PENUH */}
       {previewAttachment && (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fadeIn"
+          className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fadeIn"
           onClick={() => {
             setPreviewAttachment(null);
             setPreviewZoom(1);
