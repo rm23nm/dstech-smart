@@ -103,6 +103,8 @@ interface SaleItem {
   unit: string;
   price: number;
   total: number;
+  image?: string;
+  description?: string;
 }
 
 export interface InvoiceTermin {
@@ -327,11 +329,14 @@ interface FinanceSettings {
 
 interface PurchaseItem {
   id: string;
+  productId?: string;
   productName: string;
   qty: number;
   unit: string;
   price: number;
   total: number;
+  image?: string;
+  description?: string;
 }
 
 interface PurchaseOrder {
@@ -603,7 +608,7 @@ export default function AdminFinanceERPPage() {
 
   // Modal Pemilih Produk / Katalog Picker Cepat
   const [isProductCatalogPickerOpen, setIsProductCatalogPickerOpen] = useState<boolean>(false);
-  const [productPickerTarget, setProductPickerTarget] = useState<"sale" | "quotation" | "edit_sale">("sale");
+  const [productPickerTarget, setProductPickerTarget] = useState<"sale" | "quotation" | "edit_sale" | "purchase" | "edit_purchase">("sale");
   const [productPickerSearch, setProductPickerSearch] = useState<string>("");
   const [productPickerCategory, setProductPickerCategory] = useState<string>("ALL");
 
@@ -1752,7 +1757,7 @@ export default function AdminFinanceERPPage() {
     date: string;
     expectedDelivery: string;
     paymentStatus: string;
-    items: { id: string; productName: string; qty: number; unit: string; price: number; total: number }[];
+    items: PurchaseItem[];
     notes: string;
     businessEntity: "PT" | "NON_PT";
     projectId?: string;
@@ -2722,9 +2727,78 @@ export default function AdminFinanceERPPage() {
         unit: selected.unit || "Unit",
         price: price,
         total: qty * price,
+        image: selected.image || "",
+        description: (selected as any).desc || (selected as any).description || "",
       };
       return { ...prev, items: updated };
     });
+  };
+
+  const handleSelectProductForPo = (idx: number, productId: string) => {
+    const selected = products.find((p) => p.id === productId);
+    if (!selected) return;
+    setPoForm((prev) => {
+      const updated = [...prev.items];
+      const qty = updated[idx]?.qty || 1;
+      const price = Number(selected.price) || 0;
+      updated[idx] = {
+        ...updated[idx],
+        productId: selected.id,
+        productName: selected.name,
+        unit: selected.unit || "Unit",
+        price: price,
+        total: qty * price,
+        image: selected.image || "",
+        description: (selected as any).desc || (selected as any).description || "",
+      };
+      return { ...prev, items: updated };
+    });
+  };
+
+  const handleSelectProductForEditPo = (idx: number, productId: string) => {
+    const selected = products.find((p) => p.id === productId);
+    if (!selected) return;
+    const price = Number(selected.price) || 0;
+    setEditPoForm((prev) => {
+      const updated = [...prev.items];
+      const qty = updated[idx]?.qty || 1;
+      updated[idx] = {
+        ...updated[idx],
+        productId: selected.id,
+        productName: selected.name,
+        unit: selected.unit || "Unit",
+        price: price,
+        total: qty * price,
+        image: selected.image || "",
+        description: (selected as any).desc || (selected as any).description || "",
+      };
+      return { ...prev, items: updated };
+    });
+    if (editingPo) {
+      setEditingPo((prev) => {
+        if (!prev) return prev;
+        const updated = [...prev.items];
+        const qty = updated[idx]?.qty || 1;
+        updated[idx] = {
+          ...updated[idx],
+          productId: selected.id,
+          productName: selected.name,
+          unit: selected.unit || "Unit",
+          price: price,
+          total: qty * price,
+          image: selected.image || "",
+          description: (selected as any).desc || (selected as any).description || "",
+        };
+        const subtotal = updated.reduce((acc, curr) => acc + (curr.total || 0), 0);
+        const taxAmount = Number(prev.taxAmount || 0);
+        return {
+          ...prev,
+          items: updated,
+          subtotal,
+          grandTotal: subtotal + taxAmount,
+        };
+      });
+    }
   };
 
   const handleSelectProductForQuotation = (idx: number, productId: string) => {
@@ -2764,6 +2838,8 @@ export default function AdminFinanceERPPage() {
       unit: selected.unit || "Unit",
       price: price,
       total: qty * price,
+      image: selected.image || "",
+      description: (selected as any).desc || (selected as any).description || "",
     };
     const subtotal = updated.reduce((acc, curr) => acc + (curr.total || 0), 0);
     const afterDiscount = Math.max(0, subtotal - Number(editingSale.discount || 0));
@@ -2786,7 +2862,7 @@ export default function AdminFinanceERPPage() {
   };
 
   // Handler Buka Modal Katalog Picker
-  const handleOpenProductCatalogPicker = (target: "sale" | "quotation" | "edit_sale") => {
+  const handleOpenProductCatalogPicker = (target: "sale" | "quotation" | "edit_sale" | "purchase" | "edit_purchase") => {
     setProductPickerTarget(target);
     setProductPickerSearch("");
     setProductPickerCategory("ALL");
@@ -2810,6 +2886,8 @@ export default function AdminFinanceERPPage() {
             price: price,
             qty: 1,
             total: price,
+            image: selected.image || "",
+            description: (selected as any).desc || (selected as any).description || "",
           };
         } else {
           items.push({
@@ -2820,6 +2898,8 @@ export default function AdminFinanceERPPage() {
             qty: 1,
             price: price,
             total: price,
+            image: selected.image || "",
+            description: (selected as any).desc || (selected as any).description || "",
           });
         }
         return { ...prev, items };
@@ -2869,6 +2949,8 @@ export default function AdminFinanceERPPage() {
           price: price,
           qty: 1,
           total: price,
+          image: selected.image || "",
+          description: (selected as any).desc || (selected as any).description || "",
         };
       } else {
         items.push({
@@ -2879,6 +2961,8 @@ export default function AdminFinanceERPPage() {
           qty: 1,
           price: price,
           total: price,
+          image: selected.image || "",
+          description: (selected as any).desc || (selected as any).description || "",
         });
       }
       const subtotal = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
@@ -2893,6 +2977,107 @@ export default function AdminFinanceERPPage() {
         grandTotal,
       });
       showToast(`✓ "${selected.name}" dimasukkan ke Faktur!`);
+    } else if (productPickerTarget === "purchase") {
+      setPoForm((prev) => {
+        const items = [...prev.items];
+        if (items.length === 1 && !items[0].productName.trim() && items[0].price === 0) {
+          items[0] = {
+            ...items[0],
+            productId: selected.id,
+            productName: selected.name,
+            unit: unit,
+            price: price,
+            qty: 1,
+            total: price,
+            image: selected.image || "",
+            description: (selected as any).desc || (selected as any).description || "",
+          };
+        } else {
+          items.push({
+            id: Date.now().toString(),
+            productId: selected.id,
+            productName: selected.name,
+            unit: unit,
+            qty: 1,
+            price: price,
+            total: price,
+            image: selected.image || "",
+            description: (selected as any).desc || (selected as any).description || "",
+          });
+        }
+        return { ...prev, items };
+      });
+      showToast(`✓ "${selected.name}" dimasukkan ke PO Pembelian!`);
+    } else if (productPickerTarget === "edit_purchase") {
+      setEditPoForm((prev) => {
+        const items = [...prev.items];
+        if (items.length === 1 && !items[0].productName.trim() && items[0].price === 0) {
+          items[0] = {
+            ...items[0],
+            productId: selected.id,
+            productName: selected.name,
+            unit: unit,
+            price: price,
+            qty: 1,
+            total: price,
+            image: selected.image || "",
+            description: (selected as any).desc || (selected as any).description || "",
+          };
+        } else {
+          items.push({
+            id: Date.now().toString(),
+            productId: selected.id,
+            productName: selected.name,
+            unit: unit,
+            qty: 1,
+            price: price,
+            total: price,
+            image: selected.image || "",
+            description: (selected as any).desc || (selected as any).description || "",
+          });
+        }
+        return { ...prev, items };
+      });
+      if (editingPo) {
+        setEditingPo((prev) => {
+          if (!prev) return prev;
+          const items = [...prev.items];
+          if (items.length === 1 && !items[0].productName.trim() && items[0].price === 0) {
+            items[0] = {
+              ...items[0],
+              productId: selected.id,
+              productName: selected.name,
+              unit: unit,
+              price: price,
+              qty: 1,
+              total: price,
+              image: selected.image || "",
+              description: (selected as any).desc || (selected as any).description || "",
+            };
+          } else {
+            items.push({
+              id: Date.now().toString(),
+              productId: selected.id,
+              productName: selected.name,
+              unit: unit,
+              qty: 1,
+              price: price,
+              total: price,
+              image: selected.image || "",
+              description: (selected as any).desc || (selected as any).description || "",
+            });
+          }
+          const subtotal = items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+          const taxAmount = Number(prev.taxAmount || 0);
+          return {
+            ...prev,
+            items,
+            subtotal,
+            grandTotal: subtotal + taxAmount,
+          };
+        });
+      }
+      showToast(`✓ "${selected.name}" dimasukkan ke PO Pembelian!`);
     }
   };
 
@@ -2928,6 +3113,8 @@ export default function AdminFinanceERPPage() {
           item.productId = found.id;
           item.unit = found.unit || "Unit";
           item.price = Number(found.price) || item.price;
+          item.image = found.image || item.image || "";
+          item.description = (found as any).desc || (found as any).description || item.description || "";
         }
       }
       if (field === "qty" || field === "price" || field === "productName") {
@@ -2964,6 +3151,70 @@ export default function AdminFinanceERPPage() {
       }
     } catch (err) {
       console.error("Error uploading quotation item photo:", err);
+      showToast("Terjadi kesalahan saat memproses foto item.");
+    } finally {
+      setUploadingItemPhotoIdx(null);
+    }
+  };
+
+  // Helper Upload Foto Item Faktur Penjualan (Kompresi Otomatis ~40 KB)
+  const handleUploadSaleItemPhoto = async (idx: number, file: File) => {
+    if (!file) return;
+    try {
+      setUploadingItemPhotoIdx(idx);
+      showToast("Mengompresi foto item ke ~40 KB...");
+      const { file: fileToUpload } = await compressImageFile(file, 40);
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("docType", "sale_item");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        handleSaleItemChange(idx, "image", data.url);
+        showToast("✓ Foto produk faktur berhasil dilampirkan (~40 KB)!");
+      } else {
+        showToast("Gagal mengunggah foto item.");
+      }
+    } catch (err) {
+      console.error("Error uploading sale item photo:", err);
+      showToast("Terjadi kesalahan saat memproses foto item.");
+    } finally {
+      setUploadingItemPhotoIdx(null);
+    }
+  };
+
+  // Helper Upload Foto Item Purchase Order Supplier (Kompresi Otomatis ~40 KB)
+  const handleUploadPoItemPhoto = async (idx: number, file: File) => {
+    if (!file) return;
+    try {
+      setUploadingItemPhotoIdx(idx);
+      showToast("Mengompresi foto item ke ~40 KB...");
+      const { file: fileToUpload } = await compressImageFile(file, 40);
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("docType", "po_item");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        handlePoItemChange(idx, "image", data.url);
+        showToast("✓ Foto produk PO berhasil dilampirkan (~40 KB)!");
+      } else {
+        showToast("Gagal mengunggah foto item.");
+      }
+    } catch (err) {
+      console.error("Error uploading PO item photo:", err);
       showToast("Terjadi kesalahan saat memproses foto item.");
     } finally {
       setUploadingItemPhotoIdx(null);
@@ -5231,7 +5482,19 @@ export default function AdminFinanceERPPage() {
     setPoForm((prev) => {
       const updated = [...prev.items];
       const item = { ...updated[idx], [field]: val };
-      if (field === "qty" || field === "price") {
+      if (field === "productName") {
+        const found = products.find(
+          (p) => p.name.trim().toLowerCase() === String(val).trim().toLowerCase()
+        );
+        if (found) {
+          item.productId = found.id;
+          item.unit = found.unit || "Unit";
+          item.price = Number(found.price) || item.price;
+          item.image = found.image || item.image || "";
+          item.description = (found as any).desc || (found as any).description || item.description || "";
+        }
+      }
+      if (field === "qty" || field === "price" || field === "productName") {
         item.total = Number(item.qty || 0) * Number(item.price || 0);
       }
       updated[idx] = item;
@@ -5352,12 +5615,55 @@ export default function AdminFinanceERPPage() {
     setEditPoForm((prev) => {
       const updated = [...prev.items];
       const item = { ...updated[idx], [field]: val };
-      if (field === "qty" || field === "price") {
+      if (field === "productName") {
+        const found = products.find(
+          (p) => p.name.trim().toLowerCase() === String(val).trim().toLowerCase()
+        );
+        if (found) {
+          item.productId = found.id;
+          item.unit = found.unit || "Unit";
+          item.price = Number(found.price) || item.price;
+          item.image = found.image || item.image || "";
+          item.description = (found as any).desc || (found as any).description || item.description || "";
+        }
+      }
+      if (field === "qty" || field === "price" || field === "productName") {
         item.total = Number(item.qty || 0) * Number(item.price || 0);
       }
       updated[idx] = item;
       return { ...prev, items: updated };
     });
+  };
+
+  const handleUploadEditPoItemPhoto = async (idx: number, file: File) => {
+    if (!file) return;
+    try {
+      setUploadingItemPhotoIdx(idx);
+      showToast("Mengompresi foto item ke ~40 KB...");
+      const { file: fileToUpload } = await compressImageFile(file, 40);
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+      formData.append("docType", "po_item");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        handleEditPoItemChange(idx, "image", data.url);
+        showToast("✓ Foto produk PO berhasil dilampirkan (~40 KB)!");
+      } else {
+        showToast("Gagal mengunggah foto item.");
+      }
+    } catch (err) {
+      console.error("Error uploading edit PO item photo:", err);
+      showToast("Terjadi kesalahan saat memproses foto item.");
+    } finally {
+      setUploadingItemPhotoIdx(null);
+    }
   };
 
   const calculateEditPoTotals = () => {
@@ -18918,33 +19224,80 @@ export default function AdminFinanceERPPage() {
                   <label className="font-black text-slate-800 uppercase tracking-wider text-[11px]">
                     Daftar Barang yang Dipesan ({poForm.items.length})
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleAddPoItem}
-                    className="text-amber-700 font-bold text-xs hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Tambah Baris Barang</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenProductCatalogPicker("purchase")}
+                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                    >
+                      <Package className="w-3.5 h-3.5 text-amber-600" />
+                      <span>📦 Pilih dari Master Produk</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddPoItem}
+                      className="text-amber-700 font-bold text-xs hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Tambah Baris</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                   {poForm.items.map((it, idx) => (
                     <div
-                      key={it.id}
+                      key={it.id || idx}
                       className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
                     >
-                      <div className="col-span-5">
-                        <input
-                          type="text"
-                          required
-                          placeholder="Nama Barang / Sparepart..."
-                          value={it.productName}
-                          onChange={(e) => handlePoItemChange(idx, "productName", e.target.value)}
-                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
-                        />
+                      <div className="col-span-5 space-y-1">
+                        <div className="flex items-center justify-between gap-1">
+                          <label className="text-[10px] text-slate-600 font-bold">Nama Barang / Sparepart:</label>
+                          <select
+                            onChange={(e) => {
+                              if (e.target.value) handleSelectProductForPo(idx, e.target.value);
+                            }}
+                            value={it.productId || ""}
+                            className="text-[10px] bg-white hover:bg-amber-50 text-amber-800 font-black border border-amber-300 rounded-lg px-2 py-0.5 max-w-[210px] truncate cursor-pointer shadow-2xs"
+                          >
+                            <option value="">📋 Pilih List Master ({products.length})</option>
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                [{p.category}] {p.name} - {formatRupiah(Number(p.price) || 0)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {it.image ? (
+                            <div className="relative group w-8 h-8 rounded-lg overflow-hidden border border-amber-300 bg-white shadow-xs shrink-0">
+                              <img
+                                src={it.image}
+                                alt="Foto"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : null}
+                          <input
+                            type="text"
+                            required
+                            list="dstech_global_product_datalist"
+                            placeholder="Pilih dari list master atau ketik nama barang..."
+                            value={it.productName}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              handlePoItemChange(idx, "productName", val);
+                              const match = products.find((p) => p.name.toLowerCase() === val.toLowerCase());
+                              if (match) {
+                                handleSelectProductForPo(idx, match.id);
+                              }
+                            }}
+                            className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                          />
+                        </div>
                       </div>
                       <div className="col-span-2">
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Qty:</label>
                         <input
                           type="number"
                           min={1}
@@ -18956,6 +19309,7 @@ export default function AdminFinanceERPPage() {
                         />
                       </div>
                       <div className="col-span-2">
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Satuan:</label>
                         <input
                           type="text"
                           placeholder="Satuan"
@@ -18965,6 +19319,7 @@ export default function AdminFinanceERPPage() {
                         />
                       </div>
                       <div className="col-span-2">
+                        <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Harga Beli (Rp):</label>
                         <input
                           type="number"
                           min={0}
@@ -18975,7 +19330,7 @@ export default function AdminFinanceERPPage() {
                           className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
                         />
                       </div>
-                      <div className="col-span-1 text-center">
+                      <div className="col-span-1 text-center pt-3">
                         {poForm.items.length > 1 && (
                           <button
                             type="button"
@@ -19284,78 +19639,127 @@ export default function AdminFinanceERPPage() {
                   <label className="font-black text-slate-800 uppercase tracking-wider text-[11px]">
                     Daftar Barang yang Dipesan ({editPoForm.items.length})
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleAddEditPoItem}
-                    className="text-amber-700 font-bold text-xs hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Tambah Baris Barang</span>
-                  </button>
-                </div>
-
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {editPoForm.items.map((it, idx) => (
-                    <div
-                      key={it.id || idx}
-                      className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
-                    >
-                      <div className="col-span-5">
-                        <input
-                          type="text"
-                          required
-                          placeholder="Nama Barang / Sparepart..."
-                          value={it.productName}
-                          onChange={(e) => handleEditPoItemChange(idx, "productName", e.target.value)}
-                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <input
-                          type="number"
-                          min={1}
-                          required
-                          placeholder="Qty"
-                          value={it.qty}
-                          onChange={(e) => handleEditPoItemChange(idx, "qty", Number(e.target.value))}
-                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <input
-                          type="text"
-                          placeholder="Satuan"
-                          value={it.unit}
-                          onChange={(e) => handleEditPoItemChange(idx, "unit", e.target.value)}
-                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-medium text-xs"
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <input
-                          type="number"
-                          min={0}
-                          required
-                          placeholder="Harga Satuan (Rp)"
-                          value={it.price}
-                          onChange={(e) => handleEditPoItemChange(idx, "price", Number(e.target.value))}
-                          className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
-                        />
-                      </div>
-                      <div className="col-span-1 text-center">
-                        {editPoForm.items.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEditPoItem(idx)}
-                            className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                  <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenProductCatalogPicker("edit_purchase")}
+                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer transition shadow-2xs"
+                      >
+                        <Package className="w-3.5 h-3.5 text-amber-600" />
+                        <span>📦 Pilih dari Master Produk</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAddEditPoItem}
+                        className="text-amber-700 font-bold text-xs hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Tambah Baris</span>
+                      </button>
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {editPoForm.items.map((it, idx) => (
+                      <div
+                        key={it.id || idx}
+                        className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50 border border-slate-200/80"
+                      >
+                        <div className="col-span-5 space-y-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <label className="text-[10px] text-slate-600 font-bold">Nama Barang / Sparepart:</label>
+                            <select
+                              onChange={(e) => {
+                                if (e.target.value) handleSelectProductForEditPo(idx, e.target.value);
+                              }}
+                              value={it.productId || ""}
+                              className="text-[10px] bg-white hover:bg-amber-50 text-amber-800 font-black border border-amber-300 rounded-lg px-2 py-0.5 max-w-[210px] truncate cursor-pointer shadow-2xs"
+                            >
+                              <option value="">📋 Pilih List Master ({products.length})</option>
+                              {products.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  [{p.category}] {p.name} - {formatRupiah(Number(p.price) || 0)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            {it.image ? (
+                              <div className="relative group w-8 h-8 rounded-lg overflow-hidden border border-amber-300 bg-white shadow-xs shrink-0">
+                                <img
+                                  src={it.image}
+                                  alt="Foto"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ) : null}
+                            <input
+                              type="text"
+                              required
+                              list="dstech_global_product_datalist"
+                              placeholder="Pilih dari list master atau ketik nama barang..."
+                              value={it.productName}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleEditPoItemChange(idx, "productName", val);
+                                const match = products.find((p) => p.name.toLowerCase() === val.toLowerCase());
+                                if (match) {
+                                  handleSelectProductForEditPo(idx, match.id);
+                                }
+                              }}
+                              className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Qty:</label>
+                          <input
+                            type="number"
+                            min={1}
+                            required
+                            placeholder="Qty"
+                            value={it.qty}
+                            onChange={(e) => handleEditPoItemChange(idx, "qty", Number(e.target.value))}
+                            className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Satuan:</label>
+                          <input
+                            type="text"
+                            placeholder="Satuan"
+                            value={it.unit}
+                            onChange={(e) => handleEditPoItemChange(idx, "unit", e.target.value)}
+                            className="w-full p-2 rounded-lg border border-slate-200 bg-white font-medium text-xs"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Harga Beli (Rp):</label>
+                          <input
+                            type="number"
+                            min={0}
+                            required
+                            placeholder="Harga Satuan (Rp)"
+                            value={it.price}
+                            onChange={(e) => handleEditPoItemChange(idx, "price", Number(e.target.value))}
+                            className="w-full p-2 rounded-lg border border-slate-200 bg-white font-bold text-xs"
+                          />
+                        </div>
+                        <div className="col-span-1 text-center pt-3">
+                          {editPoForm.items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEditPoItem(idx)}
+                              className="text-red-500 hover:text-red-700 p-1 cursor-pointer"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
               {/* Calculations Box */}
               {(() => {
