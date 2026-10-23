@@ -3265,23 +3265,32 @@
 
 ---
 
-### 113. Tugas (Antrian): Sinkronisasi Jam Kerja Kontrak dengan Sistem Absensi Kehadiran untuk Deteksi Telat & Tepat Waktu
+### 113. Tugas: Sinkronisasi Jam Kerja Kontrak dengan Sistem Absensi Kehadiran untuk Deteksi Telat & Tepat Waktu
 - **Permintaan Pengguna**:
   *"kemudian terkait antara kehadiran pada kontrak dengan absensi, harus bisa sinkron jamnya, agar bisa kita atur telat dan tepatwaktu"*
-- **Status**: ⏳ **Dalam Antrian (Queued) - Akan dikerjakan setelah Task 111 & Task 112 Selesai**
+- **Status**: ✅ **Selesai (Completed & Live)**
 - **Penyebab Masalah / Analisis Kebutuhan**:
-  - Konfigurasi jam masuk kerja (`startTime`, contoh: 08:00) dan jam pulang kerja (`endTime`, contoh: 17:00) yang telah diatur pada Kontrak Kerja karyawan (`workSchedule`) perlu dibaca langsung oleh modul Absensi Kehadiran (`/admin/attendance` dan endpoint API absensi).
-  - Ketika karyawan melakukan presensi Masuk, sistem secara otomatis membandingkan jam check-in dengan `startTime` dari kontrak kerja karyawan:
-    - Jika check-in <= `startTime` (dengan toleransi grace period misal 5-15 menit): status "Tepat Waktu (On Time)".
-    - Jika check-in > `startTime`: status otomatis "Terlambat (Late)" beserta durasi keterlambatan (menit/jam) dan potensi pemotongan kedisiplinan jika diberlakukan.
-  - Begitu pula saat presensi Pulang: jika check-out < `endTime` ditandai "Pulang Cepat (Early Leave)", dan jika check-out > `endTime` + durasi lembur minimal dihitung sebagai "Potensi Lembur (Overtime)".
+  - Konfigurasi jam masuk kerja (`startTime`, contoh: 08:00) dan jam pulang kerja (`endTime`, contoh: 17:00) yang telah diatur pada Kontrak Kerja karyawan (`workSchedule`) sebelumnya belum terhubung dengan evaluasi status presensi.
+  - Sebelumnya, status absensi masuk di backend hanya membedakan lokasi radius ("Tepat Waktu (Kantor)" vs "Hadir Lapangan"), tanpa membandingkan jam check-in aktual karyawan terhadap jam kerja yang diperjanjikan di kontrak PKWT.
+- **Tindakan Perbaikan & Implementasi**:
+  1. [x] **Backend Helper Kontrak Kerja di API Absensi** (`src/app/api/employee/attendance/route.ts`):
+     - Menambahkan fungsi `getEmployeeContractSchedule(employeeName)` yang membaca langsung file kontrak PKWT aktif (`dstech_contracts.json`).
+     - Mengambil parameter jam masuk (`startTime`), jam pulang (`endTime`), dan jenis hari kerja (`workDaysType`).
+  2. [x] **Evaluasi Otomatis Keterlambatan saat Check-in**:
+     - Sistem menghitung selisih menit antara waktu check-in aktual dan batas jam masuk kontrak (`nowTotalMinutes - schedTotalMinutes`).
+     - Diterapkan batas toleransi keterlambatan resmi sebesar 5 menit.
+     - Jika karyawan check-in melebihi batas toleransi, status kehadiran otomatis ditetapkan menjadi **`Terlambat (Xm)`** (contoh: `Terlambat (25m)`).
+     - Jika check-in tepat waktu atau lebih awal: status **`Tepat Waktu`** (area kantor) atau **`Hadir Lapangan`** (area proyek).
+  3. [x] **Visualisasi Status Terlambat di Dashboard Admin Absensi** (`src/app/admin/attendance/page.tsx`):
+     - Memperbarui fungsi `renderStatusBadge` untuk menangani status `Terlambat (Xm)`.
+     - Ditampilkan dalam badge merah khas dengan ikon jam `Clock` dan durasi keterlambatan yang presisi.
 
 ---
 
 ### 114. Tugas: Penugasan Tim Karyawan/Teknisi pada Master Proyek Sesuai Kontrak PKWT & Integrasi dengan Absensi Kerja
 - **Permintaan Pengguna**:
   *"pada project, tolong tambahkan karyawan yang bertugas siapa saja dalam menangani proyek tersebut, sesuai dengan PKWT yang ada. misalnya project tersebut butuh 10 orang maka harus dapat dimasukkan kedalamnya. agar bisa diterapkan pada saat absensi kerja"*
-- **Status**: 🟡 **Sedang Dikerjakan (In Progress)**
+- **Status**: ✅ **Selesai (Completed & Live)**
 - **Penyebab Masalah / Analisis Kebutuhan**:
   - Pada entitas Master Proyek (`ProjectItem`), belum ada atribut untuk mencatat siapa saja personil / teknisi / helper yang ditugaskan dalam menangani proyek tersebut.
   - Pengguna membutuhkan fleksibilitas penugasan multi-personil (misal 5, 10, atau berapa pun teknisi yang dibutuhkan) yang bersumber dari master kontrak PKWT karyawan yang masih aktif.
@@ -3289,24 +3298,41 @@
   - Penugasan pada proyek ini harus terhubung langsung ke modul Presensi Absensi Kerja (`/employee` dan `/admin/attendance`):
     1. Karyawan saat presensi masuk (Check-in) dapat memilih proyek aktif di mana mereka ditugaskan.
     2. Admin absensi dapat memantau dan memfilter rekap kehadiran personil per proyek tertentu.
-- **Rencana Langkah Pelaksanaan**:
-  - [ ] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/admin/finance/page.tsx`, `src/app/api/finance/route.ts`, `src/app/employee/page.tsx`, `src/app/admin/attendance/page.tsx`, `src/app/api/employee/attendance/route.ts`) ke folder `_backup/`.
-  - [ ] **Langkah 2**: Tambahkan interface `ProjectAssignedEmployee` dan perluas tipe `ProjectItem` serta `projectForm` di `src/app/admin/finance/page.tsx`.
-  - [ ] **Langkah 3**: Perbarui backend API `src/app/api/finance/route.ts` pada action `project` (POST & PUT) untuk menyimpan `assignedEmployees`.
-  - [ ] **Langkah 4**: Perbarui UI modal Tambah/Edit Master Proyek (`isProjectModalOpen`) di `finance/page.tsx`:
-    - Mengambil data kontrak PKWT aktif.
-    - Sub-panel interaktif penugasan tim karyawan: Dropdown karyawan PKWT aktif + peran dalam proyek + tombol "+ Tambah Anggota Tim".
-    - Tabel daftar anggota tim dengan badge peran, nama, jabatan PKWT, nomor kontrak, tanggal penugasan, dan tombol hapus/keluarkan.
-    - Counter total personil tim (misal: "10 Personil Ditugaskan").
-  - [ ] **Langkah 5**: Tampilkan daftar tim yang bertugas pada kartu proyek dan detail dossier proyek di `/admin/finance`.
-  - [ ] **Langkah 6**: Integrasikan dengan modul Absensi (`src/app/employee/page.tsx`, `src/app/api/employee/attendance/route.ts`, dan `src/app/admin/attendance/page.tsx`):
-    - Tambahkan pemilihan proyek saat presensi masuk/pulang karyawan.
-    - Simpan `projectId` & `projectName` pada log presensi.
-    - Sediakan filter proyek pada halaman admin absensi.
-  - [ ] **Langkah 7**: Validasi lokal dengan `npm run build` di folder `dstech-smart`.
-  - [ ] **Langkah 8**: Push ke repositori GitHub via `push_with_native_git.js`.
-  - [ ] **Langkah 9**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
-  - [ ] **Langkah 10**: Verifikasi di server live dan bersihkan file cadangan `_backup/`.
+- **Rincian Langkah Pelaksanaan yang Diselesaikan**:
+  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/admin/finance/page.tsx`, `src/app/api/finance/route.ts`, `src/app/employee/page.tsx`, `src/app/admin/attendance/page.tsx`, `src/app/api/employee/attendance/route.ts`) ke folder `_backup/`.
+  - [x] **Langkah 2**: Tambahkan interface `ProjectAssignedEmployee` dan perluas tipe `ProjectItem` serta `projectForm` di `src/app/admin/finance/page.tsx`:
+    ```ts
+    export interface ProjectAssignedEmployee {
+      employeeId: string;
+      employeeName: string;
+      position: string;
+      roleInProject: string;
+      contractNumber?: string;
+      phone?: string;
+      assignedDate?: string;
+      notes?: string;
+    }
+    ```
+  - [x] **Langkah 3**: Perbarui backend API `src/app/api/finance/route.ts` pada action `project` (POST & PUT) untuk menyimpan array `assignedEmployees`.
+  - [x] **Langkah 4**: Perbarui UI modal Tambah/Edit Master Proyek (`isProjectModalOpen`) di `finance/page.tsx`:
+    - Mengambil data kontrak PKWT aktif via `fetch('/api/contracts')`.
+    - Sub-panel interaktif penugasan tim karyawan: Dropdown karyawan PKWT aktif + peran dalam proyek (Lead Technician, Teknisi Skill, Helper, dll.) + tombol "+ Tambah Tim".
+    - Validasi anti-duplikasi anggota tim dalam satu proyek.
+    - Tabel daftar anggota tim dengan nomor urut, nama, jabatan PKWT, nomor kontrak, peran proyek, dan tombol hapus/keluarkan.
+    - Counter dinamis total personil tim (misal: "10 Orang Ditugaskan").
+  - [x] **Langkah 5**: Tampilkan badge jumlah tim bertugas pada kartu proyek (`{prj.assignedEmployees?.length || 0} Personil PKWT`) dan tambahkan tab khusus **"Tim Personil PKWT"** pada modal Dossier & Analisis Finansial Proyek di `/admin/finance`.
+  - [x] **Langkah 6**: Integrasikan dengan Portal Karyawan / Teknisi (`src/app/employee/page.tsx` & `/api/employee/attendance`):
+    - Memuat daftar proyek aktif dari `/api/finance`.
+    - Pada modal Check-In dan Check-Out, disediakan dropdown **"Terkait Penugasan Proyek (Sesuai Tim PKWT)"**:
+      - Otomatis menandai proyek di mana karyawan terdaftar sebagai tim (`⭐ [Tim Anda: Teknisi Skill] PRJ-...`).
+    - Menyimpan `projectId`, `projectName`, dan `projectRole` pada log absensi.
+    - Baris riwayat absensi teknisi menampilkan badge proyek penugasan.
+  - [x] **Langkah 7**: Integrasikan dengan Dashboard Admin Absensi (`src/app/admin/attendance/page.tsx`):
+    - Tambahkan filter dropdown cepat per proyek (`filterProject`).
+    - Menampilkan badge nama proyek dan peran PKWT pada kolom nama karyawan di tabel absensi.
+  - [x] **Langkah 8**: Validasi lokal dengan `npm run build` di folder `dstech-smart` (sukses 52 routes, 0 error).
+  - [x] **Langkah 9**: Push ke repositori GitHub via `push_with_native_git.js` (Commit: `e70209d`).
+  - [x] **Langkah 10**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js`, restart PM2 `dstech-main` (online), verifikasi live API HTTP 200 OK, dan bersihkan file cadangan `_backup/`.
 
 ---
 

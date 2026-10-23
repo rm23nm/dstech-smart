@@ -14810,16 +14810,43 @@ export default function AdminFinanceERPPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">
-                    Nama Klien / Customer:
+                  <label className="font-bold text-slate-700 block mb-1 flex items-center justify-between">
+                    <span>Nama Klien / Customer:</span>
+                    <span className="text-[10px] text-indigo-600 font-bold">Wajib dari Master Klien</span>
                   </label>
-                  <input
-                    type="text"
-                    value={projectForm.clientName}
-                    onChange={(e) => setProjectForm({ ...projectForm, clientName: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-200"
-                    placeholder="Pilih atau tulis nama klien"
-                  />
+                  <select
+                    required
+                    value={projectForm.clientId ? `${projectForm.clientId}|||${projectForm.clientName}` : projectForm.clientName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        setProjectForm({ ...projectForm, clientId: "", clientName: "" });
+                        return;
+                      }
+                      if (val.includes("|||")) {
+                        const [cId, cName] = val.split("|||");
+                        setProjectForm({ ...projectForm, clientId: cId, clientName: cName });
+                      } else {
+                        const matchedClient = clients.find((cl) => cl.name.trim().toLowerCase() === val.trim().toLowerCase());
+                        setProjectForm({
+                          ...projectForm,
+                          clientId: matchedClient?.id || "",
+                          clientName: val,
+                        });
+                      }
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">-- Pilih Klien / Customer Terdaftar --</option>
+                    {clients.map((cl) => (
+                      <option key={cl.id} value={`${cl.id}|||${cl.name}`}>
+                        🏢 {cl.name} {cl.category ? `(${cl.category})` : ""} {cl.pic ? `• PIC: ${cl.pic}` : ""}
+                      </option>
+                    ))}
+                    {projectForm.clientName && !clients.some((cl) => cl.name.trim().toLowerCase() === projectForm.clientName.trim().toLowerCase()) && (
+                      <option value={projectForm.clientName}>🏢 {projectForm.clientName} (Tersimpan di Proyek)</option>
+                    )}
+                  </select>
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">
@@ -14854,16 +14881,26 @@ export default function AdminFinanceERPPage() {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">
-                    PIC Lapangan:
+                  <label className="font-bold text-slate-700 block mb-1 flex items-center justify-between">
+                    <span>PIC Lapangan:</span>
+                    <span className="text-[10px] text-indigo-600 font-bold">Wajib dari Staf PKWT</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
+                    required
                     value={projectForm.picProject}
                     onChange={(e) => setProjectForm({ ...projectForm, picProject: e.target.value })}
-                    className="w-full p-2.5 rounded-xl border border-slate-200"
-                    placeholder="Nama PIC teknis lapangan"
-                  />
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="">-- Pilih PIC Lapangan dari Staf PKWT --</option>
+                    {availableContracts.map((c: any) => (
+                      <option key={c.id} value={c.employeeName}>
+                        👷 {c.employeeName} — {c.position} ({c.contractNumber})
+                      </option>
+                    ))}
+                    {projectForm.picProject && !availableContracts.some((c: any) => c.employeeName?.trim().toLowerCase() === projectForm.picProject.trim().toLowerCase()) && (
+                      <option value={projectForm.picProject}>👷 {projectForm.picProject} (Tersimpan di Proyek)</option>
+                    )}
+                  </select>
                 </div>
               </div>
 
@@ -15265,6 +15302,18 @@ export default function AdminFinanceERPPage() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => setProjectDossierTab("team")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      projectDossierTab === "team"
+                        ? "bg-indigo-600 text-white shadow"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Tim Personil PKWT ({prj.assignedEmployees?.length || 0})</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setProjectDossierTab("sales")}
                     className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
                       projectDossierTab === "sales"
@@ -15311,19 +15360,77 @@ export default function AdminFinanceERPPage() {
                     <Camera className="w-3.5 h-3.5" />
                     <span>Foto Dokumentasi & Part ({prj.photos?.length || 0})</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setProjectDossierTab("team")}
-                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
-                      projectDossierTab === "team"
-                        ? "bg-indigo-600 text-white shadow"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    <span>Tim Personil PKWT ({prj.assignedEmployees?.length || 0})</span>
-                  </button>
                 </div>
+
+                {/* Tab Content: Summary */}
+                {projectDossierTab === "summary" && (
+                  <div className="space-y-4 text-xs">
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                      <h4 className="font-black text-slate-800 text-sm flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4 text-purple-600" />
+                        <span>Informasi & Deskripsi Pekerjaan</span>
+                      </h4>
+                      <p className="text-slate-600 leading-relaxed">
+                        {prj.description || "Tidak ada rincian catatan deskripsi proyek."}
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-slate-600">
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Tanggal Mulai:</span>
+                          <span className="font-bold">{prj.startDate || "-"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Target Selesai:</span>
+                          <span className="font-bold">{prj.targetEndDate || "-"}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">Piutang Klien:</span>
+                          <span className="font-bold text-amber-600">{formatRupiah(totalSalesOutstanding)}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 block">SPH Terhubung:</span>
+                          {linkedQuotation ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedQuotationForPrint(linkedQuotation);
+                              }}
+                              className="font-bold text-purple-700 underline cursor-pointer"
+                            >
+                              {linkedQuotation.quotationNumber}
+                            </button>
+                          ) : (
+                            <span className="font-medium text-slate-400">-</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Kalkulasi Keuangan Proyek */}
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3">
+                      <h4 className="font-black text-slate-800 text-sm">Rincian Komponen Laba Rugi Proyek</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">1. Realisasi Pendapatan (Faktur Terbit)</span>
+                          <span className="font-black text-emerald-600 text-sm">{formatRupiah(totalSalesInvoiced)}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">2. Beban Material / Hardware (PO Supplier)</span>
+                          <span className="font-black text-rose-600 text-sm">- {formatRupiah(totalPurchaseCost)}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
+                          <span className="text-slate-600 font-medium">3. Beban Operasional Lapangan (BBM, Teknisi, dll)</span>
+                          <span className="font-black text-rose-600 text-sm">- {formatRupiah(totalCashFieldCost)}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 bg-purple-50 px-3 rounded-xl font-black text-sm text-purple-950">
+                          <span>Estimasi Laba Bersih Proyek:</span>
+                          <span className={netProfit >= 0 ? "text-purple-700 font-black text-base" : "text-rose-600 font-black text-base"}>
+                            {formatRupiah(netProfit)} ({profitMargin}%)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Tab Content: Team (Personil PKWT) */}
                 {projectDossierTab === "team" && (
@@ -15394,76 +15501,6 @@ export default function AdminFinanceERPPage() {
                         </table>
                       </div>
                     )}
-                  </div>
-                )}
-
-                {/* Tab Content: Summary */}
-                {projectDossierTab === "summary" && (
-                  <div className="space-y-4 text-xs">
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                      <h4 className="font-black text-slate-800 text-sm flex items-center gap-1.5">
-                        <Building2 className="w-4 h-4 text-purple-600" />
-                        <span>Informasi & Deskripsi Pekerjaan</span>
-                      </h4>
-                      <p className="text-slate-600 leading-relaxed">
-                        {prj.description || "Tidak ada rincian catatan deskripsi proyek."}
-                      </p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200 text-slate-600">
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Tanggal Mulai:</span>
-                          <span className="font-bold">{prj.startDate || "-"}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Target Selesai:</span>
-                          <span className="font-bold">{prj.targetEndDate || "-"}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">Piutang Klien:</span>
-                          <span className="font-bold text-amber-600">{formatRupiah(totalSalesOutstanding)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-slate-400 block">SPH Terhubung:</span>
-                          {linkedQuotation ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedQuotationForPrint(linkedQuotation);
-                              }}
-                              className="font-bold text-purple-700 underline cursor-pointer"
-                            >
-                              {linkedQuotation.quotationNumber}
-                            </button>
-                          ) : (
-                            <span className="font-medium text-slate-400">-</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Breakdown Kalkulasi Keuangan Proyek */}
-                    <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3">
-                      <h4 className="font-black text-slate-800 text-sm">Rincian Komponen Laba Rugi Proyek</h4>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
-                          <span className="text-slate-600 font-medium">1. Realisasi Pendapatan (Faktur Terbit)</span>
-                          <span className="font-black text-emerald-600 text-sm">{formatRupiah(totalSalesInvoiced)}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
-                          <span className="text-slate-600 font-medium">2. Beban Material / Hardware (PO Supplier)</span>
-                          <span className="font-black text-rose-600 text-sm">- {formatRupiah(totalPurchaseCost)}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
-                          <span className="text-slate-600 font-medium">3. Beban Operasional Lapangan (BBM, Teknisi, dll)</span>
-                          <span className="font-black text-rose-600 text-sm">- {formatRupiah(totalCashFieldCost)}</span>
-                        </div>
-                        <div className="flex justify-between items-center py-2 bg-purple-50 px-3 rounded-xl font-black text-sm text-purple-950">
-                          <span>Estimasi Laba Bersih Proyek:</span>
-                          <span className={netProfit >= 0 ? "text-purple-700 font-black text-base" : "text-rose-600 font-black text-base"}>
-                            {formatRupiah(netProfit)} ({profitMargin}%)
-                          </span>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )}
 
