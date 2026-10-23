@@ -6184,6 +6184,9 @@ export default function AdminFinanceERPPage() {
         if (res.ok) {
           const resJson = await res.json().catch(() => null);
           const newProject = resJson?.data;
+          if (newProject) {
+            setProjects((prev) => [newProject, ...prev]);
+          }
           showToast(`Proyek baru ${projectForm.projectName} berhasil ditambahkan!`);
           setIsProjectModalOpen(false);
           fetchFinanceData();
@@ -6210,6 +6213,18 @@ export default function AdminFinanceERPPage() {
                 ? (newProject?.clientName || projectForm.clientName)
                 : prev.customerName,
             }));
+          }
+
+          if (editingSale) {
+            setEditingSale((prev: any) =>
+              prev
+                ? {
+                    ...prev,
+                    projectId: newProject?.id || prev.projectId,
+                    projectName: newProject?.projectName || projectForm.projectName,
+                  }
+                : prev
+            );
           }
         } else {
           showToast("Gagal menambahkan proyek");
@@ -11474,9 +11489,19 @@ export default function AdminFinanceERPPage() {
                     <Briefcase className="w-3.5 h-3.5 text-purple-600" />
                     <span>Alokasikan Pendapatan ke Proyek (Opsional):</span>
                   </label>
-                  <span className="text-[10px] text-purple-600 font-medium">
-                    {saleForm.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAddProject()}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Tambah Proyek Baru</span>
+                    </button>
+                    <span className="text-[10px] text-purple-600 font-medium hidden sm:inline">
+                      {saleForm.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
+                    </span>
+                  </div>
                 </div>
                 <select
                   value={saleForm.projectId || ""}
@@ -11494,7 +11519,7 @@ export default function AdminFinanceERPPage() {
                   }}
                   className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
                 >
-                  <option value="">-- Bukan Penjualan Proyek Khusus (Penjualan / Ritel Umum) --</option>
+                  <option value="">-- Bukan Penjualan Proyek Khusus (atau klik &quot;+ Tambah Proyek Baru&quot;) --</option>
                   {projects
                     .filter((p) => (saleForm.businessEntity || "PT") === (p.businessEntity || "PT"))
                     .map((p) => (
@@ -14123,9 +14148,19 @@ export default function AdminFinanceERPPage() {
                     <Briefcase className="w-3.5 h-3.5 text-purple-600" />
                     <span>Tautkan ke Master Proyek (Opsional):</span>
                   </label>
-                  <span className="text-[10px] text-purple-600 font-medium">
-                    {quotationForm.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAddProject()}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Tambah Proyek Baru</span>
+                    </button>
+                    <span className="text-[10px] text-purple-600 font-medium hidden sm:inline">
+                      {quotationForm.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
+                    </span>
+                  </div>
                 </div>
                 <select
                   value={quotationForm.projectId || ""}
@@ -14141,7 +14176,7 @@ export default function AdminFinanceERPPage() {
                   }}
                   className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
                 >
-                  <option value="">-- Tidak Terkait Proyek Spesifik (Penawaran Bebas / Mandiri) --</option>
+                  <option value="">-- Tidak Terkait Proyek Spesifik (atau klik &quot;+ Tambah Proyek Baru&quot;) --</option>
                   {projects
                     .filter((p) => (quotationForm.businessEntity || "PT") === (p.businessEntity || "PT"))
                     .map((p) => (
@@ -24189,9 +24224,19 @@ export default function AdminFinanceERPPage() {
                     <Briefcase className="w-3.5 h-3.5 text-purple-600" />
                     <span>Tautkan ke Master Proyek:</span>
                   </label>
-                  <span className="text-[10px] text-purple-600 font-medium">
-                    {editingSale.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAddProject()}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] shadow-xs transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>+ Tambah Proyek Baru</span>
+                    </button>
+                    <span className="text-[10px] text-purple-600 font-medium hidden sm:inline">
+                      {editingSale.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
+                    </span>
+                  </div>
                 </div>
                 <select
                   value={editingSale.projectId || ""}
@@ -24206,7 +24251,7 @@ export default function AdminFinanceERPPage() {
                   }}
                   className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
                 >
-                  <option value="">-- Bukan Penjualan Proyek Khusus (Penjualan / Ritel Umum) --</option>
+                  <option value="">-- Bukan Penjualan Proyek Khusus (atau klik &quot;+ Tambah Proyek Baru&quot;) --</option>
                   {projects
                     .filter((p) => (editingSale.businessEntity || "PT") === (p.businessEntity || "PT"))
                     .map((p) => (
