@@ -83,7 +83,12 @@
 - **2026-10-23**: Penguncian Koordinat GPS Absensi dan Kewajiban Foto Selfie Presensi Teknisi (Tugas 100). Mengunci koordinat GPS saat Check-In / Check-Out agar tidak dapat dimodifikasi ulang ke-2x, mewajibkan aktivasi kamera selfie perangkat real-time, dan memblokir input koordinat manual demi integritas data absensi lapangan. Lolos verifikasi build dan deploy live.
 - **2026-10-23**: Sistem Manajemen Kontrak Kerja & Perekrutan Karyawan Baru (Tugas 101). Menyiapkan modul `/admin/contracts` lengkap dengan data store terisolasi `dstech_contracts.json` (prefix `dstech_contract_`), dukungan kontrak Staf (Bulanan/Tahunan) dan Teknisi (Tipe 1: Flat Harian Penuh, Tipe 2: Hourly Rate + Rumus Lembur Pengali 1.5x - 3.0x), generator cetak Surat Perjanjian Kerja Waktu Tertentu (PKWT) resmi A4 ber-Kop Surat DSTech dan dual signatures, serta tombol download PDF A4. Lolos verifikasi build dan deploy live.
 - **2026-10-23**: Integrasi Otomatis Kontrak Kerja ke User Management & Fitur Masa Berlaku Akun / User Expiry (Tugas 103). Menyelesaikan masalah staf dummy kontrak kerja (`Teknisi Hendra`, `Ikhsan Maulidi`, `Marshanda Salwa Agustina`) yang sebelumnya belum muncul di User Management dengan membuat fungsi auto-sync `syncContractsWithUsers()` di backend `src/app/api/users/route.ts`. Menambahkan atribut `expiresAt` pada skema master user, kontrol masa berlaku fleksibel (Permanen, +1 Bulan, +3 Bulan, +6 Bulan, +1 Tahun, serta Date Picker kustom) pada modal Tambah & Edit User di `/admin/users`, badge status masa berlaku (🟢 Permanen, 🟡 Sisa X Hari, 🔴 Kedaluwarsa), serta pencekalan login ketat di `/api/auth/login` (status HTTP 403 Forbidden dengan pesan penolakan ramah jika akun telah melewati batas tanggal masa berlaku). Lolos validasi TypeScript (0 error), build 51 rute sukses, commit `43e4ea4`, dan deploy sukses ke server live VPS PM2 `dstech-main`.
-- **2026-10-23**: Sistem Geofencing GPS Staf Tertentu (Wajib Presensi di Kantor / Tolak Jika di Luar Radius) (Tugas 102). Membangun sistem pembatasan lokasi presensi akurat satelit (Haversine Formula) berbasis kebijakan user: (1) Menambahkan atribut `attendanceLocationLock` ("ANY" | "OFFICE") dan `officeRadius` (default 100m) pada User Management (`/admin/users`) dan skema data store `dstech_users.json`, lengkap dengan badge status tabel ("🏢 Wajib Kantor" vs "🌐 Bebas Lapangan") dan pemilih radio interaktif pada modal Tambah & Edit Pengguna; (2) Backend presensi `src/app/api/employee/attendance/route.ts` memverifikasi jarak satelit riil ke koordinat resmi Kantor Pusat DSTech Cilegon (`-6.031846, 106.037198`) dan secara otomatis menolak dengan respons `HTTP 403 Forbidden` jika staf terkunci kantor berada di luar batas radius 100 meter; (3) Portal karyawan `src/app/employee/page.tsx` menampilkan Geofence Radar Satelit interaktif real-time pada modal Check-In dan Check-Out, mengunci/mendisable tombol submit jika melanggar radius kantor, serta menyinkronkan kebijakan lokasi user dari API; (4) Antarmuka admin `src/app/admin/attendance/page.tsx` menampilkan badge jarak & status geofence riil ("🏢 Kantor (X m)" atau "🌐 Lapangan") pada setiap log presensi. Lolos validasi kompilasi `tsc`, Next.js build 51 rute sukses, commit `892a3a9`, deploy live ke VPS PM2 `dstech-main` (PID 551858), dan teruji 100% via automated HTTP test (rejection HTTP 403 saat di luar kantor dan accept HTTP 200 saat di dalam kantor).
+- **2026-10-23**: Format Tampilan Sisa Masa Berlaku Kontrak Kerja Lebih Eksplisit & Validasi Generator Slip Auto-Payroll (Tugas 106 & 107). Memperbaiki kalkulasi sisa durasi kontrak kerja di tabel `/admin/contracts` agar menampilkan format lengkap yang mudah dipahami: `🟢 Aktif • Sisa X Bulan Y Hari (Z Hari lagi s/d [Tanggal Selesai])` sehingga tidak membingungkan pengguna yang mengira durasi kontrak 12 bulan dihitung sebagai 69 hari. Memvalidasi generator auto-payroll di `/api/payroll` agar staf bulanan tidak menduplikasi uang kehadiran (`presenceAllowance = 0`) dan teknisi harian dikalikan presensi kehadiran secara akurat. Lolos verifikasi build lokal, push GitHub `173857d`, dan live VPS PM2 `dstech-main`.
+- **2026-10-23**: Penambahan Skema Tipe 3: 'Bulanan Dibayar Penuh (Flat Monthly Salary)' pada Kontrak Kerja & Auto-Payroll (Tugas 108). Menambahkan pilihan kartu ketiga yang sejajar di form modal kontrak kerja (`/admin/contracts`): (1) Tipe 1: Harian Dibayar Penuh (Flat Daily Rate), (2) Tipe 2: Bayaran Jam + Pengali Lembur (Hourly Rate & Multiplier), dan (3) Tipe 3: Bulanan Dibayar Penuh (Flat Monthly Salary) untuk teknisi dan staf bulanan tetap. Dilengkapi input Gaji Pokok, Tunjangan Jabatan, Transport, BPJS, dan Tarif Lembur Opsional. Memperbarui kolom "Skema Pembayaran" pada tabel kontrak dengan badge biru `Tipe 3: Bulanan Penuh` serta memperbarui generator auto-payroll `/api/payroll` agar skema Tipe 3 dibayarkan penuh tanpa pengali hari hadir harian (`presenceAllowance = 0`). Lolos uji kompilasi TypeScript 0 error, build lokal 52 routes sukses, push ke GitHub `a6c1a0a`, dan live deploy sukses di VPS PM2 `dstech-main` (PID 570767).
+- **2026-10-23**: [SEDANG BERJALAN] Sistem Pengaturan Kuota Cuti Tahunan, Izin, dan Sakit pada Kontrak Kerja, Portal Karyawan, dan Penggajian (Tugas 109). Menambahkan pengaturan hak cuti tahunan (default 12 hari/tahun), batas izin (izin resmi berbayar vs izin potong upah proporsional), dan klausa sakit (wajib surat dokter / berbayar penuh) pada formulir kontrak kerja karyawan, profil karyawan, portal absensi karyawan, serta integrasi pemotongan otomatis atau kompensasi pada slip gaji payroll.
+
+
+
 
 
 
@@ -2990,7 +2995,11 @@
 ### 104. Tugas: Fitur Auto Penggajian Otomatis pada Tanggal Tertentu & Rekap Penggajian / Payroll Summary
 - **Permintaan Pengguna**:
   *"kemudian saya ingin kamu membuat fitur auto penggajian pada tanggal tertentu, kemudian saya tidak melihat adanya rekap gaji/penggajian"*
-- **Status**: ⏳ **Antrian Pekerjaan Selanjutnya (Queued)**
+- **Status**: ✅ **Selesai 100% (Deployed Live)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Di sidebar navigasi admin (`/admin/layout.tsx`), sebelumnya belum ada menu mandiri "Penggajian & Rekap Gaji", sehingga pengguna tidak melihat adanya fitur rekap gaji/penggajian.
+  - Modul penggajian sebelumnya hanya berupa sub-tab dan kalkulator input manual satuan di `/admin/attendance`, belum memiliki dashboard Rekapitulasi Penggajian yang komprehensif.
+  - Belum ada fitur konfigurasi tanggal gajian otomatis (*Auto Payday* & *Cut-off Date*) dan generator slip gaji otomatis (*Auto Payroll Generation*) yang mengkalkulasi seluruh gaji staf/teknisi aktif berdasarkan presensi riil dan kontrak kerja.
 - **Kebutuhan Fitur**:
   - Konfigurasi tanggal penggajian otomatis (Cut-Off & Payday date, misal tanggal 25 atau tanggal 1 setiap bulan).
   - Generator otomatisasi slip gaji (Auto-Payroll Generation) bagi seluruh karyawan aktif & kontrak berdasarkan data presensi riil (hari kerja, jam kerja, lembur pengali, dan rate upah kontrak).
@@ -3000,8 +3009,168 @@
     - Status pembayaran (Draft, Disetujui, Dibayarkan) dengan tombol aksi cepat persetujuan massal.
     - Integrasi otomatis pembukuan ke Buku Arus Kas Keluar (`dstech_cash_flow`) modul Keuangan ERP.
     - Lembar Cetak & Ekspor Rekap Penggajian Bulanan resmi A4 ber-Kop Surat DSTech.
+- **Realisasi Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat cadangan (backup) file sebelum modifikasi (`src/app/api/payroll/route.ts`, `src/app/admin/layout.tsx`, `src/data/dstech_payroll.json`) ke folder `_backup/`.
+  - [x] **Langkah 2**: Perluas API `src/app/api/payroll/route.ts` dengan dukungan:
+    - Konfigurasi tanggal penggajian otomatis (`autoPaydayDay: 25`, `cutoffStartDay: 21`, `cutoffEndDay: 20`, `autoGenerateEnabled: true`, `defaultPaymentMethod: "Transfer Bank BCA"`).
+    - Action `auto_generate`: otomatis membaca seluruh staf aktif dari `dstech_contracts.json` & `dstech_users.json`, menghitung hari presensi & jam lembur riil dari `dstech_employee_attendance.json` dalam rentang cut-off, menghitung gaji pokok/harian, uang kehadiran, lembur, dan tunjangan secara dinamis, dan menerbitkan/memperbarui slip gaji bulan tersebut.
+    - Action `bulk_approve` & `bulk_pay`: otorisasi dan pembayaran massal dengan pencatatan otomatis ke Buku Arus Kas ERP (`dstech_cash_flow`).
+    - Summary metrik agregat penggajian (Total THP, Gross, Potongan, Hari Ini Payday, Konfigurasi Cutoff).
+  - [x] **Langkah 3**: Tambahkan menu navigasi resmi di Sidebar Admin (`src/app/admin/layout.tsx`):
+    - `Penggajian & Rekap Gaji` (`/admin/payroll`) ber-ikon `Banknote` di sidebar desktop & mobile, entri di katalog pencarian cepat admin, serta banner navigasi cepat di `/admin/attendance?tab=payroll`.
+  - [x] **Langkah 4**: Bangun Halaman Dedicated Rekapitulasi Gaji & Penggajian di `src/app/admin/payroll/page.tsx`:
+    - Dashboard Metrik KPI Finansial Payroll (Total Anggaran Gaji, Total Gaji Pokok, Total Kehadiran, Total Lembur, Total Potongan BPJS, Status Pembayaran).
+    - Banner Notifikasi Real-time Hari Payday jika tanggal hari ini sama dengan tanggal gajian.
+    - Toolbar Kontrol Lengkap: Filter Periode Bulan, Filter Status, Kotak Pencarian, Tombol "⚙️ Atur Tanggal Gajian Otomatis (25)", Tombol "⚡ Auto-Generate Penggajian", Tombol "➕ Terbitkan Slip Manual", Tombol "✅ Bayar Massal", Tombol "🖨️ Cetak Rekap Penggajian (A4)", dan Tombol "📥 Unduh CSV".
+    - Tabel Rekapitulasi Penggajian Komprehensif dengan rincian per karyawan, divisi, hari kerja, jam lembur, komponen gaji, status, dan tombol aksi (Cetak Slip Individual A4, Bayar, Edit, Hapus).
+    - Modal 1: Konfigurasi Penggajian Otomatis (Setting Tanggal Gajian 1-31, Tanggal Cut-Off, dan Rekening Transfer).
+    - Modal 2: Eksekusi Auto-Generate Penggajian Massal dengan Opsi Overwrite.
+    - Modal 3: Form Tambah & Edit Slip Gaji Interaktif.
+    - Modal 4: Cetak Slip Gaji Individual A4 Resmi ber-Kop Surat DSTech, Rincian Penghasilan/Potongan, dan Dual Signature.
+    - Modal 5: Cetak Lembar Rekapitulasi Penggajian Bulanan Resmi A4 ber-Kop Surat DSTech, Tabel Komprehensif Seluruh Karyawan, dan Tanda Tangan Direktur Utama Ramadhani, ST & Bagian Keuangan.
+    - Modal 6: Dialog Konfirmasi Hapus Slip Gaji Aman.
+  - [x] **Langkah 5**: Validasi kompilasi lokal (`npx tsc --noEmit` lolos 0 error dan `npm run build` sukses 52 static routes).
+  - [x] **Langkah 6**: Push ke repositori GitHub `rm23nm/dstech-smart` via `push_with_native_git.js` (commit `f04bd67`).
+  - [x] **Langkah 7**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main` (PID 554375).
+  - [x] **Langkah 8**: Verifikasi pengujian fungsionalitas di server live (`https://dstechsmart.com/api/payroll` respon HTTP 200 OK, `https://dstechsmart.com/admin/payroll` termuat 50KB lengkap, dan eksekusi `auto_generate` live berhasil menerbitkan slip baru).
+  - [x] **Langkah 9**: Hapus file cadangan di `_backup/` dan perbarui Laporan Progres akhir.
 
 ---
+
+### 105. Tugas: Skema Tarif Gaji Harian Sesuai Posisi Jabatan & Level Keahlian (Helper Rp 150.000, Skill Rp 175.000, Senior Rp 200.000)
+- **Permintaan Pengguna**:
+  *"untuk gaji perhari kita punya rate yang berbeda sesuai dengan posisi jabatan, misalnya helper 150.000 dan Skil 175,000"*
+- **Status**: 🟢 **Selesai (Completed)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Tarif harian teknisi sebelumnya masih menggunakan tarif flat acuan tunggal pada kontrak/generator (misal Rp 200.000), belum ada diferensiasi resmi berbasis grade jabatan lapangan (Helper vs Teknisi Skill).
+  - Diperlukan konfigurasi tarif harian per posisi jabatan (`dailyRatesByPosition`) di database penggajian:
+    - Helper / Asisten Teknisi: **Rp 150.000 / hari** (lembur default Rp 25.000/jam)
+    - Teknisi Skill / Teknisi Lapangan: **Rp 175.000 / hari** (lembur default Rp 30.000/jam)
+    - Teknisi Senior / Specialist: **Rp 200.000 / hari** (lembur default Rp 35.000/jam)
+    - Lead / Foreman Lapangan: **Rp 225.000 / hari** (lembur default Rp 40.000/jam)
+  - Integrasi tarif jabatan ini telah diterapkan secara terpadu pada:
+    1. Pengaturan Penggajian (`dstech_payroll.json` & `/api/payroll`): admin dapat mengatur dan menyimpan tarif upah harian dan lembur tiap level keahlian secara dinamis.
+    2. Generator Auto-Payroll (`/api/payroll`): membaca posisi karyawan secara cerdas (Helper vs Skill vs Senior) dan otomatis mengalikan hari hadir dengan tarif jabatan (`baseSalary = presenceDays * dailyRate`).
+    3. Modal Tambah & Edit Slip Gaji Manual (`/admin/payroll/page.tsx`): 4 tombol preset tingkat jabatan (Helper, Skill, Senior, Staf Kantor) dan input field "Tarif Harian (Rp/Hari)" yang reaktif.
+    4. Kontrak Kerja (`/admin/contracts/page.tsx` & `dstech_contracts.json`): 4 tombol preset tingkat jabatan teknisi harian (Helper 150rb, Skill 175rb, Senior 200rb, Foreman 225rb).
+    5. Rekapitulasi & Lembar Cetak Slip A4: menampilkan badge rate posisi (misal: `Helper: Rp 150.000/hr`) serta rincian perkalian hari kerja pada slip A4.
+- **Realisasi Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/api/payroll/route.ts`, `src/app/admin/payroll/page.tsx`, `src/data/dstech_payroll.json`, `src/app/admin/contracts/page.tsx`, `src/data/dstech_contracts.json`) ke folder `_backup/`.
+  - [x] **Langkah 2**: Perbarui schema dan data store `src/data/dstech_payroll.json` dengan tabel tarif harian jabatan:
+    - Helper: Rp 150.000 (lembur Rp 25.000)
+    - Teknisi Skill: Rp 175.000 (lembur Rp 30.000)
+    - Teknisi Senior: Rp 200.000 (lembur Rp 35.000)
+    - Lead Teknisi: Rp 225.000 (lembur Rp 40.000)
+  - [x] **Langkah 3**: Perbarui backend API `src/app/api/payroll/route.ts`:
+    - Simpan dan sediakan `dailyRatesByPosition` pada `defaultSettings` serta dukung update pengaturan via PUT.
+    - Di `auto_generate`, deteksi grade posisi karyawan (Helper -> Rp 150.000, Skill -> Rp 175.000, Senior -> Rp 200.000) saat menghitung `baseSalary = presenceDays * rateJabatan`, serta simpan `dailyRate` dan `positionTier` pada record slip.
+  - [x] **Langkah 4**: Perbarui antarmuka `src/app/admin/payroll/page.tsx`:
+    - Tambahkan 4 kartu konfigurasi tarif per jabatan pada Modal Pengaturan Auto Payday & Tarif.
+    - Tambahkan tombol preset cepat (Helper 150rb, Skill 175rb, Senior 200rb, Staf Kantor) serta input field "Tarif Harian (Rp/Hari)" pada Modal Tambah/Edit Slip Gaji Manual.
+    - Tampilkan badge posisi/grade skill pada tabel slip gaji dan rincian perkalian hari pada lembar cetak slip resmi A4.
+  - [x] **Langkah 5**: Perbarui formulir kontrak kerja di `src/app/admin/contracts/page.tsx` dengan 4 tombol preset tingkat jabatan teknisi harian (Helper 150rb, Skill 175rb, Senior 200rb, Foreman 225rb) pada skema Tipe 1.
+  - [x] **Langkah 6**: Validasi lokal (`npx tsc --noEmit` lolos 0 error & `npm run build` sukses 52 static routes).
+  - [x] **Langkah 7**: Push ke repositori GitHub via `push_with_native_git.js` (commit `2ef6e29`).
+  - [x] **Langkah 8**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main` (PID 565484).
+### 106. Tugas: Penyelarasan Input Kontrak Kerja (Pemilihan Jabatan Resmi & Status Penggajian Harian vs Bulanan) serta Akurasi Hasil Auto-Generate Penggajian Sesuai Kontrak
+- **Permintaan Pengguna**:
+  *"kenapa hasil generetnya tidak sesuai dengan kontrak hasilnya? kemudian untuk menentukan jabatan dan status penggajian perhari dan perbulannya sepertinya settingannya gak ada saat input kontrak"*
+- **Status**: 🟡 **Sedang Dikerjakan (In Progress)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  1. Pada Modal Form Kontrak Kerja (`/admin/contracts`):
+     - Belum ada kontrol eksplisit **"Status Skema Penggajian"** (`Gaji Harian Proyek (Helper/Skill)` vs `Gaji Bulanan Tetap (Staf Kantor)`).
+     - Kolom "Jabatan / Posisi Kerja" masih berupa input teks bebas, belum ada dropdown/preset standar jabatan resmi PT DSTech Smart Perkasa (Helper 150rb, Teknisi Skill 175rb, Teknisi Senior 200rb, Lead/Foreman 225rb, Staf Administrasi, IT Support, dll).
+  2. Pada Generator Auto-Payroll (`/api/payroll`):
+     - Staf kontrak bulanan (seperti Marshanda) gajinya menjadi berlipat karena uang kehadiran dihitung dobel di luar gaji pokok kontrak.
+     - Kontrak lama teknisi (Hendra & Ikhsan) belum tersinkronisasi ke rate standar baru (Hendra Teknisi Skill Rp 175.000/hari, Ikhsan Teknisi Senior Rp 200.000/hari atau skema harian yang tepat).
+     - Data kontrak di server live belum sepenuhnya tersinkronisasi dengan master kontrak terkini.
+- **Rencana Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`contracts/page.tsx`, `payroll/route.ts`, `payroll/page.tsx`, `dstech_contracts.json`, `dstech_payroll.json`) ke folder `_backup/`.
+  - [ ] **Langkah 2**: Perbarui Form Kontrak Kerja (`src/app/admin/contracts/page.tsx`):
+    - Tambahkan pemilih **Status Skema Penggajian** yang tegas:
+      - 🟢 **Sistem Gaji Harian (Daily Rate)**: Untuk Helper (150rb), Teknisi Skill (175rb), Teknisi Senior (200rb), Lead (225rb).
+      - 🔵 **Sistem Gaji Bulanan (Monthly Salary)**: Untuk Staf Administrasi, IT Support, Supervisor, dll.
+    - Tambahkan dropdown **Pilihan Jabatan Resmi** yang saat dipilih otomatis mengatur nama jabatan, kategori (STAFF/TECHNICIAN), skema penggajian (Harian/Bulanan), tarif harian atau gaji pokok acuan, serta tarif lembur secara otomatis.
+    - Sediakan opsi "Jabatan Kustom Lainnya" jika admin ingin mengetik nama posisi bebas.
+  - [ ] **Langkah 3**: Perbaiki Generator Auto-Payroll di `src/app/api/payroll/route.ts`:
+    - Untuk Staf Bulanan (`staffScheme`): gaji pokok murni diambil dari `contract.salaryScheme.staffScheme.baseSalary` + tunjangan jabatan/transport/BPJS dari kontrak, **uang kehadiran tidak diduplikasi** jika kontrak bulanan sudah flat.
+    - Untuk Teknisi Harian (`dailyScheme`): gaji pokok murni perkalian `presenceDays * dailyRate` dari kontrak atau tarif jabatan (Helper 150rb, Skill 175rb).
+    - Terapkan fallback cerdas dan akurat agar hasil slip 100% klop dengan nilai yang disepakati di kontrak.
+### 107. Tugas: Penyempurnaan Tampilan Status & Sisa Waktu Masa Kontrak Kerja (Format Eksplisit Durasi Sisa Bulan & Hari agar Tidak Membingungkan)
+- **Permintaan Pengguna**:
+  *"untuk aktif sisa waktunya tidak sesuai"*
+- **Status**: 🟢 **Selesai (Completed)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada tabel kontrak kerja (`/admin/contracts`), kolom "Status & Sisa Waktu" menampilkan badge: `Aktif (69 Hari)` untuk kontrak kerja berdurasi 1 tahun (12 bulan, 1 Jan 2026 s/d 31 Des 2026).
+  - Tampilan ini menimbulkan salah paham karena tidak menyertakan kata "Sisa" dan format bulan, sehingga user mengira itu adalah total durasi kontrak yang salah hitung (seolah kontraknya cuma 69 hari, padahal 12 bulan).
+  - Nilai 69 hari itu secara matematis adalah sisa hari dari tanggal hari ini (23 Okt 2026) hingga akhir kontrak (31 Des 2026).
+  - Telah diperbaiki dengan helper `getContractTimeInfo`:
+    - Normalisasi perbandingan tanggal ke midnight (00:00:00).
+    - Konversi hari ke Bulan & Hari: `🟢 Aktif • Sisa X Bulan Y Hari`.
+    - Subtitle informatif: `Sisa 69 hari lagi s/d 2026-12-31`.
+    - Kondisi &le; 30 hari: `🟡 Segera Berakhir • Sisa X Hari`.
+    - Kondisi expired: `🔴 Kedaluwarsa • Telah berakhir pada [Tanggal]`.
+- **Realisasi Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat fungsi helper `getContractTimeInfo(startDateStr, endDateStr)` dan normalisasi `getDaysRemaining` di `src/app/admin/contracts/page.tsx`.
+  - [x] **Langkah 2**: Perbaiki render kolom "Status & Sisa Waktu" pada tabel kontrak dengan badge `🟢 Aktif • Sisa X Bulan Y Hari` dan subtitle `Sisa Z hari lagi s/d [Tanggal]`.
+  - [x] **Langkah 3**: Bersihkan sisa blok duplikat JSX di formulir modal kontrak `src/app/admin/contracts/page.tsx`.
+  - [x] **Langkah 4**: Validasi lokal (`npm run build` sukses 52 routes).
+  - [x] **Langkah 5**: Push ke GitHub repository `rm23nm/dstech-smart` (commit `173857d`).
+  - [x] **Langkah 6**: Deploy ke server live VPS 157.66.34.199 dan restart PM2 `dstech-main` (PID 568677 online).
+
+---
+
+### 108. Tugas: Penambahan Tipe 3: Bulanan Dibayar Penuh (Flat Monthly Salary) pada Pilihan Tipe Skema Upah Kontrak Kerja & Generator Penggajian
+- **Permintaan Pengguna**:
+  *"1 Type lagi kurang bulanan dibayar penuh"*
+- **Status**: 🟡 **Sedang Dikerjakan (In Progress)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada formulir kontrak kerja (`/admin/contracts`), bagian **"3. Rincian Skema Upah & Kompensasi"** sebelumnya hanya menampilkan 2 kartu pilihan tipe upah teknisi:
+    1. *Tipe 1: Harian Dibayar Penuh (Flat Daily Rate)*
+    2. *Tipe 2: Bayaran Jam + Pengali Lembur (Hourly Rate & Multiplier)*
+  - Pengguna meminta agar ditambahkan 1 Tipe lagi yang setara:
+    3. **Tipe 3: Bulanan Dibayar Penuh (Flat Monthly Salary)**
+       - Karyawan / teknisi kontrak dengan gaji pokok bulanan tetap (misal Rp 4.000.000 s/d Rp 5.000.000 / bulan).
+       - Dilengkapi input: Gaji Pokok Bulanan (Rp/Bulan), Tunjangan Jabatan, Tunjangan Transport, Potongan BPJS Ketenagakerjaan, serta Tarif Lembur Opsional (Rp/Jam).
+       - Pada generator slip auto-payroll (`/api/payroll`): karyawan tipe ini menerima gaji pokok penuh tanpa dikalikan hari hadir harian, plus lembur jika ada.
+- **Rencana Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat cadangan (backup) file sebelum modifikasi (`contracts/page.tsx`, `payroll/route.ts`, `payroll/page.tsx`, `dstech_contracts.json`) ke folder `_backup/`.
+  - [ ] **Langkah 2**: Perbarui interface `DstechContract` dan state `formData` di `src/app/admin/contracts/page.tsx`:
+    - Tambahkan `"TYPE_3_MONTHLY_FULL"` pada `dailyRateType`.
+    - Tambahkan 3 kartu pilihan di Bagian 3:
+      - 🟧 **Tipe 1: Harian Dibayar Penuh** *(Flat Daily Rate)*
+      - 🟪 **Tipe 2: Bayaran Jam + Pengali Lembur** *(Hourly Rate & Multiplier)*
+      - 🟦 **Tipe 3: Bulanan Dibayar Penuh** *(Flat Monthly Salary)*
+    - Tampilkan form parameter input untuk Tipe 3:
+      - Gaji Pokok Bulanan (Rp/Bulan)
+      - Tunjangan Jabatan (Rp)
+      - Tunjangan Transport (Rp)
+      - BPJS Ketenagakerjaan (Rp)
+      - Tarif Lembur Opsional (Rp/Jam)
+      - Keterangan edukatif: Karyawan dibayar gaji bulanan penuh tanpa dikalikan harian.
+  - [ ] **Langkah 3**: Perbarui tabel kontrak kerja (`/admin/contracts`) agar menampilkan badge `Tipe 3: Bulanan Penuh` pada kolom Skema Pembayaran.
+  - [ ] **Langkah 4**: Perbarui generator slip auto-payroll di `src/app/api/payroll/route.ts` agar menangani `TYPE_3_MONTHLY_FULL` secara konsisten (gaji pokok tetap bulanan + tunjangan - BPJS + lembur jam kerja riil).
+  - [ ] **Langkah 5**: Validasi lokal (`npm run build` di folder `dstech-smart`).
+  - [ ] **Langkah 6**: Push ke repositori GitHub via `push_with_native_git.js`.
+  - [ ] **Langkah 7**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [ ] **Langkah 8**: Verifikasi tampilan 3 Tipe di server live dan bersihkan file cadangan `_backup/`.
+
+---
+
+### 109. Tugas: Pengaturan Hak Cuti Tahunan, Izin, dan Sakit pada Kontrak Kerja & Sistem Penggajian (Antrian Pekerjaan Berikutnya)
+- **Permintaan Pengguna**:
+  *"untuk cuti dan izin, sakit sepertinya belum ada settingannya"*
+- **Status**: ⏳ **Dalam Antrian (Queued) - Menunggu Penyelesaian Task 108**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada pengaturan kontrak kerja (`/admin/contracts`) dan penggajian (`/admin/payroll`), belum ada pengaturan hak kuota cuti tahunan (misal default 12 hari/tahun), batasan izin berbayar (paid leave) vs izin potong upah (unpaid leave), serta kebijakan surat keterangan sakit dokter.
+  - Perlu ditambahkan:
+    1. Input kuota cuti tahunan, izin berbayar, dan syarat sakit di form Kontrak Kerja (`dstech_contracts.json`).
+    2. Kebijakan pemotongan upah (prorata potong gaji/kehadiran jika izin tanpa keterangan) di sistem penggajian & presensi.
+- **Rencana Langkah Pelaksanaan**:
+  - [ ] Akan dieksekusi segera setelah Task 108 (3 Tipe Skema Upah) selesai dan dideploy sukses.
+
+---
+
 
 ### 88. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
