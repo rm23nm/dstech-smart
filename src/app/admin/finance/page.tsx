@@ -14286,28 +14286,134 @@ export default function AdminFinanceERPPage() {
                 </div>
               </div>
 
-              {/* Quick Select Client from Master Data */}
-              <div className="p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-200/80 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-black text-indigo-900 flex items-center gap-1.5">
-                    <Users className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Pilih Klien dari Master Data Rekanan (Auto-Fill):</span>
-                  </label>
-                  <span className="text-[10px] text-indigo-600 font-medium">Opsional</span>
-                </div>
-                <select
-                  value={quotationForm.clientId}
-                  onChange={(e) => handleClientSelectForQuotation(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-white border border-indigo-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none cursor-pointer"
-                >
-                  <option value="">-- Pilih dari Master Data Klien (atau isi manual di bawah) --</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.category}) — {c.pic ? `PIC: ${c.pic}` : c.city}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Quick Select Client from Master Data with Live Search */}
+              {(() => {
+                const filteredQuotationClients = clients.filter((c) => {
+                  if (!quotationClientSearchQuery.trim()) return true;
+                  const q = quotationClientSearchQuery.toLowerCase();
+                  return (
+                    c.name.toLowerCase().includes(q) ||
+                    (c.pic && c.pic.toLowerCase().includes(q)) ||
+                    (c.city && c.city.toLowerCase().includes(q)) ||
+                    (c.category && c.category.toLowerCase().includes(q)) ||
+                    (c.phone && c.phone.includes(q))
+                  );
+                });
+                const selectedQuotationClient = clients.find((c) => c.id === quotationForm.clientId);
+
+                return (
+                  <div className="p-3.5 bg-indigo-50/80 rounded-2xl border border-indigo-200/90 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-black text-indigo-950 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Pilih Klien dari Master Data Rekanan:</span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAddClient()}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>+ Tambah Klien Baru</span>
+                        </button>
+                        <span className="text-[10px] text-indigo-600 font-bold hidden sm:inline">
+                          {selectedQuotationClient ? "✓ Klien Terhubung" : "Opsional"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Live Search Input */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-indigo-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={quotationClientSearchQuery}
+                        onChange={(e) => setQuotationClientSearchQuery(e.target.value)}
+                        placeholder="🔍 Ketik di sini untuk mencari nama klien, PIC, instansi, kota, atau nomor HP..."
+                        className="w-full pl-8.5 pr-8 py-2 rounded-xl bg-white border border-indigo-200 text-xs font-bold text-slate-800 placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                      />
+                      {quotationClientSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setQuotationClientSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                          title="Hapus pencarian"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dropdown Select Filtered Clients */}
+                    <div className="space-y-1">
+                      <select
+                        value={quotationForm.clientId || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            handleClientSelectForQuotation(val);
+                          } else {
+                            setQuotationForm((prev) => ({ ...prev, clientId: "" }));
+                          }
+                        }}
+                        className="w-full p-2.5 rounded-xl bg-white border border-indigo-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none cursor-pointer"
+                      >
+                        <option value="">
+                          {quotationClientSearchQuery.trim()
+                            ? `-- Ditemukan ${filteredQuotationClients.length} Klien (Pilih salah satu) --`
+                            : `-- Pilih dari Master Data Klien (${clients.length} Klien Terdaftar) atau isi manual di bawah --`}
+                        </option>
+                        {filteredQuotationClients.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.category}) — {c.pic ? `PIC: ${c.pic}` : c.city} {c.phone ? `• WA: ${c.phone}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      {quotationClientSearchQuery.trim() && filteredQuotationClients.length === 0 && (
+                        <p className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 flex items-center justify-between">
+                          <span>Tidak ditemukan klien dengan kata kunci &quot;{quotationClientSearchQuery}&quot;.</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleOpenAddClient();
+                              setClientForm((prev) => ({ ...prev, name: quotationClientSearchQuery }));
+                            }}
+                            className="font-bold underline text-indigo-700 hover:text-indigo-900 cursor-pointer ml-2"
+                          >
+                            + Daftarkan sebagai Klien Baru?
+                          </button>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Quick Selected Client Badge */}
+                    {selectedQuotationClient && (
+                      <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-200 text-[11px] text-emerald-900 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <div>
+                            <span className="font-black">{selectedQuotationClient.name}</span>
+                            <span className="text-emerald-700 text-[10px] ml-1.5">
+                              ({selectedQuotationClient.category} • {selectedQuotationClient.city} • {selectedQuotationClient.phone || "No telp -"})
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setQuotationForm((prev) => ({ ...prev, clientId: "" }));
+                            showToast("Tautan master klien dilepas (data teks tetap tersimpan)");
+                          }}
+                          className="text-[10px] text-red-600 hover:text-red-700 font-bold hover:underline cursor-pointer ml-2 shrink-0"
+                        >
+                          Lepas Tautan
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Selector Proyek Terkait (Opsional) */}
               <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
@@ -14394,17 +14500,49 @@ export default function AdminFinanceERPPage() {
               {/* Data Klien & Tujuan Penawaran */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">
-                    Nama Klien / PIC Penerima <span className="text-red-500">*</span>:
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-slate-700 block">
+                      Nama Klien / PIC Penerima <span className="text-red-500">*</span>:
+                    </label>
+                    <span className="text-[10px] text-indigo-600 font-semibold">Tersedia Autocomplete</span>
+                  </div>
                   <input
                     type="text"
                     required
+                    list="quotation_client_names_datalist"
                     placeholder="Contoh: Bapak H. Hendra Wijaya"
                     value={quotationForm.customerName}
-                    onChange={(e) => setQuotationForm({ ...quotationForm, customerName: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const matched = clients.find(
+                        (c) =>
+                          c.name.toLowerCase() === val.toLowerCase() ||
+                          (c.pic && c.pic.toLowerCase() === val.toLowerCase())
+                      );
+                      if (matched) {
+                        setQuotationForm((prev) => ({
+                          ...prev,
+                          clientId: matched.id,
+                          customerName: matched.pic ? `${matched.name} (PIC: ${matched.pic})` : matched.name,
+                          customerOrg: matched.name,
+                          customerPhone: matched.phone || prev.customerPhone,
+                          customerAddress: matched.address
+                            ? `${matched.address}, ${matched.city}`
+                            : matched.city || prev.customerAddress,
+                        }));
+                      } else {
+                        setQuotationForm({ ...quotationForm, customerName: val });
+                      }
+                    }}
                     className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
+                  <datalist id="quotation_client_names_datalist">
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.category} • {c.pic ? `PIC: ${c.pic} • ` : ""}{c.city} ({c.phone})
+                      </option>
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">
@@ -16009,7 +16147,7 @@ export default function AdminFinanceERPPage() {
       {/* MODAL 4: MASTER DATA - TAMBAH / EDIT KLIEN */}
       {isClientModalOpen && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
           onClick={() => setIsClientModalOpen(false)}
         >
           <div
