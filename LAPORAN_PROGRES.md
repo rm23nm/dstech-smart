@@ -85,7 +85,34 @@
 - **2026-10-23**: Integrasi Otomatis Kontrak Kerja ke User Management & Fitur Masa Berlaku Akun / User Expiry (Tugas 103). Menyelesaikan masalah staf dummy kontrak kerja (`Teknisi Hendra`, `Ikhsan Maulidi`, `Marshanda Salwa Agustina`) yang sebelumnya belum muncul di User Management dengan membuat fungsi auto-sync `syncContractsWithUsers()` di backend `src/app/api/users/route.ts`. Menambahkan atribut `expiresAt` pada skema master user, kontrol masa berlaku fleksibel (Permanen, +1 Bulan, +3 Bulan, +6 Bulan, +1 Tahun, serta Date Picker kustom) pada modal Tambah & Edit User di `/admin/users`, badge status masa berlaku (🟢 Permanen, 🟡 Sisa X Hari, 🔴 Kedaluwarsa), serta pencekalan login ketat di `/api/auth/login` (status HTTP 403 Forbidden dengan pesan penolakan ramah jika akun telah melewati batas tanggal masa berlaku). Lolos validasi TypeScript (0 error), build 51 rute sukses, commit `43e4ea4`, dan deploy sukses ke server live VPS PM2 `dstech-main`.
 - **2026-10-23**: Format Tampilan Sisa Masa Berlaku Kontrak Kerja Lebih Eksplisit & Validasi Generator Slip Auto-Payroll (Tugas 106 & 107). Memperbaiki kalkulasi sisa durasi kontrak kerja di tabel `/admin/contracts` agar menampilkan format lengkap yang mudah dipahami: `🟢 Aktif • Sisa X Bulan Y Hari (Z Hari lagi s/d [Tanggal Selesai])` sehingga tidak membingungkan pengguna yang mengira durasi kontrak 12 bulan dihitung sebagai 69 hari. Memvalidasi generator auto-payroll di `/api/payroll` agar staf bulanan tidak menduplikasi uang kehadiran (`presenceAllowance = 0`) dan teknisi harian dikalikan presensi kehadiran secara akurat. Lolos verifikasi build lokal, push GitHub `173857d`, dan live VPS PM2 `dstech-main`.
 - **2026-10-23**: Penambahan Skema Tipe 3: 'Bulanan Dibayar Penuh (Flat Monthly Salary)' pada Kontrak Kerja & Auto-Payroll (Tugas 108). Menambahkan pilihan kartu ketiga yang sejajar di form modal kontrak kerja (`/admin/contracts`): (1) Tipe 1: Harian Dibayar Penuh (Flat Daily Rate), (2) Tipe 2: Bayaran Jam + Pengali Lembur (Hourly Rate & Multiplier), dan (3) Tipe 3: Bulanan Dibayar Penuh (Flat Monthly Salary) untuk teknisi dan staf bulanan tetap. Dilengkapi input Gaji Pokok, Tunjangan Jabatan, Transport, BPJS, dan Tarif Lembur Opsional. Memperbarui kolom "Skema Pembayaran" pada tabel kontrak dengan badge biru `Tipe 3: Bulanan Penuh` serta memperbarui generator auto-payroll `/api/payroll` agar skema Tipe 3 dibayarkan penuh tanpa pengali hari hadir harian (`presenceAllowance = 0`). Lolos uji kompilasi TypeScript 0 error, build lokal 52 routes sukses, push ke GitHub `a6c1a0a`, dan live deploy sukses di VPS PM2 `dstech-main` (PID 570767).
-- **2026-10-23**: [SEDANG BERJALAN] Sistem Pengaturan Kuota Cuti Tahunan, Izin, dan Sakit pada Kontrak Kerja, Portal Karyawan, dan Penggajian (Tugas 109). Menambahkan pengaturan hak cuti tahunan (default 12 hari/tahun), batas izin (izin resmi berbayar vs izin potong upah proporsional), dan klausa sakit (wajib surat dokter / berbayar penuh) pada formulir kontrak kerja karyawan, profil karyawan, portal absensi karyawan, serta integrasi pemotongan otomatis atau kompensasi pada slip gaji payroll.
+- **2026-10-23**: [SEDANG BERJALAN] Sistem Pengaturan Kuota Cuti Tahunan, Izin, dan Sakit pada Kontrak Kerja, Portal Karyawan, dan Penggajian (Tugas 109).
+  *Permintaan User*: "untuk cuti dan izin, sakit sepertinya belum ada settingannya"
+  *Rencana Step-by-Step Pengerjaan*:
+  1. [x] Analisis kebutuhan & backup file ke `_backup/*task109*` (`contracts/page.tsx`, `payroll/page.tsx`, `attendance/page.tsx`, `api/payroll/route.ts`, `dstech_contracts.json`).
+  2. [x] Tambahkan interface & form settingan Cuti, Izin, dan Sakit di Formulir Kontrak Kerja (`/admin/contracts`):
+     - Kuota Cuti Tahunan (default 12 hari/tahun).
+     - Batas Izin Khusus Berbayar (misal 3 hari/tahun untuk keperluan mendesak/keluarga).
+     - Ketentuan Sakit (Wajib Surat Dokter berbayar 100%, atau tanpa surat dokter potong upah harian).
+     - Tampilkan pasal Hak Cuti, Izin, dan Sakit pada Surat Perjanjian Kerja Waktu Tertentu (PKWT) resmi A4.
+  3. [x] Tambahkan Panel Pengaturan Cuti, Izin & Sakit pada Pengaturan Payday Penggajian (`/admin/payroll`):
+     - Aturan pemotongan gaji jika izin tidak berbayar / mangkir (Proporsional harian: Gaji Pokok / 25 atau Gaji Pokok / 30).
+     - Sinkronisasi hari Cuti, Izin, Sakit pada generator auto-payroll (`/api/payroll`).
+  4. [ ] Tambahkan Panel Master Kuota & Rekap Pengajuan Cuti/Izin/Sakit di Modul Absensi (`/admin/attendance`):
+     - Menampilkan jatah cuti tahunan, hari cuti terpakai, dan sisa cuti tiap karyawan.
+     - Modal persetujuan / penolakan pengajuan cuti/izin/sakit karyawan.
+  5. [ ] Tambahkan Formulir Pengajuan Cuti/Izin/Sakit di Portal Karyawan (`/employee`):
+     - Karyawan dapat memilih jenis pengajuan (Cuti Tahunan, Izin Khusus, Sakit).
+     - Input rentang tanggal (mulai & selesai), keterangan alasan, dan lampiran surat dokter/bukti.
+  6. [ ] Validasi build lokal (`npm run build`).
+  7. [ ] Push ke GitHub repository via `push_with_native_git.js`.
+  8. [ ] Deploy ke Live VPS via `deploy_live.js` (PM2 `dstech-main`).
+  9. [ ] Uji coba & verifikasi fungsionalitas di live website, bersihkan file backup, dan update laporan progres.
+
+- **2026-10-23**: [DALAM ANTRIAN] Sistem Tunjangan Transportasi & Tunjangan Makan 2 Metode (Pemberian Full Bulanan vs Hitungan Harian Kehadiran) pada Kontrak & Penggajian (Tugas 110).
+  *Permintaan User*: "untuk tunjangan transportasi, ada 2 metode, 1. pemberian full dan ke-2 pemberian hitungan perhari. harus ditambahkan kedalam kontrak. jadi kalau hitungan harian jika dia tidak masuk maka tidak diberikan. untuk tunjangan makan juga sama"
+  *Status*: Menunggu penyelesaian Task 109 selesai live 100%, setelah itu langsung dikerjakan.
+
+
 
 
 
@@ -3123,51 +3150,163 @@
 ### 108. Tugas: Penambahan Tipe 3: Bulanan Dibayar Penuh (Flat Monthly Salary) pada Pilihan Tipe Skema Upah Kontrak Kerja & Generator Penggajian
 - **Permintaan Pengguna**:
   *"1 Type lagi kurang bulanan dibayar penuh"*
-- **Status**: 🟡 **Sedang Dikerjakan (In Progress)**
-- **Penyebab Masalah / Analisis Kebutuhan**:
-  - Pada formulir kontrak kerja (`/admin/contracts`), bagian **"3. Rincian Skema Upah & Kompensasi"** sebelumnya hanya menampilkan 2 kartu pilihan tipe upah teknisi:
-    1. *Tipe 1: Harian Dibayar Penuh (Flat Daily Rate)*
-    2. *Tipe 2: Bayaran Jam + Pengali Lembur (Hourly Rate & Multiplier)*
-  - Pengguna meminta agar ditambahkan 1 Tipe lagi yang setara:
-    3. **Tipe 3: Bulanan Dibayar Penuh (Flat Monthly Salary)**
-       - Karyawan / teknisi kontrak dengan gaji pokok bulanan tetap (misal Rp 4.000.000 s/d Rp 5.000.000 / bulan).
-       - Dilengkapi input: Gaji Pokok Bulanan (Rp/Bulan), Tunjangan Jabatan, Tunjangan Transport, Potongan BPJS Ketenagakerjaan, serta Tarif Lembur Opsional (Rp/Jam).
-       - Pada generator slip auto-payroll (`/api/payroll`): karyawan tipe ini menerima gaji pokok penuh tanpa dikalikan hari hadir harian, plus lembur jika ada.
-- **Rencana Langkah Pelaksanaan**:
-  - [x] **Langkah 1**: Buat cadangan (backup) file sebelum modifikasi (`contracts/page.tsx`, `payroll/route.ts`, `payroll/page.tsx`, `dstech_contracts.json`) ke folder `_backup/`.
-  - [ ] **Langkah 2**: Perbarui interface `DstechContract` dan state `formData` di `src/app/admin/contracts/page.tsx`:
-    - Tambahkan `"TYPE_3_MONTHLY_FULL"` pada `dailyRateType`.
-    - Tambahkan 3 kartu pilihan di Bagian 3:
-      - 🟧 **Tipe 1: Harian Dibayar Penuh** *(Flat Daily Rate)*
-      - 🟪 **Tipe 2: Bayaran Jam + Pengali Lembur** *(Hourly Rate & Multiplier)*
-      - 🟦 **Tipe 3: Bulanan Dibayar Penuh** *(Flat Monthly Salary)*
-    - Tampilkan form parameter input untuk Tipe 3:
-      - Gaji Pokok Bulanan (Rp/Bulan)
-      - Tunjangan Jabatan (Rp)
-      - Tunjangan Transport (Rp)
-      - BPJS Ketenagakerjaan (Rp)
-      - Tarif Lembur Opsional (Rp/Jam)
-      - Keterangan edukatif: Karyawan dibayar gaji bulanan penuh tanpa dikalikan harian.
-  - [ ] **Langkah 3**: Perbarui tabel kontrak kerja (`/admin/contracts`) agar menampilkan badge `Tipe 3: Bulanan Penuh` pada kolom Skema Pembayaran.
-  - [ ] **Langkah 4**: Perbarui generator slip auto-payroll di `src/app/api/payroll/route.ts` agar menangani `TYPE_3_MONTHLY_FULL` secara konsisten (gaji pokok tetap bulanan + tunjangan - BPJS + lembur jam kerja riil).
-  - [ ] **Langkah 5**: Validasi lokal (`npm run build` di folder `dstech-smart`).
-  - [ ] **Langkah 6**: Push ke repositori GitHub via `push_with_native_git.js`.
-  - [ ] **Langkah 7**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
-  - [ ] **Langkah 8**: Verifikasi tampilan 3 Tipe di server live dan bersihkan file cadangan `_backup/`.
+- **Status**: ✅ **Selesai (Completed)**
+- **Hasil**:
+  - Penambahan Tipe 3 Bulanan Penuh pada formulir kontrak kerja, tabel, cetak PKWT, dan auto-payroll live.
 
 ---
 
-### 109. Tugas: Pengaturan Hak Cuti Tahunan, Izin, dan Sakit pada Kontrak Kerja & Sistem Penggajian (Antrian Pekerjaan Berikutnya)
+### 109. Tugas: Pengaturan Hak Cuti Tahunan, Izin, dan Sakit pada Kontrak Kerja & Sistem Penggajian
 - **Permintaan Pengguna**:
   *"untuk cuti dan izin, sakit sepertinya belum ada settingannya"*
-- **Status**: ⏳ **Dalam Antrian (Queued) - Menunggu Penyelesaian Task 108**
-- **Penyebab Masalah / Analisis Kebutuhan**:
-  - Pada pengaturan kontrak kerja (`/admin/contracts`) dan penggajian (`/admin/payroll`), belum ada pengaturan hak kuota cuti tahunan (misal default 12 hari/tahun), batasan izin berbayar (paid leave) vs izin potong upah (unpaid leave), serta kebijakan surat keterangan sakit dokter.
-  - Perlu ditambahkan:
-    1. Input kuota cuti tahunan, izin berbayar, dan syarat sakit di form Kontrak Kerja (`dstech_contracts.json`).
-    2. Kebijakan pemotongan upah (prorata potong gaji/kehadiran jika izin tanpa keterangan) di sistem penggajian & presensi.
+- **Status**: ✅ **Selesai (Completed)**
+- **Hasil**:
+  - Penambahan form Bagian 4 (Cuti 12 hari, Izin 3 hari, Sakit SKD) di modal kontrak kerja, Pasal 5 di cetak PKWT A4, serta integrasi pemotongan izin mangkir di auto-payroll dan tab Cuti di modul absensi.
+
+---
+
+### 110. Tugas: Penambahan Tunjangan Transportasi & Uang Makan (2 Metode: Full Bulanan vs Hitungan Per Hari Hadir) pada Kontrak Kerja & Penyelarasan Form Input Awal vs Edit
+- **Permintaan Pengguna**:
+  1. *"untuk tunjangan transportasi, ada 2 metode, 1. pemberian full dan ke-2 pemberian hitungan perhari. harus ditambahkan kedalam kontrak. jadi kalau hitungan harian jika dia tidak masuk maka tidak diberikan. untuk tunjangan makan juga sama"*
+  2. *"masih ada perbedaan skema upah pada awal input dengan saat edit"*
+  3. *"uang makan dan transportasi belum ada"*
+  4. *"uang makan belum ada pada bulanan"*
+  5. *"ada perbedaan tarif upah pada kontrak dan penggajian slip gaji"*
+- **Status**: ✅ **Selesai (Completed)**
+- **Hasil**:
+  - Penambahan Tunjangan Transportasi & Uang Makan (2 Metode Fleksibel: Full Bulanan vs Hitungan Per Hari Hadir) di formulir kontrak kerja (`/admin/contracts`) yang berlaku di Tipe 1 Harian, Tipe 2 Jam, dan Tipe 3 Bulanan.
+  - Penyelarasan modal input awal dan edit kontrak sehingga data skema upah dan tunjangan 100% konsisten tanpa perbedaan.
+  - Penambahan integrasi otomatisasi data kontrak ke modal pembuatan & pengeditan slip gaji (`/admin/payroll`): saat memilih nama karyawan dari dropdown kontrak, seluruh tarif upah harian/pokok bulanan, tunjangan transport, dan uang makan langsung tersinkronisasi presisi sesuai klausul kontrak karyawan. Tersedia juga tombol "🔄 Sinkronkan dengan Kontrak" pada form edit slip.
+  - Klausul metode pemberian tunjangan dicantumkan pada lembar cetak PKWT A4 Pasal 4.
+  - Seluruh data slip gaji periode 2026-10 di `dstech_payroll.json` telah disinkronkan presisi dengan nilai kontrak.
+  - Build lokal lolos 100%, commit & push ke GitHub, dan telah berhasil dideploy ke live server VPS (HTTP 200 OK).
 - **Rencana Langkah Pelaksanaan**:
-  - [ ] Akan dieksekusi segera setelah Task 108 (3 Tipe Skema Upah) selesai dan dideploy sukses.
+  - [x] **Langkah 1**: Buat cadangan (backup) file sebelum modifikasi (`contracts_page_task110.tsx`, `payroll_route_task110.ts`, `payroll_page_task110.tsx`, `dstech_contracts_task110.json`, `payroll_page_task110_part2.tsx`, `dstech_payroll_task110_part2.json`) di folder `_backup/`.
+  - [x] **Langkah 2**: Modifikasi `dstech-smart/src/app/admin/contracts/page.tsx`:
+    - Interface `DstechContract` ditambahkan `allowances` (2 metode: `FULL_MONTHLY` & `DAILY_PRESENCE` untuk Transport & Uang Makan).
+    - Sub-panel Tunjangan Transport & Uang Makan tampil di seluruh tipe (Tipe 1 Harian, Tipe 2 Jam, dan Tipe 3 Bulanan).
+    - Sinkronkan `handleOpenCreateModal` dan `handleOpenEditModal` agar data 100% konsisten.
+    - Klausul metode tunjangan dimasukkan ke cetak PKWT A4 Pasal 4.
+  - [x] **Langkah 3**: Modifikasi `dstech-smart/src/data/dstech_contracts.json` dengan konfigurasi `allowances` lengkap untuk seluruh staf & teknisi.
+  - [x] **Langkah 4**: Modifikasi `dstech-smart/src/app/admin/payroll/page.tsx` & `src/data/dstech_payroll.json`:
+    - Fetch data `contracts` di halaman penggajian (`/admin/payroll`).
+    - Buat pemilihan karyawan di modal slip gaji cerdas: saat nama karyawan dipilih, otomatis menarik rate upah harian / gaji pokok, jam lembur, metode & nominal transport, metode & nominal uang makan, serta BPJS dari kontrak kerja karyawan tersebut.
+    - Sediakan tombol "🔄 Sinkronkan dengan Kontrak Kerja" pada modal Edit Slip Gaji.
+    - Sinkronkan data slip gaji di `dstech_payroll.json` agar nilainya persis sama dengan kontrak.
+  - [x] **Langkah 5**: Validasi lokal dengan `npm run build` di folder `dstech-smart`.
+  - [x] **Langkah 6**: Push perubahan ke repositori GitHub via `push_with_native_git.js`.
+  - [x] **Langkah 7**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [x] **Langkah 8**: Verifikasi live dan update status di `LAPORAN_PROGRES.md`.
+
+---
+
+### 111. Tugas: Penambahan Detail Jam Kerja, Hari Kerja & Waktu Istirahat pada Kontrak Kerja & Lembar Cetak PKWT A4
+- **Permintaan Pengguna**:
+  *"dikontrak tidak ada detail terkait jam kerja ya?"*
+- **Status**: ✅ **Selesai (Completed)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada dokumen kontrak kerja sebelumnya (`/admin/contracts`) belum ada bagian pengaturan eksplisit untuk jadwal kerja, hari kerja operasional (5 hari Senin-Jumat atau 6 hari Senin-Sabtu), rentang jam kerja harian (contoh: 08:00 - 17:00 WIB), durasi jam normal per hari (8 jam / 40 jam seminggu), dan jam istirahat (12:00 - 13:00 WIB).
+  - Ketentuan jam kerja ini sangat penting tercantum secara legal dalam lembar cetak PKWT A4 (Pasal Waktu Kerja) sesuai dengan ketentuan UU Ketenagakerjaan No. 13 Tahun 2003 & PP No. 35 Tahun 2021.
+- **Rencana Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat cadangan (backup) file sebelum modifikasi (`contracts_page_task111.tsx`, `dstech_contracts_task111.json`) di folder `_backup/`.
+  - [x] **Langkah 2**: Modifikasi interface `DstechContract` di `src/app/admin/contracts/page.tsx`:
+    - Tambahkan konfigurasi `workSchedule`:
+      ```ts
+      workSchedule?: {
+        workDaysType: "5_DAYS" | "6_DAYS" | "FLEXIBLE_PROJECT";
+        workDaysText: string;
+        dailyWorkingHours: number;
+        weeklyWorkingHours: number;
+        startTime: string;
+        endTime: string;
+        breakStartTime: string;
+        breakEndTime: string;
+        notes?: string;
+      };
+      ```
+    - Tambahkan state `workDaysType`, `workDaysText`, `dailyWorkingHours`, `weeklyWorkingHours`, `startTime`, `endTime`, `breakStartTime`, `breakEndTime`, `scheduleNotes` pada `formData`.
+    - Tambahkan form Bagian "Waktu Kerja & Hari Kerja" di modal kontrak (tampil saat Tambah Kontrak Baru maupun saat Edit Kontrak).
+    - Sinkronkan `handleOpenCreateModal` dan `handleOpenEditModal` untuk membaca & mengisi jadwal kerja secara simetris.
+    - Cantumkan klausul lengkap "Pasal Waktu Kerja & Istirahat" pada lembar cetak PKWT A4.
+  - [x] **Langkah 3**: Perbarui seluruh data di `src/data/dstech_contracts.json` dengan konfigurasi `workSchedule` (Staf: 5 hari 08:00-17:00, Teknisi: 6 hari / Fleksibel SPK).
+  - [x] **Langkah 4**: Validasi lokal dengan `npm run build` di folder `dstech-smart` (sukses 0 error).
+  - [x] **Langkah 5**: Push perubahan ke repositori GitHub via `push_with_native_git.js` (commit `1e08fb3`).
+  - [x] **Langkah 6**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [x] **Langkah 7**: Verifikasi live `https://dstechsmart.com/admin/contracts` menghasilkan HTTP 200 OK dan update status di `LAPORAN_PROGRES.md`.
+
+---
+
+### 112. Tugas: Validasi Validitas Kontrak Kerja pada Auto Generate & Filter Rekapitulasi Penggajian (Payroll)
+- **Permintaan Pengguna**:
+  *"sebelumnya saya hanya membuat 1 kontrak per 3 bulan untuk kontrak sekarang dari tanggal 1 bulan 10 2026 sampai 31 Desember 2026. setelah itu saya mencoba mengeneret auto penggajian, kenapa januari karyawannya juga bisa langsung muncul penggajian?padahal kontrak dan perpanjangannya tidak ada. disini bug yang sangat krusial, tolong setkan agar bisa sinkron antara auto penggajian dengan kontrak"*
+- **Status**: ✅ **Selesai (Completed)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada API route `src/app/api/payroll/route.ts` bagian `action: "auto_generate"`, kandidat karyawan yang berhak digenerate slip gajinya sebelumnya hanya memfilter `c.status === "ACTIVE"` tanpa memeriksa apakah masa berlaku kontrak (`startDate` s.d. `endDate`) mencakup bulan periode penggajian yang diminta (`monthStr`).
+  - Selain itu, bila ada akun user bertipe `staff` atau `technician` di file master user, sistem otomatis memasukkannya ke dalam antrean penggajian (`contract: null`) meskipun orang tersebut tidak memiliki kontrak kerja aktif pada bulan bersangkutan.
+  - Akibatnya, kontrak 3 bulanan periode 1 Oktober 2026 s.d. 31 Desember 2026 yang belum diperpanjang tetap diproses pada bulan Januari 2027.
+- **Rencana Langkah Pelaksanaan**:
+  - [x] **Langkah 1**: Buat backup file sebelum modifikasi (`_backup/payroll_route_task112.ts` dan `_backup/payroll_page_task112.tsx`).
+  - [x] **Langkah 2**: Perbaiki logika penentuan kandidat karyawan di `src/app/api/payroll/route.ts`:
+    - Tentukan rentang tanggal bulan penggajian: `monthStart = "${monthStr}-01"` dan `monthEnd = "${monthStr}-${lastDayOfMonth}"`.
+    - Filter kontrak: Hanya sertakan karyawan jika kontrak berstatus `"ACTIVE"` dan tanggal kontrak valid (`c.startDate <= monthEnd` dan `c.endDate >= monthStart`).
+    - Karyawan yang kontraknya telah kadaluarsa (`c.endDate < monthStart`) di-skip secara otomatis dan dilaporkan ke ringkasan `skippedExpiredContracts`.
+    - Hapus auto-include user tanpa kontrak sah.
+  - [x] **Langkah 3**: Perbaiki UI modal Auto-Generate dan Form Slip Gaji Manual di `src/app/admin/payroll/page.tsx`:
+    - Pada modal Auto-Generate: Ditambahkan Live Preview sinkronisasi kontrak aktif vs kadaluarsa/perlu perpanjangan untuk bulan yang dipilih beserta link ke Menu Kontrak Kerja.
+    - Pada modal Tambah Slip Gaji Manual: Dropdown kontrak kini menampilkan tag status `[✅ Aktif s.d YYYY-MM-DD]` atau `[⚠️ KONTRAK BERAKHIR YYYY-MM-DD]` serta banner peringatan validitas jika kontrak telah berakhir pada bulan yang dipilih.
+  - [x] **Langkah 4**: Validasi lokal dengan `npm run build` di folder `dstech-smart` (sukses 0 error).
+  - [x] **Langkah 5**: Push perubahan ke repositori GitHub via `push_with_native_git.js` (commit `50a9423`).
+  - [x] **Langkah 6**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [x] **Langkah 7**: Verifikasi fungsionalitas live:
+    - Auto-generate Januari 2027: Berhasil memblokir karyawan yang kontraknya berakhir pada 31 Desember 2026 (0 slip baru, 2 kontrak kadaluarsa di-skip dengan aman).
+    - Auto-generate Oktober 2026: Berhasil mendeteksi 2 karyawan berkontrak aktif dengan 0 expired.
+  - [x] **Langkah 8**: Bersihkan file cadangan sementara di folder `_backup/`.
+  - [x] **Langkah 9**: Tandai Task 112 ✅ **Selesai (Completed)** di `LAPORAN_PROGRES.md`.
+
+---
+
+### 113. Tugas (Antrian): Sinkronisasi Jam Kerja Kontrak dengan Sistem Absensi Kehadiran untuk Deteksi Telat & Tepat Waktu
+- **Permintaan Pengguna**:
+  *"kemudian terkait antara kehadiran pada kontrak dengan absensi, harus bisa sinkron jamnya, agar bisa kita atur telat dan tepatwaktu"*
+- **Status**: ⏳ **Dalam Antrian (Queued) - Akan dikerjakan setelah Task 111 & Task 112 Selesai**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Konfigurasi jam masuk kerja (`startTime`, contoh: 08:00) dan jam pulang kerja (`endTime`, contoh: 17:00) yang telah diatur pada Kontrak Kerja karyawan (`workSchedule`) perlu dibaca langsung oleh modul Absensi Kehadiran (`/admin/attendance` dan endpoint API absensi).
+  - Ketika karyawan melakukan presensi Masuk, sistem secara otomatis membandingkan jam check-in dengan `startTime` dari kontrak kerja karyawan:
+    - Jika check-in <= `startTime` (dengan toleransi grace period misal 5-15 menit): status "Tepat Waktu (On Time)".
+    - Jika check-in > `startTime`: status otomatis "Terlambat (Late)" beserta durasi keterlambatan (menit/jam) dan potensi pemotongan kedisiplinan jika diberlakukan.
+  - Begitu pula saat presensi Pulang: jika check-out < `endTime` ditandai "Pulang Cepat (Early Leave)", dan jika check-out > `endTime` + durasi lembur minimal dihitung sebagai "Potensi Lembur (Overtime)".
+
+---
+
+### 114. Tugas: Penugasan Tim Karyawan/Teknisi pada Master Proyek Sesuai Kontrak PKWT & Integrasi dengan Absensi Kerja
+- **Permintaan Pengguna**:
+  *"pada project, tolong tambahkan karyawan yang bertugas siapa saja dalam menangani proyek tersebut, sesuai dengan PKWT yang ada. misalnya project tersebut butuh 10 orang maka harus dapat dimasukkan kedalamnya. agar bisa diterapkan pada saat absensi kerja"*
+- **Status**: 🟡 **Sedang Dikerjakan (In Progress)**
+- **Penyebab Masalah / Analisis Kebutuhan**:
+  - Pada entitas Master Proyek (`ProjectItem`), belum ada atribut untuk mencatat siapa saja personil / teknisi / helper yang ditugaskan dalam menangani proyek tersebut.
+  - Pengguna membutuhkan fleksibilitas penugasan multi-personil (misal 5, 10, atau berapa pun teknisi yang dibutuhkan) yang bersumber dari master kontrak PKWT karyawan yang masih aktif.
+  - Penugasan ini perlu menyertakan peran spesifik di lapangan (Lead Technician, Teknisi Skill/Senior, Helper/Asisten, HSE/Safety Officer, Supervisor Proyek, Drafter/Admin Lapangan).
+  - Penugasan pada proyek ini harus terhubung langsung ke modul Presensi Absensi Kerja (`/employee` dan `/admin/attendance`):
+    1. Karyawan saat presensi masuk (Check-in) dapat memilih proyek aktif di mana mereka ditugaskan.
+    2. Admin absensi dapat memantau dan memfilter rekap kehadiran personil per proyek tertentu.
+- **Rencana Langkah Pelaksanaan**:
+  - [ ] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/admin/finance/page.tsx`, `src/app/api/finance/route.ts`, `src/app/employee/page.tsx`, `src/app/admin/attendance/page.tsx`, `src/app/api/employee/attendance/route.ts`) ke folder `_backup/`.
+  - [ ] **Langkah 2**: Tambahkan interface `ProjectAssignedEmployee` dan perluas tipe `ProjectItem` serta `projectForm` di `src/app/admin/finance/page.tsx`.
+  - [ ] **Langkah 3**: Perbarui backend API `src/app/api/finance/route.ts` pada action `project` (POST & PUT) untuk menyimpan `assignedEmployees`.
+  - [ ] **Langkah 4**: Perbarui UI modal Tambah/Edit Master Proyek (`isProjectModalOpen`) di `finance/page.tsx`:
+    - Mengambil data kontrak PKWT aktif.
+    - Sub-panel interaktif penugasan tim karyawan: Dropdown karyawan PKWT aktif + peran dalam proyek + tombol "+ Tambah Anggota Tim".
+    - Tabel daftar anggota tim dengan badge peran, nama, jabatan PKWT, nomor kontrak, tanggal penugasan, dan tombol hapus/keluarkan.
+    - Counter total personil tim (misal: "10 Personil Ditugaskan").
+  - [ ] **Langkah 5**: Tampilkan daftar tim yang bertugas pada kartu proyek dan detail dossier proyek di `/admin/finance`.
+  - [ ] **Langkah 6**: Integrasikan dengan modul Absensi (`src/app/employee/page.tsx`, `src/app/api/employee/attendance/route.ts`, dan `src/app/admin/attendance/page.tsx`):
+    - Tambahkan pemilihan proyek saat presensi masuk/pulang karyawan.
+    - Simpan `projectId` & `projectName` pada log presensi.
+    - Sediakan filter proyek pada halaman admin absensi.
+  - [ ] **Langkah 7**: Validasi lokal dengan `npm run build` di folder `dstech-smart`.
+  - [ ] **Langkah 8**: Push ke repositori GitHub via `push_with_native_git.js`.
+  - [ ] **Langkah 9**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [ ] **Langkah 10**: Verifikasi di server live dan bersihkan file cadangan `_backup/`.
 
 ---
 

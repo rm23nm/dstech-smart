@@ -75,6 +75,9 @@ interface AttendanceRecord {
   distanceToOffice?: number | null;
   checkOutDistanceToOffice?: number | null;
   geofenceLock?: "ANY" | "OFFICE";
+  projectId?: string | null;
+  projectName?: string | null;
+  projectRole?: string | null;
 }
 
 interface OvertimeRecord {
@@ -197,6 +200,8 @@ export default function AdminAttendancePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [filterProject, setFilterProject] = useState("ALL");
+  const [projectsList, setProjectsList] = useState<any[]>([]);
   const [filterMonth, setFilterMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -394,11 +399,12 @@ export default function AdminAttendancePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resAtt, resUsers, resPayroll, resContracts] = await Promise.all([
+      const [resAtt, resUsers, resPayroll, resContracts, resFinance] = await Promise.all([
         fetch("/api/employee/attendance"),
         fetch("/api/users"),
         fetch("/api/payroll"),
         fetch("/api/contracts"),
+        fetch("/api/finance"),
       ]);
 
       if (resAtt.ok) {
@@ -421,6 +427,13 @@ export default function AdminAttendancePage() {
       if (resContracts.ok) {
         const cData = await resContracts.json();
         if (cData.contracts) setContractsList(cData.contracts);
+      }
+
+      if (resFinance && resFinance.ok) {
+        const finData = await resFinance.json();
+        if (finData?.data?.projects && Array.isArray(finData.data.projects)) {
+          setProjectsList(finData.data.projects);
+        }
       }
     } catch (err) {
       console.error("Gagal memuat data presensi & payroll:", err);
@@ -473,12 +486,16 @@ export default function AdminAttendancePage() {
       if (filterStatus !== "ALL" && item.status !== filterStatus) {
         return false;
       }
+      if (filterProject !== "ALL") {
+        const matchPrj = item.projectId === filterProject || item.projectName === filterProject;
+        if (!matchPrj) return false;
+      }
       if (filterMonth && filterMonth !== "ALL") {
         if (!item.date || !item.date.startsWith(filterMonth)) return false;
       }
       return true;
     });
-  }, [attendanceList, searchQuery, filterEmployee, filterStatus, filterMonth]);
+  }, [attendanceList, searchQuery, filterEmployee, filterStatus, filterProject, filterMonth]);
 
   // Filtered payroll list
   const filteredPayroll = useMemo(() => {
@@ -884,13 +901,6 @@ export default function AdminAttendancePage() {
             Lembur
           </span>
         );
-      case "Terlambat":
-        return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-50 text-rose-700 border border-rose-200">
-            <Clock className="w-3.5 h-3.5 text-rose-600" />
-            Terlambat
-          </span>
-        );
       case "Izin":
       case "Sakit":
       case "Cuti":
@@ -901,6 +911,14 @@ export default function AdminAttendancePage() {
           </span>
         );
       default:
+        if (status && status.startsWith("Terlambat")) {
+          return (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+              <Clock className="w-3.5 h-3.5 text-rose-600" />
+              {status}
+            </span>
+          );
+        }
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
             {status || "Hadir"}
@@ -1234,6 +1252,19 @@ export default function AdminAttendancePage() {
                 <option value="Cuti">Cuti</option>
               </select>
 
+              <select
+                value={filterProject}
+                onChange={(e) => setFilterProject(e.target.value)}
+                className="px-3 py-2 text-xs font-bold bg-indigo-50 border border-indigo-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-indigo-900"
+              >
+                <option value="ALL">🏢 Semua Proyek (Umum)</option>
+                {projectsList.map((p: any) => (
+                  <option key={p.id} value={p.id}>
+                    [{p.projectCode}] {p.projectName} ({p.assignedEmployees?.length || 0} Tim)
+                  </option>
+                ))}
+              </select>
+
               <input
                 type="month"
                 value={filterMonth}
@@ -1303,12 +1334,19 @@ export default function AdminAttendancePage() {
 
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-sm">
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-sm shrink-0">
                               {item.employeeName?.charAt(0) || "T"}
                             </div>
                             <div>
                               <p className="font-bold text-slate-900">{item.employeeName}</p>
-                              <span className="text-[10px] text-slate-400">Staf / Teknisi</span>
+                              {item.projectName ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-md border border-indigo-200 font-bold mt-0.5 max-w-[200px] truncate" title={`${item.projectName} - ${item.projectRole || ""}`}>
+                                  <Briefcase className="w-2.5 h-2.5 text-indigo-600 shrink-0" />
+                                  <span className="truncate">{item.projectName} {item.projectRole ? `(${item.projectRole})` : ""}</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-400">Staf / Non-Proyek</span>
+                              )}
                             </div>
                           </div>
                         </td>

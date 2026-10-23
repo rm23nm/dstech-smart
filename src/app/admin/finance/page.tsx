@@ -130,6 +130,17 @@ export interface DocumentAttachment {
   notes?: string;
 }
 
+export interface ProjectAssignedEmployee {
+  employeeId: string;
+  employeeName: string;
+  position: string;
+  roleInProject: string;
+  contractNumber?: string;
+  phone?: string;
+  assignedDate?: string;
+  notes?: string;
+}
+
 export interface ProjectItem {
   id: string;
   projectCode: string;
@@ -150,6 +161,7 @@ export interface ProjectItem {
   actualEndDate?: string;
   picProject?: string;
   description?: string;
+  assignedEmployees?: ProjectAssignedEmployee[];
   createdAt?: string;
   isPublishedToPortfolio?: boolean;
   portfolioId?: string;
@@ -1261,7 +1273,7 @@ export default function AdminFinanceERPPage() {
   const [isProjectModalOpen, setIsProjectModalOpen] = useState<boolean>(false);
   const [editingProject, setEditingProject] = useState<ProjectItem | null>(null);
   const [selectedProjectForDetail, setSelectedProjectForDetail] = useState<ProjectItem | null>(null);
-  const [projectDossierTab, setProjectDossierTab] = useState<"summary" | "sales" | "purchases" | "cash" | "photos">("summary");
+  const [projectDossierTab, setProjectDossierTab] = useState<"summary" | "sales" | "purchases" | "cash" | "photos" | "team">("summary");
   const [selectedProjectForPhotoPrint, setSelectedProjectForPhotoPrint] = useState<ProjectItem | null>(null);
   const [isUploadingProjectPhoto, setIsUploadingProjectPhoto] = useState<boolean>(false);
   const [projectPhotoCategory, setProjectPhotoCategory] = useState<"documentation" | "part_replacement">("documentation");
@@ -1350,6 +1362,7 @@ export default function AdminFinanceERPPage() {
     status: "Planning" | "In Progress" | "Completed" | "On Hold" | "Cancelled";
     description: string;
     picProject: string;
+    assignedEmployees: ProjectAssignedEmployee[];
   }>({
     projectCode: "",
     projectName: "",
@@ -1364,7 +1377,14 @@ export default function AdminFinanceERPPage() {
     status: "In Progress",
     description: "",
     picProject: "",
+    assignedEmployees: [],
   });
+
+  // State Penugasan Personil PKWT Proyek
+  const [availableContracts, setAvailableContracts] = useState<any[]>([]);
+  const [assignFormSelectedContractId, setAssignFormSelectedContractId] = useState<string>("");
+  const [assignFormSelectedRole, setAssignFormSelectedRole] = useState<string>("Teknisi Skill");
+  const [assignFormNotes, setAssignFormNotes] = useState<string>("");
 
   // Master Warehouse Modal State
   const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState<boolean>(false);
@@ -2454,10 +2474,17 @@ export default function AdminFinanceERPPage() {
   const fetchFinanceData = async () => {
     try {
       setIsLoading(true);
-      const [res, prodRes] = await Promise.all([
+      const [res, prodRes, contractRes] = await Promise.all([
         fetch("/api/finance"),
         fetch("/api/products"),
+        fetch("/api/contracts"),
       ]);
+      if (contractRes && contractRes.ok) {
+        const cData = await contractRes.json();
+        if (cData && Array.isArray(cData.contracts)) {
+          setAvailableContracts(cData.contracts);
+        }
+      }
       if (prodRes.ok) {
         const pd = await prodRes.json();
         if (pd.data) setProducts(pd.data);
@@ -5522,6 +5549,9 @@ export default function AdminFinanceERPPage() {
   // Project Master Handlers
   const handleOpenAddProject = () => {
     setEditingProject(null);
+    setAssignFormSelectedContractId("");
+    setAssignFormSelectedRole("Teknisi Skill");
+    setAssignFormNotes("");
     setProjectForm({
       projectCode: `PRJ-${new Date().getFullYear()}-${String(projects.length + 1).padStart(3, "0")}`,
       projectName: "",
@@ -5536,12 +5566,16 @@ export default function AdminFinanceERPPage() {
       status: "In Progress",
       description: "",
       picProject: "",
+      assignedEmployees: [],
     });
     setIsProjectModalOpen(true);
   };
 
   const handleOpenEditProject = (prj: ProjectItem) => {
     setEditingProject(prj);
+    setAssignFormSelectedContractId("");
+    setAssignFormSelectedRole("Teknisi Skill");
+    setAssignFormNotes("");
     setProjectForm({
       projectCode: prj.projectCode,
       projectName: prj.projectName,
@@ -5556,12 +5590,16 @@ export default function AdminFinanceERPPage() {
       status: (prj.status as any) || "In Progress",
       description: prj.description || "",
       picProject: prj.picProject || "",
+      assignedEmployees: Array.isArray(prj.assignedEmployees) ? prj.assignedEmployees : [],
     });
     setIsProjectModalOpen(true);
   };
 
   const handleConvertQuotationToProject = (sph: Quotation) => {
     setEditingProject(null);
+    setAssignFormSelectedContractId("");
+    setAssignFormSelectedRole("Teknisi Skill");
+    setAssignFormNotes("");
     setProjectForm({
       projectCode: `PRJ-${new Date().getFullYear()}-${String(projects.length + 1).padStart(3, "0")}`,
       projectName: sph.subject || `Proyek Instalasi ${sph.customerName}`,
@@ -5576,9 +5614,61 @@ export default function AdminFinanceERPPage() {
       status: "In Progress",
       description: `Konversi otomatis dari SPH Disetujui: ${sph.quotationNumber} - ${sph.subject}`,
       picProject: sph.approvedBy || "DSTech Engineer",
+      assignedEmployees: [],
     });
     setIsProjectModalOpen(true);
     showToast(`SPH ${sph.quotationNumber} siap didaftarkan sebagai Master Proyek baru!`);
+  };
+
+  const handleAddEmployeeToProject = () => {
+    if (!assignFormSelectedContractId) {
+      showToast("Pilih karyawan berkontrak PKWT terlebih dahulu!");
+      return;
+    }
+
+    const contract = availableContracts.find((c: any) => c.id === assignFormSelectedContractId);
+    if (!contract) {
+      showToast("Data kontrak karyawan tidak ditemukan!");
+      return;
+    }
+
+    // Cek apakah karyawan sudah terdaftar dalam tim
+    const alreadyAssigned = (projectForm.assignedEmployees || []).some(
+      (emp) => emp.employeeId === contract.id || emp.employeeName.trim().toLowerCase() === contract.employeeName.trim().toLowerCase()
+    );
+
+    if (alreadyAssigned) {
+      showToast(`Karyawan ${contract.employeeName} sudah terdaftar dalam tim penugasan proyek ini!`);
+      return;
+    }
+
+    const newMember: ProjectAssignedEmployee = {
+      employeeId: contract.id,
+      employeeName: contract.employeeName,
+      position: contract.position || "Teknisi Lapangan",
+      roleInProject: assignFormSelectedRole || "Teknisi Skill",
+      contractNumber: contract.contractNumber || "-",
+      phone: contract.employeePhone || "-",
+      assignedDate: new Date().toISOString().split("T")[0],
+      notes: assignFormNotes || "-",
+    };
+
+    setProjectForm((prev) => ({
+      ...prev,
+      assignedEmployees: [...(prev.assignedEmployees || []), newMember],
+    }));
+
+    setAssignFormSelectedContractId("");
+    setAssignFormNotes("");
+    showToast(`✓ ${contract.employeeName} (${newMember.roleInProject}) berhasil ditambahkan ke tim proyek!`);
+  };
+
+  const handleRemoveEmployeeFromProject = (employeeId: string, employeeName: string) => {
+    setProjectForm((prev) => ({
+      ...prev,
+      assignedEmployees: (prev.assignedEmployees || []).filter((emp) => emp.employeeId !== employeeId),
+    }));
+    showToast(`Personil ${employeeName} dikeluarkan dari tim proyek.`);
   };
 
   const handleSaveProjectSubmit = async (e: React.FormEvent) => {
@@ -9737,6 +9827,17 @@ export default function AdminFinanceERPPage() {
                             {prj.picProject || "-"}
                           </span>
                         </div>
+                      </div>
+
+                      {/* Tim Personil Bertugas */}
+                      <div className="bg-indigo-50/60 p-2 rounded-xl border border-indigo-100 flex items-center justify-between gap-1 text-[11px]">
+                        <span className="text-slate-500 font-medium flex items-center gap-1">
+                          <Users className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>Tim Ditugaskan:</span>
+                        </span>
+                        <span className="font-bold text-indigo-800 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
+                          {prj.assignedEmployees?.length || 0} Personil PKWT
+                        </span>
                       </div>
 
                       {/* Financial Track for this Project */}
@@ -14638,7 +14739,7 @@ export default function AdminFinanceERPPage() {
           onClick={() => setIsProjectModalOpen(false)}
         >
           <div
-            className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -14802,6 +14903,141 @@ export default function AdminFinanceERPPage() {
                   className="w-full p-2.5 rounded-xl border border-slate-200"
                   placeholder="Catatan lingkup pekerjaan proyek..."
                 />
+              </div>
+
+              {/* SUB-PANEL: TIM KARYAWAN & TEKNISI YANG BERTUGAS (SESUAI PKWT) */}
+              <div className="border border-indigo-100 rounded-2xl p-4 bg-slate-50/70 space-y-3">
+                <div className="flex items-center justify-between border-b border-indigo-100/70 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700">
+                      <Users className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                        <span>Tim Teknisi & Personil Bertugas</span>
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-black">
+                          {projectForm.assignedEmployees?.length || 0} Orang Ditugaskan
+                        </span>
+                      </h4>
+                      <p className="text-[10px] text-slate-500">
+                        Pilih karyawan dari master kontrak PKWT aktif (misal butuh 5 s.d 10 teknisi/helper).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form Input Tambah Personil */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200/80 space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
+                    <div className="md:col-span-5">
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        Karyawan Berkontrak PKWT:
+                      </label>
+                      <select
+                        value={assignFormSelectedContractId}
+                        onChange={(e) => setAssignFormSelectedContractId(e.target.value)}
+                        className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-white font-medium"
+                      >
+                        <option value="">-- Pilih Karyawan PKWT --</option>
+                        {availableContracts.map((c: any) => {
+                          const isAssigned = (projectForm.assignedEmployees || []).some(
+                            (emp) => emp.employeeId === c.id || emp.employeeName.trim().toLowerCase() === c.employeeName?.trim().toLowerCase()
+                          );
+                          return (
+                            <option key={c.id} value={c.id} disabled={isAssigned}>
+                              {isAssigned ? "✓ (Sudah Ditugaskan) " : ""}
+                              {c.employeeName} — {c.position} ({c.contractNumber})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-4">
+                      <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                        Peran di Proyek Ini:
+                      </label>
+                      <select
+                        value={assignFormSelectedRole}
+                        onChange={(e) => setAssignFormSelectedRole(e.target.value)}
+                        className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-white font-bold text-slate-700"
+                      >
+                        <option value="Lead Technician">👑 Lead Technician / Koordinator</option>
+                        <option value="Teknisi Skill">⚡ Teknisi Skill Lapangan</option>
+                        <option value="Teknisi Senior">🌟 Teknisi Senior Specialist</option>
+                        <option value="Helper">🦺 Helper / Asisten Teknisi</option>
+                        <option value="HSE / Safety Officer">🛡️ HSE / K3 & Keselamatan</option>
+                        <option value="Project Supervisor">📋 Supervisor / QC Proyek</option>
+                        <option value="Drafter / Admin Lapangan">💻 Drafter / Admin Lapangan</option>
+                        <option value="Staf Pendukung">🏢 Staf Pendukung</option>
+                      </select>
+                    </div>
+
+                    <div className="md:col-span-3 flex items-end">
+                      <button
+                        type="button"
+                        onClick={handleAddEmployeeToProject}
+                        className="w-full py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-colors cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Tambah Tim</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabel Daftar Tim Terdaftar */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                  {(!projectForm.assignedEmployees || projectForm.assignedEmployees.length === 0) ? (
+                    <div className="p-4 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-1">
+                      <Users className="w-6 h-6 text-slate-300" />
+                      <p className="font-semibold text-slate-500">Belum ada personil yang ditugaskan pada proyek ini.</p>
+                      <p className="text-[10px]">Pilih karyawan berkontrak PKWT di atas untuk menambahkan tim kerja (misal: 10 teknisi).</p>
+                    </div>
+                  ) : (
+                    <div className="max-h-52 overflow-y-auto divide-y divide-slate-100">
+                      <div className="grid grid-cols-12 bg-slate-100/80 px-3 py-1.5 text-[10px] font-bold text-slate-600 uppercase">
+                        <div className="col-span-1 text-center">No</div>
+                        <div className="col-span-4">Nama & No. PKWT</div>
+                        <div className="col-span-3">Jabatan Kontrak</div>
+                        <div className="col-span-3">Peran Proyek</div>
+                        <div className="col-span-1 text-center">Aksi</div>
+                      </div>
+                      {projectForm.assignedEmployees.map((member, idx) => (
+                        <div
+                          key={member.employeeId || idx}
+                          className="grid grid-cols-12 items-center px-3 py-2 text-xs hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="col-span-1 text-center font-bold text-slate-400 text-[11px]">
+                            {idx + 1}
+                          </div>
+                          <div className="col-span-4 pr-1">
+                            <p className="font-bold text-slate-800 leading-tight">{member.employeeName}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">{member.contractNumber || "-"}</p>
+                          </div>
+                          <div className="col-span-3 pr-1 text-[11px] text-slate-600 truncate" title={member.position}>
+                            {member.position}
+                          </div>
+                          <div className="col-span-3 pr-1">
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                              {member.roleInProject}
+                            </span>
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveEmployeeFromProject(member.employeeId, member.employeeName)}
+                              title="Keluarkan dari tim"
+                              className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
@@ -15075,7 +15311,91 @@ export default function AdminFinanceERPPage() {
                     <Camera className="w-3.5 h-3.5" />
                     <span>Foto Dokumentasi & Part ({prj.photos?.length || 0})</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setProjectDossierTab("team")}
+                    className={`px-3 py-1.5 rounded-xl font-black text-xs transition-all cursor-pointer flex items-center gap-1.5 ${
+                      projectDossierTab === "team"
+                        ? "bg-indigo-600 text-white shadow"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Tim Personil PKWT ({prj.assignedEmployees?.length || 0})</span>
+                  </button>
                 </div>
+
+                {/* Tab Content: Team (Personil PKWT) */}
+                {projectDossierTab === "team" && (
+                  <div className="space-y-4 text-xs">
+                    <div className="flex items-center justify-between bg-indigo-50/70 p-3.5 rounded-2xl border border-indigo-100">
+                      <div>
+                        <h4 className="font-black text-slate-800 text-sm flex items-center gap-1.5">
+                          <Users className="w-4 h-4 text-indigo-600" />
+                          <span>Tim Teknisi & Personil Bertugas (Sesuai PKWT)</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Personil yang didaftarkan untuk menangani proyek ini dan terintegrasi ke absensi lapangan.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedProjectForDetail(null);
+                          handleOpenEditProject(prj);
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Kelola / Tambah Tim</span>
+                      </button>
+                    </div>
+
+                    {(!prj.assignedEmployees || prj.assignedEmployees.length === 0) ? (
+                      <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">
+                        <Users className="w-8 h-8 mx-auto text-slate-300 mb-2" />
+                        <p className="font-bold text-slate-600">Belum ada personil yang ditugaskan pada proyek ini.</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Klik tombol &quot;Kelola / Tambah Tim&quot; di atas untuk memasukkan personil teknisi berkontrak PKWT.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
+                        <table className="w-full text-left bg-white text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                            <tr>
+                              <th className="p-3 text-center w-12">No</th>
+                              <th className="p-3">Nama Karyawan</th>
+                              <th className="p-3">Jabatan di PKWT</th>
+                              <th className="p-3">Peran dalam Proyek</th>
+                              <th className="p-3">Nomor Kontrak PKWT</th>
+                              <th className="p-3">Tanggal Penugasan</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {prj.assignedEmployees.map((member, idx) => (
+                              <tr key={member.employeeId || idx} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="p-3 text-center font-bold text-slate-400">{idx + 1}</td>
+                                <td className="p-3">
+                                  <p className="font-bold text-slate-900">{member.employeeName}</p>
+                                  {member.phone && <p className="text-[10px] text-slate-400">{member.phone}</p>}
+                                </td>
+                                <td className="p-3 text-slate-600 font-medium">{member.position}</td>
+                                <td className="p-3">
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-700 border border-indigo-200 inline-block">
+                                    {member.roleInProject}
+                                  </span>
+                                </td>
+                                <td className="p-3 font-mono text-[11px] text-slate-500">{member.contractNumber || "-"}</td>
+                                <td className="p-3 text-slate-600">{member.assignedDate || prj.startDate || "-"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Tab Content: Summary */}
                 {projectDossierTab === "summary" && (

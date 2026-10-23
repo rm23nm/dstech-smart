@@ -40,6 +40,7 @@ import {
   Upload,
   Image as ImageIcon,
   Building,
+  Briefcase,
 } from "lucide-react";
 
 interface DamagedItem {
@@ -154,6 +155,9 @@ interface AttendanceLog {
   selfieCheckOut?: string | null;
   status: string;
   notes: string;
+  projectId?: string | null;
+  projectName?: string | null;
+  projectRole?: string | null;
 }
 
 interface OvertimeLog {
@@ -369,6 +373,11 @@ export default function EmployeeDashboard() {
   });
   const [isDetectingCheckInGps, setIsDetectingCheckInGps] = useState<boolean>(false);
   const [gpsErrorCheckIn, setGpsErrorCheckIn] = useState<string | null>(null);
+
+  // Penugasan Proyek PKWT pada Absensi
+  const [projectsList, setProjectsList] = useState<any[]>([]);
+  const [selectedProjectIdCheckIn, setSelectedProjectIdCheckIn] = useState<string>("");
+  const [selectedProjectIdCheckOut, setSelectedProjectIdCheckOut] = useState<string>("");
 
   const [isCheckOutModalOpen, setIsCheckOutModalOpen] = useState<boolean>(false);
   const [checkOutLocation, setCheckOutLocation] = useState<string>("Lokasi GPS Satelit");
@@ -665,12 +674,13 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [resTasks, resInv, resAtt, resAnn, resKms] = await Promise.all([
+        const [resTasks, resInv, resAtt, resAnn, resKms, resFin] = await Promise.all([
           fetch("/api/employee/tasks"),
           fetch("/api/employee/inventory"),
           fetch("/api/employee/attendance"),
           fetch("/api/employee/announcements"),
           fetch("/api/kms"),
+          fetch("/api/finance"),
         ]);
 
         if (resTasks.ok) {
@@ -695,6 +705,14 @@ export default function EmployeeDashboard() {
         if (resKms && resKms.ok) {
           const d = await resKms.json();
           if (d.data && Array.isArray(d.data)) setKmsList(d.data);
+        }
+        if (resFin && resFin.ok) {
+          const finData = await resFin.json();
+          if (finData?.data?.projects && Array.isArray(finData.data.projects)) {
+            setProjectsList(
+              finData.data.projects.filter((p: any) => p.status !== "Completed" && p.status !== "Cancelled")
+            );
+          }
         }
       } catch (err) {
         console.warn("Using offline fallback data for employee portal:", err);
@@ -1325,6 +1343,11 @@ export default function EmployeeDashboard() {
     }
 
     try {
+      const selectedProject = projectsList.find((p) => p.id === selectedProjectIdCheckIn);
+      const myTeamAssignment = selectedProject?.assignedEmployees?.find(
+        (emp: any) => emp.employeeName?.trim().toLowerCase() === currentUser?.name?.trim().toLowerCase()
+      );
+
       const res = await fetch("/api/employee/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1339,6 +1362,9 @@ export default function EmployeeDashboard() {
           mapsUrl: `https://www.google.com/maps?q=${checkInCoords.lat},${checkInCoords.lng}`,
           selfieCheckIn: selfieCheckInPhoto,
           notes: checkInNotes,
+          projectId: selectedProject?.id || undefined,
+          projectName: selectedProject?.projectName || undefined,
+          projectRole: myTeamAssignment?.roleInProject || undefined,
         }),
       });
 
@@ -1379,6 +1405,11 @@ export default function EmployeeDashboard() {
     }
 
     try {
+      const selectedProject = projectsList.find((p) => p.id === selectedProjectIdCheckOut);
+      const myTeamAssignment = selectedProject?.assignedEmployees?.find(
+        (emp: any) => emp.employeeName?.trim().toLowerCase() === currentUser?.name?.trim().toLowerCase()
+      );
+
       const res = await fetch("/api/employee/attendance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1393,6 +1424,9 @@ export default function EmployeeDashboard() {
           mapsUrl: `https://www.google.com/maps?q=${checkOutCoords.lat},${checkOutCoords.lng}`,
           selfieCheckOut: selfieCheckOutPhoto,
           notes: checkOutSummary,
+          projectId: selectedProject?.id || undefined,
+          projectName: selectedProject?.projectName || undefined,
+          projectRole: myTeamAssignment?.roleInProject || undefined,
         }),
       });
 
@@ -2634,6 +2668,12 @@ export default function EmployeeDashboard() {
                               </td>
                               <td className="p-3 text-slate-600">
                                 <div className="space-y-1">
+                                  {att.projectName && (
+                                    <div className="flex items-center gap-1 text-[10px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 font-bold w-fit">
+                                      <Briefcase className="w-3 h-3 text-indigo-600" />
+                                      <span>{att.projectName} {att.projectRole ? `(${att.projectRole})` : ""}</span>
+                                    </div>
+                                  )}
                                   <div className="flex items-center gap-1.5 font-bold text-slate-800">
                                     <MapPin className="w-3.5 h-3.5 text-dstech-red shrink-0" />
                                     <span>{att.location}</span>
@@ -3616,6 +3656,45 @@ export default function EmployeeDashboard() {
             </div>
 
             <form onSubmit={handleCheckIn} className="space-y-4 text-xs">
+              {/* PENUGASAN PROYEK HARI INI */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-1.5">
+                <label className="text-[11px] font-black text-indigo-950 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-indigo-600" />
+                    Terkait Penugasan Proyek (Sesuai Tim PKWT):
+                  </span>
+                  <span className="text-[10px] text-indigo-700 font-bold bg-white px-2 py-0.5 rounded-full border border-indigo-200">
+                    {selectedProjectIdCheckIn ? "✓ Terhubung Proyek" : "Opsional"}
+                  </span>
+                </label>
+                <select
+                  value={selectedProjectIdCheckIn}
+                  onChange={(e) => setSelectedProjectIdCheckIn(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-indigo-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                >
+                  <option value="">-- Operasional Kantor / Standar Non-Proyek --</option>
+                  {projectsList.map((p: any) => {
+                    const isMyTeam = (p.assignedEmployees || []).some(
+                      (emp: any) => emp.employeeName?.trim().toLowerCase() === currentUser?.name?.trim().toLowerCase()
+                    );
+                    const myRole = (p.assignedEmployees || []).find(
+                      (emp: any) => emp.employeeName?.trim().toLowerCase() === currentUser?.name?.trim().toLowerCase()
+                    )?.roleInProject;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {isMyTeam ? `⭐ [Tim Anda: ${myRole || "Teknisi"}] ` : ""}
+                        [{p.projectCode}] {p.projectName} — {p.clientName}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  {selectedProjectIdCheckIn
+                    ? "Presensi masuk ini akan dicatat dan dihubungkan ke proyek yang Anda pilih."
+                    : "Pilih proyek di mana Anda ditugaskan hari ini agar presensi terdata di rekap proyek."}
+                </p>
+              </div>
+
               {/* Status Koordinat GPS Satelit Terkunci */}
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
@@ -3966,6 +4045,45 @@ export default function EmployeeDashboard() {
             </div>
 
             <form onSubmit={handleCheckOut} className="space-y-4 text-xs">
+              {/* PENUGASAN PROYEK HARI INI */}
+              <div className="p-3.5 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-1.5">
+                <label className="text-[11px] font-black text-indigo-950 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-indigo-600" />
+                    Terkait Penugasan Proyek (Sesuai Tim PKWT):
+                  </span>
+                  <span className="text-[10px] text-indigo-700 font-bold bg-white px-2 py-0.5 rounded-full border border-indigo-200">
+                    {selectedProjectIdCheckOut ? "✓ Terhubung Proyek" : "Opsional"}
+                  </span>
+                </label>
+                <select
+                  value={selectedProjectIdCheckOut}
+                  onChange={(e) => setSelectedProjectIdCheckOut(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-indigo-200 bg-white text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                >
+                  <option value="">-- Operasional Kantor / Standar Non-Proyek --</option>
+                  {projectsList.map((p: any) => {
+                    const isMyTeam = (p.assignedEmployees || []).some(
+                      (emp: any) => emp.employeeName?.trim().toLowerCase() === currentUser?.name?.trim().toLowerCase()
+                    );
+                    const myRole = (p.assignedEmployees || []).find(
+                      (emp: any) => emp.employeeName?.trim().toLowerCase() === currentUser?.name?.trim().toLowerCase()
+                    )?.roleInProject;
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {isMyTeam ? `⭐ [Tim Anda: ${myRole || "Teknisi"}] ` : ""}
+                        [{p.projectCode}] {p.projectName} — {p.clientName}
+                      </option>
+                    );
+                  })}
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  {selectedProjectIdCheckOut
+                    ? "Presensi pulang ini akan dicatat dan dihubungkan ke proyek yang Anda pilih."
+                    : "Pilih proyek di mana Anda bertugas hari ini."}
+                </p>
+              </div>
+
               {/* Status Koordinat GPS Satelit Pulang Terkunci */}
               <div>
                 <label className="font-bold text-slate-700 block mb-1">

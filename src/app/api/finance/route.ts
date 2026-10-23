@@ -1199,6 +1199,7 @@ export async function POST(request: Request) {
         actualEndDate: payload.actualEndDate || "",
         picProject: payload.picProject || "Project Manager DSTech",
         description: payload.description || "-",
+        assignedEmployees: Array.isArray(payload.assignedEmployees) ? payload.assignedEmployees : [],
         photos: Array.isArray(payload.photos) ? payload.photos : [],
         createdAt: new Date().toISOString(),
       };

@@ -56,6 +56,43 @@ function getUserLocationPolicy(employeeName?: string, employeeEmail?: string) {
   };
 }
 
+const CONTRACTS_FILE = path.join(process.cwd(), "src", "data", "dstech_contracts.json");
+
+// Helper sinkronisasi jadwal jam kerja dari kontrak kerja PKWT aktif
+function getEmployeeContractSchedule(employeeName?: string) {
+  try {
+    if (fs.existsSync(CONTRACTS_FILE)) {
+      const contracts: any[] = JSON.parse(fs.readFileSync(CONTRACTS_FILE, "utf-8"));
+      if (Array.isArray(contracts) && employeeName) {
+        const matched = contracts.find(
+          (c) =>
+            c.employeeName &&
+            c.employeeName.trim().toLowerCase() === employeeName.trim().toLowerCase() &&
+            c.status === "ACTIVE"
+        );
+        if (matched?.workSchedule?.startTime) {
+          return {
+            startTime: matched.workSchedule.startTime || "08:00",
+            endTime: matched.workSchedule.endTime || "17:00",
+            workDaysType: matched.workSchedule.workDaysType || "6_DAYS",
+            hasContract: true,
+            contractNumber: matched.contractNumber || null,
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Could not read contract workSchedule:", err);
+  }
+  return {
+    startTime: "08:00",
+    endTime: "17:00",
+    workDaysType: "6_DAYS",
+    hasContract: false,
+    contractNumber: null,
+  };
+}
+
 function readAttendance() {
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -101,7 +138,7 @@ export async function POST(request: Request) {
     const dateStr = now.toISOString().split("T")[0];
 
     if (action === "checkin") {
-      const { location, notes, latitude, longitude, accuracy, mapsUrl } = body;
+      const { location, notes, latitude, longitude, accuracy, mapsUrl, projectId, projectName, projectRole } = body;
       const selfieCheckIn = body.selfieCheckIn || body.selfiePhoto || null;
 
       // 1. Validasi Wajib Koordinat GPS (Input manual dilarang!)
@@ -147,11 +184,32 @@ export async function POST(request: Request) {
         }
       }
 
+      // 4. Sinkronisasi Jam Kerja dengan Kontrak PKWT Karyawan (Tepat Waktu vs Terlambat)
+      const contractSched = getEmployeeContractSchedule(body.employeeName);
+      const [schedHour, schedMin] = (contractSched.startTime || "08:00").split(":").map(Number);
+      const schedTotalMin = (isNaN(schedHour) ? 8 : schedHour) * 60 + (isNaN(schedMin) ? 0 : schedMin);
+      const nowTotalMin = now.getHours() * 60 + now.getMinutes();
+      const lateMinutes = nowTotalMin - schedTotalMin;
+      const isLate = lateMinutes > 5; // Toleransi dispensasi keterlambatan 5 menit
+
+      let computedStatus = "Tepat Waktu";
+      if (isLate) {
+        computedStatus = `Terlambat (${lateMinutes}m)`;
+      } else if (distanceToOffice <= userPolicy.officeRadius) {
+        computedStatus = "Tepat Waktu";
+      } else {
+        computedStatus = "Hadir Lapangan";
+      }
+
       const existingToday = data.attendance.find((a: any) => a.date === dateStr);
       const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
 
       if (existingToday) {
         existingToday.checkIn = existingToday.checkIn || timeStr;
+        existingToday.status = computedStatus;
+        if (projectId) existingToday.projectId = projectId;
+        if (projectName) existingToday.projectName = projectName;
+        if (projectRole) existingToday.projectRole = projectRole;
         // PENGUNCIAN KOORDINAT (IMMUTABLE): Jika koordinat masuk sudah terekam, kunci dan jangan ubah ke-2x!
         if (!existingToday.latitude || !existingToday.longitude) {
           existingToday.latitude = Number(latitude);
@@ -173,6 +231,9 @@ export async function POST(request: Request) {
           employeeName: body.employeeName || "Teknisi Lapangan",
           checkIn: timeStr,
           checkOut: "-",
+          projectId: projectId || null,
+          projectName: projectName || null,
+          projectRole: projectRole || null,
           location: location || (distanceToOffice <= userPolicy.officeRadius ? "Kantor DSTech Cilegon" : `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`),
           latitude: Number(latitude),
           longitude: Number(longitude),
@@ -181,7 +242,7 @@ export async function POST(request: Request) {
           selfieCheckIn,
           distanceToOffice,
           geofenceLock: userPolicy.locationLock,
-          status: distanceToOffice <= userPolicy.officeRadius ? "Tepat Waktu (Kantor)" : "Hadir Lapangan",
+          status: computedStatus,
           notes: notes || `Absen masuk via GPS (${distanceToOffice}m dari kantor) & Foto Selfie terverifikasi`,
           isGpsLocked: true,
         };
@@ -198,7 +259,7 @@ export async function POST(request: Request) {
     }
 
     if (action === "checkout") {
-      const { notes, location, latitude, longitude, accuracy, mapsUrl } = body;
+      const { notes, location, latitude, longitude, accuracy, mapsUrl, projectId, projectName, projectRole } = body;
       const selfieCheckOut = body.selfieCheckOut || body.selfiePhoto || null;
 
       // 1. Validasi Wajib Koordinat GPS Pulang (Input manual dilarang!)
@@ -249,6 +310,9 @@ export async function POST(request: Request) {
 
       if (existingToday) {
         existingToday.checkOut = timeStr;
+        if (projectId) existingToday.projectId = projectId;
+        if (projectName) existingToday.projectName = projectName;
+        if (projectRole) existingToday.projectRole = projectRole;
         // PENGUNCIAN KOORDINAT PULANG: Jika sudah terekam, kunci dan jangan ubah ke-2x!
         if (!existingToday.checkOutLat || !existingToday.checkOutLng) {
           existingToday.checkOutLat = Number(latitude);
@@ -269,6 +333,9 @@ export async function POST(request: Request) {
           employeeName: body.employeeName || "Teknisi Lapangan",
           checkIn: "08:00 WIB",
           checkOut: timeStr,
+          projectId: projectId || null,
+          projectName: projectName || null,
+          projectRole: projectRole || null,
           location: `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`,
           checkOutLocation: location || (distanceToOffice <= userPolicy.officeRadius ? "Kantor DSTech Cilegon" : `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`),
           checkOutLat: Number(latitude),
