@@ -188,17 +188,37 @@ export default function AdminAttendancePage() {
     absentDays: 0,
   });
   const [usersList, setUsersList] = useState<SystemUser[]>([]);
+  const [contractsList, setContractsList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Tab & Filters
-  const [activeTab, setActiveTab] = useState<"attendance" | "overtime" | "payroll" | "summary">("attendance");
+  const [activeTab, setActiveTab] = useState<"attendance" | "overtime" | "payroll" | "summary" | "leave">("attendance");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [filterMonth, setFilterMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+
+  // Modal Catat Cuti / Izin / Sakit dari Admin
+  const [leaveRecordModal, setLeaveRecordModal] = useState<{
+    isOpen: boolean;
+    employeeName: string;
+    type: "Cuti" | "Izin" | "Sakit";
+    startDate: string;
+    endDate: string;
+    notes: string;
+    hasDoctorNote: boolean;
+  }>({
+    isOpen: false,
+    employeeName: "",
+    type: "Cuti",
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: new Date().toISOString().split("T")[0],
+    notes: "",
+    hasDoctorNote: false,
   });
 
   // Current logged in Superadmin info
@@ -374,10 +394,11 @@ export default function AdminAttendancePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resAtt, resUsers, resPayroll] = await Promise.all([
+      const [resAtt, resUsers, resPayroll, resContracts] = await Promise.all([
         fetch("/api/employee/attendance"),
         fetch("/api/users"),
         fetch("/api/payroll"),
+        fetch("/api/contracts"),
       ]);
 
       if (resAtt.ok) {
@@ -395,6 +416,11 @@ export default function AdminAttendancePage() {
       if (resPayroll.ok) {
         const pData = await resPayroll.json();
         if (pData.payrolls) setPayrollList(pData.payrolls);
+      }
+
+      if (resContracts.ok) {
+        const cData = await resContracts.json();
+        if (cData.contracts) setContractsList(cData.contracts);
       }
     } catch (err) {
       console.error("Gagal memuat data presensi & payroll:", err);
@@ -782,6 +808,53 @@ export default function AdminAttendancePage() {
     } catch (err) {
       console.error("Error deleting record:", err);
       setToastMsg({ type: "error", text: "Terjadi kesalahan saat menghapus data" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handler simpan permohonan Cuti / Izin / Sakit dari admin
+  const handleSaveLeaveRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leaveRecordModal.employeeName || !leaveRecordModal.startDate || !leaveRecordModal.endDate) {
+      alert("Mohon pilih karyawan dan tentukan rentang tanggal!");
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const start = new Date(leaveRecordModal.startDate);
+      const end = new Date(leaveRecordModal.endDate);
+      const dates: string[] = [];
+      const cur = new Date(start);
+      while (cur <= end) {
+        dates.push(cur.toISOString().split("T")[0]);
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      for (const d of dates) {
+        const payload = {
+          date: d,
+          employeeName: leaveRecordModal.employeeName,
+          checkIn: "-",
+          checkOut: "-",
+          location: "Dispensasi Izin/Cuti Resmi",
+          status: leaveRecordModal.type,
+          notes: `${leaveRecordModal.type}: ${leaveRecordModal.notes || "Pengajuan resmi"}${leaveRecordModal.hasDoctorNote ? " (Surat Keterangan Dokter Terlampir)" : ""}`,
+        };
+        await fetch("/api/employee/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      setToastMsg({ type: "success", text: `Berhasil mencatat ${leaveRecordModal.type} untuk ${leaveRecordModal.employeeName} (${dates.length} hari)` });
+      setLeaveRecordModal((prev) => ({ ...prev, isOpen: false }));
+      fetchData();
+    } catch (err) {
+      console.error("Gagal mencatat cuti/izin:", err);
+      setToastMsg({ type: "error", text: "Terjadi kesalahan saat menyimpan data cuti/izin" });
     } finally {
       setSubmitting(false);
     }

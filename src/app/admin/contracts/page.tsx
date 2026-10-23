@@ -34,7 +34,10 @@ import {
   ArrowUpRight,
   Info,
   KeyRound,
-  X
+  X,
+  CalendarCheck,
+  Car,
+  Utensils
 } from "lucide-react";
 
 export interface DstechContract {
@@ -75,6 +78,20 @@ export interface DstechContract {
       description?: string;
     };
   };
+  allowances?: {
+    transportMethod: "FULL_MONTHLY" | "DAILY_PRESENCE";
+    transportAmount: number;
+    mealMethod: "FULL_MONTHLY" | "DAILY_PRESENCE";
+    mealAmount: number;
+  };
+  leavePolicy?: {
+    annualLeaveDays?: number;
+    paidPermissionDays?: number;
+    sickLeavePaid?: boolean;
+    requiresDoctorCertificate?: boolean;
+    unpaidLeaveDeduction?: "PRORATE_DAILY" | "NONE";
+    specialLeaveNotes?: string;
+  };
   workLocation: string;
   status: "ACTIVE" | "EXPIRED" | "TERMINATED" | "DRAFT";
   signedByFirstParty: {
@@ -105,6 +122,11 @@ export interface OfficialPositionPreset {
   baseSalary?: number;
   positionAllowance?: number;
   transportAllowance?: number;
+  mealAllowance?: number;
+  transportMethod?: "FULL_MONTHLY" | "DAILY_PRESENCE";
+  transportAmount?: number;
+  mealMethod?: "FULL_MONTHLY" | "DAILY_PRESENCE";
+  mealAmount?: number;
   bpjsAllowance?: number;
   notes?: string;
 }
@@ -119,6 +141,10 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     contractType: "DAILY",
     dailyRate: 150000,
     overtimeHourlyRate: 25000,
+    transportMethod: "DAILY_PRESENCE",
+    transportAmount: 20000,
+    mealMethod: "DAILY_PRESENCE",
+    mealAmount: 25000,
     notes: "Upah harian Helper Rp 150.000/hari kerja & lembur Rp 25.000/jam",
   },
   {
@@ -130,6 +156,10 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     contractType: "DAILY",
     dailyRate: 175000,
     overtimeHourlyRate: 30000,
+    transportMethod: "DAILY_PRESENCE",
+    transportAmount: 20000,
+    mealMethod: "DAILY_PRESENCE",
+    mealAmount: 25000,
     notes: "Upah harian Teknisi Skill Rp 175.000/hari kerja & lembur Rp 30.000/jam",
   },
   {
@@ -141,6 +171,10 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     contractType: "DAILY",
     dailyRate: 200000,
     overtimeHourlyRate: 35000,
+    transportMethod: "DAILY_PRESENCE",
+    transportAmount: 25000,
+    mealMethod: "DAILY_PRESENCE",
+    mealAmount: 30000,
     notes: "Upah harian Teknisi Senior Rp 200.000/hari kerja & lembur Rp 35.000/jam",
   },
   {
@@ -152,6 +186,10 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     contractType: "DAILY",
     dailyRate: 225000,
     overtimeHourlyRate: 40000,
+    transportMethod: "DAILY_PRESENCE",
+    transportAmount: 30000,
+    mealMethod: "DAILY_PRESENCE",
+    mealAmount: 35000,
     notes: "Upah harian Lead/Foreman Rp 225.000/hari kerja & lembur Rp 40.000/jam",
   },
   {
@@ -164,6 +202,9 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     baseSalary: 4200000,
     positionAllowance: 500000,
     transportAllowance: 400000,
+    mealAllowance: 500000,
+    transportMethod: "FULL_MONTHLY",
+    mealMethod: "FULL_MONTHLY",
     bpjsAllowance: 150000,
     notes: "Gaji bulanan tetap staf kantor (tidak dikalikan harian)",
   },
@@ -177,6 +218,9 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     baseSalary: 4500000,
     positionAllowance: 500000,
     transportAllowance: 400000,
+    mealAllowance: 500000,
+    transportMethod: "FULL_MONTHLY",
+    mealMethod: "FULL_MONTHLY",
     bpjsAllowance: 150000,
     notes: "Gaji bulanan staf IT tetap",
   },
@@ -190,6 +234,9 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     baseSalary: 5500000,
     positionAllowance: 750000,
     transportAllowance: 500000,
+    mealAllowance: 600000,
+    transportMethod: "FULL_MONTHLY",
+    mealMethod: "FULL_MONTHLY",
     bpjsAllowance: 150000,
     notes: "Gaji bulanan manajerial/supervisor",
   },
@@ -205,6 +252,9 @@ export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
     baseSalary: 4000000,
     positionAllowance: 500000,
     transportAllowance: 400000,
+    mealAllowance: 500000,
+    transportMethod: "FULL_MONTHLY",
+    mealMethod: "FULL_MONTHLY",
     bpjsAllowance: 150000,
     notes: "Posisi kustom",
   },
@@ -244,11 +294,17 @@ export default function ContractsPage() {
     durationMonths: 3,
     workLocation: "Kantor & Proyek Lapangan (Sesuai SPK)",
     status: "ACTIVE" as "ACTIVE" | "EXPIRED" | "TERMINATED" | "DRAFT",
-    // Staff Scheme
+    // Staff Scheme & Flat Monthly
     baseSalary: 4000000,
     positionAllowance: 500000,
     transportAllowance: 400000,
+    mealAllowance: 500000,
     bpjsAllowance: 150000,
+    // Tunjangan Transportasi & Uang Makan (2 Metode: Full vs Harian Hadir)
+    transportMethod: "FULL_MONTHLY" as "FULL_MONTHLY" | "DAILY_PRESENCE",
+    transportAmount: 400000,
+    mealMethod: "FULL_MONTHLY" as "FULL_MONTHLY" | "DAILY_PRESENCE",
+    mealAmount: 500000,
     // Technician Daily Scheme
     dailyRateType: "TYPE_1_FULL_DAY" as "TYPE_1_FULL_DAY" | "TYPE_2_HOURLY" | "TYPE_3_MONTHLY_FULL",
     dailyRate: 175000,
@@ -258,6 +314,13 @@ export default function ContractsPage() {
     overtimeMultiplierHour1: 1.5,
     overtimeMultiplierHour2Plus: 2.0,
     weekendMultiplier: 2.0,
+    // Cuti, Izin, & Sakit
+    annualLeaveDays: 12,
+    paidPermissionDays: 3,
+    sickLeavePaid: true,
+    requiresDoctorCertificate: true,
+    unpaidLeaveDeduction: "PRORATE_DAILY" as "PRORATE_DAILY" | "NONE",
+    specialLeaveNotes: "Cuti tahunan 12 hari/tahun. Izin berbayar 3 hari. Sakit wajib melampirkan Surat Keterangan Dokter.",
     // First & Second Party
     directorName: "RAMADHANI, ST",
     directorTitle: "Direktur Utama",
@@ -466,7 +529,13 @@ export default function ContractsPage() {
       baseSalary: 4000000,
       positionAllowance: 500000,
       transportAllowance: 400000,
+      mealAllowance: 500000,
       bpjsAllowance: 150000,
+      // Tunjangan Transportasi & Uang Makan (2 Metode Fleksibel)
+      transportMethod: "DAILY_PRESENCE",
+      transportAmount: 20000,
+      mealMethod: "DAILY_PRESENCE",
+      mealAmount: 25000,
       dailyRateType: "TYPE_1_FULL_DAY",
       dailyRate: 175000,
       overtimeHourlyRate: 30000,
@@ -475,6 +544,13 @@ export default function ContractsPage() {
       overtimeMultiplierHour1: 1.5,
       overtimeMultiplierHour2Plus: 2.0,
       weekendMultiplier: 2.0,
+      // Cuti, Izin, Sakit
+      annualLeaveDays: 12,
+      paidPermissionDays: 3,
+      sickLeavePaid: true,
+      requiresDoctorCertificate: true,
+      unpaidLeaveDeduction: "PRORATE_DAILY",
+      specialLeaveNotes: "Cuti tahunan 12 hari/tahun. Izin berbayar 3 hari. Sakit wajib melampirkan Surat Keterangan Dokter.",
       directorName: "RAMADHANI, ST",
       directorTitle: "Direktur Utama",
       notes: "Kontrak kerja baru teknisi lapangan sistem harian (Teknisi Skill Rp 175.000/hari).",
@@ -488,7 +564,11 @@ export default function ContractsPage() {
   const handleOpenEditModal = (item: DstechContract) => {
     const daily = item.salaryScheme?.dailyScheme;
     const staff = item.salaryScheme?.staffScheme;
-    const isDaily = !!daily || item.employeeCategory === "TECHNICIAN" && item.contractType === "DAILY";
+    const isDaily = !!daily && daily.dailyRateType !== "TYPE_3_MONTHLY_FULL" && item.employeeCategory === "TECHNICIAN" && item.contractType === "DAILY";
+
+    // Detect active rate type
+    const activeRateType = daily?.dailyRateType || (item.employeeCategory === "STAFF" || item.contractType === "MONTHLY" || item.contractType === "YEARLY" ? "TYPE_3_MONTHLY_FULL" : "TYPE_1_FULL_DAY");
+    const activeSchemeType = activeRateType === "TYPE_3_MONTHLY_FULL" ? "MONTHLY" : (isDaily ? "DAILY" : "MONTHLY");
 
     // Detect preset id
     let matchedPreset = "custom";
@@ -499,6 +579,13 @@ export default function ContractsPage() {
     else if (posLower.includes("foreman") || posLower.includes("lead")) matchedPreset = "foreman";
     else if (posLower.includes("administrasi") || posLower.includes("keuangan")) matchedPreset = "staff_admin";
     else if (posLower.includes("it") || posLower.includes("network")) matchedPreset = "staff_it";
+    else if (posLower.includes("supervisor")) matchedPreset = "staff_spv";
+
+    // Detect allowances & methods
+    const activeTransportMethod = item.allowances?.transportMethod || (item.employeeCategory === "STAFF" || item.contractType === "MONTHLY" || item.contractType === "YEARLY" ? "FULL_MONTHLY" : "DAILY_PRESENCE");
+    const activeTransportAmount = item.allowances?.transportAmount ?? staff?.transportAllowance ?? daily?.transportAllowance ?? (activeTransportMethod === "FULL_MONTHLY" ? 400000 : 20000);
+    const activeMealMethod = item.allowances?.mealMethod || (item.employeeCategory === "STAFF" || item.contractType === "MONTHLY" || item.contractType === "YEARLY" ? "FULL_MONTHLY" : "DAILY_PRESENCE");
+    const activeMealAmount = item.allowances?.mealAmount ?? (activeMealMethod === "FULL_MONTHLY" ? 500000 : 25000);
 
     setFormData({
       id: item.id,
@@ -510,7 +597,7 @@ export default function ContractsPage() {
       employeeAddress: item.employeeAddress || "",
       selectedRolePresetId: matchedPreset,
       position: item.position,
-      payrollSchemeType: isDaily ? "DAILY" : "MONTHLY",
+      payrollSchemeType: activeSchemeType,
       employeeCategory: item.employeeCategory,
       contractType: item.contractType,
       startDate: item.startDate,
@@ -518,11 +605,17 @@ export default function ContractsPage() {
       durationMonths: item.durationMonths,
       workLocation: item.workLocation,
       status: item.status,
-      baseSalary: staff?.baseSalary || 4200000,
-      positionAllowance: staff?.positionAllowance || 500000,
-      transportAllowance: staff?.transportAllowance || 400000,
-      bpjsAllowance: staff?.bpjsAllowance || 150000,
-      dailyRateType: daily?.dailyRateType || (item.employeeCategory === "STAFF" || item.contractType === "MONTHLY" || item.contractType === "YEARLY" ? "TYPE_3_MONTHLY_FULL" : "TYPE_1_FULL_DAY"),
+      baseSalary: daily?.monthlyBaseSalary || staff?.baseSalary || 4200000,
+      positionAllowance: daily?.positionAllowance ?? staff?.positionAllowance ?? 500000,
+      transportAllowance: activeTransportAmount,
+      mealAllowance: activeMealAmount,
+      bpjsAllowance: daily?.bpjsAllowance ?? staff?.bpjsAllowance ?? 150000,
+      // Tunjangan Transport & Makan (2 Metode Fleksibel)
+      transportMethod: activeTransportMethod,
+      transportAmount: activeTransportAmount,
+      mealMethod: activeMealMethod,
+      mealAmount: activeMealAmount,
+      dailyRateType: activeRateType,
       dailyRate: daily?.dailyRate || 175000,
       overtimeHourlyRate: daily?.overtimeHourlyRate || 30000,
       hourlyRate: daily?.hourlyRate || 30000,
@@ -530,6 +623,13 @@ export default function ContractsPage() {
       overtimeMultiplierHour1: daily?.overtimeMultiplierHour1 || 1.5,
       overtimeMultiplierHour2Plus: daily?.overtimeMultiplierHour2Plus || 2.0,
       weekendMultiplier: daily?.weekendMultiplier || 2.0,
+      // Cuti, Izin, Sakit
+      annualLeaveDays: item.leavePolicy?.annualLeaveDays ?? 12,
+      paidPermissionDays: item.leavePolicy?.paidPermissionDays ?? 3,
+      sickLeavePaid: item.leavePolicy?.sickLeavePaid ?? true,
+      requiresDoctorCertificate: item.leavePolicy?.requiresDoctorCertificate ?? true,
+      unpaidLeaveDeduction: (item.leavePolicy?.unpaidLeaveDeduction as any) ?? "PRORATE_DAILY",
+      specialLeaveNotes: item.leavePolicy?.specialLeaveNotes ?? "Cuti tahunan 12 hari/tahun. Izin berbayar 3 hari. Sakit wajib melampirkan Surat Keterangan Dokter.",
       directorName: item.signedByFirstParty?.name || "RAMADHANI, ST",
       directorTitle: item.signedByFirstParty?.title || "Direktur Utama",
       notes: item.notes || "",
@@ -573,13 +673,18 @@ export default function ContractsPage() {
         salaryScheme.staffScheme = {
           baseSalary: Number(formData.baseSalary || 0),
           positionAllowance: Number(formData.positionAllowance || 0),
-          transportAllowance: Number(formData.transportAllowance || 0),
+          transportAllowance: Number(formData.transportAmount || 0),
+          mealAllowance: Number(formData.mealAmount || 0),
           bpjsAllowance: Number(formData.bpjsAllowance || 0),
           notes: "Tipe 3: Gaji bulanan dibayar penuh (tidak dikalikan hari hadir di auto-payroll)",
         };
         salaryScheme.dailyScheme = {
           dailyRateType: "TYPE_3_MONTHLY_FULL",
           monthlyBaseSalary: Number(formData.baseSalary || 0),
+          positionAllowance: Number(formData.positionAllowance || 0),
+          transportAllowance: Number(formData.transportAmount || 0),
+          mealAllowance: Number(formData.mealAmount || 0),
+          bpjsAllowance: Number(formData.bpjsAllowance || 0),
           overtimeHourlyRate: Number(formData.overtimeHourlyRate || 30000),
           description: `Tipe 3: Bulanan dibayar penuh Rp ${Number(formData.baseSalary || 0).toLocaleString("id-ID")}/bulan.`,
         };
@@ -593,6 +698,8 @@ export default function ContractsPage() {
           overtimeMultiplierHour2Plus: Number(formData.overtimeMultiplierHour2Plus || 2.0),
           weekendMultiplier: Number(formData.weekendMultiplier || 2.0),
           overtimeHourlyRate: Number(formData.hourlyRate || 0) * Number(formData.overtimeMultiplierHour1 || 1.5),
+          transportAllowance: Number(formData.transportAmount || 0),
+          mealAllowance: Number(formData.mealAmount || 0),
           description: `Tipe 2: Bayaran per jam Rp ${(formData.hourlyRate || 0).toLocaleString("id-ID")}/jam dengan pengali lembur 1.5x dan 2.0x.`,
         };
       } else {
@@ -601,6 +708,8 @@ export default function ContractsPage() {
           dailyRateType: "TYPE_1_FULL_DAY",
           dailyRate: Number(formData.dailyRate || 0),
           overtimeHourlyRate: Number(formData.overtimeHourlyRate || 0),
+          transportAllowance: Number(formData.transportAmount || 0),
+          mealAllowance: Number(formData.mealAmount || 0),
           description: `Tipe 1: Harian dibayar penuh Rp ${(formData.dailyRate || 0).toLocaleString("id-ID")}/hari kerja.`,
         };
       }
@@ -620,6 +729,20 @@ export default function ContractsPage() {
         endDate: formData.endDate,
         durationMonths: Number(formData.durationMonths || 1),
         salaryScheme,
+        allowances: {
+          transportMethod: formData.transportMethod,
+          transportAmount: Number(formData.transportAmount || 0),
+          mealMethod: formData.mealMethod,
+          mealAmount: Number(formData.mealAmount || 0),
+        },
+        leavePolicy: {
+          annualLeaveDays: Number(formData.annualLeaveDays || 12),
+          paidPermissionDays: Number(formData.paidPermissionDays || 3),
+          sickLeavePaid: !!formData.sickLeavePaid,
+          requiresDoctorCertificate: !!formData.requiresDoctorCertificate,
+          unpaidLeaveDeduction: formData.unpaidLeaveDeduction || "PRORATE_DAILY",
+          specialLeaveNotes: formData.specialLeaveNotes || "",
+        },
         workLocation: formData.workLocation,
         status: formData.status,
         signedByFirstParty: {
@@ -1375,6 +1498,11 @@ export default function ContractsPage() {
                             baseSalary: preset.baseSalary ?? formData.baseSalary,
                             positionAllowance: preset.positionAllowance ?? formData.positionAllowance,
                             transportAllowance: preset.transportAllowance ?? formData.transportAllowance,
+                            mealAllowance: preset.mealAllowance ?? formData.mealAllowance,
+                            transportMethod: preset.transportMethod ?? formData.transportMethod,
+                            transportAmount: preset.transportAmount ?? formData.transportAmount,
+                            mealMethod: preset.mealMethod ?? formData.mealMethod,
+                            mealAmount: preset.mealAmount ?? formData.mealAmount,
                             bpjsAllowance: preset.bpjsAllowance ?? formData.bpjsAllowance,
                           });
                         }
@@ -1851,7 +1979,7 @@ export default function ContractsPage() {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div>
                         <label className="text-xs font-bold text-slate-700 block mb-1">Gaji Pokok (Rp/Bulan) <span className="text-rose-500">*</span></label>
                         <input
@@ -1874,17 +2002,7 @@ export default function ContractsPage() {
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Tunjangan Transport (Rp)</label>
-                        <input
-                          type="number"
-                          value={formData.transportAllowance}
-                          onChange={(e) => setFormData({ ...formData, transportAllowance: Number(e.target.value) })}
-                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-bold"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Potongan BPJS (Rp)</label>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Potongan BPJS / PPh21 (Rp)</label>
                         <input
                           type="number"
                           value={formData.bpjsAllowance}
@@ -1894,7 +2012,7 @@ export default function ContractsPage() {
                       </div>
 
                       <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Tarif Lembur (Rp/Jam)</label>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Tarif Lembur Opsional (Rp/Jam)</label>
                         <input
                           type="number"
                           value={formData.overtimeHourlyRate}
@@ -1913,12 +2031,350 @@ export default function ContractsPage() {
                     </p>
                   </div>
                 )}
+
+                {/* SUB-SEKSI: TUNJANGAN TRANSPORTASI & UANG MAKAN (2 METODE: FULL BULANAN VS HARIAN HADIR) */}
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-200/60">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 bg-amber-100 text-amber-700 rounded-lg">
+                        <Car className="w-4 h-4" />
+                      </span>
+                      <div>
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                          Tunjangan Transportasi & Uang Makan (2 Metode Fleksibel)
+                        </h4>
+                        <p className="text-[10px] text-slate-500">
+                          Pilih metode pemberian: <strong>Full Bulanan</strong> (flat per bulan) atau <strong>Hitungan Per Hari Hadir</strong> (hanya dibayar jika masuk kerja).
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-600 bg-white px-2.5 py-1 rounded-full border border-slate-200 w-fit">
+                      Berlaku Otomatis di Auto-Payroll
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* KARTU 1: TUNJANGAN TRANSPORTASI */}
+                    <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-3 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <Car className="w-4 h-4 text-amber-600" /> Tunjangan Transportasi
+                        </label>
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                          {formData.transportMethod === "FULL_MONTHLY" ? "Pemberian Full" : "Hitungan Harian"}
+                        </span>
+                      </div>
+
+                      {/* Pilihan 2 Metode Radio Pills */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              transportMethod: "FULL_MONTHLY",
+                              transportAmount: formData.transportAmount < 100000 ? 400000 : formData.transportAmount,
+                            });
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            formData.transportMethod === "FULL_MONTHLY"
+                              ? "border-emerald-500 bg-emerald-50/80 text-emerald-950 font-bold ring-2 ring-emerald-500/20"
+                              : "border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          <div className="text-[11px] font-black flex items-center gap-1">
+                            <span className={`w-2 h-2 rounded-full ${formData.transportMethod === "FULL_MONTHLY" ? "bg-emerald-600" : "bg-slate-400"}`}></span>
+                            1. Full Bulanan
+                          </div>
+                          <div className="text-[9px] text-slate-500 mt-1 leading-tight">
+                            Dibayar penuh flat tanpa dipotong absensi
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              transportMethod: "DAILY_PRESENCE",
+                              transportAmount: formData.transportAmount > 100000 ? 20000 : formData.transportAmount,
+                            });
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            formData.transportMethod === "DAILY_PRESENCE"
+                              ? "border-blue-500 bg-blue-50/80 text-blue-950 font-bold ring-2 ring-blue-500/20"
+                              : "border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          <div className="text-[11px] font-black flex items-center gap-1">
+                            <span className={`w-2 h-2 rounded-full ${formData.transportMethod === "DAILY_PRESENCE" ? "bg-blue-600" : "bg-slate-400"}`}></span>
+                            2. Hitungan Per Hari
+                          </div>
+                          <div className="text-[9px] text-slate-500 mt-1 leading-tight">
+                            Hanya jika hadir (tidak masuk = tidak dapat)
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Input Nominal Transport */}
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                          Nominal Transportasi ({formData.transportMethod === "FULL_MONTHLY" ? "Rp / Bulan" : "Rp / Hari Hadir"})
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            value={formData.transportAmount}
+                            onChange={(e) => setFormData({ ...formData, transportAmount: Number(e.target.value) })}
+                            placeholder={formData.transportMethod === "FULL_MONTHLY" ? "400000" : "20000"}
+                            className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900"
+                          />
+                          <span className="absolute right-3.5 top-2.5 text-[11px] text-slate-400 font-bold">
+                            {formData.transportMethod === "FULL_MONTHLY" ? "/ bln" : "/ hr hadir"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 mt-1 block">
+                          {formData.transportMethod === "FULL_MONTHLY"
+                            ? `Tetap Rp ${Number(formData.transportAmount || 0).toLocaleString("id-ID")} / bulan`
+                            : `Rp ${Number(formData.transportAmount || 0).toLocaleString("id-ID")} x 22 hari kerja ≈ Rp ${(Number(formData.transportAmount || 0) * 22).toLocaleString("id-ID")}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* KARTU 2: TUNJANGAN UANG MAKAN */}
+                    <div className="p-4 bg-white rounded-xl border border-slate-200 space-y-3 shadow-2xs">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <Utensils className="w-4 h-4 text-rose-600" /> Tunjangan Uang Makan
+                        </label>
+                        <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          {formData.mealMethod === "FULL_MONTHLY" ? "Pemberian Full" : "Hitungan Harian"}
+                        </span>
+                      </div>
+
+                      {/* Pilihan 2 Metode Radio Pills */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              mealMethod: "FULL_MONTHLY",
+                              mealAmount: formData.mealAmount < 100000 ? 500000 : formData.mealAmount,
+                            });
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            formData.mealMethod === "FULL_MONTHLY"
+                              ? "border-emerald-500 bg-emerald-50/80 text-emerald-950 font-bold ring-2 ring-emerald-500/20"
+                              : "border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          <div className="text-[11px] font-black flex items-center gap-1">
+                            <span className={`w-2 h-2 rounded-full ${formData.mealMethod === "FULL_MONTHLY" ? "bg-emerald-600" : "bg-slate-400"}`}></span>
+                            1. Full Bulanan
+                          </div>
+                          <div className="text-[9px] text-slate-500 mt-1 leading-tight">
+                            Dibayar penuh flat tanpa dipotong absensi
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData({
+                              ...formData,
+                              mealMethod: "DAILY_PRESENCE",
+                              mealAmount: formData.mealAmount > 100000 ? 25000 : formData.mealAmount,
+                            });
+                          }}
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            formData.mealMethod === "DAILY_PRESENCE"
+                              ? "border-blue-500 bg-blue-50/80 text-blue-950 font-bold ring-2 ring-blue-500/20"
+                              : "border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          <div className="text-[11px] font-black flex items-center gap-1">
+                            <span className={`w-2 h-2 rounded-full ${formData.mealMethod === "DAILY_PRESENCE" ? "bg-blue-600" : "bg-slate-400"}`}></span>
+                            2. Hitungan Per Hari
+                          </div>
+                          <div className="text-[9px] text-slate-500 mt-1 leading-tight">
+                            Hanya jika hadir (tidak masuk = tidak dapat)
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Input Nominal Uang Makan */}
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                          Nominal Uang Makan ({formData.mealMethod === "FULL_MONTHLY" ? "Rp / Bulan" : "Rp / Hari Hadir"})
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            value={formData.mealAmount}
+                            onChange={(e) => setFormData({ ...formData, mealAmount: Number(e.target.value) })}
+                            placeholder={formData.mealMethod === "FULL_MONTHLY" ? "500000" : "25000"}
+                            className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900"
+                          />
+                          <span className="absolute right-3.5 top-2.5 text-[11px] text-slate-400 font-bold">
+                            {formData.mealMethod === "FULL_MONTHLY" ? "/ bln" : "/ hr hadir"}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 mt-1 block">
+                          {formData.mealMethod === "FULL_MONTHLY"
+                            ? `Tetap Rp ${Number(formData.mealAmount || 0).toLocaleString("id-ID")} / bulan`
+                            : `Rp ${Number(formData.mealAmount || 0).toLocaleString("id-ID")} x 22 hari kerja ≈ Rp ${(Number(formData.mealAmount || 0) * 22).toLocaleString("id-ID")}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* BANNER KALKULASI SIMULASI TAKE HOME PAY */}
+                  <div className="p-3.5 bg-blue-50/80 rounded-xl border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-blue-900 font-medium">
+                      <Calculator className="w-4 h-4 text-blue-600 shrink-0" />
+                      <div>
+                        <span className="font-bold">Estimasi Total Penerimaan Take Home Pay:</span>
+                        <span className="text-[10px] text-blue-700 block">
+                          {formData.dailyRateType === "TYPE_3_MONTHLY_FULL" || formData.payrollSchemeType === "MONTHLY"
+                            ? `Gaji Pokok (Rp ${(formData.baseSalary || 0).toLocaleString("id-ID")}) + Tunj. Jabatan (${(formData.positionAllowance || 0).toLocaleString("id-ID")}) + Transport (${(formData.transportMethod === "FULL_MONTHLY" ? (formData.transportAmount || 0) : (formData.transportAmount || 0) * 22).toLocaleString("id-ID")}) + Makan (${(formData.mealMethod === "FULL_MONTHLY" ? (formData.mealAmount || 0) : (formData.mealAmount || 0) * 22).toLocaleString("id-ID")}) - BPJS (${(formData.bpjsAllowance || 0).toLocaleString("id-ID")})`
+                            : formData.dailyRateType === "TYPE_1_FULL_DAY"
+                            ? `Upah Harian 22 Hari (Rp ${((formData.dailyRate || 0) * 22).toLocaleString("id-ID")}) + Transport (${(formData.transportMethod === "FULL_MONTHLY" ? (formData.transportAmount || 0) : (formData.transportAmount || 0) * 22).toLocaleString("id-ID")}) + Makan (${(formData.mealMethod === "FULL_MONTHLY" ? (formData.mealAmount || 0) : (formData.mealAmount || 0) * 22).toLocaleString("id-ID")})`
+                            : `Upah 8 Jam x 22 Hari (Rp ${((formData.hourlyRate || 0) * 8 * 22).toLocaleString("id-ID")}) + Transport & Makan`}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] text-blue-700 uppercase font-black block">Total THP Bulanan</span>
+                      <strong className="text-sm font-black text-blue-950">
+                        Rp {Math.max(
+                          0,
+                          (formData.dailyRateType === "TYPE_3_MONTHLY_FULL" || formData.payrollSchemeType === "MONTHLY"
+                            ? (formData.baseSalary || 0) + (formData.positionAllowance || 0) - (formData.bpjsAllowance || 0)
+                            : formData.dailyRateType === "TYPE_1_FULL_DAY"
+                            ? (formData.dailyRate || 0) * 22
+                            : (formData.hourlyRate || 0) * 8 * 22) +
+                            (formData.transportMethod === "FULL_MONTHLY" ? (formData.transportAmount || 0) : (formData.transportAmount || 0) * 22) +
+                            (formData.mealMethod === "FULL_MONTHLY" ? (formData.mealAmount || 0) : (formData.mealAmount || 0) * 22)
+                        ).toLocaleString("id-ID")}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* BAGIAN 4: SINKRONISASI AKUN USER & DURASI AKSES */}
+              {/* BAGIAN 4: HAK CUTI, IZIN & KEBIJAKAN SAKIT */}
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <KeyRound className="w-4 h-4 text-blue-500" /> 4. Akun Login & Batas Waktu Akses
+                  <CalendarCheck className="w-4 h-4 text-emerald-600" /> 4. Hak Cuti Tahunan, Izin & Kebijakan Sakit
+                </h3>
+
+                <div className="p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Hak Cuti Tahunan */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Hak Cuti Tahunan (Hari/Tahun)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          max="30"
+                          value={formData.annualLeaveDays}
+                          onChange={(e) => setFormData({ ...formData, annualLeaveDays: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-emerald-300 rounded-xl font-bold text-slate-900"
+                        />
+                        <span className="absolute right-3.5 top-2.5 text-xs text-slate-400 font-semibold">hari</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1 block">Standar UU Ketenagakerjaan: 12 hari</span>
+                    </div>
+
+                    {/* Izin Khusus Berbayar */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Batas Izin Berbayar (Hari/Tahun)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="0"
+                          max="14"
+                          value={formData.paidPermissionDays}
+                          onChange={(e) => setFormData({ ...formData, paidPermissionDays: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-emerald-300 rounded-xl font-bold text-slate-900"
+                        />
+                        <span className="absolute right-3.5 top-2.5 text-xs text-slate-400 font-semibold">hari</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 mt-1 block">Keperluan penting/keluarga/menikah</span>
+                    </div>
+
+                    {/* Ketentuan Izin Tak Berbayar */}
+                    <div>
+                      <label className="text-xs font-bold text-slate-700 block mb-1">
+                        Aturan Izin Tak Berbayar / Mangkir
+                      </label>
+                      <select
+                        value={formData.unpaidLeaveDeduction}
+                        onChange={(e) => setFormData({ ...formData, unpaidLeaveDeduction: e.target.value as any })}
+                        className="w-full px-3.5 py-2.5 text-xs bg-white border border-emerald-300 rounded-xl font-bold text-slate-900"
+                      >
+                        <option value="PRORATE_DAILY">Potong Upah Proporsional (Gaji/Hari Kerja)</option>
+                        <option value="NONE">Tanpa Potongan (Kebijakan Pimpinan)</option>
+                      </select>
+                      <span className="text-[10px] text-slate-500 mt-1 block">Dihitung otomatis saat auto-payroll</span>
+                    </div>
+                  </div>
+
+                  {/* Kebijakan Sakit */}
+                  <div className="pt-3 border-t border-emerald-200/60 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label className="flex items-center gap-2.5 p-2.5 bg-white rounded-xl border border-emerald-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.requiresDoctorCertificate}
+                        onChange={(e) => setFormData({ ...formData, requiresDoctorCertificate: e.target.checked })}
+                        className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                      />
+                      <span className="text-xs font-bold text-slate-800">
+                        Wajib Lampirkan Surat Keterangan Dokter (SKD)
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 p-2.5 bg-white rounded-xl border border-emerald-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.sickLeavePaid}
+                        onChange={(e) => setFormData({ ...formData, sickLeavePaid: e.target.checked })}
+                        className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500"
+                      />
+                      <span className="text-xs font-bold text-slate-800">
+                        Sakit dengan SKD: Upah Tetap Dibayar Penuh (100%)
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Catatan Khusus Cuti */}
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Catatan / Ketentuan Khusus Hak Cuti & Izin
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.specialLeaveNotes}
+                      onChange={(e) => setFormData({ ...formData, specialLeaveNotes: e.target.value })}
+                      placeholder="Contoh: Pengajuan cuti diajukan paling lambat 3 hari sebelumnya melalui portal karyawan..."
+                      className="w-full px-3 py-2 text-xs bg-white border border-emerald-200 rounded-lg text-slate-800"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* BAGIAN 5: SINKRONISASI AKUN USER & DURASI AKSES */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <KeyRound className="w-4 h-4 text-blue-500" /> 5. Akun Login & Batas Waktu Akses
                 </h3>
 
                 <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
@@ -2247,14 +2703,22 @@ export default function ContractsPage() {
                   <h4 className="font-bold font-sans text-center text-slate-900 mb-1">
                     PASAL 4: SISTEM UPAH & SKEMA PEMBAYARAN
                   </h4>
-                  {selectedContract.employeeCategory === "STAFF" || selectedContract.contractType === "MONTHLY" || selectedContract.contractType === "YEARLY" ? (
+                  {selectedContract.employeeCategory === "STAFF" || selectedContract.contractType === "MONTHLY" || selectedContract.contractType === "YEARLY" || selectedContract.salaryScheme?.dailyScheme?.dailyRateType === "TYPE_3_MONTHLY_FULL" ? (
                     <div className="space-y-1">
                       <p>PIHAK KEDUA berhak menerima kompensasi upah bulanan dengan rincian sebagai berikut:</p>
                       <ul className="list-disc pl-6 space-y-0.5 font-sans text-[10px]">
-                        <li>Gaji Pokok: <strong>Rp {(selectedContract.salaryScheme?.staffScheme?.baseSalary || 0).toLocaleString("id-ID")}</strong> / bulan.</li>
-                        <li>Tunjangan Jabatan: Rp {(selectedContract.salaryScheme?.staffScheme?.positionAllowance || 0).toLocaleString("id-ID")}.</li>
-                        <li>Tunjangan Transportasi: Rp {(selectedContract.salaryScheme?.staffScheme?.transportAllowance || 0).toLocaleString("id-ID")}.</li>
-                        <li>BPJS: Rp {(selectedContract.salaryScheme?.staffScheme?.bpjsAllowance || 0).toLocaleString("id-ID")}.</li>
+                        <li>Gaji Pokok: <strong>Rp {(selectedContract.salaryScheme?.dailyScheme?.monthlyBaseSalary || selectedContract.salaryScheme?.staffScheme?.baseSalary || 0).toLocaleString("id-ID")}</strong> / bulan.</li>
+                        <li>Tunjangan Jabatan: Rp {(selectedContract.salaryScheme?.dailyScheme?.positionAllowance || selectedContract.salaryScheme?.staffScheme?.positionAllowance || 0).toLocaleString("id-ID")}.</li>
+                        <li>
+                          Tunjangan Transportasi: <strong>Rp {(selectedContract.allowances?.transportAmount ?? selectedContract.salaryScheme?.staffScheme?.transportAllowance ?? 0).toLocaleString("id-ID")}</strong> {selectedContract.allowances?.transportMethod === "DAILY_PRESENCE" ? "(Metode Harian Hadir: dibayarkan per hari kehadiran kerja, tidak hadir = tidak diberikan)" : "(Metode Full Bulanan: dibayarkan penuh per bulan)"}.
+                        </li>
+                        <li>
+                          Tunjangan Uang Makan: <strong>Rp {(selectedContract.allowances?.mealAmount ?? 0).toLocaleString("id-ID")}</strong> {selectedContract.allowances?.mealMethod === "DAILY_PRESENCE" ? "(Metode Harian Hadir: dibayarkan per hari kehadiran kerja, tidak hadir = tidak diberikan)" : "(Metode Full Bulanan: dibayarkan penuh per bulan)"}.
+                        </li>
+                        <li>Potongan BPJS / PPh21: Rp {(selectedContract.salaryScheme?.dailyScheme?.bpjsAllowance || selectedContract.salaryScheme?.staffScheme?.bpjsAllowance || 0).toLocaleString("id-ID")}.</li>
+                        {selectedContract.salaryScheme?.dailyScheme?.overtimeHourlyRate ? (
+                          <li>Tarif Upah Lembur: Rp {(selectedContract.salaryScheme.dailyScheme.overtimeHourlyRate).toLocaleString("id-ID")} / jam (jika ada surat perintah lembur).</li>
+                        ) : null}
                       </ul>
                       <p>Upah dibayarkan secara rutin setiap tanggal 25 (dua puluh lima) setiap bulannya melalui transfer rekening resmi.</p>
                     </div>
@@ -2266,6 +2730,12 @@ export default function ContractsPage() {
                       <ul className="list-disc pl-6 space-y-0.5 font-sans text-[10px]">
                         <li>
                           Upah Harian Penuh: <strong>Rp {(selectedContract.salaryScheme?.dailyScheme?.dailyRate || 0).toLocaleString("id-ID")} / hari kerja</strong>, dibayarkan penuh atas setiap hari kerja efektif dan penyelesaian tugas lapangan.
+                        </li>
+                        <li>
+                          Tunjangan Transportasi: <strong>Rp {(selectedContract.allowances?.transportAmount || 0).toLocaleString("id-ID")}</strong> {selectedContract.allowances?.transportMethod === "DAILY_PRESENCE" ? "(Metode Harian Hadir: dibayarkan per hari masuk kerja)" : "(Metode Full Bulanan)"}.
+                        </li>
+                        <li>
+                          Tunjangan Uang Makan: <strong>Rp {(selectedContract.allowances?.mealAmount || 0).toLocaleString("id-ID")}</strong> {selectedContract.allowances?.mealMethod === "DAILY_PRESENCE" ? "(Metode Harian Hadir: dibayarkan per hari masuk kerja)" : "(Metode Full Bulanan)"}.
                         </li>
                         <li>
                           Upah Lembur Tambahan: <strong>Rp {(selectedContract.salaryScheme?.dailyScheme?.overtimeHourlyRate || 0).toLocaleString("id-ID")} / jam</strong>, jika ditugaskan bekerja melebihi jam kerja harian normal.
@@ -2280,6 +2750,12 @@ export default function ContractsPage() {
                       <ul className="list-disc pl-6 space-y-0.5 font-sans text-[10px]">
                         <li>
                           Upah Per Jam Kerja Normal: <strong>Rp {(selectedContract.salaryScheme?.dailyScheme?.hourlyRate || 0).toLocaleString("id-ID")} / jam</strong> (standar {selectedContract.salaryScheme?.dailyScheme?.normalHoursPerDay || 8} jam per hari kerja).
+                        </li>
+                        <li>
+                          Tunjangan Transportasi: <strong>Rp {(selectedContract.allowances?.transportAmount || 0).toLocaleString("id-ID")}</strong> {selectedContract.allowances?.transportMethod === "DAILY_PRESENCE" ? "/ hari kehadiran" : "/ bulan"}.
+                        </li>
+                        <li>
+                          Tunjangan Uang Makan: <strong>Rp {(selectedContract.allowances?.mealAmount || 0).toLocaleString("id-ID")}</strong> {selectedContract.allowances?.mealMethod === "DAILY_PRESENCE" ? "/ hari kehadiran" : "/ bulan"}.
                         </li>
                         <li>
                           Pengali Lembur Jam Pertama: <strong>{selectedContract.salaryScheme?.dailyScheme?.overtimeMultiplierHour1 || 1.5}x</strong> dari tarif upah per jam.
@@ -2298,7 +2774,23 @@ export default function ContractsPage() {
                 {/* PASAL 5 */}
                 <div>
                   <h4 className="font-bold font-sans text-center text-slate-900 mb-1">
-                    PASAL 5: KERAHASIAAN & TATA TERTIB
+                    PASAL 5: HAK CUTI, IZIN, DAN KETENTUAN SAKIT
+                  </h4>
+                  <p>
+                    1. <strong>Hak Cuti Tahunan:</strong> PIHAK KEDUA berhak atas cuti tahunan sebanyak <strong>{selectedContract.leavePolicy?.annualLeaveDays || 12} (dua belas) hari kerja</strong> per tahun (dihitung proporsional sesuai masa kerja berjalan) dengan permohonan melalui sistem aplikasi DSTech Smart paling lambat 3 (tiga) hari kerja sebelumnya.
+                  </p>
+                  <p>
+                    2. <strong>Izin Khusus Berbayar:</strong> Diberikan dispensasi izin berbayar penuh maksimal <strong>{selectedContract.leavePolicy?.paidPermissionDays || 3} hari kerja</strong> untuk keperluan penting/keluarga inti. Di luar kuota tersebut, ketidakhadiran diperhitungkan sebagai izin tidak berbayar dengan pemotongan upah harian secara proporsional.
+                  </p>
+                  <p>
+                    3. <strong>Ketentuan Sakit:</strong> Apabila PIHAK KEDUA berhalangan bekerja dikarenakan sakit, wajib melampirkan Surat Keterangan Sakit resmi dari Dokter/Fasilitas Pelayanan Kesehatan. {selectedContract.leavePolicy?.sickLeavePaid !== false ? "Sakit yang disertai Surat Keterangan Dokter yang sah tetap menerima upah penuh (100%)." : "Sakit disesuaikan dengan regulasi upah berjalan."} Ketidakhadiran tanpa surat dokter dihitung sebagai mangkir kerja.
+                  </p>
+                </div>
+
+                {/* PASAL 6 */}
+                <div>
+                  <h4 className="font-bold font-sans text-center text-slate-900 mb-1">
+                    PASAL 6: KERAHASIAAN & TATA TERTIB
                   </h4>
                   <p>
                     PIHAK KEDUA wajib menjaga kerahasiaan data instalasi, aset, kode sandi, dan rahasia bisnis milik PIHAK PERTAMA maupun klien. Pelanggaran berat terhadap keselamatan kerja (K3) dan penyalahgunaan wewenang dapat berakibat pemutusan kontrak sepihak tanpa ganti rugi.

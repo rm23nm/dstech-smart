@@ -38,6 +38,7 @@ import {
   Send,
   Zap,
   Calendar,
+  UserCheck,
 } from "lucide-react";
 
 interface PayrollRecord {
@@ -57,6 +58,9 @@ interface PayrollRecord {
   overtimePay: number;
   positionAllowance: number;
   transportAllowance: number;
+  mealAllowance?: number;
+  transportMethod?: "FULL_MONTHLY" | "DAILY_PRESENCE";
+  mealMethod?: "FULL_MONTHLY" | "DAILY_PRESENCE";
   bonusProject: number;
   bonusPerformance: number;
   bpjsDeduction: number;
@@ -97,6 +101,13 @@ interface PayrollSettings {
     senior: PositionRateItem;
     lead: PositionRateItem;
   };
+  leaveSettings?: {
+    defaultAnnualLeave: number;
+    paidPermissionDays: number;
+    prorateDivisor: number;
+    sickRequiresDoctorNote: boolean;
+    sickLeavePaid: boolean;
+  };
 }
 
 interface PayrollSummary {
@@ -125,6 +136,7 @@ function formatRupiah(num: number): string {
 
 export default function AdminPayrollPage() {
   const [payrollList, setPayrollList] = useState<PayrollRecord[]>([]);
+  const [contracts, setContracts] = useState<any[]>([]);
   const [settings, setSettings] = useState<PayrollSettings>({
     standardOvertimeRate: 30000,
     standardPresenceRate: 50000,
@@ -140,6 +152,13 @@ export default function AdminPayrollPage() {
       skill: { name: "Teknisi Skill / Ahli", dailyRate: 175000, overtimeRate: 30000 },
       senior: { name: "Teknisi Senior / Specialist", dailyRate: 200000, overtimeRate: 35000 },
       lead: { name: "Lead / Foreman Lapangan", dailyRate: 225000, overtimeRate: 40000 },
+    },
+    leaveSettings: {
+      defaultAnnualLeave: 12,
+      paidPermissionDays: 3,
+      prorateDivisor: 25,
+      sickRequiresDoctorNote: true,
+      sickLeavePaid: true,
     },
   });
   const [summary, setSummary] = useState<PayrollSummary | null>(null);
@@ -183,6 +202,7 @@ export default function AdminPayrollPage() {
     overtimePay: number;
     positionAllowance: number;
     transportAllowance: number;
+    mealAllowance: number;
     bonusProject: number;
     bonusPerformance: number;
     bpjsDeduction: number;
@@ -194,6 +214,10 @@ export default function AdminPayrollPage() {
     recordInCashFlow: boolean;
     dailyRate?: number;
     positionTier?: string;
+    transportMethod?: "FULL_MONTHLY" | "DAILY_PRESENCE";
+    transportUnit?: number;
+    mealMethod?: "FULL_MONTHLY" | "DAILY_PRESENCE";
+    mealUnit?: number;
   }>({
     isEdit: false,
     slipNumber: "",
@@ -212,7 +236,8 @@ export default function AdminPayrollPage() {
     overtimeRate: 30000,
     overtimePay: 0,
     positionAllowance: 0,
-    transportAllowance: 300000,
+    transportAllowance: 440000,
+    mealAllowance: 550000,
     bonusProject: 0,
     bonusPerformance: 0,
     bpjsDeduction: 150000,
@@ -222,6 +247,10 @@ export default function AdminPayrollPage() {
     notes: "",
     status: "Draft",
     recordInCashFlow: true,
+    transportMethod: "DAILY_PRESENCE",
+    transportUnit: 20000,
+    mealMethod: "DAILY_PRESENCE",
+    mealUnit: 25000,
   });
 
   // Auto Generate Options
@@ -242,12 +271,23 @@ export default function AdminPayrollPage() {
       if (filterMonth && filterMonth !== "ALL") params.append("month", filterMonth);
       if (filterStatus && filterStatus !== "ALL") params.append("status", filterStatus);
 
-      const res = await fetch(`/api/payroll?${params.toString()}`);
-      if (res.ok) {
-        const json = await res.json();
+      const [resPayroll, resContracts] = await Promise.all([
+        fetch(`/api/payroll?${params.toString()}`),
+        fetch("/api/contracts").catch(() => null),
+      ]);
+
+      if (resPayroll.ok) {
+        const json = await resPayroll.json();
         setPayrollList(json.payrolls || []);
         if (json.defaultSettings) setSettings(json.defaultSettings);
         if (json.summary) setSummary(json.summary);
+      }
+
+      if (resContracts && resContracts.ok) {
+        const cJson = await resContracts.json();
+        if (cJson.success && Array.isArray(cJson.contracts)) {
+          setContracts(cJson.contracts);
+        }
       }
     } catch (err) {
       console.error("Gagal memuat payroll:", err);
@@ -255,6 +295,109 @@ export default function AdminPayrollPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper: Terapkan data dari Kontrak Kerja ke form slip gaji
+  const applyContractData = (contract: any, customDays?: number, customOtHours?: number) => {
+    if (!contract) return;
+    const days = customDays !== undefined ? customDays : (formData.presenceDays || 22);
+    const otHours = customOtHours !== undefined ? customOtHours : (formData.overtimeHours || 0);
+
+    const daily = contract.salaryScheme?.dailyScheme;
+    const staff = contract.salaryScheme?.staffScheme;
+    const isStaff =
+      contract.employeeCategory === "STAFF" ||
+      contract.contractType === "MONTHLY" ||
+      contract.contractType === "YEARLY" ||
+      daily?.dailyRateType === "TYPE_3_MONTHLY_FULL";
+
+    let baseSalary = 0;
+    let dailyRate = 0;
+    let presenceAllowance = 0;
+    let presenceRate = 0;
+    let positionAllowance = 0;
+    let overtimeRate = 30000;
+    let positionTier = "skill";
+
+    if (isStaff) {
+      baseSalary = Number(daily?.monthlyBaseSalary || staff?.baseSalary || 4200000);
+      positionAllowance = Number(daily?.positionAllowance ?? staff?.positionAllowance ?? 500000);
+      dailyRate = 0;
+      presenceRate = 0;
+      presenceAllowance = 0;
+      overtimeRate = Number(daily?.overtimeHourlyRate || 30000);
+      positionTier = "staff";
+    } else if (daily?.dailyRateType === "TYPE_2_HOURLY") {
+      const hourly = Number(daily.hourlyRate || 30000);
+      dailyRate = hourly * (daily.normalHoursPerDay || 8);
+      baseSalary = days * dailyRate;
+      overtimeRate = Number(daily.overtimeHourlyRate || 40000);
+      positionTier = "skill";
+    } else {
+      // TYPE_1_FULL_DAY
+      dailyRate = Number(daily?.dailyRate || 175000);
+      baseSalary = days * dailyRate;
+      overtimeRate = Number(daily?.overtimeHourlyRate || 30000);
+      if (dailyRate === 150000) positionTier = "helper";
+      else if (dailyRate === 200000) positionTier = "senior";
+      else if (dailyRate === 225000) positionTier = "lead";
+      else positionTier = "skill";
+    }
+
+    const overtimePay = otHours * overtimeRate;
+
+    // Tunjangan Transportasi (2 Metode: Full vs Harian Hadir)
+    const transportMethod: "FULL_MONTHLY" | "DAILY_PRESENCE" =
+      contract.allowances?.transportMethod || (isStaff ? "FULL_MONTHLY" : "DAILY_PRESENCE");
+    const transportUnit = Number(
+      contract.allowances?.transportAmount ??
+      staff?.transportAllowance ??
+      daily?.transportAllowance ??
+      (transportMethod === "FULL_MONTHLY" ? 400000 : 20000)
+    );
+    const transportAllowance = transportMethod === "DAILY_PRESENCE" ? days * transportUnit : transportUnit;
+
+    // Tunjangan Uang Makan (2 Metode: Full vs Harian Hadir)
+    const mealMethod: "FULL_MONTHLY" | "DAILY_PRESENCE" =
+      contract.allowances?.mealMethod || (isStaff ? "FULL_MONTHLY" : "DAILY_PRESENCE");
+    const mealUnit = Number(
+      contract.allowances?.mealAmount ??
+      staff?.mealAllowance ??
+      daily?.mealAllowance ??
+      (mealMethod === "FULL_MONTHLY" ? 500000 : 25000)
+    );
+    const mealAllowance = mealMethod === "DAILY_PRESENCE" ? days * mealUnit : mealUnit;
+
+    const bpjsDeduction = Number(staff?.bpjsAllowance ?? daily?.bpjsAllowance ?? 150000);
+    const bankAccount = contract.employeePhone
+      ? `Transfer Bank (HP: ${contract.employeePhone})`
+      : (formData.bankAccount || "-");
+
+    setFormData((prev) => ({
+      ...prev,
+      employeeName: contract.employeeName,
+      employeeRole: contract.position || prev.employeeRole,
+      bankAccount: bankAccount || prev.bankAccount,
+      baseSalary,
+      dailyRate,
+      presenceDays: days,
+      presenceRate,
+      presenceAllowance,
+      overtimeHours: otHours,
+      overtimeRate,
+      overtimePay,
+      positionAllowance,
+      transportAllowance,
+      mealAllowance,
+      bpjsDeduction,
+      positionTier,
+      transportMethod,
+      transportUnit,
+      mealMethod,
+      mealUnit,
+    }));
+
+    showToast("success", `Tarif berhasil disinkronkan dengan Kontrak Kerja: ${contract.employeeName} (${contract.position})`);
   };
 
   const showToast = (type: "success" | "error" | "info", text: string) => {
@@ -506,6 +649,7 @@ export default function AdminPayrollPage() {
       overtimePay: p.overtimePay,
       positionAllowance: p.positionAllowance,
       transportAllowance: p.transportAllowance,
+      mealAllowance: p.mealAllowance || 0,
       bonusProject: p.bonusProject,
       bonusPerformance: p.bonusPerformance,
       bpjsDeduction: p.bpjsDeduction,
@@ -678,17 +822,20 @@ export default function AdminPayrollPage() {
                 month: filterMonth !== "ALL" ? filterMonth : new Date().toISOString().slice(0, 7),
                 paymentDate: new Date().toISOString().split("T")[0],
                 employeeName: "",
-                employeeRole: "Teknisi Lapangan",
+                employeeRole: "Teknisi Skill Instalasi & Integrasi",
                 bankAccount: "",
-                baseSalary: 4200000,
+                baseSalary: 3850000,
+                dailyRate: 175000,
+                positionTier: "skill",
                 presenceDays: 22,
-                presenceRate: settings.standardPresenceRate || 50000,
-                presenceAllowance: 22 * (settings.standardPresenceRate || 50000),
+                presenceRate: 0,
+                presenceAllowance: 0,
                 overtimeHours: 0,
                 overtimeRate: settings.standardOvertimeRate || 30000,
                 overtimePay: 0,
-                positionAllowance: 400000,
-                transportAllowance: settings.standardTransportAllowance || 400000,
+                positionAllowance: 0,
+                transportAllowance: 440000,
+                mealAllowance: 550000,
                 bonusProject: 0,
                 bonusPerformance: 0,
                 bpjsDeduction: settings.defaultBpjsDeduction || 150000,
@@ -698,6 +845,10 @@ export default function AdminPayrollPage() {
                 notes: "",
                 status: "Draft",
                 recordInCashFlow: true,
+                transportMethod: "DAILY_PRESENCE",
+                transportUnit: 20000,
+                mealMethod: "DAILY_PRESENCE",
+                mealUnit: 25000,
               });
               setIsFormModalOpen(true);
             }}
@@ -1015,6 +1166,7 @@ export default function AdminPayrollPage() {
                     (p.overtimePay || 0) +
                     (p.positionAllowance || 0) +
                     (p.transportAllowance || 0) +
+                    (p.mealAllowance || 0) +
                     (p.bonusProject || 0) +
                     (p.bonusPerformance || 0);
 
@@ -1611,6 +1763,135 @@ export default function AdminPayrollPage() {
                 </div>
               </div>
 
+              {/* Seksi Kebijakan Cuti, Izin & Sakit */}
+              <div className="bg-emerald-50/60 p-4 sm:p-5 rounded-2xl border border-emerald-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-emerald-900 uppercase tracking-wider flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                    Kebijakan Cuti, Izin & Sakit (Peraturan Penggajian)
+                  </h4>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100/80 px-2 py-0.5 rounded">
+                    Auto-Payroll Rule
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div className="bg-white p-3 rounded-xl border border-emerald-200">
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Kuota Cuti Tahunan Default
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="30"
+                        value={settings.leaveSettings?.defaultAnnualLeave ?? 12}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            leaveSettings: {
+                              ...settings.leaveSettings!,
+                              defaultAnnualLeave: Number(e.target.value),
+                            },
+                          })
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs"
+                      />
+                      <span className="absolute right-2 top-1.5 text-[10px] text-slate-400">hari/thn</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-emerald-200">
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Batas Izin Khusus Berbayar
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="14"
+                        value={settings.leaveSettings?.paidPermissionDays ?? 3}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            leaveSettings: {
+                              ...settings.leaveSettings!,
+                              paidPermissionDays: Number(e.target.value),
+                            },
+                          })
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs"
+                      />
+                      <span className="absolute right-2 top-1.5 text-[10px] text-slate-400">hari/thn</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-xl border border-emerald-200">
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                      Pembagi Potongan Harian
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="20"
+                        max="31"
+                        value={settings.leaveSettings?.prorateDivisor ?? 25}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            leaveSettings: {
+                              ...settings.leaveSettings!,
+                              prorateDivisor: Number(e.target.value),
+                            },
+                          })
+                        }
+                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 font-bold text-xs"
+                      />
+                      <span className="absolute right-2 top-1.5 text-[10px] text-slate-400">hari kerja</span>
+                    </div>
+                    <span className="text-[9px] text-slate-500 mt-0.5 block">Potongan/hari = Gaji / {settings.leaveSettings?.prorateDivisor || 25}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-1 text-[11px] font-medium text-emerald-900">
+                  <label className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-emerald-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.leaveSettings?.sickRequiresDoctorNote ?? true}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          leaveSettings: {
+                            ...settings.leaveSettings!,
+                            sickRequiresDoctorNote: e.target.checked,
+                          },
+                        })
+                      }
+                      className="w-4 h-4 text-emerald-600 rounded"
+                    />
+                    <span>Sakit wajib Surat Keterangan Dokter (SKD)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-emerald-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.leaveSettings?.sickLeavePaid ?? true}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          leaveSettings: {
+                            ...settings.leaveSettings!,
+                            sickLeavePaid: e.target.checked,
+                          },
+                        })
+                      }
+                      className="w-4 h-4 text-emerald-600 rounded"
+                    />
+                    <span>Sakit ber-SKD dibayar penuh 100% tanpa potongan</span>
+                  </label>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
@@ -1755,75 +2036,151 @@ export default function AdminPayrollPage() {
             </div>
 
             <form onSubmit={handleSaveForm} className="space-y-6 mt-6">
+              {/* Banner Sinkronisasi Kontrak untuk Mode Edit */}
+              {formData.isEdit && (() => {
+                const matchedContract = contracts.find(
+                  (c) => c.employeeName?.trim().toLowerCase() === formData.employeeName?.trim().toLowerCase()
+                );
+                if (!matchedContract) return null;
+                return (
+                  <div className="p-3.5 bg-blue-50/90 border border-blue-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2 text-blue-950 font-semibold">
+                      <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
+                      <div>
+                        <span>
+                          Ditemukan Kontrak Kerja Aktif: <strong>{matchedContract.employeeName}</strong> — {matchedContract.position}
+                        </span>
+                        <div className="text-[10px] text-blue-700 font-normal mt-0.5">
+                          {matchedContract.employeeCategory === "STAFF" || matchedContract.salaryScheme?.staffScheme
+                            ? `Gaji Pokok: Rp ${Number(matchedContract.salaryScheme?.staffScheme?.baseSalary || 4200000).toLocaleString("id-ID")} (Bulanan)`
+                            : `Upah Harian: Rp ${Number(matchedContract.salaryScheme?.dailyScheme?.dailyRate || 175000).toLocaleString("id-ID")}/hari`}
+                          {" | "}Transport: {matchedContract.allowances?.transportMethod === "DAILY_PRESENCE" ? `Rp ${Number(matchedContract.allowances?.transportAmount || 20000).toLocaleString("id-ID")}/hr hadir` : `Rp ${Number(matchedContract.allowances?.transportAmount || 400000).toLocaleString("id-ID")}/bln full`}
+                          {" | "}Makan: {matchedContract.allowances?.mealMethod === "DAILY_PRESENCE" ? `Rp ${Number(matchedContract.allowances?.mealAmount || 25000).toLocaleString("id-ID")}/hr hadir` : `Rp ${Number(matchedContract.allowances?.mealAmount || 500000).toLocaleString("id-ID")}/bln full`}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => applyContractData(matchedContract)}
+                      className="px-3.5 py-2 bg-dstech-blue hover:bg-blue-600 text-white rounded-xl font-bold text-xs shrink-0 shadow-sm flex items-center gap-1.5 transition-all"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>🔄 Sinkronkan dengan Kontrak</span>
+                    </button>
+                  </div>
+                );
+              })()}
+
               {/* Seksi 1: Data Identitas & Periode */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Nama Karyawan *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.employeeName}
-                    onChange={(e) => setFormData({ ...formData, employeeName: e.target.value })}
-                    placeholder="Contoh: Ikhsan Maulidi"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Jabatan / Divisi *</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.employeeRole}
-                    onChange={(e) => setFormData({ ...formData, employeeRole: e.target.value })}
-                    placeholder="Contoh: Teknisi Lapangan"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Periode Bulan *</label>
-                  <input
-                    type="month"
-                    required
-                    value={formData.month}
-                    onChange={(e) => setFormData({ ...formData, month: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Tanggal Pembayaran</label>
-                  <input
-                    type="date"
-                    value={formData.paymentDate}
-                    onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Metode Transfer</label>
+              <div className="space-y-4">
+                {/* Selector Cepat Kontrak Kerja */}
+                <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <label className="block text-xs font-black text-slate-800 mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <UserCheck className="w-4 h-4 text-dstech-blue" />
+                      ⚡ Pilih Karyawan dari Kontrak Kerja (Otomatis Isi Tarif & Skema Tunjangan)
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100/70 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                      Rekomendasi Presisi
+                    </span>
+                  </label>
                   <select
-                    value={formData.paymentMethod}
-                    onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      if (!selectedId) return;
+                      const found = contracts.find((c) => c.id === selectedId);
+                      if (found) applyContractData(found);
+                    }}
+                    defaultValue=""
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-blue-300 bg-white text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-dstech-blue cursor-pointer shadow-2xs"
                   >
-                    <option value="Transfer Bank BCA">Transfer Bank BCA</option>
-                    <option value="Transfer Bank Mandiri">Transfer Bank Mandiri</option>
-                    <option value="Kas Tunai (Petty Cash)">Kas Tunai (Petty Cash)</option>
+                    <option value="">-- Pilih Karyawan Berkontrak (Tarif Otomatis Mengikuti Kontrak) --</option>
+                    {contracts.map((c: any) => {
+                      const isStaf = c.employeeCategory === "STAFF" || c.salaryScheme?.staffScheme;
+                      const rateDesc = isStaf
+                        ? `Bulanan Rp ${Number(c.salaryScheme?.staffScheme?.baseSalary || 4200000).toLocaleString("id-ID")}`
+                        : `Harian Rp ${Number(c.salaryScheme?.dailyScheme?.dailyRate || 175000).toLocaleString("id-ID")}/hr`;
+                      return (
+                        <option key={c.id} value={c.id}>
+                          {c.employeeName} — {c.position} ({rateDesc})
+                        </option>
+                      );
+                    })}
                   </select>
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    Memilih karyawan otomatis menyelaraskan: Jabatan, Tarif Harian/Pokok Bulanan, Tarif Lembur, Tunjangan Transport & Makan (Full vs Harian), serta Rekening Bank.
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Nomor Rekening / Rek Tujuan</label>
-                  <input
-                    type="text"
-                    value={formData.bankAccount}
-                    onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value })}
-                    placeholder="BCA 0293847561 a.n Ikhsan"
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Nama Karyawan *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.employeeName}
+                      onChange={(e) => setFormData({ ...formData, employeeName: e.target.value })}
+                      placeholder="Contoh: Rian Maulana"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Jabatan / Divisi *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.employeeRole}
+                      onChange={(e) => setFormData({ ...formData, employeeRole: e.target.value })}
+                      placeholder="Contoh: Helper / Asisten Teknisi CCTV"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Periode Bulan *</label>
+                    <input
+                      type="month"
+                      required
+                      value={formData.month}
+                      onChange={(e) => setFormData({ ...formData, month: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Tanggal Pembayaran</label>
+                    <input
+                      type="date"
+                      value={formData.paymentDate}
+                      onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Metode Transfer</label>
+                    <select
+                      value={formData.paymentMethod}
+                      onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
+                    >
+                      <option value="Transfer Bank BCA">Transfer Bank BCA</option>
+                      <option value="Transfer Bank Mandiri">Transfer Bank Mandiri</option>
+                      <option value="Kas Tunai (Petty Cash)">Kas Tunai (Petty Cash)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Nomor Rekening / Rek Tujuan</label>
+                    <input
+                      type="text"
+                      value={formData.bankAccount}
+                      onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value })}
+                      placeholder="BCA 0293847561 a.n Rian"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-dstech-blue"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1835,7 +2192,7 @@ export default function AdminPayrollPage() {
                     Komponen Upah Pokok & Tarif Tingkat Jabatan
                   </h4>
                   <span className="text-[10px] text-slate-500 font-bold">
-                    Pilih preset tingkat keahlian atau input manual
+                    Pilih preset tingkat keahlian atau sesuaikan manual
                   </span>
                 </div>
 
@@ -1846,21 +2203,26 @@ export default function AdminPayrollPage() {
                     onClick={() => {
                       const rate = settings.dailyRatesByPosition?.helper?.dailyRate || 150000;
                       const ot = settings.dailyRatesByPosition?.helper?.overtimeRate || 25000;
+                      const days = formData.presenceDays || 22;
+                      const tAmt = formData.transportMethod === "DAILY_PRESENCE" ? days * 20000 : 400000;
+                      const mAmt = formData.mealMethod === "DAILY_PRESENCE" ? days * 25000 : 500000;
                       setFormData({
                         ...formData,
                         positionTier: "helper",
                         dailyRate: rate,
-                        baseSalary: (formData.presenceDays || 0) * rate,
+                        baseSalary: days * rate,
                         presenceRate: 0,
                         presenceAllowance: 0,
                         overtimeRate: ot,
                         overtimePay: (formData.overtimeHours || 0) * ot,
-                        employeeRole: formData.employeeRole || "Helper / Asisten Teknisi",
+                        transportAllowance: tAmt,
+                        mealAllowance: mAmt,
+                        employeeRole: formData.employeeRole || "Helper / Asisten Teknisi CCTV",
                       });
                     }}
                     className={`p-2.5 rounded-xl border text-left transition-all ${
                       formData.positionTier === "helper" || formData.dailyRate === 150000
-                        ? "border-cyan-500 bg-cyan-50 text-cyan-950 font-bold shadow-xs"
+                        ? "border-cyan-500 bg-cyan-50 text-cyan-950 font-bold shadow-xs ring-1 ring-cyan-500/20"
                         : "border-slate-200 bg-white hover:bg-slate-100/80 text-slate-700"
                     }`}
                   >
@@ -1874,21 +2236,26 @@ export default function AdminPayrollPage() {
                     onClick={() => {
                       const rate = settings.dailyRatesByPosition?.skill?.dailyRate || 175000;
                       const ot = settings.dailyRatesByPosition?.skill?.overtimeRate || 30000;
+                      const days = formData.presenceDays || 22;
+                      const tAmt = formData.transportMethod === "DAILY_PRESENCE" ? days * 20000 : 400000;
+                      const mAmt = formData.mealMethod === "DAILY_PRESENCE" ? days * 25000 : 500000;
                       setFormData({
                         ...formData,
                         positionTier: "skill",
                         dailyRate: rate,
-                        baseSalary: (formData.presenceDays || 0) * rate,
+                        baseSalary: days * rate,
                         presenceRate: 0,
                         presenceAllowance: 0,
                         overtimeRate: ot,
                         overtimePay: (formData.overtimeHours || 0) * ot,
-                        employeeRole: formData.employeeRole || "Teknisi Skill / Ahli",
+                        transportAllowance: tAmt,
+                        mealAllowance: mAmt,
+                        employeeRole: formData.employeeRole || "Teknisi Skill Instalasi & Integrasi",
                       });
                     }}
                     className={`p-2.5 rounded-xl border text-left transition-all ${
-                      formData.positionTier === "skill" || formData.dailyRate === 175000
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-950 font-bold shadow-xs"
+                      formData.positionTier === "skill" || (formData.dailyRate === 175000 && formData.positionTier !== "helper")
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-950 font-bold shadow-xs ring-1 ring-emerald-500/20"
                         : "border-slate-200 bg-white hover:bg-slate-100/80 text-slate-700"
                     }`}
                   >
@@ -1902,21 +2269,26 @@ export default function AdminPayrollPage() {
                     onClick={() => {
                       const rate = settings.dailyRatesByPosition?.senior?.dailyRate || 200000;
                       const ot = settings.dailyRatesByPosition?.senior?.overtimeRate || 35000;
+                      const days = formData.presenceDays || 22;
+                      const tAmt = formData.transportMethod === "DAILY_PRESENCE" ? days * 25000 : 400000;
+                      const mAmt = formData.mealMethod === "DAILY_PRESENCE" ? days * 30000 : 500000;
                       setFormData({
                         ...formData,
                         positionTier: "senior",
                         dailyRate: rate,
-                        baseSalary: (formData.presenceDays || 0) * rate,
+                        baseSalary: days * rate,
                         presenceRate: 0,
                         presenceAllowance: 0,
                         overtimeRate: ot,
                         overtimePay: (formData.overtimeHours || 0) * ot,
-                        employeeRole: formData.employeeRole || "Teknisi Senior",
+                        transportAllowance: tAmt,
+                        mealAllowance: mAmt,
+                        employeeRole: formData.employeeRole || "Teknisi Senior Specialist",
                       });
                     }}
                     className={`p-2.5 rounded-xl border text-left transition-all ${
                       formData.positionTier === "senior" || formData.dailyRate === 200000
-                        ? "border-purple-500 bg-purple-50 text-purple-950 font-bold shadow-xs"
+                        ? "border-purple-500 bg-purple-50 text-purple-950 font-bold shadow-xs ring-1 ring-purple-500/20"
                         : "border-slate-200 bg-white hover:bg-slate-100/80 text-slate-700"
                     }`}
                   >
@@ -1932,21 +2304,27 @@ export default function AdminPayrollPage() {
                         ...formData,
                         positionTier: "staff",
                         dailyRate: 0,
-                        baseSalary: 4000000,
-                        presenceAllowance: (formData.presenceDays || 0) * 25000,
-                        presenceRate: 25000,
+                        baseSalary: 4200000,
+                        presenceAllowance: 0,
+                        presenceRate: 0,
+                        positionAllowance: 500000,
+                        transportAllowance: 400000,
+                        mealAllowance: 500000,
                         overtimeRate: 30000,
+                        transportMethod: "FULL_MONTHLY",
+                        mealMethod: "FULL_MONTHLY",
+                        employeeRole: formData.employeeRole || "Staf Kantor / Administrasi",
                       });
                     }}
                     className={`p-2.5 rounded-xl border text-left transition-all ${
                       formData.positionTier === "staff"
-                        ? "border-blue-500 bg-blue-50 text-blue-950 font-bold shadow-xs"
+                        ? "border-blue-500 bg-blue-50 text-blue-950 font-bold shadow-xs ring-1 ring-blue-500/20"
                         : "border-slate-200 bg-white hover:bg-slate-100/80 text-slate-700"
                     }`}
                   >
                     <div className="text-[11px] font-black">🏢 Staf Kantor</div>
                     <div className="text-xs font-black text-blue-800 mt-0.5">Gaji Bulanan</div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">Pokok + Uang Hadir</div>
+                    <div className="text-[10px] text-slate-500 mt-0.5">Pokok Tetap + Full Tunjangan</div>
                   </button>
                 </div>
 
@@ -1966,11 +2344,11 @@ export default function AdminPayrollPage() {
                           baseSalary: rate > 0 ? (formData.presenceDays || 0) * rate : formData.baseSalary,
                         });
                       }}
-                      placeholder="Contoh: 150000 atau 175000"
+                      placeholder="Helper 150rb / Skill 175rb / Senior 200rb"
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-black text-dstech-blue bg-white"
                     />
                     <span className="text-[10px] text-slate-400 mt-0.5 block">
-                      Helper 150rb | Skill 175rb | Senior 200rb
+                      Helper 150rb | Skill 175rb | Senior 200rb | Bulanan: 0
                     </span>
                   </div>
 
@@ -1984,11 +2362,23 @@ export default function AdminPayrollPage() {
                       onChange={(e) => {
                         const days = Number(e.target.value);
                         const rate = formData.dailyRate || 0;
+                        const newBase = rate > 0 ? days * rate : formData.baseSalary;
+                        const newTransport =
+                          formData.transportMethod === "DAILY_PRESENCE"
+                            ? days * (formData.transportUnit || 20000)
+                            : formData.transportAllowance;
+                        const newMeal =
+                          formData.mealMethod === "DAILY_PRESENCE"
+                            ? days * (formData.mealUnit || 25000)
+                            : formData.mealAllowance;
+
                         setFormData({
                           ...formData,
                           presenceDays: days,
-                          baseSalary: rate > 0 ? days * rate : formData.baseSalary,
-                          presenceAllowance: rate > 0 ? 0 : days * (formData.presenceRate || 25000),
+                          baseSalary: newBase,
+                          presenceAllowance: rate > 0 ? 0 : days * (formData.presenceRate || 0),
+                          transportAllowance: newTransport,
+                          mealAllowance: newMeal,
                         });
                       }}
                       className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white"
@@ -1996,7 +2386,7 @@ export default function AdminPayrollPage() {
                     <span className="text-[10px] text-slate-400 mt-0.5 block">
                       {formData.dailyRate && formData.dailyRate > 0
                         ? `Otomatis: ${formData.presenceDays} hr x ${formatRupiah(formData.dailyRate)}`
-                        : "Hari kerja hadir"}
+                        : "Hari kerja hadir (bulanan flat)"}
                     </span>
                   </div>
 
@@ -2103,6 +2493,15 @@ export default function AdminPayrollPage() {
                       />
                     </div>
                     <div>
+                      <label className="block text-[11px] font-bold text-slate-600">Tunjangan Uang Makan (Rp)</label>
+                      <input
+                        type="number"
+                        value={formData.mealAllowance}
+                        onChange={(e) => setFormData({ ...formData, mealAllowance: Number(e.target.value) })}
+                        className="w-full px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-emerald-700"
+                      />
+                    </div>
+                    <div>
                       <label className="block text-[11px] font-bold text-slate-600">Bonus Proyek Lapangan (Rp)</label>
                       <input
                         type="number"
@@ -2167,6 +2566,7 @@ export default function AdminPayrollPage() {
                           (Number(formData.overtimePay) || 0) +
                           (Number(formData.positionAllowance) || 0) +
                           (Number(formData.transportAllowance) || 0) +
+                          (Number(formData.mealAllowance) || 0) +
                           (Number(formData.bonusProject) || 0) -
                           (Number(formData.bpjsDeduction) || 0) -
                           (Number(formData.loanDeduction) || 0)
@@ -2181,6 +2581,7 @@ export default function AdminPayrollPage() {
                       (Number(formData.overtimePay) || 0) +
                       (Number(formData.positionAllowance) || 0) +
                       (Number(formData.transportAllowance) || 0) +
+                      (Number(formData.mealAllowance) || 0) +
                       (Number(formData.bonusProject) || 0)
                   )}</div>
                   <div className="text-rose-400">Potongan: -{formatRupiah(
@@ -2326,6 +2727,10 @@ export default function AdminPayrollPage() {
                     <div className="flex justify-between">
                       <span className="text-slate-600">Tunjangan Transport:</span>
                       <span className="font-bold">{formatRupiah(selectedSlipForPrint.transportAllowance)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Tunjangan Uang Makan:</span>
+                      <span className="font-bold">{formatRupiah(selectedSlipForPrint.mealAllowance || 0)}</span>
                     </div>
                     {selectedSlipForPrint.bonusProject > 0 && (
                       <div className="flex justify-between">

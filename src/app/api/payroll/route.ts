@@ -347,12 +347,19 @@ export async function POST(request: Request) {
           );
         });
 
-        const actualPresenceDays = employeeAttendances.length;
+        // Identifikasi Hadir Kerja, Cuti, Sakit, dan Izin
+        const presentDaysCount = employeeAttendances.filter((att: any) => !["Cuti", "Sakit", "Izin", "Alpha"].includes(att.status)).length;
+        const leaveDaysCount = employeeAttendances.filter((att: any) => att.status === "Cuti").length;
+        const sickDaysCount = employeeAttendances.filter((att: any) => att.status === "Sakit").length;
+        const permissionDaysCount = employeeAttendances.filter((att: any) => att.status === "Izin").length;
+        const alphaDaysCount = employeeAttendances.filter((att: any) => att.status === "Alpha").length;
+
+        const actualPresenceDays = (presentDaysCount + leaveDaysCount + sickDaysCount) > 0 ? (presentDaysCount + leaveDaysCount + sickDaysCount) : 22;
         const actualOvertimeHours = employeeOvertimes.reduce((sum: number, item: any) => sum + (Number(item.hours) || 0), 0);
 
         // Nilai acuan default
         let baseSalary = 4200000;
-        let presenceDays = actualPresenceDays > 0 ? actualPresenceDays : 22; // Default 22 jika log belum lengkap
+        let presenceDays = actualPresenceDays;
         let presenceRate = data.defaultSettings.standardPresenceRate || 50000;
         let presenceAllowance = presenceDays * presenceRate;
         let overtimeHours = actualOvertimeHours;
@@ -360,6 +367,7 @@ export async function POST(request: Request) {
         let overtimePay = overtimeHours * overtimeRate;
         let positionAllowance = 400000;
         let transportAllowance = data.defaultSettings.standardTransportAllowance || 400000;
+        let mealAllowance = 500000;
         let bonusProject = 0;
         let bonusPerformance = 0;
         let bpjsDeduction = data.defaultSettings.defaultBpjsDeduction || 150000;
@@ -372,13 +380,34 @@ export async function POST(request: Request) {
         let appliedDailyRate = positionRateInfo.dailyRate;
         let positionTier = positionRateInfo.tierName;
 
+        // Ambil konfigurasi allowances dari kontrak (2 Metode: Full vs Harian Hadir)
+        const contractAllowances = emp.contract?.allowances;
+        const transportMethod = contractAllowances?.transportMethod || (emp.contract?.employeeCategory === "STAFF" || emp.contract?.contractType === "MONTHLY" || emp.contract?.contractType === "YEARLY" ? "FULL_MONTHLY" : "DAILY_PRESENCE");
+        const transportUnit = Number(contractAllowances?.transportAmount ?? emp.contract?.salaryScheme?.staffScheme?.transportAllowance ?? emp.contract?.salaryScheme?.dailyScheme?.transportAllowance ?? (transportMethod === "FULL_MONTHLY" ? 400000 : 20000));
+        
+        const mealMethod = contractAllowances?.mealMethod || (emp.contract?.employeeCategory === "STAFF" || emp.contract?.contractType === "MONTHLY" || emp.contract?.contractType === "YEARLY" ? "FULL_MONTHLY" : "DAILY_PRESENCE");
+        const mealUnit = Number(contractAllowances?.mealAmount ?? emp.contract?.salaryScheme?.staffScheme?.mealAllowance ?? emp.contract?.salaryScheme?.dailyScheme?.mealAllowance ?? (mealMethod === "FULL_MONTHLY" ? 500000 : 25000));
+
+        // Hitung Tunjangan Transportasi sesuai metode
+        if (transportMethod === "DAILY_PRESENCE") {
+          transportAllowance = presenceDays * transportUnit;
+        } else {
+          transportAllowance = transportUnit;
+        }
+
+        // Hitung Tunjangan Uang Makan sesuai metode
+        if (mealMethod === "DAILY_PRESENCE") {
+          mealAllowance = presenceDays * mealUnit;
+        } else {
+          mealAllowance = mealUnit;
+        }
+
         // Sesuaikan dengan skema kontrak jika ada
         if (emp.contract && emp.contract.salaryScheme) {
           const scheme = emp.contract.salaryScheme;
           if (scheme.staffScheme) {
             baseSalary = Number(scheme.staffScheme.baseSalary || baseSalary);
             positionAllowance = Number(scheme.staffScheme.positionAllowance !== undefined ? scheme.staffScheme.positionAllowance : 500000);
-            transportAllowance = Number(scheme.staffScheme.transportAllowance !== undefined ? scheme.staffScheme.transportAllowance : 400000);
             bpjsDeduction = Number(scheme.staffScheme.bpjsAllowance !== undefined ? scheme.staffScheme.bpjsAllowance : bpjsDeduction);
             // STAF BULANAN: Gaji pokok sudah mencakup kehadiran bulanan tetap, TIDAK diduplikasi
             presenceRate = 0;
@@ -393,7 +422,6 @@ export async function POST(request: Request) {
               presenceRate = 0;
               presenceAllowance = 0;
               positionAllowance = 0;
-              transportAllowance = Number(scheme.dailyScheme.transportAllowance || 0);
               overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || positionRateInfo.overtimeRate);
               overtimePay = overtimeHours * overtimeRate;
             } else if (scheme.dailyScheme.dailyRateType === "TYPE_2_HOURLY") {
@@ -402,7 +430,6 @@ export async function POST(request: Request) {
               presenceRate = 0;
               presenceAllowance = 0;
               positionAllowance = 0;
-              transportAllowance = 0;
               overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || 40000);
               overtimePay = overtimeHours * overtimeRate;
               positionTier = "Teknisi Jam-jaman (Tipe 2)";
@@ -412,7 +439,6 @@ export async function POST(request: Request) {
               presenceAllowance = 0;
               appliedDailyRate = 0;
               positionAllowance = Number(scheme.dailyScheme.positionAllowance !== undefined ? scheme.dailyScheme.positionAllowance : (scheme.staffScheme?.positionAllowance || 0));
-              transportAllowance = Number(scheme.dailyScheme.transportAllowance !== undefined ? scheme.dailyScheme.transportAllowance : (scheme.staffScheme?.transportAllowance || 0));
               bpjsDeduction = Number(scheme.dailyScheme.bpjsAllowance !== undefined ? scheme.dailyScheme.bpjsAllowance : (scheme.staffScheme?.bpjsAllowance || bpjsDeduction));
               overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || 30000);
               overtimePay = overtimeHours * overtimeRate;
@@ -425,12 +451,20 @@ export async function POST(request: Request) {
           presenceRate = 0;
           presenceAllowance = 0;
           positionAllowance = 0;
-          transportAllowance = 0;
           overtimeRate = positionRateInfo.overtimeRate;
           overtimePay = overtimeHours * overtimeRate;
         }
 
-        const totalGross = baseSalary + presenceAllowance + overtimePay + positionAllowance + transportAllowance + bonusProject + bonusPerformance;
+        // Perhitungan Pemotongan Izin Tidak Berbayar / Mangkir (Alpha)
+        const paidPermLimit = emp.contract?.leavePolicy?.paidPermissionDays ?? data.defaultSettings?.leaveSettings?.paidPermissionDays ?? 3;
+        const unpaidPermissionDays = Math.max(0, permissionDaysCount - paidPermLimit) + alphaDaysCount;
+        const prorateDivisor = data.defaultSettings?.leaveSettings?.prorateDivisor || 25;
+        if (unpaidPermissionDays > 0) {
+          const unpaidDeduction = Math.round((baseSalary / prorateDivisor) * unpaidPermissionDays);
+          otherDeduction += unpaidDeduction;
+        }
+
+        const totalGross = baseSalary + presenceAllowance + overtimePay + positionAllowance + transportAllowance + mealAllowance + bonusProject + bonusPerformance;
         const totalDeductions = bpjsDeduction + loanDeduction + otherDeduction;
         const takeHomePay = Math.max(0, totalGross - totalDeductions);
 
@@ -454,6 +488,9 @@ export async function POST(request: Request) {
               overtimePay,
               positionAllowance,
               transportAllowance,
+              mealAllowance,
+              transportMethod,
+              mealMethod,
               bonusProject,
               bonusPerformance,
               bpjsDeduction,
@@ -491,6 +528,9 @@ export async function POST(request: Request) {
             overtimePay,
             positionAllowance,
             transportAllowance,
+            mealAllowance,
+            transportMethod,
+            mealMethod,
             bonusProject,
             bonusPerformance,
             bpjsDeduction,
@@ -638,14 +678,15 @@ export async function POST(request: Request) {
       overtimePay,
       positionAllowance,
       transportAllowance,
+      mealAllowance: body.mealAllowance ? Number(body.mealAllowance) : 0,
       bonusProject,
       bonusPerformance,
       bpjsDeduction,
       loanDeduction,
       otherDeduction,
-      totalGross,
+      totalGross: (totalGross || 0) + Number(body.mealAllowance || 0),
       totalDeductions,
-      takeHomePay,
+      takeHomePay: Math.max(0, ((totalGross || 0) + Number(body.mealAllowance || 0)) - totalDeductions),
       status: body.status || "Draft",
       paymentMethod: body.paymentMethod || "Transfer Bank BCA",
       notes: body.notes || "",
@@ -707,6 +748,7 @@ export async function PUT(request: Request) {
     if (body.overtimePay !== undefined) payroll.overtimePay = Number(body.overtimePay);
     if (body.positionAllowance !== undefined) payroll.positionAllowance = Number(body.positionAllowance);
     if (body.transportAllowance !== undefined) payroll.transportAllowance = Number(body.transportAllowance);
+    if (body.mealAllowance !== undefined) payroll.mealAllowance = Number(body.mealAllowance);
     if (body.bonusProject !== undefined) payroll.bonusProject = Number(body.bonusProject);
     if (body.bonusPerformance !== undefined) payroll.bonusPerformance = Number(body.bonusPerformance);
     if (body.bpjsDeduction !== undefined) payroll.bpjsDeduction = Number(body.bpjsDeduction);
@@ -723,6 +765,7 @@ export async function PUT(request: Request) {
       (payroll.overtimePay || 0) +
       (payroll.positionAllowance || 0) +
       (payroll.transportAllowance || 0) +
+      (payroll.mealAllowance || 0) +
       (payroll.bonusProject || 0) +
       (payroll.bonusPerformance || 0);
 
