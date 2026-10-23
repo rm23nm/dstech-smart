@@ -3369,22 +3369,24 @@
     - `photoUrl?: string` (Foto Profil / Pas Foto Diri Karyawan).
     - `idCardUrl?: string` (Foto KTP / Kartu Identitas Resmi Karyawan).
     - `department?: string` (Divisi / Departemen Kerja: IT & Security, Operasional Lapangan, Keuangan & Administrasi, Sales & Marketing, Logistik, dll.).
-  - [ ] **Langkah 3**: Fitur Upload Foto Diri & Foto KTP di Modal Form PKWT:
+  - [x] **Langkah 3**: Fitur Upload Foto Diri & Foto KTP di Modal Form PKWT:
     - Upload Pas Foto Diri (3x4) dengan preview bulat, tombol ganti, dan hapus foto.
     - Upload Foto KTP dengan preview horizontal, tombol ganti, dan hapus foto.
     - Penanganan upload via `/api/upload` (disediakan fallback DataURL jika offline).
-  - [ ] **Langkah 4**: Pengaturan Divisi / Departemen & Kategori Staf:
+  - [x] **Langkah 4**: Pengaturan Divisi / Departemen & Kategori Staf:
     - Selector Divisi / Departemen dengan preset korporat DSTech + opsi input manual kustom.
     - Switch Kategori: "Teknisi Lapangan" (Harian/Lembur) vs "Staf Kantor / Admin" (Gaji Bulanan Tetap).
-    - Menampilkan badge Divisi pada tabel daftar kontrak.
-  - [ ] **Langkah 5**: Otomatisasi Perhitungan Tanggal Selesai Kontrak (`endDate`):
-    - Helper fungsi penambah bulan/tahun otomatis: saat `startDate` atau `durationMonths` diubah, `endDate` otomatis terkalkulasi (misal: mulai 1 Oktober 2026 + 3 bulan -> berakhir 31 Desember 2026; durasi 12 bulan -> 1 tahun penuh).
-    - Opsi tombol cepat durasi: "1 Bulan", "3 Bulan", "6 Bulan", "1 Tahun (12 Bln)", "2 Tahun (24 Bln)".
-  - [ ] **Langkah 6**: Tampilan Avatar Foto Karyawan & Preview KTP di List Tabel:
+    - Menampilkan badge Divisi pada tabel daftar kontrak dan dropdown filter Divisi di toolbar.
+  - [x] **Langkah 5**: Otomatisasi Perhitungan Tanggal Selesai Kontrak (`endDate`):
+    - Helper fungsi penambah bulan/tahun otomatis (`calculateEndDateFromDuration`): saat `startDate` atau `durationMonths` diubah, `endDate` otomatis terkalkulasi (misal: mulai 1 Oktober 2026 + 3 bulan -> berakhir 31 Desember 2026; durasi 12 bulan -> 1 tahun penuh).
+    - Tombol cepat preset durasi: "1 Bulan", "3 Bulan (Standar)", "6 Bulan", "1 Tahun (12 Bln)", "2 Tahun (24 Bln)".
+  - [x] **Langkah 6**: Tampilan Avatar Foto Karyawan & Preview KTP di List Tabel:
     - Kolom Nama Karyawan menampilkan foto avatar asli (atau inisial jika belum ada foto).
-    - Tombol badge "🪪 KTP" dengan modal lightbox preview untuk melihat kartu identitas karyawan.
-  - [ ] **Langkah 7**: Validasi build lokal (`npm run build`), push ke GitHub via `push_with_native_git.js`, deploy ke live VPS via `deploy_live.js`, uji live respon HTTP 200 OK, dan bersihkan folder `_backup/`.
-  - [ ] **Langkah 8**: Berikan penjelasan arsitektur multi-tenant SaaS terpadu dengan `pos.dstechsmart.com` dan strategi skema langganan klien.
+    - Tombol badge "🪪 KTP" dengan modal lightbox preview untuk melihat kartu identitas karyawan resolusi tinggi.
+  - [x] **Langkah 7**: Validasi build lokal (`npm run build`), push ke GitHub via `push_with_native_git.js` (commit `cef872a`), deploy ke live VPS via `deploy_live.js`, restart PM2 `dstech-main` (PID 604262), uji live respon HTTP 200 OK, dan bersihkan folder `_backup/`.
+  - [x] **Langkah 8**: Memberikan penjelasan komprehensif arsitektur Multi-Tenant SaaS terpadu dengan `pos.dstechsmart.com` dan strategi skema langganan klien tanpa mengganggu sistem POS mandiri yang sudah berjalan.
+
+**Status**: Selesai 100% & Live di VPS (`https://dstechsmart.com/admin/contracts`)
 
 ---
 
