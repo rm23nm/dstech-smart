@@ -60,10 +60,14 @@ export interface DstechContract {
       notes?: string;
     };
     dailyScheme?: {
-      dailyRateType: "TYPE_1_FULL_DAY" | "TYPE_2_HOURLY";
+      dailyRateType: "TYPE_1_FULL_DAY" | "TYPE_2_HOURLY" | "TYPE_3_MONTHLY_FULL";
       dailyRate?: number;
       overtimeHourlyRate?: number;
       hourlyRate?: number;
+      monthlyBaseSalary?: number;
+      positionAllowance?: number;
+      transportAllowance?: number;
+      bpjsAllowance?: number;
       normalHoursPerDay?: number;
       overtimeMultiplierHour1?: number;
       overtimeMultiplierHour2Plus?: number;
@@ -246,7 +250,7 @@ export default function ContractsPage() {
     transportAllowance: 400000,
     bpjsAllowance: 150000,
     // Technician Daily Scheme
-    dailyRateType: "TYPE_1_FULL_DAY" as "TYPE_1_FULL_DAY" | "TYPE_2_HOURLY",
+    dailyRateType: "TYPE_1_FULL_DAY" as "TYPE_1_FULL_DAY" | "TYPE_2_HOURLY" | "TYPE_3_MONTHLY_FULL",
     dailyRate: 175000,
     overtimeHourlyRate: 30000,
     hourlyRate: 30000,
@@ -518,7 +522,7 @@ export default function ContractsPage() {
       positionAllowance: staff?.positionAllowance || 500000,
       transportAllowance: staff?.transportAllowance || 400000,
       bpjsAllowance: staff?.bpjsAllowance || 150000,
-      dailyRateType: daily?.dailyRateType || "TYPE_1_FULL_DAY",
+      dailyRateType: daily?.dailyRateType || (item.employeeCategory === "STAFF" || item.contractType === "MONTHLY" || item.contractType === "YEARLY" ? "TYPE_3_MONTHLY_FULL" : "TYPE_1_FULL_DAY"),
       dailyRate: daily?.dailyRate || 175000,
       overtimeHourlyRate: daily?.overtimeHourlyRate || 30000,
       hourlyRate: daily?.hourlyRate || 30000,
@@ -563,31 +567,41 @@ export default function ContractsPage() {
       setSaving(true);
       const isEdit = !!formData.id;
 
-      // Build Salary Scheme based on Explicit Payroll Scheme Type
+      // Build Salary Scheme based on dailyRateType / payrollSchemeType
       let salaryScheme: any = {};
-      if (formData.payrollSchemeType === "MONTHLY") {
+      if (formData.dailyRateType === "TYPE_3_MONTHLY_FULL" || formData.payrollSchemeType === "MONTHLY") {
         salaryScheme.staffScheme = {
           baseSalary: Number(formData.baseSalary || 0),
           positionAllowance: Number(formData.positionAllowance || 0),
           transportAllowance: Number(formData.transportAllowance || 0),
           bpjsAllowance: Number(formData.bpjsAllowance || 0),
-          notes: "Gaji bulanan tetap staf / karyawan (tidak dikalikan hari hadir di auto-payroll)",
+          notes: "Tipe 3: Gaji bulanan dibayar penuh (tidak dikalikan hari hadir di auto-payroll)",
         };
-      } else {
-        // DAILY RATE
         salaryScheme.dailyScheme = {
-          dailyRateType: formData.dailyRateType,
-          dailyRate: Number(formData.dailyRate || 0),
-          overtimeHourlyRate: Number(formData.overtimeHourlyRate || 0),
+          dailyRateType: "TYPE_3_MONTHLY_FULL",
+          monthlyBaseSalary: Number(formData.baseSalary || 0),
+          overtimeHourlyRate: Number(formData.overtimeHourlyRate || 30000),
+          description: `Tipe 3: Bulanan dibayar penuh Rp ${Number(formData.baseSalary || 0).toLocaleString("id-ID")}/bulan.`,
+        };
+      } else if (formData.dailyRateType === "TYPE_2_HOURLY") {
+        // TIPE 2: HOURLY RATE
+        salaryScheme.dailyScheme = {
+          dailyRateType: "TYPE_2_HOURLY",
           hourlyRate: Number(formData.hourlyRate || 0),
           normalHoursPerDay: Number(formData.normalHoursPerDay || 8),
           overtimeMultiplierHour1: Number(formData.overtimeMultiplierHour1 || 1.5),
           overtimeMultiplierHour2Plus: Number(formData.overtimeMultiplierHour2Plus || 2.0),
           weekendMultiplier: Number(formData.weekendMultiplier || 2.0),
-          description:
-            formData.dailyRateType === "TYPE_1_FULL_DAY"
-              ? `Tipe 1: Harian dibayar penuh Rp ${(formData.dailyRate || 0).toLocaleString("id-ID")}/hari kerja.`
-              : `Tipe 2: Bayaran per jam Rp ${(formData.hourlyRate || 0).toLocaleString("id-ID")}/jam dengan pengali lembur 1.5x dan 2.0x.`,
+          overtimeHourlyRate: Number(formData.hourlyRate || 0) * Number(formData.overtimeMultiplierHour1 || 1.5),
+          description: `Tipe 2: Bayaran per jam Rp ${(formData.hourlyRate || 0).toLocaleString("id-ID")}/jam dengan pengali lembur 1.5x dan 2.0x.`,
+        };
+      } else {
+        // TIPE 1: FLAT DAILY RATE (DEFAULT)
+        salaryScheme.dailyScheme = {
+          dailyRateType: "TYPE_1_FULL_DAY",
+          dailyRate: Number(formData.dailyRate || 0),
+          overtimeHourlyRate: Number(formData.overtimeHourlyRate || 0),
+          description: `Tipe 1: Harian dibayar penuh Rp ${(formData.dailyRate || 0).toLocaleString("id-ID")}/hari kerja.`,
         };
       }
 
@@ -1093,14 +1107,17 @@ export default function ContractsPage() {
 
                       {/* Skema Pembayaran */}
                       <td className="py-4 px-4">
-                        {item.employeeCategory === "STAFF" || item.contractType === "MONTHLY" || item.contractType === "YEARLY" ? (
-                          <div className="space-y-1">
-                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Gaji Pokok Bulanan</span>
-                            <p className="text-sm font-black text-slate-900">
-                              Rp {(staff?.baseSalary || 0).toLocaleString("id-ID")}
+                        {daily?.dailyRateType === "TYPE_3_MONTHLY_FULL" || item.employeeCategory === "STAFF" || item.contractType === "MONTHLY" || item.contractType === "YEARLY" ? (
+                          <div className="space-y-1 bg-sky-50/70 p-2.5 rounded-xl border border-sky-100/90">
+                            <span className="px-1.5 py-0.5 bg-sky-200 text-sky-900 rounded font-black text-[9px] uppercase">
+                              Tipe 3: Bulanan Penuh
+                            </span>
+                            <p className="text-sm font-black text-sky-950">
+                              Rp {(daily?.monthlyBaseSalary || staff?.baseSalary || 0).toLocaleString("id-ID")}{" "}
+                              <span className="text-[10px] font-normal text-sky-700">/ bulan</span>
                             </p>
-                            <p className="text-[10px] text-slate-400">
-                              Tunjangan: Rp {((staff?.positionAllowance || 0) + (staff?.transportAllowance || 0)).toLocaleString("id-ID")}
+                            <p className="text-[10px] text-sky-700">
+                              Tunjangan: Rp {((daily?.positionAllowance || staff?.positionAllowance || 0) + (daily?.transportAllowance || staff?.transportAllowance || 0)).toLocaleString("id-ID")}
                             </p>
                           </div>
                         ) : daily?.dailyRateType === "TYPE_1_FULL_DAY" ? (
@@ -1323,87 +1340,15 @@ export default function ContractsPage() {
                 </div>
               </div>
 
-              {/* BAGIAN 2: PENEMPATAN, STATUS PENGGAJIAN & JABATAN */}
+              {/* BAGIAN 2: PENEMPATAN & JABATAN KARYAWAN */}
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Briefcase className="w-4 h-4 text-blue-500" /> 2. Status Penggajian & Jabatan Karyawan
+                    <Briefcase className="w-4 h-4 text-blue-500" /> 2. Jabatan & Masa Kontrak Karyawan
                   </h3>
                   <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
                     Standar Penggajian DSTech
                   </span>
-                </div>
-
-                {/* 1. Pemilih Status Sistem Penggajian (Harian vs Bulanan) */}
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1.5">
-                    Tentukan Sistem Status Penggajian <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div
-                      onClick={() => {
-                        setFormData({
-                          ...formData,
-                          payrollSchemeType: "DAILY",
-                          employeeCategory: "TECHNICIAN",
-                          contractType: "DAILY",
-                          dailyRate: formData.dailyRate || 175000,
-                          overtimeHourlyRate: formData.overtimeHourlyRate || 30000,
-                        });
-                      }}
-                      className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
-                        formData.payrollSchemeType === "DAILY"
-                          ? "border-amber-500 bg-amber-50/70 shadow-xs"
-                          : "border-slate-200 hover:border-slate-300 bg-white"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-black text-amber-900 flex items-center gap-1.5">
-                          <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                          🟢 Sistem Gaji Harian (Daily Rate)
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
-                          Helper / Teknisi Skill
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-snug">
-                        Upah dihitung dari kehadiran riil dikalikan tarif harian posisi (Helper 150rb, Skill 175rb, Senior 200rb).
-                      </p>
-                    </div>
-
-                    <div
-                      onClick={() => {
-                        setFormData({
-                          ...formData,
-                          payrollSchemeType: "MONTHLY",
-                          employeeCategory: "STAFF",
-                          contractType: "YEARLY",
-                          baseSalary: formData.baseSalary || 4200000,
-                          positionAllowance: formData.positionAllowance || 500000,
-                          transportAllowance: formData.transportAllowance || 400000,
-                          bpjsAllowance: formData.bpjsAllowance || 150000,
-                        });
-                      }}
-                      className={`p-3.5 rounded-2xl border-2 cursor-pointer transition-all ${
-                        formData.payrollSchemeType === "MONTHLY"
-                          ? "border-blue-500 bg-blue-50/70 shadow-xs"
-                          : "border-slate-200 hover:border-slate-300 bg-white"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-black text-blue-900 flex items-center gap-1.5">
-                          <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                          🔵 Sistem Gaji Bulanan (Monthly Salary)
-                        </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-200 text-blue-900">
-                          Staf Kantor / Tetap
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-snug">
-                        Gaji pokok tetap per bulan sesuai kontrak (tidak dikalikan hari hadir di auto-payroll).
-                      </p>
-                    </div>
-                  </div>
                 </div>
 
                 {/* 2. Pilihan Jabatan Resmi & Tarif Standar */}
@@ -1570,27 +1515,348 @@ export default function ContractsPage() {
 
               {/* BAGIAN 3: SKEMA PEMBAYARAN & UPAH */}
               <div className="space-y-4 pt-4 border-t border-slate-100">
-                <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <DollarSign className="w-4 h-4 text-emerald-500" /> 3. Rincian Skema Upah & Kompensasi
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <DollarSign className="w-4 h-4 text-emerald-500" /> 3. Rincian Tipe Skema Upah & Sistem Penggajian
+                  </h3>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-100">
+                    Pilih 1 dari 3 Tipe Upah
+                  </span>
+                </div>
 
-                {/* JIKA SISTEM GAJI BULANAN */}
-                {formData.payrollSchemeType === "MONTHLY" ? (
+                {/* 3 KARTU PILIHAN TIPE SEJAJAR */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+                  {/* Tipe 1: Harian Dibayar Penuh */}
+                  <div
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        dailyRateType: "TYPE_1_FULL_DAY",
+                        payrollSchemeType: "DAILY",
+                        contractType: "DAILY",
+                      });
+                    }}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      formData.dailyRateType === "TYPE_1_FULL_DAY"
+                        ? "border-amber-500 bg-amber-50/70 shadow-sm ring-2 ring-amber-500/20"
+                        : "border-slate-200 hover:border-slate-300 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-black uppercase text-amber-900 tracking-wide flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                        Tipe 1: Harian Dibayar Penuh
+                      </span>
+                    </div>
+                    <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-200/80 text-amber-900 mb-2">
+                      Flat Daily Rate
+                    </span>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Dibayar per hari kehadiran kerja (Helper Rp 150rb, Skill Rp 175rb, Senior Rp 200rb, Foreman Rp 225rb).
+                    </p>
+                  </div>
+
+                  {/* Tipe 2: Bayaran Jam + Pengali Lembur */}
+                  <div
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        dailyRateType: "TYPE_2_HOURLY",
+                        payrollSchemeType: "DAILY",
+                        contractType: "DAILY",
+                      });
+                    }}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      formData.dailyRateType === "TYPE_2_HOURLY"
+                        ? "border-indigo-500 bg-indigo-50/70 shadow-sm ring-2 ring-indigo-500/20"
+                        : "border-slate-200 hover:border-slate-300 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-black uppercase text-indigo-900 tracking-wide flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                        Tipe 2: Bayaran Jam + Lembur
+                      </span>
+                    </div>
+                    <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-200/80 text-indigo-900 mb-2">
+                      Hourly Rate & Multiplier
+                    </span>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Dihitung per jam kerja efektif. Lembur menggunakan rumus pengali 1.5x (jam 1) dan 2.0x (jam 2+).
+                    </p>
+                  </div>
+
+                  {/* Tipe 3: Bulanan Dibayar Penuh */}
+                  <div
+                    onClick={() => {
+                      setFormData({
+                        ...formData,
+                        dailyRateType: "TYPE_3_MONTHLY_FULL",
+                        payrollSchemeType: "MONTHLY",
+                        contractType: formData.durationMonths >= 12 ? "YEARLY" : "MONTHLY",
+                      });
+                    }}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                      formData.dailyRateType === "TYPE_3_MONTHLY_FULL" || (formData.payrollSchemeType === "MONTHLY" && formData.dailyRateType !== "TYPE_1_FULL_DAY" && formData.dailyRateType !== "TYPE_2_HOURLY")
+                        ? "border-blue-500 bg-blue-50/70 shadow-sm ring-2 ring-blue-500/20"
+                        : "border-slate-200 hover:border-slate-300 bg-white"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-black uppercase text-blue-900 tracking-wide flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                        Tipe 3: Bulanan Dibayar Penuh
+                      </span>
+                    </div>
+                    <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-200/80 text-blue-900 mb-2">
+                      Flat Monthly Salary
+                    </span>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Gaji pokok bulanan tetap dibayar penuh per bulan (tidak dikalikan absensi harian), plus tunjangan & lembur.
+                    </p>
+                  </div>
+                </div>
+
+                {/* FORM DETAIL PARAMETER SESUAI TIPE */}
+                {/* 1. JIKA TIPE 1: HARIAN DIBAYAR PENUH */}
+                {formData.dailyRateType === "TYPE_1_FULL_DAY" && (
+                  <div className="bg-amber-50/40 p-5 rounded-2xl border border-amber-200 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <span className="text-xs font-black text-amber-900 uppercase tracking-wider block">
+                        Parameter Upah Tipe 1 (Harian Dibayar Penuh)
+                      </span>
+                      <span className="text-[10px] text-amber-700 font-bold">
+                        Preset Cepat Tarif Tingkat Jabatan
+                      </span>
+                    </div>
+
+                    {/* Quick Preset Buttons for Daily Rate */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            dailyRate: 150000,
+                            overtimeHourlyRate: 25000,
+                            position: formData.position.includes("Helper") ? formData.position : "Helper / Asisten Teknisi Lapangan",
+                          });
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          formData.dailyRate === 150000
+                            ? "border-cyan-500 bg-cyan-100/70 text-cyan-950 font-bold shadow-xs"
+                            : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
+                        }`}
+                      >
+                        <div className="text-[11px] font-black">👷‍♂️ Helper</div>
+                        <div className="text-xs font-black text-cyan-800 mt-0.5">Rp 150.000<span className="text-[10px] font-normal">/hr</span></div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">OT: 25rb/jam</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            dailyRate: 175000,
+                            overtimeHourlyRate: 30000,
+                            position: formData.position.includes("Skill") ? formData.position : "Teknisi Skill Instalasi & Integrasi",
+                          });
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          formData.dailyRate === 175000
+                            ? "border-emerald-500 bg-emerald-100/70 text-emerald-950 font-bold shadow-xs"
+                            : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
+                        }`}
+                      >
+                        <div className="text-[11px] font-black">⚡ Teknisi Skill</div>
+                        <div className="text-xs font-black text-emerald-800 mt-0.5">Rp 175.000<span className="text-[10px] font-normal">/hr</span></div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">OT: 30rb/jam</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            dailyRate: 200000,
+                            overtimeHourlyRate: 35000,
+                            position: formData.position.includes("Senior") ? formData.position : "Teknisi Senior / Specialist",
+                          });
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          formData.dailyRate === 200000
+                            ? "border-purple-500 bg-purple-100/70 text-purple-950 font-bold shadow-xs"
+                            : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
+                        }`}
+                      >
+                        <div className="text-[11px] font-black">🎯 Senior</div>
+                        <div className="text-xs font-black text-purple-800 mt-0.5">Rp 200.000<span className="text-[10px] font-normal">/hr</span></div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">OT: 35rb/jam</div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            dailyRate: 225000,
+                            overtimeHourlyRate: 40000,
+                            position: formData.position.includes("Lead") || formData.position.includes("Foreman") ? formData.position : "Lead / Foreman Lapangan",
+                          });
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                          formData.dailyRate === 225000
+                            ? "border-indigo-500 bg-indigo-100/70 text-indigo-950 font-bold shadow-xs"
+                            : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
+                        }`}
+                      >
+                        <div className="text-[11px] font-black">👑 Foreman</div>
+                        <div className="text-xs font-black text-indigo-800 mt-0.5">Rp 225.000<span className="text-[10px] font-normal">/hr</span></div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">OT: 40rb/jam</div>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">
+                          Upah Harian Penuh (Rp/Hari) <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={formData.dailyRate}
+                          onChange={(e) => setFormData({ ...formData, dailyRate: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-amber-300 rounded-xl font-bold text-amber-950"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-1 block">
+                          Standar DSTech: Helper Rp 150rb, Skill Rp 175rb, Senior Rp 200rb, Foreman Rp 225rb.
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">
+                          Tarif Lembur Opsional (Rp/Jam)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.overtimeHourlyRate}
+                          onChange={(e) => setFormData({ ...formData, overtimeHourlyRate: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-amber-300 rounded-xl font-bold"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-1 block">
+                          Diberikan jika teknisi diminta lembur melebihi jam kerja normal harian.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. JIKA TIPE 2: BAYARAN JAM + LEMBUR */}
+                {formData.dailyRateType === "TYPE_2_HOURLY" && (
+                  <div className="bg-indigo-50/40 p-5 rounded-2xl border border-indigo-200 space-y-4">
+                    <span className="text-xs font-black text-indigo-900 uppercase tracking-wider block">
+                      Parameter Upah Tipe 2 (Jam Kerja & Pengali Lembur)
+                    </span>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">
+                          Upah Per Jam Kerja (Rp/Jam) <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={formData.hourlyRate}
+                          onChange={(e) => setFormData({ ...formData, hourlyRate: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-indigo-300 rounded-xl font-bold text-indigo-950"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">
+                          Jam Kerja Normal (Jam/Hari)
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.normalHoursPerDay}
+                          onChange={(e) => setFormData({ ...formData, normalHoursPerDay: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-indigo-300 rounded-xl font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">
+                          Pengali Jam Lembur Ke-1
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={formData.overtimeMultiplierHour1}
+                          onChange={(e) => setFormData({ ...formData, overtimeMultiplierHour1: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-indigo-300 rounded-xl font-bold"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-0.5 block">Default: 1.5x</span>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">
+                          Pengali Lembur Jam Ke-2 dst
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={formData.overtimeMultiplierHour2Plus}
+                          onChange={(e) => setFormData({ ...formData, overtimeMultiplierHour2Plus: Number(e.target.value) })}
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-indigo-300 rounded-xl font-bold"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-0.5 block">Default: 2.0x</span>
+                      </div>
+                    </div>
+
+                    {/* Kalkulator Simulasi Cepat */}
+                    <div className="p-3.5 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-indigo-700">
+                        <Calculator className="w-4 h-4 text-indigo-500" />
+                        <span>
+                          Simulasi Upah Normal 8 Jam:{" "}
+                          <strong>
+                            Rp {((formData.hourlyRate || 0) * (formData.normalHoursPerDay || 8)).toLocaleString("id-ID")}
+                          </strong>
+                        </span>
+                      </div>
+                      <div className="text-slate-600">
+                        Lembur Jam 1:{" "}
+                        <strong>
+                          Rp {((formData.hourlyRate || 0) * (formData.overtimeMultiplierHour1 || 1.5)).toLocaleString("id-ID")}
+                        </strong>{" "}
+                        | Jam 2+:{" "}
+                        <strong>
+                          Rp {((formData.hourlyRate || 0) * (formData.overtimeMultiplierHour2Plus || 2.0)).toLocaleString("id-ID")}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. JIKA TIPE 3: BULANAN DIBAYAR PENUH */}
+                {(formData.dailyRateType === "TYPE_3_MONTHLY_FULL" || (formData.payrollSchemeType === "MONTHLY" && formData.dailyRateType !== "TYPE_1_FULL_DAY" && formData.dailyRateType !== "TYPE_2_HOURLY")) && (
                   <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-200 space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black text-blue-900 uppercase tracking-wider block">
-                        Rincian Gaji Bulanan Tetap (Staf Kantor)
+                        Parameter Upah Tipe 3 (Bulanan Dibayar Penuh)
                       </span>
                       <span className="text-[10px] font-bold text-blue-700 bg-white px-2.5 py-0.5 rounded-full border border-blue-200">
                         Gaji Pokok Tetap Per Bulan
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                       <div>
-                        <label className="text-xs font-bold text-slate-700 block mb-1">Gaji Pokok (Rp/Bulan)</label>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Gaji Pokok (Rp/Bulan) <span className="text-rose-500">*</span></label>
                         <input
                           type="number"
+                          required
                           value={formData.baseSalary}
                           onChange={(e) => setFormData({ ...formData, baseSalary: Number(e.target.value) })}
                           className="w-full px-3.5 py-2.5 text-xs bg-white border border-blue-300 rounded-xl font-bold text-blue-950"
@@ -1626,283 +1892,25 @@ export default function ContractsPage() {
                           className="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl font-bold"
                         />
                       </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-slate-700 block mb-1">Tarif Lembur (Rp/Jam)</label>
+                        <input
+                          type="number"
+                          value={formData.overtimeHourlyRate}
+                          onChange={(e) => setFormData({ ...formData, overtimeHourlyRate: Number(e.target.value) })}
+                          placeholder="30000"
+                          className="w-full px-3.5 py-2.5 text-xs bg-white border border-blue-200 rounded-xl font-bold"
+                        />
+                      </div>
                     </div>
 
-                    <p className="text-[11px] text-blue-800 bg-white/80 p-2.5 rounded-xl border border-blue-100">
-                      💡 Catatan: Karyawan dengan sistem Gaji Bulanan akan menerima Gaji Pokok tetap setiap periode gajian tanpa dikalikan hari hadir harian di generator slip gaji.
+                    <p className="text-[11px] text-blue-800 bg-white/80 p-2.5 rounded-xl border border-blue-100 flex items-center gap-2">
+                      <span>💡</span>
+                      <span>
+                        <strong>Catatan Tipe 3:</strong> Karyawan menerima Gaji Pokok tetap setiap periode gajian secara utuh tanpa dikalikan hari hadir harian di generator slip gaji, ditambah uang lembur jika ada surat perintah lembur.
+                      </span>
                     </p>
-                  </div>
-                ) : (
-                  /* JIKA SISTEM GAJI HARIAN */
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Pilihan Tipe 1: Harian Dibayar Penuh */}
-                      <div
-                        onClick={() => setFormData({ ...formData, dailyRateType: "TYPE_1_FULL_DAY" })}
-                        className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                          formData.dailyRateType === "TYPE_1_FULL_DAY"
-                            ? "border-amber-500 bg-amber-50/60 shadow-xs"
-                            : "border-slate-200 hover:border-slate-300 bg-white"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-black uppercase text-amber-900 tracking-wide flex items-center gap-1.5">
-                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                            Tipe 1: Harian Dibayar Penuh
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-200 text-amber-900">
-                            Flat Daily Rate
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600">
-                          Teknisi dibayar per hari hadir kerja berdasarkan tarif jabatan (Helper Rp 150.000, Skill Rp 175.000).
-                        </p>
-                      </div>
-
-                      {/* Pilihan Tipe 2: Bayaran Per Jam + Lembur */}
-                      <div
-                        onClick={() => setFormData({ ...formData, dailyRateType: "TYPE_2_HOURLY" })}
-                        className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                          formData.dailyRateType === "TYPE_2_HOURLY"
-                            ? "border-indigo-500 bg-indigo-50/60 shadow-xs"
-                            : "border-slate-200 hover:border-slate-300 bg-white"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-black uppercase text-indigo-900 tracking-wide flex items-center gap-1.5">
-                            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
-                            Tipe 2: Bayaran Jam + Pengali Lembur
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-200 text-indigo-900">
-                            Hourly Rate & Multiplier
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-600">
-                          Teknisi dihitung per jam kerja efektif. Lembur menggunakan rumus pengali 1.5x dan 2.0x.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Form Input Detail Tipe 1 */}
-                    {formData.dailyRateType === "TYPE_1_FULL_DAY" && (
-                      <div className="bg-amber-50/40 p-5 rounded-2xl border border-amber-200 space-y-4">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                          <span className="text-xs font-black text-amber-900 uppercase tracking-wider block">
-                            Parameter Upah Tipe 1 (Harian Dibayar Penuh)
-                          </span>
-                          <span className="text-[10px] text-amber-700 font-bold">
-                            Preset Cepat Tarif Tingkat Jabatan
-                          </span>
-                        </div>
-
-                        {/* Quick Preset Buttons for Daily Rate */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFormData({
-                                ...formData,
-                                dailyRate: 150000,
-                                overtimeHourlyRate: 25000,
-                                position: formData.position.includes("Helper") ? formData.position : "Helper / Asisten Teknisi Lapangan",
-                              });
-                            }}
-                            className={`p-2.5 rounded-xl border text-left transition-all ${
-                              formData.dailyRate === 150000
-                                ? "border-cyan-500 bg-cyan-100/70 text-cyan-950 font-bold shadow-xs"
-                                : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
-                            }`}
-                          >
-                            <div className="text-[11px] font-black">👷‍♂️ Helper</div>
-                            <div className="text-xs font-black text-cyan-800 mt-0.5">Rp 150.000<span className="text-[10px] font-normal">/hr</span></div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">OT: 25rb/jam</div>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFormData({
-                                ...formData,
-                                dailyRate: 175000,
-                                overtimeHourlyRate: 30000,
-                                position: formData.position.includes("Skill") ? formData.position : "Teknisi Skill Instalasi & Integrasi",
-                              });
-                            }}
-                            className={`p-2.5 rounded-xl border text-left transition-all ${
-                              formData.dailyRate === 175000
-                                ? "border-emerald-500 bg-emerald-100/70 text-emerald-950 font-bold shadow-xs"
-                                : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
-                            }`}
-                          >
-                            <div className="text-[11px] font-black">⚡ Teknisi Skill</div>
-                            <div className="text-xs font-black text-emerald-800 mt-0.5">Rp 175.000<span className="text-[10px] font-normal">/hr</span></div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">OT: 30rb/jam</div>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFormData({
-                                ...formData,
-                                dailyRate: 200000,
-                                overtimeHourlyRate: 35000,
-                                position: formData.position.includes("Senior") ? formData.position : "Teknisi Senior / Specialist",
-                              });
-                            }}
-                            className={`p-2.5 rounded-xl border text-left transition-all ${
-                              formData.dailyRate === 200000
-                                ? "border-purple-500 bg-purple-100/70 text-purple-950 font-bold shadow-xs"
-                                : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
-                            }`}
-                          >
-                            <div className="text-[11px] font-black">🎯 Senior</div>
-                            <div className="text-xs font-black text-purple-800 mt-0.5">Rp 200.000<span className="text-[10px] font-normal">/hr</span></div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">OT: 35rb/jam</div>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFormData({
-                                ...formData,
-                                dailyRate: 225000,
-                                overtimeHourlyRate: 40000,
-                                position: formData.position.includes("Lead") || formData.position.includes("Foreman") ? formData.position : "Lead / Foreman Lapangan",
-                              });
-                            }}
-                            className={`p-2.5 rounded-xl border text-left transition-all ${
-                              formData.dailyRate === 225000
-                                ? "border-indigo-500 bg-indigo-100/70 text-indigo-950 font-bold shadow-xs"
-                                : "border-amber-200/80 bg-white hover:bg-amber-100/50 text-slate-700"
-                            }`}
-                          >
-                            <div className="text-[11px] font-black">👑 Foreman</div>
-                            <div className="text-xs font-black text-indigo-800 mt-0.5">Rp 225.000<span className="text-[10px] font-normal">/hr</span></div>
-                            <div className="text-[10px] text-slate-500 mt-0.5">OT: 40rb/jam</div>
-                          </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-xs font-bold text-slate-700 block mb-1">
-                              Upah Harian Penuh (Rp/Hari) <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                              type="number"
-                              required
-                              value={formData.dailyRate}
-                              onChange={(e) => setFormData({ ...formData, dailyRate: Number(e.target.value) })}
-                              className="w-full px-3.5 py-2.5 text-xs bg-white border border-amber-300 rounded-xl font-bold text-amber-950"
-                            />
-                            <span className="text-[10px] text-slate-500 mt-1 block">
-                              Standar DSTech: Helper Rp 150rb, Skill Rp 175rb, Senior Rp 200rb, Foreman Rp 225rb.
-                            </span>
-                          </div>
-
-                          <div>
-                            <label className="text-xs font-bold text-slate-700 block mb-1">
-                              Tarif Lembur Opsional (Rp/Jam)
-                            </label>
-                            <input
-                              type="number"
-                              value={formData.overtimeHourlyRate}
-                              onChange={(e) => setFormData({ ...formData, overtimeHourlyRate: Number(e.target.value) })}
-                              className="w-full px-3.5 py-2.5 text-xs bg-white border border-amber-300 rounded-xl font-bold"
-                            />
-                            <span className="text-[10px] text-slate-500 mt-1 block">
-                              Diberikan jika teknisi diminta lembur melebihi jam kerja normal harian.
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Form Input Detail Tipe 2 */}
-                    {formData.dailyRateType === "TYPE_2_HOURLY" && (
-                      <div className="bg-indigo-50/40 p-5 rounded-2xl border border-indigo-200 space-y-4">
-                        <span className="text-xs font-black text-indigo-900 uppercase tracking-wider block">
-                          Parameter Upah Tipe 2 (Jam Kerja & Pengali Lembur)
-                        </span>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                          <div>
-                            <label className="text-xs font-bold text-slate-700 block mb-1">
-                              Upah Per Jam Kerja (Rp/Jam) <span className="text-rose-500">*</span>
-                            </label>
-                            <input
-                              type="number"
-                              required
-                              value={formData.hourlyRate}
-                              onChange={(e) => setFormData({ ...formData, hourlyRate: Number(e.target.value) })}
-                              className="w-full px-3.5 py-2.5 text-xs bg-white border border-indigo-300 rounded-xl font-bold text-indigo-950"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-xs font-bold text-slate-700 block mb-1">
-                              Jam Kerja Normal (Jam/Hari)
-                            </label>
-                            <input
-                              type="number"
-                              value={formData.normalHoursPerDay}
-                              onChange={(e) => setFormData({ ...formData, normalHoursPerDay: Number(e.target.value) })}
-                              className="w-full px-3.5 py-2.5 text-xs bg-white border border-indigo-300 rounded-xl font-bold"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="text-xs font-bold text-slate-700 block mb-1">
-                              Pengali Jam Lembur Ke-1
-                            </label>
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={formData.overtimeMultiplierHour1}
-                              onChange={(e) => setFormData({ ...formData, overtimeMultiplierHour1: Number(e.target.value) })}
-                              className="w-full px-3.5 py-2.5 text-xs bg-white border border-indigo-300 rounded-xl font-bold"
-                            />
-                            <span className="text-[10px] text-slate-500 mt-0.5 block">Default: 1.5x</span>
-                          </div>
-
-                          <div>
-                            <label className="text-xs font-bold text-slate-700 block mb-1">
-                              Pengali Lembur Jam Ke-2 dst
-                            </label>
-                            <input
-                              type="number"
-                              step="0.1"
-                              value={formData.overtimeMultiplierHour2Plus}
-                              onChange={(e) => setFormData({ ...formData, overtimeMultiplierHour2Plus: Number(e.target.value) })}
-                              className="w-full px-3.5 py-2.5 text-xs bg-white border border-indigo-300 rounded-xl font-bold"
-                            />
-                            <span className="text-[10px] text-slate-500 mt-0.5 block">Default: 2.0x</span>
-                          </div>
-                        </div>
-
-                        {/* Kalkulator Simulasi Cepat */}
-                        <div className="p-3.5 bg-white rounded-xl border border-indigo-100 flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2 text-indigo-700">
-                            <Calculator className="w-4 h-4 text-indigo-500" />
-                            <span>
-                              Simulasi Upah Normal 8 Jam:{" "}
-                              <strong>
-                                Rp {((formData.hourlyRate || 0) * (formData.normalHoursPerDay || 8)).toLocaleString("id-ID")}
-                              </strong>
-                            </span>
-                          </div>
-                          <div className="text-slate-600">
-                            Lembur Jam 1:{" "}
-                            <strong>
-                              Rp {((formData.hourlyRate || 0) * (formData.overtimeMultiplierHour1 || 1.5)).toLocaleString("id-ID")}
-                            </strong>{" "}
-                            | Jam 2+:{" "}
-                            <strong>
-                              Rp {((formData.hourlyRate || 0) * (formData.overtimeMultiplierHour2Plus || 2.0)).toLocaleString("id-ID")}
-                            </strong>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

@@ -406,6 +406,17 @@ export async function POST(request: Request) {
               overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || 40000);
               overtimePay = overtimeHours * overtimeRate;
               positionTier = "Teknisi Jam-jaman (Tipe 2)";
+            } else if (scheme.dailyScheme.dailyRateType === "TYPE_3_MONTHLY_FULL") {
+              baseSalary = Number(scheme.dailyScheme.monthlyBaseSalary || scheme.staffScheme?.baseSalary || 4200000);
+              presenceRate = 0;
+              presenceAllowance = 0;
+              appliedDailyRate = 0;
+              positionAllowance = Number(scheme.dailyScheme.positionAllowance !== undefined ? scheme.dailyScheme.positionAllowance : (scheme.staffScheme?.positionAllowance || 0));
+              transportAllowance = Number(scheme.dailyScheme.transportAllowance !== undefined ? scheme.dailyScheme.transportAllowance : (scheme.staffScheme?.transportAllowance || 0));
+              bpjsDeduction = Number(scheme.dailyScheme.bpjsAllowance !== undefined ? scheme.dailyScheme.bpjsAllowance : (scheme.staffScheme?.bpjsAllowance || bpjsDeduction));
+              overtimeRate = Number(scheme.dailyScheme.overtimeHourlyRate || 30000);
+              overtimePay = overtimeHours * overtimeRate;
+              positionTier = "Bulanan Dibayar Penuh (Tipe 3)";
             }
           }
         } else if (emp.role && (emp.role.toLowerCase().includes("teknisi") || emp.role.toLowerCase().includes("helper"))) {
