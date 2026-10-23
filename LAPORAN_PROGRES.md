@@ -3390,6 +3390,55 @@
 
 ---
 
+### 87. BLUEPRINT PERENCANAAN MASA DEPAN: INTEGRASI MULTI-TENANT SAAS POS & SISTEM LANGGANAN (FUTURE ROADMAP)
+*(Status: Disimpan & Dimatangkan dalam Perencanaan. TIDAK BOLEH diterapkan ke kode/database sebelum disetujui pengguna secara khusus)*
+
+- **Latar Belakang & Tujuan**:
+  - Menyatukan aplikasi manajemen `dstechsmart.com` dengan aplikasi kasir/point-of-sale `pos.dstechsmart.com` menjadi satu ekosistem SaaS (Software as a Service) komersial.
+  - Memungkinkan PT. DSTech Smart Perkasa menjual layanan POS & manajemen bisnis kepada klien eksternal dengan sistem biaya berlangganan berkala (bulanan/tahunan).
+  - **Prinsip Utama**: Menjaga aplikasi POS eksisting tetap mandiri dan aman 100% tanpa risiko gangguan operasional atau perubahan data mendadak.
+
+- **Rencana Arsitektur Teknis**:
+  1. **Tingkat 1 - Isolasi Data Tenant (Data Isolation)**:
+     - *Tenant Eksisting (DSTech Internal)*: Tetap menggunakan database POS mandiri saat ini.
+     - *Tenant Klien Baru*: Menggunakan skema isolasi via kolom `tenant_id` berindeks tinggi atau database dedicated per-cluster (`dstech_pos_tenant_[id]`), sehingga data kasir, produk, dan transaksi antar klien 100% terpisah secara logis dan aman.
+  2. **Tingkat 2 - Subdomain & Routing Terpadu**:
+     - Setiap klien yang berlangganan mendapatkan alamat kasir mandiri: `[nama-toko].pos.dstechsmart.com`.
+     - Nginx Reverse Proxy membaca header Host subdomain dan meneruskannya ke engine multi-tenant.
+  3. **Tingkat 3 - Skema Tier Paket Berlangganan (Subscription Models)**:
+     - **Paket Starter (UMKM / Toko Kecil - Rp 49.000 / Bulan)**:
+       - 1 Outlet / Cabang.
+       - 1 Akun Kasir.
+       - Maksimal 500 Master Produk.
+       - Cetak Struk Kasir Bluetooth / Thermal 58mm & 80mm.
+       - Laporan Penjualan Harian.
+     - **Paket Pro (Bisnis Berkembang - Rp 99.000 / Bulan)**:
+       - 2 Outlet / Cabang.
+       - Multi-Kasir & Manajemen Shift Karyawan.
+       - Produk Unlimited + Manajemen Stok Gudang Real-Time.
+       - Laporan Laba Rugi, Piutang Pelanggan, & Riwayat Kas Masuk/Keluar.
+       - Cetak Surat Jalan & Faktur Resmi.
+     - **Paket Enterprise (Bisnis Besar / Chain Store - Rp 199.000 / Bulan)**:
+       - Multi-Cabang & Multi-Gudang Tanpa Batas.
+       - Integrasi Presensi GPS Karyawan & Slip Gaji (DSTech HR).
+       - Integrasi WhatsApp Notifikasi Faktur & Laporan Otomatis ke Owner.
+       - Akses API & Bantuan Support Prioritas 24/7.
+  4. **Tingkat 4 - Engine Billing & Pembayaran Berulang (Recurring Payment)**:
+     - Integrasi Payment Gateway (Midtrans / Xendit / QRIS Otomatis).
+     - Fitur Auto-Invoice Langganan: terbit 7 hari sebelum masa aktif berakhir via WhatsApp & Email.
+     - Masa Tenggang (*Grace Period*): 3 hari setelah jatuh tempo sebelum pembatasan akses kasir.
+  5. **Tingkat 5 - Portal Navigasi Terpadu (Single Sign-On / App Switcher)**:
+     - Menu cepat di header dashboard `dstechsmart.com`: *"Buka Kasir POS"*, *"Panel Pelanggan SaaS"*, dan *"Kelola Langganan Toko"*.
+     - Pengguna cukup satu kali login untuk mengakses modul manajemen dan modul kasir POS sesuai lisensi aktif.
+
+- **Checklist Kesiapan Sebelum Eksekusi Fisik**:
+  - [ ] Validasi source code & arsitektur aplikasi `pos.dstechsmart.com` (apakah Node.js, Laravel, Next.js, dsb.).
+  - [ ] Pembuatan skema sandbox/staging terpisah untuk uji coba multi-tenant tanpa menyentuh server live POS.
+  - [ ] Konfirmasi penetapan harga dan gateway pembayaran resmi yang dipilih oleh Direktur/Manajemen.
+  - [ ] Persetujuan eksplisit dari pengguna sebelum penerapan pertama kali.
+
+---
+
 
 ### 88. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
