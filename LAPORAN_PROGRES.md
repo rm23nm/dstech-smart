@@ -2926,15 +2926,30 @@
 ### 102. Tugas: Kunci Lokasi Absensi GPS & Geofencing Staf Tertentu (Wajib Absen di Lokasi Tertentu / Kantor, Tolak Absen Jika di Luar Radius)
 - **Permintaan Pengguna**:
   *"kemudian saya ingin mengunci staf tertentu hanya bisa absen di lokasi tertentu dengan GPS. misalnya kantor. wajib absen dikantor dan GPS akan memvalidasi. jika berada diluar kantor maka tidak bisa untuk melakukan absen"*
-- **Status**: ⏳ **Antrian Pekerjaan Selanjutnya (Queued)**
+- **Status**: 🔄 **Sedang Dikerjakan (In Progress)**
 - **Kebutuhan Fitur**:
   - Konfigurasi Aturan Lokasi Presensi per Karyawan/Staf:
     - Opsi 1: Fleksibel / Dinas Lapangan (Bebas lokasi di mana pun proyek berada, tetap wajib koordinat GPS satelit & foto selfie).
-    - Opsi 2: Terkunci Lokasi Tertentu (Contoh: Kantor Utama Cilegon, Workshop Serang, atau Titik Proyek Khusus Klien).
+    - Opsi 2: Terkunci Wajib Kantor Utama DSTech Cilegon (Radius toleransi geofence maks. 100 meter dari koordinat kantor `-6.031846, 106.037198`).
   - Validasi Radius Geofencing (Formula Haversine Satelit):
     - Jika staf berstatus 'Terkunci Kantor', sistem menghitung jarak riil perangkat ke koordinat kantor (-6.031846, 106.037198).
-    - Jika jarak melebihi batas radius (misal > 100 meter dari kantor), sistem MENOLAK presensi dan menampilkan peringatan: "Presensi Ditolak: Anda berada di luar radius kantor resmi (Jarak: ... meter). Anda wajib berada di area kantor untuk melakukan presensi!"
-  - Pengaturan Geofencing staf dapat diatur oleh Admin / Superadmin di tab Manajemen Karyawan / Absensi.
+    - Jika jarak melebihi batas radius (jarak > 100 meter dari kantor), sistem MENOLAK presensi dan menampilkan peringatan: "Presensi Ditolak: Anda berada di luar radius kantor resmi (Jarak: ... meter). Anda wajib berada di area kantor untuk melakukan presensi!"
+  - Pengaturan Geofencing staf dapat diatur oleh Admin / Superadmin di tab Manajemen User (`/admin/users`) dan dipantau di Manajemen Absensi (`/admin/attendance`).
+  - Integrasi visual real-time pada modal Check-In & Check-Out di Portal Karyawan (`/employee`):
+    - Radar GPS Geofence instan yang menampilkan jarak ke kantor secara live.
+    - Menonaktifkan/disable tombol Check-In dan Check-Out jika staf terkunci kantor berada di luar batas 100 meter.
+
+- **Rencana Langkah Pelaksanaan**:
+  - [ ] **Langkah 1**: Buat backup file sebelum modifikasi (`src/app/api/users/route.ts`, `src/app/admin/users/page.tsx`, `src/app/api/employee/attendance/route.ts`, `src/app/employee/page.tsx`, `src/app/admin/attendance/page.tsx`) di folder `_backup/`.
+  - [ ] **Langkah 2**: Perbarui schema User (`dstech_users.json`, `src/app/api/users/route.ts`, dan `src/app/admin/users/page.tsx`) untuk mendukung atribut `attendanceLocationLock` ("ANY" | "OFFICE") dan `officeRadius` (default 100 meter). Sediakan kontrol pada modal Tambah & Edit User serta badge status di tabel pengguna ("🏢 Wajib Kantor" vs "🌐 Fleksibel").
+  - [ ] **Langkah 3**: Perbarui backend presensi `src/app/api/employee/attendance/route.ts` dengan kalkulasi formula Haversine satelit dan validasi ketat geofencing. Tolak presensi dengan pesan error informatif jika staf wajib kantor berada > 100 meter.
+  - [ ] **Langkah 4**: Perbarui antarmuka portal karyawan `src/app/employee/page.tsx` dengan deteksi radar jarak live ke kantor, peringatan visual jika di luar radius, dan disable tombol submit presensi jika melanggar geofence.
+  - [ ] **Langkah 5**: Perbarui antarmuka Admin Attendance di `src/app/admin/attendance/page.tsx` untuk menampilkan badge verifikasi geofence ("🏢 Kantor (X m)" atau "🌐 Lapangan").
+  - [ ] **Langkah 6**: Validasi kompilasi lokal (`npx tsc --noEmit` & `npm run build`).
+  - [ ] **Langkah 7**: Commit & push ke repositori GitHub via `push_with_native_git.js`.
+  - [ ] **Langkah 8**: Deploy ke server live VPS 157.66.34.199 via `deploy_live.js` dan restart PM2 `dstech-main`.
+  - [ ] **Langkah 9**: Verifikasi pengujian fungsionalitas geofence pada server live dan API.
+  - [ ] **Langkah 10**: Bersihkan file backup cadangan di `_backup/` dan update Laporan Progres akhir.
 
 ---
 
@@ -2968,6 +2983,22 @@
   - [x] **Langkah 7**: Deploy ke live server VPS via `deploy_live.js` (PM2 `dstech-main` PID 548260).
   - [x] **Langkah 8**: Verifikasi tampilan akun karyawan kontrak di User Management live (`https://dstechsmart.com/admin/users` dan API `/api/users` mengembalikan 6 user aktif termasuk Hendra dan Ikhsan) serta uji coba validasi login.
   - [x] **Langkah 9**: Bersihkan file backup di `_backup/` dan update Laporan Progres.
+
+---
+
+### 104. Tugas: Fitur Auto Penggajian Otomatis pada Tanggal Tertentu & Rekap Penggajian / Payroll Summary
+- **Permintaan Pengguna**:
+  *"kemudian saya ingin kamu membuat fitur auto penggajian pada tanggal tertentu, kemudian saya tidak melihat adanya rekap gaji/penggajian"*
+- **Status**: ⏳ **Antrian Pekerjaan Selanjutnya (Queued)**
+- **Kebutuhan Fitur**:
+  - Konfigurasi tanggal penggajian otomatis (Cut-Off & Payday date, misal tanggal 25 atau tanggal 1 setiap bulan).
+  - Generator otomatisasi slip gaji (Auto-Payroll Generation) bagi seluruh karyawan aktif & kontrak berdasarkan data presensi riil (hari kerja, jam kerja, lembur pengali, dan rate upah kontrak).
+  - Rekap Penggajian Komprehensif (Payroll Summary Dashboard):
+    - Tabel ringkasan penggajian bulanan seluruh divisi (Staf & Teknisi).
+    - Total agregat pengeluaran gaji perusahaan (Total Gross, Potongan BPJS/Pinjaman, Total Take Home Pay).
+    - Status pembayaran (Draft, Disetujui, Dibayarkan) dengan tombol aksi cepat persetujuan massal.
+    - Integrasi otomatis pembukuan ke Buku Arus Kas Keluar (`dstech_cash_flow`) modul Keuangan ERP.
+    - Lembar Cetak & Ekspor Rekap Penggajian Bulanan resmi A4 ber-Kop Surat DSTech.
 
 ---
 

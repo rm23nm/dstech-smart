@@ -3,6 +3,58 @@ import fs from "fs";
 import path from "path";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_attendance.json");
+const USERS_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
+
+// Koordinat Resmi Kantor Pusat DSTech Cilegon
+const OFFICE_LOCATION = {
+  name: "Kantor Pusat PT DSTech Smart Perkasa (Cilegon)",
+  latitude: -6.031846,
+  longitude: 106.037198,
+  defaultRadius: 100, // 100 meter
+};
+
+// Formula Haversine Akurat (menghitung jarak dua titik koordinat satelit dalam meter)
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371e3; // Radius bumi dalam meter
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
+// Helper membaca kebijakan lokasi presensi staf dari database users
+function getUserLocationPolicy(employeeName?: string, employeeEmail?: string) {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const users: any[] = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+      const user = users.find((u) => {
+        if (employeeEmail && u.email && u.email.toLowerCase() === employeeEmail.toLowerCase()) return true;
+        if (employeeName && u.name && u.name.trim().toLowerCase() === employeeName.trim().toLowerCase()) return true;
+        return false;
+      });
+      if (user) {
+        return {
+          locationLock: user.attendanceLocationLock || "ANY",
+          officeRadius: user.officeRadius ? Number(user.officeRadius) : OFFICE_LOCATION.defaultRadius,
+          userName: user.name,
+        };
+      }
+    }
+  } catch (e) {
+    console.error("Error reading user policy for attendance:", e);
+  }
+  return {
+    locationLock: "ANY",
+    officeRadius: OFFICE_LOCATION.defaultRadius,
+    userName: employeeName,
+  };
+}
 
 function readAttendance() {
   try {
@@ -74,6 +126,27 @@ export async function POST(request: Request) {
         );
       }
 
+      // 3. Validasi Geofencing: Jika staf terkunci di kantor, tolak jika di luar radius kantor
+      const userPolicy = getUserLocationPolicy(body.employeeName, body.employeeEmail);
+      const distanceToOffice = calculateDistanceMeters(
+        Number(latitude),
+        Number(longitude),
+        OFFICE_LOCATION.latitude,
+        OFFICE_LOCATION.longitude
+      );
+
+      if (userPolicy.locationLock === "OFFICE" && !body.isSuperAdminBypass) {
+        if (distanceToOffice > userPolicy.officeRadius) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Presensi Masuk DITOLAK: Anda berada di luar radius kantor resmi! Jarak Anda saat ini ${distanceToOffice} meter dari Kantor DSTech Cilegon (Batas maksimal: ${userPolicy.officeRadius} meter). Anda wajib berada di area kantor untuk melakukan presensi.`,
+            },
+            { status: 403 }
+          );
+        }
+      }
+
       const existingToday = data.attendance.find((a: any) => a.date === dateStr);
       const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
 
@@ -85,7 +158,9 @@ export async function POST(request: Request) {
           existingToday.longitude = Number(longitude);
           existingToday.accuracy = accuracy || null;
           existingToday.mapsUrl = computedMapsUrl;
-          existingToday.location = location || `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`;
+          existingToday.location = location || (distanceToOffice <= userPolicy.officeRadius ? "Kantor DSTech Cilegon" : `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`);
+          existingToday.distanceToOffice = distanceToOffice;
+          existingToday.geofenceLock = userPolicy.locationLock;
         }
         if (!existingToday.selfieCheckIn && selfieCheckIn) {
           existingToday.selfieCheckIn = selfieCheckIn;
@@ -98,14 +173,16 @@ export async function POST(request: Request) {
           employeeName: body.employeeName || "Teknisi Lapangan",
           checkIn: timeStr,
           checkOut: "-",
-          location: location || `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`,
+          location: location || (distanceToOffice <= userPolicy.officeRadius ? "Kantor DSTech Cilegon" : `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`),
           latitude: Number(latitude),
           longitude: Number(longitude),
           accuracy: accuracy || null,
           mapsUrl: computedMapsUrl,
           selfieCheckIn,
-          status: location?.toLowerCase().includes("kantor") ? "Tepat Waktu" : "Hadir Lapangan",
-          notes: notes || "Absen masuk via GPS & Kamera Selfie terverifikasi",
+          distanceToOffice,
+          geofenceLock: userPolicy.locationLock,
+          status: distanceToOffice <= userPolicy.officeRadius ? "Tepat Waktu (Kantor)" : "Hadir Lapangan",
+          notes: notes || `Absen masuk via GPS (${distanceToOffice}m dari kantor) & Foto Selfie terverifikasi`,
           isGpsLocked: true,
         };
         data.attendance.unshift(newRecord);
@@ -146,6 +223,27 @@ export async function POST(request: Request) {
         );
       }
 
+      // 3. Validasi Geofencing Pulang: Jika staf terkunci kantor, tolak jika di luar radius
+      const userPolicy = getUserLocationPolicy(body.employeeName, body.employeeEmail);
+      const distanceToOffice = calculateDistanceMeters(
+        Number(latitude),
+        Number(longitude),
+        OFFICE_LOCATION.latitude,
+        OFFICE_LOCATION.longitude
+      );
+
+      if (userPolicy.locationLock === "OFFICE" && !body.isSuperAdminBypass) {
+        if (distanceToOffice > userPolicy.officeRadius) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: `Presensi Pulang DITOLAK: Anda berada di luar radius kantor resmi! Jarak Anda saat ini ${distanceToOffice} meter dari Kantor DSTech Cilegon (Batas maksimal: ${userPolicy.officeRadius} meter). Anda wajib berada di area kantor untuk melakukan presensi pulang.`,
+            },
+            { status: 403 }
+          );
+        }
+      }
+
       const existingToday = data.attendance.find((a: any) => a.date === dateStr);
       const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
 
@@ -157,7 +255,8 @@ export async function POST(request: Request) {
           existingToday.checkOutLng = Number(longitude);
           existingToday.checkOutAccuracy = accuracy || null;
           existingToday.checkOutMapsUrl = computedMapsUrl;
-          existingToday.checkOutLocation = location || `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`;
+          existingToday.checkOutLocation = location || (distanceToOffice <= userPolicy.officeRadius ? "Kantor DSTech Cilegon" : `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`);
+          existingToday.checkOutDistanceToOffice = distanceToOffice;
         }
         if (!existingToday.selfieCheckOut && selfieCheckOut) {
           existingToday.selfieCheckOut = selfieCheckOut;
@@ -171,14 +270,15 @@ export async function POST(request: Request) {
           checkIn: "08:00 WIB",
           checkOut: timeStr,
           location: `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`,
-          checkOutLocation: location || `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`,
+          checkOutLocation: location || (distanceToOffice <= userPolicy.officeRadius ? "Kantor DSTech Cilegon" : `GPS Satelit (${Number(latitude).toFixed(6)}, ${Number(longitude).toFixed(6)})`),
           checkOutLat: Number(latitude),
           checkOutLng: Number(longitude),
           checkOutAccuracy: accuracy || null,
           checkOutMapsUrl: computedMapsUrl,
+          checkOutDistanceToOffice: distanceToOffice,
           selfieCheckOut,
           status: "Hadir",
-          notes: notes || "Absen pulang via GPS & Kamera Selfie terverifikasi",
+          notes: notes || `Absen pulang via GPS (${distanceToOffice}m dari kantor) & Foto Selfie terverifikasi`,
           isGpsLocked: true,
         };
         data.attendance.unshift(newRecord);

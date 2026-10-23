@@ -54,6 +54,8 @@ function syncContractsWithUsers(users: any[]): boolean {
           phone: contract.employeePhone || "",
           status: "ACTIVE",
           expiresAt: contract.endDate || null,
+          attendanceLocationLock: contract.attendanceLocationLock || "ANY",
+          officeRadius: contract.officeRadius ? Number(contract.officeRadius) : 100,
           contractId: contract.id,
           position: contract.position || "Teknisi Lapangan",
           createdAt: contract.createdAt || new Date().toISOString(),
@@ -64,6 +66,10 @@ function syncContractsWithUsers(users: any[]): boolean {
         if (!existing.expiresAt && contract.endDate) {
           existing.expiresAt = contract.endDate;
           existing.contractId = contract.id;
+          updated = true;
+        }
+        if (!existing.attendanceLocationLock && contract.attendanceLocationLock) {
+          existing.attendanceLocationLock = contract.attendanceLocationLock;
           updated = true;
         }
       }
@@ -156,7 +162,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, role, phone, status, password, expiresAt } = body;
+    const { name, email, role, phone, status, password, expiresAt, attendanceLocationLock, officeRadius } = body;
 
     if (!name || !email) {
       return NextResponse.json(
@@ -184,6 +190,8 @@ export async function POST(request: Request) {
       phone: phone ? phone.trim() : "",
       status: status || "ACTIVE",
       expiresAt: expiresAt || null,
+      attendanceLocationLock: attendanceLocationLock || "ANY",
+      officeRadius: officeRadius ? Number(officeRadius) : 100,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -217,7 +225,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, email, role, phone, status, password, expiresAt } = body;
+    const { id, name, email, role, phone, status, password, expiresAt, attendanceLocationLock, officeRadius } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -258,6 +266,8 @@ export async function PUT(request: Request) {
       phone: phone !== undefined ? phone.trim() : users[index].phone,
       status: status !== undefined ? status : users[index].status,
       expiresAt: expiresAt !== undefined ? expiresAt : users[index].expiresAt,
+      attendanceLocationLock: attendanceLocationLock !== undefined ? attendanceLocationLock : (users[index].attendanceLocationLock || "ANY"),
+      officeRadius: officeRadius !== undefined ? Number(officeRadius) : (users[index].officeRadius || 100),
       updatedAt: new Date().toISOString(),
     };
 

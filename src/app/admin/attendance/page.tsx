@@ -72,6 +72,9 @@ interface AttendanceRecord {
   checkOutMapsUrl?: string | null;
   selfieCheckOut?: string | null;
   isGpsLocked?: boolean;
+  distanceToOffice?: number | null;
+  checkOutDistanceToOffice?: number | null;
+  geofenceLock?: "ANY" | "OFFICE";
 }
 
 interface OvertimeRecord {
@@ -1276,28 +1279,40 @@ export default function AdminAttendancePage() {
                               <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                               <span className="truncate max-w-[180px]">{item.location || "Kantor DSTech Cilegon"}</span>
                             </p>
-                            {item.latitude && item.longitude ? (
-                              <button
-                                onClick={() =>
-                                  setGpsModal({
-                                    isOpen: true,
-                                    title: "Titik Lokasi Check-In Masuk",
-                                    employeeName: item.employeeName,
-                                    timeStr: `${item.date} • ${item.checkIn}`,
-                                    locationName: item.location,
-                                    lat: item.latitude || null,
-                                    lng: item.longitude || null,
-                                    accuracy: item.accuracy,
-                                    mapsUrl: item.mapsUrl,
-                                    selfiePhoto: item.selfieCheckIn || null,
-                                  })
-                                }
-                                className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-blue-50/80 px-2 py-0.5 rounded-md"
-                              >
-                                <Navigation className="w-3 h-3" />
-                                <span>Peta GPS</span>
-                              </button>
-                            ) : null}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                              {item.distanceToOffice !== undefined && item.distanceToOffice !== null ? (
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  item.distanceToOffice <= 100
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                                }`}>
+                                  <Building className="w-2.5 h-2.5" />
+                                  {item.distanceToOffice <= 100 ? `Kantor (${item.distanceToOffice}m)` : `Lapangan (${item.distanceToOffice >= 1000 ? (item.distanceToOffice/1000).toFixed(1) + "km" : item.distanceToOffice + "m"})`}
+                                </span>
+                              ) : null}
+                              {item.latitude && item.longitude ? (
+                                <button
+                                  onClick={() =>
+                                    setGpsModal({
+                                      isOpen: true,
+                                      title: "Titik Lokasi Check-In Masuk",
+                                      employeeName: item.employeeName,
+                                      timeStr: `${item.date} • ${item.checkIn}`,
+                                      locationName: item.location,
+                                      lat: item.latitude || null,
+                                      lng: item.longitude || null,
+                                      accuracy: item.accuracy,
+                                      mapsUrl: item.mapsUrl,
+                                      selfiePhoto: item.selfieCheckIn || null,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer bg-blue-50/80 px-2 py-0.5 rounded-md"
+                                >
+                                  <Navigation className="w-3 h-3" />
+                                  <span>Peta GPS</span>
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                         </td>
 
@@ -1342,28 +1357,40 @@ export default function AdminAttendancePage() {
                                 <span className="truncate max-w-[180px]">{item.checkOutLocation}</span>
                               </p>
                             )}
-                            {item.checkOutLat && item.checkOutLng ? (
-                              <button
-                                onClick={() =>
-                                  setGpsModal({
-                                    isOpen: true,
-                                    title: "Titik Lokasi Check-Out Pulang",
-                                    employeeName: item.employeeName,
-                                    timeStr: `${item.date} • ${item.checkOut}`,
-                                    locationName: item.checkOutLocation || item.location,
-                                    lat: item.checkOutLat ?? null,
-                                    lng: item.checkOutLng ?? null,
-                                    accuracy: item.checkOutAccuracy,
-                                    mapsUrl: item.checkOutMapsUrl,
-                                    selfiePhoto: item.selfieCheckOut || null,
-                                  })
-                                }
-                                className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 hover:text-slate-900 hover:underline cursor-pointer bg-slate-100 px-2 py-0.5 rounded-md"
-                              >
-                                <Navigation className="w-3 h-3" />
-                                <span>Peta Pulang</span>
-                              </button>
-                            ) : null}
+                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                              {item.checkOutDistanceToOffice !== undefined && item.checkOutDistanceToOffice !== null ? (
+                                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  item.checkOutDistanceToOffice <= 100
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                                }`}>
+                                  <Building className="w-2.5 h-2.5" />
+                                  {item.checkOutDistanceToOffice <= 100 ? `Kantor (${item.checkOutDistanceToOffice}m)` : `Lapangan (${item.checkOutDistanceToOffice >= 1000 ? (item.checkOutDistanceToOffice/1000).toFixed(1) + "km" : item.checkOutDistanceToOffice + "m"})`}
+                                </span>
+                              ) : null}
+                              {item.checkOutLat && item.checkOutLng ? (
+                                <button
+                                  onClick={() =>
+                                    setGpsModal({
+                                      isOpen: true,
+                                      title: "Titik Lokasi Check-Out Pulang",
+                                      employeeName: item.employeeName,
+                                      timeStr: `${item.date} • ${item.checkOut}`,
+                                      locationName: item.checkOutLocation || item.location,
+                                      lat: item.checkOutLat ?? null,
+                                      lng: item.checkOutLng ?? null,
+                                      accuracy: item.checkOutAccuracy,
+                                      mapsUrl: item.checkOutMapsUrl,
+                                      selfiePhoto: item.selfieCheckOut || null,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 hover:text-slate-900 hover:underline cursor-pointer bg-slate-100 px-2 py-0.5 rounded-md"
+                                >
+                                  <Navigation className="w-3 h-3" />
+                                  <span>Peta Pulang</span>
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                         </td>
 

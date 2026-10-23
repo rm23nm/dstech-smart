@@ -39,6 +39,7 @@ import {
   Camera,
   Upload,
   Image as ImageIcon,
+  Building,
 } from "lucide-react";
 
 interface DamagedItem {
@@ -203,6 +204,24 @@ interface EmployeeUserSession {
   email: string;
   phone?: string;
   loginTime?: string;
+  attendanceLocationLock?: "ANY" | "OFFICE";
+  officeRadius?: number;
+}
+
+const OFFICE_COORDS = { lat: -6.031846, lng: 106.037198, name: "Kantor DSTech Cilegon" };
+
+function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  const R = 6371e3;
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
 }
 
 export default function EmployeeDashboard() {
@@ -614,6 +633,26 @@ export default function EmployeeDashboard() {
           const parsed = JSON.parse(rawAuth);
           if (parsed && (parsed.name || parsed.email)) {
             setCurrentUser(parsed);
+            fetch("/api/users")
+              .then((r) => r.json())
+              .then((data) => {
+                if (data.success && Array.isArray(data.data)) {
+                  const matched = data.data.find(
+                    (u: any) =>
+                      (parsed.email && u.email && u.email.toLowerCase() === parsed.email.toLowerCase()) ||
+                      (parsed.name && u.name && u.name.trim().toLowerCase() === parsed.name.trim().toLowerCase())
+                  );
+                  if (matched) {
+                    setCurrentUser((prev: any) => ({
+                      ...prev,
+                      ...matched,
+                      attendanceLocationLock: matched.attendanceLocationLock || "ANY",
+                      officeRadius: matched.officeRadius ? Number(matched.officeRadius) : 100,
+                    }));
+                  }
+                }
+              })
+              .catch(() => {});
           }
         }
       } catch (err) {
@@ -1275,6 +1314,16 @@ export default function EmployeeDashboard() {
       showToast("Presensi Masuk DITOLAK: Wajib mengambil foto selfie wajah via kamera perangkat!");
       return;
     }
+
+    if (currentUser?.attendanceLocationLock === "OFFICE") {
+      const dist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+      const maxRad = currentUser.officeRadius || 100;
+      if (dist > maxRad) {
+        showToast(`Presensi Masuk DITOLAK: Anda berada ${dist}m di luar radius kantor resmi (Maks: ${maxRad}m)!`);
+        return;
+      }
+    }
+
     try {
       const res = await fetch("/api/employee/attendance", {
         method: "POST",
@@ -1282,6 +1331,7 @@ export default function EmployeeDashboard() {
         body: JSON.stringify({
           action: "checkin",
           employeeName: currentUser?.name || "Teknisi Lapangan",
+          employeeEmail: currentUser?.email,
           location: checkInLocation,
           latitude: checkInCoords.lat,
           longitude: checkInCoords.lng,
@@ -1318,6 +1368,16 @@ export default function EmployeeDashboard() {
       showToast("Presensi Pulang DITOLAK: Wajib mengambil foto selfie wajah pulang via kamera perangkat!");
       return;
     }
+
+    if (currentUser?.attendanceLocationLock === "OFFICE") {
+      const dist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+      const maxRad = currentUser.officeRadius || 100;
+      if (dist > maxRad) {
+        showToast(`Presensi Pulang DITOLAK: Anda berada ${dist}m di luar radius kantor resmi (Maks: ${maxRad}m)!`);
+        return;
+      }
+    }
+
     try {
       const res = await fetch("/api/employee/attendance", {
         method: "POST",
@@ -1325,6 +1385,7 @@ export default function EmployeeDashboard() {
         body: JSON.stringify({
           action: "checkout",
           employeeName: currentUser?.name || "Teknisi Lapangan",
+          employeeEmail: currentUser?.email,
           location: checkOutLocation,
           latitude: checkOutCoords.lat,
           longitude: checkOutCoords.lng,
@@ -3728,6 +3789,58 @@ export default function EmployeeDashboard() {
                 )}
               </div>
 
+              {/* Radar Geofencing Satelit */}
+              {checkInCoords.lat !== 0 && (() => {
+                const dist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+                const isOfficeLocked = currentUser?.attendanceLocationLock === "OFFICE";
+                const maxRad = currentUser?.officeRadius || 100;
+                const isViolated = isOfficeLocked && dist > maxRad;
+
+                return (
+                  <div className={`p-3.5 rounded-2xl border text-xs space-y-1.5 transition-all ${
+                    isOfficeLocked
+                      ? isViolated
+                        ? "bg-rose-50 border-rose-300 text-rose-950"
+                        : "bg-emerald-50 border-emerald-300 text-emerald-950"
+                      : "bg-blue-50 border-blue-200 text-blue-950"
+                  }`}>
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <Navigation className="w-4 h-4 text-dstech-blue" />
+                        Geofence Radar Satelit:
+                      </span>
+                      <span className="font-mono text-xs">
+                        Jarak: <strong>{dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${dist} meter`}</strong>
+                      </span>
+                    </div>
+                    {isOfficeLocked ? (
+                      isViolated ? (
+                        <div className="flex items-start gap-2 text-rose-700 font-bold">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <p className="text-[11px] leading-relaxed">
+                            PRESENSI DITOLAK: Akun Anda diwajibkan presensi di Kantor DSTech Cilegon (Radius toleransi: maks. {maxRad} meter). Posisi Anda saat ini berjarak {dist} meter dari kantor!
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <p className="text-[11px]">
+                            TERVERIFIKASI DI KANTOR: Posisi Anda berada di area resmi kantor (Jarak: {dist} meter ≤ {maxRad}m). Presensi Diizinkan!
+                          </p>
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                        <p className="text-[11px]">
+                          Mode Fleksibel Lapangan: Presensi sah di mana pun lokasi proyek/lapangan berada.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">Catatan Lapangan (Opsional):</label>
                 <input
@@ -3750,19 +3863,28 @@ export default function EmployeeDashboard() {
                 >
                   Batal
                 </button>
-                <button
-                  id="btn-submit-checkin"
-                  type="submit"
-                  disabled={checkInCoords.source !== "gps" || !selfieCheckInPhoto}
-                  className={`px-5 py-2.5 rounded-xl font-bold shadow-md flex items-center gap-1.5 transition-all ${
-                    checkInCoords.source === "gps" && selfieCheckInPhoto
-                      ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
-                      : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-75"
-                  }`}
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  Konfirmasi Check-In Sekarang
-                </button>
+                {(() => {
+                  const dist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+                  const isOfficeLocked = currentUser?.attendanceLocationLock === "OFFICE";
+                  const isViolated = isOfficeLocked && checkInCoords.lat !== 0 && dist > (currentUser?.officeRadius || 100);
+                  const isReady = checkInCoords.source === "gps" && !!selfieCheckInPhoto && !isViolated;
+
+                  return (
+                    <button
+                      id="btn-submit-checkin"
+                      type="submit"
+                      disabled={!isReady}
+                      className={`px-5 py-2.5 rounded-xl font-bold shadow-md flex items-center gap-1.5 transition-all ${
+                        isReady
+                          ? "bg-green-600 hover:bg-green-700 text-white cursor-pointer"
+                          : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-75"
+                      }`}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Konfirmasi Check-In Sekarang
+                    </button>
+                  );
+                })()}
               </div>
             </form>
           </div>
@@ -4017,6 +4139,58 @@ export default function EmployeeDashboard() {
                 )}
               </div>
 
+              {/* Radar Geofencing Satelit Pulang */}
+              {checkOutCoords.lat !== 0 && (() => {
+                const dist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+                const isOfficeLocked = currentUser?.attendanceLocationLock === "OFFICE";
+                const maxRad = currentUser?.officeRadius || 100;
+                const isViolated = isOfficeLocked && dist > maxRad;
+
+                return (
+                  <div className={`p-3.5 rounded-2xl border text-xs space-y-1.5 transition-all ${
+                    isOfficeLocked
+                      ? isViolated
+                        ? "bg-rose-50 border-rose-300 text-rose-950"
+                        : "bg-emerald-50 border-emerald-300 text-emerald-950"
+                      : "bg-blue-50 border-blue-200 text-blue-950"
+                  }`}>
+                    <div className="flex items-center justify-between font-bold">
+                      <span className="flex items-center gap-1.5">
+                        <Navigation className="w-4 h-4 text-dstech-blue" />
+                        Geofence Radar Satelit:
+                      </span>
+                      <span className="font-mono text-xs">
+                        Jarak: <strong>{dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${dist} meter`}</strong>
+                      </span>
+                    </div>
+                    {isOfficeLocked ? (
+                      isViolated ? (
+                        <div className="flex items-start gap-2 text-rose-700 font-bold">
+                          <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                          <p className="text-[11px] leading-relaxed">
+                            PRESENSI PULANG DITOLAK: Akun Anda diwajibkan presensi di Kantor DSTech Cilegon (Radius toleransi: maks. {maxRad} meter). Posisi Anda saat ini berjarak {dist} meter dari kantor!
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <p className="text-[11px]">
+                            TERVERIFIKASI DI KANTOR: Posisi Anda berada di area resmi kantor (Jarak: {dist} meter ≤ {maxRad}m). Presensi Diizinkan!
+                          </p>
+                        </div>
+                      )
+                    ) : (
+                      <div className="flex items-center gap-2 text-blue-700">
+                        <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+                        <p className="text-[11px]">
+                          Mode Fleksibel Lapangan: Presensi sah di mana pun lokasi proyek/lapangan berada.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">
                   Rangkuman Kerja Hari Ini (Daily Summary):
@@ -4043,19 +4217,28 @@ export default function EmployeeDashboard() {
                 >
                   Batal
                 </button>
-                <button
-                  id="btn-submit-checkout"
-                  type="submit"
-                  disabled={checkOutCoords.source !== "gps" || !selfieCheckOutPhoto}
-                  className={`px-5 py-2.5 rounded-xl font-bold shadow-md flex items-center gap-1.5 transition-all ${
-                    checkOutCoords.source === "gps" && selfieCheckOutPhoto
-                      ? "bg-slate-900 hover:bg-slate-800 text-white cursor-pointer"
-                      : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-75"
-                  }`}
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  Simpan & Check-Out Pulang
-                </button>
+                {(() => {
+                  const dist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+                  const isOfficeLocked = currentUser?.attendanceLocationLock === "OFFICE";
+                  const isViolated = isOfficeLocked && checkOutCoords.lat !== 0 && dist > (currentUser?.officeRadius || 100);
+                  const isReady = checkOutCoords.source === "gps" && !!selfieCheckOutPhoto && !isViolated;
+
+                  return (
+                    <button
+                      id="btn-submit-checkout"
+                      type="submit"
+                      disabled={!isReady}
+                      className={`px-5 py-2.5 rounded-xl font-bold shadow-md flex items-center gap-1.5 transition-all ${
+                        isReady
+                          ? "bg-slate-900 hover:bg-slate-800 text-white cursor-pointer"
+                          : "bg-slate-300 text-slate-500 cursor-not-allowed opacity-75"
+                      }`}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Simpan & Check-Out Pulang
+                    </button>
+                  );
+                })()}
               </div>
             </form>
           </div>

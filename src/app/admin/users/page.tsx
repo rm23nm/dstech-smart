@@ -25,6 +25,9 @@ import {
   EyeOff,
   Clock,
   Calendar,
+  Building,
+  Navigation,
+  MapPin,
 } from "lucide-react";
 
 interface UserItem {
@@ -36,6 +39,8 @@ interface UserItem {
   password?: string;
   status: "ACTIVE" | "INACTIVE";
   expiresAt?: string | null;
+  attendanceLocationLock?: "ANY" | "OFFICE";
+  officeRadius?: number;
   contractId?: string;
   position?: string;
   createdAt: string;
@@ -111,6 +116,8 @@ export default function AdminUsersPage() {
   const [formNewPassword, setFormNewPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [formExpiresAt, setFormExpiresAt] = useState("");
+  const [formLocationLock, setFormLocationLock] = useState<"ANY" | "OFFICE">("ANY");
+  const [formOfficeRadius, setFormOfficeRadius] = useState<number>(100);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Helper remaining days
@@ -177,6 +184,8 @@ export default function AdminUsersPage() {
     setFormRole(u.role);
     setFormStatus(u.status);
     setFormExpiresAt(u.expiresAt ? u.expiresAt.split("T")[0] : "");
+    setFormLocationLock(u.attendanceLocationLock || "ANY");
+    setFormOfficeRadius(u.officeRadius || 100);
     setFormNewPassword("");
     setShowNewPassword(false);
     setIsEditModalOpen(true);
@@ -213,6 +222,8 @@ export default function AdminUsersPage() {
           status: formStatus,
           password: formPassword.trim(),
           expiresAt: formExpiresAt ? formExpiresAt : null,
+          attendanceLocationLock: formLocationLock,
+          officeRadius: formOfficeRadius,
         }),
       });
       const data = await res.json();
@@ -225,6 +236,8 @@ export default function AdminUsersPage() {
         setFormPhone("");
         setFormPassword("");
         setFormExpiresAt("");
+        setFormLocationLock("ANY");
+        setFormOfficeRadius(100);
         setShowPassword(false);
         setFormRole("EMPLOYEE");
         setFormStatus("ACTIVE");
@@ -259,6 +272,8 @@ export default function AdminUsersPage() {
         role: formRole,
         status: formStatus,
         expiresAt: formExpiresAt ? formExpiresAt : null,
+        attendanceLocationLock: formLocationLock,
+        officeRadius: formOfficeRadius,
       };
       if (formNewPassword.trim()) {
         payload.password = formNewPassword.trim();
@@ -488,6 +503,7 @@ export default function AdminUsersPage() {
                 <th className="py-5 px-6">Nomor Telepon/WA</th>
                 <th className="py-5 px-6">Status Akun</th>
                 <th className="py-5 px-6">Masa Berlaku Akses</th>
+                <th className="py-5 px-6">Lokasi Absen GPS</th>
                 <th className="py-5 px-6">Terdaftar</th>
                 <th className="py-5 px-6 text-right">Aksi</th>
               </tr>
@@ -495,14 +511,14 @@ export default function AdminUsersPage() {
             <tbody className="divide-y divide-slate-100 font-medium">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400 text-sm">
+                  <td colSpan={8} className="py-16 text-center text-slate-400 text-sm">
                     <div className="w-6 h-6 border-2 border-dstech-blue border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                     Memuat daftar pengguna...
                   </td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-16 text-center text-slate-400 text-sm">
+                  <td colSpan={8} className="py-16 text-center text-slate-400 text-sm">
                     Tidak ditemukan data pengguna yang cocok.
                   </td>
                 </tr>
@@ -644,6 +660,24 @@ export default function AdminUsersPage() {
                             </div>
                           );
                         })()}
+                      </td>
+
+                      {/* Lokasi Absen GPS */}
+                      <td className="py-4 px-6">
+                        {user.attendanceLocationLock === "OFFICE" ? (
+                          <div className="space-y-0.5">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-50 text-amber-800 border border-amber-200">
+                              <Building className="w-3 h-3 text-amber-600" />
+                              Wajib Kantor
+                            </span>
+                            <p className="text-[10px] text-slate-500 font-mono">Radius ≤{user.officeRadius || 100}m</p>
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-50 text-slate-600 border border-slate-200">
+                            <Navigation className="w-3 h-3 text-slate-400" />
+                            Bebas Lapangan
+                          </span>
+                        )}
                       </td>
 
                       {/* Created */}
@@ -899,6 +933,79 @@ export default function AdminUsersPage() {
                 </p>
               </div>
 
+              {/* Aturan Lokasi Presensi GPS (Geofencing) */}
+              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-dstech-blue" />
+                    Aturan Lokasi Presensi GPS (Geofencing)
+                  </label>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    formLocationLock === "OFFICE"
+                      ? "bg-amber-100 text-amber-800 border border-amber-200"
+                      : "bg-slate-200 text-slate-700"
+                  }`}>
+                    {formLocationLock === "OFFICE" ? "Terkunci di Kantor" : "Bebas Lapangan"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormLocationLock("ANY")}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                      formLocationLock === "ANY"
+                        ? "bg-white border-dstech-blue shadow-xs ring-1 ring-dstech-blue"
+                        : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <Navigation className={`w-4 h-4 mt-0.5 ${formLocationLock === "ANY" ? "text-dstech-blue" : "text-slate-400"}`} />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">🌐 Bebas / Lapangan</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Bisa absen di mana pun proyek berada (tetap wajib GPS & foto selfie).</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormLocationLock("OFFICE")}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                      formLocationLock === "OFFICE"
+                        ? "bg-amber-50/70 border-amber-400 shadow-xs ring-1 ring-amber-400"
+                        : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <Building className={`w-4 h-4 mt-0.5 ${formLocationLock === "OFFICE" ? "text-amber-600" : "text-slate-400"}`} />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">🏢 Wajib di Kantor</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Wajib berada di area Kantor DSTech Cilegon (GPS tervalidasi).</p>
+                    </div>
+                  </button>
+                </div>
+
+                {formLocationLock === "OFFICE" && (
+                  <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                    <span className="text-slate-600 font-medium">Radius Maksimal Toleransi:</span>
+                    <div className="flex items-center gap-1.5">
+                      {[50, 100, 200].map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setFormOfficeRadius(r)}
+                          className={`px-2 py-0.5 text-[11px] font-bold rounded-md ${
+                            formOfficeRadius === r
+                              ? "bg-amber-600 text-white"
+                              : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {r} Meter
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="pt-4 flex gap-3">
                 <button
                   type="button"
@@ -1114,6 +1221,79 @@ export default function AdminUsersPage() {
                 <p className="text-[10px] text-slate-400">
                   Setelah tanggal ini berlalu, pengguna otomatis ditolak masuk (login) ke aplikasi.
                 </p>
+              </div>
+
+              {/* Aturan Lokasi Presensi GPS (Geofencing) */}
+              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-dstech-blue" />
+                    Aturan Lokasi Presensi GPS (Geofencing)
+                  </label>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    formLocationLock === "OFFICE"
+                      ? "bg-amber-100 text-amber-800 border border-amber-200"
+                      : "bg-slate-200 text-slate-700"
+                  }`}>
+                    {formLocationLock === "OFFICE" ? "Terkunci di Kantor" : "Bebas Lapangan"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormLocationLock("ANY")}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                      formLocationLock === "ANY"
+                        ? "bg-white border-dstech-blue shadow-xs ring-1 ring-dstech-blue"
+                        : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <Navigation className={`w-4 h-4 mt-0.5 ${formLocationLock === "ANY" ? "text-dstech-blue" : "text-slate-400"}`} />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">🌐 Bebas / Lapangan</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Bisa absen di mana pun proyek berada (tetap wajib GPS & foto selfie).</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormLocationLock("OFFICE")}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                      formLocationLock === "OFFICE"
+                        ? "bg-amber-50/70 border-amber-400 shadow-xs ring-1 ring-amber-400"
+                        : "bg-white/60 border-slate-200 text-slate-600 hover:bg-white"
+                    }`}
+                  >
+                    <Building className={`w-4 h-4 mt-0.5 ${formLocationLock === "OFFICE" ? "text-amber-600" : "text-slate-400"}`} />
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">🏢 Wajib di Kantor</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Wajib berada di area Kantor DSTech Cilegon (GPS tervalidasi).</p>
+                    </div>
+                  </button>
+                </div>
+
+                {formLocationLock === "OFFICE" && (
+                  <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                    <span className="text-slate-600 font-medium">Radius Maksimal Toleransi:</span>
+                    <div className="flex items-center gap-1.5">
+                      {[50, 100, 200].map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => setFormOfficeRadius(r)}
+                          className={`px-2 py-0.5 text-[11px] font-bold rounded-md ${
+                            formOfficeRadius === r
+                              ? "bg-amber-600 text-white"
+                              : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {r} Meter
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div>
