@@ -127,6 +127,19 @@ export async function GET() {
   });
 }
 
+function getWIBDateStr(d: Date = new Date()): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jakarta",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(d);
+  } catch {
+    return d.toISOString().split("T")[0];
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -135,7 +148,9 @@ export async function POST(request: Request) {
 
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} WIB`;
-    const dateStr = now.toISOString().split("T")[0];
+    const dateStr = getWIBDateStr(now);
+    const targetEmpName = (body.employeeName || "").trim().toLowerCase();
+    const targetEmpEmail = (body.employeeEmail || "").trim().toLowerCase();
 
     if (action === "checkin") {
       const { location, notes, latitude, longitude, accuracy, mapsUrl, projectId, projectName, projectRole } = body;
@@ -201,12 +216,24 @@ export async function POST(request: Request) {
         computedStatus = "Hadir Lapangan";
       }
 
-      const existingToday = data.attendance.find((a: any) => a.date === dateStr);
+      // Cari record hari ini KHUSUS untuk karyawan/user yang sedang melakukan absensi
+      const existingToday = data.attendance.find((a: any) => {
+        const matchDate = a.date === dateStr;
+        if (!matchDate) return false;
+        const matchName = targetEmpName && a.employeeName && a.employeeName.trim().toLowerCase() === targetEmpName;
+        const matchEmail = targetEmpEmail && a.employeeEmail && a.employeeEmail.trim().toLowerCase() === targetEmpEmail;
+        return Boolean(matchName || matchEmail);
+      });
+
       const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
+      let savedRecord: any = null;
 
       if (existingToday) {
         existingToday.checkIn = existingToday.checkIn || timeStr;
         existingToday.status = computedStatus;
+        if (body.employeeEmail && !existingToday.employeeEmail) {
+          existingToday.employeeEmail = body.employeeEmail;
+        }
         if (projectId) existingToday.projectId = projectId;
         if (projectName) existingToday.projectName = projectName;
         if (projectRole) existingToday.projectRole = projectRole;
@@ -224,11 +251,13 @@ export async function POST(request: Request) {
           existingToday.selfieCheckIn = selfieCheckIn;
         }
         if (notes) existingToday.notes = notes;
+        savedRecord = existingToday;
       } else {
         const newRecord = {
           id: `dstech_att_${Date.now()}`,
           date: dateStr,
           employeeName: body.employeeName || "Teknisi Lapangan",
+          employeeEmail: body.employeeEmail || null,
           checkIn: timeStr,
           checkOut: "-",
           projectId: projectId || null,
@@ -248,13 +277,14 @@ export async function POST(request: Request) {
         };
         data.attendance.unshift(newRecord);
         if (data.monthlyStats) data.monthlyStats.presenceDays += 1;
+        savedRecord = newRecord;
       }
 
       writeAttendance(data);
       return NextResponse.json({
         success: true,
         message: `Presensi Masuk terverifikasi GPS & Foto Selfie berhasil dicatat (${timeStr})`,
-        data: data.attendance[0],
+        data: savedRecord,
       });
     }
 
@@ -305,11 +335,23 @@ export async function POST(request: Request) {
         }
       }
 
-      const existingToday = data.attendance.find((a: any) => a.date === dateStr);
+      // Cari record hari ini KHUSUS untuk karyawan/user yang sedang melakukan checkout
+      const existingToday = data.attendance.find((a: any) => {
+        const matchDate = a.date === dateStr;
+        if (!matchDate) return false;
+        const matchName = targetEmpName && a.employeeName && a.employeeName.trim().toLowerCase() === targetEmpName;
+        const matchEmail = targetEmpEmail && a.employeeEmail && a.employeeEmail.trim().toLowerCase() === targetEmpEmail;
+        return Boolean(matchName || matchEmail);
+      });
+
       const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
+      let savedRecord: any = null;
 
       if (existingToday) {
         existingToday.checkOut = timeStr;
+        if (body.employeeEmail && !existingToday.employeeEmail) {
+          existingToday.employeeEmail = body.employeeEmail;
+        }
         if (projectId) existingToday.projectId = projectId;
         if (projectName) existingToday.projectName = projectName;
         if (projectRole) existingToday.projectRole = projectRole;
@@ -326,11 +368,13 @@ export async function POST(request: Request) {
           existingToday.selfieCheckOut = selfieCheckOut;
         }
         if (notes) existingToday.notes = `${existingToday.notes ? existingToday.notes + " | " : ""}Laporan Pulang: ${notes}`;
+        savedRecord = existingToday;
       } else {
         const newRecord = {
           id: `dstech_att_${Date.now()}`,
           date: dateStr,
           employeeName: body.employeeName || "Teknisi Lapangan",
+          employeeEmail: body.employeeEmail || null,
           checkIn: "08:00 WIB",
           checkOut: timeStr,
           projectId: projectId || null,
@@ -349,13 +393,14 @@ export async function POST(request: Request) {
           isGpsLocked: true,
         };
         data.attendance.unshift(newRecord);
+        savedRecord = newRecord;
       }
 
       writeAttendance(data);
       return NextResponse.json({
         success: true,
         message: `Presensi Pulang terverifikasi GPS & Foto Selfie berhasil dicatat (${timeStr})`,
-        data: data.attendance[0],
+        data: savedRecord,
       });
     }
 

@@ -130,19 +130,45 @@ export default function AdminDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Load Admin User Session & Today's Attendance
-  const loadAdminAttendance = async (userName?: string) => {
+  // Helper mendapatkan format tanggal resmi WIB (Asia/Jakarta) & ISO fallback
+  const getTodayDateStrings = () => {
+    const dates: string[] = [];
     try {
-      const targetName = userName || adminUser?.name || "Superadmin DSTech";
+      const wib = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      dates.push(wib);
+    } catch {}
+    const iso = new Date().toISOString().split("T")[0];
+    if (!dates.includes(iso)) dates.push(iso);
+    return dates;
+  };
+
+  // Load Admin User Session & Today's Attendance
+  const loadAdminAttendance = async (userName?: string, userEmail?: string) => {
+    try {
+      const targetName = (userName || adminUser?.name || "Super Admin DStech").trim().toLowerCase();
+      const targetEmail = (userEmail || adminUser?.email || "admin@dstechsmart.com").trim().toLowerCase();
+      const validDates = getTodayDateStrings();
+
       const res = await fetch("/api/employee/attendance");
       const json = await res.json();
       if (json.success && Array.isArray(json.attendance)) {
-        const todayStr = new Date().toISOString().split("T")[0];
-        const match = json.attendance.find(
-          (a: any) =>
-            a.date === todayStr &&
-            a.employeeName?.trim().toLowerCase() === targetName.trim().toLowerCase()
-        );
+        const match = json.attendance.find((a: any) => {
+          const matchDate = validDates.includes(a.date);
+          if (!matchDate) return false;
+          const aName = (a.employeeName || "").trim().toLowerCase();
+          const aEmail = (a.employeeEmail || "").trim().toLowerCase();
+          const matchName =
+            aName === targetName ||
+            (targetName.includes("admin") && aName.includes("admin")) ||
+            targetName.replace(/\s+/g, "") === aName.replace(/\s+/g, "");
+          const matchEmail = targetEmail && aEmail && aEmail === targetEmail;
+          return Boolean(matchName || matchEmail);
+        });
         setTodayAttendance(match || null);
       }
     } catch (e) {
@@ -156,18 +182,18 @@ export default function AdminDashboard() {
         const raw = localStorage.getItem("dstech_admin_auth");
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed && parsed.name) {
+          if (parsed && (parsed.name || parsed.email)) {
             setAdminUser(parsed);
-            loadAdminAttendance(parsed.name);
+            loadAdminAttendance(parsed.name, parsed.email);
             return;
           }
         }
       } catch (err) {
         console.error(err);
       }
-      const fallback = { name: "Superadmin DSTech", role: "SUPERADMIN", email: "admin@dstechsmart.com" };
+      const fallback = { name: "Super Admin DStech", role: "SUPERADMIN", email: "admin@dstechsmart.com" };
       setAdminUser(fallback);
-      loadAdminAttendance(fallback.name);
+      loadAdminAttendance(fallback.name, fallback.email);
     }
   }, []);
 
@@ -342,9 +368,12 @@ export default function AdminDashboard() {
       });
       const json = await res.json();
       if (json.success) {
+        if (json.data) {
+          setTodayAttendance(json.data);
+        }
         alert(`✓ Presensi ${attendanceMode === "checkin" ? "Masuk" : "Pulang"} berhasil dicatat!`);
         closeAttendanceModal();
-        loadAdminAttendance(name);
+        loadAdminAttendance(name, email);
       } else {
         alert(json.error || "Gagal mencatat presensi");
       }
@@ -462,6 +491,9 @@ export default function AdminDashboard() {
         setPartnersCount(0);
         setNewestPartners([]);
       }
+
+      // Sinkronkan juga status presensi hari ini
+      loadAdminAttendance();
     } catch (err) {
       console.error("Gagal memuat data dashboard:", err);
     } finally {

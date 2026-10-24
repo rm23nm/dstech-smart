@@ -139,6 +139,7 @@ interface AttendanceLog {
   id: string;
   date: string;
   employeeName: string;
+  employeeEmail?: string | null;
   checkIn: string;
   checkOut: string;
   location: string;
@@ -1591,9 +1592,37 @@ export default function EmployeeDashboard() {
   // Active task for highlight banner
   const activeTask = tasks.find((t) => t.status === "In Progress") || tasks[0];
 
-  // Today's attendance record
-  const todayStr = new Date().toISOString().split("T")[0];
-  const todayAttendance = attendanceLogs.find((a) => a.date === todayStr);
+  // Today's attendance record (WIB Asia/Jakarta & pencocokan akun staf aktif)
+  const getWIBTodayDates = () => {
+    const list: string[] = [];
+    try {
+      const wib = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      list.push(wib);
+    } catch {}
+    const iso = new Date().toISOString().split("T")[0];
+    if (!list.includes(iso)) list.push(iso);
+    return list;
+  };
+
+  const validEmployeeTodayDates = getWIBTodayDates();
+  const currentEmpName = (currentUser?.name || "").trim().toLowerCase();
+  const currentEmpEmail = (currentUser?.email || "").trim().toLowerCase();
+
+  const todayAttendance = attendanceLogs.find((a) => {
+    const matchDate = validEmployeeTodayDates.includes(a.date);
+    if (!matchDate) return false;
+    if (!currentEmpName && !currentEmpEmail) return true;
+    const aName = (a.employeeName || "").trim().toLowerCase();
+    const aEmail = (a.employeeEmail || "").trim().toLowerCase();
+    const matchName = currentEmpName && (aName === currentEmpName || aName.includes(currentEmpName) || currentEmpName.includes(aName));
+    const matchEmail = currentEmpEmail && aEmail && aEmail === currentEmpEmail;
+    return Boolean(matchName || matchEmail);
+  });
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">
