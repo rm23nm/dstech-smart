@@ -2039,13 +2039,14 @@ export default function AdminFinanceERPPage() {
       waText += `🛡️ *Status Legalitas:* ${doc.approvalStatus}\n`;
     }
 
-    // Deteksi tangguh jenis dokumen (SPH / Quotation vs Invoice / Faktur)
+    // Deteksi tangguh jenis dokumen (SPH / Quotation vs Invoice / Faktur vs PO)
     const dt = (doc.docType || "").toUpperCase();
     const docNo = (doc.docNumber || "").toUpperCase();
     const docTitle = (doc.docTitle || "").toLowerCase();
 
     const isInvoice = dt === "INVOICE" || dt.includes("FAKTUR") || docNo.startsWith("INV");
     const isSph = dt === "SPH" || dt === "QUOTATION" || docTitle.includes("penawaran") || docTitle.includes("sph") || docNo.startsWith("SPH");
+    const isPo = dt === "PO" || dt === "PURCHASE_ORDER" || docNo.startsWith("PO") || docTitle.includes("purchase order") || docTitle.includes("pembelian");
     const encodedNo = encodeURIComponent(doc.docNumber || "");
 
     // Jika Dokumen adalah Faktur (Invoice), sertakan Tautan Unduh Langsung Berkas Lengkap
@@ -2064,6 +2065,9 @@ export default function AdminFinanceERPPage() {
     } else if (isSph) {
       waText += `\n📥 *Tautan Unduh Berkas Resmi Surat Penawaran Harga (SPH):*\n`;
       waText += `📄 *Dokumen SPH & Brosur Gambar Produk:*\n${portalUrl}/api/finance/print?doc=sph&no=${encodedNo}\n`;
+    } else if (isPo) {
+      waText += `\n📥 *Tautan Unduh & Cetak Lembar Purchase Order (PO) Resmi:*\n`;
+      waText += `📄 *Dokumen Purchase Order (PO):*\n${portalUrl}/api/finance/print?doc=po&no=${encodedNo}\n`;
     } else {
       waText += `\n📥 *Tautan Unduh Dokumen Resmi:*\n${portalUrl}/api/finance/print?doc=${encodeURIComponent((doc.docType || "document").toLowerCase())}&no=${encodedNo}\n`;
     }
@@ -2098,6 +2102,9 @@ export default function AdminFinanceERPPage() {
     } else if (isSph) {
       emailBody += `\nUnduh Berkas Resmi Surat Penawaran Harga (SPH):\n`;
       emailBody += `• Dokumen SPH & Brosur Gambar Produk: ${portalUrl}/api/finance/print?doc=sph&no=${encodedNo}\n`;
+    } else if (isPo) {
+      emailBody += `\nUnduh Berkas Resmi Purchase Order (PO):\n`;
+      emailBody += `• Dokumen Purchase Order: ${portalUrl}/api/finance/print?doc=po&no=${encodedNo}\n`;
     }
 
     emailBody += `\nDokumen lengkap telah disahkan secara digital oleh Direksi PT. DSTech Smart Perkasa.\n`;
@@ -27438,6 +27445,56 @@ export default function AdminFinanceERPPage() {
                           >
                             <ExternalLink className="w-3 h-3" />
                             <span>Buka SPH</span>
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Tombol Tautan Download Dokumen Cepat untuk Purchase Order (PO) */}
+            {(sendDocModal.docType?.toUpperCase() === "PO" || sendDocModal.docType?.toUpperCase() === "PURCHASE_ORDER" || (sendDocModal.docNumber || "").toUpperCase().startsWith("PO") || (sendDocModal.docTitle || "").toLowerCase().includes("purchase order") || (sendDocModal.docTitle || "").toLowerCase().includes("pembelian")) && (
+              <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/90 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                    <Download className="w-4 h-4 text-amber-700" />
+                    <span>Tautan Dokumen Resmi Purchase Order (PO):</span>
+                  </span>
+                  <span className="text-[10px] text-amber-700 font-bold">Siap Kirim ke Supplier / Vendor</span>
+                </div>
+                <div className="pt-1">
+                  {(() => {
+                    const portal = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
+                    const enc = encodeURIComponent(sendDocModal.docNumber);
+                    const poUrl = `${portal}/api/finance/print?doc=po&no=${enc}`;
+
+                    return (
+                      <div className="p-2.5 bg-white rounded-xl border border-amber-200 shadow-2xs flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <span className="text-xs font-black text-slate-800 block truncate">📄 Purchase Order (PO Pengadaan Material)</span>
+                          <span className="text-[10px] text-slate-400 font-mono block truncate">{sendDocModal.docNumber}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyContent(poUrl, "Link Purchase Order (PO)")}
+                            className="py-1.5 px-3 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            title="Salin Link PO"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>Salin Link</span>
+                          </button>
+                          <a
+                            href={poUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer shadow-xs transition-colors"
+                            title="Buka / Unduh Lembar PO"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Buka PO</span>
                           </a>
                         </div>
                       </div>
