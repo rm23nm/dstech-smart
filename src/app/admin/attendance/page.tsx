@@ -426,7 +426,10 @@ export default function AdminAttendancePage() {
     setLoading(true);
     try {
       const [resAtt, resUsers, resPayroll, resContracts, resFinance] = await Promise.all([
-        fetch("/api/employee/attendance"),
+        fetch(`/api/employee/attendance?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+        }),
         fetch("/api/users"),
         fetch("/api/payroll"),
         fetch("/api/contracts"),
@@ -471,6 +474,22 @@ export default function AdminAttendancePage() {
 
   useEffect(() => {
     fetchData();
+
+    // Listener sinkronisasi absensi real-time
+    const handleAttendanceSync = () => {
+      fetchData();
+    };
+
+    window.addEventListener("dstech_attendance_updated", handleAttendanceSync);
+    window.addEventListener("storage", (ev) => {
+      if (ev.key === "dstech_last_attendance_sync") {
+        fetchData();
+      }
+    });
+
+    return () => {
+      window.removeEventListener("dstech_attendance_updated", handleAttendanceSync);
+    };
   }, []);
 
   // Distinct list of employees from attendance + system users

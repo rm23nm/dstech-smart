@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_attendance.json");
 const USERS_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
 
@@ -121,10 +124,19 @@ function writeAttendance(data: any) {
 
 export async function GET() {
   const data = readAttendance();
-  return NextResponse.json({
-    success: true,
-    ...data,
-  });
+  return NextResponse.json(
+    {
+      success: true,
+      ...data,
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    }
+  );
 }
 
 function getWIBDateStr(d: Date = new Date()): string {

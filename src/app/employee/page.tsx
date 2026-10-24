@@ -905,7 +905,10 @@ export default function EmployeeDashboard() {
         const [resTasks, resInv, resAtt, resAnn, resKms, resFin, resReports] = await Promise.all([
           fetch("/api/employee/tasks"),
           fetch("/api/employee/inventory"),
-          fetch("/api/employee/attendance"),
+          fetch(`/api/employee/attendance?t=${Date.now()}`, {
+            cache: "no-store",
+            headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+          }),
           fetch("/api/employee/announcements"),
           fetch("/api/kms"),
           fetch("/api/finance"),
@@ -952,6 +955,32 @@ export default function EmployeeDashboard() {
       }
     }
     loadData();
+
+    // Listener sinkronisasi absensi real-time
+    const handleAttendanceSync = () => {
+      fetch(`/api/employee/attendance?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && Array.isArray(d.attendance)) {
+            setAttendanceLogs(d.attendance);
+          }
+        })
+        .catch(() => {});
+    };
+
+    window.addEventListener("dstech_attendance_updated", handleAttendanceSync);
+    window.addEventListener("storage", (ev) => {
+      if (ev.key === "dstech_last_attendance_sync") {
+        handleAttendanceSync();
+      }
+    });
+
+    return () => {
+      window.removeEventListener("dstech_attendance_updated", handleAttendanceSync);
+    };
   }, []);
 
   // Handler ambil koordinat GPS terkini teknisi
@@ -1871,7 +1900,20 @@ export default function EmployeeDashboard() {
 
       if (res.ok) {
         const d = await res.json();
-        setAttendanceLogs((prev) => [d.data, ...prev.filter((p) => p.date !== d.data.date)]);
+        setAttendanceLogs((prev) => [
+          d.data,
+          ...prev.filter(
+            (p) =>
+              p.id !== d.data.id &&
+              !(p.date === d.data.date && p.employeeName?.trim().toLowerCase() === d.data.employeeName?.trim().toLowerCase())
+          ),
+        ]);
+        if (typeof window !== "undefined") {
+          try {
+            window.dispatchEvent(new CustomEvent("dstech_attendance_updated", { detail: d.data }));
+            localStorage.setItem("dstech_last_attendance_sync", Date.now().toString());
+          } catch {}
+        }
         showToast("✓ Absen Masuk berhasil terverifikasi GPS & Foto Selfie!");
         stopCamera();
         setIsCheckInModalOpen(false);
@@ -1933,7 +1975,20 @@ export default function EmployeeDashboard() {
 
       if (res.ok) {
         const d = await res.json();
-        setAttendanceLogs((prev) => [d.data, ...prev.filter((p) => p.date !== d.data.date)]);
+        setAttendanceLogs((prev) => [
+          d.data,
+          ...prev.filter(
+            (p) =>
+              p.id !== d.data.id &&
+              !(p.date === d.data.date && p.employeeName?.trim().toLowerCase() === d.data.employeeName?.trim().toLowerCase())
+          ),
+        ]);
+        if (typeof window !== "undefined") {
+          try {
+            window.dispatchEvent(new CustomEvent("dstech_attendance_updated", { detail: d.data }));
+            localStorage.setItem("dstech_last_attendance_sync", Date.now().toString());
+          } catch {}
+        }
         showToast("✓ Absen Pulang berhasil terverifikasi GPS & Foto Selfie!");
         stopCamera();
         setIsCheckOutModalOpen(false);

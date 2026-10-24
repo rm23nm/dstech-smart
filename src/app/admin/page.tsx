@@ -147,14 +147,17 @@ export default function AdminDashboard() {
     return dates;
   };
 
-  // Load Admin User Session & Today's Attendance
+  // Load Admin User Session & Today's Attendance (Anti-Cache & Real-time)
   const loadAdminAttendance = async (userName?: string, userEmail?: string) => {
     try {
       const targetName = (userName || adminUser?.name || "Super Admin DStech").trim().toLowerCase();
       const targetEmail = (userEmail || adminUser?.email || "admin@dstechsmart.com").trim().toLowerCase();
       const validDates = getTodayDateStrings();
 
-      const res = await fetch("/api/employee/attendance");
+      const res = await fetch(`/api/employee/attendance?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+      });
       const json = await res.json();
       if (json.success && Array.isArray(json.attendance)) {
         const match = json.attendance.find((a: any) => {
@@ -165,11 +168,14 @@ export default function AdminDashboard() {
           const matchName =
             aName === targetName ||
             (targetName.includes("admin") && aName.includes("admin")) ||
-            targetName.replace(/\s+/g, "") === aName.replace(/\s+/g, "");
+            targetName.replace(/\s+/g, "") === aName.replace(/\s+/g, "") ||
+            (targetName && aName && (targetName.includes(aName) || aName.includes(targetName)));
           const matchEmail = targetEmail && aEmail && aEmail === targetEmail;
           return Boolean(matchName || matchEmail);
         });
-        setTodayAttendance(match || null);
+        if (match) {
+          setTodayAttendance(match);
+        }
       }
     } catch (e) {
       console.error("Gagal load absensi admin:", e);
@@ -177,23 +183,40 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    let currentAuthUser = { name: "Super Admin DStech", role: "SUPERADMIN", email: "admin@dstechsmart.com" };
     if (typeof window !== "undefined") {
       try {
         const raw = localStorage.getItem("dstech_admin_auth");
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && (parsed.name || parsed.email)) {
-            setAdminUser(parsed);
-            loadAdminAttendance(parsed.name, parsed.email);
-            return;
+            currentAuthUser = parsed;
           }
         }
       } catch (err) {
         console.error(err);
       }
-      const fallback = { name: "Super Admin DStech", role: "SUPERADMIN", email: "admin@dstechsmart.com" };
-      setAdminUser(fallback);
-      loadAdminAttendance(fallback.name, fallback.email);
+      setAdminUser(currentAuthUser);
+      loadAdminAttendance(currentAuthUser.name, currentAuthUser.email);
+
+      // Listener sinkronisasi absensi real-time antar tab & komponen
+      const handleAttendanceSync = (e: any) => {
+        if (e?.detail) {
+          setTodayAttendance(e.detail);
+        }
+        loadAdminAttendance(currentAuthUser.name, currentAuthUser.email);
+      };
+
+      window.addEventListener("dstech_attendance_updated", handleAttendanceSync);
+      window.addEventListener("storage", (ev) => {
+        if (ev.key === "dstech_last_attendance_sync") {
+          loadAdminAttendance(currentAuthUser.name, currentAuthUser.email);
+        }
+      });
+
+      return () => {
+        window.removeEventListener("dstech_attendance_updated", handleAttendanceSync);
+      };
     }
   }, []);
 
@@ -370,6 +393,14 @@ export default function AdminDashboard() {
       if (json.success) {
         if (json.data) {
           setTodayAttendance(json.data);
+          if (typeof window !== "undefined") {
+            try {
+              window.dispatchEvent(new CustomEvent("dstech_attendance_updated", { detail: json.data }));
+              localStorage.setItem("dstech_last_attendance_sync", Date.now().toString());
+            } catch (evErr) {
+              console.warn(evErr);
+            }
+          }
         }
         alert(`✓ Presensi ${attendanceMode === "checkin" ? "Masuk" : "Pulang"} berhasil dicatat!`);
         closeAttendanceModal();
