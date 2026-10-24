@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -43,6 +43,7 @@ import {
   Briefcase,
   FileSignature,
   Loader2,
+  Lock,
 } from "lucide-react";
 
 interface DamagedItem {
@@ -251,6 +252,28 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
   return Math.round(R * c);
 }
 
+function getTodayWibDate(): string {
+  const now = new Date();
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+function getCurrentWibTime(): string {
+  const now = new Date();
+  return (
+    now.toLocaleTimeString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }) + " WIB"
+  );
+}
+
 export default function EmployeeDashboard() {
   const router = useRouter();
 
@@ -278,6 +301,63 @@ export default function EmployeeDashboard() {
     targetHours: 160,
     presenceDays: 21,
   });
+
+  // Filter Proyek PT: Hanya tampilkan jika nama/email user ada di tim personil atau PIC (Tugas 138)
+  const myAssignedProjects = useMemo(() => {
+    if (!currentUser) return [];
+    const isSuperOrAdmin = currentUser.role === "SUPERADMIN" || currentUser.role === "ADMIN";
+    const uName = (currentUser.name || "").toLowerCase().trim();
+    const uEmail = (currentUser.email || "").toLowerCase().trim();
+    const uPhone = (currentUser.phone || "").replace(/\D/g, "");
+
+    return (projectsList || []).filter((p: any) => {
+      if (p.status === "Completed" || p.status === "Cancelled") return false;
+      if (isSuperOrAdmin) return true;
+
+      // Cek PIC Proyek
+      const pic = (p.picProject || p.picName || "").toLowerCase().trim();
+      if (pic && (pic.includes(uName) || uName.includes(pic))) return true;
+      if (p.picEmail && p.picEmail.toLowerCase().trim() === uEmail) return true;
+
+      // Cek tim personil assignedEmployees
+      if (Array.isArray(p.assignedEmployees)) {
+        return p.assignedEmployees.some((emp: any) => {
+          if (typeof emp === "string") {
+            const empLower = emp.toLowerCase().trim();
+            return empLower.includes(uName) || uName.includes(empLower) || empLower === uEmail;
+          }
+          if (emp && typeof emp === "object") {
+            const empName = (emp.name || emp.employeeName || "").toLowerCase().trim();
+            const empEmail = (emp.email || emp.employeeEmail || "").toLowerCase().trim();
+            const empPhone = String(emp.phone || "").replace(/\D/g, "");
+            if (empName && (empName.includes(uName) || uName.includes(empName))) return true;
+            if (empEmail && empEmail === uEmail) return true;
+            if (uPhone && empPhone && (uPhone.endsWith(empPhone) || empPhone.endsWith(uPhone))) return true;
+          }
+          return false;
+        });
+      }
+      return false;
+    });
+  }, [projectsList, currentUser]);
+
+  // Filter Tiket Toko / Maintenance: Hanya tampilkan jika user ditugaskan sebagai teknisi / PIC (Tugas 138)
+  const myAssignedTasks = useMemo(() => {
+    if (!currentUser) return [];
+    const isSuperOrAdmin = currentUser.role === "SUPERADMIN" || currentUser.role === "ADMIN";
+    const uName = (currentUser.name || "").toLowerCase().trim();
+    const uPhone = (currentUser.phone || "").replace(/\D/g, "");
+
+    return (tasks || []).filter((t: EmployeeTask) => {
+      if (isSuperOrAdmin) return true;
+      const tech = (t.technician || "").toLowerCase().trim();
+      if (tech && (tech.includes(uName) || uName.includes(tech))) return true;
+      const tPhone = (t.technicianPhone || "").replace(/\D/g, "");
+      if (uPhone && tPhone && (uPhone.endsWith(tPhone) || tPhone.endsWith(uPhone))) return true;
+      if ((t as any).assignedTo && String((t as any).assignedTo).toLowerCase().includes(uName)) return true;
+      return false;
+    });
+  }, [tasks, currentUser]);
 
   // Filter states
   const [taskFilter, setTaskFilter] = useState<string>("Semua");
@@ -403,16 +483,22 @@ export default function EmployeeDashboard() {
   const [newScopeItemInput, setNewScopeItemInput] = useState<string>("");
   const [newEquipmentItemInput, setNewEquipmentItemInput] = useState<string>("");
 
-  // Modal State Pelaporan Kerja Harian Teknisi
+  // Modal State Pelaporan Kerja Harian Teknisi (Tugas 137 & 138)
   const [isDailyReportModalOpen, setIsDailyReportModalOpen] = useState<boolean>(false);
   const [isSubmittingDailyReport, setIsSubmittingDailyReport] = useState<boolean>(false);
   const [dailyReportForm, setDailyReportForm] = useState({
-    date: new Date().toISOString().split("T")[0],
+    date: getTodayWibDate(),
+    reportTime: "",
+    selectedJobKey: "NON_PROJECT",
+    jobType: "NON_PROJECT" as "PROJECT_PT" | "MAINTENANCE_TOKO" | "NON_PROJECT",
     taskId: "",
+    projectId: "",
+    projectCode: "",
+    projectName: "",
     ticketNumber: "",
-    taskTitle: "",
-    clientName: "",
-    location: "",
+    taskTitle: "Kegiatan Rutin Kantor / Standby Internal (Non-Project & Maintenance)",
+    clientName: "PT. DSTech Smart Perkasa (Internal)",
+    location: "Kantor DSTech Cilegon / Workshop",
     activityDescription: "",
     progressPercentage: 50,
     blockers: "",
@@ -948,23 +1034,123 @@ export default function EmployeeDashboard() {
     }));
   };
 
-  // Handler Buka & Kirim Laporan Kegiatan Harian Teknisi (Tugas 135)
-  const handleOpenDailyReportModal = (task?: EmployeeTask) => {
-    const today = new Date().toISOString().split("T")[0];
-    setDailyReportForm({
-      date: today,
-      taskId: (task ? task.id : tasks[0]?.id) || "",
-      ticketNumber: (task ? task.ticketNumber : tasks[0]?.ticketNumber) || "",
-      taskTitle: (task ? task.title : tasks[0]?.title) || "Pekerjaan Lapangan / Workshop",
-      clientName: (task ? task.client : tasks[0]?.client) || "Klien Umum",
-      location: (task ? task.location : tasks[0]?.location) || "",
-      activityDescription: "",
-      progressPercentage: task && task.status === "Completed" ? 100 : 50,
-      blockers: "",
-      nextAction: "",
-      statusAfter: task ? task.status : "In Progress",
-      photos: [],
-    });
+  // Handler Buka & Kirim Laporan Kegiatan Harian Teknisi (Tugas 137 & 138)
+  const handleOpenDailyReportModal = (task?: EmployeeTask, project?: any) => {
+    const today = getTodayWibDate();
+    const currentTime = getCurrentWibTime();
+
+    if (task) {
+      setDailyReportForm({
+        date: today,
+        reportTime: currentTime,
+        selectedJobKey: `task_${task.id}`,
+        jobType: "MAINTENANCE_TOKO",
+        taskId: task.id,
+        projectId: "",
+        projectCode: "",
+        projectName: "",
+        ticketNumber: task.ticketNumber || "",
+        taskTitle: task.title || "Pekerjaan Tiket Maintenance",
+        clientName: task.client || "Klien Toko",
+        location: task.location || "",
+        activityDescription: "",
+        progressPercentage: task.status === "Completed" ? 100 : 50,
+        blockers: "",
+        nextAction: "",
+        statusAfter: task.status || "In Progress",
+        photos: [],
+      });
+    } else if (project) {
+      setDailyReportForm({
+        date: today,
+        reportTime: currentTime,
+        selectedJobKey: `prj_${project.id}`,
+        jobType: "PROJECT_PT",
+        taskId: "",
+        projectId: project.id,
+        projectCode: project.projectCode || "",
+        projectName: project.projectName || "",
+        ticketNumber: "",
+        taskTitle: project.projectName || "Proyek PT DSTech",
+        clientName: project.clientName || "Klien PT",
+        location: project.clientAddress || "Area Lapangan Proyek PT",
+        activityDescription: "",
+        progressPercentage: project.status === "Completed" ? 100 : 50,
+        blockers: "",
+        nextAction: "",
+        statusAfter: project.status || "In Progress",
+        photos: [],
+      });
+    } else {
+      // Default: utamakan Proyek PT jika ada, atau Tiket Toko jika ada, atau Non-Project
+      if (myAssignedProjects.length > 0) {
+        const prj = myAssignedProjects[0];
+        setDailyReportForm({
+          date: today,
+          reportTime: currentTime,
+          selectedJobKey: `prj_${prj.id}`,
+          jobType: "PROJECT_PT",
+          taskId: "",
+          projectId: prj.id,
+          projectCode: prj.projectCode || "",
+          projectName: prj.projectName || "",
+          ticketNumber: "",
+          taskTitle: prj.projectName || "Proyek PT DSTech",
+          clientName: prj.clientName || "Klien PT",
+          location: prj.clientAddress || "Area Lapangan Proyek PT",
+          activityDescription: "",
+          progressPercentage: prj.status === "Completed" ? 100 : 50,
+          blockers: "",
+          nextAction: "",
+          statusAfter: prj.status || "In Progress",
+          photos: [],
+        });
+      } else if (myAssignedTasks.length > 0) {
+        const t = myAssignedTasks[0];
+        setDailyReportForm({
+          date: today,
+          reportTime: currentTime,
+          selectedJobKey: `task_${t.id}`,
+          jobType: "MAINTENANCE_TOKO",
+          taskId: t.id,
+          projectId: "",
+          projectCode: "",
+          projectName: "",
+          ticketNumber: t.ticketNumber || "",
+          taskTitle: t.title || "Pekerjaan Tiket Maintenance",
+          clientName: t.client || "Klien Toko",
+          location: t.location || "",
+          activityDescription: "",
+          progressPercentage: t.status === "Completed" ? 100 : 50,
+          blockers: "",
+          nextAction: "",
+          statusAfter: t.status || "In Progress",
+          photos: [],
+        });
+      } else {
+        // Kegiatan Non-Project & Non-Maintenance (Rutin Toko / Internal)
+        setDailyReportForm({
+          date: today,
+          reportTime: currentTime,
+          selectedJobKey: "NON_PROJECT",
+          jobType: "NON_PROJECT",
+          taskId: "",
+          projectId: "",
+          projectCode: "",
+          projectName: "",
+          ticketNumber: "",
+          taskTitle: "Kegiatan Rutin Kantor / Standby Internal (Non-Project & Maintenance)",
+          clientName: "PT. DSTech Smart Perkasa (Internal)",
+          location: "Kantor DSTech Cilegon / Workshop",
+          activityDescription: "",
+          progressPercentage: 100,
+          blockers: "",
+          nextAction: "",
+          statusAfter: "Completed",
+          photos: [],
+        });
+      }
+    }
     setIsDailyReportModalOpen(true);
   };
 
@@ -977,11 +1163,14 @@ export default function EmployeeDashboard() {
 
     try {
       setIsSubmittingDailyReport(true);
+      // Selalu sertakan jam real-time saat klik kirim
+      const latestReportTime = getCurrentWibTime();
       const res = await fetch("/api/employee/daily-reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...dailyReportForm,
+          reportTime: latestReportTime,
           employeeId: currentUser?.id || "",
           employeeName: currentUser?.name || "Teknisi Lapangan",
           employeeEmail: currentUser?.email || "",
@@ -990,7 +1179,7 @@ export default function EmployeeDashboard() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        showToast("✓ Laporan Kegiatan Harian Berhasil Disimpan & Disinkronisasikan ke Proyek!");
+        showToast("✓ Laporan Kegiatan Harian Berhasil Disimpan & Terverifikasi Sistem!");
         if (data.data) {
           setDailyReports((prev) => [data.data, ...prev]);
         }
@@ -1001,7 +1190,7 @@ export default function EmployeeDashboard() {
                 ? {
                     ...t,
                     status: dailyReportForm.statusAfter as any,
-                    report: `${t.report ? t.report + "\n\n" : ""}[${dailyReportForm.date}] (${dailyReportForm.progressPercentage}%): ${dailyReportForm.activityDescription}`,
+                    report: `${t.report ? t.report + "\n\n" : ""}[${dailyReportForm.date} ${latestReportTime}] (${dailyReportForm.progressPercentage}%): ${dailyReportForm.activityDescription}`,
                   }
                 : t
             )
@@ -5874,68 +6063,162 @@ export default function EmployeeDashboard() {
 
             {/* Form */}
             <form onSubmit={handleSubmitDailyReport} className="space-y-4">
-              {/* Proyek / Tugas Terkait */}
+              {/* Proyek / Tugas Terkait (PT, Toko, atau Non-Project) */}
               <div>
                 <label className="text-xs font-bold text-slate-700 block mb-1">
                   Pekerjaan / Proyek Terkait:
                 </label>
                 <select
-                  value={dailyReportForm.taskId}
+                  value={dailyReportForm.selectedJobKey}
                   onChange={(e) => {
-                    const selected = tasks.find((t) => t.id === e.target.value);
-                    setDailyReportForm((prev) => ({
-                      ...prev,
-                      taskId: e.target.value,
-                      ticketNumber: selected?.ticketNumber || "",
-                      taskTitle: selected?.title || prev.taskTitle,
-                      clientName: selected?.client || prev.clientName,
-                      location: selected?.location || prev.location,
-                      statusAfter: selected?.status || prev.statusAfter,
-                    }));
+                    const val = e.target.value;
+                    if (val.startsWith("prj_")) {
+                      const prjId = val.replace("prj_", "");
+                      const prj = myAssignedProjects.find((p: any) => p.id === prjId);
+                      setDailyReportForm((prev) => ({
+                        ...prev,
+                        selectedJobKey: val,
+                        jobType: "PROJECT_PT",
+                        projectId: prj?.id || "",
+                        projectCode: prj?.projectCode || "",
+                        projectName: prj?.projectName || "",
+                        taskId: "",
+                        ticketNumber: "",
+                        taskTitle: prj?.projectName || prev.taskTitle,
+                        clientName: prj?.clientName || prev.clientName,
+                        location: prj?.clientAddress || "Area Lapangan Proyek PT",
+                        statusAfter: prj?.status || "In Progress",
+                      }));
+                    } else if (val.startsWith("task_")) {
+                      const taskId = val.replace("task_", "");
+                      const t = myAssignedTasks.find((item: any) => item.id === taskId);
+                      setDailyReportForm((prev) => ({
+                        ...prev,
+                        selectedJobKey: val,
+                        jobType: "MAINTENANCE_TOKO",
+                        taskId: t?.id || "",
+                        ticketNumber: t?.ticketNumber || "",
+                        projectId: "",
+                        projectCode: "",
+                        projectName: "",
+                        taskTitle: t?.title || prev.taskTitle,
+                        clientName: t?.client || prev.clientName,
+                        location: t?.location || prev.location,
+                        statusAfter: t?.status || "In Progress",
+                      }));
+                    } else {
+                      // Non-Project / Maintenance Rutin Toko / Internal
+                      setDailyReportForm((prev) => ({
+                        ...prev,
+                        selectedJobKey: "NON_PROJECT",
+                        jobType: "NON_PROJECT",
+                        taskId: "",
+                        ticketNumber: "",
+                        projectId: "",
+                        projectCode: "",
+                        projectName: "",
+                        taskTitle: "Kegiatan Rutin Kantor / Standby Internal (Non-Project & Maintenance)",
+                        clientName: "PT. DSTech Smart Perkasa (Internal)",
+                        location: "Kantor DSTech Cilegon / Workshop",
+                        statusAfter: "Completed",
+                      }));
+                    }
                   }}
                   className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                 >
-                  <option value="">-- Pekerjaan Lapangan / Workshop Umum --</option>
-                  {tasks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      [{t.ticketNumber}] {t.title} — {t.client}
-                    </option>
-                  ))}
+                  <option value="NON_PROJECT">
+                    📝 Laporan Kegiatan Harian Umum (Non-Project & Maintenance / Tugas Standby Internal)
+                  </option>
+
+                  {myAssignedProjects.length > 0 && (
+                    <optgroup label="🏢 Proyek PT (PT. DSTech Smart Perkasa)">
+                      {myAssignedProjects.map((p: any) => (
+                        <option key={p.id} value={`prj_${p.id}`}>
+                          [{p.projectCode}] {p.projectName} — {p.clientName}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+
+                  {myAssignedTasks.length > 0 && (
+                    <optgroup label="🏪 Tiket Pekerjaan Toko / Maintenance">
+                      {myAssignedTasks.map((t: any) => (
+                        <option key={t.id} value={`task_${t.id}`}>
+                          [{t.ticketNumber}] {t.title} — {t.client}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Hanya menampilkan pekerjaan di mana Anda ditugaskan sebagai PIC atau personil tim. Jika tidak ada tugas khusus, pilih opsi Tugas Standby Internal.
+                </p>
               </div>
 
-              {/* Tanggal & Progres */}
+              {/* Tanggal Kegiatan & Jam Pelaporan (Otomatis & Terkunci) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Tanggal Kegiatan:</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Tanggal Kegiatan:</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-slate-400" /> Terkunci
+                    </span>
+                  </div>
                   <input
                     type="date"
                     value={dailyReportForm.date}
-                    onChange={(e) => setDailyReportForm((prev) => ({ ...prev, date: e.target.value }))}
-                    className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    readOnly
+                    disabled
+                    className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-100/90 text-xs font-bold text-slate-600 cursor-not-allowed select-none shadow-inner"
                     required
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">Otomatis hari ini & tidak dapat diubah (Anti-Manipulasi).</p>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-slate-700">Persentase Progres Kerja:</label>
-                    <span className="text-xs font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg">
-                      {dailyReportForm.progressPercentage}%
+                    <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Jam Pelaporan (WIB):</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-emerald-600" /> Real-time
                     </span>
                   </div>
                   <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={dailyReportForm.progressPercentage}
-                    onChange={(e) =>
-                      setDailyReportForm((prev) => ({ ...prev, progressPercentage: Number(e.target.value) }))
-                    }
-                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600 mt-2"
+                    type="text"
+                    value={dailyReportForm.reportTime}
+                    readOnly
+                    disabled
+                    className="w-full p-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 text-xs font-black text-emerald-800 cursor-not-allowed select-none shadow-inner"
+                    placeholder="09:25 WIB"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">Waktu riil sistem saat pelaporan dibuat.</p>
                 </div>
+              </div>
+
+              {/* Persentase Progres Kerja */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-700">Persentase Progres Kerja:</label>
+                  <span className="text-xs font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg">
+                    {dailyReportForm.progressPercentage}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={dailyReportForm.progressPercentage}
+                  onChange={(e) =>
+                    setDailyReportForm((prev) => ({ ...prev, progressPercentage: Number(e.target.value) }))
+                  }
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600 mt-2"
+                />
               </div>
 
               {/* Status Akhir */}

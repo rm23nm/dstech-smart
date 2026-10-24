@@ -79,10 +79,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const wibDateStr = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Jakarta",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(now);
+
+    const wibTimeStr = new Intl.DateTimeFormat("id-ID", {
+      timeZone: "Asia/Jakarta",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(now) + " WIB";
+
+    const jobType = body.jobType || (body.projectId ? "PROJECT_PT" : body.taskId ? "MAINTENANCE_TOKO" : "NON_PROJECT");
+
     const newReport = {
       id: `dstech_report_${Date.now()}`,
-      date: body.date || todayStr,
+      date: body.date || wibDateStr,
+      reportTime: body.reportTime || wibTimeStr,
+      jobType: jobType,
       employeeId: body.employeeId || "",
       employeeName: body.employeeName?.trim() || "Teknisi Lapangan",
       employeeEmail: body.employeeEmail?.trim() || "",
@@ -93,9 +111,9 @@ export async function POST(request: Request) {
       workHours: body.workHours?.trim() || "1 Hari Penuh (08:00 - 17:00 WIB)",
       taskId: body.taskId || "",
       ticketNumber: body.ticketNumber || "",
-      taskTitle: body.taskTitle?.trim() || body.projectName || "Pekerjaan Lapangan / Workshop",
-      clientName: body.clientName?.trim() || "Klien Umum",
-      location: body.location?.trim() || "",
+      taskTitle: body.taskTitle?.trim() || (jobType === "NON_PROJECT" ? "Kegiatan Rutin Kantor / Standby Internal (Non-Project & Maintenance)" : body.projectName || "Pekerjaan Lapangan / Workshop"),
+      clientName: body.clientName?.trim() || (jobType === "NON_PROJECT" ? "PT. DSTech Smart Perkasa (Internal)" : "Klien Umum"),
+      location: body.location?.trim() || (jobType === "NON_PROJECT" ? "Kantor DSTech Cilegon / Workshop" : ""),
       activityDescription: body.activityDescription.trim(),
       progressPercentage: Number(body.progressPercentage) || 0,
       blockers: body.blockers?.trim() || "",
