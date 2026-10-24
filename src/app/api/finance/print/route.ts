@@ -65,6 +65,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const docType = (searchParams.get("doc") || "invoice").toLowerCase();
   const docNo = (searchParams.get("no") || searchParams.get("id") || "").trim();
+  const receiptNo = (searchParams.get("receipt") || searchParams.get("receiptNo") || searchParams.get("payId") || "").trim();
 
   const data = readFinanceData();
   const generalSettings = readGeneralSettings();
@@ -912,6 +913,7 @@ export async function GET(req: Request) {
   const encNo = encodeURIComponent(sale.invoiceNumber);
   const tabs = [
     { id: "invoice", label: "📄 Faktur Penjualan", active: docType === "invoice" },
+    { id: "receipt", label: "🧾 Kuitansi Pembayaran", active: docType === "receipt" || docType === "kwitansi" },
     { id: "bast", label: "📝 Berita Acara (BAST)", active: docType === "bast" },
     { id: "delivery", label: "🚚 Surat Jalan", active: docType === "delivery" },
     { id: "photos", label: "📸 Dokumentasi Foto", active: docType === "photos" },
@@ -921,7 +923,182 @@ export async function GET(req: Request) {
   let documentContent = "";
   let documentTitle = `Faktur Penjualan - ${sale.invoiceNumber}`;
 
-  if (docType === "bast") {
+  if (docType === "receipt" || docType === "kwitansi") {
+    const payments: any[] = Array.isArray(sale.payments) ? sale.payments : [];
+    let selectedPayment = payments.find((p: any) => p.receiptNumber === receiptNo || p.id === receiptNo);
+    if (!selectedPayment && payments.length > 0) {
+      selectedPayment = payments[payments.length - 1];
+    }
+
+    const romanMonths = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+    const invDateObj = sale.date ? new Date(sale.date) : new Date();
+    const romanMonth = romanMonths[invDateObj.getMonth()] || "X";
+    const curYear = invDateObj.getFullYear();
+    const invClean = sale.invoiceNumber ? sale.invoiceNumber.replace(/^INV-/, "").replace(/[^a-zA-Z0-9]/g, "") : "001";
+    const fallbackReceiptNo = `KW/DSP/${romanMonth}/${curYear}/${invClean}`;
+
+    const receiptNumberDisplay = selectedPayment?.receiptNumber || fallbackReceiptNo;
+    const paidNominal = Number(selectedPayment?.amount || (sale.paidAmount > 0 ? sale.paidAmount : (sale.invoiceType === "DP" ? sale.dpAmount : sale.grandTotal)) || 0);
+    const receiptDateDisplay = selectedPayment?.paymentDate || sale.date || new Date().toISOString().split("T")[0];
+    const receiptMethodDisplay = selectedPayment?.paymentMethod || sale.paymentMethod || defaultBank.bankName;
+    const isFullPaid = sale.paymentStatus === "Lunas" || sale.remainingAmount === 0;
+    const isDpPhase = sale.invoiceType === "DP" && !isFullPaid;
+
+    const receiptPurpose = selectedPayment?.notes || (
+      isDpPhase
+        ? `Pembayaran Uang Muka (DP ${sale.dpPercentage || 50}%) atas Faktur ${sale.invoiceNumber} - Pengadaan & Instalasi IT / Security System`
+        : isFullPaid
+        ? `Pelunasan Pembayaran Penuh atas Faktur ${sale.invoiceNumber} - Pengadaan & Instalasi IT / Security System`
+        : `Pembayaran Angsuran / Termin atas Faktur ${sale.invoiceNumber}`
+    );
+
+    const terbilangReceipt = angkaKeTerbilang(paidNominal) + " Rupiah";
+    documentTitle = `Kuitansi_Pembayaran_${receiptNumberDisplay.replace(/[^a-zA-Z0-9_-]/g, "_")}_${(sale.customerName || "").replace(/[^a-zA-Z0-9]/g, "_")}`;
+
+    documentContent = `
+      <!-- LEMBAR KUITANSI PEMBAYARAN RESMI (OFFICIAL PAYMENT RECEIPT) -->
+      <div class="border-b-2 border-slate-900 pb-3 flex justify-between items-start">
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-xl font-black text-slate-900 tracking-wider uppercase">KUITANSI PEMBAYARAN</h2>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+              isFullPaid
+                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                : 'bg-amber-100 text-amber-800 border border-amber-300'
+            }">
+              ${isFullPaid ? '✓ LUNAS (PAID)' : 'UANG MUKA / SEBAGIAN'}
+            </span>
+          </div>
+          <p class="text-xs font-mono font-bold text-indigo-700 mt-1">NO: ${receiptNumberDisplay}</p>
+          <p class="text-[11px] text-slate-500">Lampiran Faktur Referensi: <strong>${sale.invoiceNumber}</strong></p>
+        </div>
+        <div class="text-right text-xs space-y-1">
+          <p><span class="text-slate-500">Tanggal Kuitansi:</span> <strong class="text-slate-900 font-bold">${receiptDateDisplay}</strong></p>
+          <p><span class="text-slate-500">Metode Bayar:</span> <strong class="text-slate-800 font-semibold">${receiptMethodDisplay}</strong></p>
+          <p><span class="text-slate-500">Kode Verifikasi:</span> <strong class="font-mono text-[11px] text-slate-700">${sale.verificationCode || 'DSP-VERIFIED'}</strong></p>
+        </div>
+      </div>
+
+      <!-- Pilihan Riwayat Kuitansi jika ada lebih dari 1 pembayaran -->
+      ${payments.length > 1 ? `
+        <div class="p-2.5 rounded-xl bg-slate-100 border border-slate-200 flex flex-wrap items-center gap-2 text-xs print:hidden">
+          <span class="font-bold text-slate-700">Pilih Pembayaran:</span>
+          ${payments.map((p: any, idx: number) => `
+            <a
+              href="/api/finance/print?doc=receipt&no=${encNo}&receiptNo=${encodeURIComponent(p.receiptNumber || p.id)}"
+              class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                (selectedPayment?.id === p.id || selectedPayment?.receiptNumber === p.receiptNumber)
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+              }"
+            >
+              #${idx + 1}: ${p.receiptNumber} (${formatRupiah(p.amount)})
+            </a>
+          `).join("")}
+        </div>
+      ` : ''}
+
+      <!-- Badan Utama Formulir Kuitansi Standar Korporat -->
+      <div class="py-4 space-y-4 text-xs">
+        <!-- Baris 1: Telah Diterima Dari -->
+        <div class="grid grid-cols-12 gap-2 py-2 border-b border-slate-200 items-baseline">
+          <div class="col-span-3 font-bold text-slate-500 uppercase tracking-wider text-[11px]">
+            Telah Diterima Dari
+          </div>
+          <div class="col-span-9">
+            <span class="text-sm font-black text-slate-900">${sale.customerName}</span>
+            ${sale.customerPic ? `<span class="text-xs text-indigo-700 font-bold ml-2">(Up. ${sale.customerPic})</span>` : ''}
+            ${sale.customerAddress ? `<p class="text-slate-600 text-[11px] mt-0.5">${sale.customerAddress}</p>` : ''}
+          </div>
+        </div>
+
+        <!-- Baris 2: Uang Sejumlah (Terbilang Huruf) -->
+        <div class="grid grid-cols-12 gap-2 py-2.5 border-b border-slate-200 items-center">
+          <div class="col-span-3 font-bold text-slate-500 uppercase tracking-wider text-[11px]">
+            Uang Sejumlah
+          </div>
+          <div class="col-span-9">
+            <div class="p-3 rounded-xl bg-slate-100/90 border border-slate-300 text-slate-900 font-serif italic font-bold text-xs leading-relaxed tracking-wide shadow-2xs">
+              # ${terbilangReceipt} #
+            </div>
+          </div>
+        </div>
+
+        <!-- Baris 3: Untuk Pembayaran -->
+        <div class="grid grid-cols-12 gap-2 py-2.5 border-b border-slate-200 items-baseline">
+          <div class="col-span-3 font-bold text-slate-500 uppercase tracking-wider text-[11px]">
+            Untuk Pembayaran
+          </div>
+          <div class="col-span-9 space-y-1.5">
+            <p class="font-bold text-slate-900 text-xs leading-relaxed">${receiptPurpose}</p>
+            ${(sale.items || []).length > 0 ? `
+              <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+                <span class="font-bold text-slate-700 block mb-1">Rincian Item Pekerjaan / Pengadaan:</span>
+                <ul class="list-disc list-inside space-y-0.5">
+                  ${(sale.items || []).slice(0, 4).map((it: any) => `
+                    <li><strong>${it.productName || it.name}</strong> - ${it.qty} ${it.unit || 'Unit'}</li>
+                  `).join("")}
+                  ${(sale.items || []).length > 4 ? `<li>...dan ${(sale.items || []).length - 4} item lainnya tercantum di Faktur No. ${sale.invoiceNumber}</li>` : ''}
+                </ul>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Baris 4: Rekapitulasi Pembayaran Faktur (Transparan) -->
+        <div class="grid grid-cols-3 gap-3 p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-xs">
+          <div>
+            <span class="text-[10px] text-indigo-700 font-bold uppercase block tracking-wider">Total Nilai Faktur:</span>
+            <p class="font-black text-slate-900 text-xs mt-0.5">${formatRupiah(sale.grandTotal)}</p>
+          </div>
+          <div>
+            <span class="text-[10px] text-indigo-700 font-bold uppercase block tracking-wider">Kuitansi Pembayaran Ini:</span>
+            <p class="font-black text-indigo-700 text-xs mt-0.5">${formatRupiah(paidNominal)}</p>
+          </div>
+          <div>
+            <span class="text-[10px] text-indigo-700 font-bold uppercase block tracking-wider">Sisa Tagihan Faktur:</span>
+            <p class="font-black ${sale.remainingAmount > 0 ? 'text-amber-700' : 'text-emerald-700'} text-xs mt-0.5">
+              ${sale.remainingAmount > 0 ? formatRupiah(sale.remainingAmount) : 'Rp 0 (LUNAS)'}
+            </p>
+          </div>
+        </div>
+
+        <!-- Baris 5: Kotak Jumlah Nominal & Tanda Tangan Resmi -->
+        <div class="grid grid-cols-12 gap-4 pt-4 items-end">
+          <!-- Kotak Nominal Uang Klasik Kuitansi Indonesia -->
+          <div class="col-span-6 space-y-3">
+            <div class="inline-block p-4 rounded-2xl bg-white border-2 border-slate-900 shadow-md">
+              <span class="text-[10px] text-slate-500 font-black tracking-widest block uppercase">JUMLAH (RUPIAH):</span>
+              <div class="text-xl font-black font-mono text-slate-950 mt-1 tracking-tight">
+                ${formatRupiah(paidNominal)},-
+              </div>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[10px] text-slate-500 leading-normal space-y-0.5">
+              <p>• Pembayaran via transfer sah setelah dana efektif masuk ke rekening resmi PT. DSTech Smart Perkasa.</p>
+              <p>• Kuitansi ini dicetak melalui sistem ERP digital resmi PT. DSTech Smart Perkasa.</p>
+            </div>
+          </div>
+
+          <!-- Kolom Tanda Tangan Sah Penerima -->
+          <div class="col-span-6 text-center">
+            <p class="text-xs text-slate-600 mb-1">Cilegon, ${receiptDateDisplay}</p>
+            <p class="font-bold text-slate-900 text-xs">Penerima Resmi:</p>
+            <p class="font-black text-slate-900 text-xs">PT. DSTECH SMART PERKASA</p>
+
+            <div class="h-24 flex items-center justify-center relative my-1">
+              ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan Direktur" class="h-20 object-contain z-10" />` : ""}
+              ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Stempel Resmi" class="h-20 opacity-80 absolute" />` : ""}
+              ${!signatureImage && !masterStampUrl ? `<div class="h-16 w-32 border-b border-dashed border-slate-400"></div>` : ""}
+            </div>
+
+            <p class="font-black text-slate-950 text-xs underline">( ${signerName} )</p>
+            <p class="text-[10px] text-slate-500 font-bold">${signerTitle}</p>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (docType === "bast") {
     documentTitle = `BAST - ${sale.invoiceNumber}`;
     documentContent = `
       <!-- LEMBAR BAST -->

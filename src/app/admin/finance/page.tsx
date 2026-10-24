@@ -1900,6 +1900,7 @@ export default function AdminFinanceERPPage() {
     subject: string;
     grandTotal: number;
     subtotal?: number;
+    paidAmount?: number;
     discount?: number;
     discountLabel?: string;
     paymentStatus?: string;
@@ -1921,6 +1922,7 @@ export default function AdminFinanceERPPage() {
     subject: "",
     grandTotal: 0,
     subtotal: 0,
+    paidAmount: 0,
     discount: 0,
     discountLabel: "",
     paymentStatus: "",
@@ -1957,6 +1959,7 @@ export default function AdminFinanceERPPage() {
     subject: string;
     grandTotal: number;
     subtotal?: number;
+    paidAmount?: number;
     discount?: number;
     discountLabel?: string;
     paymentStatus?: string;
@@ -1980,6 +1983,7 @@ export default function AdminFinanceERPPage() {
       subject: params.subject,
       grandTotal: params.grandTotal,
       subtotal: params.subtotal || 0,
+      paidAmount: params.paidAmount || 0,
       discount: params.discount || 0,
       discountLabel: params.discountLabel || "",
       paymentStatus: params.paymentStatus || "",
@@ -2056,6 +2060,9 @@ export default function AdminFinanceERPPage() {
       waText += `📝 *2. Berita Acara Serah Terima (BAST):*\n${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n\n`;
       waText += `🚚 *3. Surat Jalan Material (Delivery Order):*\n${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n\n`;
       waText += `📸 *4. Laporan Foto Dokumentasi & Part:*\n${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n`;
+      if ((doc.paidAmount && doc.paidAmount > 0) || doc.paymentStatus === "Lunas" || doc.paymentStatus === "Sebagian") {
+        waText += `🧾 *5. Kuitansi Pembayaran Sah:*\n${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n`;
+      }
 
       waText += `\n💳 *Rekening Resmi Pembayaran Transfer:*\n`;
       const defaultBank = bankAccounts.find((b) => b.isDefault) || bankAccounts[0];
@@ -2094,8 +2101,11 @@ export default function AdminFinanceERPPage() {
       emailBody += `• Faktur Penjualan: ${portalUrl}/api/finance/print?doc=invoice&no=${encodedNo}\n`;
       emailBody += `• Berita Acara (BAST): ${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n`;
       emailBody += `• Surat Jalan: ${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n`;
-      emailBody += `• Foto Dokumentasi: ${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n\n`;
-      emailBody += `Instruksi Pembayaran Transfer Rekening Perusahaan:\n`;
+      emailBody += `• Foto Dokumentasi: ${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n`;
+      if ((doc.paidAmount && doc.paidAmount > 0) || doc.paymentStatus === "Lunas" || doc.paymentStatus === "Sebagian") {
+        emailBody += `• Kuitansi Pembayaran Sah: ${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n`;
+      }
+      emailBody += `\nInstruksi Pembayaran Transfer Rekening Perusahaan:\n`;
       bankAccounts.filter((b) => b.status === "Aktif").forEach((acc) => {
         emailBody += `- Bank: ${acc.bankName} | No. Rek: ${acc.accountNumber} | a/n: ${acc.accountHolder} (${acc.branch})\n`;
       });
@@ -4713,8 +4723,15 @@ export default function AdminFinanceERPPage() {
       if (result.success) {
         showToast(result.message || "Pembayaran berhasil dibukukan ke kas masuk!");
         setIsPayInvoiceModalOpen(false);
+        const invNo = selectedInvoiceForPayment.invoiceNumber;
+        const receiptNo = result.receipt?.receiptNumber || "";
         setSelectedInvoiceForPayment(null);
         fetchFinanceData();
+
+        // Tawarkan untuk langsung membuka dan mencetak Kuitansi Pembayaran resmi untuk klien
+        if (typeof window !== "undefined" && window.confirm(`Pembayaran berhasil dicatat dengan Kuitansi No. ${receiptNo || 'Resmi'}.\n\nApakah Anda ingin langsung membuka dan mencetak Kuitansi Pembayaran untuk klien?`)) {
+          window.open(`/api/finance/print?doc=receipt&no=${encodeURIComponent(invNo)}&receiptNo=${encodeURIComponent(receiptNo)}`, '_blank');
+        }
       } else {
         showToast(result.error || "Gagal membukukan pembayaran");
       }
@@ -8435,6 +8452,18 @@ export default function AdminFinanceERPPage() {
                               className="p-2 rounded-xl bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
                             >
                               <Printer className="w-4 h-4" />
+                            </button>
+
+                            {/* Cetak Kuitansi Pembayaran Sah (Kop Resmi DSTech) */}
+                            <button
+                              onClick={() => {
+                                window.open(`/api/finance/print?doc=receipt&no=${encodeURIComponent(sale.invoiceNumber)}`, "_blank");
+                              }}
+                              title="Cetak Kuitansi Pembayaran Sah (Kop Resmi DSTech)"
+                              className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                            >
+                              <Receipt className="w-3.5 h-3.5" />
+                              <span className="hidden xl:inline">Kuitansi</span>
                             </button>
 
                             {/* Kirim Faktur via WhatsApp */}
@@ -13852,6 +13881,21 @@ export default function AdminFinanceERPPage() {
                   >
                     <CreditCard className="w-3.5 h-3.5" />
                     <span>+ Input Bayar</span>
+                  </button>
+                )}
+
+                {/* Tombol Cetak Kuitansi Pembayaran Resmi di Toolbar Cetak */}
+                {(Number(selectedInvoiceForPrint.paidAmount) > 0 || selectedInvoiceForPrint.paymentStatus === "Lunas") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(`/api/finance/print?doc=receipt&no=${encodeURIComponent(selectedInvoiceForPrint.invoiceNumber)}`, "_blank");
+                    }}
+                    title="Buka & Cetak Kuitansi Pembayaran Sah (Kop Resmi DSTech)"
+                    className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center gap-1.5 shadow cursor-pointer transition-all"
+                  >
+                    <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Cetak Kuitansi</span>
                   </button>
                 )}
 

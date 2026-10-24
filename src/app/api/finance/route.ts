@@ -676,10 +676,35 @@ export async function POST(request: Request) {
       invoice.remainingAmount = newRemaining;
       invoice.paymentStatus = newPaymentStatus;
 
-      // Catat ke Arus Kas
-      if (!data.cash_flow) data.cash_flow = [];
+      // Catat ke Riwayat Kuitansi Resmi Faktur (invoice.payments)
+      if (!Array.isArray(invoice.payments)) invoice.payments = [];
+      const allPaymentsCount = (data.sales || []).reduce((acc: number, s: any) => acc + (Array.isArray(s.payments) ? s.payments.length : 0), 0);
+      const romanMonths = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+      const payDateObj = paymentDate ? new Date(paymentDate) : new Date();
+      const romanMonth = romanMonths[payDateObj.getMonth()] || "X";
+      const payYear = payDateObj.getFullYear();
+      const receiptNumber = `KW/DSP/${romanMonth}/${payYear}/${String(allPaymentsCount + 1).padStart(3, "0")}`;
+
       const isDpPayment = invoice.invoiceType === "DP" && newPaidAmount <= (Number(invoice.dpAmount) || 0);
       const isTerminPayment = invoice.invoiceType === "Termin";
+
+      const paymentRecord = {
+        id: `dstech_pay_${Date.now()}`,
+        receiptNumber,
+        amount: amountToPay,
+        paymentDate: paymentDate || new Date().toISOString().split("T")[0],
+        paymentMethod: paymentMethod || invoice.paymentMethod,
+        notes: notes || `Penerimaan Pembayaran Faktur ${invoice.invoiceNumber}`,
+        terminId: terminId || null,
+        terminName: targetTerminName || null,
+        paymentType: isTerminPayment ? targetTerminName || "Termin" : isDpPayment ? "Uang Muka (DP)" : "Pelunasan",
+        remainingAfter: newRemaining,
+        createdAt: new Date().toISOString(),
+      };
+      invoice.payments.push(paymentRecord);
+
+      // Catat ke Arus Kas
+      if (!data.cash_flow) data.cash_flow = [];
       const cashCategory = isDpPayment
         ? "Uang Muka Penjualan"
         : isTerminPayment
@@ -694,7 +719,7 @@ export async function POST(request: Request) {
         amount: amountToPay,
         account: formatAccountFromPaymentMethod(paymentMethod || invoice.paymentMethod, data),
         reference: invoice.invoiceNumber,
-        description: `Penerimaan ${isTerminPayment ? targetTerminName || "Termin" : isDpPayment ? "DP" : "Pelunasan"} ${invoice.invoiceNumber} - ${invoice.customerName} (${notes || "Pembayaran Masuk"})`,
+        description: `Penerimaan ${isTerminPayment ? targetTerminName || "Termin" : isDpPayment ? "DP" : "Pelunasan"} ${invoice.invoiceNumber} - ${invoice.customerName} (${notes || "Pembayaran Masuk"}) [Kuitansi: ${receiptNumber}]`,
         balanceAfter: 0,
         businessEntity: invoice.businessEntity || "PT",
       });
@@ -702,8 +727,9 @@ export async function POST(request: Request) {
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
-        message: `Pembayaran sebesar Rp ${amountToPay.toLocaleString("id-ID")} berhasil dibukukan untuk faktur ${invoice.invoiceNumber}`,
+        message: `Pembayaran sebesar Rp ${amountToPay.toLocaleString("id-ID")} berhasil dibukukan dengan Kuitansi No. ${receiptNumber}`,
         data: invoice,
+        receipt: paymentRecord,
       });
     }
 
