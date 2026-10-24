@@ -43,6 +43,7 @@ import {
   createFullPermissions,
   createEmptyPermissions,
   summarizePermissions,
+  DSTECH_ROLES,
 } from "@/utils/dstech_permissions";
 
 interface UserItem {
@@ -123,6 +124,10 @@ export default function AdminUsersPage() {
 
   // Permissions Modal States
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
+  const [modalTargetType, setModalTargetType] = useState<"ROLE" | "USER">("ROLE");
+  const [activeRoleTab, setActiveRoleTab] = useState<string>("EMPLOYEE");
+  const [rolePermissionsData, setRolePermissionsData] = useState<Record<string, any>>({});
+  const [roleUserCounts, setRoleUserCounts] = useState<Record<string, number>>({});
   const [permissionUser, setPermissionUser] = useState<UserItem | null>(null);
   const [editingPermissions, setEditingPermissions] = useState<UserPermissions>({});
   const [isSavingPermissions, setIsSavingPermissions] = useState(false);
@@ -184,8 +189,23 @@ export default function AdminUsersPage() {
     }
   };
 
+  // Fetch role permissions terpusat
+  const fetchRolePermissions = async () => {
+    try {
+      const res = await fetch("/api/roles/permissions");
+      const json = await res.json();
+      if (json.success) {
+        setRolePermissionsData(json.data || {});
+        setRoleUserCounts(json.userCounts || {});
+      }
+    } catch (err) {
+      console.error("Gagal memuat role permissions:", err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
+    fetchRolePermissions();
   }, []);
 
   // Filtered users
@@ -221,12 +241,62 @@ export default function AdminUsersPage() {
     setIsDeleteModalOpen(true);
   };
 
-  // Open Permissions Modal
+  // Open Role Permissions Modal (Kelola Peran Terpusat)
+  const openRolePermissionsModal = (roleKey: string = "EMPLOYEE") => {
+    setModalTargetType("ROLE");
+    setActiveRoleTab(roleKey);
+    setPermissionUser(null);
+
+    const roleData = rolePermissionsData[roleKey]?.permissions || getDefaultPermissionsByRole(roleKey);
+    const base: UserPermissions = JSON.parse(JSON.stringify(roleData));
+
+    for (const m of DSTECH_SYSTEM_MENUS) {
+      if (!base[m.id]) {
+        base[m.id] = {
+          view: false,
+          create: false,
+          edit: false,
+          delete: false,
+          print: false,
+          send: false,
+        };
+      }
+    }
+    setEditingPermissions(base);
+    setActiveCategoryFilter("ALL");
+    setPermissionSearch("");
+    setIsPermissionsModalOpen(true);
+  };
+
+  // Switch role tab inside modal
+  const selectRoleInModal = (roleKey: string) => {
+    setActiveRoleTab(roleKey);
+    const roleData = rolePermissionsData[roleKey]?.permissions || getDefaultPermissionsByRole(roleKey);
+    const base: UserPermissions = JSON.parse(JSON.stringify(roleData));
+
+    for (const m of DSTECH_SYSTEM_MENUS) {
+      if (!base[m.id]) {
+        base[m.id] = {
+          view: false,
+          create: false,
+          edit: false,
+          delete: false,
+          print: false,
+          send: false,
+        };
+      }
+    }
+    setEditingPermissions(base);
+  };
+
+  // Open Permissions Modal for Individual User
   const openPermissionsModal = (u: UserItem) => {
+    setModalTargetType("USER");
+    setActiveRoleTab(u.role);
     setPermissionUser(u);
     const base: UserPermissions = u.permissions
       ? JSON.parse(JSON.stringify(u.permissions))
-      : getDefaultPermissionsByRole(u.role);
+      : rolePermissionsData[u.role]?.permissions || getDefaultPermissionsByRole(u.role);
 
     // Pastikan seluruh menu dari master ada di object
     for (const m of DSTECH_SYSTEM_MENUS) {
@@ -356,43 +426,101 @@ export default function AdminUsersPage() {
     }
   };
 
-  // Simpan Hak Akses ke Database via API
+  // Simpan Hak Akses (Mode Peran Terpusat atau User Individual)
   const handleSavePermissions = async () => {
-    if (!permissionUser) return;
     try {
       setIsSavingPermissions(true);
-      const res = await fetch("/api/users", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: permissionUser.id,
-          permissions: editingPermissions,
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        showToast("success", `Hak akses & permissions untuk ${permissionUser.name} berhasil disimpan!`);
-        setUsers((prev) =>
-          prev.map((u) =>
-            u.id === permissionUser.id ? { ...u, permissions: editingPermissions } : u
-          )
-        );
-        // Sinkronisasi local auth jika admin mengedit izin akun sendiri
-        if (typeof window !== "undefined") {
-          const authRaw = localStorage.getItem("dstech_admin_auth");
-          if (authRaw) {
-            try {
-              const authParsed = JSON.parse(authRaw);
-              if (authParsed.id === permissionUser.id || authParsed.email === permissionUser.email) {
-                authParsed.permissions = editingPermissions;
-                localStorage.setItem("dstech_admin_auth", JSON.stringify(authParsed));
-              }
-            } catch {}
+
+      if (modalTargetType === "ROLE") {
+        // Simpan ke API Peran terpusat & otomatis sinkronkan seluruh user dengan peran terkait
+        const res = await fetch("/api/roles/permissions", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: activeRoleTab,
+            permissions: editingPermissions,
+          }),
+        });
+        const json = await res.json();
+
+        if (json.success) {
+          showToast(
+            "success",
+            json.message || `Hak akses peran ${activeRoleTab} berhasil disimpan dan disinkronkan!`
+          );
+
+          // Update local state role permissions map
+          setRolePermissionsData((prev) => ({
+            ...prev,
+            [activeRoleTab]: {
+              ...(prev[activeRoleTab] || {}),
+              permissions: editingPermissions,
+              updatedAt: new Date().toISOString(),
+            },
+          }));
+
+          // Sinkronkan seluruh user di state tabel yang memiliki role ini
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.role === activeRoleTab ? { ...u, permissions: editingPermissions } : u
+            )
+          );
+
+          // Sinkronkan local storage jika akun login saat ini memiliki role yang sama
+          if (typeof window !== "undefined") {
+            const authRaw = localStorage.getItem("dstech_admin_auth");
+            if (authRaw) {
+              try {
+                const authParsed = JSON.parse(authRaw);
+                if (authParsed.role === activeRoleTab) {
+                  authParsed.permissions = editingPermissions;
+                  localStorage.setItem("dstech_admin_auth", JSON.stringify(authParsed));
+                }
+              } catch {}
+            }
           }
+
+          setIsPermissionsModalOpen(false);
+          fetchUsers();
+          fetchRolePermissions();
+        } else {
+          showToast("error", json.message || "Gagal menyimpan hak akses peran.");
         }
-        setIsPermissionsModalOpen(false);
       } else {
-        showToast("error", json.message || "Gagal menyimpan hak akses pengguna.");
+        // Mode User Individual
+        if (!permissionUser) return;
+        const res = await fetch("/api/users", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: permissionUser.id,
+            permissions: editingPermissions,
+          }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          showToast("success", `Hak akses & permissions untuk ${permissionUser.name} berhasil disimpan!`);
+          setUsers((prev) =>
+            prev.map((u) =>
+              u.id === permissionUser.id ? { ...u, permissions: editingPermissions } : u
+            )
+          );
+          if (typeof window !== "undefined") {
+            const authRaw = localStorage.getItem("dstech_admin_auth");
+            if (authRaw) {
+              try {
+                const authParsed = JSON.parse(authRaw);
+                if (authParsed.id === permissionUser.id || authParsed.email === permissionUser.email) {
+                  authParsed.permissions = editingPermissions;
+                  localStorage.setItem("dstech_admin_auth", JSON.stringify(authParsed));
+                }
+              } catch {}
+            }
+          }
+          setIsPermissionsModalOpen(false);
+        } else {
+          showToast("error", json.message || "Gagal menyimpan hak akses pengguna.");
+        }
       }
     } catch (err) {
       showToast("error", "Terjadi kesalahan jaringan saat menyimpan hak akses.");
@@ -577,21 +705,32 @@ export default function AdminUsersPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setFormName("");
-            setFormEmail("");
-            setFormPhone("");
-            setFormRole("EMPLOYEE");
-            setFormStatus("ACTIVE");
-            setIsAddModalOpen(true);
-          }}
-          id="btn-add-user"
-          className="inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-dstech-blue text-white font-bold text-xs uppercase tracking-wider hover:bg-blue-700 shadow-xl shadow-blue-500/25 transition-all self-start md:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Tambah Pengguna</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => openRolePermissionsModal("EMPLOYEE")}
+            id="btn-manage-role-permissions"
+            className="inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-dstech-blue text-white font-bold text-xs uppercase tracking-wider hover:shadow-indigo-500/30 hover:opacity-95 shadow-xl shadow-indigo-600/25 transition-all self-start md:self-auto cursor-pointer border border-indigo-400/20"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Kelola Hak Akses Per Peran (Role Manager)</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setFormName("");
+              setFormEmail("");
+              setFormPhone("");
+              setFormRole("EMPLOYEE");
+              setFormStatus("ACTIVE");
+              setIsAddModalOpen(true);
+            }}
+            id="btn-add-user"
+            className="inline-flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-dstech-blue text-white font-bold text-xs uppercase tracking-wider hover:bg-blue-700 shadow-xl shadow-blue-500/25 transition-all self-start md:self-auto cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Tambah Pengguna</span>
+          </button>
+        </div>
       </div>
 
       {/* Summary KPI Cards */}
@@ -646,6 +785,72 @@ export default function AdminUsersPage() {
           </div>
           <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Status Aktif</p>
           <h3 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">{activeCount} Akun</h3>
+        </div>
+      </div>
+
+      {/* Role Access Quick Selector Bar */}
+      <div className="p-6 rounded-3xl bg-gradient-to-r from-indigo-900 via-slate-900 to-slate-950 text-white shadow-xl border border-indigo-800/30">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-black tracking-tight text-white flex items-center gap-2">
+                Hak Akses Berbasis Peran Terpusat
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 font-bold uppercase tracking-wider">
+                  Auto Sync Role
+                </span>
+              </h2>
+              <p className="text-xs text-indigo-200/70 mt-0.5">
+                Cukup atur izin pada peran (Role) sekali, seluruh karyawan & staf ber-peran tersebut akan otomatis tersinkronisasi!
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-slate-400 self-start lg:self-auto">
+            Klik tombol &quot;Atur Izin Peran&quot; untuk mengedit hak akses massal
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {DSTECH_ROLES.map((r) => {
+            const count = roleUserCounts[r.role] || users.filter((u) => u.role === r.role).length;
+            const perms = rolePermissionsData[r.role]?.permissions || getDefaultPermissionsByRole(r.role);
+            const sum = summarizePermissions(perms, r.role);
+
+            return (
+              <div
+                key={r.role}
+                className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${r.badge}`}>
+                      {r.role}
+                    </span>
+                    <span className="text-[11px] font-bold text-indigo-200">
+                      {count} Akun
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-bold text-white group-hover:text-indigo-200 transition-colors">
+                    {r.label}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 mt-1 line-clamp-1">
+                    {sum.activeLabel}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => openRolePermissionsModal(r.role)}
+                  className="mt-3 w-full py-2 px-3 rounded-xl bg-white/10 hover:bg-indigo-600 text-white font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-white/10 hover:border-indigo-500 shadow-sm"
+                >
+                  <Sliders className="w-3 h-3 text-indigo-300" />
+                  <span>Atur Izin Peran</span>
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -801,12 +1006,12 @@ export default function AdminUsersPage() {
                               <div>
                                 <button
                                   type="button"
-                                  onClick={() => openPermissionsModal(user)}
+                                  onClick={() => openRolePermissionsModal(user.role)}
                                   className="inline-flex items-center gap-1 text-[11px] font-bold text-dstech-blue hover:text-blue-800 transition-colors cursor-pointer group/btn"
-                                  title="Atur Hak Akses Menu & Aksi Granular"
+                                  title={`Atur Hak Akses Seluruh Pengguna Ber-peran ${user.role}`}
                                 >
-                                  <Key className="w-3 h-3 group-hover/btn:scale-110 transition-transform text-amber-500" />
-                                  <span className="underline decoration-dotted underline-offset-2">Kelola Izin & Aksi</span>
+                                  <Sliders className="w-3 h-3 group-hover/btn:scale-110 transition-transform text-indigo-600" />
+                                  <span className="underline decoration-dotted underline-offset-2">Ubah Izin Peran ({user.role})</span>
                                 </button>
                               </div>
                             </div>
@@ -1645,8 +1850,8 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Modal Matriks Hak Akses & Role User Manager */}
-      {isPermissionsModalOpen && permissionUser && (
+      {/* Modal Matriks Hak Akses & Role User Manager (Terpusat Per Peran / User) */}
+      {isPermissionsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto bg-slate-900/70 backdrop-blur-md">
           <div
             className="fixed inset-0"
@@ -1662,21 +1867,30 @@ export default function AdminUsersPage() {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg sm:text-xl font-black text-slate-900">
-                      Matriks Hak Akses & Permissions
+                      {modalTargetType === "ROLE"
+                        ? "Pengaturan Hak Akses Per Peran (Role Manager)"
+                        : "Matriks Hak Akses Pengguna"}
                     </h3>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-200">
-                      Role Manager
+                      {modalTargetType === "ROLE" ? "Otomatis Semua Pengguna" : "Kustom Pengguna"}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <span className="font-bold text-slate-800 text-sm">{permissionUser.name}</span>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-xs text-slate-500 font-mono">{permissionUser.email}</span>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
-                      Role: {ROLE_CONFIG[permissionUser.role]?.label || permissionUser.role}
-                    </span>
-                  </div>
+
+                  {modalTargetType === "ROLE" ? (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Pilih peran di bawah. Perubahan izin akan langsung tersinkronisasi otomatis ke semua pengguna dengan peran ini.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <span className="font-bold text-slate-800 text-sm">{permissionUser?.name}</span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-xs text-slate-500 font-mono">{permissionUser?.email}</span>
+                      <span className="text-slate-300">•</span>
+                      <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                        Role: {permissionUser?.role ? ROLE_CONFIG[permissionUser.role]?.label || permissionUser.role : ""}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1689,6 +1903,55 @@ export default function AdminUsersPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Role Switcher Tabs (Aktif saat mode ROLE) */}
+            {modalTargetType === "ROLE" && (
+              <div className="px-5 py-3 bg-slate-100/70 border-b border-slate-200/80 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-500 mr-2">
+                  Pilih Peran:
+                </span>
+                {DSTECH_ROLES.map((r) => {
+                  const isActive = activeRoleTab === r.role;
+                  const count = roleUserCounts[r.role] || users.filter((u) => u.role === r.role).length;
+                  return (
+                    <button
+                      key={r.role}
+                      type="button"
+                      onClick={() => selectRoleInModal(r.role)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                        isActive
+                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25 ring-2 ring-indigo-600 ring-offset-1"
+                          : "bg-white text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200"
+                      }`}
+                    >
+                      <span>{r.label}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                          isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {count} Akun
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Banner Otomatis Role */}
+            {modalTargetType === "ROLE" && (
+              <div className="px-5 py-2.5 bg-indigo-50/70 border-b border-indigo-100 flex items-center justify-between text-xs text-indigo-900">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>
+                    Mengedit hak akses untuk peran <strong>{ROLE_CONFIG[activeRoleTab]?.label || activeRoleTab}</strong>. Perubahan akan langsung disinkronkan ke <strong>{roleUserCounts[activeRoleTab] || users.filter((u) => u.role === activeRoleTab).length} pengguna</strong>.
+                  </span>
+                </div>
+                <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-wider hidden md:inline">
+                  Inherited by Role
+                </span>
+              </div>
+            )}
 
             {/* Presets Bar */}
             <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -1895,7 +2158,8 @@ export default function AdminUsersPage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse" />
                 <p className="text-xs text-slate-600 font-medium">
                   {(() => {
-                    const summary = summarizePermissions(editingPermissions, permissionUser.role);
+                    const currentRole = modalTargetType === "ROLE" ? activeRoleTab : permissionUser?.role || "EMPLOYEE";
+                    const summary = summarizePermissions(editingPermissions, currentRole);
                     return (
                       <span>
                         Total menu aktif: <strong className="text-slate-900 font-bold">{summary.viewCount}</strong> dari {summary.totalMenus} menu sistem.
@@ -1925,7 +2189,11 @@ export default function AdminUsersPage() {
                   ) : (
                     <ShieldCheck className="w-4 h-4" />
                   )}
-                  <span>Simpan Hak Akses Pengguna</span>
+                  <span>
+                    {modalTargetType === "ROLE"
+                      ? "Simpan Izin Peran (" + activeRoleTab + ") & Sinkronkan Semua"
+                      : "Simpan Hak Akses Pengguna"}
+                  </span>
                 </button>
               </div>
             </div>

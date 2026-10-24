@@ -363,3 +363,75 @@ export function summarizePermissions(
     activeLabel,
   };
 }
+
+export interface RoleDefinition {
+  role: string;
+  label: string;
+  color: string;
+  badge: string;
+  desc: string;
+}
+
+export const DSTECH_ROLES: RoleDefinition[] = [
+  {
+    role: "SUPERADMIN",
+    label: "Super Administrator",
+    color: "purple",
+    badge: "bg-purple-100 text-purple-700 border-purple-200",
+    desc: "Akses penuh tanpa batas ke seluruh modul, sistem & otoritas tertinggi",
+  },
+  {
+    role: "ADMIN",
+    label: "Administrator",
+    color: "blue",
+    badge: "bg-blue-100 text-blue-700 border-blue-200",
+    desc: "Manajerial operasional, inventaris, produk, keuangan & tim",
+  },
+  {
+    role: "EMPLOYEE",
+    label: "Karyawan / Teknisi Lapangan",
+    color: "amber",
+    badge: "bg-amber-100 text-amber-700 border-amber-200",
+    desc: "Maintenance CCTV, absensi mandiri, request barang & SOP KMS",
+  },
+  {
+    role: "AFFILIATE",
+    label: "Mitra / Affiliate",
+    color: "emerald",
+    badge: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    desc: "Portal referral mitra, promosi e-katalog & komisi affiliate",
+  },
+  {
+    role: "CLIENT",
+    label: "Klien Korporat",
+    color: "slate",
+    badge: "bg-slate-100 text-slate-700 border-slate-200",
+    desc: "Monitoring progres proyek, portofolio & katalog solusi",
+  },
+];
+
+/**
+ * Mengambil hak akses efektif pengguna, mengutamakan perannya jika userPermissions belum dikustomisasi
+ */
+export function resolveUserEffectivePermissions(
+  userPermissions?: UserPermissions | null,
+  userRole?: string | null,
+  rolePermissionsMap?: Record<string, any> | null
+): UserPermissions {
+  const roleKey = (userRole || "EMPLOYEE").toUpperCase();
+  if (roleKey === "SUPERADMIN") return createFullPermissions();
+
+  // Jika ada peta rolePermissions dari server/cache
+  if (rolePermissionsMap && rolePermissionsMap[roleKey]?.permissions) {
+    return rolePermissionsMap[roleKey].permissions;
+  }
+
+  // Jika ada user-level permission
+  if (userPermissions && Object.keys(userPermissions).length > 0) {
+    return userPermissions;
+  }
+
+  // Fallback default peran
+  return getDefaultPermissionsByRole(roleKey);
+}
+
