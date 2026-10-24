@@ -1439,6 +1439,27 @@ export default function AdminFinanceERPPage() {
   const [assignFormSelectedRole, setAssignFormSelectedRole] = useState<string>("Teknisi Skill");
   const [assignFormNotes, setAssignFormNotes] = useState<string>("");
 
+  // State Log Kegiatan Harian Teknisi (Per Personil) & Laporan Progress Klien oleh PIC (Tugas 135)
+  const [dailyReports, setDailyReports] = useState<any[]>([]);
+  const [selectedTechnicianForLogs, setSelectedTechnicianForLogs] = useState<{
+    member: ProjectAssignedEmployee;
+    project: ProjectItem;
+    logs: any[];
+  } | null>(null);
+  const [isPicProgressModalOpen, setIsPicProgressModalOpen] = useState<boolean>(false);
+  const [isSubmittingPicProgress, setIsSubmittingPicProgress] = useState<boolean>(false);
+  const [picProgressForm, setPicProgressForm] = useState({
+    date: new Date().toISOString().split("T")[0],
+    picName: "",
+    progressPercentage: 50,
+    summaryForClient: "",
+    milestoneStatus: "Fase 2: Instalasi & Penarikan Kabel",
+    clientNotes: "",
+    nextSteps: "",
+    photos: [] as any[],
+  });
+  const [selectedReportForClientPrint, setSelectedReportForClientPrint] = useState<any | null>(null);
+
   // Master Warehouse Modal State
   const [isWarehouseModalOpen, setIsWarehouseModalOpen] = useState<boolean>(false);
   const [editingWarehouse, setEditingWarehouse] = useState<WarehouseItem | null>(null);
@@ -2542,12 +2563,21 @@ export default function AdminFinanceERPPage() {
   const fetchFinanceData = async () => {
     try {
       setIsLoading(true);
-      const [res, prodRes, contractRes, tasksRes] = await Promise.all([
+      const [res, prodRes, contractRes, tasksRes, dailyReportsRes] = await Promise.all([
         fetch("/api/finance"),
         fetch("/api/products"),
         fetch("/api/contracts"),
         fetch("/api/employee/tasks"),
+        fetch("/api/employee/daily-reports"),
       ]);
+      if (dailyReportsRes && dailyReportsRes.ok) {
+        const drData = await dailyReportsRes.json();
+        if (drData && Array.isArray(drData.data)) {
+          setDailyReports(drData.data);
+        } else if (Array.isArray(drData)) {
+          setDailyReports(drData);
+        }
+      }
       if (tasksRes && tasksRes.ok) {
         const tData = await tasksRes.json();
         if (Array.isArray(tData)) {
@@ -17870,6 +17900,156 @@ export default function AdminFinanceERPPage() {
                         </table>
                       </div>
                     )}
+
+                    {/* Tugas Lapangan Tim Proyek Ini */}
+                    <div className="mt-6 pt-4 border-t border-slate-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="font-black text-slate-800 text-sm flex items-center gap-1.5">
+                            <Briefcase className="w-4 h-4 text-amber-600" />
+                            <span>Tugas & Penugasan Lapangan (Modul Employee Tasks)</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-500">
+                            Daftar tiket tugas teknis yang sedang dikerjakan atau telah diselesaikan oleh personil proyek.
+                          </p>
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const projectTasks = employeeTasks.filter((t: any) =>
+                          t.projectId === prj.id ||
+                          t.projectCode === prj.projectCode ||
+                          (t.projectName && prj.projectName && t.projectName.toLowerCase().includes(prj.projectName.toLowerCase())) ||
+                          (prj.assignedEmployees || []).some((emp: any) =>
+                            emp.employeeName && t.assignedTo && emp.employeeName.toLowerCase().includes(t.assignedTo.toLowerCase())
+                          )
+                        );
+
+                        if (projectTasks.length === 0) {
+                          return (
+                            <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                              <p className="font-semibold text-slate-500">Belum ada tiket tugas lapangan tercatat untuk proyek ini.</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Tiket tugas yang dibuat di modul Karyawan / Employee Tasks akan otomatis muncul di sini.</p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="overflow-x-auto rounded-xl border border-slate-200">
+                            <table className="w-full text-left bg-white text-xs">
+                              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                                <tr>
+                                  <th className="p-2.5">No. Tiket</th>
+                                  <th className="p-2.5">Judul Tugas</th>
+                                  <th className="p-2.5">Teknisi / PIC</th>
+                                  <th className="p-2.5">Prioritas</th>
+                                  <th className="p-2.5">Status</th>
+                                  <th className="p-2.5">Batas Waktu</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {projectTasks.map((t: any) => (
+                                  <tr key={t.id} className="hover:bg-slate-50/70">
+                                    <td className="p-2.5 font-mono font-bold text-indigo-600">{t.ticketNumber || t.id}</td>
+                                    <td className="p-2.5 font-medium text-slate-800">{t.title}</td>
+                                    <td className="p-2.5 text-slate-600 font-semibold">{t.assignedTo || "-"}</td>
+                                    <td className="p-2.5">
+                                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                        t.priority === "URGENT" || t.priority === "HIGH" ? "bg-red-50 text-red-700 border border-red-200" :
+                                        t.priority === "MEDIUM" ? "bg-amber-50 text-amber-700 border border-amber-200" :
+                                        "bg-slate-100 text-slate-600 border border-slate-200"
+                                      }`}>
+                                        {t.priority || "NORMAL"}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        t.status === "DONE" || t.status === "COMPLETED" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                                        t.status === "IN_PROGRESS" ? "bg-blue-50 text-blue-700 border border-blue-200" :
+                                        "bg-slate-100 text-slate-600 border border-slate-200"
+                                      }`}>
+                                        {t.status || "PENDING"}
+                                      </span>
+                                    </td>
+                                    <td className="p-2.5 text-slate-500">{t.dueDate || "-"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Laporan Harian Teknisi Lapangan (Daily Activity Reports) */}
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h4 className="font-black text-slate-800 text-sm flex items-center gap-1.5">
+                            <Clock className="w-4 h-4 text-emerald-600" />
+                            <span>Laporan Harian Lapangan (Daily Activity Reports)</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-500">
+                            Log aktivitas kerja, dokumentasi foto, dan jam kerja yang dilaporkan teknisi dari lapangan.
+                          </p>
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const projectReports = dailyReports.filter((r: any) =>
+                          r.projectId === prj.id ||
+                          r.projectCode === prj.projectCode ||
+                          (r.projectName && prj.projectName && r.projectName.toLowerCase().includes(prj.projectName.toLowerCase())) ||
+                          (prj.assignedEmployees || []).some((emp: any) =>
+                            emp.employeeName && r.employeeName && emp.employeeName.toLowerCase().includes(r.employeeName.toLowerCase())
+                          )
+                        );
+
+                        if (projectReports.length === 0) {
+                          return (
+                            <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                              <p className="font-semibold text-slate-500">Belum ada laporan aktivitas harian teknisi yang masuk untuk proyek ini.</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Laporan harian yang disubmit teknisi melalui portal karyawan akan tersinkron otomatis ke sini.</p>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="overflow-x-auto rounded-xl border border-slate-200">
+                            <table className="w-full text-left bg-white text-xs">
+                              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                                <tr>
+                                  <th className="p-2.5">Tanggal</th>
+                                  <th className="p-2.5">Teknisi</th>
+                                  <th className="p-2.5">Ringkasan Aktivitas</th>
+                                  <th className="p-2.5">Jam Kerja</th>
+                                  <th className="p-2.5">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {projectReports.map((r: any, rIdx: number) => (
+                                  <tr key={r.id || rIdx} className="hover:bg-slate-50/70">
+                                    <td className="p-2.5 font-mono text-slate-600">{r.date || "-"}</td>
+                                    <td className="p-2.5 font-bold text-slate-800">{r.employeeName || "-"}</td>
+                                    <td className="p-2.5 text-slate-700 max-w-xs">{r.activitySummary || r.description || "-"}</td>
+                                    <td className="p-2.5 font-mono text-slate-600">{r.hoursWorked ? `${r.hoursWorked} Jam` : "-"}</td>
+                                    <td className="p-2.5">
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                        r.status === "APPROVED" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                                        r.status === "REJECTED" ? "bg-rose-50 text-rose-700 border border-rose-200" :
+                                        "bg-amber-50 text-amber-700 border border-amber-200"
+                                      }`}>
+                                        {r.status || "SUBMITTED"}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
                 )}
 

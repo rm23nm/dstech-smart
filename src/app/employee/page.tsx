@@ -41,6 +41,8 @@ import {
   Image as ImageIcon,
   Building,
   Briefcase,
+  FileSignature,
+  Loader2,
 } from "lucide-react";
 
 interface DamagedItem {
@@ -133,6 +135,26 @@ interface MaterialRequest {
   date: string;
   status: string;
   notes: string;
+}
+
+interface DailyReportItem {
+  id: string;
+  date: string;
+  employeeId?: string;
+  employeeName: string;
+  employeeEmail?: string;
+  taskId?: string;
+  ticketNumber?: string;
+  taskTitle: string;
+  clientName: string;
+  location?: string;
+  activityDescription: string;
+  progressPercentage: number;
+  blockers?: string;
+  nextAction?: string;
+  photos?: TaskPhoto[];
+  statusAfter?: string;
+  createdAt?: string;
 }
 
 interface AttendanceLog {
@@ -248,6 +270,8 @@ export default function EmployeeDashboard() {
   const [overtimeLogs, setOvertimeLogs] = useState<OvertimeLog[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [kmsList, setKmsList] = useState<KmsGuideItem[]>([]);
+  const [dailyReports, setDailyReports] = useState<DailyReportItem[]>([]);
+  const [projectsList, setProjectsList] = useState<any[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({
     totalHours: 168,
     overtimeHours: 14,
@@ -379,6 +403,24 @@ export default function EmployeeDashboard() {
   const [newScopeItemInput, setNewScopeItemInput] = useState<string>("");
   const [newEquipmentItemInput, setNewEquipmentItemInput] = useState<string>("");
 
+  // Modal State Pelaporan Kerja Harian Teknisi
+  const [isDailyReportModalOpen, setIsDailyReportModalOpen] = useState<boolean>(false);
+  const [isSubmittingDailyReport, setIsSubmittingDailyReport] = useState<boolean>(false);
+  const [dailyReportForm, setDailyReportForm] = useState({
+    date: new Date().toISOString().split("T")[0],
+    taskId: "",
+    ticketNumber: "",
+    taskTitle: "",
+    clientName: "",
+    location: "",
+    activityDescription: "",
+    progressPercentage: 50,
+    blockers: "",
+    nextAction: "",
+    statusAfter: "In Progress",
+    photos: [] as TaskPhoto[],
+  });
+
   interface GeoCoords {
     lat: number;
     lng: number;
@@ -409,7 +451,6 @@ export default function EmployeeDashboard() {
   const [gpsErrorCheckIn, setGpsErrorCheckIn] = useState<string | null>(null);
 
   // Penugasan Proyek PKWT pada Absensi
-  const [projectsList, setProjectsList] = useState<any[]>([]);
   const [selectedProjectIdCheckIn, setSelectedProjectIdCheckIn] = useState<string>("");
   const [selectedProjectIdCheckOut, setSelectedProjectIdCheckOut] = useState<string>("");
 
@@ -775,13 +816,14 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [resTasks, resInv, resAtt, resAnn, resKms, resFin] = await Promise.all([
+        const [resTasks, resInv, resAtt, resAnn, resKms, resFin, resReports] = await Promise.all([
           fetch("/api/employee/tasks"),
           fetch("/api/employee/inventory"),
           fetch("/api/employee/attendance"),
           fetch("/api/employee/announcements"),
           fetch("/api/kms"),
           fetch("/api/finance"),
+          fetch("/api/employee/daily-reports"),
         ]);
 
         if (resTasks.ok) {
@@ -814,6 +856,10 @@ export default function EmployeeDashboard() {
               finData.data.projects.filter((p: any) => p.status !== "Completed" && p.status !== "Cancelled")
             );
           }
+        }
+        if (resReports && resReports.ok) {
+          const d = await resReports.json();
+          if (d.data && Array.isArray(d.data)) setDailyReports(d.data);
         }
       } catch (err) {
         console.warn("Using offline fallback data for employee portal:", err);
@@ -900,6 +946,76 @@ export default function EmployeeDashboard() {
         item.id === id ? { ...item, [field]: value } : item
       ),
     }));
+  };
+
+  // Handler Buka & Kirim Laporan Kegiatan Harian Teknisi (Tugas 135)
+  const handleOpenDailyReportModal = (task?: EmployeeTask) => {
+    const today = new Date().toISOString().split("T")[0];
+    setDailyReportForm({
+      date: today,
+      taskId: (task ? task.id : tasks[0]?.id) || "",
+      ticketNumber: (task ? task.ticketNumber : tasks[0]?.ticketNumber) || "",
+      taskTitle: (task ? task.title : tasks[0]?.title) || "Pekerjaan Lapangan / Workshop",
+      clientName: (task ? task.client : tasks[0]?.client) || "Klien Umum",
+      location: (task ? task.location : tasks[0]?.location) || "",
+      activityDescription: "",
+      progressPercentage: task && task.status === "Completed" ? 100 : 50,
+      blockers: "",
+      nextAction: "",
+      statusAfter: task ? task.status : "In Progress",
+      photos: [],
+    });
+    setIsDailyReportModalOpen(true);
+  };
+
+  const handleSubmitDailyReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!dailyReportForm.activityDescription.trim()) {
+      showToast("Uraian kegiatan pekerjaan hari ini wajib diisi!");
+      return;
+    }
+
+    try {
+      setIsSubmittingDailyReport(true);
+      const res = await fetch("/api/employee/daily-reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...dailyReportForm,
+          employeeId: currentUser?.id || "",
+          employeeName: currentUser?.name || "Teknisi Lapangan",
+          employeeEmail: currentUser?.email || "",
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast("✓ Laporan Kegiatan Harian Berhasil Disimpan & Disinkronisasikan ke Proyek!");
+        if (data.data) {
+          setDailyReports((prev) => [data.data, ...prev]);
+        }
+        if (dailyReportForm.taskId) {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === dailyReportForm.taskId
+                ? {
+                    ...t,
+                    status: dailyReportForm.statusAfter as any,
+                    report: `${t.report ? t.report + "\n\n" : ""}[${dailyReportForm.date}] (${dailyReportForm.progressPercentage}%): ${dailyReportForm.activityDescription}`,
+                  }
+                : t
+            )
+          );
+        }
+        setIsDailyReportModalOpen(false);
+      } else {
+        showToast("Gagal menyimpan laporan: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      showToast("Gagal mengirim laporan: " + err.message);
+    } finally {
+      setIsSubmittingDailyReport(false);
+    }
   };
 
   // Handler buka form pengajuan material langsung terkait tugas
@@ -2050,6 +2166,15 @@ export default function EmployeeDashboard() {
                           <span>Buat Tiket Maintenance</span>
                         </button>
 
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDailyReportModal()}
+                          className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-800 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-emerald-500/25 transition-all cursor-pointer active:scale-95"
+                        >
+                          <FileSignature className="w-4 h-4" />
+                          <span>Lapor Kegiatan Harian</span>
+                        </button>
+
                         <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl overflow-x-auto">
                           {["Semua", "In Progress", "Pending", "Completed"].map((st) => (
                             <button
@@ -2159,6 +2284,16 @@ export default function EmployeeDashboard() {
                               </button>
                               <button
                                 type="button"
+                                onClick={() => handleOpenDailyReportModal(task)}
+                                className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 transition-all flex items-center gap-1.5 cursor-pointer"
+                                title="Kirim Laporan Kegiatan Harian untuk Pekerjaan Ini"
+                              >
+                                <FileSignature className="w-3.5 h-3.5" />
+                                <span>Lapor Harian</span>
+                              </button>
+
+                              <button
+                                type="button"
                                 onClick={() => {
                                   setSelectedTask(task);
                                   setTaskStatusForm({
@@ -2181,6 +2316,98 @@ export default function EmployeeDashboard() {
                         ))
                       )}
                     </div>
+                  </div>
+
+                  {/* Widget Riwayat Laporan Kegiatan Harian Teknisi & Proyek (Tugas 135) */}
+                  <div className="bg-white p-6 sm:p-8 rounded-[36px] border border-slate-200/80 shadow-sm space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-black text-slate-900">
+                            Riwayat Laporan Kerja Harian & Proyek
+                          </h3>
+                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black">
+                            {dailyReports.length} Laporan
+                          </span>
+                        </div>
+                        <p className="text-slate-400 text-xs font-medium">
+                          Log aktivitas harian teknisi yang langsung tersinkronisasi ke pengawasan proyek & manajemen
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDailyReportModal()}
+                        className="px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md self-start sm:self-auto"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Tulis Laporan Baru</span>
+                      </button>
+                    </div>
+
+                    {dailyReports.length === 0 ? (
+                      <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                        <FileSignature className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                        <p className="text-sm font-bold text-slate-600">Belum ada laporan kegiatan harian yang dikirim</p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Klik tombol "Lapor Kegiatan Harian" di atas untuk melaporkan progres pekerjaan Anda hari ini.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {dailyReports.slice(0, 10).map((rep) => (
+                          <div
+                            key={rep.id}
+                            className="p-5 rounded-2xl bg-slate-50 border border-slate-200/70 hover:border-emerald-300 transition-all space-y-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-3">
+                              <div className="flex items-center gap-2.5">
+                                <span className="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-xs font-black">
+                                  {rep.date}
+                                </span>
+                                <h4 className="font-bold text-slate-900 text-sm">{rep.taskTitle}</h4>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-slate-500">Progres:</span>
+                                <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-black">
+                                  {rep.progressPercentage}%
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="text-xs text-slate-700 leading-relaxed font-medium bg-white p-3.5 rounded-xl border border-slate-100 whitespace-pre-wrap">
+                              {rep.activityDescription}
+                            </div>
+
+                            {(rep.blockers || rep.nextAction) && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                                {rep.blockers && (
+                                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900">
+                                    <span className="font-bold block text-[10px] uppercase tracking-wider text-amber-700 mb-0.5">
+                                      ⚠️ Kendala / Hambatan Lapangan:
+                                    </span>
+                                    <span>{rep.blockers}</span>
+                                  </div>
+                                )}
+                                {rep.nextAction && (
+                                  <div className="p-3 rounded-xl bg-blue-50 border border-blue-200/80 text-blue-900">
+                                    <span className="font-bold block text-[10px] uppercase tracking-wider text-blue-700 mb-0.5">
+                                      📌 Tindak Lanjut Besok:
+                                    </span>
+                                    <span>{rep.nextAction}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                              <span>Pelapor: <strong className="text-slate-700">{rep.employeeName}</strong></span>
+                              <span>Klien / Lokasi: <strong className="text-slate-700">{rep.clientName || "-"}</strong></span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -5609,6 +5836,223 @@ export default function EmployeeDashboard() {
                 Tutup KMS
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 11: Laporan Kegiatan Harian Teknisi Langsung ke Proyek & Manajemen (Tugas 135) */}
+      {isDailyReportModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsDailyReportModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <FileSignature className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Laporan Kegiatan Harian Proyek</h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Sinkronisasi langsung ke pengawasan proyek & manajemen PT. DSTech Smart Perkasa
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDailyReportModalOpen(false)}
+                className="w-9 h-9 rounded-xl border border-slate-200 hover:bg-slate-50 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmitDailyReport} className="space-y-4">
+              {/* Proyek / Tugas Terkait */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Pekerjaan / Proyek Terkait:
+                </label>
+                <select
+                  value={dailyReportForm.taskId}
+                  onChange={(e) => {
+                    const selected = tasks.find((t) => t.id === e.target.value);
+                    setDailyReportForm((prev) => ({
+                      ...prev,
+                      taskId: e.target.value,
+                      ticketNumber: selected?.ticketNumber || "",
+                      taskTitle: selected?.title || prev.taskTitle,
+                      clientName: selected?.client || prev.clientName,
+                      location: selected?.location || prev.location,
+                      statusAfter: selected?.status || prev.statusAfter,
+                    }));
+                  }}
+                  className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                >
+                  <option value="">-- Pekerjaan Lapangan / Workshop Umum --</option>
+                  {tasks.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      [{t.ticketNumber}] {t.title} — {t.client}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tanggal & Progres */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-700 block mb-1">Tanggal Kegiatan:</label>
+                  <input
+                    type="date"
+                    value={dailyReportForm.date}
+                    onChange={(e) => setDailyReportForm((prev) => ({ ...prev, date: e.target.value }))}
+                    className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-700">Persentase Progres Kerja:</label>
+                    <span className="text-xs font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg">
+                      {dailyReportForm.progressPercentage}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={dailyReportForm.progressPercentage}
+                    onChange={(e) =>
+                      setDailyReportForm((prev) => ({ ...prev, progressPercentage: Number(e.target.value) }))
+                    }
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600 mt-2"
+                  />
+                </div>
+              </div>
+
+              {/* Status Akhir */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Status Proyek / Tugas Terkini:</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDailyReportForm((prev) => ({ ...prev, statusAfter: "In Progress" }))}
+                    className={`py-2.5 px-4 rounded-xl border text-xs font-bold transition-all ${
+                      dailyReportForm.statusAfter === "In Progress"
+                        ? "bg-blue-50 border-blue-300 text-blue-800 ring-2 ring-blue-500/20"
+                        : "bg-slate-50 border-slate-200 text-slate-600"
+                    }`}
+                  >
+                    🛠️ Masih Berjalan (In Progress)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDailyReportForm((prev) => ({
+                        ...prev,
+                        statusAfter: "Completed",
+                        progressPercentage: 100,
+                      }))
+                    }
+                    className={`py-2.5 px-4 rounded-xl border text-xs font-bold transition-all ${
+                      dailyReportForm.statusAfter === "Completed"
+                        ? "bg-green-50 border-green-300 text-green-800 ring-2 ring-green-500/20"
+                        : "bg-slate-50 border-slate-200 text-slate-600"
+                    }`}
+                  >
+                    ✅ Selesai Total (Completed 100%)
+                  </button>
+                </div>
+              </div>
+
+              {/* Uraian Aktivitas Harian */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">
+                  Uraian Kegiatan Pekerjaan Hari Ini <span className="text-red-500">*</span>:
+                </label>
+                <textarea
+                  rows={4}
+                  value={dailyReportForm.activityDescription}
+                  onChange={(e) =>
+                    setDailyReportForm((prev) => ({ ...prev, activityDescription: e.target.value }))
+                  }
+                  placeholder="Jelaskan secara rinci apa saja yang Anda kerjakan hari ini (misal: penarikan kabel 60m, pemasangan bracket kamera 4 titik, terminasi RJ45, pengujian tampilan di monitor)..."
+                  className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed"
+                  required
+                />
+              </div>
+
+              {/* Kendala & Rencana Besok */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-amber-700 block mb-1">
+                    ⚠️ Kendala / Hambatan Lapangan (Opsional):
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={dailyReportForm.blockers}
+                    onChange={(e) => setDailyReportForm((prev) => ({ ...prev, blockers: e.target.value }))}
+                    placeholder="Contoh: Terkendala hujan lebat di area outdoor, izin akses pabrik baru terbit siang..."
+                    className="w-full p-3 rounded-xl border border-amber-200 bg-amber-50/50 text-xs text-amber-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-blue-700 block mb-1">
+                    📌 Rencana Kerja Esok Hari (Opsional):
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={dailyReportForm.nextAction}
+                    onChange={(e) => setDailyReportForm((prev) => ({ ...prev, nextAction: e.target.value }))}
+                    placeholder="Contoh: Lanjut pemasangan 2 unit kamera indoor, konfigurasi remote access smartphone..."
+                    className="w-full p-3 rounded-xl border border-blue-200 bg-blue-50/50 text-xs text-blue-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Info Pelapor */}
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
+                <span>Pelapor: <strong className="text-slate-800">{currentUser?.name || "Teknisi Lapangan"}</strong></span>
+                <span>Role: <strong className="text-slate-800">{currentUser?.role || "Teknisi"}</strong></span>
+              </div>
+
+              {/* Tombol Aksi */}
+              <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsDailyReportModalOpen(false)}
+                  className="flex-1 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDailyReport}
+                  className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-800 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/25 transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isSubmittingDailyReport ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Kirim & Sinkronkan</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

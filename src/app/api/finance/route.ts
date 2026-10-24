@@ -1609,6 +1609,49 @@ export async function PUT(request: Request) {
       });
     }
 
+    if (actionType === "project_pic_progress") {
+      const index = (data.projects || []).findIndex((p: any) => p.id === id || p.projectCode === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Proyek tidak ditemukan" }, { status: 404 });
+      }
+
+      const prj = data.projects[index];
+      if (!Array.isArray(prj.clientProgressReports)) {
+        prj.clientProgressReports = [];
+      }
+
+      const todayStr = new Date().toISOString().split("T")[0];
+      const newPicReport = {
+        id: `cpr_${Date.now()}`,
+        date: updates.date || todayStr,
+        picName: updates.picName || prj.picProject || "PIC Lapangan",
+        picEmail: updates.picEmail || "",
+        progressPercentage: Number(updates.progressPercentage) || 0,
+        summaryForClient: updates.summaryForClient || "",
+        milestoneStatus: updates.milestoneStatus || "Fase Berjalan",
+        clientNotes: updates.clientNotes || "",
+        nextSteps: updates.nextSteps || "",
+        photos: Array.isArray(updates.photos) ? updates.photos : [],
+        createdAt: new Date().toISOString(),
+      };
+
+      prj.clientProgressReports.unshift(newPicReport);
+      prj.progressPercentage = newPicReport.progressPercentage;
+      if (newPicReport.progressPercentage >= 100) {
+        prj.status = "Completed";
+      } else if (prj.status === "Planning") {
+        prj.status = "In Progress";
+      }
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Laporan Progress Resmi untuk Klien berhasil diterbitkan oleh PIC (${newPicReport.picName})`,
+        data: prj,
+        report: newPicReport,
+      });
+    }
+
     return NextResponse.json({ success: false, error: "Tipe aksi tidak dikenali" }, { status: 400 });
   } catch (err) {
     console.error("Error updating finance record:", err);
