@@ -965,15 +965,43 @@ export async function GET(req: Request) {
         </div>
 
         <div class="relative z-10 space-y-1.5">
-          <!-- Header Bar: Kop Ringkas & Judul Kuitansi -->
-          <div class="border-b-2 border-slate-900 pb-1 flex justify-between items-start gap-2">
-            <div class="flex items-center gap-2">
-              <div class="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
+          <!-- Kop Gambar Resmi DSTech Smart (Header Clipping Proporsional dari Gambar Kop A4) -->
+          <div id="receipt-letterhead-image-box" class="w-full border-b-2 border-slate-900 pb-2 mb-2" style="display: ${letterheadEnabled ? 'block' : 'none'};">
+            <div class="w-full h-24 sm:h-28 overflow-hidden relative rounded-xs bg-white">
+              <img
+                src="${letterheadUrl}"
+                alt="Kop Surat Resmi DSTech"
+                class="w-full select-none pointer-events-none"
+                style="object-fit: cover; object-position: top center; width: 100%; height: 110px; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+              />
+            </div>
+            <div class="flex items-center justify-between mt-1 px-1">
+              <div class="text-[8.5px] font-mono text-slate-500 font-bold tracking-wider">
+                BUKTI PENERIMAAN PEMBAYARAN RESMI
+              </div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-xs font-black text-slate-950 tracking-wider uppercase font-serif">KUITANSI PEMBAYARAN</h2>
+                <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
+                  isFullPaid
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }">
+                  ${isFullPaid ? '✓ LUNAS' : 'UANG MUKA / TERMIN'}
+                </span>
+                <span class="text-[9.5px] font-mono font-bold text-indigo-700">NO: ${receiptNumberDisplay}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Header Bar: Kop Ringkas Teks Bawaan (Tampil jika Kop Gambar Dimatikan) -->
+          <div id="receipt-letterhead-text-box" class="border-b-2 border-slate-900 pb-1.5 flex justify-between items-start gap-2" style="display: ${letterheadEnabled ? 'none' : 'flex'};">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
                 DST
               </div>
               <div>
-                <h3 class="text-[10px] font-black tracking-wide text-slate-950 uppercase leading-none">PT. DSTECH SMART PERKASA</h3>
-                <p class="text-[7.5px] text-slate-500 mt-0.5 leading-none">Solusi Teknologi, Jaringan &amp; Keamanan • Cilegon, Banten</p>
+                <h3 class="text-[11px] font-black tracking-wide text-slate-950 uppercase leading-none">PT. DSTECH SMART PERKASA</h3>
+                <p class="text-[8px] text-slate-500 mt-0.5 leading-none">Solusi Teknologi, Jaringan &amp; Keamanan • Cilegon, Banten</p>
               </div>
             </div>
             <div class="text-right shrink-0">
@@ -987,7 +1015,7 @@ export async function GET(req: Request) {
                   ${isFullPaid ? '✓ LUNAS' : 'UANG MUKA / TERMIN'}
                 </span>
               </div>
-              <p class="text-[9px] font-mono font-bold text-indigo-700 mt-0.5 leading-none">NO: ${receiptNumberDisplay}</p>
+              <p class="text-[9.5px] font-mono font-bold text-indigo-700 mt-0.5 leading-none">NO: ${receiptNumberDisplay}</p>
             </div>
           </div>
 
@@ -1498,35 +1526,26 @@ export async function GET(req: Request) {
         <!-- Tombol Aksi Cepat Cetak, Pilihan Format Ukuran & Download -->
         <div class="flex flex-wrap items-center gap-2">
           ${isReceipt ? `
-            <!-- Selektor Ukuran Kuitansi Kompak -->
+            <!-- Selektor Ukuran Kuitansi Lengkap -->
             <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 text-xs">
               <span class="px-2 text-slate-500 font-bold hidden sm:inline">📐 Ukuran:</span>
               <button
                 type="button"
-                id="btn-size-quarter-a6"
-                onclick="setReceiptSize('quarter-a6')"
+                id="btn-size-full-width"
+                onclick="setReceiptSize('full-width')"
                 class="px-2.5 py-1.5 rounded-lg font-black transition-all bg-indigo-600 text-white shadow-xs cursor-pointer"
-                title="1/4 Kertas A4 (A6 Landscape 148×105mm)"
+                title="Selebar Kertas A4 (210×108mm) - Panjang Sampai Habis"
               >
-                1/4 A4 (A6)
-              </button>
-              <button
-                type="button"
-                id="btn-size-quarter-strip"
-                onclick="setReceiptSize('quarter-strip')"
-                class="px-2.5 py-1.5 rounded-lg font-bold transition-all bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer"
-                title="1/4 Kertas A4 Format Slip Memanjang (210×74mm)"
-              >
-                1/4 Slip
+                Panjang A4 (Slip)
               </button>
               <button
                 type="button"
                 id="btn-size-half-a5"
                 onclick="setReceiptSize('half-a5')"
                 class="px-2.5 py-1.5 rounded-lg font-bold transition-all bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer"
-                title="1/2 Kertas A4 (A5 Landscape 210×148mm)"
+                title="1/2 Kertas A4 (210×148mm)"
               >
-                1/2 A4 (A5)
+                1/2 A4
               </button>
               <button
                 type="button"
@@ -1537,19 +1556,29 @@ export async function GET(req: Request) {
               >
                 Full A4
               </button>
+              <button
+                type="button"
+                id="btn-size-quarter-a6"
+                onclick="setReceiptSize('quarter-a6')"
+                class="px-2.5 py-1.5 rounded-lg font-bold transition-all bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                title="1/4 Kertas A4 (A6 Landscape 148×105mm)"
+              >
+                Kompak A6
+              </button>
             </div>
-          ` : `
-            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100">
-              <input
-                type="checkbox"
-                id="toggle-letterhead"
-                ${letterheadEnabled ? 'checked' : ''}
-                onchange="toggleLetterhead(this.checked)"
-                class="w-4 h-4 text-indigo-600 rounded cursor-pointer"
-              />
-              <span>Kop Surat Resmi</span>
-            </label>
-          `}
+          ` : ''}
+
+          <!-- Toggle Kop Gambar Resmi (Tersedia untuk semua dokumen termasuk Kuitansi) -->
+          <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 shadow-2xs">
+            <input
+              type="checkbox"
+              id="toggle-letterhead"
+              ${letterheadEnabled ? 'checked' : ''}
+              onchange="toggleLetterhead(this.checked)"
+              class="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+            />
+            <span>Kop Gambar Resmi</span>
+          </label>
 
           <button
             type="button"
@@ -1584,16 +1613,16 @@ export async function GET(req: Request) {
         `).join("")}
       </div>
 
-      <!-- LEMBAR DOKUMEN FISIK (A4 Standar atau Kuitansi Kompak 1/4 A4) -->
+      <!-- LEMBAR DOKUMEN FISIK (A4 Standar atau Kuitansi Selebar A4) -->
       <div
         id="print-sheet-document"
         class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 ${isReceipt ? 'receipt-cut-border' : ''}"
         style="${isReceipt 
-          ? 'width: 148mm; min-height: 105mm; max-height: 105mm; height: 105mm; padding: 14px 18px;' 
+          ? 'width: 210mm; min-height: 108mm; max-height: none; height: auto; padding: 14px 22px;' 
           : 'width: 210mm; min-height: 297mm; padding: 0;'
         } max-width: 100%; box-sizing: border-box;"
       >
-        <!-- Background Kop Surat Resmi Gambar A4 Penuh (Hanya untuk dokumen selain Kuitansi) -->
+        <!-- Background Kop Surat Resmi Gambar A4 Penuh (Hanya untuk dokumen selain Kuitansi atau saat Kuitansi mode Full A4) -->
         <img
           id="letterhead-bg-img"
           src="${letterheadUrl}"
@@ -1613,25 +1642,30 @@ export async function GET(req: Request) {
       </div>
 
       ${isReceipt ? `
-        <!-- Garis Panduan Gunting Potong 1/4 Kertas A4 (Tampil di Layar & Cetak jika menggunakan kertas A4) -->
+        <!-- Garis Panduan Gunting Potong Kuitansi Selebar A4 (Tampil di Layar & Cetak jika menggunakan kertas A4) -->
         <div id="receipt-cut-guide" class="max-w-[210mm] mx-auto mt-2 text-center text-[10px] text-slate-400 font-mono flex items-center justify-center gap-2 select-none print:mt-1">
-          <span class="text-slate-300">✂️ - - - - - - - - - - - - - - - - - - - - - - -</span>
-          <span id="cut-guide-label" class="font-bold text-slate-500 uppercase tracking-wider">Batas Gunting / Potong Kuitansi 1/4 Kertas A4 (148mm × 105mm)</span>
-          <span class="text-slate-300">- - - - - - - - - - - - - - - - - - - - - - - ✂️</span>
+          <span class="text-slate-300">✂️ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</span>
+          <span id="cut-guide-label" class="font-bold text-slate-500 uppercase tracking-wider">Batas Gunting / Potong Kuitansi Selebar Kertas A4 (210mm × 108mm)</span>
+          <span class="text-slate-300">- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ✂️</span>
         </div>
       ` : ''}
 
       <script>
-        let currentReceiptMode = 'quarter-a6';
+        let currentReceiptMode = 'full-width';
 
         function setReceiptSize(mode) {
           currentReceiptMode = mode;
           const sheet = document.getElementById('print-sheet-document');
           const guideLabel = document.getElementById('cut-guide-label');
           const styleEl = document.getElementById('dynamic-print-style');
+          const bgImg = document.getElementById('letterhead-bg-img');
+          const receiptImgBox = document.getElementById('receipt-letterhead-image-box');
+          const receiptTextBox = document.getElementById('receipt-letterhead-text-box');
+          const letterheadCheckbox = document.getElementById('toggle-letterhead');
+          const isLetterheadOn = letterheadCheckbox ? letterheadCheckbox.checked : true;
           
           // Reset style tombol aktif
-          ['quarter-a6', 'quarter-strip', 'half-a5', 'full-a4'].forEach(m => {
+          ['full-width', 'half-a5', 'full-a4', 'quarter-a6'].forEach(m => {
             const btn = document.getElementById('btn-size-' + m);
             if (btn) {
               if (m === mode) {
@@ -1644,94 +1678,79 @@ export async function GET(req: Request) {
 
           if (!sheet) return;
 
-          if (mode === 'quarter-a6') {
-            // 1/4 Kertas A4 Standar Kompak (A6 Landscape: 148mm x 105mm)
-            sheet.style.width = '148mm';
-            sheet.style.height = '105mm';
-            sheet.style.minHeight = '105mm';
-            sheet.style.maxHeight = '105mm';
-            sheet.style.padding = '14px 18px';
-            if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi 1/4 Kertas A4 (148mm × 105mm)';
-            if (styleEl) {
-              styleEl.innerHTML = \`
-                @page { size: A4 portrait; margin: 8mm; }
-                @media print {
-                  body { background: white !important; padding: 0 !important; margin: 0 !important; }
-                  .print-hidden { display: none !important; }
-                  .print-sheet {
-                    box-shadow: none !important;
-                    margin: 0 !important;
-                    width: 148mm !important;
-                    height: 105mm !important;
-                    min-height: 105mm !important;
-                    max-height: 105mm !important;
-                    page-break-after: avoid;
-                  }
-                  .receipt-cut-border { border: 1px dashed #94a3b8 !important; }
-                }
-              \`;
-            }
-          } else if (mode === 'quarter-strip') {
-            // 1/4 Format Slip Memanjang (210mm x 74mm)
+          if (mode === 'full-width') {
+            // Selebar Kertas A4 Penuh (210mm x 108mm, Format Slip Kuitansi Ideal)
             sheet.style.width = '210mm';
-            sheet.style.height = '74mm';
-            sheet.style.minHeight = '74mm';
-            sheet.style.maxHeight = '74mm';
-            sheet.style.padding = '10px 20px';
-            if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi 1/4 Slip Kertas A4 (210mm × 74mm)';
+            sheet.style.height = 'auto';
+            sheet.style.minHeight = '108mm';
+            sheet.style.maxHeight = 'none';
+            sheet.style.padding = '14px 22px';
+            if (bgImg) bgImg.style.display = 'none';
+            if (receiptImgBox && receiptTextBox) {
+              receiptImgBox.style.display = isLetterheadOn ? 'block' : 'none';
+              receiptTextBox.style.display = isLetterheadOn ? 'none' : 'flex';
+            }
+            if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi Selebar Kertas A4 (210mm × 108mm)';
             if (styleEl) {
               styleEl.innerHTML = \`
-                @page { size: A4 portrait; margin: 8mm; }
+                @page { size: A4 portrait; margin: 8mm 0; }
                 @media print {
                   body { background: white !important; padding: 0 !important; margin: 0 !important; }
                   .print-hidden { display: none !important; }
                   .print-sheet {
                     box-shadow: none !important;
-                    margin: 0 !important;
+                    margin: 0 auto !important;
                     width: 210mm !important;
-                    height: 74mm !important;
-                    min-height: 74mm !important;
-                    max-height: 74mm !important;
+                    min-height: 108mm !important;
+                    height: auto !important;
                     page-break-after: avoid;
                   }
-                  .receipt-cut-border { border: 1px dashed #94a3b8 !important; }
+                  .receipt-cut-border { border-bottom: 1px dashed #94a3b8 !important; border-top: none !important; border-left: none !important; border-right: none !important; }
                 }
               \`;
             }
           } else if (mode === 'half-a5') {
-            // 1/2 Kertas A4 (A5: 210mm x 148mm)
+            // 1/2 Kertas A4 (210mm x 148mm)
             sheet.style.width = '210mm';
             sheet.style.height = '148mm';
             sheet.style.minHeight = '148mm';
             sheet.style.maxHeight = '148mm';
-            sheet.style.padding = '24px 30px';
+            sheet.style.padding = '20px 24px';
+            if (bgImg) bgImg.style.display = 'none';
+            if (receiptImgBox && receiptTextBox) {
+              receiptImgBox.style.display = isLetterheadOn ? 'block' : 'none';
+              receiptTextBox.style.display = isLetterheadOn ? 'none' : 'flex';
+            }
             if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi 1/2 Kertas A4 (210mm × 148mm)';
             if (styleEl) {
               styleEl.innerHTML = \`
-                @page { size: A4 portrait; margin: 8mm; }
+                @page { size: A4 portrait; margin: 8mm 0; }
                 @media print {
                   body { background: white !important; padding: 0 !important; margin: 0 !important; }
                   .print-hidden { display: none !important; }
                   .print-sheet {
                     box-shadow: none !important;
-                    margin: 0 !important;
+                    margin: 0 auto !important;
                     width: 210mm !important;
                     height: 148mm !important;
                     min-height: 148mm !important;
                     max-height: 148mm !important;
                     page-break-after: avoid;
                   }
-                  .receipt-cut-border { border: 1px dashed #94a3b8 !important; }
+                  .receipt-cut-border { border-bottom: 1px dashed #94a3b8 !important; border-top: none !important; border-left: none !important; border-right: none !important; }
                 }
               \`;
             }
           } else if (mode === 'full-a4') {
-            // 1 Lembar A4 Penuh
+            // 1 Lembar A4 Penuh (210mm x 297mm) dengan Kop A4 Utuh
             sheet.style.width = '210mm';
             sheet.style.height = '297mm';
             sheet.style.minHeight = '297mm';
             sheet.style.maxHeight = '297mm';
-            sheet.style.padding = '40px 45px';
+            sheet.style.padding = isLetterheadOn ? '130px 42px 90px 42px' : '40px 42px';
+            if (bgImg) bgImg.style.display = isLetterheadOn ? 'block' : 'none';
+            if (receiptImgBox) receiptImgBox.style.display = 'none'; // Gunakan bgImg A4 utuh
+            if (receiptTextBox) receiptTextBox.style.display = isLetterheadOn ? 'none' : 'flex';
             if (guideLabel) guideLabel.innerText = 'Format Kuitansi A4 Penuh (210mm × 297mm)';
             if (styleEl) {
               styleEl.innerHTML = \`
@@ -1752,23 +1771,73 @@ export async function GET(req: Request) {
                 }
               \`;
             }
+          } else if (mode === 'quarter-a6') {
+            // 1/4 Kertas A4 (A6 Landscape: 148mm x 105mm)
+            sheet.style.width = '148mm';
+            sheet.style.height = '105mm';
+            sheet.style.minHeight = '105mm';
+            sheet.style.maxHeight = '105mm';
+            sheet.style.padding = '12px 16px';
+            if (bgImg) bgImg.style.display = 'none';
+            if (receiptImgBox && receiptTextBox) {
+              receiptImgBox.style.display = isLetterheadOn ? 'block' : 'none';
+              receiptTextBox.style.display = isLetterheadOn ? 'none' : 'flex';
+            }
+            if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi 1/4 Kertas A4 (148mm × 105mm)';
+            if (styleEl) {
+              styleEl.innerHTML = \`
+                @page { size: A4 portrait; margin: 8mm; }
+                @media print {
+                  body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                  .print-hidden { display: none !important; }
+                  .print-sheet {
+                    box-shadow: none !important;
+                    margin: 0 !important;
+                    width: 148mm !important;
+                    height: 105mm !important;
+                    min-height: 105mm !important;
+                    max-height: 105mm !important;
+                    page-break-after: avoid;
+                  }
+                  .receipt-cut-border { border: 1px dashed #94a3b8 !important; }
+                }
+              \`;
+            }
           }
         }
 
         function toggleLetterhead(enabled) {
           const bgImg = document.getElementById('letterhead-bg-img');
           const wrapper = document.getElementById('document-content-wrapper');
-          if (enabled) {
-            if (bgImg) bgImg.style.display = 'block';
-            if (wrapper) {
-              wrapper.style.paddingTop = '120px';
-              wrapper.style.paddingBottom = '90px';
+          const receiptImgBox = document.getElementById('receipt-letterhead-image-box');
+          const receiptTextBox = document.getElementById('receipt-letterhead-text-box');
+          const sheet = document.getElementById('print-sheet-document');
+          const isReceiptDoc = ${isReceipt ? 'true' : 'false'};
+
+          if (isReceiptDoc) {
+            if (currentReceiptMode === 'full-a4') {
+              if (bgImg) bgImg.style.display = enabled ? 'block' : 'none';
+              if (sheet) sheet.style.padding = enabled ? '130px 42px 90px 42px' : '40px 42px';
+              if (receiptImgBox) receiptImgBox.style.display = 'none';
+              if (receiptTextBox) receiptTextBox.style.display = enabled ? 'none' : 'flex';
+            } else {
+              if (bgImg) bgImg.style.display = 'none';
+              if (receiptImgBox) receiptImgBox.style.display = enabled ? 'block' : 'none';
+              if (receiptTextBox) receiptTextBox.style.display = enabled ? 'none' : 'flex';
             }
           } else {
-            if (bgImg) bgImg.style.display = 'none';
-            if (wrapper) {
-              wrapper.style.paddingTop = '30px';
-              wrapper.style.paddingBottom = '30px';
+            if (enabled) {
+              if (bgImg) bgImg.style.display = 'block';
+              if (wrapper) {
+                wrapper.style.paddingTop = '120px';
+                wrapper.style.paddingBottom = '90px';
+              }
+            } else {
+              if (bgImg) bgImg.style.display = 'none';
+              if (wrapper) {
+                wrapper.style.paddingTop = '30px';
+                wrapper.style.paddingBottom = '30px';
+              }
             }
           }
         }
@@ -1781,14 +1850,14 @@ export async function GET(req: Request) {
           let jsPdfOrientation = 'portrait';
 
           if (isReceipt) {
-            if (currentReceiptMode === 'quarter-a6') {
-              jsPdfFormat = [148, 105];
-              jsPdfOrientation = 'landscape';
-            } else if (currentReceiptMode === 'quarter-strip') {
-              jsPdfFormat = [210, 74];
+            if (currentReceiptMode === 'full-width') {
+              jsPdfFormat = [210, 108];
               jsPdfOrientation = 'landscape';
             } else if (currentReceiptMode === 'half-a5') {
               jsPdfFormat = [210, 148];
+              jsPdfOrientation = 'landscape';
+            } else if (currentReceiptMode === 'quarter-a6') {
+              jsPdfFormat = [148, 105];
               jsPdfOrientation = 'landscape';
             } else {
               jsPdfFormat = 'a4';
