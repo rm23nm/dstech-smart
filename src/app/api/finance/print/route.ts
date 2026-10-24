@@ -64,6 +64,7 @@ function angkaKeTerbilang(nilai: number): string {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const docType = (searchParams.get("doc") || "invoice").toLowerCase();
+  const isReceipt = docType === "receipt" || docType === "kwitansi";
   const docNo = (searchParams.get("no") || searchParams.get("id") || "").trim();
   const receiptNo = (searchParams.get("receipt") || searchParams.get("receiptNo") || searchParams.get("payId") || "").trim();
 
@@ -956,144 +957,134 @@ export async function GET(req: Request) {
     documentTitle = `Kuitansi_Pembayaran_${receiptNumberDisplay.replace(/[^a-zA-Z0-9_-]/g, "_")}_${(sale.customerName || "").replace(/[^a-zA-Z0-9]/g, "_")}`;
 
     documentContent = `
-      <!-- LEMBAR KUITANSI PEMBAYARAN RESMI (OFFICIAL PAYMENT RECEIPT) -->
-      <div class="border-b-2 border-slate-900 pb-3 flex justify-between items-start">
-        <div>
-          <div class="flex items-center gap-2">
-            <h2 class="text-xl font-black text-slate-900 tracking-wider uppercase">KUITANSI PEMBAYARAN</h2>
-            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-              isFullPaid
-                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                : 'bg-amber-100 text-amber-800 border border-amber-300'
-            }">
-              ${isFullPaid ? '✓ LUNAS (PAID)' : 'UANG MUKA / SEBAGIAN'}
-            </span>
-          </div>
-          <p class="text-xs font-mono font-bold text-indigo-700 mt-1">NO: ${receiptNumberDisplay}</p>
-          <p class="text-[11px] text-slate-500">Lampiran Faktur Referensi: <strong>${sale.invoiceNumber}</strong></p>
-        </div>
-        <div class="text-right text-xs space-y-1">
-          <p><span class="text-slate-500">Tanggal Kuitansi:</span> <strong class="text-slate-900 font-bold">${receiptDateDisplay}</strong></p>
-          <p><span class="text-slate-500">Metode Bayar:</span> <strong class="text-slate-800 font-semibold">${receiptMethodDisplay}</strong></p>
-          <p><span class="text-slate-500">Kode Verifikasi:</span> <strong class="font-mono text-[11px] text-slate-700">${sale.verificationCode || 'DSP-VERIFIED'}</strong></p>
-        </div>
-      </div>
-
-      <!-- Pilihan Riwayat Kuitansi jika ada lebih dari 1 pembayaran -->
-      ${payments.length > 1 ? `
-        <div class="p-2.5 rounded-xl bg-slate-100 border border-slate-200 flex flex-wrap items-center gap-2 text-xs print:hidden">
-          <span class="font-bold text-slate-700">Pilih Pembayaran:</span>
-          ${payments.map((p: any, idx: number) => `
-            <a
-              href="/api/finance/print?doc=receipt&no=${encNo}&receiptNo=${encodeURIComponent(p.receiptNumber || p.id)}"
-              class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                (selectedPayment?.id === p.id || selectedPayment?.receiptNumber === p.receiptNumber)
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-              }"
-            >
-              #${idx + 1}: ${p.receiptNumber} (${formatRupiah(p.amount)})
-            </a>
-          `).join("")}
-        </div>
-      ` : ''}
-
-      <!-- Badan Utama Formulir Kuitansi Standar Korporat -->
-      <div class="py-4 space-y-4 text-xs">
-        <!-- Baris 1: Telah Diterima Dari -->
-        <div class="grid grid-cols-12 gap-2 py-2 border-b border-slate-200 items-baseline">
-          <div class="col-span-3 font-bold text-slate-500 uppercase tracking-wider text-[11px]">
-            Telah Diterima Dari
-          </div>
-          <div class="col-span-9">
-            <span class="text-sm font-black text-slate-900">${sale.customerName}</span>
-            ${sale.customerPic ? `<span class="text-xs text-indigo-700 font-bold ml-2">(Up. ${sale.customerPic})</span>` : ''}
-            ${sale.customerAddress ? `<p class="text-slate-600 text-[11px] mt-0.5">${sale.customerAddress}</p>` : ''}
-          </div>
+      <!-- LEMBAR KUITANSI PEMBAYARAN RESMI KOMPAK 1/4 KERTAS A4 (148mm x 105mm) -->
+      <div id="receipt-main-container" class="receipt-box text-slate-800 text-[10px] leading-tight select-none relative font-sans">
+        <!-- Watermark DSP Latar Belakang Kuitansi -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.035] z-0">
+          <div class="text-7xl font-black font-serif tracking-widest text-slate-900 rotate-[-15deg]">DSTECH</div>
         </div>
 
-        <!-- Baris 2: Uang Sejumlah (Terbilang Huruf) -->
-        <div class="grid grid-cols-12 gap-2 py-2.5 border-b border-slate-200 items-center">
-          <div class="col-span-3 font-bold text-slate-500 uppercase tracking-wider text-[11px]">
-            Uang Sejumlah
-          </div>
-          <div class="col-span-9">
-            <div class="p-3 rounded-xl bg-slate-100/90 border border-slate-300 text-slate-900 font-serif italic font-bold text-xs leading-relaxed tracking-wide shadow-2xs">
-              # ${terbilangReceipt} #
+        <div class="relative z-10 space-y-1.5">
+          <!-- Header Bar: Kop Ringkas & Judul Kuitansi -->
+          <div class="border-b-2 border-slate-900 pb-1 flex justify-between items-start gap-2">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
+                DST
+              </div>
+              <div>
+                <h3 class="text-[10px] font-black tracking-wide text-slate-950 uppercase leading-none">PT. DSTECH SMART PERKASA</h3>
+                <p class="text-[7.5px] text-slate-500 mt-0.5 leading-none">Solusi Teknologi, Jaringan &amp; Keamanan • Cilegon, Banten</p>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="flex items-center justify-end gap-1.5">
+                <h2 class="text-xs font-black text-slate-950 tracking-wider uppercase font-serif">KUITANSI PEMBAYARAN</h2>
+                <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
+                  isFullPaid
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }">
+                  ${isFullPaid ? '✓ LUNAS' : 'UANG MUKA / TERMIN'}
+                </span>
+              </div>
+              <p class="text-[9px] font-mono font-bold text-indigo-700 mt-0.5 leading-none">NO: ${receiptNumberDisplay}</p>
             </div>
           </div>
-        </div>
 
-        <!-- Baris 3: Untuk Pembayaran -->
-        <div class="grid grid-cols-12 gap-2 py-2.5 border-b border-slate-200 items-baseline">
-          <div class="col-span-3 font-bold text-slate-500 uppercase tracking-wider text-[11px]">
-            Untuk Pembayaran
-          </div>
-          <div class="col-span-9 space-y-1.5">
-            <p class="font-bold text-slate-900 text-xs leading-relaxed">${receiptPurpose}</p>
-            ${(sale.items || []).length > 0 ? `
-              <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
-                <span class="font-bold text-slate-700 block mb-1">Rincian Item Pekerjaan / Pengadaan:</span>
-                <ul class="list-disc list-inside space-y-0.5">
-                  ${(sale.items || []).slice(0, 4).map((it: any) => `
-                    <li><strong>${it.productName || it.name}</strong> - ${it.qty} ${it.unit || 'Unit'}</li>
-                  `).join("")}
-                  ${(sale.items || []).length > 4 ? `<li>...dan ${(sale.items || []).length - 4} item lainnya tercantum di Faktur No. ${sale.invoiceNumber}</li>` : ''}
-                </ul>
+          <!-- Pilihan Riwayat Kuitansi jika ada lebih dari 1 pembayaran (Khusus Layar Saja) -->
+          ${payments.length > 1 ? `
+            <div class="p-1 rounded-lg bg-slate-100 border border-slate-200 flex flex-wrap items-center gap-1 text-[9px] print:hidden">
+              <span class="font-bold text-slate-700">Pilih Pembayaran:</span>
+              ${payments.map((p: any, idx: number) => `
+                <a
+                  href="/api/finance/print?doc=receipt&no=${encNo}&receiptNo=${encodeURIComponent(p.receiptNumber || p.id)}"
+                  class="px-1.5 py-0.5 rounded text-[8.5px] font-bold transition-all ${
+                    (selectedPayment?.id === p.id || selectedPayment?.receiptNumber === p.receiptNumber)
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                  }"
+                >
+                  #${idx + 1}: ${p.receiptNumber} (${formatRupiah(p.amount)})
+                </a>
+              `).join("")}
+            </div>
+          ` : ''}
+
+          <!-- Formulir Isi Kuitansi Kompak 1/4 A4 -->
+          <div class="space-y-1">
+            <!-- Baris 1: Telah Diterima Dari -->
+            <div class="grid grid-cols-12 gap-1 items-baseline border-b border-slate-200/80 pb-0.5">
+              <div class="col-span-3 text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">
+                Telah Diterima Dari
               </div>
-            ` : ''}
-          </div>
-        </div>
-
-        <!-- Baris 4: Rekapitulasi Pembayaran Faktur (Transparan) -->
-        <div class="grid grid-cols-3 gap-3 p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 text-xs">
-          <div>
-            <span class="text-[10px] text-indigo-700 font-bold uppercase block tracking-wider">Total Nilai Faktur:</span>
-            <p class="font-black text-slate-900 text-xs mt-0.5">${formatRupiah(sale.grandTotal)}</p>
-          </div>
-          <div>
-            <span class="text-[10px] text-indigo-700 font-bold uppercase block tracking-wider">Kuitansi Pembayaran Ini:</span>
-            <p class="font-black text-indigo-700 text-xs mt-0.5">${formatRupiah(paidNominal)}</p>
-          </div>
-          <div>
-            <span class="text-[10px] text-indigo-700 font-bold uppercase block tracking-wider">Sisa Tagihan Faktur:</span>
-            <p class="font-black ${sale.remainingAmount > 0 ? 'text-amber-700' : 'text-emerald-700'} text-xs mt-0.5">
-              ${sale.remainingAmount > 0 ? formatRupiah(sale.remainingAmount) : 'Rp 0 (LUNAS)'}
-            </p>
-          </div>
-        </div>
-
-        <!-- Baris 5: Kotak Jumlah Nominal & Tanda Tangan Resmi -->
-        <div class="grid grid-cols-12 gap-4 pt-4 items-end">
-          <!-- Kotak Nominal Uang Klasik Kuitansi Indonesia -->
-          <div class="col-span-6 space-y-3">
-            <div class="inline-block p-4 rounded-2xl bg-white border-2 border-slate-900 shadow-md">
-              <span class="text-[10px] text-slate-500 font-black tracking-widest block uppercase">JUMLAH (RUPIAH):</span>
-              <div class="text-xl font-black font-mono text-slate-950 mt-1 tracking-tight">
-                ${formatRupiah(paidNominal)},-
+              <div class="col-span-9 flex items-baseline justify-between gap-1">
+                <div class="truncate">
+                  <span class="font-black text-slate-950 text-[10.5px]">${sale.customerName}</span>
+                  ${sale.customerPic ? `<span class="text-[8.5px] text-indigo-700 font-bold ml-1">(Up. ${sale.customerPic})</span>` : ''}
+                </div>
+                <div class="text-[8px] text-slate-500 font-medium whitespace-nowrap shrink-0">
+                  Tgl: <strong class="text-slate-900">${receiptDateDisplay}</strong>
+                </div>
               </div>
             </div>
 
-            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[10px] text-slate-500 leading-normal space-y-0.5">
-              <p>• Pembayaran via transfer sah setelah dana efektif masuk ke rekening resmi PT. DSTech Smart Perkasa.</p>
-              <p>• Kuitansi ini dicetak melalui sistem ERP digital resmi PT. DSTech Smart Perkasa.</p>
+            <!-- Baris 2: Uang Sejumlah (Terbilang Huruf) -->
+            <div class="grid grid-cols-12 gap-1 items-center border-b border-slate-200/80 pb-0.5">
+              <div class="col-span-3 text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">
+                Uang Sejumlah
+              </div>
+              <div class="col-span-9">
+                <div class="py-0.5 px-2 rounded bg-slate-50 border border-slate-300 text-slate-900 font-serif italic font-bold text-[8.5px] leading-snug">
+                  # ${terbilangReceipt} #
+                </div>
+              </div>
+            </div>
+
+            <!-- Baris 3: Untuk Pembayaran -->
+            <div class="grid grid-cols-12 gap-1 items-baseline border-b border-slate-200/80 pb-0.5">
+              <div class="col-span-3 text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">
+                Untuk Pembayaran
+              </div>
+              <div class="col-span-9">
+                <p class="font-bold text-slate-900 text-[9.5px] leading-tight line-clamp-2">${receiptPurpose}</p>
+                <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[7.5px] text-slate-500 mt-0.5">
+                  <span>Faktur: <strong class="text-indigo-900 font-mono">${sale.invoiceNumber}</strong></span>
+                  <span>Total Tagihan: <strong>${formatRupiah(sale.grandTotal)}</strong></span>
+                  ${sale.remainingAmount > 0 
+                    ? `<span>Sisa: <strong class="text-amber-700">${formatRupiah(sale.remainingAmount)}</strong></span>` 
+                    : `<span>Status: <strong class="text-emerald-700">LUNAS</strong></span>`}
+                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Kolom Tanda Tangan Sah Penerima -->
-          <div class="col-span-6 text-center">
-            <p class="text-xs text-slate-600 mb-1">Cilegon, ${receiptDateDisplay}</p>
-            <p class="font-bold text-slate-900 text-xs">Penerima Resmi:</p>
-            <p class="font-black text-slate-900 text-xs">PT. DSTECH SMART PERKASA</p>
-
-            <div class="h-24 flex items-center justify-center relative my-1">
-              ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan Direktur" class="h-20 object-contain z-10" />` : ""}
-              ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Stempel Resmi" class="h-20 opacity-80 absolute" />` : ""}
-              ${!signatureImage && !masterStampUrl ? `<div class="h-16 w-32 border-b border-dashed border-slate-400"></div>` : ""}
+          <!-- Footer Kuitansi: Kotak Nominal & Tanda Tangan Sah -->
+          <div class="grid grid-cols-12 gap-2 pt-0.5 items-end">
+            <!-- Kotak Jumlah Nominal Angka (Khas Kuitansi Resmi Indonesia) -->
+            <div class="col-span-7 space-y-0.5">
+              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border-2 border-slate-900 shadow-2xs">
+                <span class="text-[8px] text-slate-600 font-black tracking-widest uppercase">JUMLAH:</span>
+                <span class="text-sm font-black font-mono text-slate-950 tracking-tight">
+                  ${formatRupiah(paidNominal)},-
+                </span>
+              </div>
+              <p class="text-[7.5px] text-slate-500 leading-none">
+                • Metode: <strong class="text-slate-700">${receiptMethodDisplay}</strong> • Verifikasi: <span class="font-mono">${sale.verificationCode || 'DSP-VERIFIED'}</span> • ERP DSP
+              </p>
             </div>
 
-            <p class="font-black text-slate-950 text-xs underline">( ${signerName} )</p>
-            <p class="text-[10px] text-slate-500 font-bold">${signerTitle}</p>
+            <!-- Tanda Tangan Sah Penerima -->
+            <div class="col-span-5 text-center">
+              <p class="text-[8px] text-slate-500 leading-none">Cilegon, ${receiptDateDisplay}</p>
+              <p class="font-black text-slate-950 text-[8.5px] leading-none mt-0.5">PT. DSTECH SMART PERKASA</p>
+              <div class="h-8 flex items-center justify-center relative my-0.5">
+                ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-8 object-contain z-10" />` : ""}
+                ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-8 opacity-75 absolute" />` : ""}
+                ${!signatureImage && !masterStampUrl ? `<div class="h-5 w-20 border-b border-dashed border-slate-400"></div>` : ""}
+              </div>
+              <p class="font-black text-slate-950 text-[8.5px] underline leading-none">( ${signerName} )</p>
+              <p class="text-[7.5px] text-slate-500 font-bold leading-none mt-0.5">${signerTitle}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1464,10 +1455,10 @@ export async function GET(req: Request) {
       <title>${documentTitle} - PT. DSTech Smart Perkasa</title>
       <script src="https://cdn.tailwindcss.com"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-      <style>
+      <style id="dynamic-print-style">
         @page {
-          size: A4 portrait;
-          margin: 0;
+          size: ${isReceipt ? 'A4 portrait' : 'A4 portrait'};
+          margin: ${isReceipt ? '8mm' : '0'};
         }
         @media print {
           body {
@@ -1480,12 +1471,12 @@ export async function GET(req: Request) {
           }
           .print-sheet {
             box-shadow: none !important;
-            border: none !important;
             margin: 0 !important;
-            width: 210mm !important;
-            height: 297mm !important;
-            min-height: 297mm !important;
-            page-break-after: always;
+            page-break-after: avoid;
+          }
+          /* Garis putus-putus pembatas potong saat dicetak di kertas A4 */
+          .receipt-cut-border {
+            border: 1px dashed #94a3b8 !important;
           }
         }
       </style>
@@ -1504,18 +1495,61 @@ export async function GET(req: Request) {
           </div>
         </div>
 
-        <!-- Tombol Aksi Cepat Cetak, Toggle Kop Surat & Download -->
+        <!-- Tombol Aksi Cepat Cetak, Pilihan Format Ukuran & Download -->
         <div class="flex flex-wrap items-center gap-2">
-          <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100">
-            <input
-              type="checkbox"
-              id="toggle-letterhead"
-              ${letterheadEnabled ? 'checked' : ''}
-              onchange="toggleLetterhead(this.checked)"
-              class="w-4 h-4 text-indigo-600 rounded cursor-pointer"
-            />
-            <span>Kop Surat Resmi</span>
-          </label>
+          ${isReceipt ? `
+            <!-- Selektor Ukuran Kuitansi Kompak -->
+            <div class="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 text-xs">
+              <span class="px-2 text-slate-500 font-bold hidden sm:inline">📐 Ukuran:</span>
+              <button
+                type="button"
+                id="btn-size-quarter-a6"
+                onclick="setReceiptSize('quarter-a6')"
+                class="px-2.5 py-1.5 rounded-lg font-black transition-all bg-indigo-600 text-white shadow-xs cursor-pointer"
+                title="1/4 Kertas A4 (A6 Landscape 148×105mm)"
+              >
+                1/4 A4 (A6)
+              </button>
+              <button
+                type="button"
+                id="btn-size-quarter-strip"
+                onclick="setReceiptSize('quarter-strip')"
+                class="px-2.5 py-1.5 rounded-lg font-bold transition-all bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                title="1/4 Kertas A4 Format Slip Memanjang (210×74mm)"
+              >
+                1/4 Slip
+              </button>
+              <button
+                type="button"
+                id="btn-size-half-a5"
+                onclick="setReceiptSize('half-a5')"
+                class="px-2.5 py-1.5 rounded-lg font-bold transition-all bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                title="1/2 Kertas A4 (A5 Landscape 210×148mm)"
+              >
+                1/2 A4 (A5)
+              </button>
+              <button
+                type="button"
+                id="btn-size-full-a4"
+                onclick="setReceiptSize('full-a4')"
+                class="px-2.5 py-1.5 rounded-lg font-bold transition-all bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                title="1 Kertas A4 Penuh (210×297mm)"
+              >
+                Full A4
+              </button>
+            </div>
+          ` : `
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100">
+              <input
+                type="checkbox"
+                id="toggle-letterhead"
+                ${letterheadEnabled ? 'checked' : ''}
+                onchange="toggleLetterhead(this.checked)"
+                class="w-4 h-4 text-indigo-600 rounded cursor-pointer"
+              />
+              <span>Kop Surat Resmi</span>
+            </label>
+          `}
 
           <button
             type="button"
@@ -1534,7 +1568,7 @@ export async function GET(req: Request) {
         </div>
       </div>
 
-      <!-- Tab Navigasi Dokumen Terkait (Faktur, BAST, Surat Jalan, Foto) -->
+      <!-- Tab Navigasi Dokumen Terkait (Faktur, BAST, Surat Jalan, Foto, Kuitansi) -->
       <div class="max-w-[210mm] mx-auto mb-4 flex items-center gap-2 overflow-x-auto pb-1 print-hidden">
         ${tabs.map((tab) => `
           <a
@@ -1550,54 +1584,224 @@ export async function GET(req: Request) {
         `).join("")}
       </div>
 
-      <!-- LEMBAR DOKUMEN FISIK A4 (Presisi Kertas A4 210mm x 297mm) -->
+      <!-- LEMBAR DOKUMEN FISIK (A4 Standar atau Kuitansi Kompak 1/4 A4) -->
       <div
         id="print-sheet-document"
-        class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800"
-        style="width: 210mm; min-height: 297mm; max-width: 100%; box-sizing: border-box;"
+        class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 ${isReceipt ? 'receipt-cut-border' : ''}"
+        style="${isReceipt 
+          ? 'width: 148mm; min-height: 105mm; max-height: 105mm; height: 105mm; padding: 14px 18px;' 
+          : 'width: 210mm; min-height: 297mm; padding: 0;'
+        } max-width: 100%; box-sizing: border-box;"
       >
-        <!-- Background Kop Surat Resmi Gambar A4 Penuh (Full Bleed) -->
+        <!-- Background Kop Surat Resmi Gambar A4 Penuh (Hanya untuk dokumen selain Kuitansi) -->
         <img
           id="letterhead-bg-img"
           src="${letterheadUrl}"
           alt="Kop Surat Resmi"
           class="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
-          style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${letterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+          style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${!isReceipt && letterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
         />
 
-        <!-- Area Isi Dokumen dengan Padding Top & Bottom yang Disesuaikan -->
+        <!-- Area Isi Dokumen dengan Padding yang Disesuaikan -->
         <div
           id="document-content-wrapper"
-          class="relative z-10 space-y-4"
-          style="padding-top: ${letterheadEnabled ? '120px' : '30px'}; padding-bottom: ${letterheadEnabled ? '90px' : '30px'}; padding-left: 42px; padding-right: 42px;"
+          class="relative z-10 ${isReceipt ? 'space-y-0.5' : 'space-y-4'}"
+          style="padding-top: ${isReceipt ? '0px' : (letterheadEnabled ? '120px' : '30px')}; padding-bottom: ${isReceipt ? '0px' : (letterheadEnabled ? '90px' : '30px')}; padding-left: ${isReceipt ? '0px' : '42px'}; padding-right: ${isReceipt ? '0px' : '42px'};"
         >
           ${documentContent}
         </div>
       </div>
 
+      ${isReceipt ? `
+        <!-- Garis Panduan Gunting Potong 1/4 Kertas A4 (Tampil di Layar & Cetak jika menggunakan kertas A4) -->
+        <div id="receipt-cut-guide" class="max-w-[210mm] mx-auto mt-2 text-center text-[10px] text-slate-400 font-mono flex items-center justify-center gap-2 select-none print:mt-1">
+          <span class="text-slate-300">✂️ - - - - - - - - - - - - - - - - - - - - - - -</span>
+          <span id="cut-guide-label" class="font-bold text-slate-500 uppercase tracking-wider">Batas Gunting / Potong Kuitansi 1/4 Kertas A4 (148mm × 105mm)</span>
+          <span class="text-slate-300">- - - - - - - - - - - - - - - - - - - - - - - ✂️</span>
+        </div>
+      ` : ''}
+
       <script>
+        let currentReceiptMode = 'quarter-a6';
+
+        function setReceiptSize(mode) {
+          currentReceiptMode = mode;
+          const sheet = document.getElementById('print-sheet-document');
+          const guideLabel = document.getElementById('cut-guide-label');
+          const styleEl = document.getElementById('dynamic-print-style');
+          
+          // Reset style tombol aktif
+          ['quarter-a6', 'quarter-strip', 'half-a5', 'full-a4'].forEach(m => {
+            const btn = document.getElementById('btn-size-' + m);
+            if (btn) {
+              if (m === mode) {
+                btn.className = 'px-2.5 py-1.5 rounded-lg font-black transition-all bg-indigo-600 text-white shadow-xs cursor-pointer';
+              } else {
+                btn.className = 'px-2.5 py-1.5 rounded-lg font-bold transition-all bg-white text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer';
+              }
+            }
+          });
+
+          if (!sheet) return;
+
+          if (mode === 'quarter-a6') {
+            // 1/4 Kertas A4 Standar Kompak (A6 Landscape: 148mm x 105mm)
+            sheet.style.width = '148mm';
+            sheet.style.height = '105mm';
+            sheet.style.minHeight = '105mm';
+            sheet.style.maxHeight = '105mm';
+            sheet.style.padding = '14px 18px';
+            if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi 1/4 Kertas A4 (148mm × 105mm)';
+            if (styleEl) {
+              styleEl.innerHTML = \`
+                @page { size: A4 portrait; margin: 8mm; }
+                @media print {
+                  body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                  .print-hidden { display: none !important; }
+                  .print-sheet {
+                    box-shadow: none !important;
+                    margin: 0 !important;
+                    width: 148mm !important;
+                    height: 105mm !important;
+                    min-height: 105mm !important;
+                    max-height: 105mm !important;
+                    page-break-after: avoid;
+                  }
+                  .receipt-cut-border { border: 1px dashed #94a3b8 !important; }
+                }
+              \`;
+            }
+          } else if (mode === 'quarter-strip') {
+            // 1/4 Format Slip Memanjang (210mm x 74mm)
+            sheet.style.width = '210mm';
+            sheet.style.height = '74mm';
+            sheet.style.minHeight = '74mm';
+            sheet.style.maxHeight = '74mm';
+            sheet.style.padding = '10px 20px';
+            if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi 1/4 Slip Kertas A4 (210mm × 74mm)';
+            if (styleEl) {
+              styleEl.innerHTML = \`
+                @page { size: A4 portrait; margin: 8mm; }
+                @media print {
+                  body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                  .print-hidden { display: none !important; }
+                  .print-sheet {
+                    box-shadow: none !important;
+                    margin: 0 !important;
+                    width: 210mm !important;
+                    height: 74mm !important;
+                    min-height: 74mm !important;
+                    max-height: 74mm !important;
+                    page-break-after: avoid;
+                  }
+                  .receipt-cut-border { border: 1px dashed #94a3b8 !important; }
+                }
+              \`;
+            }
+          } else if (mode === 'half-a5') {
+            // 1/2 Kertas A4 (A5: 210mm x 148mm)
+            sheet.style.width = '210mm';
+            sheet.style.height = '148mm';
+            sheet.style.minHeight = '148mm';
+            sheet.style.maxHeight = '148mm';
+            sheet.style.padding = '24px 30px';
+            if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi 1/2 Kertas A4 (210mm × 148mm)';
+            if (styleEl) {
+              styleEl.innerHTML = \`
+                @page { size: A4 portrait; margin: 8mm; }
+                @media print {
+                  body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                  .print-hidden { display: none !important; }
+                  .print-sheet {
+                    box-shadow: none !important;
+                    margin: 0 !important;
+                    width: 210mm !important;
+                    height: 148mm !important;
+                    min-height: 148mm !important;
+                    max-height: 148mm !important;
+                    page-break-after: avoid;
+                  }
+                  .receipt-cut-border { border: 1px dashed #94a3b8 !important; }
+                }
+              \`;
+            }
+          } else if (mode === 'full-a4') {
+            // 1 Lembar A4 Penuh
+            sheet.style.width = '210mm';
+            sheet.style.height = '297mm';
+            sheet.style.minHeight = '297mm';
+            sheet.style.maxHeight = '297mm';
+            sheet.style.padding = '40px 45px';
+            if (guideLabel) guideLabel.innerText = 'Format Kuitansi A4 Penuh (210mm × 297mm)';
+            if (styleEl) {
+              styleEl.innerHTML = \`
+                @page { size: A4 portrait; margin: 0; }
+                @media print {
+                  body { background: white !important; padding: 0 !important; margin: 0 !important; }
+                  .print-hidden { display: none !important; }
+                  .print-sheet {
+                    box-shadow: none !important;
+                    border: none !important;
+                    margin: 0 !important;
+                    width: 210mm !important;
+                    height: 297mm !important;
+                    min-height: 297mm !important;
+                    max-height: 297mm !important;
+                    page-break-after: always;
+                  }
+                }
+              \`;
+            }
+          }
+        }
+
         function toggleLetterhead(enabled) {
           const bgImg = document.getElementById('letterhead-bg-img');
           const wrapper = document.getElementById('document-content-wrapper');
           if (enabled) {
-            bgImg.style.display = 'block';
-            wrapper.style.paddingTop = '120px';
-            wrapper.style.paddingBottom = '90px';
+            if (bgImg) bgImg.style.display = 'block';
+            if (wrapper) {
+              wrapper.style.paddingTop = '120px';
+              wrapper.style.paddingBottom = '90px';
+            }
           } else {
-            bgImg.style.display = 'none';
-            wrapper.style.paddingTop = '30px';
-            wrapper.style.paddingBottom = '30px';
+            if (bgImg) bgImg.style.display = 'none';
+            if (wrapper) {
+              wrapper.style.paddingTop = '30px';
+              wrapper.style.paddingBottom = '30px';
+            }
           }
         }
 
         function downloadAsPdf() {
           const element = document.getElementById('print-sheet-document');
+          const isReceipt = ${isReceipt ? 'true' : 'false'};
+
+          let jsPdfFormat = 'a4';
+          let jsPdfOrientation = 'portrait';
+
+          if (isReceipt) {
+            if (currentReceiptMode === 'quarter-a6') {
+              jsPdfFormat = [148, 105];
+              jsPdfOrientation = 'landscape';
+            } else if (currentReceiptMode === 'quarter-strip') {
+              jsPdfFormat = [210, 74];
+              jsPdfOrientation = 'landscape';
+            } else if (currentReceiptMode === 'half-a5') {
+              jsPdfFormat = [210, 148];
+              jsPdfOrientation = 'landscape';
+            } else {
+              jsPdfFormat = 'a4';
+              jsPdfOrientation = 'portrait';
+            }
+          }
+
           const opt = {
             margin:       0,
             filename:     '${documentTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf',
-            image:        { type: 'jpeg', quality: 0.65 },
-            html2canvas:  { scale: 1.5, useCORS: true },
-            jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            image:        { type: 'jpeg', quality: 0.95 },
+            html2canvas:  { scale: 2, useCORS: true },
+            jsPDF:        { unit: 'mm', format: jsPdfFormat, orientation: jsPdfOrientation }
           };
           html2pdf().set(opt).from(element).save();
         }
