@@ -7739,6 +7739,72 @@ export default function AdminFinanceERPPage() {
     };
   }, [sales, quotations, purchases, cashFlow, projects, selectedEntity]);
 
+  const getSupplierStats = (sup: SupplierItem) => {
+    const relatedPo = purchases.filter((p) => {
+      if (p.status === "Dibatalkan") return false;
+      const matchEntity = selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity;
+      if (!matchEntity) return false;
+      const matchName = p.supplierName && sup.name && p.supplierName.trim().toLowerCase() === sup.name.trim().toLowerCase();
+      const matchId = (p as any).supplierId && (p as any).supplierId === sup.id;
+      return matchName || matchId;
+    });
+
+    const calculatedPurchases = relatedPo.reduce((acc, curr) => acc + (Number(curr.grandTotal) || 0), 0);
+    const calculatedPayable = relatedPo
+      .filter((p) => {
+        const ps = (p.paymentStatus || "").toLowerCase();
+        return ps.includes("hutang") || ps.includes("tempo") || ps.includes("sebagian") || ps.includes("dp") || ps.includes("belum");
+      })
+      .reduce((acc, curr) => {
+        const ps = (curr.paymentStatus || "").toLowerCase();
+        const total = Number(curr.grandTotal) || 0;
+        if (ps.includes("dp") || ps.includes("50%")) {
+          const paid = Number((curr as any).paidAmount) || (total * 0.5);
+          return acc + Math.max(0, total - paid);
+        }
+        if ((curr as any).remainingAmount !== undefined) {
+          return acc + (Number((curr as any).remainingAmount) || 0);
+        }
+        return acc + total;
+      }, 0);
+
+    const totalPurchases = calculatedPurchases > 0 ? calculatedPurchases : (selectedEntity === "ALL" ? (Number(sup.totalPurchases) || 0) : 0);
+    const unpaidPayable = calculatedPayable > 0 ? calculatedPayable : (selectedEntity === "ALL" ? (Number(sup.unpaidPayable) || 0) : 0);
+
+    return {
+      totalPurchases,
+      unpaidPayable,
+      totalPoCount: relatedPo.length,
+    };
+  };
+
+  const getClientStats = (cli: ClientItem) => {
+    const relatedSales = sales.filter((s) => {
+      if ((s as any).status === "Dibatalkan" || s.paymentStatus === "Dibatalkan") return false;
+      const matchEntity = selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity;
+      if (!matchEntity) return false;
+      const matchName = s.customerName && cli.name && s.customerName.trim().toLowerCase() === cli.name.trim().toLowerCase();
+      const matchOrg = (s as any).customerOrg && cli.name && (s as any).customerOrg.trim().toLowerCase() === cli.name.trim().toLowerCase();
+      const matchId = (s as any).clientId && cli.id && (s as any).clientId === cli.id;
+      return matchName || matchOrg || matchId;
+    });
+
+    const calculatedInvoiced = relatedSales.reduce((acc, curr) => acc + (Number(curr.grandTotal) || 0), 0);
+    const calculatedPaid = relatedSales.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+    const calculatedReceivable = relatedSales.reduce((acc, curr) => acc + (Number(curr.remainingAmount) || 0), 0);
+
+    const totalInvoiced = calculatedInvoiced > 0 ? calculatedInvoiced : (selectedEntity === "ALL" ? (Number(cli.totalInvoiced) || 0) : 0);
+    const totalPaid = calculatedPaid > 0 ? calculatedPaid : (selectedEntity === "ALL" ? (Number(cli.totalPaid) || 0) : 0);
+    const unpaidReceivable = calculatedReceivable > 0 ? calculatedReceivable : (selectedEntity === "ALL" ? (Number(cli.unpaidReceivable) || 0) : 0);
+
+    return {
+      totalInvoiced,
+      totalPaid,
+      unpaidReceivable,
+      totalSalesCount: relatedSales.length,
+    };
+  };
+
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
@@ -11516,13 +11582,13 @@ export default function AdminFinanceERPPage() {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-purple-600">Total Akumulasi Faktur</p>
                 <p className="text-lg font-black text-purple-700 mt-0.5">
-                  {formatRupiah(clients.reduce((acc, curr) => acc + (curr.totalInvoiced || 0), 0))}
+                  {formatRupiah(clients.reduce((acc, curr) => acc + (getClientStats(curr).totalInvoiced), 0))}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-red-600">Piutang Klien Berjalan</p>
                 <p className="text-lg font-black text-red-700 mt-0.5">
-                  {formatRupiah(clients.reduce((acc, curr) => acc + (curr.unpaidReceivable || 0), 0))}
+                  {formatRupiah(clients.reduce((acc, curr) => acc + (getClientStats(curr).unpaidReceivable), 0))}
                 </p>
               </div>
             </div>
@@ -11537,6 +11603,7 @@ export default function AdminFinanceERPPage() {
                     <th className="p-3">Kategori</th>
                     <th className="p-3">Kontak & PIC</th>
                     <th className="p-3">Lokasi & NPWP</th>
+                    <th className="p-3">Akumulasi Faktur & Piutang</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-right">Aksi</th>
                   </tr>
@@ -11553,7 +11620,9 @@ export default function AdminFinanceERPPage() {
                         clientCategoryFilter === "Semua" || c.category === clientCategoryFilter;
                       return matchQuery && matchCat;
                     })
-                    .map((cli) => (
+                    .map((cli) => {
+                      const cliStats = getClientStats(cli);
+                      return (
                       <tr key={cli.id} className="hover:bg-blue-50/30 transition-colors">
                         <td className="p-3 font-mono font-bold text-slate-400 whitespace-nowrap">
                           {cli.id}
@@ -11590,6 +11659,23 @@ export default function AdminFinanceERPPage() {
                           <p className="text-[10px] text-slate-400 font-mono mt-0.5">NPWP: {cli.npwp}</p>
                         </td>
                         <td className="p-3 whitespace-nowrap">
+                          <p className="font-black text-slate-900 text-xs">
+                            {formatRupiah(cliStats.totalInvoiced)}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {cliStats.unpaidReceivable > 0 ? (
+                              <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold text-[10px]">
+                                Piutang: {formatRupiah(cliStats.unpaidReceivable)}
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                                {cliStats.totalInvoiced > 0 ? "Lunas" : "Belum Ada Faktur"}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-400 font-mono">({cliStats.totalSalesCount} Faktur)</span>
+                          </div>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
                           <span
                             className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
                               cli.status === "VIP"
@@ -11621,7 +11707,8 @@ export default function AdminFinanceERPPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -11662,13 +11749,13 @@ export default function AdminFinanceERPPage() {
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-amber-900">Total Pembelian PO</p>
                 <p className="text-lg font-black text-amber-950 mt-0.5">
-                  {formatRupiah(suppliers.reduce((acc, curr) => acc + (curr.totalPurchases || 0), 0))}
+                  {formatRupiah(suppliers.reduce((acc, curr) => acc + (getSupplierStats(curr).totalPurchases), 0))}
                 </p>
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-red-600">Hutang PO Belum Lunas</p>
                 <p className="text-lg font-black text-red-700 mt-0.5">
-                  {formatRupiah(suppliers.reduce((acc, curr) => acc + (curr.unpaidPayable || 0), 0))}
+                  {formatRupiah(suppliers.reduce((acc, curr) => acc + (getSupplierStats(curr).unpaidPayable), 0))}
                 </p>
               </div>
             </div>
@@ -11683,6 +11770,7 @@ export default function AdminFinanceERPPage() {
                     <th className="p-3">Kategori Suplai</th>
                     <th className="p-3">Kontak Sales & Rekening Transfer</th>
                     <th className="p-3">Termin (TOP)</th>
+                    <th className="p-3">Total Belanja PO & Hutang</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-right">Aksi</th>
                   </tr>
@@ -11697,7 +11785,9 @@ export default function AdminFinanceERPPage() {
                         s.city.toLowerCase().includes(supplierSearchQuery.toLowerCase())
                       );
                     })
-                    .map((sup) => (
+                    .map((sup) => {
+                      const supStats = getSupplierStats(sup);
+                      return (
                       <tr key={sup.id} className="hover:bg-amber-50/30 transition-colors">
                         <td className="p-3 font-mono font-bold text-slate-400 whitespace-nowrap">
                           {sup.id}
@@ -11723,6 +11813,23 @@ export default function AdminFinanceERPPage() {
                           <span className="px-2 py-1 rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-700">
                             {sup.paymentTerms}
                           </span>
+                        </td>
+                        <td className="p-3 whitespace-nowrap">
+                          <p className="font-black text-slate-900 text-xs">
+                            {formatRupiah(supStats.totalPurchases)}
+                          </p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {supStats.unpaidPayable > 0 ? (
+                              <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold text-[10px]">
+                                Hutang: {formatRupiah(supStats.unpaidPayable)}
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold text-[10px]">
+                                {supStats.totalPurchases > 0 ? "Lunas" : "Belum Ada PO"}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-slate-400 font-mono">({supStats.totalPoCount} PO)</span>
+                          </div>
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <span
@@ -11756,7 +11863,8 @@ export default function AdminFinanceERPPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                 </tbody>
               </table>
             </div>

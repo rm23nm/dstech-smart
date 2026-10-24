@@ -152,6 +152,69 @@ export async function GET() {
   const totalQuotationsPending = quotations.filter((q: any) => q.status === "Terkirim" || q.status === "Draf").length;
   const totalQuotationsApproved = quotations.filter((q: any) => q.status === "Disetujui Klien").length;
 
+  // Kalkulasi dinamis akumulasi PO & hutang per Supplier
+  const dynamicSuppliers = suppliers.map((sup: any) => {
+    const relatedPurchases = purchases.filter((p: any) => {
+      if (p.status === "Dibatalkan") return false;
+      const matchName = p.supplierName && sup.name && p.supplierName.trim().toLowerCase() === sup.name.trim().toLowerCase();
+      const matchId = p.supplierId && sup.id && p.supplierId === sup.id;
+      return matchName || matchId;
+    });
+
+    const totalPurchases = relatedPurchases.reduce((acc: number, curr: any) => acc + (Number(curr.grandTotal) || 0), 0);
+
+    const unpaidPayable = relatedPurchases
+      .filter((p: any) => {
+        const ps = (p.paymentStatus || "").toLowerCase();
+        return ps.includes("hutang") || ps.includes("tempo") || ps.includes("sebagian") || ps.includes("dp") || ps.includes("belum");
+      })
+      .reduce((acc: number, curr: any) => {
+        const ps = (curr.paymentStatus || "").toLowerCase();
+        const total = Number(curr.grandTotal) || 0;
+        if (ps.includes("dp") || ps.includes("50%")) {
+          const paid = Number(curr.paidAmount) || (total * 0.5);
+          return acc + Math.max(0, total - paid);
+        }
+        if (curr.remainingAmount !== undefined) {
+          return acc + (Number(curr.remainingAmount) || 0);
+        }
+        return acc + total;
+      }, 0);
+
+    return {
+      ...sup,
+      totalPurchases: totalPurchases > 0 ? totalPurchases : (Number(sup.totalPurchases) || 0),
+      unpaidPayable: unpaidPayable > 0 ? unpaidPayable : (Number(sup.unpaidPayable) || 0),
+      totalPoCount: relatedPurchases.length,
+    };
+  });
+
+  // Kalkulasi dinamis akumulasi Faktur, Pelunasan, & Piutang per Klien
+  const dynamicClients = clients.map((cli: any) => {
+    const relatedSales = sales.filter((s: any) => {
+      if (s.status === "Dibatalkan") return false;
+      const matchName = s.customerName && cli.name && s.customerName.trim().toLowerCase() === cli.name.trim().toLowerCase();
+      const matchOrg = s.customerOrg && cli.name && s.customerOrg.trim().toLowerCase() === cli.name.trim().toLowerCase();
+      const matchId = s.clientId && cli.id && s.clientId === cli.id;
+      return matchName || matchOrg || matchId;
+    });
+
+    const totalInvoiced = relatedSales.reduce((acc: number, curr: any) => acc + (Number(curr.grandTotal) || 0), 0);
+    const totalPaid = relatedSales.reduce((acc: number, curr: any) => acc + (Number(curr.paidAmount) || 0), 0);
+    const unpaidReceivable = relatedSales.reduce((acc: number, curr: any) => acc + (Number(curr.remainingAmount) || 0), 0);
+
+    return {
+      ...cli,
+      totalInvoiced: totalInvoiced > 0 ? totalInvoiced : (Number(cli.totalInvoiced) || 0),
+      totalPaid: totalPaid > 0 ? totalPaid : (Number(cli.totalPaid) || 0),
+      unpaidReceivable: unpaidReceivable > 0 ? unpaidReceivable : (Number(cli.unpaidReceivable) || 0),
+      totalSalesCount: relatedSales.length,
+    };
+  });
+
+  const totalSuppliersPurchases = dynamicSuppliers.reduce((acc: number, curr: any) => acc + (Number(curr.totalPurchases) || 0), 0);
+  const totalSuppliersPayable = dynamicSuppliers.reduce((acc: number, curr: any) => acc + (Number(curr.unpaidPayable) || 0), 0);
+
   const summary = {
     totalSalesRevenue,
     totalSalesPaid,
@@ -170,6 +233,8 @@ export async function GET() {
     totalBranchCount: (data.branches || []).length,
     totalClientsCount: clients.length,
     totalSuppliersCount: suppliers.length,
+    totalSuppliersPurchases,
+    totalSuppliersPayable,
     totalQuotationsCount: quotations.length,
     totalQuotationsValue,
     totalQuotationsPending,
@@ -181,6 +246,8 @@ export async function GET() {
     success: true,
     data: {
       ...data,
+      suppliers: dynamicSuppliers,
+      clients: dynamicClients,
       summary,
     },
   });
