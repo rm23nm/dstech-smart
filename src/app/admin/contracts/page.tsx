@@ -2388,6 +2388,23 @@ export default function ContractsPage() {
                       className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-medium text-slate-700"
                     />
                   </div>
+
+                  {/* BANNER PENEGASAN KLAUSUL HUKUM PKWT RESMI */}
+                  <div className="p-3 bg-white/95 rounded-xl border border-indigo-200/80 shadow-sm flex items-start gap-2.5">
+                    <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0 mt-0.5">
+                      <FileSignature className="w-4 h-4" />
+                    </div>
+                    <div className="text-[11px] space-y-1">
+                      <p className="font-bold text-slate-800">
+                        Penegasan Klausul Pelaporan & Kedisiplinan Kerja (Otomatis Mengikat di Lembar PKWT):
+                      </p>
+                      <ul className="list-disc pl-4 text-slate-600 space-y-0.5 text-[10px]">
+                        <li><strong>Pasal 3:</strong> Wajib Presensi Mandiri (Check-In & Check-Out) tepat waktu berbasis Satelit GPS & Kamera Live Real-time (Anti-Manipulasi) serta kepatuhan K3 & toolkit.</li>
+                        <li><strong>Pasal 5:</strong> Wajib Laporan Kegiatan Harian (Daily Activity Log) per user setiap hari kerja di Portal Karyawan & Laporan Progress PIC Proyek resmi ke Klien.</li>
+                        <li><strong>Pasal 7:</strong> Kedisiplinan pelaporan dan presensi menjadi KPI utama evaluasi kelanjutan/perpanjangan kontrak PKWT.</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -3438,7 +3455,7 @@ export default function ContractsPage() {
                 {/* PASAL 3 */}
                 <div>
                   <h4 className="font-bold font-sans text-center text-slate-900 mb-1">
-                    PASAL 3: HARI KERJA, WAKTU KERJA & ISTIRAHAT
+                    PASAL 3: HARI KERJA, WAKTU KERJA, RUTINITAS DISIPLIN & PRESENSI MANDIRI
                   </h4>
                   <p>
                     1. <strong>Hari Kerja Resmi:</strong> Hari kerja operasional bagi PIHAK KEDUA ditetapkan sebanyak <strong>{selectedContract.workSchedule?.workDaysText || (selectedContract.employeeCategory === "STAFF" ? "Senin s.d. Jumat (5 Hari Kerja)" : "Senin s.d. Sabtu (6 Hari Kerja)")}</strong>, atau disesuaikan dengan kebutuhan penugasan proyek lapangan resmi yang diatur dalam Surat Perintah Kerja (SPK).
@@ -3450,10 +3467,13 @@ export default function ContractsPage() {
                     3. <strong>Waktu Istirahat:</strong> PIHAK KEDUA berhak atas waktu istirahat siang selama 1 (satu) jam, yaitu mulai pukul <strong>{selectedContract.workSchedule?.breakStartTime || "12:00"} WIB s.d. {selectedContract.workSchedule?.breakEndTime || "13:00"} WIB</strong> (khusus hari Jumat disesuaikan pukul 11:30 WIB s.d. 13:00 WIB untuk penunaian Ibadah Sholat Jumat). Sesuai ketentuan ketenagakerjaan, waktu istirahat tidak diperhitungkan sebagai jam kerja efektif.
                   </p>
                   <p>
-                    4. <strong>Presensi Digital Berbasis Satelit & Kamera:</strong> PIHAK KEDUA wajib mencatatkan presensi Masuk dan Pulang secara mandiri melalui Aplikasi DSTech Smart yang divalidasi dengan koordinat satelit GPS dan foto kamera selfie wajah langsung secara realtime.
+                    4. <strong>Rutinitas Presensi Mandiri (Real-Time GPS Satelit & Kamera Live):</strong> PIHAK KEDUA wajib mencatatkan Presensi Masuk (Check-In) tepat waktu sebelum jam kerja dimulai dan Presensi Pulang (Check-Out) setelah menyelesaikan tugas harian melalui Aplikasi DSTech Smart. Presensi WAJIB divalidasi dengan koordinat GPS satelit aktual pada radius penugasan resmi serta pemotretan wajah (selfie) langsung secara realtime via kamera sensor perangkat. Dilarang keras memanipulasi lokasi (fake GPS), menggunakan foto galeri/dokumen lama, atau melakukan kecurangan perwakilan presensi.
                   </p>
                   <p>
-                    5. <strong>Kerja Lembur:</strong> Apabila operasional perusahaan atau penyelesaian proyek mendesak mengharuskan bekerja melebihi jam kerja harian normal, pekerjaan tersebut dikategorikan sebagai Kerja Lembur atas persetujuan/perintah tertulis PIHAK PERTAMA dan diperhitungkan kompensasi lemburnya sesuai ketentuan Pasal 4 perjanjian ini.
+                    5. <strong>Kesiapan Rutinitas Kerja & Standar K3 Lapangan:</strong> Setiap hari kerja, PIHAK KEDUA (khususnya teknisi lapangan) wajib memastikan kesiapan fisik, mengenakan Alat Pelindung Diri (APD) standar K3, membawa perlengkapan kerja/toolkit instrumen dalam kondisi prima, serta mematuhi Standar Operasional Prosedur (SOP) pengerjaan instalasi dan etika pelayanan profesional di lokasi klien.
+                  </p>
+                  <p>
+                    6. <strong>Kerja Lembur:</strong> Apabila operasional perusahaan atau penyelesaian proyek mendesak mengharuskan bekerja melebihi jam kerja harian normal, pekerjaan tersebut dikategorikan sebagai Kerja Lembur atas persetujuan/perintah tertulis PIHAK PERTAMA dan diperhitungkan kompensasi lemburnya sesuai ketentuan Pasal 4 perjanjian ini.
                   </p>
                 </div>
 
@@ -3533,7 +3553,26 @@ export default function ContractsPage() {
                 {/* PASAL 5 */}
                 <div>
                   <h4 className="font-bold font-sans text-center text-slate-900 mb-1">
-                    PASAL 5: HAK CUTI, IZIN, DAN KETENTUAN SAKIT
+                    PASAL 5: KEWAJIBAN PELAPORAN KERJA HARIAN & AKUNTABILITAS TUGAS LAPANGAN
+                  </h4>
+                  <p>
+                    1. <strong>Kewajiban Pengisian Laporan Kegiatan Harian (Daily Activity Log):</strong> PIHAK KEDUA (khususnya teknisi lapangan maupun staf proyek) <strong>diwajibkan secara tegas untuk mengisi dan mengirimkan Laporan Kegiatan Harian</strong> setiap hari kerja melalui Portal Karyawan (<em>/employee</em>) sebelum jam operasional berakhir atau sebelum melakukan Presensi Pulang (Check-Out).
+                  </p>
+                  <p>
+                    2. <strong>Muatan Laporan Harian:</strong> Laporan harian wajib memuat uraian aktivitas pekerjaan yang diselesaikan selama 1 (satu) hari penuh, identitas proyek / nomor tiket pekerjaan yang ditugaskan, alokasi jam kerja, kendala teknis lapangan (<em>blockers</em>), rencana tindak lanjut, serta lampiran foto bukti dokumentasi pekerjaan aktual di lapangan.
+                  </p>
+                  <p>
+                    3. <strong>Tanggung Jawab PIC (Person In Charge) Proyek:</strong> Bagi PIHAK KEDUA yang ditunjuk sebagai Penanggung Jawab Lapangan / PIC Proyek, wajib menyusun dan melaporkan <strong>Laporan Progress Proyek Resmi untuk Klien (Client Progress Report)</strong> secara berkala yang memuat persentase akumulatif progres fisik pekerjaan (% milestone), ringkasan perkembangan proyek, catatan kendala, serta rencana target tahap berikutnya untuk dilaporkan kepada Manajemen dan Klien.
+                  </p>
+                  <p>
+                    4. <strong>Keterkaitan Laporan dengan Validasi Kehadiran & Penggajian:</strong> Laporan kegiatan harian merupakan bukti otentik akuntabilitas pelaksanaan tugas. Kelalaian atau ketidaksediaan mengirimkan laporan harian tanpa alasan yang sah dapat mengakibatkan kehadiran pada hari bersangkutan tidak diverifikasi oleh sistem dan/atau penundaan pencairan kompensasi tunjangan operasional harian terkait.
+                  </p>
+                </div>
+
+                {/* PASAL 6 */}
+                <div>
+                  <h4 className="font-bold font-sans text-center text-slate-900 mb-1">
+                    PASAL 6: HAK CUTI, IZIN, DAN KETENTUAN SAKIT
                   </h4>
                   <p>
                     1. <strong>Hak Cuti Tahunan:</strong> PIHAK KEDUA berhak atas cuti tahunan sebanyak <strong>{selectedContract.leavePolicy?.annualLeaveDays || 12} (dua belas) hari kerja</strong> per tahun (dihitung proporsional sesuai masa kerja berjalan) dengan permohonan melalui sistem aplikasi DSTech Smart paling lambat 3 (tiga) hari kerja sebelumnya.
@@ -3546,13 +3585,19 @@ export default function ContractsPage() {
                   </p>
                 </div>
 
-                {/* PASAL 6 */}
+                {/* PASAL 7 */}
                 <div>
                   <h4 className="font-bold font-sans text-center text-slate-900 mb-1">
-                    PASAL 6: KERAHASIAAN & TATA TERTIB
+                    PASAL 7: KERAHASIAAN, TATA TERTIB, EVALUASI KINERJA (KPI) & SANKSI
                   </h4>
                   <p>
-                    PIHAK KEDUA wajib menjaga kerahasiaan data instalasi, aset, kode sandi, dan rahasia bisnis milik PIHAK PERTAMA maupun klien. Pelanggaran berat terhadap keselamatan kerja (K3) dan penyalahgunaan wewenang dapat berakibat pemutusan kontrak sepihak tanpa ganti rugi.
+                    1. <strong>Kerahasiaan Data & Aset:</strong> PIHAK KEDUA wajib menjaga kerahasiaan data instalasi, aset, kode sandi, konfigurasi sistem, dan rahasia bisnis milik PIHAK PERTAMA maupun klien.
+                  </p>
+                  <p>
+                    2. <strong>Evaluasi Kinerja (KPI):</strong> Kedisiplinan rutinitas presensi harian, kepatuhan pengisian laporan kegiatan harian, serta kualitas hasil instalasi lapangan menjadi indikator utama dalam penilaian kinerja (<em>Key Performance Indicator / KPI</em>) dan syarat mutlak pertimbangan perpanjangan kontrak kerja (PKWT).
+                  </p>
+                  <p>
+                    3. <strong>Sanksi Pelanggaran:</strong> Pelanggaran terhadap disiplin waktu, kelalaian pelaporan harian berulang, pelanggaran standar K3, atau manipulasi data pekerjaan/kehadiran akan dikenakan sanksi bertahap mulai dari Surat Peringatan (SP 1, SP 2, SP 3) hingga Pemutusan Hubungan Kerja (PHK) sepihak tanpa kompensasi ganti rugi.
                   </p>
                 </div>
               </div>
