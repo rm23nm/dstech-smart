@@ -8341,250 +8341,246 @@ export default function AdminFinanceERPPage() {
                           </div>
                         </td>
                         <td className="p-3 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Tombol Utama Input Pembayaran Klien */}
-                            {sale.remainingAmount > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenPayInvoice(sale)}
-                                title={
-                                  sale.invoiceType === "Termin"
-                                    ? `Input Pembayaran Termin (${sale.termins?.find((t) => t.id === sale.activeTerminId)?.name || "Aktif"})`
-                                    : sale.invoiceType === "DP"
-                                    ? ((Number(sale.dpPaidAmount) || 0) >= (Number(sale.dpAmount) || 0)
-                                        ? "Input Pembayaran Pelunasan Sisa Kontrak"
-                                        : `Input Pembayaran DP (${sale.dpPercentage || 50}%)`)
-                                    : "Input Penerimaan Pembayaran dari Klien (Pelunasan / Cicilan Kas Masuk)"
-                                }
-                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer hover:scale-105 shrink-0"
-                              >
-                                <CreditCard className="w-3.5 h-3.5" />
-                                <span>Input Bayar</span>
-                              </button>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                                <span>Lunas</span>
-                              </span>
-                            )}
-
-                            {/* Approval & Tanda Tangan Digital */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenApprovalModal(sale)}
-                              title={
-                                sale.approvalStatus === "Disetujui & Sah"
-                                  ? `Disetujui & Sah oleh ${sale.approvedBy || "Direktur"} (Klik untuk kelola tanda tangan)`
-                                  : "Approval & Tanda Tangan Digital Direktur"
-                              }
-                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
-                                sale.approvalStatus === "Disetujui & Sah"
-                                  ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white"
-                                  : "bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white ring-1 ring-amber-300"
-                              }`}
-                            >
-                              <PenTool className="w-4 h-4" />
-                            </button>
-
-                            {/* Tombol Khusus Tagih Pelunasan untuk Faktur DP */}
-                            {sale.invoiceType === "DP" && sale.remainingAmount > 0 && (
-                              <button
-                                onClick={() => handleOpenPrintInvoice(sale, "Pelunasan")}
-                                title="Cetak Faktur Penagihan Pelunasan (Sisa Kontrak Pasca BAST)"
-                                className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
-                              >
-                                <Receipt className="w-3.5 h-3.5" />
-                                <span className="hidden xl:inline">Tagih Pelunasan</span>
-                              </button>
-                            )}
-
-                            {/* Tombol Khusus Tagih Termin untuk Faktur Termin */}
-                            {sale.invoiceType === "Termin" && sale.remainingAmount > 0 && (
-                              <button
-                                onClick={() => handleOpenPrintInvoice(sale, "Termin")}
-                                title="Cetak Faktur Penagihan Termin Berjalan"
-                                className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
-                              >
-                                <Layers className="w-3.5 h-3.5" />
-                                <span className="hidden xl:inline">Tagih Termin</span>
-                              </button>
-                            )}
-
-                            {/* Tombol Cetak Berita Acara Serah Terima (BAST) */}
-                            <button
-                              onClick={() => handleOpenBastModal(sale)}
-                              title="Cetak Berita Acara Serah Terima Pekerjaan (BAST)"
-                              className="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
-                            >
-                              <ClipboardCheck className="w-3.5 h-3.5" />
-                              <span className="hidden xl:inline">BAST</span>
-                            </button>
-
-                            {/* Tombol Cetak Surat Jalan Pengiriman Material */}
-                            <button
-                              onClick={() => handleOpenDeliveryModal(sale)}
-                              title="Cetak Surat Jalan Material & Tanda Terima Barang (Delivery Order)"
-                              className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
-                            >
-                              <Truck className="w-3.5 h-3.5" />
-                              <span className="hidden xl:inline">Surat Jalan</span>
-                            </button>
-
-                            {/* Tombol Cetak Laporan Dokumentasi Foto */}
-                            <button
-                              onClick={() => setSelectedInvoiceForPhotoPrint(sale)}
-                              title="Cetak Laporan Dokumentasi Foto & Pergantian Part Resmi (A4)"
-                              className="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
-                            >
-                              <Camera className="w-3.5 h-3.5" />
-                              <span className="hidden xl:inline">Dokumentasi</span>
-                              {sale.photos && sale.photos.length > 0 && (
-                                <span className="ml-0.5 px-1 rounded-full bg-purple-200 text-purple-800 text-[8.5px] font-black">
-                                  {sale.photos.length}
+                          <div className="flex flex-col items-end gap-1.5 py-1">
+                            {/* Baris 1: Transaksi, Approval & Cetak Dokumen Sah */}
+                            <div className="flex items-center justify-end gap-1 flex-wrap">
+                              {/* Tombol Utama Input Pembayaran Klien */}
+                              {sale.remainingAmount > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPayInvoice(sale)}
+                                  title={
+                                    sale.invoiceType === "Termin"
+                                      ? `Input Pembayaran Termin (${sale.termins?.find((t) => t.id === sale.activeTerminId)?.name || "Aktif"})`
+                                      : sale.invoiceType === "DP"
+                                      ? ((Number(sale.dpPaidAmount) || 0) >= (Number(sale.dpAmount) || 0)
+                                          ? "Input Pembayaran Pelunasan Sisa Kontrak"
+                                          : `Input Pembayaran DP (${sale.dpPercentage || 50}%)`)
+                                      : "Input Penerimaan Pembayaran dari Klien (Pelunasan / Cicilan Kas Masuk)"
+                                  }
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer hover:scale-105 shrink-0"
+                                >
+                                  <CreditCard className="w-3.5 h-3.5" />
+                                  <span>Input Bayar</span>
+                                </button>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-xl bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Lunas</span>
                                 </span>
                               )}
-                            </button>
 
-                            {/* Cetak Faktur Resmi Kop DSTech */}
-                            <button
-                              onClick={() => handleOpenPrintInvoice(sale)}
-                              title="Cetak Faktur Resmi Kop DSTech"
-                              className="p-2 rounded-xl bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Printer className="w-4 h-4" />
-                            </button>
-
-                            {/* Cetak Kuitansi Pembayaran Sah (Kop Resmi DSTech) */}
-                            <button
-                              onClick={() => {
-                                window.open(`/api/finance/print?doc=receipt&no=${encodeURIComponent(sale.invoiceNumber)}`, "_blank");
-                              }}
-                              title="Cetak Kuitansi Pembayaran Sah (Kop Resmi DSTech)"
-                              className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
-                            >
-                              <Receipt className="w-3.5 h-3.5" />
-                              <span className="hidden xl:inline">Kuitansi</span>
-                            </button>
-
-                            {/* Kirim Faktur via WhatsApp */}
-                            <button
-                              onClick={() =>
-                                handleOpenSendDocModal({
-                                  docType: "Invoice",
-                                  docTitle: sale.invoiceType === "DP" ? `Faktur Uang Muka (DP ${sale.dpPercentage}%)` : "Faktur Penjualan (Sale Invoice)",
-                                  docNumber: sale.invoiceNumber,
-                                  recipientName: sale.customerName,
-                                  recipientPic: sale.customerPic || sale.picName || (clients.find(c => c.name.toLowerCase() === sale.customerName.toLowerCase())?.pic) || "",
-                                  recipientPhone: sale.customerPhone,
-                                  date: sale.date,
-                                  dueDate: sale.dueDate,
-                                  subject: sale.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${sale.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
-                                  grandTotal: sale.invoiceType === "DP" ? (sale.dpAmount || sale.grandTotal) : sale.grandTotal,
-                                  subtotal: sale.subtotal,
-                                  discount: sale.discount,
-                                  discountLabel: sale.discountLabel,
-                                  paymentStatus: sale.paymentStatus,
-                                  paymentMethod: sale.paymentMethod,
-                                  approvalStatus: sale.approvalStatus,
-                                  initialTab: "whatsapp",
-                                })
-                              }
-                              title="Kirim Faktur via WhatsApp ke Klien"
-                              className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <MessageCircle className="w-4 h-4" />
-                            </button>
-
-                            {/* Kirim Faktur via Email */}
-                            <button
-                              onClick={() =>
-                                handleOpenSendDocModal({
-                                  docType: "Invoice",
-                                  docTitle: sale.invoiceType === "DP" ? `Faktur Uang Muka (DP ${sale.dpPercentage}%)` : "Faktur Penjualan (Sale Invoice)",
-                                  docNumber: sale.invoiceNumber,
-                                  recipientName: sale.customerName,
-                                  recipientPic: sale.customerPic || sale.picName || (clients.find(c => c.name.toLowerCase() === sale.customerName.toLowerCase())?.pic) || "",
-                                  recipientPhone: sale.customerPhone,
-                                  date: sale.date,
-                                  dueDate: sale.dueDate,
-                                  subject: sale.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${sale.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
-                                  grandTotal: sale.invoiceType === "DP" ? (sale.dpAmount || sale.grandTotal) : sale.grandTotal,
-                                  subtotal: sale.subtotal,
-                                  discount: sale.discount,
-                                  discountLabel: sale.discountLabel,
-                                  paymentStatus: sale.paymentStatus,
-                                  paymentMethod: sale.paymentMethod,
-                                  approvalStatus: sale.approvalStatus,
-                                  initialTab: "email",
-                                })
-                              }
-                              title="Kirim Faktur via Email ke Klien"
-                              className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Mail className="w-4 h-4" />
-                            </button>
-
-                            {/* Kelola Arsip Lampiran Berkas Faktur */}
-                            <button
-                              type="button"
-                              onClick={() => openArchiveModal("sale", sale)}
-                              title="Kelola Arsip & Lampiran Berkas Faktur (SPK, PO Klien, Bukti Transfer, BAST)"
-                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
-                                sale.attachments && sale.attachments.length > 0
-                                  ? "bg-purple-100 text-purple-800 hover:bg-purple-700 hover:text-white ring-1 ring-purple-300"
-                                  : "bg-slate-100 text-slate-600 hover:bg-slate-700 hover:text-white"
-                              }`}
-                            >
-                              <FolderArchive className="w-4 h-4" />
-                              {sale.attachments && sale.attachments.length > 0 && (
-                                <span className="text-[10px] font-black">{sale.attachments.length}</span>
+                              {/* Tombol Khusus Tagih Pelunasan untuk Faktur DP */}
+                              {sale.invoiceType === "DP" && sale.remainingAmount > 0 && (
+                                <button
+                                  onClick={() => handleOpenPrintInvoice(sale, "Pelunasan")}
+                                  title="Cetak Faktur Penagihan Pelunasan (Sisa Kontrak Pasca BAST)"
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                                >
+                                  <Receipt className="w-3.5 h-3.5" />
+                                  <span className="hidden xl:inline">Tagih Pelunasan</span>
+                                </button>
                               )}
-                            </button>
 
-                            {/* Kwitansi Resmi Pembayaran Faktur */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenReceiptModal({ type: "sale", doc: sale })}
-                              title="Kwitansi Tanda Terima Pembayaran Sah (Official Payment Receipt A4)"
-                              className="p-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Receipt className="w-4 h-4" />
-                            </button>
-
-                            {/* Foto Dokumentasi & Part Penagihan Faktur */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenInvoicePhotos(sale)}
-                              title="Foto Dokumentasi Pekerjaan & Penggantian Part Khusus Faktur Ini"
-                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
-                                sale.photos && sale.photos.length > 0
-                                  ? "bg-purple-100 text-purple-700 hover:bg-purple-600 hover:text-white ring-1 ring-purple-300"
-                                  : "bg-slate-100 text-slate-600 hover:bg-purple-600 hover:text-white"
-                              }`}
-                            >
-                              <Camera className="w-4 h-4" />
-                              {sale.photos && sale.photos.length > 0 && (
-                                <span className="text-[10px] font-black">{sale.photos.length}</span>
+                              {/* Tombol Khusus Tagih Termin untuk Faktur Termin */}
+                              {sale.invoiceType === "Termin" && sale.remainingAmount > 0 && (
+                                <button
+                                  onClick={() => handleOpenPrintInvoice(sale, "Termin")}
+                                  title="Cetak Faktur Penagihan Termin Berjalan"
+                                  className="px-2.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                                >
+                                  <Layers className="w-3.5 h-3.5" />
+                                  <span className="hidden xl:inline">Tagih Termin</span>
+                                </button>
                               )}
-                            </button>
 
-                            {/* Edit Faktur */}
-                            <button
-                              onClick={() => handleOpenEditSale(sale)}
-                              title="Edit Faktur Penjualan"
-                              className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
+                              {/* Approval & Tanda Tangan Digital Direktur */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApprovalModal(sale)}
+                                title={
+                                  sale.approvalStatus === "Disetujui & Sah"
+                                    ? `Disetujui & Sah oleh ${sale.approvedBy || "Direktur"} (Klik untuk kelola tanda tangan)`
+                                    : "Approval & Tanda Tangan Digital Direktur"
+                                }
+                                className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
+                                  sale.approvalStatus === "Disetujui & Sah"
+                                    ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white"
+                                    : "bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white ring-1 ring-amber-300"
+                                }`}
+                              >
+                                <PenTool className="w-4 h-4" />
+                              </button>
 
-                            {/* Hapus Faktur */}
-                            <button
-                              onClick={() => handleDeleteSale(sale.id, sale.invoiceNumber)}
-                              title="Hapus Faktur"
-                              className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              {/* Cetak Faktur Resmi Kop DSTech */}
+                              <button
+                                onClick={() => handleOpenPrintInvoice(sale)}
+                                title="Cetak Faktur Resmi Kop DSTech"
+                                className="p-2 rounded-xl bg-blue-50 text-dstech-blue hover:bg-dstech-blue hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Printer className="w-4 h-4" />
+                              </button>
+
+                              {/* Cetak Kuitansi Pembayaran Sah (Kop Resmi DSTech) */}
+                              <button
+                                onClick={() => {
+                                  window.open(`/api/finance/print?doc=receipt&no=${encodeURIComponent(sale.invoiceNumber)}`, "_blank");
+                                }}
+                                title="Cetak Kuitansi Pembayaran Sah (Kop Resmi DSTech)"
+                                className="px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                              >
+                                <Receipt className="w-3.5 h-3.5" />
+                                <span className="hidden xl:inline">Kuitansi</span>
+                              </button>
+
+                              {/* Tombol Cetak Berita Acara Serah Terima (BAST) */}
+                              <button
+                                onClick={() => handleOpenBastModal(sale)}
+                                title="Cetak Berita Acara Serah Terima Pekerjaan (BAST)"
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                              >
+                                <ClipboardCheck className="w-3.5 h-3.5" />
+                                <span className="hidden xl:inline">BAST</span>
+                              </button>
+
+                              {/* Tombol Cetak Surat Jalan Pengiriman Material */}
+                              <button
+                                onClick={() => handleOpenDeliveryModal(sale)}
+                                title="Cetak Surat Jalan Material & Tanda Terima Barang (Delivery Order)"
+                                className="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                              >
+                                <Truck className="w-3.5 h-3.5" />
+                                <span className="hidden xl:inline">Surat Jalan</span>
+                              </button>
+
+                              {/* Tombol Cetak Laporan Dokumentasi Foto */}
+                              <button
+                                onClick={() => setSelectedInvoiceForPhotoPrint(sale)}
+                                title="Cetak Laporan Dokumentasi Foto & Pergantian Part Resmi (A4)"
+                                className="px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white font-bold text-[10px] flex items-center gap-1 shadow-sm transition-all cursor-pointer hover:scale-105"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                <span className="hidden xl:inline">Dokumentasi</span>
+                                {sale.photos && sale.photos.length > 0 && (
+                                  <span className="ml-0.5 px-1 rounded-full bg-purple-200 text-purple-800 text-[8.5px] font-black">
+                                    {sale.photos.length}
+                                  </span>
+                                )}
+                              </button>
+                            </div>
+
+                            {/* Baris 2: Komunikasi, Arsip & Manajemen */}
+                            <div className="flex items-center justify-end gap-1 flex-wrap">
+                              {/* Kirim Faktur via WhatsApp */}
+                              <button
+                                onClick={() =>
+                                  handleOpenSendDocModal({
+                                    docType: "Invoice",
+                                    docTitle: sale.invoiceType === "DP" ? `Faktur Uang Muka (DP ${sale.dpPercentage}%)` : "Faktur Penjualan (Sale Invoice)",
+                                    docNumber: sale.invoiceNumber,
+                                    recipientName: sale.customerName,
+                                    recipientPic: sale.customerPic || sale.picName || (clients.find(c => c.name.toLowerCase() === sale.customerName.toLowerCase())?.pic) || "",
+                                    recipientPhone: sale.customerPhone,
+                                    date: sale.date,
+                                    dueDate: sale.dueDate,
+                                    subject: sale.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${sale.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
+                                    grandTotal: sale.invoiceType === "DP" ? (sale.dpAmount || sale.grandTotal) : sale.grandTotal,
+                                    subtotal: sale.subtotal,
+                                    discount: sale.discount,
+                                    discountLabel: sale.discountLabel,
+                                    paymentStatus: sale.paymentStatus,
+                                    paymentMethod: sale.paymentMethod,
+                                    approvalStatus: sale.approvalStatus,
+                                    initialTab: "whatsapp",
+                                  })
+                                }
+                                title="Kirim Faktur via WhatsApp ke Klien"
+                                className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </button>
+
+                              {/* Kirim Faktur via Email */}
+                              <button
+                                onClick={() =>
+                                  handleOpenSendDocModal({
+                                    docType: "Invoice",
+                                    docTitle: sale.invoiceType === "DP" ? `Faktur Uang Muka (DP ${sale.dpPercentage}%)` : "Faktur Penjualan (Sale Invoice)",
+                                    docNumber: sale.invoiceNumber,
+                                    recipientName: sale.customerName,
+                                    recipientPic: sale.customerPic || sale.picName || (clients.find(c => c.name.toLowerCase() === sale.customerName.toLowerCase())?.pic) || "",
+                                    recipientPhone: sale.customerPhone,
+                                    date: sale.date,
+                                    dueDate: sale.dueDate,
+                                    subject: sale.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${sale.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
+                                    grandTotal: sale.invoiceType === "DP" ? (sale.dpAmount || sale.grandTotal) : sale.grandTotal,
+                                    subtotal: sale.subtotal,
+                                    discount: sale.discount,
+                                    discountLabel: sale.discountLabel,
+                                    paymentStatus: sale.paymentStatus,
+                                    paymentMethod: sale.paymentMethod,
+                                    approvalStatus: sale.approvalStatus,
+                                    initialTab: "email",
+                                  })
+                                }
+                                title="Kirim Faktur via Email ke Klien"
+                                className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Mail className="w-4 h-4" />
+                              </button>
+
+                              {/* Kelola Arsip Lampiran Berkas Faktur */}
+                              <button
+                                type="button"
+                                onClick={() => openArchiveModal("sale", sale)}
+                                title="Kelola Arsip & Lampiran Berkas Faktur (SPK, PO Klien, Bukti Transfer, BAST)"
+                                className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
+                                  sale.attachments && sale.attachments.length > 0
+                                    ? "bg-purple-100 text-purple-800 hover:bg-purple-700 hover:text-white ring-1 ring-purple-300"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-700 hover:text-white"
+                                }`}
+                              >
+                                <FolderArchive className="w-4 h-4" />
+                                {sale.attachments && sale.attachments.length > 0 && (
+                                  <span className="text-[10px] font-black">{sale.attachments.length}</span>
+                                )}
+                              </button>
+
+                              {/* Foto Dokumentasi & Part Penagihan Faktur */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenInvoicePhotos(sale)}
+                                title="Foto Dokumentasi Pekerjaan & Penggantian Part Khusus Faktur Ini"
+                                className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
+                                  sale.photos && sale.photos.length > 0
+                                    ? "bg-purple-100 text-purple-700 hover:bg-purple-600 hover:text-white ring-1 ring-purple-300"
+                                    : "bg-slate-100 text-slate-600 hover:bg-purple-600 hover:text-white"
+                                }`}
+                              >
+                                <Camera className="w-4 h-4" />
+                                {sale.photos && sale.photos.length > 0 && (
+                                  <span className="text-[10px] font-black">{sale.photos.length}</span>
+                                )}
+                              </button>
+
+                              {/* Edit Faktur */}
+                              <button
+                                onClick={() => handleOpenEditSale(sale)}
+                                title="Edit Faktur Penjualan"
+                                className="p-2 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
+
+                              {/* Hapus Faktur */}
+                              <button
+                                onClick={() => handleDeleteSale(sale.id, sale.invoiceNumber)}
+                                title="Hapus Faktur"
+                                className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -8931,7 +8927,9 @@ export default function AdminFinanceERPPage() {
 
                           {/* Aksi Cepat */}
                           <td className="p-3 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex flex-col items-end gap-1.5 py-1">
+                            {/* Baris 1: Cetak, Komunikasi & Konversi Deal/Proyek */}
+                            <div className="flex items-center justify-end gap-1 flex-wrap">
                               {/* Cetak / Preview SPH */}
                               <button
                                 onClick={() => setSelectedQuotationForPrint(sph)}
@@ -9014,6 +9012,22 @@ export default function AdminFinanceERPPage() {
                               >
                                 <Briefcase className="w-4 h-4" />
                               </button>
+                            </div>
+
+                            {/* Baris 2: Approval, Status, Arsip & Manajemen */}
+                            <div className="flex items-center justify-end gap-1 flex-wrap">
+                              {/* Approval Tanda Tangan Direktur */}
+                              <button
+                                onClick={() => handleOpenApprovalModal(sph as any)}
+                                title={sph.approvalStatus === "Disetujui & Sah" ? "Perbarui Tanda Tangan Digital SPH" : "Approval & Tanda Tangan Digital Direktur SPH"}
+                                className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
+                                  sph.approvalStatus === "Disetujui & Sah"
+                                    ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-700 hover:text-white"
+                                    : "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white"
+                                }`}
+                              >
+                                <PenTool className="w-4 h-4" />
+                              </button>
 
                               {/* Tombol Aksi Status: Tandai Expired */}
                               {classification !== "deal" && classification !== "expired" && (
@@ -9051,19 +9065,6 @@ export default function AdminFinanceERPPage() {
                                 </button>
                               )}
 
-                              {/* Approval Tanda Tangan Direktur */}
-                              <button
-                                onClick={() => handleOpenApprovalModal(sph as any)}
-                                title={sph.approvalStatus === "Disetujui & Sah" ? "Perbarui Tanda Tangan Digital SPH" : "Approval & Tanda Tangan Digital Direktur SPH"}
-                                className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
-                                  sph.approvalStatus === "Disetujui & Sah"
-                                    ? "bg-indigo-100 text-indigo-700 hover:bg-indigo-700 hover:text-white"
-                                    : "bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white"
-                                }`}
-                              >
-                                <PenTool className="w-4 h-4" />
-                              </button>
-
                               {/* Kelola Arsip Lampiran Berkas SPH */}
                               <button
                                 type="button"
@@ -9099,6 +9100,7 @@ export default function AdminFinanceERPPage() {
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
+                          </div>
                           </td>
                         </tr>
                       );
@@ -9319,131 +9321,137 @@ export default function AdminFinanceERPPage() {
                           )}
                         </td>
                         <td className="p-3 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* Cetak PO */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenPrintPo(po)}
-                              title="Cetak Purchase Order Resmi"
-                              className="p-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Printer className="w-4 h-4" />
-                            </button>
+                          <div className="flex flex-col items-end gap-1.5 py-1">
+                            {/* Baris 1: Cetak, Kwitansi & Komunikasi */}
+                            <div className="flex items-center justify-end gap-1 flex-wrap">
+                              {/* Cetak PO */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPrintPo(po)}
+                                title="Cetak Purchase Order Resmi"
+                                className="p-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Printer className="w-4 h-4" />
+                              </button>
 
-                            {/* Kirim PO via WhatsApp */}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleOpenSendDocModal({
-                                  docType: "PO",
-                                  docTitle: "Purchase Order (PO Pengadaan Material)",
-                                  docNumber: po.poNumber,
-                                  recipientName: po.supplierName,
-                                  recipientPhone: po.supplierContact,
-                                  date: po.date,
-                                  dueDate: po.expectedDelivery,
-                                  subject: po.notes || "Pesanan Pengadaan Perangkat & Material Logistik",
-                                  grandTotal: po.grandTotal,
-                                  paymentStatus: po.paymentStatus,
-                                  approvalStatus: po.approvalStatus,
-                                  initialTab: "whatsapp",
-                                })
-                              }
-                              title="Kirim PO via WhatsApp ke Supplier"
-                              className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <MessageCircle className="w-4 h-4" />
-                            </button>
+                              {/* Kwitansi Resmi Pembayaran PO (Kas Keluar) */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReceiptModal({ type: "po", doc: po })}
+                                title="Kwitansi Bukti Pembayaran / Pengeluaran PO (Official Payment Receipt A4)"
+                                className="p-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Receipt className="w-4 h-4" />
+                              </button>
 
-                            {/* Kirim PO via Email */}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleOpenSendDocModal({
-                                  docType: "PO",
-                                  docTitle: "Purchase Order (PO Pengadaan Material)",
-                                  docNumber: po.poNumber,
-                                  recipientName: po.supplierName,
-                                  recipientPhone: po.supplierContact,
-                                  date: po.date,
-                                  dueDate: po.expectedDelivery,
-                                  subject: po.notes || "Pesanan Pengadaan Perangkat & Material Logistik",
-                                  grandTotal: po.grandTotal,
-                                  paymentStatus: po.paymentStatus,
-                                  approvalStatus: po.approvalStatus,
-                                  initialTab: "email",
-                                })
-                              }
-                              title="Kirim PO via Email ke Supplier"
-                              className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Mail className="w-4 h-4" />
-                            </button>
+                              {/* Kirim PO via WhatsApp */}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleOpenSendDocModal({
+                                    docType: "PO",
+                                    docTitle: "Purchase Order (PO Pengadaan Material)",
+                                    docNumber: po.poNumber,
+                                    recipientName: po.supplierName,
+                                    recipientPhone: po.supplierContact,
+                                    date: po.date,
+                                    dueDate: po.expectedDelivery,
+                                    subject: po.notes || "Pesanan Pengadaan Perangkat & Material Logistik",
+                                    grandTotal: po.grandTotal,
+                                    paymentStatus: po.paymentStatus,
+                                    approvalStatus: po.approvalStatus,
+                                    initialTab: "whatsapp",
+                                  })
+                                }
+                                title="Kirim PO via WhatsApp ke Supplier"
+                                className="p-2 rounded-xl bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                              </button>
 
-                            {/* Approval PO */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenApprovalPo(po)}
-                              title={
-                                po.approvalStatus === "Disetujui & Sah"
-                                  ? "Perbarui Tanda Tangan Digital PO"
-                                  : "Approval & Tanda Tangan Digital Direktur"
-                              }
-                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
-                                po.approvalStatus === "Disetujui & Sah"
-                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-700 hover:text-white"
-                                  : "bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white"
-                              }`}
-                            >
-                              <PenTool className="w-4 h-4" />
-                            </button>
+                              {/* Kirim PO via Email */}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleOpenSendDocModal({
+                                    docType: "PO",
+                                    docTitle: "Purchase Order (PO Pengadaan Material)",
+                                    docNumber: po.poNumber,
+                                    recipientName: po.supplierName,
+                                    recipientPhone: po.supplierContact,
+                                    date: po.date,
+                                    dueDate: po.expectedDelivery,
+                                    subject: po.notes || "Pesanan Pengadaan Perangkat & Material Logistik",
+                                    grandTotal: po.grandTotal,
+                                    paymentStatus: po.paymentStatus,
+                                    approvalStatus: po.approvalStatus,
+                                    initialTab: "email",
+                                  })
+                                }
+                                title="Kirim PO via Email ke Supplier"
+                                className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Mail className="w-4 h-4" />
+                              </button>
+                            </div>
 
-                            {/* Kelola Arsip Lampiran Berkas PO */}
-                            <button
-                              type="button"
-                              onClick={() => openArchiveModal("purchase", po)}
-                              title="Kelola Arsip & Lampiran Berkas PO (Invoice Asli Supplier, Surat Jalan, Resi, Garansi)"
-                              className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
-                                po.attachments && po.attachments.length > 0
-                                  ? "bg-purple-100 text-purple-800 hover:bg-purple-700 hover:text-white ring-1 ring-purple-300"
-                                  : "bg-slate-100 text-slate-600 hover:bg-slate-700 hover:text-white"
-                              }`}
-                            >
-                              <FolderArchive className="w-4 h-4" />
-                              {po.attachments && po.attachments.length > 0 && (
-                                <span className="text-[10px] font-black">{po.attachments.length}</span>
-                              )}
-                            </button>
+                            {/* Baris 2: Approval, Arsip & Manajemen */}
+                            <div className="flex items-center justify-end gap-1 flex-wrap">
+                              {/* Approval PO */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApprovalPo(po)}
+                                title={
+                                  po.approvalStatus === "Disetujui & Sah"
+                                    ? "Perbarui Tanda Tangan Digital PO"
+                                    : "Approval & Tanda Tangan Digital Direktur"
+                                }
+                                className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 ${
+                                  po.approvalStatus === "Disetujui & Sah"
+                                    ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-700 hover:text-white"
+                                    : "bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white"
+                                }`}
+                              >
+                                <PenTool className="w-4 h-4" />
+                              </button>
 
-                            {/* Kwitansi Resmi Pembayaran PO (Kas Keluar) */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenReceiptModal({ type: "po", doc: po })}
-                              title="Kwitansi Bukti Pembayaran / Pengeluaran PO (Official Payment Receipt A4)"
-                              className="p-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Receipt className="w-4 h-4" />
-                            </button>
+                              {/* Kelola Arsip Lampiran Berkas PO */}
+                              <button
+                                type="button"
+                                onClick={() => openArchiveModal("purchase", po)}
+                                title="Kelola Arsip & Lampiran Berkas PO (Invoice Asli Supplier, Surat Jalan, Resi, Garansi)"
+                                className={`p-2 rounded-xl transition-all cursor-pointer shadow-sm hover:scale-105 flex items-center gap-1 ${
+                                  po.attachments && po.attachments.length > 0
+                                    ? "bg-purple-100 text-purple-800 hover:bg-purple-700 hover:text-white ring-1 ring-purple-300"
+                                    : "bg-slate-100 text-slate-600 hover:bg-slate-700 hover:text-white"
+                                }`}
+                              >
+                                <FolderArchive className="w-4 h-4" />
+                                {po.attachments && po.attachments.length > 0 && (
+                                  <span className="text-[10px] font-black">{po.attachments.length}</span>
+                                )}
+                              </button>
 
-                            {/* Edit PO */}
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditPo(po)}
-                              title="Edit Data PO"
-                              className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
+                              {/* Edit PO */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEditPo(po)}
+                                title="Edit Data PO"
+                                className="p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-700 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                              </button>
 
-                            {/* Hapus PO */}
-                            <button
-                              type="button"
-                              onClick={() => handleDeletePo(po)}
-                              title="Hapus Purchase Order"
-                              className="p-2 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                              {/* Hapus PO */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePo(po)}
+                                title="Hapus Purchase Order"
+                                className="p-2 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-105"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         </td>
                       </tr>
