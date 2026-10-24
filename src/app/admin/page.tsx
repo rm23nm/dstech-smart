@@ -97,7 +97,6 @@ export default function AdminDashboard() {
   const [selfiePhoto, setSelfiePhoto] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
-  const nativeCameraInputRef = useRef<HTMLInputElement | null>(null);
 
   // GPS Lokasi Presensi Admin
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
@@ -294,48 +293,6 @@ export default function AdminDashboard() {
     const dataUrl = canvas.toDataURL("image/jpeg", 0.65);
     setSelfiePhoto(dataUrl);
     stopCamera();
-  };
-
-  // Handler Fallback Kamera Bawaan HP (Native HTML5 Camera Capture)
-  const handleNativeCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        const img = new Image();
-        img.onload = () => {
-          const maxDim = 800;
-          let width = img.width;
-          let height = img.height;
-          if (width > height && width > maxDim) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else if (height > maxDim) {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            const compressed = canvas.toDataURL("image/jpeg", 0.7);
-            setSelfiePhoto(compressed);
-          } else {
-            setSelfiePhoto(result);
-          }
-          setCameraError(null);
-          stopCamera();
-        };
-        img.src = result;
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
   };
 
   // Deteksi GPS
@@ -1265,37 +1222,33 @@ export default function AdminDashboard() {
                 {selfiePhoto ? (
                   <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-black h-60 flex items-center justify-center">
                     <img src={selfiePhoto} alt="Selfie Preview" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/50 opacity-90 sm:opacity-0 hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-2 p-4">
-                      <button
-                        type="button"
-                        onClick={() => nativeCameraInputRef.current?.click()}
-                        className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Camera className="w-3.5 h-3.5" />
-                        <span>Foto Ulang (Kamera HP)</span>
-                      </button>
+                    <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shadow">
+                      <CheckCircle2 className="w-3 h-3" /> Foto Live Terverifikasi
+                    </div>
+                    <div className="absolute inset-0 bg-black/40 opacity-90 sm:opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center p-4">
                       <button
                         type="button"
                         onClick={() => {
                           setSelfiePhoto(null);
                           startCamera("user");
                         }}
-                        className="px-3.5 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-md cursor-pointer hover:bg-slate-100 flex items-center gap-1.5"
+                        className="px-4 py-2.5 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-md cursor-pointer hover:bg-slate-100 flex items-center gap-2 transition-all active:scale-95"
                       >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Foto Ulang (WebRTC)</span>
+                        <RefreshCw className="w-4 h-4" />
+                        <span>Jepret Ulang Foto Live</span>
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-black h-60 flex items-center justify-center">
+                  <div className="space-y-3">
+                    {/* Viewport Video Live Streaming */}
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-300 bg-slate-950 h-64 flex items-center justify-center shadow-inner">
                       {cameraLoading ? (
-                        <div className="flex flex-col items-center justify-center gap-2 text-white text-xs">
+                        <div className="flex flex-col items-center justify-center gap-2 text-white text-xs p-4 text-center">
                           <RefreshCw className="w-6 h-6 animate-spin text-blue-400" />
-                          <span>Menghubungkan ke sensor kamera...</span>
+                          <span className="font-bold">Menghubungkan ke sensor kamera live...</span>
                         </div>
-                      ) : (
+                      ) : cameraStream ? (
                         <video
                           ref={(el) => {
                             videoRef.current = el;
@@ -1307,90 +1260,97 @@ export default function AdminDashboard() {
                           autoPlay
                           playsInline
                           muted
-                          webkit-playsinline="true"
                           className={`w-full h-full object-cover ${cameraFacing === "user" ? "transform -scale-x-100" : ""}`}
                         />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-2.5 text-slate-300 text-xs p-6 text-center">
+                          <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-400">
+                            <Camera className="w-6 h-6" />
+                          </div>
+                          <p className="font-bold text-white">Kamera Live Belum Terhubung</p>
+                          <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                            Ketuk tombol di bawah untuk meminta akses kamera live langsung pada browser HP Anda.
+                          </p>
+                        </div>
                       )}
 
-                      <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1 shadow">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white"></span> Live Camera
-                      </div>
+                      {/* Frame Guide Pemandu Posisi Wajah */}
+                      {cameraStream && (
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                          <div className="w-36 h-48 rounded-[50%] border-2 border-dashed border-white/50 shadow-[0_0_0_9999px_rgba(0,0,0,0.25)]"></div>
+                        </div>
+                      )}
 
-                      <button
-                        type="button"
-                        onClick={switchCamera}
-                        title="Balik Kamera"
-                        className="absolute top-2 right-2 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur transition-all cursor-pointer shadow"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                      </button>
+                      {cameraStream && (
+                        <div className="absolute top-2 left-2 px-2.5 py-1 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-wider animate-pulse flex items-center gap-1 shadow">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white"></span> Live Camera Anti-Manipulasi
+                        </div>
+                      )}
+
+                      {cameraStream && (
+                        <button
+                          type="button"
+                          onClick={switchCamera}
+                          title="Balik Kamera Depan / Belakang"
+                          className="absolute top-2 right-2 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur transition-all cursor-pointer shadow"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
 
-                    {/* Input Hidden untuk Fallback Kamera Asli HP */}
-                    <input
-                      ref={nativeCameraInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="user"
-                      className="hidden"
-                      onChange={handleNativeCameraCapture}
-                    />
-
+                    {/* Panduan Pemulihan Izin Kamera Browser HP jika Terblokir */}
                     {cameraError && (
-                      <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2.5 shadow-sm">
+                      <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-950 text-xs space-y-2.5 shadow-sm">
                         <div className="flex items-start gap-2">
                           <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
                           <div>
-                            <p className="font-bold text-amber-900">{cameraError}</p>
-                            <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
-                              Jangan khawatir! Anda dapat langsung menggunakan <strong>Kamera Asli HP</strong> Anda di bawah ini tanpa perlu merubah izin browser:
+                            <p className="font-black text-amber-900 text-xs">Akses Kamera Live Belum Diizinkan</p>
+                            <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                              Presensi wajib jepret wajah langsung (tanpa file/upload). Cara mengaktifkannya di HP:
                             </p>
                           </div>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => nativeCameraInputRef.current?.click()}
-                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-95"
-                        >
-                          <Camera className="w-4 h-4" />
-                          <span>Buka Kamera HP Langsung (Ambil Selfie)</span>
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <button
-                        type="button"
-                        onClick={takeSnapshot}
-                        disabled={cameraLoading || Boolean(cameraError)}
-                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 shadow cursor-pointer transition-all active:scale-95"
-                      >
-                        <Camera className="w-4 h-4" />
-                        <span>Jepret Foto Selfie Sekarang</span>
-                      </button>
-
-                      <div className="flex items-center gap-2 pt-0.5">
-                        <button
-                          type="button"
-                          onClick={() => nativeCameraInputRef.current?.click()}
-                          className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
-                        >
-                          <Camera className="w-3.5 h-3.5 text-slate-600" />
-                          <span>Gunakan Kamera Bawaan HP</span>
-                        </button>
+                        <div className="bg-white/80 p-2.5 rounded-xl border border-amber-200/80 text-[11px] space-y-1 font-medium text-slate-800 leading-snug">
+                          <p>1. Ketuk ikon <strong>Gembok 🔒</strong> atau <strong>Setelan</strong> di kiri bilah URL atas.</p>
+                          <p>2. Ketuk <strong>Izin (Permissions)</strong> &gt; pilih <strong>Kamera</strong>.</p>
+                          <p>3. Pilih <strong>Izinkan (Allow)</strong>.</p>
+                        </div>
 
                         <button
                           type="button"
                           onClick={() => startCamera(cameraFacing)}
-                          className="py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-blue-200"
-                          title="Coba Minta Izin Ulang"
+                          className="w-full py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow transition-all cursor-pointer active:scale-95"
                         >
                           <RefreshCw className="w-3.5 h-3.5" />
-                          <span>Coba Ulang</span>
+                          <span>Hubungkan Ulang Kamera Live</span>
                         </button>
                       </div>
-                    </div>
+                    )}
+
+                    {/* Tombol Utama: Jepret Langsung */}
+                    {cameraStream ? (
+                      <button
+                        type="button"
+                        onClick={takeSnapshot}
+                        disabled={cameraLoading}
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-95"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Jepret Foto Selfie Sekarang</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => startCamera(cameraFacing)}
+                        disabled={cameraLoading}
+                        className="w-full py-3.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-40 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-95"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Buka & Izinkan Kamera Live Sekarang</span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
