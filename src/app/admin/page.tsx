@@ -97,6 +97,7 @@ export default function AdminDashboard() {
   const [selfiePhoto, setSelfiePhoto] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  const nativeCameraInputRef = useRef<HTMLInputElement | null>(null);
 
   // GPS Lokasi Presensi Admin
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
@@ -293,6 +294,48 @@ export default function AdminDashboard() {
     const dataUrl = canvas.toDataURL("image/jpeg", 0.65);
     setSelfiePhoto(dataUrl);
     stopCamera();
+  };
+
+  // Handler Fallback Kamera Bawaan HP (Native HTML5 Camera Capture)
+  const handleNativeCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 800;
+          let width = img.width;
+          let height = img.height;
+          if (width > height && width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL("image/jpeg", 0.7);
+            setSelfiePhoto(compressed);
+          } else {
+            setSelfiePhoto(result);
+          }
+          setCameraError(null);
+          stopCamera();
+        };
+        img.src = result;
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   // Deteksi GPS
@@ -1222,16 +1265,25 @@ export default function AdminDashboard() {
                 {selfiePhoto ? (
                   <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-black h-60 flex items-center justify-center">
                     <img src={selfiePhoto} alt="Selfie Preview" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 opacity-90 sm:opacity-0 hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-2 p-4">
+                      <button
+                        type="button"
+                        onClick={() => nativeCameraInputRef.current?.click()}
+                        className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Foto Ulang (Kamera HP)</span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
                           setSelfiePhoto(null);
                           startCamera("user");
                         }}
-                        className="px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-md cursor-pointer hover:bg-slate-100"
+                        className="px-3.5 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-md cursor-pointer hover:bg-slate-100 flex items-center gap-1.5"
                       >
-                        Ambil Ulang Foto
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Foto Ulang (WebRTC)</span>
                       </button>
                     </div>
                   </div>
@@ -1274,22 +1326,71 @@ export default function AdminDashboard() {
                       </button>
                     </div>
 
+                    {/* Input Hidden untuk Fallback Kamera Asli HP */}
+                    <input
+                      ref={nativeCameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="user"
+                      className="hidden"
+                      onChange={handleNativeCameraCapture}
+                    />
+
                     {cameraError && (
-                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-                        <span>{cameraError}</span>
+                      <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2.5 shadow-sm">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                          <div>
+                            <p className="font-bold text-amber-900">{cameraError}</p>
+                            <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                              Jangan khawatir! Anda dapat langsung menggunakan <strong>Kamera Asli HP</strong> Anda di bawah ini tanpa perlu merubah izin browser:
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => nativeCameraInputRef.current?.click()}
+                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md cursor-pointer transition-all active:scale-95"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>Buka Kamera HP Langsung (Ambil Selfie)</span>
+                        </button>
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={takeSnapshot}
-                      disabled={cameraLoading}
-                      className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs flex items-center justify-center gap-2 shadow cursor-pointer transition-all active:scale-95"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <span>Jepret Foto Selfie Sekarang</span>
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        type="button"
+                        onClick={takeSnapshot}
+                        disabled={cameraLoading || Boolean(cameraError)}
+                        className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-2 shadow cursor-pointer transition-all active:scale-95"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Jepret Foto Selfie Sekarang</span>
+                      </button>
+
+                      <div className="flex items-center gap-2 pt-0.5">
+                        <button
+                          type="button"
+                          onClick={() => nativeCameraInputRef.current?.click()}
+                          className="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                        >
+                          <Camera className="w-3.5 h-3.5 text-slate-600" />
+                          <span>Gunakan Kamera Bawaan HP</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => startCamera(cameraFacing)}
+                          className="py-2.5 px-3 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-blue-200"
+                          title="Coba Minta Izin Ulang"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Coba Ulang</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
