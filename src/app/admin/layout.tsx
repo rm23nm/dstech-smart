@@ -28,6 +28,7 @@ import {
   CalendarCheck,
   FileSignature,
   Banknote,
+  ShoppingBag,
 } from "lucide-react";
 import { checkUserPermission } from "@/utils/dstech_permissions";
 
@@ -59,6 +60,7 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Manajemen Stok & Gudang", category: "Operasional", url: "/admin/inventory", desc: "Kelola kartu stok real-time, stok per gudang Cilegon/Serang, stock opname, dan approval material teknisi" },
   { title: "Daftar Klien & Pelanggan (Customers)", category: "Keuangan", url: "/admin/finance", desc: "Direktori klien B2B industri, komersial, instansi, PIC, kontak WhatsApp, dan piutang" },
   { title: "Daftar Supplier & Vendor (Vendors)", category: "Keuangan", url: "/admin/finance", desc: "Direktori vendor CCTV, kabel, biometrik, PIC sales, rekening bank transfer PO, dan hutang" },
+  { title: "Manajemen Pesanan E-Store (Orders)", category: "Operasional", url: "/admin/orders", desc: "Kelola pesanan marketplace pembeli, konfirmasi bukti transfer lunas, dan input resi armada DSTech" },
   { title: "Manajemen Produk (CRUD)", category: "Produk", url: "/admin/products", desc: "Tambah, edit, hapus inventori CCTV & Smart Home" },
   { title: "Kategori & Sub-Kategori", category: "Produk", url: "/admin/categories", desc: "Kelola klasifikasi kategori dan sub-kategori produk" },
   { title: "Portofolio Proyek", category: "Navigasi", url: "/admin/portfolios", desc: "Kelola dokumentasi proyek selesai, foto & video instalasi" },
@@ -103,6 +105,7 @@ export default function AdminLayout({
   // Current Admin User Session
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [logoUrl, setLogoUrl] = useState<string>("/logo.png");
+  const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -122,6 +125,19 @@ export default function AdminLayout({
         }
       })
       .catch((err) => console.error("Gagal load logo admin:", err));
+
+    // Ambil jumlah pesanan baru / perlu tindakan
+    fetch("/api/orders?t=" + Date.now())
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && Array.isArray(data.data)) {
+          const needAction = data.data.filter(
+            (o: any) => o.status === "PAYMENT_PENDING" || o.status === "PAID" || o.status === "PROCESSING"
+          ).length;
+          setPendingOrdersCount(needAction);
+        }
+      })
+      .catch((err) => console.error("Gagal load orders count:", err));
   }, []);
 
   // Search filter
@@ -224,6 +240,13 @@ export default function AdminLayout({
       active: pathname.startsWith("/admin/products"),
     },
     {
+      id: "orders",
+      label: "Pesanan E-Store",
+      href: "/admin/orders",
+      icon: ShoppingBag,
+      active: pathname.startsWith("/admin/orders"),
+    },
+    {
       id: "categories",
       label: "Kategori & Sub-Kategori",
       href: "/admin/categories",
@@ -317,13 +340,19 @@ export default function AdminLayout({
                   <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-slate-400 group-hover:text-dstech-blue"}`} />
                   <span>{item.label}</span>
                 </div>
-                <ChevronRight
-                  className={`w-4 h-4 transition-transform ${
-                    isActive
-                      ? "opacity-80 translate-x-0.5"
-                      : "opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5"
-                  }`}
-                />
+                {item.id === "orders" && pendingOrdersCount > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-dstech-red text-white shadow-sm animate-pulse">
+                    {pendingOrdersCount}
+                  </span>
+                ) : (
+                  <ChevronRight
+                    className={`w-4 h-4 transition-transform ${
+                      isActive
+                        ? "opacity-80 translate-x-0.5"
+                        : "opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5"
+                    }`}
+                  />
+                )}
               </Link>
             );
           })}
@@ -380,7 +409,13 @@ export default function AdminLayout({
                       <Icon className="w-4 h-4" />
                       <span>{item.label}</span>
                     </div>
-                    <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+                    {item.id === "orders" && pendingOrdersCount > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-dstech-red text-white shadow-sm">
+                        {pendingOrdersCount}
+                      </span>
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 opacity-50" />
+                    )}
                   </Link>
                 );
               })}

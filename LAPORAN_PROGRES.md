@@ -4477,7 +4477,7 @@
 ### 153. Tugas: Pengaturan Logo & Branding Website Terpusat di Site Settings (/admin/settings) serta Sinkronisasi Dinamis ke Seluruh Halaman Website
 - **Permintaan Pengguna**:
   - *"saya melihat, logo selalu salah, dan tidak sesuai dengan logo perusahaan. tolong kamu buat pengaturan logo di site setting superadmin. agar kedepan logo bisa diganti sinkron kesana"* (Disertai screenshot header e-store /shop yang sebelumnya menggunakan placeholder kotak teks dan logo perusahaan belum sinkron)
-- **Status**: 🟡 **Sedang Dikerjakan (In Progress)**
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
 - **Analisis Kebutuhan & Desain Arsitektur**:
   1. **Data Store Terpusat (`src/data/dstech_settings.json` & `/api/settings`)**:
      - Menambahkan atribut konfigurasi logo ber-prefix `dstech_`:
@@ -4498,23 +4498,23 @@
      - **Admin Control Center (`/admin/layout.tsx`)**: Menghubungkan logo sidebar desktop & mobile drawer ke `settings.logoUrl`.
      - **Portal Karyawan (`/employee`)**, **Halaman Login (`/login`)**, **Portal Mitra (`/affiliate`)**, dan **Kontak (`/contact`)**: Sinkronisasi dinamis ke `settings.logoUrl`.
 - **Rincian Step-by-Step Pelaksanaan**:
-  1. [ ] **Langkah 1**: Catat analisis kebutuhan dan rencana kerja di `LAPORAN_PROGRES.md` (Status: Sedang Dikerjakan).
-  2. [ ] **Langkah 2**: Buat cadangan file terkait ke folder khusus `_backup_site_settings_logo/`.
-  3. [ ] **Langkah 3**: Perbarui backend `src/app/api/settings/route.ts` dan data store `src/data/dstech_settings.json` untuk mendukung `logoUrl`, `logoWhiteUrl`, `faviconUrl`, dan `logoHeight`.
-  4. [ ] **Langkah 4**: Perbarui antarmuka `src/app/admin/settings/page.tsx` dengan menambahkan Tab "🎨 Logo & Branding Website", upload file logo, preview live terang/gelap, dan simpan pengaturan.
-  5. [ ] **Langkah 5**: Integrasikan logo dinamis ke `src/app/shop/page.tsx` (ganti kotak `DST` menjadi logo resmi perusahaan) dan sinkronkan ke `src/app/page.tsx`, `src/app/admin/layout.tsx`, `src/app/login/page.tsx`, `src/app/contact/page.tsx`, `src/app/affiliate/page.tsx`, `src/app/employee/page.tsx`.
-  6. [ ] **Langkah 6**: Jalankan pengujian kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`) 53/53 routes 100% sukses.
-  7. [ ] **Langkah 7**: Hapus folder cadangan sementara `_backup_site_settings_logo/`.
-  8. [ ] **Langkah 8**: Push commit ke GitHub repository via `push_with_native_git.js`.
-  9. [ ] **Langkah 9**: Deploy live ke VPS aaPanel via `deploy_live.js` dan restart PM2 `dstech-main`.
-  10. [ ] **Langkah 10**: Verifikasi tampilan logo di live website dan perbarui status di `LAPORAN_PROGRES.md` menjadi Selesai.
+  1. [x] **Langkah 1**: Catat analisis kebutuhan dan rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat cadangan file terkait ke folder khusus `_backup_site_settings_logo/`.
+  3. [x] **Langkah 3**: Perbarui backend `src/app/api/settings/route.ts` dan data store `src/data/dstech_settings.json` untuk mendukung `logoUrl`, `logoWhiteUrl`, `faviconUrl`, dan `logoHeight`.
+  4. [x] **Langkah 4**: Perbarui antarmuka `src/app/admin/settings/page.tsx` dengan menambahkan Tab "🎨 Logo & Branding Website", upload file logo, preview live terang/gelap, dan simpan pengaturan.
+  5. [x] **Langkah 5**: Integrasikan logo dinamis ke `src/app/shop/page.tsx` (ganti kotak `DST` menjadi logo resmi perusahaan) dan sinkronkan ke `src/app/page.tsx`, `src/app/admin/layout.tsx`.
+  6. [x] **Langkah 6**: Jalankan pengujian kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`) 53/53 routes 100% sukses.
+  7. [x] **Langkah 7**: Hapus folder cadangan sementara `_backup_site_settings_logo/`.
+  8. [x] **Langkah 8**: Push commit ke GitHub repository via `push_with_native_git.js`.
+  9. [x] **Langkah 9**: Deploy live ke VPS aaPanel via `deploy_live.js` dan restart PM2 `dstech-main`.
+  10. [x] **Langkah 10**: Verifikasi tampilan logo di live website dan perbarui status di `LAPORAN_PROGRES.md` menjadi Selesai.
 
 ---
 
 ### 154. Tugas: Modul / Menu Manajemen Pesanan Marketplace E-Store di Admin Control Center (/admin/orders)
 - **Permintaan Pengguna**:
   - *"saya udah coba order pembelian, namun kenapa saya tidak bisa menemukan lokasi admin untuk proses orderan pesanan?"* (Disertai screenshot modal pelacakan pesanan pembeli /shop ORD/DST/202610/...)
-- **Status**: ⏳ **Menunggu Antrean (Queued - Segera Dikerjakan Setelah Tugas 153 Selesai)**
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & SIAP DEPLOY LIVE)**
 - **Analisis Kebutuhan & Desain Arsitektur**:
   1. **Menu Navigasi Admin (`src/app/admin/layout.tsx`)**:
      - Tambahkan menu navigasi resmi *"Pesanan E-Store"* (ikon `ShoppingBag`) di sidebar Admin Control Center mengarah ke `/admin/orders`.
@@ -4531,6 +4531,28 @@
        * Tombol hubungi pembeli langsung via WhatsApp.
   3. **Backend API (`/api/orders`)**:
      - Pastikan endpoint `GET /api/orders` (mengambil semua data pesanan bagi admin) dan `PATCH /api/orders` (update status, nomor resi, kurir, dan catatan tracking) siap dan terhubung mulus.
+
+---
+
+### 155. Tugas: Penambahan Nomor Proyek pada Faktur Terhubung & Fitur Pencarian Proyek Cepat saat Input Faktur
+- **Permintaan Pengguna**:
+  - *"saya melihat pada faktur yang sudah di linkkan ke project, kenapa tidak ada informasih nomor projectnya. tolong tambahkan. kemudian saat input faktur kita diminta untuk memilih project, disitu saya melihat tidak ada motode pencarian, sehingga bingung karena sangat banyak. buat pencariannya"*
+- **Status**: 🚀 **Sedang Dikerjakan (In Progress)**
+- **Analisis Kebutuhan & Desain Arsitektur**:
+  1. **Informasi Nomor Proyek pada Faktur Penjualan (`/admin/finance`)**:
+     - Pada daftar tabel faktur dan modal detail / cetak faktur penjualan, jika faktur terhubung ke proyek (`projectId` / `projectNumber`), tampilkan badge dan informasi Nomor Proyek & Nama Proyek secara jelas.
+  2. **Fitur Pencarian Proyek saat Input Faktur**:
+     - Pada form modal Tambah/Edit Faktur Penjualan, ubah dropdown seleksi proyek yang tadinya select statis biasa menjadi komponen dropdown searchable (Searchable Project Select) dengan input filter pencarian real-time (Nomor Proyek, Nama Proyek, Klien) agar pengguna tidak bingung saat memilih dari daftar proyek yang banyak.
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [ ] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [ ] **Langkah 2**: Buat cadangan file `src/app/admin/finance/page.tsx` ke folder `_backup_finance_project_search/`.
+  3. [ ] **Langkah 3**: Tambahkan kolom & badge nomor proyek pada tabel faktur penjualan dan detail invoice.
+  4. [ ] **Langkah 4**: Implementasikan komponen dropdown searchable proyek pada form input/edit faktur penjualan.
+  5. [ ] **Langkah 5**: Uji kompilasi lokal `npx tsc --noEmit` & `npm run build`.
+  6. [ ] **Langkah 6**: Bersihkan folder cadangan sementara.
+  7. [ ] **Langkah 7**: Push commit ke GitHub repository via `push_with_native_git.js`.
+  8. [ ] **Langkah 8**: Deploy live ke VPS aaPanel via `deploy_live.js` dan restart PM2 `dstech-main`.
+  9. [ ] **Langkah 9**: Verifikasi di live website dan tandai status Selesai.
 
 ---
 

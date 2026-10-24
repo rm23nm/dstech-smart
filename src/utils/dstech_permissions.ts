@@ -112,6 +112,13 @@ export const DSTECH_SYSTEM_MENUS: MenuItemConfig[] = [
     desc: "Pusat pengetahuan SOP instalasi CCTV, standar K3 & firmware NVR",
   },
   {
+    id: "orders",
+    name: "Pesanan E-Store",
+    category: "Operasional",
+    path: "/admin/orders",
+    desc: "Proses pesanan e-store, verifikasi bukti bayar, cetak surat jalan & input no. resi kurir / armada DSTech",
+  },
+  {
     id: "users",
     name: "User Management & Role",
     category: "Sistem & Legalitas",
