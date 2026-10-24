@@ -957,161 +957,178 @@ export async function GET(req: Request) {
     documentTitle = `Kuitansi_Pembayaran_${receiptNumberDisplay.replace(/[^a-zA-Z0-9_-]/g, "_")}_${(sale.customerName || "").replace(/[^a-zA-Z0-9]/g, "_")}`;
 
     documentContent = `
-      <!-- LEMBAR KUITANSI PEMBAYARAN RESMI KOMPAK 1/4 KERTAS A4 (148mm x 105mm) -->
-      <div id="receipt-main-container" class="receipt-box text-slate-800 text-[10px] leading-tight select-none relative font-sans">
+      <!-- LEMBAR KUITANSI PEMBAYARAN RESMI DSTECH (FULL BLEED TEPI-KE-TEPI) -->
+      <div id="receipt-main-container" class="receipt-box text-slate-800 text-[10px] leading-tight select-none relative font-sans w-full">
         <!-- Watermark DSP Latar Belakang Kuitansi -->
         <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.035] z-0">
           <div class="text-7xl font-black font-serif tracking-widest text-slate-900 rotate-[-15deg]">DSTECH</div>
         </div>
 
-        <div class="relative z-10 space-y-1.5">
-          <!-- Kop Gambar Resmi DSTech Smart (Header Clipping Proporsional dari Gambar Kop A4) -->
-          <div id="receipt-letterhead-image-box" class="w-full border-b-2 border-slate-900 pb-2 mb-2" style="display: ${letterheadEnabled ? 'block' : 'none'};">
-            <div class="w-full h-24 sm:h-28 overflow-hidden relative rounded-xs bg-white">
+        <div class="relative z-10 flex flex-col justify-between min-h-[115mm]">
+          <div>
+            <!-- Kop Gambar Resmi DSTech Smart (Full Bleed Tepi-ke-Tepi Penuh Selebar Kertas A4) -->
+            <div id="receipt-letterhead-image-box" class="w-full relative select-none" style="display: ${letterheadEnabled ? 'block' : 'none'};">
+              <div class="w-full overflow-hidden relative bg-white" style="height: 125px;">
+                <img
+                  src="${letterheadUrl}"
+                  alt="Kop Surat Resmi DSTech"
+                  class="w-full select-none pointer-events-none absolute top-0 left-0"
+                  style="width: 100%; height: auto; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+                />
+              </div>
+              <div class="flex items-center justify-between px-6 py-1 bg-slate-50 border-b border-slate-300">
+                <div class="text-[8.5px] font-mono text-slate-500 font-bold tracking-wider">
+                  BUKTI PENERIMAAN PEMBAYARAN RESMI
+                </div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-xs font-black text-slate-950 tracking-wider uppercase font-serif">KUITANSI PEMBAYARAN</h2>
+                  <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
+                    isFullPaid
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }">
+                    ${isFullPaid ? '✓ LUNAS' : 'UANG MUKA / TERMIN'}
+                  </span>
+                  <span class="text-[9.5px] font-mono font-bold text-indigo-700">NO: ${receiptNumberDisplay}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Header Bar: Kop Ringkas Teks Bawaan (Tampil jika Kop Gambar Dimatikan) -->
+            <div id="receipt-letterhead-text-box" class="px-6 pt-3 pb-1.5 border-b-2 border-slate-900 flex justify-between items-start gap-2" style="display: ${letterheadEnabled ? 'none' : 'flex'};">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
+                  DST
+                </div>
+                <div>
+                  <h3 class="text-[11px] font-black tracking-wide text-slate-950 uppercase leading-none">PT. DSTECH SMART PERKASA</h3>
+                  <p class="text-[8px] text-slate-500 mt-0.5 leading-none">Solusi Teknologi, Jaringan &amp; Keamanan • Cilegon, Banten</p>
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                <div class="flex items-center justify-end gap-1.5">
+                  <h2 class="text-xs font-black text-slate-950 tracking-wider uppercase font-serif">KUITANSI PEMBAYARAN</h2>
+                  <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
+                    isFullPaid
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                      : 'bg-amber-100 text-amber-800 border border-amber-300'
+                  }">
+                    ${isFullPaid ? '✓ LUNAS' : 'UANG MUKA / TERMIN'}
+                  </span>
+                </div>
+                <p class="text-[9.5px] font-mono font-bold text-indigo-700 mt-0.5 leading-none">NO: ${receiptNumberDisplay}</p>
+              </div>
+            </div>
+
+            <!-- Area Isi Formulir Kuitansi (Dengan Padding Horizontal Nyaman px-6) -->
+            <div class="px-6 py-2 space-y-1.5">
+              <!-- Pilihan Riwayat Kuitansi jika ada lebih dari 1 pembayaran (Khusus Layar Saja) -->
+              ${payments.length > 1 ? `
+                <div class="p-1 rounded-lg bg-slate-100 border border-slate-200 flex flex-wrap items-center gap-1 text-[9px] print:hidden">
+                  <span class="font-bold text-slate-700">Pilih Pembayaran:</span>
+                  ${payments.map((p: any, idx: number) => `
+                    <a
+                      href="/api/finance/print?doc=receipt&no=${encNo}&receiptNo=${encodeURIComponent(p.receiptNumber || p.id)}"
+                      class="px-1.5 py-0.5 rounded text-[8.5px] font-bold transition-all ${
+                        (selectedPayment?.id === p.id || selectedPayment?.receiptNumber === p.receiptNumber)
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
+                      }"
+                    >
+                      #${idx + 1}: ${p.receiptNumber} (${formatRupiah(p.amount)})
+                    </a>
+                  `).join("")}
+                </div>
+              ` : ''}
+
+              <!-- Formulir Isi Kuitansi -->
+              <div class="space-y-1">
+                <!-- Baris 1: Telah Diterima Dari -->
+                <div class="grid grid-cols-12 gap-1 items-baseline border-b border-slate-200/80 pb-0.5">
+                  <div class="col-span-3 text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">
+                    Telah Diterima Dari
+                  </div>
+                  <div class="col-span-9 flex items-baseline justify-between gap-1">
+                    <div class="truncate">
+                      <span class="font-black text-slate-950 text-[10.5px]">${sale.customerName}</span>
+                      ${sale.customerPic ? `<span class="text-[8.5px] text-indigo-700 font-bold ml-1">(Up. ${sale.customerPic})</span>` : ''}
+                    </div>
+                    <div class="text-[8px] text-slate-500 font-medium whitespace-nowrap shrink-0">
+                      Tgl: <strong class="text-slate-900">${receiptDateDisplay}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Baris 2: Uang Sejumlah (Terbilang Huruf) -->
+                <div class="grid grid-cols-12 gap-1 items-center border-b border-slate-200/80 pb-0.5">
+                  <div class="col-span-3 text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">
+                    Uang Sejumlah
+                  </div>
+                  <div class="col-span-9">
+                    <div class="py-0.5 px-2 rounded bg-slate-50 border border-slate-300 text-slate-900 font-serif italic font-bold text-[8.5px] leading-snug">
+                      # ${terbilangReceipt} #
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Baris 3: Untuk Pembayaran -->
+                <div class="grid grid-cols-12 gap-1 items-baseline border-b border-slate-200/80 pb-0.5">
+                  <div class="col-span-3 text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">
+                    Untuk Pembayaran
+                  </div>
+                  <div class="col-span-9">
+                    <p class="font-bold text-slate-900 text-[9.5px] leading-tight line-clamp-2">${receiptPurpose}</p>
+                    <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[7.5px] text-slate-500 mt-0.5">
+                      <span>Faktur: <strong class="text-indigo-900 font-mono">${sale.invoiceNumber}</strong></span>
+                      <span>Total Tagihan: <strong>${formatRupiah(sale.grandTotal)}</strong></span>
+                      ${sale.remainingAmount > 0 
+                        ? `<span>Sisa: <strong class="text-amber-700">${formatRupiah(sale.remainingAmount)}</strong></span>` 
+                        : `<span>Status: <strong class="text-emerald-700">LUNAS</strong></span>`}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Bagian Nominal & Tanda Tangan Sah -->
+              <div class="grid grid-cols-12 gap-2 pt-0.5 items-end">
+                <!-- Kotak Jumlah Nominal Angka -->
+                <div class="col-span-7 space-y-0.5">
+                  <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border-2 border-slate-900 shadow-2xs">
+                    <span class="text-[8px] text-slate-600 font-black tracking-widest uppercase">JUMLAH:</span>
+                    <span class="text-sm font-black font-mono text-slate-950 tracking-tight">
+                      ${formatRupiah(paidNominal)},-
+                    </span>
+                  </div>
+                  <p class="text-[7.5px] text-slate-500 leading-none">
+                    • Metode: <strong class="text-slate-700">${receiptMethodDisplay}</strong> • Verifikasi: <span class="font-mono">${sale.verificationCode || 'DSP-VERIFIED'}</span> • ERP DSP
+                  </p>
+                </div>
+
+                <!-- Tanda Tangan Sah Penerima -->
+                <div class="col-span-5 text-center">
+                  <p class="text-[8px] text-slate-500 leading-none">Cilegon, ${receiptDateDisplay}</p>
+                  <p class="font-black text-slate-950 text-[8.5px] leading-none mt-0.5">PT. DSTECH SMART PERKASA</p>
+                  <div class="h-8 flex items-center justify-center relative my-0.5">
+                    ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-8 object-contain z-10" />` : ""}
+                    ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-8 opacity-75 absolute" />` : ""}
+                    ${!signatureImage && !masterStampUrl ? `<div class="h-5 w-20 border-b border-dashed border-slate-400"></div>` : ""}
+                  </div>
+                  <p class="font-black text-slate-950 text-[8.5px] underline leading-none">( ${signerName} )</p>
+                  <p class="text-[7.5px] text-slate-500 font-bold leading-none mt-0.5">${signerTitle}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer Gambar Resmi DSTech Smart (Full Bleed Tepi-ke-Tepi Penuh Selebar Kertas A4) -->
+          <div id="receipt-letterhead-footer-box" class="w-full relative mt-2 select-none" style="display: ${letterheadEnabled ? 'block' : 'none'};">
+            <div class="w-full overflow-hidden relative bg-white" style="height: 54px;">
               <img
                 src="${letterheadUrl}"
-                alt="Kop Surat Resmi DSTech"
-                class="w-full select-none pointer-events-none"
-                style="object-fit: cover; object-position: top center; width: 100%; height: 110px; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+                alt="Footer Kop Surat Resmi DSTech"
+                class="w-full select-none pointer-events-none absolute bottom-0 left-0"
+                style="width: 100%; height: auto; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
               />
-            </div>
-            <div class="flex items-center justify-between mt-1 px-1">
-              <div class="text-[8.5px] font-mono text-slate-500 font-bold tracking-wider">
-                BUKTI PENERIMAAN PEMBAYARAN RESMI
-              </div>
-              <div class="flex items-center gap-2">
-                <h2 class="text-xs font-black text-slate-950 tracking-wider uppercase font-serif">KUITANSI PEMBAYARAN</h2>
-                <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
-                  isFullPaid
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                    : 'bg-amber-100 text-amber-800 border border-amber-300'
-                }">
-                  ${isFullPaid ? '✓ LUNAS' : 'UANG MUKA / TERMIN'}
-                </span>
-                <span class="text-[9.5px] font-mono font-bold text-indigo-700">NO: ${receiptNumberDisplay}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Header Bar: Kop Ringkas Teks Bawaan (Tampil jika Kop Gambar Dimatikan) -->
-          <div id="receipt-letterhead-text-box" class="border-b-2 border-slate-900 pb-1.5 flex justify-between items-start gap-2" style="display: ${letterheadEnabled ? 'none' : 'flex'};">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
-                DST
-              </div>
-              <div>
-                <h3 class="text-[11px] font-black tracking-wide text-slate-950 uppercase leading-none">PT. DSTECH SMART PERKASA</h3>
-                <p class="text-[8px] text-slate-500 mt-0.5 leading-none">Solusi Teknologi, Jaringan &amp; Keamanan • Cilegon, Banten</p>
-              </div>
-            </div>
-            <div class="text-right shrink-0">
-              <div class="flex items-center justify-end gap-1.5">
-                <h2 class="text-xs font-black text-slate-950 tracking-wider uppercase font-serif">KUITANSI PEMBAYARAN</h2>
-                <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
-                  isFullPaid
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                    : 'bg-amber-100 text-amber-800 border border-amber-300'
-                }">
-                  ${isFullPaid ? '✓ LUNAS' : 'UANG MUKA / TERMIN'}
-                </span>
-              </div>
-              <p class="text-[9.5px] font-mono font-bold text-indigo-700 mt-0.5 leading-none">NO: ${receiptNumberDisplay}</p>
-            </div>
-          </div>
-
-          <!-- Pilihan Riwayat Kuitansi jika ada lebih dari 1 pembayaran (Khusus Layar Saja) -->
-          ${payments.length > 1 ? `
-            <div class="p-1 rounded-lg bg-slate-100 border border-slate-200 flex flex-wrap items-center gap-1 text-[9px] print:hidden">
-              <span class="font-bold text-slate-700">Pilih Pembayaran:</span>
-              ${payments.map((p: any, idx: number) => `
-                <a
-                  href="/api/finance/print?doc=receipt&no=${encNo}&receiptNo=${encodeURIComponent(p.receiptNumber || p.id)}"
-                  class="px-1.5 py-0.5 rounded text-[8.5px] font-bold transition-all ${
-                    (selectedPayment?.id === p.id || selectedPayment?.receiptNumber === p.receiptNumber)
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
-                  }"
-                >
-                  #${idx + 1}: ${p.receiptNumber} (${formatRupiah(p.amount)})
-                </a>
-              `).join("")}
-            </div>
-          ` : ''}
-
-          <!-- Formulir Isi Kuitansi Kompak 1/4 A4 -->
-          <div class="space-y-1">
-            <!-- Baris 1: Telah Diterima Dari -->
-            <div class="grid grid-cols-12 gap-1 items-baseline border-b border-slate-200/80 pb-0.5">
-              <div class="col-span-3 text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">
-                Telah Diterima Dari
-              </div>
-              <div class="col-span-9 flex items-baseline justify-between gap-1">
-                <div class="truncate">
-                  <span class="font-black text-slate-950 text-[10.5px]">${sale.customerName}</span>
-                  ${sale.customerPic ? `<span class="text-[8.5px] text-indigo-700 font-bold ml-1">(Up. ${sale.customerPic})</span>` : ''}
-                </div>
-                <div class="text-[8px] text-slate-500 font-medium whitespace-nowrap shrink-0">
-                  Tgl: <strong class="text-slate-900">${receiptDateDisplay}</strong>
-                </div>
-              </div>
-            </div>
-
-            <!-- Baris 2: Uang Sejumlah (Terbilang Huruf) -->
-            <div class="grid grid-cols-12 gap-1 items-center border-b border-slate-200/80 pb-0.5">
-              <div class="col-span-3 text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">
-                Uang Sejumlah
-              </div>
-              <div class="col-span-9">
-                <div class="py-0.5 px-2 rounded bg-slate-50 border border-slate-300 text-slate-900 font-serif italic font-bold text-[8.5px] leading-snug">
-                  # ${terbilangReceipt} #
-                </div>
-              </div>
-            </div>
-
-            <!-- Baris 3: Untuk Pembayaran -->
-            <div class="grid grid-cols-12 gap-1 items-baseline border-b border-slate-200/80 pb-0.5">
-              <div class="col-span-3 text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">
-                Untuk Pembayaran
-              </div>
-              <div class="col-span-9">
-                <p class="font-bold text-slate-900 text-[9.5px] leading-tight line-clamp-2">${receiptPurpose}</p>
-                <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[7.5px] text-slate-500 mt-0.5">
-                  <span>Faktur: <strong class="text-indigo-900 font-mono">${sale.invoiceNumber}</strong></span>
-                  <span>Total Tagihan: <strong>${formatRupiah(sale.grandTotal)}</strong></span>
-                  ${sale.remainingAmount > 0 
-                    ? `<span>Sisa: <strong class="text-amber-700">${formatRupiah(sale.remainingAmount)}</strong></span>` 
-                    : `<span>Status: <strong class="text-emerald-700">LUNAS</strong></span>`}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Footer Kuitansi: Kotak Nominal & Tanda Tangan Sah -->
-          <div class="grid grid-cols-12 gap-2 pt-0.5 items-end">
-            <!-- Kotak Jumlah Nominal Angka (Khas Kuitansi Resmi Indonesia) -->
-            <div class="col-span-7 space-y-0.5">
-              <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border-2 border-slate-900 shadow-2xs">
-                <span class="text-[8px] text-slate-600 font-black tracking-widest uppercase">JUMLAH:</span>
-                <span class="text-sm font-black font-mono text-slate-950 tracking-tight">
-                  ${formatRupiah(paidNominal)},-
-                </span>
-              </div>
-              <p class="text-[7.5px] text-slate-500 leading-none">
-                • Metode: <strong class="text-slate-700">${receiptMethodDisplay}</strong> • Verifikasi: <span class="font-mono">${sale.verificationCode || 'DSP-VERIFIED'}</span> • ERP DSP
-              </p>
-            </div>
-
-            <!-- Tanda Tangan Sah Penerima -->
-            <div class="col-span-5 text-center">
-              <p class="text-[8px] text-slate-500 leading-none">Cilegon, ${receiptDateDisplay}</p>
-              <p class="font-black text-slate-950 text-[8.5px] leading-none mt-0.5">PT. DSTECH SMART PERKASA</p>
-              <div class="h-8 flex items-center justify-center relative my-0.5">
-                ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-8 object-contain z-10" />` : ""}
-                ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-8 opacity-75 absolute" />` : ""}
-                ${!signatureImage && !masterStampUrl ? `<div class="h-5 w-20 border-b border-dashed border-slate-400"></div>` : ""}
-              </div>
-              <p class="font-black text-slate-950 text-[8.5px] underline leading-none">( ${signerName} )</p>
-              <p class="text-[7.5px] text-slate-500 font-bold leading-none mt-0.5">${signerTitle}</p>
             </div>
           </div>
         </div>
@@ -1618,7 +1635,7 @@ export async function GET(req: Request) {
         id="print-sheet-document"
         class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 ${isReceipt ? 'receipt-cut-border' : ''}"
         style="${isReceipt 
-          ? 'width: 210mm; min-height: 108mm; max-height: none; height: auto; padding: 14px 22px;' 
+          ? 'width: 210mm; min-height: 115mm; max-height: none; height: auto; padding: 0;' 
           : 'width: 210mm; min-height: 297mm; padding: 0;'
         } max-width: 100%; box-sizing: border-box;"
       >
@@ -1645,7 +1662,7 @@ export async function GET(req: Request) {
         <!-- Garis Panduan Gunting Potong Kuitansi Selebar A4 (Tampil di Layar & Cetak jika menggunakan kertas A4) -->
         <div id="receipt-cut-guide" class="max-w-[210mm] mx-auto mt-2 text-center text-[10px] text-slate-400 font-mono flex items-center justify-center gap-2 select-none print:mt-1">
           <span class="text-slate-300">✂️ - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -</span>
-          <span id="cut-guide-label" class="font-bold text-slate-500 uppercase tracking-wider">Batas Gunting / Potong Kuitansi Selebar Kertas A4 (210mm × 108mm)</span>
+          <span id="cut-guide-label" class="font-bold text-slate-500 uppercase tracking-wider">Batas Gunting / Potong Kuitansi Selebar Kertas A4 (210mm × 115mm)</span>
           <span class="text-slate-300">- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - ✂️</span>
         </div>
       ` : ''}
@@ -1660,6 +1677,7 @@ export async function GET(req: Request) {
           const styleEl = document.getElementById('dynamic-print-style');
           const bgImg = document.getElementById('letterhead-bg-img');
           const receiptImgBox = document.getElementById('receipt-letterhead-image-box');
+          const receiptFooterBox = document.getElementById('receipt-letterhead-footer-box');
           const receiptTextBox = document.getElementById('receipt-letterhead-text-box');
           const letterheadCheckbox = document.getElementById('toggle-letterhead');
           const isLetterheadOn = letterheadCheckbox ? letterheadCheckbox.checked : true;
@@ -1679,21 +1697,22 @@ export async function GET(req: Request) {
           if (!sheet) return;
 
           if (mode === 'full-width') {
-            // Selebar Kertas A4 Penuh (210mm x 108mm, Format Slip Kuitansi Ideal)
+            // Selebar Kertas A4 Penuh (210mm x 115mm, Format Slip Kuitansi Ideal)
             sheet.style.width = '210mm';
             sheet.style.height = 'auto';
-            sheet.style.minHeight = '108mm';
+            sheet.style.minHeight = '115mm';
             sheet.style.maxHeight = 'none';
-            sheet.style.padding = '14px 22px';
+            sheet.style.padding = '0';
             if (bgImg) bgImg.style.display = 'none';
             if (receiptImgBox && receiptTextBox) {
               receiptImgBox.style.display = isLetterheadOn ? 'block' : 'none';
               receiptTextBox.style.display = isLetterheadOn ? 'none' : 'flex';
             }
-            if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi Selebar Kertas A4 (210mm × 108mm)';
+            if (receiptFooterBox) receiptFooterBox.style.display = isLetterheadOn ? 'block' : 'none';
+            if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi Selebar Kertas A4 (210mm × 115mm)';
             if (styleEl) {
               styleEl.innerHTML = \`
-                @page { size: A4 portrait; margin: 8mm 0; }
+                @page { size: A4 portrait; margin: 0; }
                 @media print {
                   body { background: white !important; padding: 0 !important; margin: 0 !important; }
                   .print-hidden { display: none !important; }
@@ -1701,8 +1720,9 @@ export async function GET(req: Request) {
                     box-shadow: none !important;
                     margin: 0 auto !important;
                     width: 210mm !important;
-                    min-height: 108mm !important;
+                    min-height: 115mm !important;
                     height: auto !important;
+                    padding: 0 !important;
                     page-break-after: avoid;
                   }
                   .receipt-cut-border { border-bottom: 1px dashed #94a3b8 !important; border-top: none !important; border-left: none !important; border-right: none !important; }
@@ -1715,16 +1735,17 @@ export async function GET(req: Request) {
             sheet.style.height = '148mm';
             sheet.style.minHeight = '148mm';
             sheet.style.maxHeight = '148mm';
-            sheet.style.padding = '20px 24px';
+            sheet.style.padding = '0';
             if (bgImg) bgImg.style.display = 'none';
             if (receiptImgBox && receiptTextBox) {
               receiptImgBox.style.display = isLetterheadOn ? 'block' : 'none';
               receiptTextBox.style.display = isLetterheadOn ? 'none' : 'flex';
             }
+            if (receiptFooterBox) receiptFooterBox.style.display = isLetterheadOn ? 'block' : 'none';
             if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi 1/2 Kertas A4 (210mm × 148mm)';
             if (styleEl) {
               styleEl.innerHTML = \`
-                @page { size: A4 portrait; margin: 8mm 0; }
+                @page { size: A4 portrait; margin: 0; }
                 @media print {
                   body { background: white !important; padding: 0 !important; margin: 0 !important; }
                   .print-hidden { display: none !important; }
@@ -1735,6 +1756,7 @@ export async function GET(req: Request) {
                     height: 148mm !important;
                     min-height: 148mm !important;
                     max-height: 148mm !important;
+                    padding: 0 !important;
                     page-break-after: avoid;
                   }
                   .receipt-cut-border { border-bottom: 1px dashed #94a3b8 !important; border-top: none !important; border-left: none !important; border-right: none !important; }
@@ -1747,9 +1769,10 @@ export async function GET(req: Request) {
             sheet.style.height = '297mm';
             sheet.style.minHeight = '297mm';
             sheet.style.maxHeight = '297mm';
-            sheet.style.padding = isLetterheadOn ? '130px 42px 90px 42px' : '40px 42px';
+            sheet.style.padding = isLetterheadOn ? '135px 42px 90px 42px' : '40px 42px';
             if (bgImg) bgImg.style.display = isLetterheadOn ? 'block' : 'none';
             if (receiptImgBox) receiptImgBox.style.display = 'none'; // Gunakan bgImg A4 utuh
+            if (receiptFooterBox) receiptFooterBox.style.display = 'none';
             if (receiptTextBox) receiptTextBox.style.display = isLetterheadOn ? 'none' : 'flex';
             if (guideLabel) guideLabel.innerText = 'Format Kuitansi A4 Penuh (210mm × 297mm)';
             if (styleEl) {
@@ -1777,16 +1800,17 @@ export async function GET(req: Request) {
             sheet.style.height = '105mm';
             sheet.style.minHeight = '105mm';
             sheet.style.maxHeight = '105mm';
-            sheet.style.padding = '12px 16px';
+            sheet.style.padding = '0';
             if (bgImg) bgImg.style.display = 'none';
             if (receiptImgBox && receiptTextBox) {
               receiptImgBox.style.display = isLetterheadOn ? 'block' : 'none';
               receiptTextBox.style.display = isLetterheadOn ? 'none' : 'flex';
             }
+            if (receiptFooterBox) receiptFooterBox.style.display = isLetterheadOn ? 'block' : 'none';
             if (guideLabel) guideLabel.innerText = 'Batas Gunting / Potong Kuitansi 1/4 Kertas A4 (148mm × 105mm)';
             if (styleEl) {
               styleEl.innerHTML = \`
-                @page { size: A4 portrait; margin: 8mm; }
+                @page { size: A4 portrait; margin: 0; }
                 @media print {
                   body { background: white !important; padding: 0 !important; margin: 0 !important; }
                   .print-hidden { display: none !important; }
@@ -1797,6 +1821,7 @@ export async function GET(req: Request) {
                     height: 105mm !important;
                     min-height: 105mm !important;
                     max-height: 105mm !important;
+                    padding: 0 !important;
                     page-break-after: avoid;
                   }
                   .receipt-cut-border { border: 1px dashed #94a3b8 !important; }
@@ -1810,6 +1835,7 @@ export async function GET(req: Request) {
           const bgImg = document.getElementById('letterhead-bg-img');
           const wrapper = document.getElementById('document-content-wrapper');
           const receiptImgBox = document.getElementById('receipt-letterhead-image-box');
+          const receiptFooterBox = document.getElementById('receipt-letterhead-footer-box');
           const receiptTextBox = document.getElementById('receipt-letterhead-text-box');
           const sheet = document.getElementById('print-sheet-document');
           const isReceiptDoc = ${isReceipt ? 'true' : 'false'};
@@ -1817,12 +1843,15 @@ export async function GET(req: Request) {
           if (isReceiptDoc) {
             if (currentReceiptMode === 'full-a4') {
               if (bgImg) bgImg.style.display = enabled ? 'block' : 'none';
-              if (sheet) sheet.style.padding = enabled ? '130px 42px 90px 42px' : '40px 42px';
+              if (sheet) sheet.style.padding = enabled ? '135px 42px 90px 42px' : '40px 42px';
               if (receiptImgBox) receiptImgBox.style.display = 'none';
+              if (receiptFooterBox) receiptFooterBox.style.display = 'none';
               if (receiptTextBox) receiptTextBox.style.display = enabled ? 'none' : 'flex';
             } else {
               if (bgImg) bgImg.style.display = 'none';
+              if (sheet) sheet.style.padding = '0';
               if (receiptImgBox) receiptImgBox.style.display = enabled ? 'block' : 'none';
+              if (receiptFooterBox) receiptFooterBox.style.display = enabled ? 'block' : 'none';
               if (receiptTextBox) receiptTextBox.style.display = enabled ? 'none' : 'flex';
             }
           } else {
