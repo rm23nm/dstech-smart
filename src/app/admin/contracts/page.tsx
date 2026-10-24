@@ -174,6 +174,74 @@ export const calculateEndDateFromDuration = (startDateStr: string, months: numbe
   return end.toISOString().split("T")[0];
 };
 
+export const angkaKeTerbilangIndo = (num: number): string => {
+  const n = Math.round(Number(num) || 0);
+  if (n <= 0) return "nol";
+  const kata = [
+    "", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "delapan", "sembilan",
+    "sepuluh", "sebelas", "dua belas", "tiga belas", "empat belas", "lima belas",
+    "enam belas", "tujuh belas", "delapan belas", "sembilan belas"
+  ];
+  if (n < 20) return kata[n];
+  if (n < 100) {
+    const puluhan = Math.floor(n / 10);
+    const sisa = n % 10;
+    const namaPuluhan = ["", "", "dua puluh", "tiga puluh", "empat puluh", "lima puluh", "enam puluh", "tujuh puluh", "delapan puluh", "sembilan puluh"][puluhan];
+    return sisa === 0 ? namaPuluhan : `${namaPuluhan} ${kata[sisa]}`;
+  }
+  return String(n);
+};
+
+export const hitungJamKerjaEfektif = (
+  startTime: string,
+  endTime: string,
+  breakStartTime?: string,
+  breakEndTime?: string
+): number => {
+  if (!startTime || !endTime) return 8;
+
+  const [startH, startM] = startTime.split(":").map(Number);
+  const [endH, endM] = endTime.split(":").map(Number);
+
+  if (isNaN(startH) || isNaN(endH)) return 8;
+
+  const startMinutes = startH * 60 + (startM || 0);
+  let endMinutes = endH * 60 + (endM || 0);
+
+  if (endMinutes < startMinutes) {
+    endMinutes += 24 * 60;
+  }
+
+  let totalMinutes = endMinutes - startMinutes;
+
+  if (breakStartTime && breakEndTime) {
+    const [bStartH, bStartM] = breakStartTime.split(":").map(Number);
+    const [bEndH, bEndM] = breakEndTime.split(":").map(Number);
+    if (!isNaN(bStartH) && !isNaN(bEndH)) {
+      const bStartMinutes = bStartH * 60 + (bStartM || 0);
+      let bEndMinutes = bEndH * 60 + (bEndM || 0);
+      if (bEndMinutes < bStartMinutes) bEndMinutes += 24 * 60;
+
+      const breakDuration = bEndMinutes - bStartMinutes;
+      if (breakDuration > 0 && breakDuration < totalMinutes) {
+        totalMinutes -= breakDuration;
+      }
+    }
+  }
+
+  const hours = Math.round((totalMinutes / 60) * 10) / 10;
+  return hours > 0 ? (hours % 1 === 0 ? Math.round(hours) : hours) : 8;
+};
+
+export const hitungJamKerjaMingguan = (
+  dailyHours: number,
+  workDaysType?: string
+): number => {
+  const days = workDaysType === "6_DAYS" ? 6 : 5;
+  const weekly = Math.round((Number(dailyHours) || 8) * days);
+  return weekly > 0 ? weekly : 40;
+};
+
 export const OFFICIAL_POSITION_PRESETS: OfficialPositionPreset[] = [
   {
     id: "helper",
@@ -516,6 +584,27 @@ export default function ContractsPage() {
       contractType: months >= 12 ? "YEARLY" : (prev.employeeCategory === "STAFF" ? "MONTHLY" : "DAILY"),
       endDate: newEnd,
     }));
+  };
+
+  // Helper Otomatisasi Jam Kerja Efektif & Mingguan saat jam masuk/pulang/istirahat diubah
+  const handleScheduleTimeChange = (
+    field: "startTime" | "endTime" | "breakStartTime" | "breakEndTime",
+    value: string
+  ) => {
+    const updated = { ...formData, [field]: value };
+    const calculatedDaily = hitungJamKerjaEfektif(
+      updated.startTime,
+      updated.endTime,
+      updated.breakStartTime,
+      updated.breakEndTime
+    );
+    const calculatedWeekly = hitungJamKerjaMingguan(calculatedDaily, updated.workDaysType);
+
+    setFormData({
+      ...updated,
+      dailyWorkingHours: calculatedDaily,
+      weeklyWorkingHours: calculatedWeekly,
+    });
   };
 
   // Extend Modal Form State
@@ -2285,8 +2374,8 @@ export default function ContractsPage() {
                       <input
                         type="time"
                         value={formData.startTime}
-                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+                        onChange={(e) => handleScheduleTimeChange("startTime", e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-200 transition-all"
                       />
                     </div>
 
@@ -2297,8 +2386,8 @@ export default function ContractsPage() {
                       <input
                         type="time"
                         value={formData.endTime}
-                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800"
+                        onChange={(e) => handleScheduleTimeChange("endTime", e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-200 transition-all"
                       />
                     </div>
 
@@ -2309,8 +2398,8 @@ export default function ContractsPage() {
                       <input
                         type="time"
                         value={formData.breakStartTime}
-                        onChange={(e) => setFormData({ ...formData, breakStartTime: e.target.value })}
-                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-700"
+                        onChange={(e) => handleScheduleTimeChange("breakStartTime", e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-indigo-200 transition-all"
                       />
                     </div>
 
@@ -2321,8 +2410,8 @@ export default function ContractsPage() {
                       <input
                         type="time"
                         value={formData.breakEndTime}
-                        onChange={(e) => setFormData({ ...formData, breakEndTime: e.target.value })}
-                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-700"
+                        onChange={(e) => handleScheduleTimeChange("breakEndTime", e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg font-medium text-slate-700 focus:bg-white focus:ring-2 focus:ring-indigo-200 transition-all"
                       />
                     </div>
                   </div>
@@ -2342,37 +2431,53 @@ export default function ContractsPage() {
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                        Durasi Kerja Harian
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-700">
+                          Durasi Kerja Harian
+                        </label>
+                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded capitalize">
+                          {angkaKeTerbilangIndo(formData.dailyWorkingHours)} jam
+                        </span>
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <input
                           type="number"
                           min="1"
                           max="24"
                           value={formData.dailyWorkingHours}
-                          onChange={(e) => setFormData({ ...formData, dailyWorkingHours: Number(e.target.value) })}
+                          onChange={(e) => {
+                            const val = Number(e.target.value) || 0;
+                            const calcWeekly = hitungJamKerjaMingguan(val, formData.workDaysType);
+                            setFormData({ ...formData, dailyWorkingHours: val, weeklyWorkingHours: calcWeekly });
+                          }}
                           className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-bold text-slate-800"
                         />
                         <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Jam / Hari</span>
                       </div>
+                      <p className="text-[9px] text-slate-400 mt-0.5">Otomatis terhitung dari selisih jam kerja</p>
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                        Maksimal Jam Mingguan
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-700">
+                          Maksimal Jam Mingguan
+                        </label>
+                        <span className="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded capitalize">
+                          {angkaKeTerbilangIndo(formData.weeklyWorkingHours)} jam
+                        </span>
+                      </div>
                       <div className="flex items-center gap-1.5">
                         <input
                           type="number"
                           min="1"
-                          max="60"
+                          max="80"
                           value={formData.weeklyWorkingHours}
                           onChange={(e) => setFormData({ ...formData, weeklyWorkingHours: Number(e.target.value) })}
                           className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-bold text-slate-800"
                         />
                         <span className="text-[11px] font-bold text-slate-500 whitespace-nowrap">Jam / Minggu</span>
                       </div>
+                      <p className="text-[9px] text-slate-400 mt-0.5">Sesuai ketentuan PP 35/2021</p>
                     </div>
                   </div>
 
@@ -3461,7 +3566,7 @@ export default function ContractsPage() {
                     1. <strong>Hari Kerja Resmi:</strong> Hari kerja operasional bagi PIHAK KEDUA ditetapkan sebanyak <strong>{selectedContract.workSchedule?.workDaysText || (selectedContract.employeeCategory === "STAFF" ? "Senin s.d. Jumat (5 Hari Kerja)" : "Senin s.d. Sabtu (6 Hari Kerja)")}</strong>, atau disesuaikan dengan kebutuhan penugasan proyek lapangan resmi yang diatur dalam Surat Perintah Kerja (SPK).
                   </p>
                   <p>
-                    2. <strong>Jam Kerja Operasional:</strong> Jam kerja normal dimulai pukul <strong>{selectedContract.workSchedule?.startTime || "08:00"} WIB</strong> sampai dengan pukul <strong>{selectedContract.workSchedule?.endTime || "17:00"} WIB</strong>, dengan waktu kerja efektif <strong>{selectedContract.workSchedule?.dailyWorkingHours || 8} (delapan) jam per hari</strong> dan maksimal <strong>{selectedContract.workSchedule?.weeklyWorkingHours || 40} (empat puluh) jam per minggu</strong> sesuai ketentuan Peraturan Pemerintah No. 35 Tahun 2021.
+                    2. <strong>Jam Kerja Operasional:</strong> Jam kerja normal dimulai pukul <strong>{selectedContract.workSchedule?.startTime || "08:00"} WIB</strong> sampai dengan pukul <strong>{selectedContract.workSchedule?.endTime || "17:00"} WIB</strong>, dengan waktu kerja efektif <strong>{selectedContract.workSchedule?.dailyWorkingHours || 8} ({angkaKeTerbilangIndo(selectedContract.workSchedule?.dailyWorkingHours || 8)}) jam per hari</strong> dan maksimal <strong>{selectedContract.workSchedule?.weeklyWorkingHours || 40} ({angkaKeTerbilangIndo(selectedContract.workSchedule?.weeklyWorkingHours || 40)}) jam per minggu</strong> sesuai ketentuan Peraturan Pemerintah No. 35 Tahun 2021.
                   </p>
                   <p>
                     3. <strong>Waktu Istirahat:</strong> PIHAK KEDUA berhak atas waktu istirahat siang selama 1 (satu) jam, yaitu mulai pukul <strong>{selectedContract.workSchedule?.breakStartTime || "12:00"} WIB s.d. {selectedContract.workSchedule?.breakEndTime || "13:00"} WIB</strong> (khusus hari Jumat disesuaikan pukul 11:30 WIB s.d. 13:00 WIB untuk penunaian Ibadah Sholat Jumat). Sesuai ketentuan ketenagakerjaan, waktu istirahat tidak diperhitungkan sebagai jam kerja efektif.

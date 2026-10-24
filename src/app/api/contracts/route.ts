@@ -149,6 +149,9 @@ export async function POST(req: Request) {
       endDate: body.endDate,
       durationMonths: Number(body.durationMonths || 1),
       salaryScheme: body.salaryScheme || {},
+      allowances: body.allowances || {},
+      leavePolicy: body.leavePolicy || {},
+      workSchedule: body.workSchedule || {},
       workLocation: body.workLocation || "Kantor Utama DSTech Cilegon",
       status: body.status || "ACTIVE",
       signedByFirstParty: body.signedByFirstParty || {
