@@ -346,6 +346,39 @@ export default function EmployeeDashboard() {
   const [calcInputQty, setCalcInputQty] = useState<number>(1);
   const [calcDirection, setCalcDirection] = useState<"primary_to_sub" | "sub_to_primary">("primary_to_sub");
 
+  // Modal State Pembuatan Tiket Maintenance Mandiri Teknisi
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState<boolean>(false);
+  const [isSubmittingNewTask, setIsSubmittingNewTask] = useState<boolean>(false);
+  const [newTaskForm, setNewTaskForm] = useState({
+    ticketNumber: "",
+    entityType: "PT" as "PT" | "NON_PT",
+    type: "Corrective Maintenance",
+    title: "",
+    client: "",
+    clientId: "",
+    clientPhone: "",
+    clientPic: "",
+    location: "",
+    date: new Date().toISOString().split("T")[0],
+    deadline: new Date().toISOString().split("T")[0],
+    status: "In Progress" as "Pending" | "In Progress" | "Completed",
+    priority: "Medium" as "Normal" | "Medium" | "High" | "Urgent",
+    technician: "",
+    technicianPhone: "",
+    scope: [
+      "Pengecekan dan investigasi kendala di lokasi",
+      "Perbaikan konektor / modul perangkat",
+      "Uji fungsi operasional sistem",
+    ],
+    equipment: ["Tool Set Obeng & Tang", "Digital Multitester"],
+    notes: "",
+    latitude: null as number | null,
+    longitude: null as number | null,
+    googleMapsUrl: "",
+  });
+  const [newScopeItemInput, setNewScopeItemInput] = useState<string>("");
+  const [newEquipmentItemInput, setNewEquipmentItemInput] = useState<string>("");
+
   interface GeoCoords {
     lat: number;
     lng: number;
@@ -973,6 +1006,101 @@ export default function EmployeeDashboard() {
       }
     } catch {
       showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  // Handler Buka Modal Buat Tiket Maintenance
+  const handleOpenCreateTaskModal = () => {
+    const today = new Date().toISOString().split("T")[0];
+    setNewTaskForm({
+      ticketNumber: "",
+      entityType: "PT",
+      type: "Corrective Maintenance",
+      title: "",
+      client: "",
+      clientId: "",
+      clientPhone: "",
+      clientPic: "",
+      location: "",
+      date: today,
+      deadline: today,
+      status: "In Progress",
+      priority: "Medium",
+      technician: currentUser?.name || "Teknisi Lapangan",
+      technicianPhone: currentUser?.phone || "",
+      scope: [
+        "Pengecekan dan investigasi kendala di lokasi",
+        "Perbaikan konektor / modul perangkat",
+        "Uji fungsi operasional sistem",
+      ],
+      equipment: ["Tool Set Obeng & Tang", "Digital Multitester"],
+      notes: "",
+      latitude: null,
+      longitude: null,
+      googleMapsUrl: "",
+    });
+    setNewScopeItemInput("");
+    setNewEquipmentItemInput("");
+    setIsCreateTaskModalOpen(true);
+
+    // Otomatis deteksi GPS teknisi saat buka form
+    if (typeof window !== "undefined" && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = Number(pos.coords.latitude.toFixed(6));
+          const lng = Number(pos.coords.longitude.toFixed(6));
+          setNewTaskForm((prev) => ({
+            ...prev,
+            latitude: lat,
+            longitude: lng,
+            googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+          }));
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+  };
+
+  // Handler Submit Pembuatan Tiket Maintenance Mandiri
+  const handleSubmitCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskForm.title.trim()) {
+      showToast("Judul perbaikan / pekerjaan wajib diisi!");
+      return;
+    }
+    if (!newTaskForm.client.trim()) {
+      showToast("Nama Klien / Perusahaan / Lokasi wajib diisi!");
+      return;
+    }
+
+    try {
+      setIsSubmittingNewTask(true);
+      const payload = {
+        ...newTaskForm,
+        technician: newTaskForm.technician.trim() || currentUser?.name || "Teknisi Lapangan",
+        technicianId: currentUser?.id || "",
+        technicianPhone: newTaskForm.technicianPhone || currentUser?.phone || "",
+      };
+
+      const res = await fetch("/api/employee/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setTasks((prev) => [json.data, ...prev]);
+        showToast(`✓ Tiket Maintenance ${json.data.ticketNumber || ""} berhasil dibuat & siap dieksekusi!`);
+        setIsCreateTaskModalOpen(false);
+      } else {
+        showToast("Gagal membuat tiket: " + (json.error || ""));
+      }
+    } catch (err: any) {
+      showToast("Terjadi kesalahan jaringan: " + err.message);
+    } finally {
+      setIsSubmittingNewTask(false);
     }
   };
 
@@ -1899,34 +2027,50 @@ export default function EmployeeDashboard() {
 
                   {/* Filter & Task List */}
                   <div className="bg-white p-6 sm:p-8 rounded-[36px] border border-slate-200/80 shadow-sm space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
-                        <h3 className="text-lg font-black text-slate-900">Daftar Surat Tugas Kerja</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-black text-slate-900">Daftar Surat Tugas Kerja</h3>
+                          <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-black">
+                            {filteredTasks.length} Tiket
+                          </span>
+                        </div>
                         <p className="text-slate-400 text-xs font-medium">
                           Pekerjaan yang ditugaskan kepada {currentUser?.name || "Teknisi Lapangan"}
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl overflow-x-auto">
-                        {["Semua", "In Progress", "Pending", "Completed"].map((st) => (
-                          <button
-                            key={st}
-                            onClick={() => setTaskFilter(st)}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
-                              taskFilter === st
-                                ? "bg-white text-slate-900 shadow-sm"
-                                : "text-slate-500 hover:text-slate-900"
-                            }`}
-                          >
-                            {st === "In Progress"
-                              ? "Berjalan"
-                              : st === "Pending"
-                              ? "Menunggu"
-                              : st === "Completed"
-                              ? "Selesai"
-                              : "Semua"}
-                          </button>
-                        ))}
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <button
+                          type="button"
+                          onClick={handleOpenCreateTaskModal}
+                          className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-dstech-blue to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer active:scale-95"
+                        >
+                          <Plus className="w-4 h-4" />
+                          <span>Buat Tiket Maintenance</span>
+                        </button>
+
+                        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl overflow-x-auto">
+                          {["Semua", "In Progress", "Pending", "Completed"].map((st) => (
+                            <button
+                              key={st}
+                              onClick={() => setTaskFilter(st)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                                taskFilter === st
+                                  ? "bg-white text-slate-900 shadow-sm"
+                                  : "text-slate-500 hover:text-slate-900"
+                              }`}
+                            >
+                              {st === "In Progress"
+                                ? "Berjalan"
+                                : st === "Pending"
+                                ? "Menunggu"
+                                : st === "Completed"
+                                ? "Selesai"
+                                : "Semua"}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -4714,6 +4858,385 @@ export default function EmployeeDashboard() {
                   className="px-5 py-2.5 rounded-xl bg-dstech-blue text-white font-bold hover:bg-blue-700 shadow-md"
                 >
                   Ajukan ke HR
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Buat Tiket Maintenance Mandiri Teknisi */}
+      {isCreateTaskModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto animate-fadeIn"
+          onClick={() => !isSubmittingNewTask && setIsCreateTaskModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-[32px] max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative my-auto border border-slate-100 max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-dstech-blue text-[10px] font-black uppercase tracking-wider">
+                    Portal Teknisi Lapangan
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">
+                    Eksekusi Cepat
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+                  Buat Tiket Maintenance Baru
+                </h3>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Catat pekerjaan atau temuan kendala di lapangan dan langsung mulai eksekusi perbaikan.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateTaskModalOpen(false)}
+                disabled={isSubmittingNewTask}
+                className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSubmitCreateTask} className="space-y-5 text-xs">
+              {/* Entitas Perusahaan & Jenis Pekerjaan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1.5">
+                    Entitas Penugasan:
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewTaskForm({ ...newTaskForm, entityType: "PT" })}
+                      className={`p-2.5 rounded-xl font-bold border text-center transition-all cursor-pointer ${
+                        newTaskForm.entityType === "PT"
+                          ? "bg-blue-50 border-dstech-blue text-dstech-blue shadow-sm"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      🏢 PT (Resmi)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewTaskForm({ ...newTaskForm, entityType: "NON_PT" })}
+                      className={`p-2.5 rounded-xl font-bold border text-center transition-all cursor-pointer ${
+                        newTaskForm.entityType === "NON_PT"
+                          ? "bg-amber-50 border-amber-500 text-amber-700 shadow-sm"
+                          : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      👤 Non-PT / Perseorangan
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1.5">
+                    Jenis Tindakan:
+                  </label>
+                  <select
+                    value={newTaskForm.type}
+                    onChange={(e) => setNewTaskForm({ ...newTaskForm, type: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-800 focus:border-dstech-blue focus:ring-1 focus:ring-dstech-blue"
+                  >
+                    <option value="Corrective Maintenance">🔧 Corrective Maintenance (Perbaikan Kendala)</option>
+                    <option value="Preventive Maintenance">🛡️ Preventive Maintenance (Perawatan Berkala)</option>
+                    <option value="Instalasi Baru">⚡ Instalasi & Pemasangan Baru</option>
+                    <option value="Pengecekan Darurat">🚨 Pengecekan Darurat / Emergency</option>
+                    <option value="Penggantian Part">🔄 Penggantian Komponen / Sparepart</option>
+                    <option value="Relokasi & Setting">📍 Relokasi & Kalibrasi Ulang</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Judul Pekerjaan */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Judul Pekerjaan / Kendala <span className="text-red-500">*</span>:
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: Perbaikan Barrier Gate Macet & Sensor Loop Pos Masuk"
+                  value={newTaskForm.title}
+                  onChange={(e) => setNewTaskForm({ ...newTaskForm, title: e.target.value })}
+                  className="w-full p-3 rounded-xl border border-slate-200 font-bold text-slate-900 focus:border-dstech-blue focus:ring-1 focus:ring-dstech-blue"
+                />
+              </div>
+
+              {/* Klien & Lokasi */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Nama Klien / Perusahaan <span className="text-red-500">*</span>:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: PT Krakatau Posco / RS Kurnia"
+                    value={newTaskForm.client}
+                    onChange={(e) => setNewTaskForm({ ...newTaskForm, client: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-semibold text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    PIC Klien & Telepon (Opsional):
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Nama PIC"
+                      value={newTaskForm.clientPic}
+                      onChange={(e) => setNewTaskForm({ ...newTaskForm, clientPic: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border border-slate-200 text-xs"
+                    />
+                    <input
+                      type="text"
+                      placeholder="No HP / WA"
+                      value={newTaskForm.clientPhone}
+                      onChange={(e) => setNewTaskForm({ ...newTaskForm, clientPhone: e.target.value })}
+                      className="w-full p-2.5 rounded-xl border border-slate-200 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Alamat Lokasi + Tombol GPS */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">
+                    Alamat / Area Lokasi Lapangan:
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => {
+                            const lat = Number(pos.coords.latitude.toFixed(6));
+                            const lng = Number(pos.coords.longitude.toFixed(6));
+                            setNewTaskForm((prev) => ({
+                              ...prev,
+                              location: prev.location || `Area Lokasi (${lat}, ${lng})`,
+                              latitude: lat,
+                              longitude: lng,
+                              googleMapsUrl: `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`,
+                            }));
+                            showToast(`📍 Koordinat GPS terkunci: ${lat}, ${lng}`);
+                          },
+                          (err) => showToast("Gagal baca GPS: " + err.message),
+                          { enableHighAccuracy: true, timeout: 8000 }
+                        );
+                      }
+                    }}
+                    className="text-[11px] font-bold text-dstech-blue hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Navigation className="w-3.5 h-3.5" />
+                    <span>Kunci Koordinat GPS Saya</span>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Contoh: Gedung Administrasi Lt. 2, Kawasan Industri Krakatau Cilegon"
+                  value={newTaskForm.location}
+                  onChange={(e) => setNewTaskForm({ ...newTaskForm, location: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 font-medium text-slate-800"
+                />
+                {newTaskForm.latitude && newTaskForm.longitude && (
+                  <p className="text-[10px] text-emerald-600 font-bold mt-1 flex items-center gap-1">
+                    ✓ Koordinat terdata: {newTaskForm.latitude}, {newTaskForm.longitude}
+                  </p>
+                )}
+              </div>
+
+              {/* Tanggal, Prioritas & Status */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Tanggal Eksekusi:
+                  </label>
+                  <input
+                    type="date"
+                    value={newTaskForm.date}
+                    onChange={(e) => setNewTaskForm({ ...newTaskForm, date: e.target.value, deadline: e.target.value })}
+                    className="w-full p-2 rounded-xl border border-slate-200 text-xs font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Tingkat Prioritas:
+                  </label>
+                  <select
+                    value={newTaskForm.priority}
+                    onChange={(e) => setNewTaskForm({ ...newTaskForm, priority: e.target.value as any })}
+                    className="w-full p-2 rounded-xl border border-slate-200 text-xs font-bold"
+                  >
+                    <option value="Normal">Normal</option>
+                    <option value="Medium">Medium (Sedang)</option>
+                    <option value="High">High (Tinggi)</option>
+                    <option value="Urgent">🚨 Urgent (Darurat)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Status Awal:
+                  </label>
+                  <select
+                    value={newTaskForm.status}
+                    onChange={(e) => setNewTaskForm({ ...newTaskForm, status: e.target.value as any })}
+                    className="w-full p-2 rounded-xl border border-slate-200 text-xs font-bold text-blue-700 bg-blue-50"
+                  >
+                    <option value="In Progress">▶ In Progress (Langsung Dikerjakan)</option>
+                    <option value="Pending">⏳ Pending (Menunggu Jadwal)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Teknisi Pelaksana */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Teknisi / Personel Pelaksana:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Nama Teknisi"
+                    value={newTaskForm.technician}
+                    onChange={(e) => setNewTaskForm({ ...newTaskForm, technician: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 font-bold text-slate-800"
+                  />
+                  <input
+                    type="text"
+                    placeholder="No HP / Kontak Teknisi"
+                    value={newTaskForm.technicianPhone}
+                    onChange={(e) => setNewTaskForm({ ...newTaskForm, technicianPhone: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Lingkup Pekerjaan (Scope Checklist) */}
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                <label className="font-black text-slate-800 block text-xs flex items-center justify-between">
+                  <span>Rencana Lingkup Tindakan / Checklist:</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    {newTaskForm.scope.length} Poin Tindakan
+                  </span>
+                </label>
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {newTaskForm.scope.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between gap-2 p-2 rounded-xl bg-white border border-slate-200 text-[11px]"
+                    >
+                      <span className="font-medium text-slate-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                        {item}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setNewTaskForm({
+                            ...newTaskForm,
+                            scope: newTaskForm.scope.filter((_, i) => i !== idx),
+                          })
+                        }
+                        className="text-slate-400 hover:text-red-500 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <input
+                    type="text"
+                    placeholder="Tambah item tindakan/perbaikan..."
+                    value={newScopeItemInput}
+                    onChange={(e) => setNewScopeItemInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (newScopeItemInput.trim()) {
+                          setNewTaskForm({
+                            ...newTaskForm,
+                            scope: [...newTaskForm.scope, newScopeItemInput.trim()],
+                          });
+                          setNewScopeItemInput("");
+                        }
+                      }
+                    }}
+                    className="flex-1 p-2 rounded-xl border border-slate-200 bg-white text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newScopeItemInput.trim()) {
+                        setNewTaskForm({
+                          ...newTaskForm,
+                          scope: [...newTaskForm.scope, newScopeItemInput.trim()],
+                        });
+                        setNewScopeItemInput("");
+                      }
+                    }}
+                    className="px-3 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 cursor-pointer"
+                  >
+                    + Tambah
+                  </button>
+                </div>
+              </div>
+
+              {/* Catatan / Keterangan Tambahan */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Catatan Awal / Gejala Kerusakan:
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Keterangan singkat kendala di lapangan atau instruksi khusus dari klien..."
+                  value={newTaskForm.notes}
+                  onChange={(e) => setNewTaskForm({ ...newTaskForm, notes: e.target.value })}
+                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateTaskModalOpen(false)}
+                  disabled={isSubmittingNewTask}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingNewTask}
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-dstech-blue to-blue-700 hover:from-blue-600 hover:to-blue-800 text-white font-black uppercase tracking-wider text-xs shadow-lg shadow-blue-500/25 flex items-center gap-2 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isSubmittingNewTask ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Menyimpan Tiket...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                      <span>✓ Buat & Mulai Eksekusi Tiket</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>
