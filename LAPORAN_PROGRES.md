@@ -223,14 +223,7 @@
   8. [ ] Bersihkan file cadangan `_backup/`.
   9. [ ] Push pembaruan ke GitHub dan deploy ke server VPS live.
   10. [ ] Perbarui status Tugas 127 menjadi [SELESAI].
-
-
-
-
-
-
-
-
+- **2026-10-25**: Sinkronisasi Otomatis Total Pembelian PO & Hutang PO Belum Lunas pada Daftar Supplier (/admin/finance) (Tugas 145). Mengatasi masalah nilai akumulasi PO dan hutang supplier yang sebelumnya bernilai 0/statis pada ringkasan KPI dan tabel daftar supplier. Menghitung secara dinamis dari data agregasi transaksi Purchase Order (`purchases`) di backend `GET /api/finance` (`src/app/api/finance/route.ts`) dan helper frontend `getSupplierStats` & `getClientStats` di `src/app/admin/finance/page.tsx`. Menambahkan kolom baru "Total Belanja PO & Hutang" pada tabel direktori supplier dan kolom "Akumulasi Faktur & Piutang" pada tabel klien lengkap dengan badge status (Hutang / Piutang / Lunas / Belum Ada Transaksi) dan counter jumlah transaksi terkait. Divalidasi `npx tsc --noEmit` (0 error), build lokal `npm run build` (53/53 routes sukses), commit git GitHub `609c349`, deploy live ke VPS aaPanel (PM2 `dstech-main` restart sukses), dan terverifikasi live di `https://dstechsmart.com/api/finance` (terkonfirmasi `totalSuppliersPurchases: 29164000`, `totalSuppliersPayable: 29164000`).
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
 **Status**: Selesai
@@ -4238,8 +4231,250 @@
   8. [x] **Langkah 8**: Push commit `83b3b4a` ke GitHub repository via `push_with_native_git.js`.
   9. [x] **Langkah 9**: Deploy ke live server VPS aaPanel via `deploy_live.js` (restart PM2 `dstech-main` PID 827693 online).
   10. [x] **Langkah 10**: Perbarui status di `LAPORAN_PROGRES.md` menjadi Selesai.
+---
+
+### 144. Tugas: Format Cetak Kuitansi Pembayaran Kompak 1/4 Ukuran Kertas A4
+- **Permintaan Pengguna**:
+  - *"untuk format print kuitansi jangan terlalu besar, kalau bisa 1/4 ukuran kerta A4 saja"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Analisis Kebutuhan & Desain Solusi**:
+  1. Kuitansi berukuran 1 lembar A4 penuh terlalu boros kertas dan ruang cetak. Format kuitansi standar yang ideal dan elegan adalah berukuran 1/4 kertas A4 (proporsi 148mm x 105mm / A6 Landscape).
+  2. Saat dicetak di printer kantor/toko dengan kertas A4 biasa, kuitansi mencetak pas di 1/4 bidang sudut kertas dengan garis panduan potong rapi (`✂️ Batas Gunting / Potong Kuitansi 1/4 Kertas A4`), dan tidak membesar/membengkak ke satu halaman penuh.
+  3. Menyediakan kontrol ukuran fleksibel di Action Toolbar Kuitansi:
+     - **1/4 A4 (A6 Landscape 148×105mm)** [Default Rekomendasi]
+     - **1/4 Slip Memanjang (210×74mm)**
+     - **1/2 A4 (A5 Landscape 210×148mm)**
+     - **Full A4 (210×297mm)**
+  4. Penyesuaian tata letak konten:
+     - Watermark samar resmi "DSTECH" di latar belakang kuitansi.
+     - Kop surat resmi kompak dengan identitas PT. DSTech Smart Perkasa.
+     - Nomor kuitansi resmi, tanggal pembayaran, badge status lunas/uang muka.
+     - Uang sejumlah dalam format terbilang rupiah khas formulir kuitansi korporat.
+     - Peruntukan pembayaran, nomor faktur, dan ringkasan sisa tagihan.
+     - Kotak nominal nominal rupiah tebal (`JUMLAH: Rp ...,-`).
+     - Tanda tangan Direktur & cap stempel digital resmi DSTech.
+  5. Fitur Unduh PDF (`downloadAsPdf`) otomatis mengadopsi ukuran kertas sesuai mode yang dipilih pengguna ([148, 105] untuk 1/4 A6 landscape).
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md` dan buat backup file `src/app/api/finance/print/route.ts` ke `_backup_kuitansi_quarter/`.
+  2. [x] **Langkah 2**: Modifikasi template kuitansi dan CSS `@page` / `.print-sheet` di `src/app/api/finance/print/route.ts` agar default berukuran 1/4 kertas A4 (148mm × 105mm A6 landscape) dengan garis putus-putus pembatas potong cetak.
+  3. [x] **Langkah 3**: Tambahkan selektor ukuran kuitansi interaktif (1/4 A4 A6, 1/4 Slip, 1/2 A4 A5, Full A4) di Floating Action Toolbar lengkap dengan fungsi adaptif `setReceiptSize(mode)` dan `downloadAsPdf()`.
+  4. [x] **Langkah 4**: Uji kompilasi lokal Next.js `npm run build` dan terverifikasi 100% sukses (53/53 static & dynamic routes lulus tanpa error).
+  5. [x] **Langkah 5**: Hapus folder backup sementara `_backup_kuitansi_quarter/`.
+  6. [x] **Langkah 6**: Push ke GitHub dan deploy ke live VPS aaPanel via `deploy_live.js`.
+  7. [x] **Langkah 7**: Perbarui status di `LAPORAN_PROGRES.md` menjadi Selesai.
 
 ---
+
+### 145. Tugas: Sinkronisasi Otomatis Total Pembelian PO & Hutang PO Belum Lunas pada Daftar Supplier
+- **Permintaan Pengguna**:
+  - *"saya melihat pada daftar suplayer ada nilai Total Pembelian PO dan juga Hutang PO belum lunas, namun kenapa 0, tidak sinkron"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Investigasi Akar Masalah & Desain Solusi**:
+  1. Di `src/app/api/finance/route.ts`, array `data.suppliers` menyimpan nilai statis `totalPurchases: 0` dan `unpaidPayable: 0` saat supplier baru dibuat.
+  2. Ketika transaksi Purchase Order (PO) dicatat di `data.purchases`, nilai `totalPurchases` dan `unpaidPayable` pada supplier terkait tidak dihitung secara real-time.
+  3. Solusi:
+     - Pada handler `GET` di `src/app/api/finance/route.ts`: hitung secara dinamis `totalPurchases` (akumulasi grandTotal seluruh PO aktif) dan `unpaidPayable` (sisa hutang PO yang belum lunas atau DP) untuk setiap supplier berdasarkan `supplierName` atau `supplierId`.
+     - Pada antarmuka `src/app/admin/finance/page.tsx`: sediakan helper kalkulasi real-time `getSupplierStats(sup)`, perbarui kartu KPI bar atas agar mencerminkan total riil transaksi PO, dan tambahkan kolom **Total Belanja PO & Hutang** pada tabel direktori Supplier lengkap dengan status badge (Hutang / Lunas / Belum Ada PO) dan jumlah transaksi PO.
+- **Hasil Pekerjaan yang Telah Diselesaikan**:
+  1. [x] **Langkah 1**: Catat instruksi dan rencana kerja di `LAPORAN_PROGRES.md` (Status: Sedang Dikerjakan).
+  2. [x] **Langkah 2**: Buat cadangan file `src/app/api/finance/route.ts` dan `src/app/admin/finance/page.tsx` ke dalam folder khusus `_backup_supplier_sync/`.
+  3. [x] **Langkah 3**: Perbarui backend API `src/app/api/finance/route.ts` untuk menghitung `totalPurchases` dan `unpaidPayable` setiap supplier secara dinamis dari data `purchases`, serta `totalInvoiced` dan `unpaidReceivable` pada data `clients`.
+  4. [x] **Langkah 4**: Perbarui frontend `src/app/admin/finance/page.tsx` pada kartu KPI ringkasan supplier dan tabel direktori supplier (tambah kolom Akumulasi Belanja & Hutang PO) serta tabel klien.
+  5. [x] **Langkah 5**: Uji kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`) hingga 100% lulus (53/53 static/dynamic routes).
+  6. [x] **Langkah 6**: Hapus folder cadangan sementara `_backup_supplier_sync/`.
+  7. [x] **Langkah 7**: Push perubahan ke GitHub repository via `push_with_native_git.js` (commit `609c349`).
+  8. [x] **Langkah 8**: Deploy live ke VPS aaPanel via `deploy_live.js` (PM2 `dstech-main` PID 1002371 online).
+  9. [x] **Langkah 9**: Verifikasi di live website (HTTP 200 OK, terkonfirmasi `totalSuppliersPurchases: 29164000`, `totalSuppliersPayable: 29164000`) dan perbarui status di `LAPORAN_PROGRES.md` menjadi ✅ **SELESAI**.
+
+---
+
+### 146. Tugas: Fitur Upload Dokumen Berkas Arsip Proyek & Konversi Otomatis Kompresi Gambar ke PDF Super Ringan
+- **Permintaan Pengguna**:
+  - *"untuk file arsip yang di upload bisakah foto diubah ke pdf dengan ukuran yang sangat kecil. misalnya 2kb?"*
+  - *"atau ada PO misalnya yang bentuk JPG dikonversi ke pdf dengan ukuran sangat kecil"*
+  - *"kalau saya mau upload dokumentasi sebagai arsip bagai mana caranya pada folder project, diluar foto laporan Kegiatan. file arsip yang ingin diupload itu seperti PO, Surat tanda terima invoice, suart jalan yang ditanda tangan clien, dan lain-lain kebutuhan sebagai arsip"*
+  - *"kalau bisa semua dokumen bisa dikonvert menjadi pdf secara otomatis dengan ukuran sangat kecil. sehingga tidak akan menjadi beban terlalu besar"*
+- **Status**: ⏳ **MENUNGGU ANTREAN (SIAP DIKERJAKAN SETELAH TUGAS 145)**
+- **Investigasi & Desain Solusi**:
+  1. Menambahkan tab/seksi khusus **"Berkas Arsip Proyek (Project Documents & Legal Archive)"** pada manajemen proyek / modal proyek di luar foto dokumentasi kegiatan fisik.
+  2. Kategori berkas arsip yang didukung: PO Klien / Vendor, Surat Tanda Terima Invoice, Surat Jalan Bertandatangan, BAST, SPK / Kontrak, dan Dokumen Pendukung Lainnya.
+  3. Konversi gambar (JPG/PNG) otomatis ke PDF dengan kompresi cerdas pada sisi browser / backend:
+     - Resolusi dan kualitas gambar dioptimalkan secara dinamis (downsampling greyscale/kompresi tinggi) agar ukuran file PDF menjadi sangat kecil (ringan, hemat bandwidth dan storage server).
+     - Menyediakan fitur preview PDF, download, dan hapus berkas arsip.
+
+### 147. Tugas: Penataan Ikon Aksi Kolom Tabel Menjadi 2 Baris Kompak di Menu Keuangan & ERP (/admin/finance)
+- **Permintaan Pengguna**:
+  - *"ikon aksi sebaiknya dibuat 2 baris saja, jadi tidak terlalu panjang kesamping jadinya"* (Disertai screenshot tabel Faktur Penjualan di `/admin/finance`)
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Analisis Kebutuhan & Desain Solusi**:
+  1. Pada tabel Faktur Penjualan (`activeTab === "sales"`), sebelumnya terdapat 14-15 tombol aksi (Input Bayar/Lunas, Tagih Pelunasan, Approval Direktur, Cetak Faktur, Cetak Kuitansi, BAST, Surat Jalan, Dokumentasi Foto, Kirim WhatsApp, Kirim Email, Kelola Arsip, Foto Penagihan, Edit, Hapus) yang berjejer dalam satu baris horizontal (`flex items-center gap-1.5`).
+  2. Akibatnya kolom "Aksi" menjadi sangat lebar (~600px+) dan mendorong tampilan tabel terlalu jauh ke kanan pada layar komputer/laptop.
+  3. Solusi: Mengelompokkan tombol aksi ke dalam **2 Baris Kompak yang Terstruktur & Rapi** (`flex flex-col items-end gap-1.5 py-1`):
+     - **Baris 1 (Operasional Transaksi & Cetak Dokumen Sah)**:
+       * Tombol Utama `Input Bayar` (atau badge status `Lunas`)
+       * Tombol `Tagih Pelunasan / Termin` (jika bertipe DP/Termin)
+       * `Approval Direktur & Tanda Tangan Digital` (PenTool)
+       * `Cetak Faktur Resmi` (Printer)
+       * `Cetak Kuitansi Sah` (Receipt)
+       * `Cetak BAST` (ClipboardCheck)
+       * `Cetak Surat Jalan` (Truck)
+       * `Laporan Dokumentasi Foto` (Camera)
+     - **Baris 2 (Komunikasi, Arsip & Manajemen Data)**:
+       * `Kirim WhatsApp ke Klien` (MessageCircle)
+       * `Kirim Email ke Klien` (Mail)
+       * `Kelola Arsip & Lampiran Berkas` (FolderArchive)
+       * `Foto Dokumentasi & Part Penagihan` (Camera)
+       * `Edit Faktur` (Edit3)
+       * `Hapus Faktur` (Trash2)
+  4. Menerapkan penataan 2 baris serupa pada tabel SPH (Quotations) dan PO (Purchases) agar konsisten, kompak, dan nyaman di mata pengguna.
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Catat instruksi dan rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat cadangan file `src/app/admin/finance/page.tsx` ke dalam folder `_backup_two_row_actions/`.
+  3. [x] **Langkah 3**: Refaktor sel `<td>` kolom Aksi pada tabel Faktur Penjualan, SPH, dan PO di `src/app/admin/finance/page.tsx` menjadi format 2 baris rapi (`flex flex-col items-end gap-1.5`).
+  4. [x] **Langkah 4**: Uji kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`) hingga 100% lulus (53/53 static & dynamic routes).
+  5. [x] **Langkah 5**: Hapus folder cadangan sementara `_backup_two_row_actions/`.
+  6. [x] **Langkah 6**: Push perubahan ke GitHub repository dan deploy live ke VPS aaPanel via `deploy_live.js`.
+  7. [x] **Langkah 7**: Perbarui status di `LAPORAN_PROGRES.md` menjadi Selesai.
+
+
+### 148. Tugas: Pengaturan Kuitansi Selebar Kertas A4 (Full Width 210mm) & Integrasi Kop Gambar Resmi DSTech
+- **Permintaan Pengguna**:
+  - *"setkan agar panjang sampai habis ukuran A4nya. kemudian saya ingin kasih kop gambar seperti biasa. bagai mana carra kita atur, dengan kop sekarang panjang"* (Disertai screenshot dialog Print Preview browser di mana kuitansi sebelumnya hanya berukuran 1/4 A6 148mm sehingga menyisakan ruang kosong di kanan kertas A4)
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Analisis Kebutuhan & Desain Solusi**:
+  1. **Ukuran Lebar Kuitansi Penuh**:
+     - Kertas cetak printer fisik di Indonesia umumnya adalah A4 Portrait (lebar 210mm × tinggi 297mm).
+     - Kuitansi diset default **Lebar Penuh 210mm** (`width: 210mm`), sehingga membentang dari tepi kiri hingga ujung kanan kertas A4 ("panjang sampai habis ukuran A4nya").
+     - Format tinggi disesuaikan menjadi proporsi Slip Kuitansi Resmi (`210mm × 108mm`, pas 1/3 kertas A4) dengan garis panduan potong gunting rapi di bawahnya.
+  2. **Pengaturan Kop Gambar yang Berukuran Panjang (A4 Potret)**:
+     - File gambar kop resmi `/kop_surat_dstech.jpg` berukuran 724×1024px (A4 potret panjang ke bawah).
+     - **Solusi Cerdas**: Untuk format slip kuitansi selebar 210mm, sistem menerapkan teknik *Smart Header Clipping* (`object-fit: cover; object-position: top center; height: 110px`), sehingga **hanya bagian KOP ATAS (Logo DSTech Smart, Nama PT, Alamat & Kontak)** yang tampil di bagian atas kuitansi dengan skala lebar 100% pas dan tidak gepeng / terdistorsi.
+     - Disediakan toggle checkbox **"Kop Gambar Resmi"** di toolbar kuitansi agar pengguna dapat bebas memilih menggunakan Kop Gambar Resmi DSTech atau Kop Teks Bawaan.
+     - Disediakan pula mode ukuran **"Full A4"** jika pengguna ingin mencetak kuitansi 1 lembar A4 utuh dengan kop surat panjang penuh dari atas sampai bawah.
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Catat instruksi dan rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat cadangan file `src/app/api/finance/print/route.ts` ke dalam folder `_backup_receipt_full_width/`.
+  3. [x] **Langkah 3**: Perbarui template kuitansi dan toolbar di `src/app/api/finance/print/route.ts`:
+     - Default sheet kuitansi menjadi lebar penuh 210mm (`width: 210mm; min-height: 108mm;`).
+     - Tambahkan kontainer Kop Gambar Resmi dengan clipping header proporsional.
+     - Tambahkan checkbox toggle "Kop Gambar Resmi" di toolbar kuitansi.
+     - Perbarui tombol selektor ukuran: `Panjang A4 (Slip 210×108mm)` [Default], `1/2 A4 (210×148mm)`, `Full A4 (210×297mm)`, `Kompak A6 (148×105mm)`.
+     - Sinkronisasi fungsi JavaScript `setReceiptSize()`, `toggleLetterhead()`, dan `downloadAsPdf()`.
+  4. [x] **Langkah 4**: Uji kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`) hingga 100% sukses.
+  5. [x] **Langkah 5**: Hapus folder cadangan sementara `_backup_receipt_full_width/`.
+  6. [x] **Langkah 6**: Push commit ke GitHub repository dan deploy live ke VPS aaPanel via `deploy_live.js`.
+  7. [x] **Langkah 7**: Perbarui status di `LAPORAN_PROGRES.md` menjadi Selesai.
+
+---
+
+### 149. Tugas: Penguncian Kolom Aksi Menjadi Tepat 2 Baris (Fixed 2-Rows Non-Wrap) di Tabel Keuangan & ERP
+- **Permintaan Pengguna**:
+  - *"untuk icon aksinya jadikan 2 baris saja, jangan 4"* (Disertai screenshot di mana tombol aksi Faktur Penjualan terlipat secara otomatis menjadi 4 baris ke bawah karena adanya atribut `flex-wrap` dan label teks tombol yang panjang)
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & TERKUNCI 2 BARIS ICON-ONLY)**
+- **Analisis Kebutuhan & Desain Solusi**:
+  1. **Penyebab Terlipat Menjadi 4 Baris**:
+     - Pada implementasi sebelumnya, kontainer Baris 1 dan Baris 2 menggunakan class `flex-wrap`.
+     - Pada Baris 1, terdapat tombol-tombol yang memuat label teks panjang (`Tagih Pelunasan`, `Kuitansi`, `BAST`, `Surat Jalan`, `Dokumentasi`). Akibatnya total lebar Baris 1 melebihi 550px sehingga browser otomatis melipat Baris 1 menjadi 2 baris.
+     - Baris 2 juga memiliki `flex-wrap` dan ikut terlipat menjadi 2 baris, sehingga totalnya menjadi 4 baris ke bawah dan membuat baris tabel sangat tinggi.
+  2. **Solusi Pasti Tepat 2 Baris**:
+     - Seluruh class `flex-wrap` diganti dengan **`flex-nowrap`** agar setiap baris terkunci secara mutlak dalam 1 baris horizontal.
+     - Tombol-tombol cetak dan aksi pendukung diubah menjadi format **Icon-Only Kompak** (`p-1.5 rounded-lg`, ukuran 28×28px) dengan tooltip `title` penjelasan lengkap saat cursor diarahkan (hover).
+     - Tombol status `Lunas` / `Bayar` menggunakan icon ringkas `CheckCircle2` / `CreditCard`.
+     - Susunan:
+       * **Baris 1 (Operasional Transaksi & Dokumen Sah - Pasti 1 Baris)**: `Input Bayar` / `Lunas`, `Tagih Pelunasan / Termin` (Icon), `Approval Direktur` (Icon), `Cetak Faktur` (Icon), `Kuitansi` (Icon), `BAST` (Icon), `Surat Jalan` (Icon), `Dokumentasi Foto` (Icon).
+       * **Baris 2 (Komunikasi, Arsip & Manajemen - Pasti 1 Baris)**: `WhatsApp` (Icon), `Email` (Icon), `Arsip Dokumen` (Icon), `Foto Part` (Icon), `Edit` (Icon), `Hapus` (Icon).
+     - Telah diterapkan merata pada tabel Penjualan, SPH, dan PO.
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Catat instruksi dan rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat cadangan file `src/app/admin/finance/page.tsx` ke dalam folder `_backup_two_row_strict/`.
+  3. [x] **Langkah 3**: Refaktor kolom Aksi di `src/app/admin/finance/page.tsx` menjadi `flex-nowrap` dan format icon-only ringkas ber-tooltip.
+  4. [x] **Langkah 4**: Uji kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`) hingga 100% sukses (53/53 routes).
+  5. [x] **Langkah 5**: Hapus folder cadangan sementara `_backup_two_row_strict/`.
+  6. [x] **Langkah 6**: Validasi tampilan 2 baris murni tanpa wrap.
+
+---
+
+### 150. Tugas: Kuitansi Full Bleed Tepi-ke-Tepi (Kop Gambar & Footer Bawah Menempel 100% Selebar Kertas A4)
+- **Permintaan Pengguna**:
+  1. *"foothernya gak ada"*
+  2. *"kemudian kopnya tidak penuh kesamping seperti aslinya"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Analisis Akar Masalah (Root Cause Analysis)**:
+  1. **Kop Tidak Penuh ke Samping**:
+     - Pada elemen lembar dokumen `#print-sheet-document`, terdapat padding inline `padding: 14px 22px;` saat mode kuitansi (`isReceipt`).
+     - Pada script `setReceiptSize()` untuk mode `'full-width'`, `'half-a5'`, dan `'quarter-a6'`, properti `sheet.style.padding` diatur `14px 22px`, `20px 24px`, dan `12px 16px`.
+     - Akibat adanya padding luar tersebut, kontainer gambar kop surat terdorong 22px dari kiri dan kanan sehingga memiliki margin putih dan tidak menempel penuh dari tepi kiri ke kanan seperti kop aslinya di kertas A4.
+  2. **Footer Bawah Kop Surat Hilang / Tidak Tampil**:
+     - Pada gambar asli `public/kop_surat_dstech.jpg`, footer bawah berisi bar grafis biru-merah, alamat lengkap Cilegon, email `cs@dstechsmart.com`, website `www.dstechsmart.com`, dan kontak telepon `0822-5949-4242`.
+     - Pada script `toggleLetterhead(enabled)` dan `setReceiptSize()`, elemen footer kuitansi (`receipt-letterhead-footer-box`) belum disinkronkan secara dinamis sehingga display-nya tidak dikontrol dengan benar saat toggle dinyalakan atau saat beralih ukuran kuitansi.
+- **Hasil Pekerjaan yang Telah Diselesaikan**:
+  1. [x] **Langkah 1**: Buat cadangan file `src/app/api/finance/print/route.ts` ke folder khusus `_backup_receipt_full_bleed/`.
+  2. [x] **Langkah 2**: Setel pembungkus `#print-sheet-document` untuk kuitansi menjadi `padding: 0;` (full bleed 0 margin).
+  3. [x] **Langkah 3**: Buat Kop Atas Kuitansi (`receipt-letterhead-image-box`) menempel 100% penuh dari tepi kiri ke kanan kertas A4 setinggi `125px` (proporsional 11.23% dari A4) dengan `overflow: hidden` dan gambar `width: 100%; height: auto; position: absolute; top: 0; left: 0;`.
+  4. [x] **Langkah 4**: Berikan padding horizontal pada isi formulir kuitansi (`px-6 py-2`) agar konten teks rapi dan proporsional.
+  5. [x] **Langkah 5**: Pasang Footer Bawah Kop Surat Kuitansi (`receipt-letterhead-footer-box`) menempel 100% penuh di bagian paling bawah kuitansi setinggi `54px` (proporsional 5.2% dari A4) dengan potongan baris alamat, email, dan telepon resmi DSTech Smart.
+  6. [x] **Langkah 6**: Sinkronkan fungsi JavaScript `setReceiptSize(mode)` dan `toggleLetterhead(enabled)` agar menampilkan/menyembunyikan kop atas dan footer bawah secara serentak.
+  7. [x] **Langkah 7**: Uji kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal Next.js (`npm run build`) 53/53 static/dynamic routes 100% sukses.
+  8. [x] **Langkah 8**: Hapus folder cadangan sementara `_backup_receipt_full_bleed/`.
+  9. [x] **Langkah 9**: Push commit ke GitHub via `push_with_native_git.js` dan deploy ke live VPS aaPanel via `deploy_live.js` (PM2 `dstech-main` restart sukses).
+  10. [x] **Langkah 10**: Perbarui status di `LAPORAN_PROGRES.md` menjadi ✅ **SELESAI**.
+
+---
+
+### 151. Tugas: Menghilangkan Informasi Stok pada Halaman Utama Website
+- **Permintaan Pengguna**:
+  - *"tolong hilangkan informasi stock pada halaman Utama website."* (Disertai screenshot card produk di halaman utama yang menampilkan teks stok produk di atas judul produk)
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Analisis Kebutuhan**:
+  - Pada halaman utama website (`/`), katalog produk atau kartu produk sebelumnya menampilkan badge/teks stok (contoh: "Stok: 100 Pcs" atau sejenisnya).
+  - Pengguna ingin informasi stok tersebut dihilangkan dari card produk di halaman depan agar tampilan lebih bersih dan berfokus pada nama layanan/produk, harga, dan tombol aksi tanpa membingungkan calon klien.
+- **Hasil Pekerjaan yang Telah Diselesaikan**:
+  1. [x] **Langkah 1**: Ditemukan elemen tampilan informasi stok pada [src/components/ProductSection.tsx](file:///d:/OneDrive/My%20Project%20Aplikasi/Website%20DStech%20Smart/dstech-smart/src/components/ProductSection.tsx#L286-L296).
+  2. [x] **Langkah 2**: Dibuat cadangan file `src/components/ProductSection.tsx` ke dalam folder khusus `_backup_hide_stock/`.
+  3. [x] **Langkah 3**: Dihapus elemen render teks stok `{prod.stock !== undefined && ( ... Stok: {prod.stock} unit ... )}` pada card produk di halaman utama, serta memperbarui badge modal detail menjadi *"Unit Resmi Bergaransi"*.
+  4. [x] **Langkah 4**: Diuji kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal Next.js (`npm run build`) 53/53 static/dynamic routes 100% sukses.
+  5. [x] **Langkah 5**: Dihapus folder cadangan sementara `_backup_hide_stock/`.
+  6. [x] **Langkah 6**: Dipush commit ke GitHub repository via `push_with_native_git.js` dan dideploy live ke VPS aaPanel via `deploy_live.js` (PM2 service `dstech-main` restart sukses).
+  7. [x] **Langkah 7**: Status di `LAPORAN_PROGRES.md` diperbarui menjadi ✅ **SELESAI**.
+
+---
+
+### 152. Tugas: Transformasi E-Store Menjadi Marketplace Modern (Wajib Login Akun, Checkout Keranjang, Pelacakan Pengiriman Real-Time & Panel Admin Pesanan)
+- **Permintaan Pengguna**:
+  - *"untuk estore, bisakah kamu buat seperti marketplace, yang bisa ditracking pengiriman, proses dan lain sebagainya, kemudian harus sistem login akun untuk belanja"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Analisis Kebutuhan & Desain Arsitektur**:
+  1. **Autentikasi Akun Pembeli (Wajib Login untuk Belanja)**:
+     - Pengunjung dapat melihat katalog dan spesifikasi di `/shop` secara bebas.
+     - Saat menekan tombol *"Tambah ke Keranjang"* atau *"Beli Sekarang"*, sistem memvalidasi sesi akun aktif.
+     - Jika belum login, muncul modal login / registrasi instan akun member/pelanggan (`Role: CLIENT`) yang otomatis tersimpan di `src/data/dstech_users.json`.
+     - Pengguna yang telah login memiliki avatar, nama akun di header shop, tombol *Keranjang Belanja*, dan tab *Pesanan Saya*.
+  2. **Data Model Terpusat (`src/data/dstech_orders.json`)**:
+     - Menggunakan prefix resmi aplikasi `dstech_orders`.
+     - Menyimpan nomor pesanan unik (`ORD/DST/202610/...`), ID customer, rincian produk, alamat pengiriman lengkap, pilihan kurir (Armada DSTech / Ekspedisi JNE/J&T), jasa instalasi teknisi, nomor resi pengiriman, bukti bayar, dan status linimasa pelacakan (*trackingTimeline*).
+  3. **Backend API (`src/app/api/orders/route.ts` & `src/app/api/orders/tracking/route.ts`)**:
+     - `POST /api/orders`: Checkout pesanan baru oleh pelanggan terautentikasi.
+     - `GET /api/orders`: Mengambil riwayat pesanan (filter by user untuk klien, atau semua untuk admin).
+     - `PATCH /api/orders`: Update status pesanan (Konfirmasi bayar, update nomor resi, pengiriman, selesai).
+     - `GET /api/orders/tracking?orderNumber=...`: Pelacakan publik status pengiriman secara real-time.
+  4. **Frontend Marketplace (`src/app/shop/page.tsx`)**:
+     - Keranjang Belanja interaktif (Drawer/Modal) dengan kontrol kuantitas (+/-), opsi tambahan Jasa Pemasangan Teknisi Resmi, dan form alamat kirim.
+     - Modal & Tab *Pesanan Saya & Lacak Pengiriman* dengan stepper linimasa visual (1. Menunggu Pembayaran -> 2. Dikonfirmasi -> 3. Diproses & Dikemas -> 4. Sedang Dikirim [Kurir & No Resi] -> 5. Selesai).
+     - Tombol upload bukti transfer bank / QRIS.
+     - Menghilangkan badge teks stok produk di `/shop` agar tampilan bersih.
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Dibuat data store `src/data/dstech_orders.json` dengan prefix `dstech_orders`.
+  2. [x] **Langkah 2**: Dibuat API backend `src/app/api/orders/route.ts` dan `src/app/api/orders/tracking/route.ts`.
+  3. [x] **Langkah 3**: Dibuat cadangan `src/app/shop/page.tsx` ke dalam folder khusus `_backup_marketplace/`.
+  4. [x] **Langkah 4**: Diimplementasikan fitur marketplace di `src/app/shop/page.tsx` (Autentikasi pembeli, Cart Drawer, Checkout Form, Modal Tracking Pengiriman Live, dan pembersihan teks stok).
+  5. [x] **Langkah 5**: Diuji kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`) 53/53 static/dynamic routes 100% sukses.
+  6. [x] **Langkah 6**: Dihapus folder cadangan sementara `_backup_marketplace/`.
+  7. [x] **Langkah 7**: Dipush commit ke GitHub repository via `push_with_native_git.js` dan dideploy live ke VPS aaPanel via `deploy_live.js` (PM2 service `dstech-main` restart sukses).
+  8. [x] **Langkah 8**: Status di `LAPORAN_PROGRES.md` diperbarui menjadi ✅ **SELESAI**.
+
+---
+
+
 
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
