@@ -288,11 +288,6 @@ export default function ProductSection() {
                           <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                           <span>5.0</span>
                         </div>
-                        {prod.stock !== undefined && (
-                          <span className="text-[11px] font-bold text-slate-400">
-                            Stok: <strong className="text-slate-700">{prod.stock} unit</strong>
-                          </span>
-                        )}
                       </div>
 
                       <h3 className="text-lg sm:text-xl font-black text-slate-900 mb-2 leading-snug group-hover:text-dstech-blue transition-colors line-clamp-2">
@@ -484,7 +479,7 @@ export default function ProductSection() {
                     </span>
                   </div>
                   <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black">
-                    Stok Tersedia
+                    Unit Resmi Bergaransi
                   </span>
                 </div>
 
