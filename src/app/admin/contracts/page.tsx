@@ -111,7 +111,17 @@ export interface DstechContract {
     notes?: string;
   };
   workLocation: string;
-  status: "ACTIVE" | "EXPIRED" | "TERMINATED" | "DRAFT";
+  status: "ACTIVE" | "EXPIRED" | "TERMINATED" | "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+  approval?: {
+    status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+    approvedBy?: string;
+    approvedTitle?: string;
+    approvedAt?: string;
+    rejectedBy?: string;
+    rejectedTitle?: string;
+    rejectedAt?: string;
+    notes?: string;
+  };
   signedByFirstParty: {
     name: string;
     title: string;
@@ -424,7 +434,7 @@ export default function ContractsPage() {
   const [filterCategory, setFilterCategory] = useState<"ALL" | "STAFF" | "TECHNICIAN">("ALL");
   const [filterDepartment, setFilterDepartment] = useState<string>("ALL");
   const [filterType, setFilterType] = useState<"ALL" | "DAILY_1" | "DAILY_2" | "MONTHLY" | "YEARLY">("ALL");
-  const [filterStatus, setFilterStatus] = useState<"ALL" | "ACTIVE" | "EXPIRING" | "EXPIRED">("ALL");
+  const [filterStatus, setFilterStatus] = useState<"ALL" | "ACTIVE" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "EXPIRING" | "EXPIRED">("ALL");
 
   // Modals & Previews
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -433,6 +443,12 @@ export default function ContractsPage() {
   const [isExtendModalOpen, setIsExtendModalOpen] = useState(false);
   const [selectedContract, setSelectedContract] = useState<DstechContract | null>(null);
   const [previewKtpModal, setPreviewKtpModal] = useState<{ isOpen: boolean; employeeName: string; idCardUrl: string } | null>(null);
+  const [approvalModal, setApprovalModal] = useState<{
+    isOpen: boolean;
+    contract: DstechContract | null;
+    action: "APPROVE" | "REJECT" | "ACTIVATE";
+    notes: string;
+  } | null>(null);
 
   // Upload states & refs
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -461,7 +477,7 @@ export default function ContractsPage() {
     endDate: calculateEndDateFromDuration(new Date().toISOString().split("T")[0], 3),
     durationMonths: 3,
     workLocation: "Kantor & Proyek Lapangan (Sesuai SPK)",
-    status: "ACTIVE" as "ACTIVE" | "EXPIRED" | "TERMINATED" | "DRAFT",
+    status: "ACTIVE" as "ACTIVE" | "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "EXPIRED" | "TERMINATED" | "DRAFT",
     // Staff Scheme & Flat Monthly
     baseSalary: 4000000,
     positionAllowance: 500000,
@@ -717,9 +733,53 @@ export default function ContractsPage() {
     }
   };
 
+  // Helper detail status sisa waktu & persetujuan kontrak kerja (format ramah pengguna)
+  const getContractStatusInfo = (item: DstechContract) => {
+    if (item.status === "PENDING_APPROVAL") {
+      return {
+        isPending: true,
+        isApproved: false,
+        isRejected: false,
+        isExpired: false,
+        isExpiringSoon: false,
+        badgeText: "⏳ Menunggu Approval",
+        badgeColor: "bg-amber-100 text-amber-900 border-amber-300 font-bold shadow-xs",
+        descText: "Menunggu peninjauan & persetujuan Direktur Utama",
+      };
+    }
+    if (item.status === "APPROVED") {
+      return {
+        isPending: false,
+        isApproved: true,
+        isRejected: false,
+        isExpired: false,
+        isExpiringSoon: false,
+        badgeText: "✅ Disetujui (Approved)",
+        badgeColor: "bg-blue-100 text-blue-900 border-blue-300 font-bold shadow-xs",
+        descText: "Disetujui pimpinan, siap ditandatangani & dicetak",
+      };
+    }
+    if (item.status === "REJECTED") {
+      return {
+        isPending: false,
+        isApproved: false,
+        isRejected: true,
+        isExpired: false,
+        isExpiringSoon: false,
+        badgeText: "❌ Ditolak / Perlu Revisi",
+        badgeColor: "bg-rose-100 text-rose-900 border-rose-300 font-bold shadow-xs",
+        descText: item.approval?.notes || "Memerlukan perbaikan data kontrak kerja",
+      };
+    }
+
+    return getContractTimeInfo(item.startDate, item.endDate);
+  };
+
   // KPI Calculations
   const stats = useMemo(() => {
     const total = contracts.length;
+    const pendingApproval = contracts.filter((c) => c.status === "PENDING_APPROVAL").length;
+    const approved = contracts.filter((c) => c.status === "APPROVED").length;
     const active = contracts.filter((c) => c.status === "ACTIVE").length;
     const staff = contracts.filter((c) => c.employeeCategory === "STAFF").length;
     const techType1 = contracts.filter(
@@ -737,7 +797,7 @@ export default function ContractsPage() {
       return c.status === "ACTIVE" && days > 0 && days <= 30;
     }).length;
 
-    return { total, active, staff, techType1, techType2, expiringSoon };
+    return { total, pendingApproval, approved, active, staff, techType1, techType2, expiringSoon };
   }, [contracts]);
 
   // Filtered List
@@ -763,6 +823,9 @@ export default function ContractsPage() {
       }
       // Status filter
       const days = getDaysRemaining(item.endDate);
+      if (filterStatus === "PENDING_APPROVAL" && item.status !== "PENDING_APPROVAL") return false;
+      if (filterStatus === "APPROVED" && item.status !== "APPROVED") return false;
+      if (filterStatus === "REJECTED" && item.status !== "REJECTED") return false;
       if (filterStatus === "ACTIVE" && item.status !== "ACTIVE") return false;
       if (filterStatus === "EXPIRING") {
         if (item.status !== "ACTIVE" || days <= 0 || days > 30) return false;
@@ -1159,18 +1222,97 @@ export default function ContractsPage() {
     }
   };
 
-  // Handle Print PDF
+  // Handle Approval Action (APPROVE / REJECT / ACTIVATE)
+  const handleApprovalAction = async (
+    contractId: string,
+    action: "APPROVE" | "REJECT" | "ACTIVATE",
+    notes?: string
+  ) => {
+    try {
+      setSaving(true);
+      const res = await fetch("/api/contracts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: contractId,
+          action,
+          approvedBy: "RAMADHANI, ST",
+          approvedTitle: "Direktur Utama",
+          approvalNotes: notes || (action === "APPROVE" ? "Kontrak kerja disetujui Direktur Utama untuk dicetak dan diberlakukan." : "Kontrak memerlukan revisi kelengkapan data."),
+        }),
+      });
+
+      const json = await res.json();
+      if (!json.success) throw new Error(json.message);
+
+      showToast(json.message || "Status persetujuan kontrak berhasil diperbarui!");
+      setApprovalModal(null);
+      if (selectedContract && selectedContract.id === contractId) {
+        setSelectedContract(json.contract);
+      }
+      fetchContracts();
+    } catch (err: any) {
+      alert(err.message || "Gagal memproses persetujuan kontrak kerja");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Handle Unduh Dokumen PKWT Standar Resmi (.doc / MS Word Compatible)
+  const handleDownloadWordDoc = () => {
+    const element = document.getElementById("pkwt-print-sheet");
+    if (!element || !selectedContract) return;
+
+    const htmlContent = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head>
+        <meta charset='utf-8'>
+        <title>PKWT - ${selectedContract.contractNumber} - ${selectedContract.employeeName}</title>
+        <style>
+          @page Section1 { size: 210mm 297mm; margin: 20mm 15mm 20mm 15mm; mso-header-margin: 35.4pt; mso-footer-margin: 35.4pt; mso-paper-source: 0; }
+          div.Section1 { page: Section1; }
+          body { font-family: 'Times New Roman', Times, serif; font-size: 11pt; line-height: 1.5; color: #000000; }
+          h2, h3, h4 { font-family: Arial, sans-serif; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 10px; }
+          td, th { padding: 4px 6px; }
+          .text-center { text-align: center; }
+          .text-justify { text-align: justify; }
+          .font-bold { font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="Section1">
+          ${element.innerHTML}
+        </div>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob(['\ufeff', htmlContent], {
+      type: 'application/msword'
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `PKWT_${selectedContract.contractNumber.replace(/[\/\\]/g, '-')}_${selectedContract.employeeName.replace(/\s+/g, '_')}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Dokumen PKWT (.doc / Word) berhasil diunduh!");
+  };
+
+  // Handle Print PDF ke Format Kertas Standar A4
   const handlePrintPKWT = () => {
     window.print();
   };
 
-  // Handle Download PDF via html2pdf
+  // Handle Download PDF via html2pdf dengan fallback dialog cetak
   const handleDownloadPDF = async () => {
     const element = document.getElementById("pkwt-print-sheet");
     if (!element) return;
 
     try {
-      // Dynamic load html2pdf if not present
       if (!(window as any).html2pdf) {
         await new Promise((resolve, reject) => {
           const script = document.createElement("script");
@@ -1192,7 +1334,8 @@ export default function ContractsPage() {
       await (window as any).html2pdf().set(opt).from(element).save();
       showToast("File PDF Surat Kontrak PKWT berhasil diunduh!");
     } catch (err) {
-      console.warn("Gagal ekspor langsung html2pdf, membuka dialog cetak browser:", err);
+      console.warn("Gagal ekspor langsung html2pdf, membuka dialog cetak browser (Simpan sebagai PDF):", err);
+      showToast("Membuka dialog cetak browser. Silakan pilih 'Simpan sebagai PDF' (Ukuran A4).");
       window.print();
     }
   };
@@ -1333,6 +1476,16 @@ export default function ContractsPage() {
           <span className="text-[11px] font-semibold text-slate-500 mt-1 block">Arsip PKWT terbit</span>
         </div>
 
+        {/* Menunggu Approval */}
+        <div className="bg-white p-5 rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/40 shadow-xs">
+          <div className="flex items-center justify-between text-amber-700 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">Approval Pimpinan</span>
+            <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+          </div>
+          <p className="text-2xl font-black text-amber-800">{stats.pendingApproval}</p>
+          <span className="text-[11px] font-semibold text-amber-700 mt-1 block">Menunggu persetujuan</span>
+        </div>
+
         {/* Kontrak Aktif */}
         <div className="bg-white p-5 rounded-2xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/20 shadow-xs">
           <div className="flex items-center justify-between text-emerald-600 mb-2">
@@ -1353,24 +1506,14 @@ export default function ContractsPage() {
           <span className="text-[11px] font-semibold text-blue-600 mt-1 block">Bulanan & Tahunan</span>
         </div>
 
-        {/* Teknisi Tipe 1 */}
-        <div className="bg-white p-5 rounded-2xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/20 shadow-xs">
-          <div className="flex items-center justify-between text-amber-600 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Teknisi Tipe 1</span>
-            <Wrench className="w-4 h-4 text-amber-500" />
+        {/* Teknisi Lapangan Total */}
+        <div className="bg-white p-5 rounded-2xl border border-cyan-100 bg-gradient-to-br from-white to-cyan-50/20 shadow-xs">
+          <div className="flex items-center justify-between text-cyan-600 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">Teknisi Lapangan</span>
+            <Wrench className="w-4 h-4 text-cyan-500" />
           </div>
-          <p className="text-2xl font-black text-amber-700">{stats.techType1}</p>
-          <span className="text-[11px] font-semibold text-amber-600 mt-1 block">Harian Dibayar Penuh</span>
-        </div>
-
-        {/* Teknisi Tipe 2 */}
-        <div className="bg-white p-5 rounded-2xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/20 shadow-xs">
-          <div className="flex items-center justify-between text-indigo-600 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Teknisi Tipe 2</span>
-            <Calculator className="w-4 h-4 text-indigo-500" />
-          </div>
-          <p className="text-2xl font-black text-indigo-700">{stats.techType2}</p>
-          <span className="text-[11px] font-semibold text-indigo-600 mt-1 block">Upah Jam + Lembur</span>
+          <p className="text-2xl font-black text-cyan-700">{stats.techType1 + stats.techType2}</p>
+          <span className="text-[11px] font-semibold text-cyan-600 mt-1 block">Tipe 1 & Tipe 2</span>
         </div>
 
         {/* Mendekati Habis */}
@@ -1460,9 +1603,11 @@ export default function ContractsPage() {
             <span className="font-bold text-slate-400">Filter Status:</span>
             {[
               { id: "ALL", label: "Semua Status" },
-              { id: "ACTIVE", label: "🟢 Aktif Bekerja" },
-              { id: "EXPIRING", label: "🟡 Segera Berakhir (<= 30 Hari)" },
-              { id: "EXPIRED", label: "🔴 Kedaluwarsa / Selesai" },
+              { id: "PENDING_APPROVAL", label: `⏳ Menunggu Approval (${stats.pendingApproval})` },
+              { id: "APPROVED", label: `✅ Disetujui (${stats.approved})` },
+              { id: "ACTIVE", label: `🟢 Aktif (${stats.active})` },
+              { id: "EXPIRING", label: `🟡 Segera Habis (${stats.expiringSoon})` },
+              { id: "EXPIRED", label: "🔴 Kedaluwarsa" },
             ].map((st) => (
               <button
                 key={st.id}
@@ -1532,6 +1677,7 @@ export default function ContractsPage() {
                   const days = getDaysRemaining(item.endDate);
                   const isExpiring = item.status === "ACTIVE" && days > 0 && days <= 30;
                   const isExpired = days <= 0 || item.status === "EXPIRED";
+                  const statusInfo = getContractStatusInfo(item);
                   const timeInfo = getContractTimeInfo(item.startDate, item.endDate);
 
                   const daily = item.salaryScheme?.dailyScheme;
@@ -1687,21 +1833,11 @@ export default function ContractsPage() {
                       {/* Status & Sisa Waktu */}
                       <td className="py-4 px-4">
                         <div className="space-y-1">
-                          {timeInfo.isExpired ? (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-100 text-rose-700 border border-rose-200 uppercase flex items-center gap-1 w-fit shadow-xs">
-                              <AlertCircle className="w-3 h-3" /> Kedaluwarsa
-                            </span>
-                          ) : timeInfo.isExpiringSoon ? (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200 uppercase flex items-center gap-1 w-fit shadow-xs">
-                              <Clock className="w-3 h-3 text-amber-600 animate-pulse" /> {timeInfo.badgeText}
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase flex items-center gap-1 w-fit shadow-xs">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> {timeInfo.badgeText}
-                            </span>
-                          )}
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase flex items-center gap-1 w-fit shadow-xs ${statusInfo.badgeColor}`}>
+                            {statusInfo.badgeText}
+                          </span>
                           <span className="text-[10px] text-slate-500 font-medium block">
-                            {timeInfo.descText}
+                            {statusInfo.descText}
                           </span>
                         </div>
                       </td>
@@ -1709,14 +1845,50 @@ export default function ContractsPage() {
                       {/* Aksi & Dokumen */}
                       <td className="py-4 px-5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Cetak PKWT */}
+                          {/* Aksi Persetujuan Pimpinan (Approve / Reject) */}
+                          {item.status === "PENDING_APPROVAL" && (
+                            <button
+                              onClick={() => handleApprovalAction(item.id, "APPROVE")}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition-all hover:scale-105 active:scale-95"
+                              title="Setujui Kontrak Ini (Direktur Utama)"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" /> Setujui
+                            </button>
+                          )}
+
+                          {item.status === "PENDING_APPROVAL" && (
+                            <button
+                              onClick={() => {
+                                const notes = prompt("Masukkan catatan revisi / alasan penolakan kontrak:", "Mohon periksa kembali kelengkapan identitas dan rincian upah.");
+                                if (notes !== null) {
+                                  handleApprovalAction(item.id, "REJECT", notes);
+                                }
+                              }}
+                              className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg text-xs font-bold transition-all"
+                              title="Tolak / Minta Revisi Kontrak"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+
+                          {item.status === "APPROVED" && (
+                            <button
+                              onClick={() => handleApprovalAction(item.id, "ACTIVATE")}
+                              className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition-all hover:scale-105 active:scale-95"
+                              title="Aktifkan Kontrak (Telah Ditandatangani Para Pihak)"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Aktifkan
+                            </button>
+                          )}
+
+                          {/* Cetak & Pratinjau PKWT A4 */}
                           <button
                             onClick={() => {
                               setSelectedContract(item);
                               setIsPrintModalOpen(true);
                             }}
                             className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
-                            title="Cetak & Pratinjau PKWT Resmi A4"
+                            title="Cetak A4 & Unduh Dokumen PKWT Resmi"
                           >
                             <Printer className="w-4 h-4" />
                           </button>
@@ -3422,42 +3594,147 @@ export default function ContractsPage() {
 
       {/* MODAL 3: CETAK & PRATINJAU PKWT RESMI STANDAR A4 */}
       {isPrintModalOpen && selectedContract && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static">
-          <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6 print:m-0 print:border-none print:shadow-none print:max-w-none">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static print-modal-backdrop">
+          <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6 print:m-0 print:border-none print:shadow-none print:max-w-none print-modal-box">
             {/* Toolbar Modal */}
-            <div className="p-4 bg-slate-900 text-white flex items-center justify-between print:hidden">
+            <div className="p-4 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 print:hidden">
               <div className="flex items-center gap-3">
-                <FileSignature className="w-5 h-5 text-blue-400" />
+                <FileSignature className="w-5 h-5 text-blue-400 shrink-0" />
                 <div>
-                  <h3 className="text-sm font-bold">Pratinjau Surat Perjanjian Kerja Waktu Tertentu (PKWT)</h3>
+                  <h3 className="text-sm font-bold flex items-center gap-2">
+                    Pratinjau Surat Perjanjian Kerja Waktu Tertentu (PKWT)
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                      selectedContract.status === "APPROVED" || selectedContract.status === "ACTIVE"
+                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                        : selectedContract.status === "PENDING_APPROVAL"
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                        : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                    }`}>
+                      {selectedContract.status}
+                    </span>
+                  </h3>
                   <p className="text-[11px] text-slate-400">{selectedContract.contractNumber} - {selectedContract.employeeName}</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Tombol Unduh Word .doc */}
                 <button
+                  type="button"
+                  onClick={handleDownloadWordDoc}
+                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                  title="Unduh Dokumen Format Microsoft Word (.doc)"
+                >
+                  <FileText className="w-4 h-4" /> Unduh Word (.doc)
+                </button>
+
+                {/* Tombol Unduh PDF */}
+                <button
+                  type="button"
                   onClick={handleDownloadPDF}
                   className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                  title="Unduh PDF Resmi PKWT"
                 >
                   <Download className="w-4 h-4" /> Unduh PDF
                 </button>
+
+                {/* Tombol Cetak A4 */}
                 <button
+                  type="button"
                   onClick={handlePrintPKWT}
                   className="px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                  title="Cetak Langsung Lembar Standar A4"
                 >
                   <Printer className="w-4 h-4" /> Cetak Lembar A4
                 </button>
+
                 <button
+                  type="button"
                   onClick={() => setIsPrintModalOpen(false)}
                   className="p-2 text-slate-400 hover:text-white rounded-xl transition-all"
+                  title="Tutup"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
+            {/* Banner Status Persetujuan Direktur Utama */}
+            {selectedContract.status === "PENDING_APPROVAL" && (
+              <div className="bg-amber-50 border-b border-amber-200 p-3.5 px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-amber-900 print:hidden">
+                <div className="flex items-center gap-2.5 text-xs">
+                  <Clock className="w-5 h-5 text-amber-600 animate-pulse shrink-0" />
+                  <div>
+                    <strong className="block font-black text-amber-950">Kontrak Ini Menunggu Persetujuan Direktur Utama</strong>
+                    <span className="text-[11px] text-amber-700">Tinjau seluruh pasal di bawah ini. Anda dapat menyetujui langsung untuk mencetak secara sah.</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleApprovalAction(selectedContract.id, "APPROVE")}
+                    disabled={saving}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition-all hover:scale-105"
+                  >
+                    <ShieldCheck className="w-4 h-4" /> Setujui Kontrak Ini
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const notes = prompt("Catatan perbaikan / alasan penolakan:", "Mohon lengkapi NIK dan periksa kembali besaran gaji.");
+                      if (notes !== null) handleApprovalAction(selectedContract.id, "REJECT", notes);
+                    }}
+                    disabled={saving}
+                    className="px-3 py-2 bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
+                  >
+                    <X className="w-3.5 h-3.5" /> Tolak / Revisi
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {selectedContract.status === "APPROVED" && (
+              <div className="bg-blue-50 border-b border-blue-200 p-3 px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-blue-900 print:hidden">
+                <div className="flex items-center gap-2.5 text-xs">
+                  <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+                  <div>
+                    <strong className="block font-black text-blue-950">Kontrak Kerja Telah Disetujui (Approved)</strong>
+                    <span className="text-[11px] text-blue-700">
+                      Disetujui oleh {selectedContract.approval?.approvedBy || "Direktur Utama"}. Dokumen siap dicetak ke A4 dan ditandatangani para pihak.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleApprovalAction(selectedContract.id, "ACTIVATE")}
+                  disabled={saving}
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all hover:scale-105"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Aktifkan Kontrak (Mulai Bekerja)
+                </button>
+              </div>
+            )}
+
+            {selectedContract.status === "REJECTED" && (
+              <div className="bg-rose-50 border-b border-rose-200 p-3 px-6 flex items-center gap-2.5 text-xs text-rose-900 print:hidden">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                <div>
+                  <strong className="block font-bold">Kontrak Dikembalikan / Perlu Revisi</strong>
+                  <span className="text-[11px] text-rose-700">Catatan: {selectedContract.approval?.notes || "Periksa kembali data kontrak"}</span>
+                </div>
+              </div>
+            )}
+
             {/* LEMBAR CETAK DOKUMEN PKWT STANDAR A4 */}
-            <div id="pkwt-print-sheet" className="p-8 md:p-12 text-slate-900 bg-white font-serif max-w-[210mm] mx-auto min-h-[297mm] text-[12px] leading-relaxed relative">
+            <div id="pkwt-print-sheet" className="p-8 md:p-12 text-slate-900 bg-white font-serif max-w-[210mm] mx-auto min-h-[297mm] text-[12px] leading-relaxed relative print-document-sheet print-single-sheet">
+              {/* Watermark Draft jika PENDING_APPROVAL */}
+              {selectedContract.status === "PENDING_APPROVAL" && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.07] select-none z-0">
+                  <span className="text-8xl font-black text-slate-900 uppercase rotate-[-35deg] tracking-widest">
+                    DRAFT APPROVAL
+                  </span>
+                </div>
+              )}
               {/* Kop Surat Header */}
               <div className="border-b-2 border-slate-900 pb-4 mb-6 text-center font-sans">
                 <h2 className="text-xl font-black tracking-wider text-slate-950 uppercase">PT. DSTECH SMART PERKASA</h2>
@@ -3720,9 +3997,22 @@ export default function ContractsPage() {
                     <p className="text-[10px] text-slate-500">PT. DSTech Smart Perkasa</p>
 
                     <div className="h-20 flex items-center justify-center relative">
-                      <div className="w-16 h-16 rounded-full border border-blue-600/40 text-blue-700/60 flex items-center justify-center text-[8px] font-black uppercase rotate-[-12deg] tracking-wider select-none pointer-events-none">
-                        PT. DSTECH<br />PERKASA
-                      </div>
+                      {selectedContract.status === "APPROVED" || selectedContract.status === "ACTIVE" ? (
+                        <div className="w-24 h-24 rounded-full border-2 border-emerald-600/70 text-emerald-800 bg-emerald-50/40 flex flex-col items-center justify-center text-[7px] font-black uppercase rotate-[-10deg] tracking-wider select-none pointer-events-none p-1 shadow-2xs">
+                          <span className="text-[6.5px] font-black text-emerald-900 tracking-widest">PT. DSTECH SMART</span>
+                          <span className="text-[6px] text-emerald-700">PERKASA</span>
+                          <div className="my-0.5 px-1 py-0.2 bg-emerald-700 text-white rounded text-[6.5px] font-black tracking-widest">
+                            DISETUJUI
+                          </div>
+                          <span className="text-[5.5px] text-emerald-700 font-mono">
+                            {selectedContract.approval?.approvedAt ? selectedContract.approval.approvedAt.substring(0, 10) : selectedContract.startDate}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-full border border-blue-600/40 text-blue-700/60 flex items-center justify-center text-[8px] font-black uppercase rotate-[-12deg] tracking-wider select-none pointer-events-none">
+                          PT. DSTECH<br />PERKASA
+                        </div>
+                      )}
                     </div>
 
                     <p className="font-bold underline text-slate-900">{selectedContract.signedByFirstParty?.name || "RAMADHANI, ST"}</p>

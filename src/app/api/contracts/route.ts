@@ -153,7 +153,18 @@ export async function POST(req: Request) {
       leavePolicy: body.leavePolicy || {},
       workSchedule: body.workSchedule || {},
       workLocation: body.workLocation || "Kantor Utama DSTech Cilegon",
-      status: body.status || "ACTIVE",
+      status: body.status || "PENDING_APPROVAL",
+      approval: body.approval || (body.status === "ACTIVE" || body.status === "APPROVED" ? {
+        status: "APPROVED",
+        approvedBy: body.approvedBy || "RAMADHANI, ST",
+        approvedTitle: "Direktur Utama",
+        approvedAt: now.toISOString(),
+        notes: body.approvalNotes || "Kontrak disetujui langsung",
+      } : {
+        status: "PENDING_APPROVAL",
+        submittedAt: now.toISOString(),
+        notes: "Menunggu peninjauan & persetujuan Direktur Utama",
+      }),
       signedByFirstParty: body.signedByFirstParty || {
         name: "RAMADHANI, ST",
         title: "Direktur Utama",
@@ -181,7 +192,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      message: "Kontrak kerja berhasil dibuat dan disimpan",
+      message: "Kontrak kerja berhasil dibuat dan diajukan untuk approval",
       contract: newContract,
     });
   } catch (error: any) {
@@ -192,7 +203,7 @@ export async function POST(req: Request) {
   }
 }
 
-// PUT: Perbarui kontrak kerja
+// PUT: Perbarui kontrak kerja (Termasuk Aksi Approval, Reject, & Aktivasi)
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
@@ -213,11 +224,38 @@ export async function PUT(req: Request) {
       );
     }
 
-    const updatedContract = {
+    let updatedContract = {
       ...data.contracts[index],
       ...body,
       updatedAt: new Date().toISOString(),
     };
+
+    // Alur Aksi Khusus Approval
+    if (body.action === "APPROVE") {
+      updatedContract.status = "APPROVED";
+      updatedContract.approval = {
+        status: "APPROVED",
+        approvedBy: body.approvedBy || "RAMADHANI, ST",
+        approvedTitle: "Direktur Utama",
+        approvedAt: new Date().toISOString(),
+        notes: body.approvalNotes || "Kontrak kerja disetujui untuk ditandatangani dan diberlakukan.",
+      };
+      if (body.signedByFirstParty) {
+        updatedContract.signedByFirstParty = body.signedByFirstParty;
+      }
+    } else if (body.action === "REJECT") {
+      updatedContract.status = "REJECTED";
+      updatedContract.approval = {
+        status: "REJECTED",
+        rejectedBy: body.rejectedBy || "RAMADHANI, ST",
+        rejectedTitle: "Direktur Utama",
+        rejectedAt: new Date().toISOString(),
+        notes: body.approvalNotes || "Kontrak kerja ditolak / dikembalikan untuk perbaikan data.",
+      };
+    } else if (body.action === "ACTIVATE") {
+      updatedContract.status = "ACTIVE";
+      updatedContract.activatedAt = new Date().toISOString();
+    }
 
     data.contracts[index] = updatedContract;
     writeContractsData(data);
@@ -227,9 +265,14 @@ export async function PUT(req: Request) {
       syncUserAccount(updatedContract);
     }
 
+    let successMsg = "Kontrak kerja berhasil diperbarui";
+    if (body.action === "APPROVE") successMsg = "Kontrak kerja berhasil DISETUJUI (APPROVED)!";
+    else if (body.action === "REJECT") successMsg = "Kontrak kerja DIKEMBALIKAN (REJECTED) dengan catatan revisi.";
+    else if (body.action === "ACTIVATE") successMsg = "Kontrak kerja berhasil DIAKTIFKAN!";
+
     return NextResponse.json({
       success: true,
-      message: "Kontrak kerja berhasil diperbarui",
+      message: successMsg,
       contract: updatedContract,
     });
   } catch (error: any) {
