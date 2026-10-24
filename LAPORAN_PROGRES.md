@@ -4474,7 +4474,65 @@
 
 ---
 
+### 153. Tugas: Pengaturan Logo & Branding Website Terpusat di Site Settings (/admin/settings) serta Sinkronisasi Dinamis ke Seluruh Halaman Website
+- **Permintaan Pengguna**:
+  - *"saya melihat, logo selalu salah, dan tidak sesuai dengan logo perusahaan. tolong kamu buat pengaturan logo di site setting superadmin. agar kedepan logo bisa diganti sinkron kesana"* (Disertai screenshot header e-store /shop yang sebelumnya menggunakan placeholder kotak teks dan logo perusahaan belum sinkron)
+- **Status**: 🟡 **Sedang Dikerjakan (In Progress)**
+- **Analisis Kebutuhan & Desain Arsitektur**:
+  1. **Data Store Terpusat (`src/data/dstech_settings.json` & `/api/settings`)**:
+     - Menambahkan atribut konfigurasi logo ber-prefix `dstech_`:
+       * `logoUrl`: URL logo utama (Navbar / Header / Sidebar). Default: `/logo.png`.
+       * `logoWhiteUrl`: URL logo versi putih/transparan (Footer gelap / Dark theme).
+       * `faviconUrl`: URL favicon / icon tab browser.
+       * `logoHeight`: Ukuran tinggi tampilan logo dalam pixel (slider 24px - 64px, default 40px).
+  2. **Antarmuka Pengaturan di Site Settings (`/admin/settings`)**:
+     - Menambahkan Tab Navigasi Khusus: **"🎨 Logo & Branding Website"** di urutan teratas/utama.
+     - Komponen Upload File Logo langsung ke server via `/api/upload` (tersimpan di `public/uploads/` dengan penamaan aman prefix `dstech_logo_...`).
+     - Input URL kustom alternatif jika ingin menggunakan link gambar tertentu.
+     - Live Interactive Preview: Menampilkan pratinjau instan logo pada latar belakang terang (White Navbar) dan latar belakang gelap (Dark Navbar).
+     - Tombol preset cepat *"Gunakan Logo Asli PT. DSTech Smart Perkasa (`/logo.png`)"*.
+     - Tombol *"Simpan Pengaturan Logo"* dengan feedback toast notifikasi.
+  3. **Sinkronisasi Dinamis ke Seluruh Halaman Website**:
+     - **E-Store / Marketplace (`/shop`)**: Mengganti kotak teks placeholder `DST` dengan logo resmi perusahaan dari `settings.logoUrl`.
+     - **Beranda Utama (`/`)**: Menghubungkan navbar atas dan footer ke `settings.logoUrl` dan `settings.logoWhiteUrl`.
+     - **Admin Control Center (`/admin/layout.tsx`)**: Menghubungkan logo sidebar desktop & mobile drawer ke `settings.logoUrl`.
+     - **Portal Karyawan (`/employee`)**, **Halaman Login (`/login`)**, **Portal Mitra (`/affiliate`)**, dan **Kontak (`/contact`)**: Sinkronisasi dinamis ke `settings.logoUrl`.
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [ ] **Langkah 1**: Catat analisis kebutuhan dan rencana kerja di `LAPORAN_PROGRES.md` (Status: Sedang Dikerjakan).
+  2. [ ] **Langkah 2**: Buat cadangan file terkait ke folder khusus `_backup_site_settings_logo/`.
+  3. [ ] **Langkah 3**: Perbarui backend `src/app/api/settings/route.ts` dan data store `src/data/dstech_settings.json` untuk mendukung `logoUrl`, `logoWhiteUrl`, `faviconUrl`, dan `logoHeight`.
+  4. [ ] **Langkah 4**: Perbarui antarmuka `src/app/admin/settings/page.tsx` dengan menambahkan Tab "🎨 Logo & Branding Website", upload file logo, preview live terang/gelap, dan simpan pengaturan.
+  5. [ ] **Langkah 5**: Integrasikan logo dinamis ke `src/app/shop/page.tsx` (ganti kotak `DST` menjadi logo resmi perusahaan) dan sinkronkan ke `src/app/page.tsx`, `src/app/admin/layout.tsx`, `src/app/login/page.tsx`, `src/app/contact/page.tsx`, `src/app/affiliate/page.tsx`, `src/app/employee/page.tsx`.
+  6. [ ] **Langkah 6**: Jalankan pengujian kompilasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`) 53/53 routes 100% sukses.
+  7. [ ] **Langkah 7**: Hapus folder cadangan sementara `_backup_site_settings_logo/`.
+  8. [ ] **Langkah 8**: Push commit ke GitHub repository via `push_with_native_git.js`.
+  9. [ ] **Langkah 9**: Deploy live ke VPS aaPanel via `deploy_live.js` dan restart PM2 `dstech-main`.
+  10. [ ] **Langkah 10**: Verifikasi tampilan logo di live website dan perbarui status di `LAPORAN_PROGRES.md` menjadi Selesai.
 
+---
+
+### 154. Tugas: Modul / Menu Manajemen Pesanan Marketplace E-Store di Admin Control Center (/admin/orders)
+- **Permintaan Pengguna**:
+  - *"saya udah coba order pembelian, namun kenapa saya tidak bisa menemukan lokasi admin untuk proses orderan pesanan?"* (Disertai screenshot modal pelacakan pesanan pembeli /shop ORD/DST/202610/...)
+- **Status**: ⏳ **Menunggu Antrean (Queued - Segera Dikerjakan Setelah Tugas 153 Selesai)**
+- **Analisis Kebutuhan & Desain Arsitektur**:
+  1. **Menu Navigasi Admin (`src/app/admin/layout.tsx`)**:
+     - Tambahkan menu navigasi resmi *"Pesanan E-Store"* (ikon `ShoppingBag`) di sidebar Admin Control Center mengarah ke `/admin/orders`.
+     - Tampilkan badge counter jumlah pesanan baru/menunggu verifikasi bayar secara real-time.
+  2. **Halaman Manajemen Pesanan (`/admin/orders`)**:
+     - Tabel daftar seluruh pesanan pembeli dari `src/data/dstech_orders.json`.
+     - Filter status pesanan (Semua, Menunggu Pembayaran, Dikonfirmasi / Diproses, Sedang Dikirim, Selesai, Dibatalkan).
+     - Kolom info pemesan (Nama Klien, Kontak WA, Alamat Pengiriman, Pilihan Kurir & Ekspedisi, Catatan Pasang Teknisi).
+     - Modal Detail & Tindakan Proses Pesanan:
+       * Lihat bukti transfer pembayaran pembeli.
+       * Tombol aksi satu sentuhan: *Konfirmasi Pembayaran Sah*.
+       * Tombol aksi: *Update Nomor Resi & Kurir Ekspedisi* / *Kirim dengan Armada DSTech*.
+       * Tombol aksi: *Tandai Pesanan Telah Sampai / Selesai*.
+       * Tombol hubungi pembeli langsung via WhatsApp.
+  3. **Backend API (`/api/orders`)**:
+     - Pastikan endpoint `GET /api/orders` (mengambil semua data pesanan bagi admin) dan `PATCH /api/orders` (update status, nomor resi, kurir, dan catatan tracking) siap dan terhubung mulus.
+
+---
 
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).

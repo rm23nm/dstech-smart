@@ -102,6 +102,7 @@ export default function AdminLayout({
 
   // Current Admin User Session
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [logoUrl, setLogoUrl] = useState<string>("/logo.png");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -112,6 +113,15 @@ export default function AdminLayout({
         } catch {}
       }
     }
+
+    fetch("/api/settings?t=" + Date.now())
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && data.data && data.data.logoUrl) {
+          setLogoUrl(data.data.logoUrl);
+        }
+      })
+      .catch((err) => console.error("Gagal load logo admin:", err));
   }, []);
 
   // Search filter
@@ -282,7 +292,7 @@ export default function AdminLayout({
       <aside className="hidden lg:flex w-80 bg-white border-r border-slate-200 flex-col sticky top-0 h-screen z-30">
         <div className="p-8 flex flex-col items-center border-b border-slate-100">
           <Link href="/admin" className="relative w-36 h-10 mb-2 block">
-            <Image src="/logo.png" alt="DSTech Logo" fill className="object-contain" priority />
+            <Image src={logoUrl || "/logo.png"} alt="DSTech Logo" fill className="object-contain" priority />
           </Link>
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 mt-1">
             <ShieldCheck className="w-3.5 h-3.5 text-dstech-blue" /> Admin Control Center
@@ -341,7 +351,7 @@ export default function AdminLayout({
           <div className="fixed inset-y-0 left-0 w-72 bg-white shadow-2xl flex flex-col z-10 animate-in slide-in-from-left duration-300">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <div className="relative w-32 h-9">
-                <Image src="/logo.png" alt="DSTech Logo" fill className="object-contain" />
+                <Image src={logoUrl || "/logo.png"} alt="DSTech Logo" fill className="object-contain" />
               </div>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}

@@ -88,6 +88,10 @@ export interface SiteSettingsData {
   instagram: string;
   facebook: string;
   linkedin: string;
+  logoUrl?: string;
+  logoWhiteUrl?: string;
+  faviconUrl?: string;
+  logoHeight?: number;
   bankAccounts?: BankAccountItem[];
   letterheadSettings?: LetterheadSettingsData;
   updatedAt?: string;
@@ -95,7 +99,7 @@ export interface SiteSettingsData {
 
 export default function AdminSettingsPage() {
   // Tab Aktif Utama
-  const [activeTab, setActiveTab] = useState<"profile" | "banks" | "letterhead" | "danger">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "branding" | "banks" | "letterhead" | "danger">("profile");
 
   const [settings, setSettings] = useState<SiteSettingsData>({
     companyName: "PT. DSTech Smart Perkasa",
@@ -112,7 +116,15 @@ export default function AdminSettingsPage() {
     instagram: "https://instagram.com/dstechsmart",
     facebook: "https://facebook.com/dstechsmart",
     linkedin: "https://linkedin.com/company/dstechsmart",
+    logoUrl: "/logo.png",
+    logoWhiteUrl: "/logo.png",
+    faviconUrl: "/logo.png",
+    logoHeight: 40,
   });
+
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const logoWhiteFileInputRef = useRef<HTMLInputElement>(null);
 
   // State Rekening Bank
   const [bankAccounts, setBankAccounts] = useState<BankAccountItem[]>([
@@ -259,6 +271,36 @@ export default function AdminSettingsPage() {
       showToast("error", "Terjadi kesalahan koneksi saat menyimpan pengaturan.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Handler Upload Logo & Branding
+  const handleUploadLogoFile = async (e: React.ChangeEvent<HTMLInputElement>, targetField: "logoUrl" | "logoWhiteUrl" | "faviconUrl") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingLogo(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("docType", "image");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success && json.url) {
+        setSettings((prev) => ({ ...prev, [targetField]: json.url }));
+        showToast("success", `File ${file.name} berhasil diunggah! Klik 'Simpan Logo' untuk menerapkan ke seluruh situs.`);
+      } else {
+        showToast("error", json.message || "Gagal mengunggah file logo.");
+      }
+    } catch {
+      showToast("error", "Terjadi kesalahan koneksi saat mengunggah logo.");
+    } finally {
+      setIsUploadingLogo(false);
+      if (e.target) e.target.value = "";
     }
   };
 
@@ -437,6 +479,19 @@ export default function AdminSettingsPage() {
 
         <button
           type="button"
+          onClick={() => setActiveTab("branding")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "branding"
+              ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <ImageIcon className="w-4 h-4" />
+          <span>🎨 Logo &amp; Branding Website</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab("banks")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === "banks"
@@ -474,6 +529,213 @@ export default function AdminSettingsPage() {
           <span>⚠️ Zona Bahaya (Pembersihan)</span>
         </button>
       </div>
+
+      {/* KONTEN TAB: LOGO & BRANDING WEBSITE */}
+      {activeTab === "branding" && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-amber-500" />
+                  Pengaturan Logo Resmi &amp; Identitas Visual Website
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Logo yang diatur di sini akan otomatis disinkronkan ke seluruh bagian website: Beranda, E-Store Marketplace (/shop), Admin Sidebar, Halaman Login, Kontak, dan Portal Teknisi.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettings((prev) => ({
+                      ...prev,
+                      logoUrl: "/logo.png",
+                      logoWhiteUrl: "/logo.png",
+                      faviconUrl: "/logo.png",
+                      logoHeight: 40,
+                    }));
+                    showToast("success", "Logo direset ke Logo Resmi PT. DSTech Smart Perkasa (/logo.png)");
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  <span>Preset Logo Asli DSTech</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSaveAll(undefined, "Pengaturan logo & branding berhasil disimpan!")}
+                  disabled={saving}
+                  className="px-5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-md shadow-amber-600/20 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>{saving ? "Menyimpan..." : "Simpan Logo"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Input Logo Utama */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Kolom Kiri: Form Upload & URL */}
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
+                    1. Logo Utama Situs (Light / Standard Navbar)
+                  </label>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Format disarankan file PNG transparan beresolusi tinggi atau SVG.
+                  </p>
+
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={settings.logoUrl || ""}
+                      onChange={(e) => setSettings({ ...settings, logoUrl: e.target.value })}
+                      placeholder="Contoh: /logo.png atau https://..."
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-amber-500 font-mono bg-slate-50"
+                    />
+
+                    <input
+                      ref={logoFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleUploadLogoFile(e, "logoUrl")}
+                      className="hidden"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => logoFileInputRef.current?.click()}
+                      disabled={isUploadingLogo}
+                      className="px-4 py-2.5 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 disabled:opacity-50"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{isUploadingLogo ? "Mengunggah..." : "Upload Logo"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Slider Ukuran Tinggi Logo */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-700">Tinggi Logo di Header:</span>
+                    <span className="font-black text-amber-600 font-mono bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                      {settings.logoHeight || 40}px
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="24"
+                    max="64"
+                    step="2"
+                    value={settings.logoHeight || 40}
+                    onChange={(e) => setSettings({ ...settings, logoHeight: Number(e.target.value) })}
+                    className="w-full accent-amber-600 cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                    <span>24px (Kecil)</span>
+                    <span>40px (Standar)</span>
+                    <span>64px (Besar)</span>
+                  </div>
+                </div>
+
+                {/* Logo Versi Putih / Footer */}
+                <div className="pt-4 border-t border-slate-100">
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 mb-2">
+                    2. Logo Versi Terang / Gelap (Footer &amp; Dark Theme)
+                  </label>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Logo dengan warna putih / kontras tinggi untuk latar belakang gelap (opsional, jika dikosongkan akan menggunakan logo utama).
+                  </p>
+
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={settings.logoWhiteUrl || ""}
+                      onChange={(e) => setSettings({ ...settings, logoWhiteUrl: e.target.value })}
+                      placeholder="Contoh: /logo.png atau URL logo putih..."
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-amber-500 font-mono bg-slate-50"
+                    />
+
+                    <input
+                      ref={logoWhiteFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleUploadLogoFile(e, "logoWhiteUrl")}
+                      className="hidden"
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => logoWhiteFileInputRef.current?.click()}
+                      disabled={isUploadingLogo}
+                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 disabled:opacity-50"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>Upload</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kolom Kanan: Pratinjau Interaktif */}
+              <div className="space-y-4">
+                <p className="text-xs font-black uppercase tracking-wider text-slate-700">
+                  Live Preview Logo di Seluruh Background
+                </p>
+
+                {/* Preview di Latar Belakang Terang (Navbar Putih) */}
+                <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-bold border-b border-slate-100 pb-2">
+                    <span>Pratinjau: Navbar Terang (Beranda &amp; Shop)</span>
+                    <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full font-mono text-[10px]">White Mode</span>
+                  </div>
+                  <div className="h-24 flex items-center justify-center p-3 bg-gradient-to-r from-slate-50 to-white rounded-xl border border-dashed border-slate-200">
+                    {settings.logoUrl ? (
+                      <img
+                        src={settings.logoUrl}
+                        alt="Logo Preview Light"
+                        style={{ height: `${settings.logoHeight || 40}px` }}
+                        className="max-w-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">Belum ada logo dipilih</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Preview di Latar Belakang Gelap (Footer / Dark Navbar) */}
+                <div className="p-5 rounded-2xl border border-slate-800 bg-slate-950 text-white shadow-md space-y-2">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-bold border-b border-slate-800 pb-2">
+                    <span>Pratinjau: Latar Gelap (Footer &amp; Admin Sidebar)</span>
+                    <span className="text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded-full font-mono text-[10px]">Dark Mode</span>
+                  </div>
+                  <div className="h-24 flex items-center justify-center p-3 bg-slate-900/60 rounded-xl border border-dashed border-slate-800">
+                    {settings.logoWhiteUrl || settings.logoUrl ? (
+                      <img
+                        src={settings.logoWhiteUrl || settings.logoUrl}
+                        alt="Logo Preview Dark"
+                        style={{ height: `${settings.logoHeight || 40}px` }}
+                        className="max-w-full object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <span className="text-xs text-slate-500 italic">Belum ada logo dipilih</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KONTEN TAB 1: PROFIL & LEGALITAS PERUSAHAAN */}
       {activeTab === "profile" && (

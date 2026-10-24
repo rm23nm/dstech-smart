@@ -227,6 +227,8 @@ export default function ShopPage() {
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // Site branding settings
+  const [siteSettings, setSiteSettings] = useState<any>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -273,11 +275,24 @@ export default function ShopPage() {
     }
   }, [cart]);
 
-  // Fetch katalog & promosi
+  // Fetch katalog, promosi & site settings
   useEffect(() => {
     fetchProducts();
     fetchPromotions();
+    fetchSiteSettings();
   }, []);
+
+  const fetchSiteSettings = async () => {
+    try {
+      const res = await fetch("/api/settings?t=" + Date.now());
+      const data = await res.json();
+      if (data && data.success && data.data) {
+        setSiteSettings(data.data);
+      }
+    } catch (err) {
+      console.error("Gagal memuat site settings:", err);
+    }
+  };
 
   // Ambil riwayat pesanan milik user saat modal tracking terbuka atau user aktif
   useEffect(() => {
@@ -668,16 +683,22 @@ export default function ShopPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           {/* Logo & Navigation */}
           <div className="flex items-center gap-4">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-dstech-blue to-blue-600 flex items-center justify-center text-white font-black text-sm shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                DST
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="relative h-11 w-36 sm:w-44 shrink-0 flex items-center">
+                <Image
+                  src={siteSettings?.logoUrl || "/logo.png"}
+                  alt={siteSettings?.companyName || "PT. DSTech Smart Perkasa"}
+                  fill
+                  className="object-contain object-left transition-transform group-hover:scale-105"
+                  priority
+                />
               </div>
-              <div>
-                <span className="font-black text-slate-900 text-base sm:text-lg tracking-tight flex items-center gap-1.5">
-                  DSTECH <span className="text-dstech-red">MARKETPLACE</span>
+              <div className="hidden sm:block border-l border-slate-200 pl-3">
+                <span className="font-black text-slate-900 text-xs sm:text-sm tracking-tight flex items-center gap-1.5">
+                  MARKETPLACE <span className="text-dstech-red">OFFICIAL</span>
                 </span>
-                <span className="text-[9.5px] font-bold text-slate-400 block -mt-1 tracking-wider uppercase">
-                  Official Hardware &amp; IT Suite
+                <span className="text-[9.5px] font-bold text-slate-400 block -mt-0.5 tracking-wider uppercase">
+                  Hardware &amp; IT Suite
                 </span>
               </div>
             </Link>

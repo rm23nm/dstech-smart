@@ -41,6 +41,10 @@ interface SiteSettings {
   instagram: string;
   facebook: string;
   linkedin: string;
+  logoUrl?: string;
+  logoWhiteUrl?: string;
+  faviconUrl?: string;
+  logoHeight?: number;
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -94,8 +98,8 @@ export default function Home() {
           <a href="#" className="flex items-center gap-3">
             <div className="relative w-32 sm:w-44 h-10 sm:h-12 flex items-center">
               <Image 
-                src="/logo.png" 
-                alt="PT. DSTech Smart Perkasa Logo" 
+                src={settings.logoUrl || "/logo.png"} 
+                alt={settings.companyName || "PT. DSTech Smart Perkasa Logo"} 
                 fill 
                 className="object-contain object-left" 
                 priority 
@@ -420,7 +424,7 @@ export default function Home() {
             {/* Col 1: About */}
             <div className="space-y-6">
                <div className="relative w-40 sm:w-52 h-12 sm:h-16">
-                  <Image src="/logo.png" alt={settings.companyName || "DSTech Logo"} fill className="object-contain object-left" />
+                  <Image src={settings.logoWhiteUrl || settings.logoUrl || "/logo.png"} alt={settings.companyName || "DSTech Logo"} fill className="object-contain object-left" />
                </div>
                <p className="text-sm text-slate-600 font-medium leading-relaxed max-w-sm">
                   {settings.tagline}
