@@ -4,6 +4,18 @@ import path from "path";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
 const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
+const SETTINGS_FILE = path.join(process.cwd(), "src", "data", "dstech_settings.json");
+
+function readGeneralSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
+    }
+  } catch (e) {
+    console.error("Error reading dstech_settings.json:", e);
+  }
+  return {};
+}
 
 function readFinanceData() {
   try {
@@ -55,15 +67,25 @@ export async function GET(req: Request) {
   const docNo = (searchParams.get("no") || searchParams.get("id") || "").trim();
 
   const data = readFinanceData();
+  const generalSettings = readGeneralSettings();
   const sales: any[] = data.sales || [];
   const quotations: any[] = data.quotations || [];
   const purchases: any[] = data.purchases || [];
   const bankAccounts: any[] = data.bank_accounts || [];
-  const settings: any = data.settings || {};
+  const settings: any = {
+    ...generalSettings,
+    ...(generalSettings.letterheadSettings || {}),
+    ...(data.settings || {}),
+  };
   const products: any[] = readProducts();
 
-  // Pengaturan Kop Surat & Info Perusahaan Resmi
-  const letterheadUrl = settings.letterheadUrl || "/kop_surat_dstech.jpg";
+  // Pengaturan Kop Surat & Info Perusahaan Resmi (Prioritaskan berkas Base64 / upload user)
+  const letterheadUrl =
+    settings.letterheadUrl_PT ||
+    settings.letterheadUrl ||
+    generalSettings?.letterheadSettings?.letterheadUrl_PT ||
+    generalSettings?.letterheadSettings?.letterheadUrl ||
+    "/kop_surat_dstech.jpg";
   const letterheadEnabled = settings.letterheadEnabled !== false;
   const masterStampUrl = settings.masterStampUrl || "";
   const defaultBank = bankAccounts.find((b) => b.isDefault) || bankAccounts[0] || {
@@ -570,6 +592,16 @@ export async function GET(req: Request) {
             </div>
           </div>
           <div class="flex items-center gap-2">
+            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-slate-700 transition">
+              <input
+                type="checkbox"
+                id="toggle-letterhead"
+                ${letterheadEnabled ? 'checked' : ''}
+                onchange="toggleLetterhead(this.checked)"
+                class="w-4 h-4 text-amber-500 rounded cursor-pointer"
+              />
+              <span>Kop Surat Resmi</span>
+            </label>
             <button onclick="window.print()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition">
               🖨️ Cetak Lembar A4
             </button>
@@ -583,176 +615,233 @@ export async function GET(req: Request) {
         </div>
 
         <!-- Lembar Cetak Dokumen A4 Resmi (Purchase Order) -->
-        <div id="po-print-sheet" class="print-sheet max-w-4xl mx-auto bg-white rounded-2xl shadow-lg border border-slate-200 p-8 sm:p-12 space-y-6 relative overflow-hidden">
-          
-          <!-- Kop Surat Resmi DSTech -->
-          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5">
-            <div class="space-y-1">
-              <div class="text-2xl font-black text-red-600 tracking-tight">PT. DSTECH SMART PERKASA</div>
-              <p class="text-xs font-bold text-slate-700">Solusi Security System, CCTV AI, Barrier Gate, IoT & IT Infrastructure</p>
-              <p class="text-[10px] text-slate-500 leading-relaxed max-w-md">
-                Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten<br>
-                <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong><br>
-                WhatsApp: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
-              </p>
-            </div>
-            <div class="text-left sm:text-right space-y-1">
-              <span class="px-3.5 py-1.5 rounded-md bg-amber-800 text-white font-black text-xs uppercase tracking-wider inline-block">
-                PURCHASE ORDER (PO)
-              </span>
-              <p class="font-mono font-black text-base text-amber-700 mt-1">${po.poNumber}</p>
-              <p class="text-xs text-slate-500">Tanggal Order: <span class="font-bold text-slate-800">${po.date}</span></p>
-              <p class="text-xs text-slate-700">Est. Tiba: <span class="font-bold text-amber-800">${po.expectedDelivery || "-"}</span></p>
-            </div>
-          </div>
+        <div
+          id="po-print-sheet"
+          class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8"
+          style="width: 210mm; min-height: 297mm; max-width: 100%; box-sizing: border-box;"
+        >
+          <!-- Background Kop Surat Resmi DSTech -->
+          <img
+            id="letterhead-bg-po"
+            src="${letterheadUrl}"
+            alt="Kop Surat Resmi"
+            class="letterhead-bg absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+            style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${letterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+          />
 
-          <!-- Informasi Vendor & Tempat Pengiriman -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div class="bg-amber-50/70 p-4 rounded-xl border border-amber-200/80 space-y-1.5">
-              <p class="text-[10px] font-black text-amber-800 uppercase tracking-wider">DITUJUKAN KEPADA (VENDOR / SUPPLIER):</p>
-              <p class="font-black text-slate-900 text-sm">${po.supplierName}</p>
-              <p class="text-slate-600 text-[11px]">Kontak Sales: <span class="font-bold">${po.supplierContact || "-"}</span></p>
-              <p class="text-[11px] text-slate-700">
-                Status Pembayaran: <span class="font-bold text-amber-800">${po.paymentStatus || "Belum Lunas"}</span>
-              </p>
-            </div>
-
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-1.5">
-              <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider">ALAMAT PENERIMAAN PENGIRIMAN BARANG:</p>
-              <p class="font-black text-slate-900 text-sm">Gudang Utama PT. DSTech Smart Perkasa</p>
-              <p class="text-slate-600 text-[11px]">Perum Bukit Cilegon Asri Blok DB No. 19, Cilegon - Banten</p>
-              <p class="text-[11px] text-slate-600">PIC Logistik Gudang: <strong>Staff Gudang DSTech (0822-5949-4242)</strong></p>
-            </div>
-          </div>
-
-          <!-- Tabel Rincian Barang PO -->
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
-              <thead class="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-200">
-                <tr>
-                  <th class="p-2.5 text-center w-10">No</th>
-                  <th class="p-2.5">Deskripsi Barang / Spesifikasi Teknis</th>
-                  <th class="p-2.5 text-center w-20">Qty</th>
-                  <th class="p-2.5 text-center w-20">Satuan</th>
-                  <th class="p-2.5 text-right w-36">Harga Satuan (Rp)</th>
-                  <th class="p-2.5 text-right w-36">Total (Rp)</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                ${itemsHtml}
-              </tbody>
-            </table>
-          </div>
-
-          <!-- Ringkasan Keuangan & Catatan PO -->
-          <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
-            <div class="sm:max-w-md w-full bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
-              <span class="font-bold text-slate-700 block text-[11px]">Catatan / Instruksi Pengiriman:</span>
-              <p class="text-slate-600 text-[11px] whitespace-pre-line leading-relaxed">
-                ${po.notes || "Kirim barang sesuai jadwal yang telah disepakati dan sertakan Surat Jalan serta Faktur Pajak/Kwitansi resmi."}
-              </p>
-              <div class="pt-2 border-t border-slate-200/80">
-                <span class="text-[10px] text-slate-400 block font-bold">Terbilang:</span>
-                <span class="text-[11px] font-bold text-slate-800 italic">
-                  # ${angkaKeTerbilang(po.grandTotal || 0)} Rupiah #
+          <!-- Area Isi Dokumen dengan Padding Dinamis -->
+          <div
+            id="po-content-wrapper"
+            class="relative z-10 space-y-5"
+            style="padding-top: ${letterheadEnabled ? '135px' : '30px'}; padding-bottom: ${letterheadEnabled ? '90px' : '30px'}; padding-left: 42px; padding-right: 42px;"
+          >
+            <!-- Bar Judul PO saat Kop Surat Bergambar Aktif -->
+            <div id="po-title-bar" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-slate-900 pb-3" style="display: ${letterheadEnabled ? 'flex' : 'none'};">
+              <div>
+                <span class="px-3.5 py-1 rounded-md bg-amber-800 text-white font-black text-xs uppercase tracking-wider inline-block">
+                  PURCHASE ORDER (PO)
                 </span>
+                <p class="font-mono font-black text-lg text-amber-800 mt-1">${po.poNumber}</p>
+              </div>
+              <div class="text-left sm:text-right text-xs">
+                <p class="text-slate-500">Tanggal Order: <span class="font-bold text-slate-800">${po.date}</span></p>
+                <p class="text-slate-700">Est. Tiba: <span class="font-bold text-amber-800">${po.expectedDelivery || "-"}</span></p>
               </div>
             </div>
 
-            <div class="w-full sm:w-72 space-y-1.5 text-xs">
-              <div class="flex justify-between py-1 text-slate-600 border-b border-slate-100">
-                <span>Subtotal Belanja:</span>
-                <span class="font-bold text-slate-900">${formatRupiah(po.subtotal || 0)}</span>
+            <!-- Kop Surat Teks Manual (Tampil jika Kop Bergambar Dimatikan) -->
+            <div id="po-text-header" class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b-2 border-slate-900 pb-5" style="display: ${letterheadEnabled ? 'none' : 'flex'};">
+              <div class="space-y-1">
+                <div class="text-2xl font-black text-red-600 tracking-tight">PT. DSTECH SMART PERKASA</div>
+                <p class="text-xs font-bold text-slate-700">Solusi Security System, CCTV AI, Barrier Gate, IoT & IT Infrastructure</p>
+                <p class="text-[10px] text-slate-500 leading-relaxed max-w-md">
+                  Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten<br>
+                  <strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong><br>
+                  WhatsApp: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
+                </p>
               </div>
-              <div class="flex justify-between py-1 text-slate-600 border-b border-slate-100">
-                <span>PPN Masukan (${(po.taxRate ?? 12) === 11.12 ? "12% (11/12)" : `${po.taxRate ?? 12}%`}):</span>
-                <span class="font-bold text-slate-900">${formatRupiah(po.taxAmount || 0)}</span>
-              </div>
-              ${po.shippingCost ? `
-              <div class="flex justify-between py-1 text-slate-600 border-b border-slate-100">
-                <span>Ongkos Kirim:</span>
-                <span class="font-bold text-slate-900">${formatRupiah(po.shippingCost)}</span>
-              </div>` : ""}
-              ${po.discount ? `
-              <div class="flex justify-between py-1 text-red-600 border-b border-slate-100">
-                <span>Diskon Supplier:</span>
-                <span class="font-bold">-${formatRupiah(po.discount)}</span>
-              </div>` : ""}
-              <div class="flex justify-between py-2 text-sm font-black text-slate-900 border-t-2 border-slate-900">
-                <span class="text-amber-800">TOTAL BELANJA PO:</span>
-                <span class="text-emerald-700">${formatRupiah(po.grandTotal || 0)}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Syarat & Ketentuan PO Resmi -->
-          <div class="text-[10px] leading-relaxed text-slate-500 border-t border-slate-200 pt-3 space-y-0.5">
-            <p class="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
-              Syarat & Ketentuan Purchase Order (PO):
-            </p>
-            <p>1. Barang yang dikirim harus 100% baru (Brand New in Box), original dan bergaransi resmi dari distributor/pabrik.</p>
-            <p>2. Setiap pengiriman wajib melampirkan Surat Jalan dan mencantumkan Nomor PO resmi ini: <strong>${po.poNumber}</strong>.</p>
-            <p>3. Pemeriksaan fisik dan Quality Control (QC) dilakukan saat barang tiba di gudang PT. DSTech Smart Perkasa.</p>
-            <p>4. Pembayaran akan diproses sesuai kesepakatan (${po.paymentStatus || "Sesuai Termin"}) setelah barang dan dokumen penagihan lengkap diterima.</p>
-          </div>
-
-          <!-- Tanda Tangan Dual Approval (Vendor & Direktur DSTech) -->
-          <div class="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
-            <!-- Sisi Kiri: Vendor / Supplier -->
-            <div class="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-3 bg-white shadow-xs text-center">
-              <div>
-                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dikonfirmasi & Diterima Oleh,</p>
-                <p class="text-xs font-black text-slate-900 mt-0.5">${po.supplierName}</p>
-              </div>
-              <div class="h-12 flex items-center justify-center text-slate-300 text-[9px] italic">
-                (Tanda Tangan & Stempel Vendor)
-              </div>
-              <div class="pt-1 border-t border-slate-200">
-                <p class="font-bold text-slate-900 text-xs">${po.supplierContact ? `( ${po.supplierContact.split("(")[0].trim()} )` : "( ................................................ )"}</p>
-                <p class="text-[9px] text-slate-500">Sales / PIC Vendor</p>
+              <div class="text-left sm:text-right space-y-1">
+                <span class="px-3.5 py-1.5 rounded-md bg-amber-800 text-white font-black text-xs uppercase tracking-wider inline-block">
+                  PURCHASE ORDER (PO)
+                </span>
+                <p class="font-mono font-black text-base text-amber-700 mt-1">${po.poNumber}</p>
+                <p class="text-xs text-slate-500">Tanggal Order: <span class="font-bold text-slate-800">${po.date}</span></p>
+                <p class="text-xs text-slate-700">Est. Tiba: <span class="font-bold text-amber-800">${po.expectedDelivery || "-"}</span></p>
               </div>
             </div>
 
-            <!-- Sisi Kanan: Pemesan Resmi PT. DSTech Smart Perkasa -->
-            <div class="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-3 bg-white shadow-xs text-center relative overflow-hidden">
-              <div>
-                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pemesan Resmi,</p>
-                <p class="text-xs font-black text-amber-800 mt-0.5">PT. DSTech Smart Perkasa</p>
+            <!-- Informasi Vendor & Tempat Pengiriman -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div class="bg-amber-50/70 p-4 rounded-xl border border-amber-200/80 space-y-1.5">
+                <p class="text-[10px] font-black text-amber-800 uppercase tracking-wider">DITUJUKAN KEPADA (VENDOR / SUPPLIER):</p>
+                <p class="font-black text-slate-900 text-sm">${po.supplierName}</p>
+                <p class="text-slate-600 text-[11px]">Kontak Sales: <span class="font-bold">${po.supplierContact || "-"}</span></p>
+                <p class="text-[11px] text-slate-700">
+                  Status Pembayaran: <span class="font-bold text-amber-800">${po.paymentStatus || "Belum Lunas"}</span>
+                </p>
               </div>
-              <div class="h-12 relative flex items-center justify-center">
-                ${isApproved ? `
-                  <div class="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[6px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
-                    <span class="font-black text-[5.5px]">PT. DSTECH</span>
-                    <span class="text-[4.5px] tracking-tight">SMART PERKASA</span>
-                    <span class="text-[4px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL PO</span>
-                  </div>
-                  ${signatureImage ? `
-                    <img src="${signatureImage}" alt="Tanda Tangan" class="max-h-12 max-w-[130px] object-contain relative z-10" />
+
+              <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider">ALAMAT PENERIMAAN PENGIRIMAN BARANG:</p>
+                <p class="font-black text-slate-900 text-sm">Gudang Utama PT. DSTech Smart Perkasa</p>
+                <p class="text-slate-600 text-[11px]">Perum Bukit Cilegon Asri Blok DB No. 19, Cilegon - Banten</p>
+                <p class="text-[11px] text-slate-600">PIC Logistik Gudang: <strong>Staff Gudang DSTech (0822-5949-4242)</strong></p>
+              </div>
+            </div>
+
+            <!-- Tabel Rincian Barang PO -->
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs border border-slate-200 rounded-xl overflow-hidden">
+                <thead class="bg-slate-100 text-slate-700 font-bold uppercase text-[10px] border-b border-slate-200">
+                  <tr>
+                    <th class="p-2.5 text-center w-10">No</th>
+                    <th class="p-2.5">Deskripsi Barang / Spesifikasi Teknis</th>
+                    <th class="p-2.5 text-center w-20">Qty</th>
+                    <th class="p-2.5 text-center w-20">Satuan</th>
+                    <th class="p-2.5 text-right w-36">Harga Satuan (Rp)</th>
+                    <th class="p-2.5 text-right w-36">Total (Rp)</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                  ${itemsHtml}
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Ringkasan Keuangan & Catatan PO -->
+            <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
+              <div class="sm:max-w-md w-full bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                <span class="font-bold text-slate-700 block text-[11px]">Catatan / Instruksi Pengiriman:</span>
+                <p class="text-slate-600 text-[11px] whitespace-pre-line leading-relaxed">
+                  ${po.notes || "Kirim barang sesuai jadwal yang telah disepakati dan sertakan Surat Jalan serta Faktur Pajak/Kwitansi resmi."}
+                </p>
+                <div class="pt-2 border-t border-slate-200/80">
+                  <span class="text-[10px] text-slate-400 block font-bold">Terbilang:</span>
+                  <span class="text-[11px] font-bold text-slate-800 italic">
+                    # ${angkaKeTerbilang(po.grandTotal || 0)} Rupiah #
+                  </span>
+                </div>
+              </div>
+
+              <div class="w-full sm:w-72 space-y-1.5 text-xs">
+                <div class="flex justify-between py-1 text-slate-600 border-b border-slate-100">
+                  <span>Subtotal Belanja:</span>
+                  <span class="font-bold text-slate-900">${formatRupiah(po.subtotal || 0)}</span>
+                </div>
+                <div class="flex justify-between py-1 text-slate-600 border-b border-slate-100">
+                  <span>PPN Masukan (${(po.taxRate ?? 12) === 11.12 ? "12% (11/12)" : `${po.taxRate ?? 12}%`}):</span>
+                  <span class="font-bold text-slate-900">${formatRupiah(po.taxAmount || 0)}</span>
+                </div>
+                ${po.shippingCost ? `
+                <div class="flex justify-between py-1 text-slate-600 border-b border-slate-100">
+                  <span>Ongkos Kirim:</span>
+                  <span class="font-bold text-slate-900">${formatRupiah(po.shippingCost)}</span>
+                </div>` : ""}
+                ${po.discount ? `
+                <div class="flex justify-between py-1 text-red-600 border-b border-slate-100">
+                  <span>Diskon Supplier:</span>
+                  <span class="font-bold">-${formatRupiah(po.discount)}</span>
+                </div>` : ""}
+                <div class="flex justify-between py-2 text-sm font-black text-slate-900 border-t-2 border-slate-900">
+                  <span class="text-amber-800">TOTAL BELANJA PO:</span>
+                  <span class="text-emerald-700">${formatRupiah(po.grandTotal || 0)}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Syarat & Ketentuan PO Resmi -->
+            <div class="text-[10px] leading-relaxed text-slate-500 border-t border-slate-200 pt-3 space-y-0.5">
+              <p class="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
+                Syarat & Ketentuan Purchase Order (PO):
+              </p>
+              <p>1. Barang yang dikirim harus 100% baru (Brand New in Box), original dan bergaransi resmi dari distributor/pabrik.</p>
+              <p>2. Setiap pengiriman wajib melampirkan Surat Jalan dan mencantumkan Nomor PO resmi ini: <strong>${po.poNumber}</strong>.</p>
+              <p>3. Pemeriksaan fisik dan Quality Control (QC) dilakukan saat barang tiba di gudang PT. DSTech Smart Perkasa.</p>
+              <p>4. Pembayaran akan diproses sesuai kesepakatan (${po.paymentStatus || "Sesuai Termin"}) setelah barang dan dokumen penagihan lengkap diterima.</p>
+            </div>
+
+            <!-- Tanda Tangan Dual Approval (Vendor & Direktur DSTech) -->
+            <div class="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
+              <!-- Sisi Kiri: Vendor / Supplier -->
+              <div class="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-3 bg-white shadow-xs text-center">
+                <div>
+                  <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dikonfirmasi & Diterima Oleh,</p>
+                  <p class="text-xs font-black text-slate-900 mt-0.5">${po.supplierName}</p>
+                </div>
+                <div class="h-12 flex items-center justify-center text-slate-300 text-[9px] italic">
+                  (Tanda Tangan & Stempel Vendor)
+                </div>
+                <div class="pt-1 border-t border-slate-200">
+                  <p class="font-bold text-slate-900 text-xs">${po.supplierContact ? `( ${po.supplierContact.split("(")[0].trim()} )` : "( ................................................ )"}</p>
+                  <p class="text-[9px] text-slate-500">Sales / PIC Vendor</p>
+                </div>
+              </div>
+
+              <!-- Sisi Kanan: Pemesan Resmi PT. DSTech Smart Perkasa -->
+              <div class="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-3 bg-white shadow-xs text-center relative overflow-hidden">
+                <div>
+                  <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pemesan Resmi,</p>
+                  <p class="text-xs font-black text-amber-800 mt-0.5">PT. DSTech Smart Perkasa</p>
+                </div>
+                <div class="h-12 relative flex items-center justify-center">
+                  ${isApproved ? `
+                    <div class="absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-amber-600/50 flex flex-col items-center justify-center text-[6px] text-amber-800 font-bold uppercase rotate-[-12deg] pointer-events-none bg-amber-50/40">
+                      <span class="font-black text-[5.5px]">PT. DSTECH</span>
+                      <span class="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                      <span class="text-[4px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL PO</span>
+                    </div>
+                    ${signatureImage ? `
+                      <img src="${signatureImage}" alt="Tanda Tangan" class="max-h-12 max-w-[130px] object-contain relative z-10" />
+                    ` : `
+                      <div class="font-serif italic text-base text-slate-800 font-black relative z-10 tracking-wider">
+                        ${signerName}
+                      </div>
+                    `}
                   ` : `
-                    <div class="font-serif italic text-base text-slate-800 font-black relative z-10 tracking-wider">
-                      ${signerName}
+                    <div class="text-[10px] text-amber-700 font-bold italic bg-amber-50 px-3 py-1 rounded-lg border border-amber-200">
+                      ⏳ Dalam Proses / Menunggu Pengesahan
                     </div>
                   `}
-                ` : `
-                  <div class="text-[10px] text-amber-700 font-bold italic bg-amber-50 px-3 py-1 rounded-lg border border-amber-200">
-                    ⏳ Dalam Proses / Menunggu Pengesahan
-                  </div>
-                `}
-              </div>
-              <div class="pt-1 border-t border-slate-200">
-                <p class="font-bold text-slate-900 text-xs">( ${signerName} )</p>
-                <p class="text-[9px] text-slate-500">${signerTitle}</p>
+                </div>
+                <div class="pt-1 border-t border-slate-200">
+                  <p class="font-bold text-slate-900 text-xs">( ${signerName} )</p>
+                  <p class="text-[9px] text-slate-500">${signerTitle}</p>
+                </div>
               </div>
             </div>
-          </div>
 
-        </div>
+          </div> <!-- End po-content-wrapper -->
+        </div> <!-- End po-print-sheet -->
 
         <script>
+          function toggleLetterhead(enabled) {
+            const bgImg = document.getElementById('letterhead-bg-po');
+            const wrapper = document.getElementById('po-content-wrapper');
+            const textHeader = document.getElementById('po-text-header');
+            const titleBar = document.getElementById('po-title-bar');
+            if (enabled) {
+              if (bgImg) bgImg.style.display = 'block';
+              if (wrapper) {
+                wrapper.style.paddingTop = '135px';
+                wrapper.style.paddingBottom = '90px';
+              }
+              if (textHeader) textHeader.style.display = 'none';
+              if (titleBar) titleBar.style.display = 'flex';
+            } else {
+              if (bgImg) bgImg.style.display = 'none';
+              if (wrapper) {
+                wrapper.style.paddingTop = '30px';
+                wrapper.style.paddingBottom = '30px';
+              }
+              if (textHeader) textHeader.style.display = 'flex';
+              if (titleBar) titleBar.style.display = 'none';
+            }
+          }
+
           function downloadPdf() {
             const element = document.getElementById('po-print-sheet');
             const opt = {
-              margin:       [10, 10, 10, 10],
+              margin:       0,
               filename:     '${documentTitle}.pdf',
               image:        { type: 'jpeg', quality: 0.95 },
               html2canvas:  { scale: 2, useCORS: true },
