@@ -4562,6 +4562,42 @@
 
 ---
 
+### 156. Tugas: Pemeriksaan dan Konfigurasi Mail Server / Akun Email Domain dstechsmart.com di VPS aaPanel
+- **Permintaan Pengguna**:
+  - *"bisakah kamu bantu saya masuk keserver dan setting email dari dstechsmart.com agar bisa digunakan?"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIPERBAIKI, DIVERIFIKASI & AKTIF)**
+- **Hasil Investigasi & Diagnosis Masalah**:
+  1. **Status Service**: Postfix (SMTP), Dovecot (IMAP/POP3), dan plugin aaPanel `mail_sys` sudah terinstal dan aktif di VPS `157.66.34.199`.
+  2. **DNS Records**:
+     - MX Record: `mail.dstechsmart.com` (IP 157.66.34.199) -> Status Benar & Terhubung.
+     - SPF Record: `"v=spf1 +a +mx -all"` -> Status Benar & Terpasang.
+     - DKIM Record: `default._domainkey.dstechsmart.com` -> Status Benar & Terpasang.
+  3. **Penyebab Utama Email Tidak Bisa Mengirim (SMTP Error)**:
+     - Ditemukan error fatal di log Postfix:
+       `cannot get RSA private key from file "/etc/pki/dovecot/private/dovecot.pem": key values mismatch`.
+     - File sertifikat lama `/etc/pki/dovecot/certs/dovecot.pem` tidak cocok (mismatch) dengan private key-nya, sehingga Postfix otomatis menonaktifkan TLS pada port 587 (STARTTLS) dan port 465 (SMTPS), menyebabkan semua percobaan kirim email gagal (`4.7.0 TLS not available due to local problem` & `Connection reset by peer`).
+  4. **Tindakan Perbaikan yang Dilakukan**:
+     - Dibuat folder cadangan di server: `/root/_backup_mail_ssl/`.
+     - Dipasang sertifikat Let's Encrypt resmi `dstechsmart.com` (yang valid hingga 21 Januari 2027 dengan modulus match 100%) ke `/etc/pki/dovecot/certs/dovecot.pem` dan `/etc/pki/dovecot/private/dovecot.pem`.
+     - Service Dovecot dan Postfix direstart.
+     - Dilakukan pengujian otomatis autentikasi via Python script:
+       * `SMTP 587 STARTTLS`: ✅ **LOGIN OK**
+       * `SMTP 465 SSL`: ✅ **LOGIN OK**
+       * `IMAP 993 SSL`: ✅ **LOGIN OK**
+       * `Real Email Sending Test`: ✅ **SUKSES** (Email berhasil terkirim dan diterima di mailbox tujuan via LMTP).
+  5. **Daftar Akun Email Resmi Perusahaan Aktif**:
+     - `cs@dstechsmart.com`
+     - `ramadhanist@dstechsmart.com`
+     - `noreplay@dstechsmart.com`
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Jalankan skrip diagnosis SSH ke VPS untuk memeriksa status service mail (postfix, dovecot, aaPanel mail server).
+  3. [x] **Langkah 3**: Periksa port dan konfigurasi DNS domain `dstechsmart.com`.
+  4. [x] **Langkah 4**: Perbaiki sertifikat SSL TLS Postfix yang mismatch dan restart service mail.
+  5. [x] **Langkah 5**: Berikan laporan lengkap kredensial & panduan setting email kepada pengguna.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
