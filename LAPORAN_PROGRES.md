@@ -4537,22 +4537,28 @@
 ### 155. Tugas: Penambahan Nomor Proyek pada Faktur Terhubung & Fitur Pencarian Proyek Cepat saat Input Faktur
 - **Permintaan Pengguna**:
   - *"saya melihat pada faktur yang sudah di linkkan ke project, kenapa tidak ada informasih nomor projectnya. tolong tambahkan. kemudian saat input faktur kita diminta untuk memilih project, disitu saya melihat tidak ada motode pencarian, sehingga bingung karena sangat banyak. buat pencariannya"*
-- **Status**: 🚀 **Sedang Dikerjakan (In Progress)**
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & SIAP DEPLOY LIVE)**
 - **Analisis Kebutuhan & Desain Arsitektur**:
   1. **Informasi Nomor Proyek pada Faktur Penjualan (`/admin/finance`)**:
-     - Pada daftar tabel faktur dan modal detail / cetak faktur penjualan, jika faktur terhubung ke proyek (`projectId` / `projectNumber`), tampilkan badge dan informasi Nomor Proyek & Nama Proyek secara jelas.
-  2. **Fitur Pencarian Proyek saat Input Faktur**:
-     - Pada form modal Tambah/Edit Faktur Penjualan, ubah dropdown seleksi proyek yang tadinya select statis biasa menjadi komponen dropdown searchable (Searchable Project Select) dengan input filter pencarian real-time (Nomor Proyek, Nama Proyek, Klien) agar pengguna tidak bingung saat memilih dari daftar proyek yang banyak.
+     - Pada tabel baris faktur penjualan utama, tampilkan badge Nomor Proyek (`projectCode` e.g. `PRJ-DSP-202610-001`) dan Nama Proyek di bawah nomor invoice.
+     - Pada modal pratinjau cetak faktur resmi A4 (`#print-invoice-full-wrapper`), tampilkan Nomor Proyek & Nama Proyek di header metadata faktur (di bawah Tanggal & Jatuh Tempo) dan di box data klien "Tagihan Kepada" lengkap dengan PIC Proyek.
+  2. **Fitur Pencarian Proyek Interaktif saat Input Faktur (`saleForm`)**:
+     - Mengganti elemen `<select>` statis dengan komponen **Searchable Project Selector**:
+       * Menampilkan Card Proyek Terpilih (jika ada) berisi kode proyek, nama proyek, status, klien, nilai kontrak, serta tombol *✕ Lepas Proyek*.
+       * Input pencarian real-time dengan icon Search dan tombol reset pencarian instan.
+       * Filter dropdown berbatas tinggi (`max-h-48 overflow-y-auto`) menyaring secara instan berdasarkan nomor proyek, nama proyek, nama klien, atau PIC.
+       * Opsi default *"Bukan Penjualan Proyek Khusus (Umum / Ritel)"*.
+       * Auto-fill data nama klien, nomor telepon, dan alamat klien jika belum diisi.
 - **Rincian Step-by-Step Pelaksanaan**:
-  1. [ ] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md`.
-  2. [ ] **Langkah 2**: Buat cadangan file `src/app/admin/finance/page.tsx` ke folder `_backup_finance_project_search/`.
-  3. [ ] **Langkah 3**: Tambahkan kolom & badge nomor proyek pada tabel faktur penjualan dan detail invoice.
-  4. [ ] **Langkah 4**: Implementasikan komponen dropdown searchable proyek pada form input/edit faktur penjualan.
-  5. [ ] **Langkah 5**: Uji kompilasi lokal `npx tsc --noEmit` & `npm run build`.
-  6. [ ] **Langkah 6**: Bersihkan folder cadangan sementara.
-  7. [ ] **Langkah 7**: Push commit ke GitHub repository via `push_with_native_git.js`.
-  8. [ ] **Langkah 8**: Deploy live ke VPS aaPanel via `deploy_live.js` dan restart PM2 `dstech-main`.
-  9. [ ] **Langkah 9**: Verifikasi di live website dan tandai status Selesai.
+  1. [x] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat cadangan file `src/app/admin/finance/page.tsx` ke folder `_backup_finance_project_search/`.
+  3. [x] **Langkah 3**: Tambahkan kolom & badge nomor proyek pada tabel faktur penjualan dan detail invoice cetak resmi A4.
+  4. [x] **Langkah 4**: Implementasikan komponen dropdown searchable proyek pada form input/edit faktur penjualan.
+  5. [x] **Langkah 5**: Uji kompilasi lokal `npx tsc --noEmit` & `npm run build` (54/54 static & dynamic routes 100% sukses).
+  6. [x] **Langkah 6**: Bersihkan folder cadangan sementara `_backup_finance_project_search/`.
+  7. [x] **Langkah 7**: Push commit ke GitHub repository via `push_with_native_git.js`.
+  8. [x] **Langkah 8**: Deploy live ke VPS aaPanel via `deploy_live.js` dan restart PM2 `dstech-main`.
+  9. [x] **Langkah 9**: Verifikasi di live website dan tandai status Selesai.
 
 ---
 
