@@ -7,17 +7,216 @@ export const revalidate = 0;
 
 const CRM_FILE = path.join(process.cwd(), "src", "data", "dstech_crm.json");
 
+const INITIAL_LEADS = [
+  {
+    id: "dstech_crm_lead_1",
+    leadNumber: "LEAD-DST-202610-001",
+    clientName: "Ir. Hendra Gunawan",
+    company: "PT. Krakatau Posco Steel",
+    position: "Procurement & Facility Manager",
+    phone: "0812-8899-7766",
+    email: "hendra.g@krakatauposco.co.id",
+    category: "B2B Industri",
+    projectTitle: "Pengadaan & Integrasi 24 Titik CCTV AI Thermal & Barrier Gate Pabrik",
+    estimatedValue: 85000000,
+    stage: "NEGOTIATION",
+    probability: 85,
+    source: "Website / Chat WA",
+    assignedTo: "RAMADHANI ST",
+    expectedClosingDate: "2026-11-15",
+    location: "Kawasan Industri Krakatau Cilegon",
+    sphNumber: "SPH-DSTECH-202610-001",
+    notes: "Klien membutuhkan pengawasan area furnace suhu tinggi dengan kamera PTZ Optical Zoom dan palang gerbang otomatis servo.",
+    activities: [
+      {
+        id: "act_1_1",
+        type: "SURVEY",
+        title: "Survey Lapangan & Pemetaan Titik CCTV",
+        notes: "Tim teknisi DSTech telah melakukan survey site walk, pengukuran jarak kabel FO 450 meter, dan penentuan posisi tiang kamera.",
+        createdAt: "2026-10-18T10:00:00.000Z",
+        createdBy: "Tim Teknisi DSTech"
+      },
+      {
+        id: "act_1_2",
+        type: "PROPOSAL",
+        title: "Penerbitan & Pengiriman SPH Resmi",
+        notes: "SPH SPH-DSTECH-202610-001 telah dikirimkan via email resmi dan WhatsApp ke Bpk Hendra Gunawan.",
+        createdAt: "2026-10-20T14:30:00.000Z",
+        createdBy: "RAMADHANI ST"
+      },
+      {
+        id: "act_1_3",
+        type: "MEETING",
+        title: "Negosiasi Termin Pembayaran & Jadwal Instalasi",
+        notes: "Klien menyetujui spesifikasi teknis. Saat ini tahap finalisasi Purchase Order (PO) dengan termin DP 50%.",
+        createdAt: "2026-10-23T11:15:00.000Z",
+        createdBy: "RAMADHANI ST"
+      }
+    ],
+    createdAt: "2026-10-15T08:00:00.000Z",
+    updatedAt: "2026-10-23T11:15:00.000Z"
+  },
+  {
+    id: "dstech_crm_lead_2",
+    leadNumber: "LEAD-DST-202610-002",
+    clientName: "Ibu Ratna Dewi",
+    company: "Perumahan Grand Cilegon Cluster Sapphire",
+    position: "Ketua Pengurus Paguyuban Warga",
+    phone: "0813-7744-1122",
+    email: "ratna.dewi@grandcilegon.id",
+    category: "Residensial / Smart Home",
+    projectTitle: "Smart Access Gate RFID & Sistem Barrier Parkir Cluster Perumahan",
+    estimatedValue: 32000000,
+    stage: "PROPOSAL_SENT",
+    probability: 65,
+    source: "Referral Mitra",
+    assignedTo: "Commercial Team",
+    expectedClosingDate: "2026-11-20",
+    location: "Cibeber, Kota Cilegon",
+    sphNumber: "SPH-DSTECH-202610-002",
+    notes: "Penggantian palang manual menjadi otomatis berkecepatan 1.8 detik dengan kartu akses RFID untuk 120 kepala keluarga.",
+    activities: [
+      {
+        id: "act_2_1",
+        type: "CALL",
+        title: "Telepon Konsultasi Awal",
+        notes: "Diskusi kebutuhan warga perumahan untuk keamanan gerbang masuk portal otomatis.",
+        createdAt: "2026-10-19T09:00:00.000Z",
+        createdBy: "CS DSTech"
+      },
+      {
+        id: "act_2_2",
+        type: "SURVEY",
+        title: "Pengukuran Lebar Jalan & Pondasi Gate",
+        notes: "Lebar jalan 6 meter, membutuhkan 2 unit barrier gate (1 In, 1 Out).",
+        createdAt: "2026-10-21T13:00:00.000Z",
+        createdBy: "Teknisi Lapangan"
+      }
+    ],
+    createdAt: "2026-10-19T08:30:00.000Z",
+    updatedAt: "2026-10-21T13:00:00.000Z"
+  },
+  {
+    id: "dstech_crm_lead_3",
+    leadNumber: "LEAD-DST-202610-003",
+    clientName: "Drs. H. Mulyadi",
+    company: "Dinas Komunikasi & Informatika (Diskominfo)",
+    position: "PPK Pengadaan Perangkat",
+    phone: "0811-9988-3344",
+    email: "mulyadi.ppk@serangkota.go.id",
+    category: "Instansi Pemerintah",
+    projectTitle: "Pengadaan Server Presensi Biometrik & Jaringan Fiber Optic Gedung OPD",
+    estimatedValue: 125000000,
+    stage: "QUALIFIED",
+    probability: 50,
+    source: "Tender",
+    assignedTo: "RAMADHANI ST",
+    expectedClosingDate: "2026-12-05",
+    location: "Pusat Pemerintahan Kota Serang",
+    sphNumber: "",
+    notes: "Kebutuhan pengadaan server lokal dan instalasi 8 titik mesin absensi face recognition.",
+    activities: [
+      {
+        id: "act_3_1",
+        type: "MEETING",
+        title: "Presentasi Produk & Portofolio DSTech",
+        notes: "Pemaparan sistem terintegrasi Smart Pro WA Gateway dan mesin biometrik.",
+        createdAt: "2026-10-22T10:00:00.000Z",
+        createdBy: "RAMADHANI ST"
+      }
+    ],
+    createdAt: "2026-10-21T15:00:00.000Z",
+    updatedAt: "2026-10-22T10:00:00.000Z"
+  },
+  {
+    id: "dstech_crm_lead_4",
+    leadNumber: "LEAD-DST-202610-004",
+    clientName: "Bpk. Aris Munandar",
+    company: "PT. Sentra Logistik Merak",
+    position: "Operational Director",
+    phone: "0819-2233-4455",
+    email: "aris.m@sentralogistik.co.id",
+    category: "B2B Industri",
+    projectTitle: "Pemasangan 12 Unit Smart Doorlock & PABX Kantor Dermaga Merak",
+    estimatedValue: 28500000,
+    stage: "WON",
+    probability: 100,
+    source: "E-Store",
+    assignedTo: "Commercial Team",
+    expectedClosingDate: "2026-10-24",
+    location: "Pelabuhan Merak, Banten",
+    sphNumber: "SPH-DSTECH-202610-004",
+    notes: "Deal berhasil closing! Pembayaran lunas dan pekerjaan instalasi telah selesai dengan garansi resmi 1 tahun.",
+    activities: [
+      {
+        id: "act_4_1",
+        type: "WHATSAPP",
+        title: "Konfirmasi Closing & Jadwal Pemasangan",
+        notes: "Klien telah mentransfer pembayaran DP dan SPK telah ditandatangani.",
+        createdAt: "2026-10-20T16:00:00.000Z",
+        createdBy: "Commercial Team"
+      }
+    ],
+    createdAt: "2026-10-17T11:00:00.000Z",
+    updatedAt: "2026-10-24T16:00:00.000Z"
+  },
+  {
+    id: "dstech_crm_lead_5",
+    leadNumber: "LEAD-DST-202610-005",
+    clientName: "Dr. Cynthia Anastasia",
+    company: "Klinik Medika Pratama Cilegon",
+    position: "Owner & Kepala Klinik",
+    phone: "0852-1133-7799",
+    email: "cynthia@medikapratama.com",
+    category: "Komersial / Ruko",
+    projectTitle: "Pengadaan CCTV Audio 2 Arah & Antrean Pasien Smart Display",
+    estimatedValue: 14500000,
+    stage: "NEW_LEAD",
+    probability: 25,
+    source: "Website / Chat WA",
+    assignedTo: "CS DSTech",
+    expectedClosingDate: "2026-11-28",
+    location: "Jl. Ahmad Yani No. 45, Cilegon",
+    sphNumber: "",
+    notes: "Calon klien menghubungi via tombol WhatsApp website meminta penawaran paket 8 channel CCTV yang bisa rekam suara.",
+    activities: [
+      {
+        id: "act_5_1",
+        type: "WHATSAPP",
+        title: "Chat Awal Masuk dari Website",
+        notes: "Menjawab pertanyaan awal klien seputar spesifikasi CCTV Proview 2 Lensa dan perkiraan biaya.",
+        createdAt: "2026-10-24T14:20:00.000Z",
+        createdBy: "CS DSTech"
+      }
+    ],
+    createdAt: "2026-10-24T14:20:00.000Z",
+    updatedAt: "2026-10-24T14:20:00.000Z"
+  }
+];
+
 function readCrmData(): { leads: any[] } {
   try {
     if (fs.existsSync(CRM_FILE)) {
       const content = fs.readFileSync(CRM_FILE, "utf-8");
       const parsed = JSON.parse(content);
-      return { leads: Array.isArray(parsed.leads) ? parsed.leads : [] };
+      if (Array.isArray(parsed.leads) && parsed.leads.length > 0) {
+        return { leads: parsed.leads };
+      }
     }
   } catch (err) {
     console.error("Gagal membaca dstech_crm.json:", err);
   }
-  return { leads: [] };
+
+  // Jika file belum ada atau kosong, inisialisasi dengan data default
+  const defaultData = { leads: INITIAL_LEADS };
+  try {
+    const dir = path.dirname(CRM_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(CRM_FILE, JSON.stringify(defaultData, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Gagal inisialisasi file dstech_crm.json:", err);
+  }
+  return defaultData;
 }
 
 function writeCrmData(data: { leads: any[] }): boolean {
