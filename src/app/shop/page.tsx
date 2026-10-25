@@ -53,6 +53,8 @@ interface Product {
   name: string;
   category: string;
   price: number;
+  installationFee?: number;
+  hasInstallationService?: boolean;
   stock?: number;
   commission?: string;
   commissionRate?: number;
@@ -560,7 +562,20 @@ export default function ShopPage() {
   // Perhitungan Biaya Keranjang
   const cartSubtotal = cart.reduce((acc, item) => acc + item.product.price * item.qty, 0);
   const selectedCourier = SHIPPING_COURIERS.find((c) => c.id === selectedCourierId) || SHIPPING_COURIERS[0];
-  const installationFee = includeInstallation ? 350000 : 0;
+
+  // Kalkulasi Jasa Pemasangan & Setup Teknisi Proporsional per Kuantiti / Unit (Tugas 202)
+  const totalInstallationUnits = includeInstallation
+    ? cart.reduce((acc, item) => acc + (item.product.hasInstallationService !== false ? item.qty : 0), 0)
+    : 0;
+
+  const installationFee = includeInstallation
+    ? cart.reduce((acc, item) => {
+        if (item.product.hasInstallationService === false) return acc;
+        const feePerUnit = typeof item.product.installationFee === "number" ? item.product.installationFee : 150000;
+        return acc + feePerUnit * item.qty;
+      }, 0)
+    : 0;
+
   const grandTotal = cartSubtotal + selectedCourier.cost + installationFee + (cart.length > 0 ? uniqueCode : 0);
 
   // Handler Submit Checkout Pesanan
@@ -1181,6 +1196,11 @@ export default function ShopPage() {
                         <span className="text-base sm:text-lg font-black text-dstech-blue">
                           {formatRupiah(prod.price)}
                         </span>
+                        {prod.hasInstallationService !== false && (prod.installationFee || 0) > 0 && (
+                          <span className="block text-[9.5px] font-bold text-indigo-600 mt-0.5">
+                            +Jasa: {formatRupiah(prod.installationFee || 0)}/unit
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -1434,9 +1454,14 @@ export default function ShopPage() {
                         </div>
                         <div>
                           <h4 className="text-xs font-black text-slate-900 line-clamp-1">{item.product.name}</h4>
-                          <span className="text-xs font-mono font-bold text-dstech-blue">
+                          <span className="text-xs font-mono font-bold text-dstech-blue block">
                             {formatRupiah(item.product.price)}
                           </span>
+                          {item.product.hasInstallationService !== false && (
+                            <span className="text-[9.5px] text-indigo-700 font-semibold block mt-0.5">
+                              🛠️ Tarif Jasa: {formatRupiah(item.product.installationFee || 150000)} / unit
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -1470,8 +1495,8 @@ export default function ShopPage() {
                   ))}
                 </div>
 
-                {/* Opsi Tambahan Jasa Pasang Teknisi */}
-                <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-200 flex items-start gap-3">
+                {/* Opsi Tambahan Jasa Pasang Teknisi Proporsional per Kuantiti Unit */}
+                <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 flex items-start gap-3">
                   <input
                     type="checkbox"
                     id="add-installation"
@@ -1480,12 +1505,17 @@ export default function ShopPage() {
                     className="w-4 h-4 mt-0.5 text-dstech-blue rounded cursor-pointer"
                   />
                   <label htmlFor="add-installation" className="text-xs cursor-pointer select-none">
-                    <span className="font-black text-slate-900 block">
-                      Tambahkan Jasa Pemasangan &amp; Setup Teknisi DSTech (+Rp 350.000)
+                    <span className="font-black text-slate-900 flex flex-wrap items-center gap-1.5">
+                      Tambahkan Jasa Pemasangan &amp; Setup Teknisi DSTech
+                      {totalInstallationUnits > 0 && (
+                        <span className="text-[11px] font-mono text-dstech-blue bg-blue-100 px-2 py-0.5 rounded-full font-bold">
+                          +{formatRupiah(installationFee)} ({totalInstallationUnits} Unit)
+                        </span>
+                      )}
                     </span>
                     <span className="text-[11px] text-slate-600 leading-relaxed block mt-0.5">
-                      Teknisi bersertifikat kami akan datang langsung ke lokasi Anda di Banten untuk instalasi kabel,
-                      mounting perangkat, dan konfigurasi aplikasi smartphone.
+                      Teknisi bersertifikat kami akan datang langsung ke lokasi Anda untuk pemasangan kabel,
+                      mounting perangkat, dan konfigurasi sistem. Biaya jasa dihitung proporsional per unit perangkat.
                     </span>
                   </label>
                 </div>
@@ -1675,8 +1705,8 @@ export default function ShopPage() {
                   </div>
                   {includeInstallation && (
                     <div className="flex justify-between text-xs text-slate-300">
-                      <span>Jasa Pemasangan Teknisi:</span>
-                      <span>{formatRupiah(installationFee)}</span>
+                      <span>Jasa Pemasangan Teknisi ({totalInstallationUnits} Unit):</span>
+                      <span className="font-mono text-amber-300 font-bold">{formatRupiah(installationFee)}</span>
                     </div>
                   )}
                   <div className="flex justify-between text-xs text-slate-300">
@@ -2844,6 +2874,27 @@ export default function ShopPage() {
                     Unit Resmi Bergaransi
                   </span>
                 </div>
+
+                {/* Jasa Pasang Teknisi Info Box */}
+                {selectedProduct.hasInstallationService !== false && (selectedProduct.installationFee || 0) > 0 ? (
+                  <div className="p-3.5 rounded-2xl bg-indigo-50 border border-indigo-200/80 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🛠️</span>
+                      <div>
+                        <span className="font-bold text-indigo-950 block">Tersedia Jasa Instalasi &amp; Setup Teknisi</span>
+                        <span className="text-[11px] text-indigo-700">Dapat ditambahkan saat checkout ke keranjang belanja</span>
+                      </div>
+                    </div>
+                    <span className="font-mono font-black text-indigo-900 bg-white px-2.5 py-1 rounded-xl border border-indigo-200">
+                      +{formatRupiah(selectedProduct.installationFee || 0)} / unit
+                    </span>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs text-slate-500">
+                    <span>📦 Pembelian Perangkat (Unit Only)</span>
+                    <span className="text-[10px] font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full">Tanpa Instalasi</span>
+                  </div>
+                )}
 
                 <div>
                   <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Deskripsi Produk</h4>

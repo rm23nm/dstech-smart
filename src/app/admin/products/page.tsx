@@ -29,6 +29,8 @@ export interface ProductItem {
   subCategory?: string;
   entityType?: "PT" | "NON_PT";
   price: number;
+  installationFee?: number;
+  hasInstallationService?: boolean;
   stock: number;
   commission: string;
   commissionRate?: number;
@@ -79,6 +81,8 @@ export default function ProductAdmin() {
     subCategory: string;
     entityType: "PT" | "NON_PT";
     price: string;
+    installationFee: string;
+    hasInstallationService: boolean;
     stock: string;
     commission: string;
     commissionType: string;
@@ -90,6 +94,8 @@ export default function ProductAdmin() {
     subCategory: "",
     entityType: "PT",
     price: "",
+    installationFee: "150000",
+    hasInstallationService: true,
     stock: "10",
     commission: "10",
     commissionType: "ONETIME",
@@ -242,6 +248,8 @@ export default function ProductAdmin() {
       subCategory: defaultSub,
       entityType: selectedEntityTab === "NON_PT" ? "NON_PT" : "PT",
       price: "",
+      installationFee: "150000",
+      hasInstallationService: true,
       stock: "10",
       commission: "10",
       commissionType: "ONETIME",
@@ -260,6 +268,8 @@ export default function ProductAdmin() {
       subCategory: product.subCategory || "",
       entityType: product.entityType || "PT",
       price: String(product.price),
+      installationFee: String(product.installationFee !== undefined ? product.installationFee : 150000),
+      hasInstallationService: product.hasInstallationService !== false,
       stock: String(product.stock),
       commission: String(product.commissionRate || parseInt(String(product.commission).replace(/[^0-9]/g, ""), 10) || 10),
       commissionType: product.commissionType || "ONETIME",
@@ -290,6 +300,8 @@ export default function ProductAdmin() {
       subCategory: formData.subCategory?.trim() || "",
       entityType: formData.entityType || "PT",
       price: parseFloat(formData.price) || 0,
+      installationFee: parseFloat(formData.installationFee) || 0,
+      hasInstallationService: formData.hasInstallationService,
       stock: parseInt(formData.stock, 10) || 0,
       commission: `${formData.commission}%`,
       commissionRate: parseInt(formData.commission, 10) || 10,
@@ -349,6 +361,8 @@ export default function ProductAdmin() {
       subCategory: formData.subCategory?.trim() || "",
       entityType: formData.entityType || "PT",
       price: parseFloat(formData.price) || 0,
+      installationFee: parseFloat(formData.installationFee) || 0,
+      hasInstallationService: formData.hasInstallationService,
       stock: parseInt(formData.stock, 10) || 0,
       commission: `${formData.commission}%`,
       commissionRate: parseInt(formData.commission, 10) || 10,
@@ -682,8 +696,21 @@ export default function ProductAdmin() {
                         </div>
                       </div>
                     </td>
-                    <td className="p-5 sm:p-6 text-center font-black text-slate-900 text-sm sm:text-base">
-                      Rp {p.price.toLocaleString("id-ID")}
+                    <td className="p-5 sm:p-6 text-center">
+                      <div className="font-black text-slate-900 text-sm sm:text-base">
+                        Rp {p.price.toLocaleString("id-ID")}
+                      </div>
+                      <div className="mt-1">
+                        {p.hasInstallationService !== false && (p.installationFee || 0) > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full">
+                            🛠️ Pasang: Rp {(p.installationFee || 0).toLocaleString("id-ID")}/unit
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                            🚫 Unit Only (Tanpa Jasa)
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-5 sm:p-6 text-center">
                       <span
@@ -962,6 +989,53 @@ export default function ProductAdmin() {
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                   />
                 </div>
+              </div>
+
+              {/* Opsi Jasa Pemasangan & Setup Teknisi */}
+              <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-black text-indigo-950 uppercase tracking-wider block">
+                      🛠️ Layanan Jasa Pemasangan & Setup Teknisi
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      Aktifkan jika produk ini menyediakan pilihan instalasi langsung oleh teknisi bersertifikat DSTech.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.hasInstallationService}
+                      onChange={(e) => setFormData({ ...formData, hasInstallationService: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                {formData.hasInstallationService && (
+                  <div className="pt-2 border-t border-indigo-100">
+                    <label className="block text-[11px] font-bold text-indigo-900 uppercase tracking-wider mb-1">
+                      Biaya Jasa Pemasangan (Rp per Unit) <span className="text-dstech-red">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="5000"
+                        required={formData.hasInstallationService}
+                        value={formData.installationFee}
+                        onChange={(e) => setFormData({ ...formData, installationFee: e.target.value })}
+                        placeholder="150000"
+                        className="w-full h-11 pl-10 pr-4 rounded-xl border border-indigo-200 text-sm font-bold text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      />
+                    </div>
+                    <p className="text-[10.5px] text-indigo-700 mt-1 italic">
+                      *Biaya jasa ini akan dihitung proporsional per unit saat pelanggan memilih opsi instalasi (misal: 2 unit = 2x jasa).
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1255,6 +1329,53 @@ export default function ProductAdmin() {
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                   />
                 </div>
+              </div>
+
+              {/* Opsi Jasa Pemasangan & Setup Teknisi */}
+              <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="text-xs font-black text-indigo-950 uppercase tracking-wider block">
+                      🛠️ Layanan Jasa Pemasangan & Setup Teknisi
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      Aktifkan jika produk ini menyediakan pilihan instalasi langsung oleh teknisi bersertifikat DSTech.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.hasInstallationService}
+                      onChange={(e) => setFormData({ ...formData, hasInstallationService: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                {formData.hasInstallationService && (
+                  <div className="pt-2 border-t border-indigo-100">
+                    <label className="block text-[11px] font-bold text-indigo-900 uppercase tracking-wider mb-1">
+                      Biaya Jasa Pemasangan (Rp per Unit) <span className="text-dstech-red">*</span>
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">Rp</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="5000"
+                        required={formData.hasInstallationService}
+                        value={formData.installationFee}
+                        onChange={(e) => setFormData({ ...formData, installationFee: e.target.value })}
+                        placeholder="150000"
+                        className="w-full h-11 pl-10 pr-4 rounded-xl border border-indigo-200 text-sm font-bold text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                      />
+                    </div>
+                    <p className="text-[10.5px] text-indigo-700 mt-1 italic">
+                      *Biaya jasa ini akan dihitung proporsional per unit saat pelanggan memilih opsi instalasi (misal: 2 unit = 2x jasa).
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -10,6 +10,8 @@ const DEFAULT_PRODUCTS = [
     name: "Smart Doorlock X-100",
     category: "Smart Home",
     price: 1850000,
+    installationFee: 250000,
+    hasInstallationService: true,
     stock: 24,
     commission: "15%",
     commissionRate: 15,
@@ -24,6 +26,8 @@ const DEFAULT_PRODUCTS = [
     name: "CCTV Hikvision 4CH HD",
     category: "Security",
     price: 3500000,
+    installationFee: 350000,
+    hasInstallationService: true,
     stock: 12,
     commission: "10%",
     commissionRate: 10,
@@ -38,6 +42,8 @@ const DEFAULT_PRODUCTS = [
     name: "Fingerprint ZKTeco Attendance",
     category: "Security",
     price: 1200000,
+    installationFee: 150000,
+    hasInstallationService: true,
     stock: 45,
     commission: "10%",
     commissionRate: 10,
@@ -52,6 +58,8 @@ const DEFAULT_PRODUCTS = [
     name: "Running Text LED Red Outdoor",
     category: "Visual",
     price: 2500000,
+    installationFee: 300000,
+    hasInstallationService: true,
     stock: 8,
     commission: "15%",
     commissionRate: 15,
@@ -66,6 +74,8 @@ const DEFAULT_PRODUCTS = [
     name: "Barrier Gate System Otomatis",
     category: "Parking",
     price: 8500000,
+    installationFee: 1500000,
+    hasInstallationService: true,
     stock: 5,
     commission: "10%",
     commissionRate: 10,
@@ -80,6 +90,8 @@ const DEFAULT_PRODUCTS = [
     name: "Paket Website Bisnis & E-Store",
     category: "Software",
     price: 2500000,
+    installationFee: 0,
+    hasInstallationService: false,
     stock: 99,
     commission: "20%",
     commissionRate: 20,
@@ -90,6 +102,18 @@ const DEFAULT_PRODUCTS = [
     updatedAt: "2026-03-05T13:20:00.000Z"
   }
 ];
+
+function getCategoryDefaultInstallationFee(category: string, name: string): number {
+  const cat = (category || "").toLowerCase();
+  const n = (name || "").toLowerCase();
+  if (n.includes("barrier gate") || cat.includes("parking")) return 1500000;
+  if (n.includes("cctv") || cat.includes("security")) return 150000;
+  if (n.includes("doorlock") || cat.includes("smart home")) return 250000;
+  if (n.includes("running text") || cat.includes("visual")) return 300000;
+  if (n.includes("fingerprint") || n.includes("absensi")) return 150000;
+  if (cat.includes("software") || cat.includes("web")) return 0;
+  return 100000;
+}
 
 function readProducts() {
   try {
@@ -102,7 +126,19 @@ function readProducts() {
       return DEFAULT_PRODUCTS;
     }
     const content = fs.readFileSync(DATA_FILE, "utf-8");
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) return DEFAULT_PRODUCTS;
+
+    // Normalisasi field installationFee dan hasInstallationService
+    return parsed.map((p: any) => ({
+      ...p,
+      installationFee: typeof p.installationFee === "number"
+        ? p.installationFee
+        : getCategoryDefaultInstallationFee(p.category, p.name),
+      hasInstallationService: p.hasInstallationService !== undefined
+        ? Boolean(p.hasInstallationService)
+        : (p.category?.toLowerCase().includes("software") ? false : true),
+    }));
   } catch (err) {
     console.error("Error reading products data:", err);
     return DEFAULT_PRODUCTS;
@@ -153,6 +189,12 @@ export async function POST(req: Request) {
     const parsedPrice = typeof price === "number" ? price : parseFloat(price) || 0;
     const parsedStock = typeof stock === "number" ? stock : parseInt(stock, 10) || 0;
     const commRate = typeof commission === "number" ? commission : parseInt(String(commission).replace(/[^0-9]/g, ""), 10) || 10;
+    const parsedInstallationFee = body.installationFee !== undefined
+      ? (typeof body.installationFee === "number" ? body.installationFee : parseFloat(body.installationFee) || 0)
+      : getCategoryDefaultInstallationFee(category, name);
+    const parsedHasInstallation = body.hasInstallationService !== undefined
+      ? Boolean(body.hasInstallationService)
+      : (category?.toLowerCase().includes("software") ? false : true);
 
     const newProduct = {
       id: `dstech_prod_${Date.now()}`,
@@ -161,6 +203,8 @@ export async function POST(req: Request) {
       subCategory: subCategory?.trim() || "",
       entityType: entityType === "NON_PT" ? "NON_PT" : "PT",
       price: parsedPrice,
+      installationFee: parsedInstallationFee,
+      hasInstallationService: parsedHasInstallation,
       stock: parsedStock,
       unit: body.unit?.trim() || "Unit",
       warehouseStock: body.warehouseStock || {
@@ -214,6 +258,12 @@ export async function PUT(req: Request) {
       subCategory: subCategory !== undefined ? subCategory.trim() : (products[index].subCategory || ""),
       entityType: entityType === "NON_PT" || entityType === "PT" ? entityType : (products[index].entityType || "PT"),
       price: parsedPrice,
+      installationFee: body.installationFee !== undefined
+        ? (typeof body.installationFee === "number" ? body.installationFee : parseFloat(body.installationFee) || 0)
+        : (products[index].installationFee ?? getCategoryDefaultInstallationFee(products[index].category, products[index].name)),
+      hasInstallationService: body.hasInstallationService !== undefined
+        ? Boolean(body.hasInstallationService)
+        : (products[index].hasInstallationService ?? true),
       stock: parsedStock,
       unit: unit !== undefined ? unit.trim() : (products[index].unit || "Unit"),
       warehouseStock: warehouseStock !== undefined ? warehouseStock : products[index].warehouseStock,

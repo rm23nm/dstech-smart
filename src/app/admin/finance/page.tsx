@@ -3572,6 +3572,46 @@ export default function AdminFinanceERPPage() {
     }
   };
 
+  // Helper Otomatis Sertakan Jasa Instalasi Teknisi per Unit ke Penawaran SPH (Tugas 203)
+  const handleAutoAttachInstallationServicesToQuotation = () => {
+    const newItems = [...quotationForm.items];
+    let addedCount = 0;
+    quotationForm.items.forEach((it) => {
+      if (!it.productName || it.productName.toLowerCase().includes("jasa pemasangan") || it.productName.toLowerCase().includes("instalasi")) return;
+      const alreadyHasService = newItems.some(
+        (x) => x.productName.toLowerCase().includes("jasa pemasangan") && x.productName.toLowerCase().includes(it.productName.toLowerCase())
+      );
+      if (!alreadyHasService) {
+        const found = products.find(
+          (p) => p.name.trim().toLowerCase() === it.productName.trim().toLowerCase() || String(p.id) === String(it.productId)
+        );
+        if (found && (found as any).hasInstallationService === false) return;
+        const fee = found && typeof (found as any).installationFee === "number" ? (found as any).installationFee : 150000;
+        const qty = Number(it.qty || 1);
+        newItems.push({
+          id: String(Date.now() + Math.floor(Math.random() * 1000)),
+          productId: "",
+          productName: `Jasa Pemasangan & Setup Teknisi - ${it.productName}`,
+          qty: qty,
+          unit: "Titik",
+          price: fee,
+          discount: 0,
+          total: qty * fee,
+          image: "/service-cctv.png",
+          description: `Jasa pemasangan kabel, instalasi mounting, pengujian, dan konfigurasi sistem ${it.productName} oleh teknisi bersertifikat DSTech (${qty} titik/unit).`,
+        });
+        addedCount++;
+      }
+    });
+
+    if (addedCount > 0) {
+      setQuotationForm((prev) => ({ ...prev, items: newItems }));
+      showToast(`✓ Sukses menyertakan ${addedCount} pos jasa instalasi teknisi ke penawaran!`);
+    } else {
+      showToast("Seluruh item perangkat dalam penawaran sudah memiliki pos jasa pemasangan.");
+    }
+  };
+
   // Handler Quotation Form Dynamic Items
   const handleAddQuotationItem = () => {
     setQuotationForm((prev) => ({
@@ -16228,6 +16268,15 @@ export default function AdminFinanceERPPage() {
                     >
                       <Package className="w-3.5 h-3.5" />
                       <span>📦 Pilih dari List / Katalog Produk</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAutoAttachInstallationServicesToQuotation}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-sm transition-all cursor-pointer hover:scale-105 active:scale-95"
+                      title="Otomatis hubungkan dan sertakan jasa pemasangan & setup teknisi per unit untuk seluruh perangkat yang ditawarkan"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>🛠️ Paket Plus Instalasi (+Jasa Otomatis)</span>
                     </button>
                     <button
                       type="button"
