@@ -674,6 +674,55 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Tipe dokumen tidak dikenali" }, { status: 400 });
     }
 
+    if (actionType === "client_approve_sph" || actionType === "client_approve_quotation") {
+      const {
+        id,
+        quotationId,
+        quotationNumber,
+        clientSignerName,
+        clientSignerTitle,
+        clientSignatureImage,
+        clientInitialImage,
+        clientApprovalNote,
+      } = payload;
+
+      const qId = id || quotationId || quotationNumber;
+      const quotations = data.quotations || [];
+      const index = quotations.findIndex((q: any) => q.id === qId || q.quotationNumber === qId);
+
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Surat Penawaran tidak ditemukan" }, { status: 404 });
+      }
+
+      const now = new Date();
+      const approvedAt = `${now.toISOString().split("T")[0]} ${now.toTimeString().slice(0, 5)} WIB`;
+      quotations[index].clientApproved = true;
+      quotations[index].clientApprovedAt = approvedAt;
+      quotations[index].clientSignerName = clientSignerName || quotations[index].customerName || "Klien";
+      quotations[index].clientSignerTitle = clientSignerTitle || "PIC / Purchasing / Manajer Terkait";
+      if (clientSignatureImage) {
+        quotations[index].clientSignatureImage = clientSignatureImage;
+      }
+      if (clientInitialImage) {
+        quotations[index].clientInitialImage = clientInitialImage;
+      }
+      if (clientApprovalNote) {
+        quotations[index].clientApprovalNote = clientApprovalNote;
+      }
+
+      // Tandai status penawaran menjadi Deal
+      quotations[index].status = "Deal";
+      quotations[index].dealStatus = "Deal";
+      quotations[index].dealDate = now.toISOString().split("T")[0];
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Surat Penawaran ${quotations[index].quotationNumber} telah berhasil disetujui & ditandatangani secara sah oleh ${quotations[index].clientSignerName}!`,
+        data: quotations[index],
+      });
+    }
+
     if (actionType === "record_payment") {
       const { invoiceId, paymentAmount, paymentMethod, paymentDate, notes, terminId } = payload;
       const sales = data.sales || [];

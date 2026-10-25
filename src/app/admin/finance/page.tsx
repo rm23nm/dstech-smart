@@ -10673,6 +10673,27 @@ export default function AdminFinanceERPPage() {
                       </div>
                     )}
 
+                    {/* Input Pemilih Tanggal Rentang Kustom Laba Rugi */}
+                    {pnlReportMode === "GLOBAL" && pnlDateFilter === "CUSTOM" && (
+                      <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1 text-xs">
+                        <input
+                          type="date"
+                          value={pnlStartDate}
+                          onChange={(e) => setPnlStartDate(e.target.value)}
+                          className="bg-white border border-emerald-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                          title="Tanggal Mulai"
+                        />
+                        <span className="text-emerald-600 font-black">s/d</span>
+                        <input
+                          type="date"
+                          value={pnlEndDate}
+                          onChange={(e) => setPnlEndDate(e.target.value)}
+                          className="bg-white border border-emerald-200 rounded-lg px-2 py-0.5 text-[11px] font-bold text-slate-800 focus:outline-none"
+                          title="Tanggal Selesai"
+                        />
+                      </div>
+                    )}
+
                     {/* Tombol Unduh PDF */}
                     <button
                       type="button"
@@ -15491,6 +15512,13 @@ export default function AdminFinanceERPPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Legal Disclaimer UU ITE */}
+                  <div className="col-span-2 pt-2 text-center border-t border-slate-100">
+                    <p className="text-[8px] text-slate-500 leading-tight italic">
+                      Dokumen ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT. DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Tahun 2008 Pasal 11 &amp; PP No. 71 Tahun 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+                    </p>
+                  </div>
                 </div>
               </div>
             );
@@ -17435,16 +17463,36 @@ export default function AdminFinanceERPPage() {
                       </p>
                     </div>
 
-                    <div className="h-11 flex items-center justify-center text-slate-300 text-[9px] italic">
-                      (Tanda Tangan, Nama Jelas & Stempel Klien)
+                    <div className="h-11 relative flex items-center justify-center">
+                      {(selectedQuotationForPrint as any).clientSignatureImage ? (
+                        <>
+                          <img
+                            src={(selectedQuotationForPrint as any).clientSignatureImage}
+                            alt="Tanda Tangan Klien"
+                            className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
+                          />
+                          <div className="absolute right-1 top-0 px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[6.5px] font-bold border border-emerald-300 print:hidden">
+                            DIGITAL APPROVAL
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-slate-300 text-[9px] italic">
+                          (Tanda Tangan, Nama Jelas & Stempel Klien)
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
-                        {selectedQuotationForPrint.customerName ? `( ${selectedQuotationForPrint.customerName} )` : "( ................................................................ )"}
+                        {(selectedQuotationForPrint as any).clientSignerName ? `( ${(selectedQuotationForPrint as any).clientSignerName} )` : selectedQuotationForPrint.customerName ? `( ${selectedQuotationForPrint.customerName} )` : "( ................................................................ )"}
                       </p>
                       <p className="text-[9px] text-slate-500">
-                        PIC / Purchasing / Manajer Terkait
+                        {(selectedQuotationForPrint as any).clientSignerTitle || "PIC / Purchasing / Manajer Terkait"}
+                        {(selectedQuotationForPrint as any).clientApprovedAt && (
+                          <span className="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">
+                            Disetujui: {(selectedQuotationForPrint as any).clientApprovedAt}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -17516,6 +17564,13 @@ export default function AdminFinanceERPPage() {
                         </p>
                       )}
                     </div>
+                  </div>
+
+                  {/* Legal Disclaimer UU ITE */}
+                  <div className="col-span-2 pt-2 text-center border-t border-slate-100">
+                    <p className="text-[8px] text-slate-500 leading-tight italic">
+                      Dokumen ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT. DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Tahun 2008 Pasal 11 &amp; PP No. 71 Tahun 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -17734,8 +17789,16 @@ export default function AdminFinanceERPPage() {
                           <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200 text-xs">
                             <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
                               <p className="text-[9.5px] font-bold text-slate-500 uppercase">Paraf Pemesan / Klien</p>
-                              <div className="h-8 flex items-center justify-center text-slate-300 text-[9px] italic">
-                                ( .................................................. )
+                              <div className="h-8 flex items-center justify-center">
+                                {(selectedQuotationForPrint as any).clientInitialImage ? (
+                                  <img
+                                    src={(selectedQuotationForPrint as any).clientInitialImage}
+                                    alt="Paraf Klien"
+                                    className="max-h-8 max-w-[80px] object-contain mx-auto"
+                                  />
+                                ) : (
+                                  <span className="text-slate-300 text-[9px] italic">( .................................................. )</span>
+                                )}
                               </div>
                             </div>
                             <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
@@ -24106,6 +24169,13 @@ export default function AdminFinanceERPPage() {
                       </p>
                     </div>
                   </div>
+
+                  {/* Legal Disclaimer UU ITE */}
+                  <div className="col-span-2 pt-2 text-center border-t border-slate-100">
+                    <p className="text-[8px] text-slate-500 leading-tight italic">
+                      Dokumen ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT. DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Tahun 2008 Pasal 11 &amp; PP No. 71 Tahun 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -29543,6 +29613,9 @@ export default function AdminFinanceERPPage() {
                             </p>
                             <p className="text-[8px] font-mono text-slate-400 mt-0.5">
                               [VERIFIKASI SISTEM: DST-REC-{receiptNumber.slice(-6)}]
+                            </p>
+                            <p className="text-[7.5px] text-slate-400 italic mt-1 leading-tight">
+                              Dokumen ini sah &amp; mengikat secara elektronik sesuai UU ITE No. 11/2008 Pasal 11 &amp; PP No. 71/2019 tanpa memerlukan stempel basah.
                             </p>
                           </div>
                         </div>

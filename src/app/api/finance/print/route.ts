@@ -314,6 +314,20 @@ export async function GET(req: Request) {
             <!-- Kop Surat Resmi Terkunci Permanen untuk Klien -->
             <input type="hidden" id="toggle-letterhead" value="1" checked />
 
+            ${sph.clientSignatureImage ? `
+              <div class="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-black flex items-center gap-1.5 shadow-2xs">
+                <span>✓ SPH Telah Disetujui Klien (${sph.clientSignerName || sph.customerName})</span>
+              </div>
+            ` : `
+              <button
+                type="button"
+                onclick="openClientSignModal()"
+                class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md transition cursor-pointer animate-pulse"
+              >
+                <span>✍️ Setujui &amp; Tanda Tangani Penawaran</span>
+              </button>
+            `}
+
             <button
               type="button"
               onclick="downloadAsPdf()"
@@ -524,16 +538,24 @@ export async function GET(req: Request) {
                   </p>
                 </div>
 
-                <div class="h-8 flex items-center justify-center text-slate-300 text-[8.5px] italic">
-                  (Tanda Tangan, Nama Jelas &amp; Stempel Klien)
+                <div class="h-8 flex items-center justify-center text-slate-300 text-[8.5px] italic relative">
+                  ${sph.clientSignatureImage ? `
+                    <img src="${sph.clientSignatureImage}" alt="Tanda Tangan Klien" class="max-h-8 max-w-[120px] object-contain relative z-10" />
+                    <span class="absolute bottom-0 text-[6.5px] text-emerald-700 font-bold bg-emerald-50 px-1 rounded border border-emerald-300">✓ Disetujui Digital</span>
+                  ` : `
+                    <button type="button" onclick="openClientSignModal()" class="print-hidden px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[9px] font-black shadow-2xs transition-all cursor-pointer flex items-center gap-1">
+                      <span>✍️ Tanda Tangani Online</span>
+                    </button>
+                    <span class="hidden print:inline text-slate-300 text-[8.5px] italic">(Tanda Tangan, Nama Jelas &amp; Stempel Klien)</span>
+                  `}
                 </div>
 
                 <div class="pt-1 border-t border-slate-300">
                   <p class="font-bold text-slate-900 text-[11px]">
-                    ${sph.customerName ? `( ${sph.customerName} )` : "( ................................................................ )"}
+                    ${sph.clientSignerName ? `( ${sph.clientSignerName} )` : sph.customerName ? `( ${sph.customerName} )` : "( ................................................................ )"}
                   </p>
                   <p class="text-[8.5px] text-slate-500">
-                    PIC / Purchasing / Manajer Terkait
+                    ${sph.clientSignerTitle || "PIC / Purchasing / Manajer Terkait"}
                   </p>
                 </div>
               </div>
@@ -569,6 +591,13 @@ export async function GET(req: Request) {
                   <p class="text-[8.5px] text-slate-500">${signerTitle}</p>
                 </div>
               </div>
+            </div>
+
+            <!-- Klausul Legalitas Keabsahan Tanda Tangan Digital Resmi -->
+            <div class="mt-2 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
+              <p class="text-[7.5px] text-slate-500 leading-tight">
+                <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Dokumen ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+              </p>
             </div>
           </div>
         </div>
@@ -691,7 +720,11 @@ export async function GET(req: Request) {
                     Paraf Pemesan / Klien (${sph.customerName || "Klien"})
                   </p>
                   <div class="h-7 flex items-center justify-center text-slate-300 text-[9px] italic">
-                    ( .................................................. )
+                    ${sph.clientInitialImage ? `
+                      <img src="${sph.clientInitialImage}" alt="Paraf Klien" class="max-h-6 max-w-[60px] object-contain inline-block" />
+                    ` : `
+                      ( .................................................. )
+                    `}
                   </div>
                 </div>
                 <div class="text-center p-1.5 rounded-lg bg-slate-50/80 border border-slate-200">
@@ -712,7 +745,11 @@ export async function GET(req: Request) {
                       Paraf Pemesan / Klien (${sph.customerName || "Klien"})
                     </p>
                     <div class="h-7 flex items-center justify-center text-slate-300 text-[9px] italic">
-                      ( .................................................. )
+                      ${sph.clientInitialImage ? `
+                        <img src="${sph.clientInitialImage}" alt="Paraf Klien" class="max-h-6 max-w-[60px] object-contain inline-block" />
+                      ` : `
+                        ( .................................................. )
+                      `}
                     </div>
                   </div>
                   <div class="text-center p-1.5 rounded-lg bg-slate-50/80 border border-slate-200">
@@ -742,7 +779,235 @@ export async function GET(req: Request) {
           </div> <!-- End sph-full-document -->
         </div> <!-- End scroll container mobile -->
 
+        <!-- Modal Persetujuan & Tanda Tangan Online Klien -->
+        <div id="client-approval-modal" class="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs hidden print-hidden">
+          <div class="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div>
+                <h3 class="font-black text-sm sm:text-base text-slate-900 flex items-center gap-1.5">
+                  <span>✍️ Persetujuan Penawaran SPH</span>
+                </h3>
+                <p class="text-[11px] text-slate-500 font-mono">${sph.quotationNumber}</p>
+              </div>
+              <button type="button" onclick="closeClientSignModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-black cursor-pointer">✕</button>
+            </div>
+
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Silakan lengkapi identitas dan bubuhkan tanda tangan serta paraf digital Anda di bawah ini sebagai bukti persetujuan resmi atas Surat Penawaran Harga ini.
+            </p>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nama Lengkap Penandatangan *</label>
+                <input type="text" id="input-client-signer-name" value="${sph.customerName || ''}" placeholder="Nama lengkap Anda..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 font-bold text-slate-900 bg-slate-50" />
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Jabatan *</label>
+                <input type="text" id="input-client-signer-title" value="PIC / Purchasing / Manajer Terkait" placeholder="Contoh: Purchasing Manager / Direktur..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-slate-900 bg-slate-50" />
+              </div>
+
+              <!-- Canvas 1: Tanda Tangan Utama (Halaman 1) -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-[11px] font-black text-slate-800 uppercase">1. Tanda Tangan Utama (Halaman 1) *</label>
+                  <button type="button" onclick="clearSignCanvas()" class="text-[10px] font-bold text-rose-600 hover:text-rose-800 underline cursor-pointer">Hapus Goresan</button>
+                </div>
+                <div class="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 p-1 flex justify-center">
+                  <canvas id="canvas-client-sign" width="420" height="150" class="w-full max-w-[420px] h-[150px] bg-white rounded-lg cursor-crosshair touch-none shadow-2xs"></canvas>
+                </div>
+                <span class="text-[9.5px] text-slate-400 italic block mt-0.5">*Goreskan tanda tangan menggunakan sentuhan jari layar HP atau mouse</span>
+              </div>
+
+              <!-- Canvas 2: Paraf Dokumen (Halaman 2 dst.) -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-[11px] font-black text-slate-800 uppercase">2. Paraf Dokumen Lampiran (Halaman 2 dst.)</label>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="copySignToInitial()" class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer">Gunakan Tanda Tangan</button>
+                    <button type="button" onclick="clearInitialCanvas()" class="text-[10px] font-bold text-rose-600 hover:text-rose-800 underline cursor-pointer">Hapus Paraf</button>
+                  </div>
+                </div>
+                <div class="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 p-1 flex justify-center">
+                  <canvas id="canvas-client-initial" width="300" height="100" class="w-full max-w-[300px] h-[100px] bg-white rounded-lg cursor-crosshair touch-none shadow-2xs"></canvas>
+                </div>
+                <span class="text-[9.5px] text-slate-400 italic block mt-0.5">*Goreskan paraf singkat untuk setiap lembar lampiran rincian penawaran</span>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Catatan Persetujuan (Opsional)</label>
+                <textarea id="input-client-approval-note" rows="2" placeholder="Catatan tambahan persetujuan..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 text-slate-900 bg-slate-50"></textarea>
+              </div>
+
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[10px] text-slate-600 leading-tight">
+                ⚖️ <strong>Keabsahan Hukum:</strong> Dengan menandatangani secara digital, Anda menyetujui seluruh klausul penawaran ini secara sah dan mengikat sesuai UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019.
+              </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+              <button type="button" onclick="closeClientSignModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer">Batal</button>
+              <button type="button" id="btn-submit-approval" onclick="submitClientApproval()" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                <span>✓ Setujui &amp; Sahkan Penawaran</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <script>
+          let isDrawingSign = false;
+          let isDrawingInit = false;
+          let signHasContent = false;
+          let initHasContent = false;
+
+          function getCanvasCoords(canvas, e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+              x: (clientX - rect.left) * (canvas.width / rect.width),
+              y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+          }
+
+          function initCanvasEvents(canvasId, isInit) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = isInit ? 2.5 : 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            function startDraw(e) {
+              e.preventDefault();
+              if (isInit) isDrawingInit = true; else isDrawingSign = true;
+              const pos = getCanvasCoords(canvas, e);
+              ctx.beginPath();
+              ctx.moveTo(pos.x, pos.y);
+            }
+
+            function draw(e) {
+              const active = isInit ? isDrawingInit : isDrawingSign;
+              if (!active) return;
+              e.preventDefault();
+              const pos = getCanvasCoords(canvas, e);
+              ctx.lineTo(pos.x, pos.y);
+              ctx.stroke();
+              if (isInit) initHasContent = true; else signHasContent = true;
+            }
+
+            function stopDraw(e) {
+              if (isInit) isDrawingInit = false; else isDrawingSign = false;
+            }
+
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', draw);
+            window.addEventListener('mouseup', stopDraw);
+
+            canvas.addEventListener('touchstart', startDraw, { passive: false });
+            canvas.addEventListener('touchmove', draw, { passive: false });
+            window.addEventListener('touchend', stopDraw);
+          }
+
+          function openClientSignModal() {
+            const modal = document.getElementById('client-approval-modal');
+            if (modal) {
+              modal.classList.remove('hidden');
+              setTimeout(function() {
+                initCanvasEvents('canvas-client-sign', false);
+                initCanvasEvents('canvas-client-initial', true);
+              }, 100);
+            }
+          }
+
+          function closeClientSignModal() {
+            const modal = document.getElementById('client-approval-modal');
+            if (modal) modal.classList.add('hidden');
+          }
+
+          function clearSignCanvas() {
+            const canvas = document.getElementById('canvas-client-sign');
+            if (canvas) {
+              const ctx = canvas.getContext('2d');
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              signHasContent = false;
+            }
+          }
+
+          function clearInitialCanvas() {
+            const canvas = document.getElementById('canvas-client-initial');
+            if (canvas) {
+              const ctx = canvas.getContext('2d');
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              initHasContent = false;
+            }
+          }
+
+          function copySignToInitial() {
+            const src = document.getElementById('canvas-client-sign');
+            const dst = document.getElementById('canvas-client-initial');
+            if (src && dst && signHasContent) {
+              const dstCtx = dst.getContext('2d');
+              dstCtx.clearRect(0, 0, dst.width, dst.height);
+              dstCtx.drawImage(src, 0, 0, dst.width, dst.height);
+              initHasContent = true;
+            }
+          }
+
+          function submitClientApproval() {
+            const name = (document.getElementById('input-client-signer-name').value || '').trim();
+            const title = (document.getElementById('input-client-signer-title').value || '').trim();
+            const note = (document.getElementById('input-client-approval-note').value || '').trim();
+            const signCanvas = document.getElementById('canvas-client-sign');
+            const initCanvas = document.getElementById('canvas-client-initial');
+
+            if (!name) {
+              alert('Silakan isi Nama Lengkap Penandatangan!');
+              return;
+            }
+            if (!signHasContent) {
+              alert('Silakan bubuhkan goresan tanda tangan Anda pada kotak tanda tangan!');
+              return;
+            }
+
+            const signData = signCanvas.toDataURL('image/png');
+            const initData = initHasContent ? initCanvas.toDataURL('image/png') : signData;
+
+            const btn = document.getElementById('btn-submit-approval');
+            if (btn) {
+              btn.disabled = true;
+              btn.innerText = 'Menyimpan Pengesahan...';
+            }
+
+            fetch('/api/finance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                actionType: 'client_approve_sph',
+                id: '${sph.id || sph.quotationNumber}',
+                quotationNumber: '${sph.quotationNumber}',
+                clientSignerName: name,
+                clientSignerTitle: title || 'PIC / Purchasing / Manajer Terkait',
+                clientSignatureImage: signData,
+                clientInitialImage: initData,
+                clientApprovalNote: note
+              })
+            }).then(function(res) {
+              return res.json();
+            }).then(function(data) {
+              if (data.success) {
+                alert('🎉 Terima kasih! Surat Penawaran Harga #' + '${sph.quotationNumber}' + ' berhasil disetujui dan ditandatangani secara sah.');
+                window.location.reload();
+              } else {
+                alert('Gagal menyimpan persetujuan: ' + (data.error || 'Terjadi kesalahan sistem'));
+                if (btn) { btn.disabled = false; btn.innerText = '✓ Setujui & Sahkan Penawaran'; }
+              }
+            }).catch(function(err) {
+              alert('Terjadi kesalahan: ' + err.message);
+              if (btn) { btn.disabled = false; btn.innerText = '✓ Setujui & Sahkan Penawaran'; }
+            });
+          }
+
           function toggleLetterhead(enabled) {
             document.querySelectorAll('.letterhead-bg').forEach(function(el) {
               el.style.display = enabled ? 'block' : 'none';
@@ -1117,6 +1382,12 @@ export async function GET(req: Request) {
               </div>
             </div>
 
+            <!-- Klausul Legalitas Keabsahan Tanda Tangan Digital Resmi -->
+            <div class="mt-2 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
+              <p class="text-[7.5px] text-slate-500 leading-tight">
+                <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Dokumen Purchase Order ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+              </p>
+            </div>
           </div> <!-- End po-content-wrapper -->
         </div> <!-- End po-print-sheet -->
 
@@ -1422,6 +1693,11 @@ export async function GET(req: Request) {
                   <p class="text-[7.5px] text-slate-500 font-bold leading-none mt-0.5">${signerTitle}</p>
                 </div>
               </div>
+
+              <!-- Klausul Legalitas Kuitansi -->
+              <p class="text-[6.5px] text-slate-400 italic text-center pt-1 border-t border-slate-200/60 leading-none">
+                *Kuitansi digital ini diterbitkan secara elektronik dan sah mengikat secara hukum sesuai UU ITE No. 11/2008 Pasal 11 tanpa memerlukan stempel basah.
+              </p>
             </div>
           </div>
 
@@ -1518,6 +1794,13 @@ export async function GET(req: Request) {
             <p class="text-[10px] text-slate-500">${signerTitle}</p>
           </div>
         </div>
+
+        <!-- Klausul Legalitas BAST -->
+        <div class="mt-3 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
+          <p class="text-[7.5px] text-slate-500 leading-tight">
+            <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Berita Acara ini diterbitkan secara elektronik dan ditandatangani secara digital. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+          </p>
+        </div>
       </div>
     `;
   } else if (docType === "delivery") {
@@ -1595,6 +1878,13 @@ export async function GET(req: Request) {
             <p class="font-bold text-slate-900 text-[11px] mt-1.5 underline">( ............................ )</p>
             <p class="text-[9px] text-slate-400">${sale.customerName}</p>
           </div>
+        </div>
+
+        <!-- Klausul Legalitas Surat Jalan -->
+        <div class="mt-3 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
+          <p class="text-[7.5px] text-slate-500 leading-tight">
+            <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Surat Jalan pengiriman ini diterbitkan secara elektronik dan ditandatangani secara digital. Sesuai UU ITE No. 11 Thn 2008 Pasal 11, tanda tangan digital ini sah dan mengikat secara hukum tanpa memerlukan stempel basah.
+          </p>
         </div>
       </div>
     `;
@@ -1797,6 +2087,13 @@ export async function GET(req: Request) {
           <p class="font-black text-slate-900 text-xs mt-1 underline">( ${signerName} )</p>
           <p class="text-[10px] text-slate-500">${signerTitle}</p>
         </div>
+      </div>
+
+      <!-- Klausul Legalitas Keabsahan Tanda Tangan Digital Resmi Faktur -->
+      <div class="mt-3 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
+        <p class="text-[7.5px] text-slate-500 leading-tight">
+          <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Dokumen Faktur ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+        </p>
       </div>
     `;
   }
