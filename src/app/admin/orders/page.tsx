@@ -29,7 +29,8 @@ import {
   ArrowRight,
   Sparkles,
   CreditCard,
-  UserCheck
+  UserCheck,
+  RotateCcw
 } from "lucide-react";
 
 interface OrderItem {
@@ -79,7 +80,7 @@ interface Order {
   notes?: string;
   subtotal: number;
   grandTotal: number;
-  status: "PAYMENT_PENDING" | "PAID" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+  status: "PAYMENT_PENDING" | "PAID" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "RETURN";
   trackingTimeline: TimelineItem[];
   createdAt: string;
   updatedAt: string;
@@ -96,7 +97,7 @@ export default function AdminOrdersPage() {
   const [proofImageSrc, setProofImageSrc] = useState<string | null>(null);
 
   // Form Proses Pesanan
-  const [actionType, setActionType] = useState<"confirm_payment" | "process_packing" | "ship_order" | "deliver_order" | "cancel_order">("confirm_payment");
+  const [actionType, setActionType] = useState<"confirm_payment" | "process_packing" | "ship_order" | "deliver_order" | "cancel_order" | "return_order">("confirm_payment");
   const [shipCourier, setShipCourier] = useState<string>("Armada Teknisi DSTech (Cilegon, Serang & Banten)");
   const [trackingNumber, setTrackingNumber] = useState<string>("");
   const [courierPhone, setCourierPhone] = useState<string>("");
@@ -153,23 +154,25 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // Metrik KPI
+  // Metrik KPI 7 Kategori
   const totalOrdersCount = orders.length;
   const pendingPaymentCount = orders.filter((o) => o.status === "PAYMENT_PENDING").length;
-  const paidProcessingCount = orders.filter((o) => o.status === "PAID" || o.status === "PROCESSING").length;
+  const packingCount = orders.filter((o) => o.status === "PAID" || o.status === "PROCESSING").length;
   const shippedCount = orders.filter((o) => o.status === "SHIPPED").length;
   const deliveredCount = orders.filter((o) => o.status === "DELIVERED").length;
+  const cancelledCount = orders.filter((o) => o.status === "CANCELLED").length;
+  const returnCount = orders.filter((o) => o.status === "RETURN").length;
   const totalOmsetSelesai = orders
     .filter((o) => o.status === "PAID" || o.status === "PROCESSING" || o.status === "SHIPPED" || o.status === "DELIVERED")
     .reduce((acc, curr) => acc + (curr.grandTotal || 0), 0);
 
   // Filter & Search
   const filteredOrders = orders.filter((order) => {
-    // Status Filter
-    if (statusFilter !== "ALL" && order.status !== statusFilter) {
-      if (statusFilter === "NEED_ACTION") {
-        if (order.status !== "PAID" && order.status !== "PROCESSING") return false;
-      } else {
+    // Status Filter 7 Kategori
+    if (statusFilter !== "ALL") {
+      if (statusFilter === "PROCESSING") {
+        if (order.status !== "PROCESSING" && order.status !== "PAID") return false;
+      } else if (order.status !== statusFilter) {
         return false;
       }
     }
@@ -195,7 +198,7 @@ export default function AdminOrdersPage() {
       case "PAYMENT_PENDING":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-50 text-amber-700 border border-amber-200">
-            <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin" /> Menunggu Pembayaran
+            <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin" /> Belum Bayar
           </span>
         );
       case "PAID":
@@ -207,25 +210,31 @@ export default function AdminOrdersPage() {
       case "PROCESSING":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-indigo-50 text-indigo-700 border border-indigo-200">
-            <RefreshCw className="w-3.5 h-3.5 text-indigo-600 animate-spin" /> Sedang Dikemas (Gudang)
+            <RefreshCw className="w-3.5 h-3.5 text-indigo-600 animate-spin" /> Sedang Dikemas
           </span>
         );
       case "SHIPPED":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-purple-50 text-purple-700 border border-purple-200">
-            <Truck className="w-3.5 h-3.5 text-purple-600" /> Sedang Dikirim
+            <Truck className="w-3.5 h-3.5 text-purple-600" /> Dikirim
           </span>
         );
       case "DELIVERED":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <PackageCheck className="w-3.5 h-3.5 text-emerald-600" /> Pesanan Selesai
+            <PackageCheck className="w-3.5 h-3.5 text-emerald-600" /> Selesai
           </span>
         );
       case "CANCELLED":
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-50 text-rose-700 border border-rose-200">
             <XCircle className="w-3.5 h-3.5 text-rose-600" /> Dibatalkan
+          </span>
+        );
+      case "RETURN":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-50 text-amber-800 border border-amber-300">
+            <RotateCcw className="w-3.5 h-3.5 text-amber-600" /> Pengembalian / Retur
           </span>
         );
       default:
@@ -400,7 +409,7 @@ export default function AdminOrdersPage() {
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl font-black text-blue-700">{paidProcessingCount}</span>
+            <span className="text-2xl font-black text-blue-700">{packingCount}</span>
             <span className="text-xs text-blue-600/80 block mt-0.5">Lunas &amp; perlu dikemas</span>
           </div>
         </div>
@@ -439,11 +448,13 @@ export default function AdminOrdersPage() {
         {/* Quick Filter Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
           {[
-            { id: "ALL", label: "Semua Pesanan", count: totalOrdersCount },
-            { id: "NEED_ACTION", label: "Perlu Diproses", count: paidProcessingCount, highlight: true },
-            { id: "PAYMENT_PENDING", label: "Menunggu Bayar", count: pendingPaymentCount },
-            { id: "SHIPPED", label: "Sedang Dikirim", count: shippedCount },
+            { id: "ALL", label: "All", count: totalOrdersCount },
+            { id: "PAYMENT_PENDING", label: "Belum Bayar", count: pendingPaymentCount },
+            { id: "PROCESSING", label: "Sedang Dikemas", count: packingCount, highlight: packingCount > 0 },
+            { id: "SHIPPED", label: "Dikirim", count: shippedCount },
             { id: "DELIVERED", label: "Selesai", count: deliveredCount },
+            { id: "CANCELLED", label: "Dibatalkan", count: cancelledCount },
+            { id: "RETURN", label: "Pengembalian", count: returnCount, highlight: returnCount > 0 },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -817,6 +828,52 @@ export default function AdminOrdersPage() {
                       <span className="font-black text-xs block">4. Tandai Selesai / Sampai</span>
                       <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
                         Barang diterima pelanggan, garansi 1 tahun aktif.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                      actionType === "return_order"
+                        ? "border-amber-500 bg-amber-50/50 text-amber-900 shadow-sm"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="actionType"
+                      value="return_order"
+                      checked={actionType === "return_order"}
+                      onChange={() => setActionType("return_order")}
+                      className="mt-1 text-amber-600 focus:ring-amber-500"
+                    />
+                    <div>
+                      <span className="font-black text-xs block">5. Proses Pengembalian / Retur</span>
+                      <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
+                        Pengembalian barang atau refund garansi disetujui.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                      actionType === "cancel_order"
+                        ? "border-rose-500 bg-rose-50/50 text-rose-900 shadow-sm"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="actionType"
+                      value="cancel_order"
+                      checked={actionType === "cancel_order"}
+                      onChange={() => setActionType("cancel_order")}
+                      className="mt-1 text-rose-600 focus:ring-rose-500"
+                    />
+                    <div>
+                      <span className="font-black text-xs block">6. Batalkan Pesanan</span>
+                      <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
+                        Batalkan transaksi pesanan secara permanen.
                       </span>
                     </div>
                   </label>

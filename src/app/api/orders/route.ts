@@ -54,6 +54,14 @@ export async function GET(req: Request) {
       orders = orders.filter((o) => o.userId === userId);
     } else if (email) {
       orders = orders.filter((o) => o.customerEmail?.toLowerCase() === email.toLowerCase());
+    } else {
+      const orderNumbers = searchParams.get("orderNumbers");
+      if (orderNumbers) {
+        const list = orderNumbers.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+        orders = orders.filter(
+          (o) => list.includes(o.orderNumber?.toLowerCase()) || list.includes(o.id?.toLowerCase())
+        );
+      }
     }
 
     // Urutkan dari yang paling baru
@@ -251,6 +259,14 @@ export async function PATCH(req: Request) {
         status: "CANCELLED",
         title: "Pesanan Dibatalkan",
         description: note || "Pesanan telah dibatalkan.",
+        timestamp: nowIso,
+      });
+    } else if (action === "return_order" || action === "refund_order") {
+      targetOrder.status = "RETURN";
+      targetOrder.trackingTimeline.push({
+        status: "RETURN",
+        title: "Pengajuan Pengembalian / Retur Barang",
+        description: note || "Pengajuan pengembalian barang & dana telah diajukan dan sedang diproses tim QC & Keuangan DSTech Smart.",
         timestamp: nowIso,
       });
     } else if (status) {

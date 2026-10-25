@@ -40,6 +40,11 @@ import {
   Trash2,
   Receipt,
   Navigation,
+  RotateCcw,
+  PackageCheck,
+  PackageX,
+  ArrowLeft,
+  Send,
 } from "lucide-react";
 
 interface Product {
@@ -215,7 +220,7 @@ export default function ShopPage() {
   });
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
-  // Pelacakan Pesanan (Order Tracking)
+  // Pelacakan & Histori Pesanan (7 Kategori Tab Status)
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
   const [trackingQuery, setTrackingQuery] = useState("");
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
@@ -224,6 +229,19 @@ export default function ShopPage() {
   const [userOrders, setUserOrders] = useState<any[]>([]);
   const [uploadProofLoading, setUploadProofLoading] = useState(false);
   const [proofFileBase64, setProofFileBase64] = useState<string | null>(null);
+
+  // 7 Tab Status Histori Pesanan: All, Belum Bayar, Sedang Dikemas, Dikirim, Selesai, Dibatalkan, Pengembalian
+  const [orderStatusTab, setOrderStatusTab] = useState<
+    "ALL" | "PAYMENT_PENDING" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "RETURN"
+  >("ALL");
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+
+  // Modal Pengajuan Pengembalian (Retur / Komplain Garansi)
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returnTargetOrder, setReturnTargetOrder] = useState<any | null>(null);
+  const [returnReason, setReturnReason] = useState("Barang Rusak / Cacat Fisik");
+  const [returnNotes, setReturnNotes] = useState("");
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -280,6 +298,7 @@ export default function ShopPage() {
     fetchProducts();
     fetchPromotions();
     fetchSiteSettings();
+    fetchUserOrders();
   }, []);
 
   const fetchSiteSettings = async () => {
@@ -329,10 +348,26 @@ export default function ShopPage() {
     }
   };
 
-  const fetchUserOrders = async (user: AuthUser) => {
+  const fetchUserOrders = async (user?: AuthUser | null) => {
     try {
-      const queryParam = user.id ? `userId=${encodeURIComponent(user.id)}` : `email=${encodeURIComponent(user.email)}`;
-      const res = await fetch(`/api/orders?${queryParam}&t=${Date.now()}`);
+      const u = user || currentUser;
+      let localNumbers: string[] = [];
+      try {
+        localNumbers = JSON.parse(localStorage.getItem("dstech_my_order_numbers") || "[]");
+      } catch (e) {
+        localNumbers = [];
+      }
+
+      let url = `/api/orders?t=${Date.now()}`;
+      if (u?.id) {
+        url = `/api/orders?userId=${encodeURIComponent(u.id)}&t=${Date.now()}`;
+      } else if (u?.email) {
+        url = `/api/orders?email=${encodeURIComponent(u.email)}&t=${Date.now()}`;
+      } else if (localNumbers.length > 0) {
+        url = `/api/orders?orderNumbers=${encodeURIComponent(localNumbers.join(","))}&t=${Date.now()}`;
+      }
+
+      const res = await fetch(url);
       const data = await res.json();
       if (data && data.success && Array.isArray(data.data)) {
         setUserOrders(data.data);
@@ -539,6 +574,17 @@ export default function ShopPage() {
         setIsCartOpen(false);
         setIsCheckoutStep(false);
 
+        // Simpan nomor pesanan ke histori lokal peramban (Guest / User)
+        try {
+          const prev = JSON.parse(localStorage.getItem("dstech_my_order_numbers") || "[]");
+          if (!prev.includes(data.data.orderNumber)) {
+            prev.unshift(data.data.orderNumber);
+            localStorage.setItem("dstech_my_order_numbers", JSON.stringify(prev));
+          }
+        } catch (e) {
+          console.error(e);
+        }
+
         // Buka modal pelacakan untuk pesanan yang baru dibuat
         setTrackedOrder(data.data);
         setIsTrackingModalOpen(true);
@@ -657,6 +703,80 @@ export default function ShopPage() {
     const matchWishlist = showOnlyWishlist ? wishlist.includes(prod.id) : true;
     return matchCategory && matchSearch && matchWishlist;
   });
+
+  // Handler Membuka Modal Pengajuan Retur
+  const handleOpenReturnModal = (order: any) => {
+    setReturnTargetOrder(order);
+    setReturnReason("Barang Rusak / Cacat Fisik");
+    setReturnNotes("");
+    setIsReturnModalOpen(true);
+  };
+
+  // Handler Submit Pengajuan Pengembalian / Retur
+  const handleSubmitReturn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!returnTargetOrder) return;
+    setIsSubmittingReturn(true);
+
+    try {
+      const res = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: returnTargetOrder.id,
+          action: "return_order",
+          note: `Pengajuan Pengembalian / Retur oleh Pelanggan: [${returnReason}]. Rincian kendala: ${returnNotes.trim() || "-"}`,
+        }),
+      });
+
+      const data = await res.json();
+      if (data && data.success && data.data) {
+        if (trackedOrder && trackedOrder.id === returnTargetOrder.id) {
+          setTrackedOrder(data.data);
+        }
+        setIsReturnModalOpen(false);
+        showToast("✓ Permintaan pengembalian telah diajukan ke Tim QC & Layanan DSTech.");
+        fetchUserOrders(currentUser);
+      } else {
+        alert("Gagal mengajukan pengembalian: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Error pengajuan retur: " + err.message);
+    } finally {
+      setIsSubmittingReturn(false);
+    }
+  };
+
+  // Handler Beli Lagi (Reorder)
+  const handleBuyAgain = (order: any) => {
+    if (!order || !Array.isArray(order.items)) return;
+    const newItems: CartItem[] = order.items.map((it: any) => ({
+      product: {
+        id: it.productId,
+        name: it.productName,
+        price: it.price,
+        image: it.image,
+        category: it.category || "Hardware",
+      },
+      qty: it.qty || 1,
+    }));
+
+    setCart((prev) => {
+      const updated = [...prev];
+      newItems.forEach((newItem) => {
+        const exist = updated.find((c) => c.product.id === newItem.product.id);
+        if (exist) {
+          exist.qty += newItem.qty;
+        } else {
+          updated.push(newItem);
+        }
+      });
+      return updated;
+    });
+
+    setIsCartOpen(true);
+    showToast("✓ Produk berhasil ditambahkan kembali ke keranjang!");
+  };
 
   const formatRupiah = (val: number) => {
     return new Intl.NumberFormat("id-ID", {
@@ -1460,126 +1580,227 @@ export default function ShopPage() {
       )}
 
       {/* ============================================================ */}
-      {/* MODAL 3: PELACAKAN PENGIRIMAN & STATUS PESANAN REAL-TIME     */}
+      {/* MODAL 3: HISTORI PESANAN TERPADU & PELACAKAN STATUS REAL-TIME */}
+      {/* Dilengkapi 7 Tab: All, Belum Bayar, Dikemas, Dikirim, Selesai, Dibatalkan, Pengembalian */}
       {/* ============================================================ */}
       {isTrackingModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
           onClick={() => setIsTrackingModalOpen(false)}
         >
           <div
-            className="bg-white rounded-[32px] max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200 relative space-y-6"
+            className="bg-white rounded-[32px] max-w-4xl w-full p-5 sm:p-8 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200 relative flex flex-col gap-6"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header Modal Tracking */}
+            {/* Header Modal Histori & Tracking */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                  <Truck className="w-5 h-5" />
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-dstech-blue to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20">
+                  <Package className="w-6 h-6" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900">Pelacakan Pesanan &amp; Pengiriman</h3>
-                  <p className="text-xs text-slate-500">Sistem pelacakan real-time logistik PT DSTech Smart Perkasa</p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                      Histori &amp; Pelacakan Pesanan
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-50 text-dstech-blue border border-blue-200">
+                      Live E-Store
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Pantau status pembayaran, logistik kurir, pesanan selesai, dan pengajuan komplain garansi/retur
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsTrackingModalOpen(false)}
-                className="w-9 h-9 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer transition"
+                className="w-9 h-9 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer transition shadow-xs"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Pencarian Manual No Pesanan / Resi */}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="Ketik Nomor Pesanan (ORD/DST/...) atau Nomor Resi..."
-                value={trackingQuery}
-                onChange={(e) => setTrackingQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleTrackOrder();
-                }}
-                className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30"
-              />
+            {/* 7 Tab Kategori Status Pesanan */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none border-b border-slate-100">
+              {[
+                { id: "ALL", label: "All", count: userOrders.length },
+                {
+                  id: "PAYMENT_PENDING",
+                  label: "Belum Bayar",
+                  count: userOrders.filter((o) => o.status === "PAYMENT_PENDING").length,
+                  highlight: userOrders.some((o) => o.status === "PAYMENT_PENDING"),
+                },
+                {
+                  id: "PROCESSING",
+                  label: "Sedang Dikemas",
+                  count: userOrders.filter((o) => o.status === "PROCESSING" || o.status === "PAID").length,
+                },
+                {
+                  id: "SHIPPED",
+                  label: "Dikirim",
+                  count: userOrders.filter((o) => o.status === "SHIPPED").length,
+                  highlight: userOrders.some((o) => o.status === "SHIPPED"),
+                },
+                {
+                  id: "DELIVERED",
+                  label: "Selesai",
+                  count: userOrders.filter((o) => o.status === "DELIVERED").length,
+                },
+                {
+                  id: "CANCELLED",
+                  label: "Dibatalkan",
+                  count: userOrders.filter((o) => o.status === "CANCELLED").length,
+                },
+                {
+                  id: "RETURN",
+                  label: "Pengembalian",
+                  count: userOrders.filter((o) => o.status === "RETURN").length,
+                  highlight: userOrders.some((o) => o.status === "RETURN"),
+                },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setOrderStatusTab(tab.id as any);
+                    setTrackedOrder(null); // Kembali ke list view saat ganti tab
+                  }}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-black shrink-0 transition-all flex items-center gap-2 cursor-pointer ${
+                    orderStatusTab === tab.id
+                      ? tab.highlight
+                        ? "bg-dstech-red text-white shadow-md shadow-red-500/20"
+                        : "bg-slate-900 text-white shadow-md shadow-slate-900/20"
+                      : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                      orderStatusTab === tab.id ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Pencarian No. Pesanan / Resi */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Ketik Nomor Pesanan (ORD/DSP/...), nama produk, atau No. Resi..."
+                  value={trackingQuery}
+                  onChange={(e) => {
+                    setTrackingQuery(e.target.value);
+                    setHistorySearchQuery(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleTrackOrder();
+                  }}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30"
+                />
+              </div>
               <button
                 onClick={() => handleTrackOrder()}
                 disabled={isTrackingLoading}
-                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs flex items-center gap-1.5"
+                className="px-5 py-2.5 bg-dstech-blue hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5 shrink-0"
               >
                 {isTrackingLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
-                <span>Lacak</span>
+                <span>Lacak Resi / Order</span>
               </button>
             </div>
 
-            {/* Riwayat Pesanan Akun Pengguna (Jika Ada) */}
-            {userOrders.length > 0 && (
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
-                <div className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                  Pesanan Aktif Akun Anda ({userOrders.length}):
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                  {userOrders.map((ord) => (
-                    <button
-                      key={ord.id}
-                      onClick={() => {
-                        setTrackedOrder(ord);
-                        setTrackingQuery(ord.orderNumber);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold whitespace-nowrap transition cursor-pointer ${
-                        trackedOrder?.id === ord.id
-                          ? "bg-dstech-blue text-white shadow-xs"
-                          : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      {ord.orderNumber} ({formatRupiah(ord.grandTotal)})
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {trackingError && (
-              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2">
+              <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{trackingError}</span>
               </div>
             )}
 
-            {/* Hasil Pelacakan Detail */}
-            {trackedOrder && (
-              <div className="space-y-5">
-                {/* Info Card Pesanan */}
-                <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            {/* ============================================================ */}
+            {/* TAMPILAN 1: DETAIL PELACAKAN SATU PESANAN (LINIMASA & RESI)  */}
+            {/* ============================================================ */}
+            {trackedOrder ? (
+              <div className="space-y-5 animate-in fade-in duration-200">
+                {/* Tombol Kembali ke Daftar Pesanan */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => setTrackedOrder(null)}
+                    className="text-xs font-black text-slate-600 hover:text-dstech-blue flex items-center gap-1.5 py-1 px-2.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                    <span>Kembali ke Daftar Pesanan</span>
+                  </button>
+
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Dibuat: {new Date(trackedOrder.createdAt || Date.now()).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+
+                {/* Info Card Pesanan Detail */}
+                <div className="p-5 rounded-2xl bg-slate-900 text-white space-y-4 shadow-lg shadow-slate-900/10">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
                     <div>
-                      <span className="text-[9.5px] font-mono text-slate-400 block">NOMOR PESANAN RESMI</span>
-                      <span className="text-base font-black font-mono text-amber-400">{trackedOrder.orderNumber}</span>
+                      <span className="text-[10px] font-mono text-slate-400 block tracking-wider uppercase">
+                        NOMOR PESANAN RESMI
+                      </span>
+                      <span className="text-lg font-black font-mono text-amber-400 tracking-tight">
+                        {trackedOrder.orderNumber}
+                      </span>
                     </div>
+
                     <span
-                      className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${
                         trackedOrder.status === "DELIVERED"
                           ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                           : trackedOrder.status === "SHIPPED"
-                          ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                          : trackedOrder.status === "PROCESSING"
                           ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                          : trackedOrder.status === "PROCESSING"
+                          ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
                           : trackedOrder.status === "PAID"
-                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                          : trackedOrder.status === "RETURN"
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                          : trackedOrder.status === "CANCELLED"
+                          ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                           : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                       }`}
                     >
-                      {trackedOrder.status === "PAYMENT_PENDING"
-                        ? "Menunggu Pembayaran"
-                        : trackedOrder.status === "PAID"
-                        ? "Pembayaran Dikonfirmasi"
-                        : trackedOrder.status === "PROCESSING"
-                        ? "Sedang Dikemas"
-                        : trackedOrder.status === "SHIPPED"
-                        ? "Sedang Dikirim"
-                        : trackedOrder.status === "DELIVERED"
-                        ? "Pesanan Selesai"
-                        : "Dibatalkan"}
+                      {trackedOrder.status === "PAYMENT_PENDING" ? (
+                        <>
+                          <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" /> Belum Bayar
+                        </>
+                      ) : trackedOrder.status === "PAID" ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" /> Pembayaran Diterima
+                        </>
+                      ) : trackedOrder.status === "PROCESSING" ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 text-indigo-400 animate-spin" /> Sedang Dikemas
+                        </>
+                      ) : trackedOrder.status === "SHIPPED" ? (
+                        <>
+                          <Truck className="w-3.5 h-3.5 text-purple-400" /> Sedang Dikirim
+                        </>
+                      ) : trackedOrder.status === "DELIVERED" ? (
+                        <>
+                          <PackageCheck className="w-3.5 h-3.5 text-emerald-400" /> Pesanan Selesai
+                        </>
+                      ) : trackedOrder.status === "RETURN" ? (
+                        <>
+                          <RotateCcw className="w-3.5 h-3.5 text-amber-300" /> Pengembalian / Retur
+                        </>
+                      ) : (
+                        <>
+                          <X className="w-3.5 h-3.5 text-rose-400" /> Dibatalkan
+                        </>
+                      )}
                     </span>
                   </div>
 
@@ -1589,7 +1810,7 @@ export default function ShopPage() {
                       <span className="font-bold">{trackedOrder.customerName}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-[10px] block">Total Belanja</span>
+                      <span className="text-slate-400 text-[10px] block">Total Pembayaran</span>
                       <span className="font-bold font-mono text-emerald-400">{formatRupiah(trackedOrder.grandTotal)}</span>
                     </div>
                     <div className="col-span-2 sm:col-span-1">
@@ -1599,23 +1820,53 @@ export default function ShopPage() {
                   </div>
 
                   {trackedOrder.trackingNumber && (
-                    <div className="p-2.5 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-between text-xs font-mono">
+                    <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700 flex flex-wrap items-center justify-between text-xs font-mono gap-2">
                       <span className="text-slate-400">No. Resi Pengiriman:</span>
-                      <span className="font-black text-amber-300">{trackedOrder.trackingNumber}</span>
+                      <span className="font-black text-amber-300 bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-700">
+                        {trackedOrder.trackingNumber}
+                      </span>
                     </div>
                   )}
+
+                  {/* List Item Pembelian dalam Pesanan */}
+                  <div className="pt-2 border-t border-slate-800 space-y-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Daftar Produk ({trackedOrder.items?.length || 0}):
+                    </span>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      {trackedOrder.items?.map((it: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between text-xs bg-slate-800/50 p-2 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-slate-700 shrink-0">
+                              <Image
+                                src={it.image || "/service-cctv.png"}
+                                alt={it.productName || "Produk"}
+                                fill
+                                className="object-cover"
+                              />
+                            </div>
+                            <span className="font-bold text-slate-200 line-clamp-1">{it.productName}</span>
+                          </div>
+                          <span className="font-mono text-slate-300 shrink-0">
+                            {it.qty}x @ {formatRupiah(it.price)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Upload Bukti Transfer jika masih Menunggu Pembayaran */}
+                {/* Upload Bukti Transfer jika status PAYMENT_PENDING */}
                 {trackedOrder.status === "PAYMENT_PENDING" && (
-                  <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 space-y-3">
+                  <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-200 space-y-3">
                     <div className="flex items-start gap-2.5">
-                      <Clock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                      <Clock className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
                       <div>
-                        <h4 className="text-xs font-black text-amber-900">Menunggu Pembayaran Transfer Bank</h4>
-                        <p className="text-[11px] text-amber-800 mt-0.5">
+                        <h4 className="text-xs sm:text-sm font-black text-amber-900">Menunggu Bukti Transfer Pembayaran</h4>
+                        <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
                           Silakan transfer tepat sebesar <strong>{formatRupiah(trackedOrder.grandTotal)}</strong> ke rekening
                           tujuan: <strong>{trackedOrder.paymentBank || "BCA 1234567890 a.n PT DSTech Smart Perkasa"}</strong>.
+                          Setelah transfer, unggah foto/screenshot struk bukti transfer di bawah.
                         </p>
                       </div>
                     </div>
@@ -1625,16 +1876,16 @@ export default function ShopPage() {
                         type="file"
                         accept="image/*"
                         onChange={handleFileChange}
-                        className="text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-amber-600 file:text-white hover:file:bg-amber-700 cursor-pointer"
+                        className="text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-amber-600 file:text-white hover:file:bg-amber-700 cursor-pointer"
                       />
                       <button
                         type="button"
                         onClick={() => handleUploadProof(trackedOrder.id)}
                         disabled={uploadProofLoading || !proofFileBase64}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-black rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-black rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-sm"
                       >
                         {uploadProofLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                        <span>Kirim Bukti Transfer</span>
+                        <span>Kirim Bukti Pembayaran</span>
                       </button>
                     </div>
                   </div>
@@ -1647,7 +1898,7 @@ export default function ShopPage() {
                     Linimasa Perjalanan Paket
                   </h4>
 
-                  <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                  <div className="relative pl-6 space-y-5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
                     {(trackedOrder.trackingTimeline || []).map((step: any, idx: number) => (
                       <div key={idx} className="relative group">
                         <div className="absolute -left-6 top-1 w-5 h-5 rounded-full bg-dstech-blue text-white flex items-center justify-center text-[10px] font-black ring-4 ring-white shadow-xs">
@@ -1679,21 +1930,386 @@ export default function ShopPage() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 flex justify-end">
+                {/* Tombol Aksi Bawah: Ajukan Retur, Beli Lagi, Chat CS */}
+                <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {trackedOrder.status === "DELIVERED" && (
+                      <button
+                        onClick={() => handleOpenReturnModal(trackedOrder)}
+                        className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-black flex items-center gap-1.5 border border-rose-200 transition cursor-pointer"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Ajukan Pengembalian / Retur</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleBuyAgain(trackedOrder)}
+                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer"
+                    >
+                      <ShoppingCart className="w-3.5 h-3.5 text-dstech-blue" />
+                      <span>Beli Lagi</span>
+                    </button>
+                  </div>
+
                   <a
                     href={`https://wa.me/6282259494242?text=${encodeURIComponent(
-                      `Halo CS DSTech Smart, saya ingin menanyakan status pesanan saya dengan nomor: ${trackedOrder.orderNumber}`
+                      `Halo Customer Service DSTech Smart, saya ingin menanyakan status pesanan saya: #${trackedOrder.orderNumber} (Total: ${formatRupiah(
+                        trackedOrder.grandTotal
+                      )})`
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition"
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm transition"
                   >
                     <Phone className="w-3.5 h-3.5" />
                     <span>Hubungi CS via WhatsApp</span>
                   </a>
                 </div>
               </div>
+            ) : (
+              /* ============================================================ */
+              /* TAMPILAN 2: DAFTAR KARTU HISTORI PESANAN (SESUAI 7 TAB)       */
+              /* ============================================================ */
+              <div className="space-y-4">
+                {(() => {
+                  const filtered = userOrders.filter((ord) => {
+                    // Filter Status Tab
+                    if (orderStatusTab !== "ALL") {
+                      if (orderStatusTab === "PROCESSING") {
+                        if (ord.status !== "PROCESSING" && ord.status !== "PAID") return false;
+                      } else if (ord.status !== orderStatusTab) {
+                        return false;
+                      }
+                    }
+
+                    // Filter Search Query
+                    if (historySearchQuery.trim()) {
+                      const q = historySearchQuery.toLowerCase();
+                      const matchNum = ord.orderNumber?.toLowerCase().includes(q);
+                      const matchResi = ord.trackingNumber?.toLowerCase().includes(q);
+                      const matchItem = ord.items?.some((i: any) => i.productName?.toLowerCase().includes(q));
+                      if (!matchNum && !matchResi && !matchItem) return false;
+                    }
+
+                    return true;
+                  });
+
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="py-12 px-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex flex-col items-center justify-center text-center space-y-3">
+                        <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 shadow-xs">
+                          <Package className="w-7 h-7" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-slate-800">
+                            Tidak Ada Pesanan pada Kategori Ini
+                          </h4>
+                          <p className="text-xs text-slate-400 max-w-sm mt-0.5">
+                            {historySearchQuery
+                              ? `Tidak ada pesanan yang sesuai dengan kata kunci "${historySearchQuery}".`
+                              : "Belum ada riwayat pesanan dengan status yang dipilih saat ini."}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                      {filtered.map((ord) => (
+                        <div
+                          key={ord.id}
+                          className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 shadow-sm transition-all space-y-3"
+                        >
+                          {/* Header Kartu Pesanan */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-black text-slate-900 text-xs sm:text-sm">
+                                #{ord.orderNumber}
+                              </span>
+                              <span className="text-slate-300">•</span>
+                              <span className="text-[11px] text-slate-400 font-medium">
+                                {new Date(ord.createdAt || Date.now()).toLocaleDateString("id-ID", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </span>
+                            </div>
+
+                            {/* Badge Status */}
+                            <span
+                              className={`px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                                ord.status === "DELIVERED"
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : ord.status === "SHIPPED"
+                                  ? "bg-purple-50 text-purple-700 border border-purple-200"
+                                  : ord.status === "PROCESSING"
+                                  ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                  : ord.status === "PAID"
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : ord.status === "RETURN"
+                                  ? "bg-amber-50 text-amber-800 border border-amber-300"
+                                  : ord.status === "CANCELLED"
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : "bg-amber-50 text-amber-700 border border-amber-200"
+                              }`}
+                            >
+                              {ord.status === "PAYMENT_PENDING" ? (
+                                <>
+                                  <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin" /> Belum Bayar
+                                </>
+                              ) : ord.status === "PAID" ? (
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" /> Pembayaran Diterima
+                                </>
+                              ) : ord.status === "PROCESSING" ? (
+                                <>
+                                  <RefreshCw className="w-3.5 h-3.5 text-indigo-600 animate-spin" /> Sedang Dikemas
+                                </>
+                              ) : ord.status === "SHIPPED" ? (
+                                <>
+                                  <Truck className="w-3.5 h-3.5 text-purple-600" /> Sedang Dikirim
+                                </>
+                              ) : ord.status === "DELIVERED" ? (
+                                <>
+                                  <PackageCheck className="w-3.5 h-3.5 text-emerald-600" /> Selesai
+                                </>
+                              ) : ord.status === "RETURN" ? (
+                                <>
+                                  <RotateCcw className="w-3.5 h-3.5 text-amber-600" /> Pengembalian / Retur
+                                </>
+                              ) : (
+                                <>
+                                  <X className="w-3.5 h-3.5 text-rose-600" /> Dibatalkan
+                                </>
+                              )}
+                            </span>
+                          </div>
+
+                          {/* Items Preview */}
+                          <div className="space-y-2">
+                            {ord.items?.slice(0, 2).map((it: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between text-xs">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                                    <Image
+                                      src={it.image || "/service-cctv.png"}
+                                      alt={it.productName || "Barang"}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                  <div>
+                                    <div className="font-bold text-slate-800 line-clamp-1">{it.productName}</div>
+                                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                                      {it.qty} Barang × {formatRupiah(it.price)}
+                                    </div>
+                                  </div>
+                                </div>
+                                <span className="font-bold font-mono text-slate-900 shrink-0">
+                                  {formatRupiah((it.qty || 1) * (it.price || 0))}
+                                </span>
+                              </div>
+                            ))}
+
+                            {ord.items?.length > 2 && (
+                              <div className="text-[11px] font-bold text-slate-400 pl-1">
+                                + {ord.items.length - 2} produk lainnya...
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Footer Kartu: Total & Tombol Aksi */}
+                          <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                Total Belanja
+                              </span>
+                              <span className="text-base font-black font-mono text-dstech-blue">
+                                {formatRupiah(ord.grandTotal)}
+                              </span>
+                              {ord.trackingNumber && (
+                                <span className="text-[10px] font-mono text-slate-500 block">
+                                  Resi: <strong>{ord.trackingNumber}</strong>
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* Tombol Lacak / Detail */}
+                              <button
+                                onClick={() => {
+                                  setTrackedOrder(ord);
+                                  setTrackingQuery(ord.orderNumber);
+                                }}
+                                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                              >
+                                <Search className="w-3 h-3" />
+                                <span>Lacak Pengiriman</span>
+                              </button>
+
+                              {/* Tombol Bayar jika PAYMENT_PENDING */}
+                              {ord.status === "PAYMENT_PENDING" && (
+                                <button
+                                  onClick={() => {
+                                    setTrackedOrder(ord);
+                                    setTrackingQuery(ord.orderNumber);
+                                  }}
+                                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                                >
+                                  <CreditCard className="w-3 h-3" />
+                                  <span>Upload Bukti Bayar</span>
+                                </button>
+                              )}
+
+                              {/* Tombol Ajukan Retur jika DELIVERED */}
+                              {ord.status === "DELIVERED" && (
+                                <button
+                                  onClick={() => handleOpenReturnModal(ord)}
+                                  className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-black flex items-center gap-1 transition cursor-pointer"
+                                >
+                                  <RotateCcw className="w-3 h-3" />
+                                  <span>Ajukan Retur</span>
+                                </button>
+                              )}
+
+                              {/* Tombol Beli Lagi */}
+                              <button
+                                onClick={() => handleBuyAgain(ord)}
+                                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black flex items-center gap-1 transition cursor-pointer"
+                                title="Beli barang ini lagi"
+                              >
+                                <ShoppingCart className="w-3 h-3 text-dstech-blue" />
+                                <span>Beli Lagi</span>
+                              </button>
+
+                              {/* Chat CS WA */}
+                              <a
+                                href={`https://wa.me/6282259494242?text=${encodeURIComponent(
+                                  `Halo CS DSTech Smart, saya ingin menanyakan pesanan saya #${ord.orderNumber}`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold transition flex items-center justify-center border border-emerald-200"
+                                title="Chat CS WhatsApp"
+                              >
+                                <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL 5: PENGAJUAN PENGEMBALIAN BARANG & DANA (RETUR / GARANSI) */}
+      {/* ============================================================ */}
+      {isReturnModalOpen && returnTargetOrder && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setIsReturnModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-[32px] max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 relative space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-100">
+                  <RotateCcw className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Pengajuan Pengembalian / Retur</h3>
+                  <p className="text-[11px] text-slate-400">Garansi resmi &amp; proteksi pembeli DSTech Smart</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsReturnModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Info Singkat Pesanan */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-1">
+              <div className="flex justify-between font-bold text-slate-700">
+                <span>Nomor Pesanan:</span>
+                <span className="font-mono text-dstech-blue">#{returnTargetOrder.orderNumber}</span>
+              </div>
+              <div className="flex justify-between text-slate-500">
+                <span>Total Nilai Pesanan:</span>
+                <span className="font-mono font-bold text-slate-900">{formatRupiah(returnTargetOrder.grandTotal)}</span>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmitReturn} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Alasan Pengembalian / Komplain:
+                </label>
+                <select
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:border-dstech-blue"
+                >
+                  <option value="Barang Rusak / Cacat Fisik">Barang Rusak / Cacat Fisik Saat Tiba</option>
+                  <option value="Barang Tidak Sesuai Spesifikasi">Barang Tidak Sesuai Spesifikasi Pesanan</option>
+                  <option value="Kelengkapan / Aksesoris Kurang">Kelengkapan / Aksesoris Barang Kurang</option>
+                  <option value="Klaim Garansi Kerusakan Fungsi">Klaim Garansi Kerusakan Fungsi (Purnajual)</option>
+                  <option value="Pengajuan Pengembalian Dana">Pengajuan Pengembalian Dana (Refund)</option>
+                  <option value="Lainnya">Alasan Lainnya</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Rincian Penjelasan Kendala:
+                </label>
+                <textarea
+                  rows={3}
+                  value={returnNotes}
+                  onChange={(e) => setReturnNotes(e.target.value)}
+                  placeholder="Jelaskan secara singkat kendala fisik / teknis barang yang dialami..."
+                  className="w-full p-3 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-dstech-blue resize-none"
+                  required
+                />
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 space-y-1">
+                <span className="font-black block">Ketentuan Garansi &amp; Retur:</span>
+                <p className="leading-relaxed">
+                  Tim QC kami akan menghubungi Anda melalui WhatsApp untuk verifikasi foto/video kendala barang serta panduan pengiriman balik unit.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsReturnModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReturn}
+                  className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-rose-600/20 cursor-pointer disabled:bg-slate-300"
+                >
+                  {isSubmittingReturn ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  <span>Kirim Pengajuan Retur</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
