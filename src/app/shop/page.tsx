@@ -295,6 +295,7 @@ export default function ShopPage() {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutStep, setIsCheckoutStep] = useState(false);
   const [includeInstallation, setIncludeInstallation] = useState(false);
+  const [includeTax, setIncludeTax] = useState<boolean>(true);
   const [selectedCourierId, setSelectedCourierId] = useState<string>("ARMADA_DSTECH");
   const [selectedBankId, setSelectedBankId] = useState<string>("dstech_bank_bca_pt");
   const [shippingForm, setShippingForm] = useState({
@@ -654,7 +655,12 @@ export default function ShopPage() {
       }, 0)
     : 0;
 
-  const grandTotal = cartSubtotal + selectedCourier.cost + installationFee + (cart.length > 0 ? uniqueCode : 0);
+  // Kalkulasi PPN 11% Resmi (Tugas 200)
+  const taxableBase = cartSubtotal + installationFee;
+  const taxRate = 11;
+  const taxAmount = includeTax ? Math.round(taxableBase * (taxRate / 100)) : 0;
+
+  const grandTotal = cartSubtotal + selectedCourier.cost + installationFee + taxAmount + (cart.length > 0 ? uniqueCode : 0);
 
   // Handler Submit Checkout Pesanan
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
@@ -695,6 +701,10 @@ export default function ShopPage() {
         })),
         includeInstallation,
         installationFee,
+        includeTax,
+        taxRate: includeTax ? taxRate : 0,
+        taxAmount,
+        subtotalBeforeTax: taxableBase,
         shippingCourier: selectedCourier.name,
         shippingCost: selectedCourier.cost,
         uniqueCode,
@@ -1803,10 +1813,46 @@ export default function ShopPage() {
                   </label>
                 </div>
 
+                {/* Opsi PPN 11% Resmi (Tugas 200) */}
+                <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="add-tax-cart"
+                    checked={includeTax}
+                    onChange={(e) => setIncludeTax(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 text-dstech-blue rounded cursor-pointer"
+                  />
+                  <label htmlFor="add-tax-cart" className="text-xs cursor-pointer select-none">
+                    <span className="font-black text-slate-900 flex flex-wrap items-center gap-1.5">
+                      <span>Sertakan PPN 11% &amp; Faktur Pajak Resmi</span>
+                      <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded border border-amber-300">
+                        PT. DSTech Smart Perkasa
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-slate-600 leading-relaxed block mt-0.5">
+                      Menerbitkan Faktur Penjualan resmi, Surat Jalan (DO), dan Kuitansi bertanda tangan sah untuk laporan keuangan.
+                    </span>
+                  </label>
+                </div>
+
                 {/* Ringkasan Subtotal */}
-                <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs font-bold text-slate-600">
-                  <span>Subtotal Barang:</span>
-                  <span className="text-sm font-black font-mono text-slate-900">{formatRupiah(cartSubtotal)}</span>
+                <div className="pt-3 border-t border-slate-200 space-y-1.5 text-xs font-bold text-slate-600">
+                  <div className="flex items-center justify-between">
+                    <span>Subtotal Barang:</span>
+                    <span className="font-black font-mono text-slate-900">{formatRupiah(cartSubtotal)}</span>
+                  </div>
+                  {includeInstallation && (
+                    <div className="flex items-center justify-between text-indigo-700">
+                      <span>Jasa Teknisi ({totalInstallationUnits} Unit):</span>
+                      <span className="font-black font-mono">+{formatRupiah(installationFee)}</span>
+                    </div>
+                  )}
+                  {includeTax && (
+                    <div className="flex items-center justify-between text-emerald-700">
+                      <span>PPN 11% (Faktur Resmi):</span>
+                      <span className="font-black font-mono">+{formatRupiah(taxAmount)}</span>
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -1996,6 +2042,12 @@ export default function ShopPage() {
                     <span>Biaya Pengiriman ({selectedCourier.name}):</span>
                     <span>{formatRupiah(selectedCourier.cost)}</span>
                   </div>
+                  {includeTax && (
+                    <div className="flex justify-between text-xs text-emerald-300 font-semibold">
+                      <span>PPN 11% (Faktur Pajak Sah PT):</span>
+                      <span className="font-mono font-bold">+{formatRupiah(taxAmount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-xs text-amber-300 font-semibold items-center bg-slate-800/80 p-2 rounded-xl border border-amber-500/30">
                     <span className="flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-amber-400" />

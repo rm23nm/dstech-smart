@@ -93,6 +93,13 @@ interface Order {
   notes?: string;
   subtotal: number;
   grandTotal: number;
+  includeTax?: boolean;
+  taxRate?: number;
+  taxAmount?: number;
+  subtotalBeforeTax?: number;
+  invoiceNumber?: string;
+  deliveryOrderNumber?: string;
+  receiptNumber?: string;
   status: "PAYMENT_PENDING" | "PAID" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "RETURN";
   hasComplaint?: boolean;
   complaint?: ComplaintData;
@@ -659,6 +666,12 @@ export default function AdminOrdersPage() {
                           <span className="font-black text-amber-900">+{order.uniqueCode}</span>
                         </div>
                       ) : null}
+                      {order.includeTax && order.taxAmount ? (
+                        <div className="text-[10px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1 mt-0.5">
+                          <span>PPN 11%:</span>
+                          <span>+{formatRupiah(order.taxAmount)}</span>
+                        </div>
+                      ) : null}
                       <div className="text-[10px] text-slate-400 mt-1">
                         Subtotal: {formatRupiah(order.subtotal)}
                       </div>
@@ -756,6 +769,16 @@ export default function AdminOrdersPage() {
                           <span>Proses</span>
                           <ChevronRight className="w-3.5 h-3.5" />
                         </button>
+
+                        <a
+                          href={`/api/finance/print?doc=invoice&id=${order.invoiceNumber || order.orderNumber}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="p-1.5 rounded-xl bg-blue-50 text-dstech-blue hover:bg-blue-100 border border-blue-200 transition-all cursor-pointer"
+                          title="Cetak Faktur Penjualan (A4)"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                        </a>
 
                         <button
                           onClick={() => handleContactWhatsApp(order)}
@@ -949,6 +972,70 @@ export default function AdminOrdersPage() {
                   <span>
                     {selectedOrder.shippingAddress?.recipientName} - {selectedOrder.shippingAddress?.address}, {selectedOrder.shippingAddress?.city}, {selectedOrder.shippingAddress?.province} {selectedOrder.shippingAddress?.postalCode}
                   </span>
+                </div>
+
+                {/* Penerbitan Dokumen Resmi ERP (Faktur, DO & Kuitansi) - Tugas 200 */}
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50/80 via-indigo-50/70 to-slate-50 border border-blue-200/90 space-y-2.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-blue-200/60">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-dstech-blue" />
+                      <span className="text-xs font-black text-slate-900">
+                        Dokumen Resmi Penjualan &amp; Pengiriman (A4)
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                      <span>✓ Siap Cetak Resmi PT DSTech</span>
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Cetak Faktur Penjualan */}
+                    <a
+                      href={`/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue hover:shadow-xs text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 transition group"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-dstech-blue group-hover:scale-110 transition-transform" />
+                      <span>Faktur Penjualan (A4)</span>
+                    </a>
+
+                    {/* Cetak Surat Jalan DO */}
+                    <a
+                      href={`/api/finance/print?doc=do&id=${selectedOrder.deliveryOrderNumber || selectedOrder.invoiceNumber || selectedOrder.orderNumber}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-600 hover:shadow-xs text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 transition group"
+                    >
+                      <Truck className="w-3.5 h-3.5 text-indigo-600 group-hover:scale-110 transition-transform" />
+                      <span>Surat Jalan / DO (A4)</span>
+                    </a>
+
+                    {/* Cetak Kuitansi Pembayaran */}
+                    <a
+                      href={`/api/finance/print?doc=receipt&id=${selectedOrder.receiptNumber || selectedOrder.invoiceNumber || selectedOrder.orderNumber}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-600 hover:shadow-xs text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 transition group"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 group-hover:scale-110 transition-transform" />
+                      <span>Kuitansi Resmi (A4)</span>
+                    </a>
+                  </div>
+
+                  <div className="text-[10px] text-slate-500 flex flex-wrap items-center justify-between pt-1 gap-2">
+                    <span>No. Faktur: <strong className="text-slate-800 font-mono">{selectedOrder.invoiceNumber || "Otomatis Digenerate"}</strong></span>
+                    <a
+                      href={`https://wa.me/${(selectedOrder.customerPhone || "").replace(/^0/, "62")}?text=${encodeURIComponent(
+                        `Halo Bpk/Ibu ${selectedOrder.customerName}, berikut dokumen resmi pesanan #${selectedOrder.orderNumber} Anda dari PT. DSTech Smart Perkasa:\n\n📄 Faktur: https://dstechsmart.com/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}\n🚚 Surat Jalan: https://dstechsmart.com/api/finance/print?doc=do&id=${selectedOrder.deliveryOrderNumber || selectedOrder.invoiceNumber || selectedOrder.orderNumber}\n\nTerima kasih atas kepercayaan Anda bermitra dengan DSTech Smart.`
+                      )}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1"
+                    >
+                      <Send className="w-3 h-3" /> Kirim Dokumen via WA
+                    </a>
+                  </div>
                 </div>
               </div>
 

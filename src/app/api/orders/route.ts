@@ -7,6 +7,7 @@ export const revalidate = 0;
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_orders.json");
 const USERS_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
+const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
 
 function readOrders(): any[] {
   try {
@@ -73,6 +74,164 @@ function syncOrderCustomerToUsers(order: any): void {
   }
 }
 
+// Otomatisasi Penerbitan Faktur Penjualan, Surat Jalan (DO), & Kuitansi di ERP Keuangan (Tugas 200)
+function syncOrderToFinanceErp(order: any, targetStatus?: string) {
+  try {
+    if (!fs.existsSync(FINANCE_FILE)) return;
+    const raw = fs.readFileSync(FINANCE_FILE, "utf-8");
+    const financeData = JSON.parse(raw);
+
+    if (!Array.isArray(financeData.sales)) financeData.sales = [];
+    if (!Array.isArray(financeData.cash_flow)) financeData.cash_flow = [];
+
+    const status = targetStatus || order.status || "PAYMENT_PENDING";
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10);
+    const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    // Cek apakah rekaman invoice untuk pesanan ini sudah ada di sales
+    const cleanId = order.orderNumber ? order.orderNumber.replace(/[^a-zA-Z0-9]/g, "_") : String(Date.now());
+    let existingSale = financeData.sales.find(
+      (s: any) => s.orderNumber === order.orderNumber || s.id === `dstech_inv_${cleanId}`
+    );
+
+    let invoiceNo = existingSale?.invoiceNumber;
+    let doNo = existingSale?.deliveryOrderNumber;
+    let kwtNo = existingSale?.receiptNumber;
+
+    if (!invoiceNo) {
+      const salesCount = financeData.sales.length + 1;
+      const seq = String(salesCount).padStart(3, "0");
+      invoiceNo = `INV-DSTECH-${yearMonth}-${seq}`;
+      doNo = `DO-DSTECH-${yearMonth}-${seq}`;
+      kwtNo = `KWT-DSTECH-${yearMonth}-${seq}`;
+    }
+
+    // Susun item produk untuk faktur resmi
+    const invoiceItems = (order.items || []).map((it: any, idx: number) => ({
+      id: String(idx + 1),
+      productId: it.productId || "",
+      productName: it.productName || "Perangkat DSTech",
+      qty: Number(it.qty) || 1,
+      unit: "Unit",
+      price: Number(it.price) || 0,
+      discount: 0,
+      total: (Number(it.qty) || 1) * (Number(it.price) || 0),
+    }));
+
+    // Pos Jasa Pemasangan & Setup Teknisi Proporsional (jika ada)
+    if (order.includeInstallation && Number(order.installationFee) > 0) {
+      const totalUnits = (order.items || []).reduce((acc: number, item: any) => acc + (Number(item.qty) || 1), 0);
+      invoiceItems.push({
+        id: String(invoiceItems.length + 1),
+        productId: "SRV-INST-01",
+        productName: `Jasa Pemasangan & Setup Teknisi Resmi DSTech Smart (${totalUnits} Unit)`,
+        qty: 1,
+        unit: "Paket",
+        price: Number(order.installationFee),
+        discount: 0,
+        total: Number(order.installationFee),
+      });
+    }
+
+    const isPaidOrDelivered = status === "PAID" || status === "DELIVERED" || status === "PROCESSING" || status === "SHIPPED";
+    const paymentStatusStr = (status === "DELIVERED" || status === "PAID") ? "Lunas" : "Menunggu Pembayaran";
+    const paidAmount = (status === "DELIVERED" || status === "PAID") ? Number(order.grandTotal) : 0;
+    const remainingAmount = (status === "DELIVERED" || status === "PAID") ? 0 : Number(order.grandTotal);
+
+    const saleRecord = {
+      id: `dstech_inv_${cleanId}`,
+      invoiceNumber: invoiceNo,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      customerAddress: order.shippingAddress?.address || "-",
+      city: order.shippingAddress?.city || "Cilegon",
+      date: dateStr,
+      dueDate: dateStr,
+      invoiceType: "LUNAS",
+      items: invoiceItems,
+      subtotal: Number(order.subtotal) + (Number(order.installationFee) || 0),
+      discount: 0,
+      discountType: "fixed",
+      taxRate: order.taxRate || 11,
+      taxAmount: Number(order.taxAmount) || 0,
+      shippingCost: Number(order.shippingCost) || 0,
+      grandTotal: Number(order.grandTotal),
+      paymentMethod: order.paymentBank || "Transfer Bank BCA PT",
+      paymentStatus: paymentStatusStr,
+      paidAmount: paidAmount,
+      remainingAmount: remainingAmount,
+      warehouseId: "dstech_wh_1",
+      branchId: "dstech_branch_1",
+      salesPerson: "DSTech E-Store System",
+      deliveryOrderNumber: doNo,
+      receiptNumber: kwtNo,
+      notes: `Pesanan E-Store Toko Online #${order.orderNumber} - Pembeli: ${order.customerName} (${order.customerPhone})`,
+      approvalStatus: "Disetujui & Sah",
+      approvedBy: "RAMADHANI ST",
+      approvedTitle: "Direktur PT. DSTech Smart Perkasa",
+      approvedAt: dateStr,
+      verificationCode: `VER-DST-${Math.floor(Math.random() * 899999 + 100000)}`,
+      photos: [],
+    };
+
+    if (existingSale) {
+      Object.assign(existingSale, saleRecord);
+    } else {
+      financeData.sales.unshift(saleRecord);
+    }
+
+    // Catat ke Buku Kas (Cash Flow) otomatis jika status lunas / selesai
+    if (isPaidOrDelivered) {
+      const existingCash = financeData.cash_flow.find((c: any) => c.reference === order.orderNumber);
+      if (!existingCash) {
+        // Pos 1: Penjualan Produk
+        financeData.cash_flow.unshift({
+          id: `dstech_cash_${Date.now()}_prod`,
+          date: dateStr,
+          type: "IN",
+          category: "Penerimaan Penjualan Produk E-Store",
+          amount: Number(order.subtotal) || 0,
+          account: order.paymentBank || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+          reference: order.orderNumber,
+          description: `Penerimaan Pembayaran Pesanan #${order.orderNumber} - ${order.customerName} (Barang/Perangkat)`,
+          balanceAfter: 0,
+          receiptUrl: "",
+          attachments: [],
+        });
+
+        // Pos 2: Jasa Pasang Teknisi (jika ada)
+        if (order.includeInstallation && Number(order.installationFee) > 0) {
+          financeData.cash_flow.unshift({
+            id: `dstech_cash_${Date.now()}_srv`,
+            date: dateStr,
+            type: "IN",
+            category: "Penerimaan Jasa Pemasangan & Setup Teknisi",
+            amount: Number(order.installationFee),
+            account: order.paymentBank || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+            reference: order.orderNumber,
+            description: `Penerimaan Jasa Instalasi Teknisi Pesanan #${order.orderNumber} - ${order.customerName}`,
+            balanceAfter: 0,
+            receiptUrl: "",
+            attachments: [],
+          });
+        }
+      }
+    }
+
+    fs.writeFileSync(FINANCE_FILE, JSON.stringify(financeData, null, 2), "utf-8");
+
+    // Simpan referensi nomor dokumen ke dalam objek order
+    order.invoiceNumber = invoiceNo;
+    order.deliveryOrderNumber = doNo;
+    order.receiptNumber = kwtNo;
+  } catch (err) {
+    console.error("Gagal sinkronisasi pesanan ke modul Finance ERP:", err);
+  }
+}
+
 // GET: Ambil daftar pesanan (bisa difilter berdasarkan userId, email, atau orderNumber)
 export async function GET(req: Request) {
   try {
@@ -133,6 +292,10 @@ export async function POST(req: Request) {
       items,
       includeInstallation,
       installationFee = 0,
+      includeTax = true,
+      taxRate = 11,
+      taxAmount = 0,
+      subtotalBeforeTax,
       shippingCourier = "Armada Teknisi DSTech (Cilegon/Serang/Banten)",
       shippingCost = 0,
       paymentMethod = "TRANSFER_BANK",
@@ -166,7 +329,8 @@ export async function POST(req: Request) {
 
     const installationTotal = includeInstallation ? Number(installationFee) || 0 : 0;
     const shippingTotal = Number(shippingCost) || 0;
-    const grandTotal = subtotal + installationTotal + shippingTotal + uniqueCode;
+    const taxTotal = includeTax ? (Number(taxAmount) || Math.round((subtotal + installationTotal) * (Number(taxRate || 11) / 100))) : 0;
+    const grandTotal = subtotal + installationTotal + shippingTotal + taxTotal + uniqueCode;
 
     const initialTimeline = [
       {
@@ -203,6 +367,10 @@ export async function POST(req: Request) {
       })),
       includeInstallation: !!includeInstallation,
       installationFee: installationTotal,
+      includeTax: !!includeTax,
+      taxRate: includeTax ? Number(taxRate || 11) : 0,
+      taxAmount: taxTotal,
+      subtotalBeforeTax: subtotal + installationTotal,
       shippingCourier,
       shippingCost: shippingTotal,
       uniqueCode,
@@ -215,11 +383,17 @@ export async function POST(req: Request) {
       notes,
       subtotal,
       grandTotal,
+      invoiceNumber: "",
+      deliveryOrderNumber: "",
+      receiptNumber: "",
       status: "PAYMENT_PENDING", // PAYMENT_PENDING | PAID | PROCESSING | SHIPPED | DELIVERED | CANCELLED | RETURN
       trackingTimeline: initialTimeline,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
     };
+
+    // Sinkronkan ke ERP Finance (Faktur, DO, dan Kuitansi)
+    syncOrderToFinanceErp(newOrder, newOrder.status);
 
     orders.unshift(newOrder);
     writeOrders(orders);
@@ -385,6 +559,10 @@ export async function PATCH(req: Request) {
     }
 
     targetOrder.updatedAt = nowIso;
+
+    // Sinkronkan ke ERP Finance (Faktur, DO, Kuitansi, dan Arus Kas jika lunas/selesai)
+    syncOrderToFinanceErp(targetOrder, targetOrder.status);
+
     orders[index] = targetOrder;
     writeOrders(orders);
 
