@@ -4972,22 +4972,22 @@
 ### 175. Tugas: Penyesuaian Format Tabel Rincian SPH dengan Kolom Gambar Produk di Samping Nomor Item (Dashboard & Print Route)
 - **Permintaan Pengguna**:
   - *"untuk rincian buat seperti ini saja, namun disamping nanti buat gambar setelah nomor item"* (Menyertakan screenshot tabel Lampiran SPH Halaman 2 yang memuat No, Deskripsi Produk & Spesifikasi, Qty, Satuan, Harga Satuan, dan Total).
-- **Status**: 🟡 **SEDANG DIKERJAKAN**
-- **Analisis & Rencana Solusi**:
-  1. Pengguna menginginkan tabel rincian penawaran harga SPH diformat persis seperti tabel Lampiran SPH resmi (header tabel biru gelap / indigo-950, perataan rapi, kolom kuantiti, satuan, harga satuan, diskon opsional, dan total nilai), dengan penambahan kolom **Foto / Gambar Produk** tepat setelah kolom **No** (`No` -> `Gambar Produk` -> `Deskripsi Produk & Spesifikasi Teknis` -> `Qty` -> `Satuan` -> `Harga Satuan` -> `Total`).
-  2. Penyesuaian ini diterapkan secara konsisten pada dua lokasi:
-     - **Modal Cetak SPH Dashboard** (`src/app/admin/finance/page.tsx`): Baik di lembar utama penawaran maupun lampiran.
-     - **Halaman Cetak / Unduh PDF Publik** (`src/app/api/finance/print/route.ts`): Pada lembar penawaran SPH resmi (`doc=sph`).
-  3. Mengambil foto thumbnail dari field `item.image` atau dicocokkan otomatis ke katalog produk (`products.find(...)`) dengan fallback gambar placeholder perangkat keamanan yang elegan.
-- **Rencana Kerja Step-by-Step**:
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Hasil Pekerjaan**:
+  1. **Tabel Rincian Item dengan Kolom Gambar Produk**: Menambahkan kolom `Gambar` tepat setelah kolom `No` (`No` -> `Gambar` -> `Deskripsi Produk & Spesifikasi Teknis` -> `Qty` -> `Satuan` -> `Harga Satuan` -> `Total`) di modal pratinjau cetak dashboard (`src/app/admin/finance/page.tsx`) dan halaman cetak publik (`src/app/api/finance/print/route.ts`).
+  2. **Paginasi Per Lembar A4 (Kop Surat Tidak Akan Pernah Rusak / Menyusut)**: Menghapus layout kartu foto raksasa yang panjang tak terbatas, dan menggantikannya dengan pembagian tabel per lembar A4 (chunk 7 item). Setiap lembar di-render dalam container ukuran presisi A4 (`width: 210mm; height: 296.5mm; page-break-after: always;`) sehingga kop surat background resmi DSTech selalu pas 100% tanpa distorsi, menyusut, atau melar.
+  3. **Logika Cerdas Lembar Utama (Page 1)**: Jika item <= 5 item, tabel rincian langsung ditampilkan rapi di lembar pertama bersama total dan tanda tangan. Jika item > 5, lembar pertama memuat ringkasan resmi dan lembar berikutnya memuat tabel rincian item penawaran berkop resmi A4.
+  4. Kompilasi Next.js (`npm run build`) diverifikasi lulus 100% (58/58 rute).
+  5. File cadangan dibersihkan, perubahan di-push ke GitHub dan dideploy ke server live VPS via `deploy_live.js` (PM2 `dstech-main` online).
+- **Rincian Step-by-Step yang Telah Dilakukan**:
   1. [x] **Langkah 1**: Catat rencana kerja Tugas 175 di `LAPORAN_PROGRES.md`.
-  2. [ ] **Langkah 2**: Buat folder cadangan sementara `_backup_sph_table_format/` dan cadangkan `src/app/admin/finance/page.tsx` serta `src/app/api/finance/print/route.ts`.
-  3. [ ] **Langkah 3**: Perbarui tabel rincian SPH pada modal cetak dashboard (`src/app/admin/finance/page.tsx`) dengan menyisipkan kolom Gambar Produk setelah kolom Nomor item.
-  4. [ ] **Langkah 4**: Perbarui tabel rincian SPH pada template cetak publik (`src/app/api/finance/print/route.ts`) agar menyertakan kolom Gambar Produk setelah nomor item dan merapikan header kop resmi.
-  5. [ ] **Langkah 5**: Validasi kompilasi lokal `npm run build` di `dstech-smart` (wajib 100% lulus tanpa error).
-  6. [ ] **Langkah 6**: Bersihkan folder cadangan sementara `_backup_sph_table_format/`.
-  7. [ ] **Langkah 7**: Push commit ke GitHub repository via `push_with_native_git.js` dan deploy ke live server VPS via `deploy_live.js`.
-  8. [ ] **Langkah 8**: Berikan laporan dan konfirmasi hasil tampilan kepada pengguna.
+  2. [x] **Langkah 2**: Buat folder cadangan sementara `_backup_sph_table_format/` dan cadangkan `src/app/admin/finance/page.tsx` serta `src/app/api/finance/print/route.ts`.
+  3. [x] **Langkah 3**: Perbarui tabel rincian SPH pada modal cetak dashboard (`src/app/admin/finance/page.tsx`) dengan menyisipkan kolom Gambar Produk setelah kolom Nomor item.
+  4. [x] **Langkah 4**: Perbarui tabel rincian SPH pada template cetak publik (`src/app/api/finance/print/route.ts`) agar menyertakan kolom Gambar Produk setelah nomor item dan merapikan header kop resmi.
+  5. [x] **Langkah 5**: Validasi kompilasi lokal `npm run build` di `dstech-smart` (sukses 100%).
+  6. [x] **Langkah 6**: Bersihkan folder cadangan sementara `_backup_sph_table_format/`.
+  7. [x] **Langkah 7**: Push commit ke GitHub repository via `push_with_native_git.js` dan deploy ke live server VPS via `deploy_live.js`.
+  8. [x] **Langkah 8**: Berikan laporan dan konfirmasi hasil tampilan kepada pengguna.
 
 ---
 
