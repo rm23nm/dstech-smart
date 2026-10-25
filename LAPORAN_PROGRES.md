@@ -4991,6 +4991,54 @@
 
 ---
 
+### 176. Tugas: Pemisahan & Filter Ketat Rekening Bank PT vs Non-PT pada Dokumen SPH, Faktur Penjualan & Template Cetak
+- **Permintaan Pengguna**:
+  - *"kenapa nomor rekening bukan PT dimunculkan?"*
+- **Penyebab Masalah**:
+  - Pada template SPH (`src/app/api/finance/print/route.ts` line 384) dan dashboard (`src/app/admin/finance/page.tsx` line 17079), pemanggilan rekening bank menggunakan filter umum `${bankAccounts.filter((b) => b.status === "Aktif")}` tanpa memvalidasi atribut `entityType` (`PT` vs `NON_PT`).
+  - Akibatnya, pada dokumen yang ber-entitas PT (`PT. DSTech Smart Perkasa`), rekening Non-PT (`Bank BCA a/n RAMADHANI ST`) ikut tercantum di bawah judul *"Rekening Resmi Pembayaran PT. DSTech Smart Perkasa"*.
+- **Rincian Step-by-Step yang Telah Dilakukan**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 176 di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat folder cadangan sementara `_backup_bank_filter/` dan cadangkan `src/app/admin/finance/page.tsx` serta `src/app/api/finance/print/route.ts`.
+  3. [x] **Langkah 3**: Perbarui logika filter rekening pada `src/app/api/finance/print/route.ts` (SPH, Faktur, Kuitansi):
+     - Dibuat fungsi helper `getFilteredBankAccounts(bankAccounts, entityType)` yang memisahkan rekening PT dan Non-PT secara ketat.
+     - Rekening Non-PT (`RAMADHANI ST`) tidak akan pernah muncul di dokumen entitas PT (`PT. DSTech Smart Perkasa`), dan sebaliknya.
+  4. [x] **Langkah 4**: Perbarui logika filter rekening pada `src/app/admin/finance/page.tsx` (modal cetak SPH, modal cetak Faktur, dan pesan WhatsApp/Email).
+  5. [x] **Langkah 5**: Validasi kompilasi lokal `npm run build` di `dstech-smart` (sukses 100%, 58/58 rute).
+  6. [x] **Langkah 6**: Bersihkan folder cadangan sementara `_backup_bank_filter/`.
+  7. [x] **Langkah 7**: Push commit ke GitHub repository via `push_with_native_git.js` dan deploy ke live server VPS via `deploy_live.js` (PM2 `dstech-main` online).
+  8. [x] **Langkah 8**: Verifikasi dan laporkan kepada pengguna.
+- **Status**: ✅ **SELESAI**
+
+---
+
+### 177. Tugas: Paginasi Lembar Lampiran SPH Otomatis Masuk Halaman Baru (Anti Terpotong / Anti Dipaksakan)
+- **Permintaan Pengguna**:
+  - *"lampiran 2nya masih belum sesuai, terpotong, seharusnya masuk ke halaman baru, jangan dipaksakan kedalam 1 halaman"*
+- **Penyebab Masalah**:
+  1. **Halaman 1 Overheight**: Pada template SPH Halaman 1, konten teks kop surat ganda + padding 120px + kotak ringkasan terlalu tinggi (> 297mm A4), menyebabkan bagian bawah (kotak tanda tangan pengesahan) tumpah ke atas Halaman 2 saat diprint.
+  2. **Halaman 2 Menempel & Tidak Pecah**: Lampiran Halaman 2 dimulai tepat di bawah tanda tangan yang tumpah, dan merender seluruh item sekaligus (misal 16 item) ke dalam 1 halaman tanpa paginasi A4 di modal dashboard, serta chunking di print route terlalu padat sehingga tabel terpotong di bagian bawah.
+- **Rincian Step-by-Step yang Telah Dilakukan**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 177 di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat folder cadangan sementara `_backup_sph_pagination/` dan cadangkan `src/app/admin/finance/page.tsx` serta `src/app/api/finance/print/route.ts`.
+  3. [x] **Langkah 3**: Kunci tinggi Halaman 1 agar tepat 1 lembar A4 (297mm) tanpa tumpah:
+     - Disesuaikan padding atas (80px), padding bawah (75px), tinggi kartu approval tanda tangan `h-28`, serta margin padding syarat dan ketentuan `p-2.5`.
+     - Ditambahkan atribut page-break eksplisit (`page-break-after: always; break-after: page; page-break-inside: avoid;`) sehingga Halaman 1 tidak tumpah dan Lampiran Halaman 2 selalu 100% mulai di lembar baru bersih.
+  4. [x] **Langkah 4**: Terapkan pemecahan paginasi dinamis per lembar A4:
+     - Sesuai spesifikasi pengguna: **Halaman 2 memuat maksimal 13 item**, sedangkan **Halaman 3 dan seterusnya memuat maksimal 15 item**.
+     - Fungsi chunking membagi `items`:
+       - Chunk 1 (Halaman 2): `items.slice(0, 13)`
+       - Chunk 2, 3, dst (Halaman 3, 4, dst): slice per 15 item (`items.slice(i, i + 15)`).
+     - Di `src/app/api/finance/print/route.ts`: Setiap chunk dirender sebagai lembar `.print-sheet` A4 tersendiri dengan kop surat utuh, header lampiran / bersambung, penomoran halaman yang akurat (`Halaman X dari Y`), tabel rapi dengan foto thumbnail dan deskripsi, serta kotak rekapitulasi hanya pada lembar chunk terakhir.
+     - Di `src/app/admin/finance/page.tsx`: Diterapkan pemecahan halaman lampiran yang sama persis (13 item lembar pertama lampiran, 15 item lembar berikutnya) pada modal dashboard SPH.
+  5. [x] **Langkah 5**: Validasi kompilasi lokal `npm run build` di `dstech-smart` (sukses 100%, 58/58 rute).
+  6. [x] **Langkah 6**: Bersihkan folder cadangan sementara `_backup_sph_pagination/`.
+  7. [x] **Langkah 7**: Push commit ke GitHub repository via `push_with_native_git.js` dan deploy ke live server VPS via `deploy_live.js` (PM2 `dstech-main` online).
+  8. [x] **Langkah 8**: Verifikasi dan laporkan kepada pengguna.
+- **Status**: ✅ **SELESAI**
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
