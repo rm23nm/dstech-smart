@@ -4585,16 +4585,22 @@
        * `SMTP 465 SSL`: ✅ **LOGIN OK**
        * `IMAP 993 SSL`: ✅ **LOGIN OK**
        * `Real Email Sending Test`: ✅ **SUKSES** (Email berhasil terkirim dan diterima di mailbox tujuan via LMTP).
-  5. **Daftar Akun Email Resmi Perusahaan Aktif**:
-     - `cs@dstechsmart.com`
-     - `ramadhanist@dstechsmart.com`
-     - `noreplay@dstechsmart.com`
+  5. **Perbaikan Webmail Browser Roundcube (`mail.dstechsmart.com`)**:
+     - *Masalah 1 (Port Firewall)*: Port `8080` dan `8443` belum di-allow pada UFW firewall server sehingga memicu error *Connection Timed Out*. -> Solusi: Menambahkan rule `ufw allow 8080/tcp` dan `ufw allow 8443/tcp`.
+     - *Masalah 2 (PHP 8.3 Mbstring Crash)*: Roundcube bootstrap crash dengan error `503 Service Unavailable` akibat hilangnya modul PHP `mbstring` (`Call to undefined function mb_internal_encoding()`). -> Solusi: Mengompilasi modul `mbstring.so` dari source PHP 8.3, memasang `extension=mbstring.so` di `php.ini`, dan merestart `php-fpm-83`.
+     - *Masalah 3 (Sertifikat SSL Webmail)*: Mengonfigurasikan sertifikat SSL Let's Encrypt resmi `dstechsmart.com` pada vhost Nginx `mail.dstechsmart.com.conf`.
+     - *Hasil Pengujian*: Akses Webmail via `https://mail.dstechsmart.com:8443` dan `http://mail.dstechsmart.com:8080` langsung merespons **HTTP 200 OK** dengan session cookie Roundcube aktif.
+  6. **Daftar Akun Email Resmi Perusahaan Aktif**:
+     - `cs@dstechsmart.com` (Password: `M4m4cantik@`)
+     - `ramadhanist@dstechsmart.com` (Password: `M4m4cantik@`)
+     - `noreplay@dstechsmart.com` (Password: `M4m4cantik`)
 - **Rincian Step-by-Step Pelaksanaan**:
   1. [x] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md`.
   2. [x] **Langkah 2**: Jalankan skrip diagnosis SSH ke VPS untuk memeriksa status service mail (postfix, dovecot, aaPanel mail server).
   3. [x] **Langkah 3**: Periksa port dan konfigurasi DNS domain `dstechsmart.com`.
   4. [x] **Langkah 4**: Perbaiki sertifikat SSL TLS Postfix yang mismatch dan restart service mail.
-  5. [x] **Langkah 5**: Berikan laporan lengkap kredensial & panduan setting email kepada pengguna.
+  5. [x] **Langkah 5**: Buka port 8080/8443 di firewall UFW dan pasang ekstensi PHP `mbstring` untuk mengaktifkan Webmail Roundcube (HTTP 200 OK).
+  6. [x] **Langkah 6**: Berikan laporan lengkap kredensial & panduan setting email kepada pengguna.
 
 ---
 
