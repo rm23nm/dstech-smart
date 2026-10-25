@@ -219,6 +219,8 @@ export default function ShopPage() {
     notes: "",
   });
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  // Kode Unik Transaksi 3 digit acak (100 - 999) untuk verifikasi mutasi bank manual
+  const [uniqueCode, setUniqueCode] = useState<number>(() => Math.floor(Math.random() * 899) + 100);
 
   // Pelacakan & Histori Pesanan (7 Kategori Tab Status)
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
@@ -512,7 +514,7 @@ export default function ShopPage() {
   const cartSubtotal = cart.reduce((acc, item) => acc + item.product.price * item.qty, 0);
   const selectedCourier = SHIPPING_COURIERS.find((c) => c.id === selectedCourierId) || SHIPPING_COURIERS[0];
   const installationFee = includeInstallation ? 350000 : 0;
-  const grandTotal = cartSubtotal + selectedCourier.cost + installationFee;
+  const grandTotal = cartSubtotal + selectedCourier.cost + installationFee + (cart.length > 0 ? uniqueCode : 0);
 
   // Handler Submit Checkout Pesanan
   const handleCheckoutSubmit = async (e: React.FormEvent) => {
@@ -555,6 +557,7 @@ export default function ShopPage() {
         installationFee,
         shippingCourier: selectedCourier.name,
         shippingCost: selectedCourier.cost,
+        uniqueCode,
         paymentMethod: "TRANSFER_BANK",
         paymentBank: `${selectedBank.name} - ${selectedBank.accountNumber} a.n ${selectedBank.accountName}`,
         notes: shippingForm.notes,
@@ -569,10 +572,11 @@ export default function ShopPage() {
       const data = await res.json();
 
       if (data.success && data.data) {
-        // Kosongkan keranjang
+        // Kosongkan keranjang & reset kode unik untuk pesanan berikutnya
         setCart([]);
         setIsCartOpen(false);
         setIsCheckoutStep(false);
+        setUniqueCode(Math.floor(Math.random() * 899) + 100);
 
         // Simpan nomor pesanan ke histori lokal peramban (Guest / User)
         try {
@@ -1529,7 +1533,7 @@ export default function ShopPage() {
                 </div>
 
                 {/* Rincian Total Akhir */}
-                <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-1.5">
+                <div className="p-4 rounded-2xl bg-slate-900 text-white space-y-2">
                   <div className="flex justify-between text-xs text-slate-300">
                     <span>Subtotal Produk:</span>
                     <span>{formatRupiah(cartSubtotal)}</span>
@@ -1544,6 +1548,16 @@ export default function ShopPage() {
                     <span>Biaya Pengiriman ({selectedCourier.name}):</span>
                     <span>{formatRupiah(selectedCourier.cost)}</span>
                   </div>
+                  <div className="flex justify-between text-xs text-amber-300 font-semibold items-center bg-slate-800/80 p-2 rounded-xl border border-amber-500/30">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      Kode Unik Verifikasi:
+                    </span>
+                    <span className="font-mono font-black text-amber-300">+{formatRupiah(uniqueCode)}</span>
+                  </div>
+                  <p className="text-[10px] text-amber-200/70 italic px-1 leading-tight">
+                    *Wajib transfer presisi hingga 3 digit terakhir untuk mempermudah pengecekan mutasi manual.
+                  </p>
                   <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-sm font-black">
                     <span>Total Pembayaran:</span>
                     <span className="text-base text-amber-400 font-mono">{formatRupiah(grandTotal)}</span>
@@ -1773,9 +1787,15 @@ export default function ShopPage() {
                       }`}
                     >
                       {trackedOrder.status === "PAYMENT_PENDING" ? (
-                        <>
-                          <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" /> Belum Bayar
-                        </>
+                        trackedOrder.paymentProof ? (
+                          <>
+                            <Clock className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> Menunggu Verifikasi Pembayaran
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="w-3.5 h-3.5 text-amber-400 animate-spin" /> Belum Bayar
+                          </>
+                        )
                       ) : trackedOrder.status === "PAID" ? (
                         <>
                           <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" /> Pembayaran Diterima
@@ -1811,7 +1831,14 @@ export default function ShopPage() {
                     </div>
                     <div>
                       <span className="text-slate-400 text-[10px] block">Total Pembayaran</span>
-                      <span className="font-bold font-mono text-emerald-400">{formatRupiah(trackedOrder.grandTotal)}</span>
+                      <span className="font-bold font-mono text-emerald-400">
+                        {formatRupiah(trackedOrder.grandTotal)}
+                      </span>
+                      {trackedOrder.uniqueCode && (
+                        <span className="text-[9.5px] font-mono text-amber-300/90 block mt-0.5">
+                          (Kode Unik: +{trackedOrder.uniqueCode})
+                        </span>
+                      )}
                     </div>
                     <div className="col-span-2 sm:col-span-1">
                       <span className="text-slate-400 text-[10px] block">Kurir / Ekspedisi</span>
@@ -1856,16 +1883,81 @@ export default function ShopPage() {
                   </div>
                 </div>
 
-                {/* Upload Bukti Transfer jika status PAYMENT_PENDING */}
-                {trackedOrder.status === "PAYMENT_PENDING" && (
+                {/* Status Verifikasi jika Bukti Transfer sudah diunggah tapi status masih PAYMENT_PENDING */}
+                {trackedOrder.status === "PAYMENT_PENDING" && trackedOrder.paymentProof && (
+                  <div className="p-4 sm:p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 border border-amber-500/40">
+                        <Clock className="w-5 h-5 animate-pulse" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-2">
+                          Bukti Transfer Sedang Diverifikasi
+                          <span className="text-[10px] bg-amber-400/20 text-amber-300 px-2 py-0.5 rounded-full font-mono">
+                            Antrean Validasi
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                          Bukti transfer Anda sebesar <strong className="text-amber-300 font-mono">{formatRupiah(trackedOrder.grandTotal)}</strong> telah berhasil kami terima.
+                          Tim Keuangan PT DSTech Smart Perkasa sedang mencocokkan mutasi rekening bank secara manual.
+                          Status pesanan akan segera berubah menjadi <strong className="text-blue-300">"Pembayaran Diterima"</strong> dan masuk ke tahap <strong className="text-indigo-300">"Sedang Dikemas"</strong> setelah tervalidasi.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-amber-500/20 flex flex-wrap items-center justify-between gap-2">
+                      <a
+                        href={trackedOrder.paymentProof}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 underline"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Lihat Bukti Transfer Terkirim
+                      </a>
+                      <label className="text-[11px] text-slate-400 hover:text-slate-200 cursor-pointer flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Unggah Ulang Bukti (Jika Salah Struk)</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+
+                    {proofFileBase64 && (
+                      <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between gap-2">
+                        <span className="text-xs text-amber-200">File baru dipilih. Siap dikirim ulang?</span>
+                        <button
+                          type="button"
+                          onClick={() => handleUploadProof(trackedOrder.id)}
+                          disabled={uploadProofLoading}
+                          className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl transition cursor-pointer flex items-center gap-1"
+                        >
+                          {uploadProofLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                          Kirim Ulang
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Upload Bukti Transfer jika status PAYMENT_PENDING dan BELUM pernah upload bukti */}
+                {trackedOrder.status === "PAYMENT_PENDING" && !trackedOrder.paymentProof && (
                   <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-200 space-y-3">
                     <div className="flex items-start gap-2.5">
                       <Clock className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
                       <div>
                         <h4 className="text-xs sm:text-sm font-black text-amber-900">Menunggu Bukti Transfer Pembayaran</h4>
                         <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
-                          Silakan transfer tepat sebesar <strong>{formatRupiah(trackedOrder.grandTotal)}</strong> ke rekening
+                          Silakan transfer tepat sebesar <strong className="font-mono text-amber-950 text-xs sm:text-sm bg-amber-100 px-1.5 py-0.5 rounded">{formatRupiah(trackedOrder.grandTotal)}</strong> ke rekening
                           tujuan: <strong>{trackedOrder.paymentBank || "BCA 1234567890 a.n PT DSTech Smart Perkasa"}</strong>.
+                          {trackedOrder.uniqueCode && (
+                            <span className="block mt-1 text-[11px] font-bold text-amber-900">
+                              *Wajib transfer tepat hingga 3 digit terakhir (+Rp {trackedOrder.uniqueCode}) agar mutasi bank dapat diverifikasi dengan cepat.
+                            </span>
+                          )}
                           Setelah transfer, unggah foto/screenshot struk bukti transfer di bawah.
                         </p>
                       </div>
@@ -2057,9 +2149,15 @@ export default function ShopPage() {
                               }`}
                             >
                               {ord.status === "PAYMENT_PENDING" ? (
-                                <>
-                                  <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin" /> Belum Bayar
-                                </>
+                                ord.paymentProof ? (
+                                  <>
+                                    <Clock className="w-3.5 h-3.5 text-amber-500 animate-pulse" /> Menunggu Verifikasi
+                                  </>
+                                ) : (
+                                  <>
+                                    <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin" /> Belum Bayar
+                                  </>
+                                )
                               ) : ord.status === "PAID" ? (
                                 <>
                                   <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" /> Pembayaran Diterima
@@ -2130,6 +2228,11 @@ export default function ShopPage() {
                               <span className="text-base font-black font-mono text-dstech-blue">
                                 {formatRupiah(ord.grandTotal)}
                               </span>
+                              {ord.uniqueCode && (
+                                <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded block mt-0.5">
+                                  Kode Unik: +{ord.uniqueCode}
+                                </span>
+                              )}
                               {ord.trackingNumber && (
                                 <span className="text-[10px] font-mono text-slate-500 block">
                                   Resi: <strong>{ord.trackingNumber}</strong>
@@ -2150,17 +2253,30 @@ export default function ShopPage() {
                                 <span>Lacak Pengiriman</span>
                               </button>
 
-                              {/* Tombol Bayar jika PAYMENT_PENDING */}
+                              {/* Tombol Bayar / Cek Status jika PAYMENT_PENDING */}
                               {ord.status === "PAYMENT_PENDING" && (
                                 <button
                                   onClick={() => {
                                     setTrackedOrder(ord);
                                     setTrackingQuery(ord.orderNumber);
                                   }}
-                                  className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                                  className={`px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
+                                    ord.paymentProof
+                                      ? "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300"
+                                      : "bg-amber-500 hover:bg-amber-600 text-white"
+                                  }`}
                                 >
-                                  <CreditCard className="w-3 h-3" />
-                                  <span>Upload Bukti Bayar</span>
+                                  {ord.paymentProof ? (
+                                    <>
+                                      <Clock className="w-3 h-3 text-amber-700" />
+                                      <span>Status Verifikasi</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CreditCard className="w-3 h-3" />
+                                      <span>Upload Bukti Bayar</span>
+                                    </>
+                                  )}
                                 </button>
                               )}
 

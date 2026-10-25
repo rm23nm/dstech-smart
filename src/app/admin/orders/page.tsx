@@ -77,6 +77,8 @@ interface Order {
   paymentMethod: string;
   paymentBank: string;
   paymentProof?: string | null;
+  paymentProofUploadedAt?: string | null;
+  uniqueCode?: number;
   notes?: string;
   subtotal: number;
   grandTotal: number;
@@ -193,10 +195,14 @@ export default function AdminOrdersPage() {
     return true;
   });
 
-  const getStatusBadge = (status: Order["status"]) => {
+  const getStatusBadge = (status: Order["status"], paymentProof?: string | null) => {
     switch (status) {
       case "PAYMENT_PENDING":
-        return (
+        return paymentProof ? (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-900 border border-amber-300 shadow-xs animate-pulse">
+            <Clock className="w-3.5 h-3.5 text-amber-600" /> Menunggu Verifikasi
+          </span>
+        ) : (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-50 text-amber-700 border border-amber-200">
             <Clock className="w-3.5 h-3.5 text-amber-500 animate-spin" /> Belum Bayar
           </span>
@@ -587,11 +593,17 @@ export default function AdminOrdersPage() {
                       )}
                     </td>
 
-                    {/* Total Biaya */}
+                    {/* Total Biaya & Kode Unik */}
                     <td className="py-4 px-5 align-top">
-                      <div className="font-black text-slate-900 text-xs">
+                      <div className="font-black text-slate-900 text-xs font-mono">
                         {formatRupiah(order.grandTotal)}
                       </div>
+                      {order.uniqueCode ? (
+                        <div className="text-[10px] font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded inline-flex items-center gap-1 mt-1">
+                          <span>Kode Unik:</span>
+                          <span className="font-black text-amber-900">+{order.uniqueCode}</span>
+                        </div>
+                      ) : null}
                       <div className="text-[10px] text-slate-400 mt-1">
                         Subtotal: {formatRupiah(order.subtotal)}
                       </div>
@@ -651,12 +663,23 @@ export default function AdminOrdersPage() {
 
                     {/* Status */}
                     <td className="py-4 px-5 align-top">
-                      {getStatusBadge(order.status)}
+                      {getStatusBadge(order.status, order.paymentProof)}
                     </td>
 
                     {/* Tombol Aksi */}
                     <td className="py-4 px-5 align-top text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        {order.status === "PAYMENT_PENDING" && order.paymentProof && (
+                          <button
+                            onClick={() => handleOpenProcessModal(order, "confirm_payment")}
+                            className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer animate-pulse"
+                            title="Verifikasi Bukti Transfer & Konfirmasi Pembayaran"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span className="hidden lg:inline">Verifikasi</span>
+                          </button>
+                        )}
+
                         <button
                           onClick={() => handleOpenProcessModal(order)}
                           className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-dstech-blue text-white font-black text-xs flex items-center gap-1 shadow-sm transition-all cursor-pointer"
@@ -709,7 +732,7 @@ export default function AdminOrdersPage() {
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500">Status Terkini:</span>
-                  <div>{getStatusBadge(selectedOrder.status)}</div>
+                  <div>{getStatusBadge(selectedOrder.status, selectedOrder.paymentProof)}</div>
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -721,10 +744,47 @@ export default function AdminOrdersPage() {
 
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-500">Total Tagihan:</span>
-                  <span className="text-xs font-black text-dstech-red">
-                    {formatRupiah(selectedOrder.grandTotal)}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-xs font-black text-dstech-red font-mono">
+                      {formatRupiah(selectedOrder.grandTotal)}
+                    </span>
+                    {selectedOrder.uniqueCode && (
+                      <span className="text-[10px] font-mono font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded block mt-0.5">
+                        Termasuk Kode Unik: +{selectedOrder.uniqueCode}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {selectedOrder.paymentProof && (
+                  <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-amber-300 bg-white shrink-0">
+                        <Image
+                          src={selectedOrder.paymentProof}
+                          alt="Bukti Transfer"
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-xs font-black text-amber-950 block">Bukti Transfer Pelanggan</span>
+                        <span className="text-[10px] text-amber-800">Cek mutasi bank nominal {formatRupiah(selectedOrder.grandTotal)}</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProofImageSrc(selectedOrder.paymentProof!);
+                        setIsPreviewProofOpen(true);
+                      }}
+                      className="px-2.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-xs cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Perbesar Bukti</span>
+                    </button>
+                  </div>
+                )}
 
                 <div className="text-xs text-slate-600 border-t border-slate-200 pt-2 flex items-start gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />

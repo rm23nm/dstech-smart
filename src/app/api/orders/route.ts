@@ -114,13 +114,22 @@ export async function POST(req: Request) {
 
     // Hitung subtotal barang
     const subtotal = items.reduce((acc: number, item: any) => acc + (Number(item.price) || 0) * (Number(item.qty) || 1), 0);
-    const grandTotal = subtotal + (includeInstallation ? Number(installationFee) || 0 : 0) + (Number(shippingCost) || 0);
+    
+    // Kode Unik Transaksi (100 - 999) agar mudah diverifikasi di mutasi rekening bank secara manual
+    let uniqueCode = Number(body.uniqueCode) || 0;
+    if (!uniqueCode || uniqueCode < 100 || uniqueCode > 999) {
+      uniqueCode = Math.floor(Math.random() * 899) + 100;
+    }
+
+    const installationTotal = includeInstallation ? Number(installationFee) || 0 : 0;
+    const shippingTotal = Number(shippingCost) || 0;
+    const grandTotal = subtotal + installationTotal + shippingTotal + uniqueCode;
 
     const initialTimeline = [
       {
         status: "PAYMENT_PENDING",
         title: "Pesanan Berhasil Dibuat",
-        description: `Pesanan #${orderNumber} telah dibuat. Menunggu konfirmasi pembayaran dari pelanggan.`,
+        description: `Pesanan #${orderNumber} telah dibuat dengan total Rp ${grandTotal.toLocaleString("id-ID")} (termasuk kode unik verifikasi Rp ${uniqueCode}). Menunggu transfer pembayaran dari pelanggan.`,
         timestamp: now.toISOString(),
       },
     ];
@@ -150,18 +159,20 @@ export async function POST(req: Request) {
         category: i.category || "Perangkat Teknologi",
       })),
       includeInstallation: !!includeInstallation,
-      installationFee: includeInstallation ? Number(installationFee) || 0 : 0,
+      installationFee: installationTotal,
       shippingCourier,
-      shippingCost: Number(shippingCost) || 0,
+      shippingCost: shippingTotal,
+      uniqueCode,
       trackingNumber: "", // Diisi saat status SHIPPED
       courierPhone: "",
       paymentMethod,
       paymentBank,
       paymentProof: null,
+      paymentProofUploadedAt: null,
       notes,
       subtotal,
       grandTotal,
-      status: "PAYMENT_PENDING", // PAYMENT_PENDING | PAID | PROCESSING | SHIPPED | DELIVERED | CANCELLED
+      status: "PAYMENT_PENDING", // PAYMENT_PENDING | PAID | PROCESSING | SHIPPED | DELIVERED | CANCELLED | RETURN
       trackingTimeline: initialTimeline,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
@@ -205,22 +216,23 @@ export async function PATCH(req: Request) {
     }
 
     if (action === "upload_proof") {
-      // Pembeli mengunggah bukti pembayaran
+      // Pembeli mengunggah bukti pembayaran: Status TETAP PAYMENT_PENDING sampai diverifikasi Admin
       targetOrder.paymentProof = paymentProof;
-      targetOrder.status = "PAID";
+      targetOrder.paymentProofUploadedAt = nowIso;
       targetOrder.trackingTimeline.push({
-        status: "PAID",
-        title: "Bukti Pembayaran Diunggah",
-        description: note || "Bukti transfer telah diterima dan sedang diverifikasi oleh Tim Keuangan DSTech Smart.",
+        status: "PAYMENT_PENDING",
+        title: "Bukti Pembayaran Diunggah (Menunggu Verifikasi)",
+        description: note || "Bukti transfer telah berhasil dikirim dan sedang dalam antrean verifikasi manual oleh Tim Keuangan PT DSTech Smart Perkasa.",
         timestamp: nowIso,
       });
     } else if (action === "confirm_payment") {
-      // Admin mengonfirmasi pembayaran sah
+      // Admin mengonfirmasi pembayaran sah setelah cek mutasi rekening
       targetOrder.status = "PAID";
+      targetOrder.confirmedAt = nowIso;
       targetOrder.trackingTimeline.push({
         status: "PAID",
-        title: "Pembayaran Dikonfirmasi Sah",
-        description: note || "Pembayaran telah tervalidasi lunas di rekening resmi PT. DSTech Smart Perkasa.",
+        title: "Pembayaran Dikonfirmasi Sah (Lunas)",
+        description: note || "Pembayaran telah dicocokkan dengan mutasi rekening bank dan dinyatakan sah lunas oleh Tim Keuangan PT DSTech Smart Perkasa.",
         timestamp: nowIso,
       });
     } else if (action === "process_packing") {
