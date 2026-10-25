@@ -30347,6 +30347,13 @@ export default function AdminFinanceERPPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Keterangan Pengesahan Legalitas Dokumen */}
+                <div className="mt-4 p-2 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                  <p className="text-[8px] text-slate-500 leading-tight">
+                    <span className="font-bold text-slate-700">Keterangan Pengesahan Legalitas:</span> Dokumen Laporan Foto Dokumentasi &amp; Pergantian Part ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT. DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+                  </p>
+                </div>
               </div>
             </div>
           );

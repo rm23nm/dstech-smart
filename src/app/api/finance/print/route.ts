@@ -2206,6 +2206,13 @@ export async function GET(req: Request) {
             <p class="text-[10px] text-slate-500">Project Coordinator / Teknisi Pelaksana</p>
           </div>
         </div>
+
+        <!-- Klausul Legalitas / Keterangan Pengesahan Dokumentasi -->
+        <div class="mt-3 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
+          <p class="text-[7.5px] text-slate-500 leading-tight">
+            <span class="font-bold text-slate-700">Keterangan Pengesahan Legalitas:</span> Dokumen Laporan Foto Dokumentasi &amp; Pergantian Part ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT. DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+          </p>
+        </div>
       </div>
     `;
   } else {
