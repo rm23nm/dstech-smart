@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_orders.json");
+const USERS_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
 
 function readOrders(): any[] {
   try {
@@ -27,6 +28,48 @@ function writeOrders(orders: any[]): boolean {
   } catch (err) {
     console.error("Gagal menulis dstech_orders.json:", err);
     return false;
+  }
+}
+
+function syncOrderCustomerToUsers(order: any): void {
+  try {
+    if (!order || (!order.customerEmail && !order.customerPhone)) return;
+    const email = (order.customerEmail || "").trim().toLowerCase();
+    const phone = (order.customerPhone || "").trim();
+    const name = (order.customerName || order.shippingAddress?.recipientName || "Pelanggan E-Store").trim();
+
+    let users: any[] = [];
+    if (fs.existsSync(USERS_FILE)) {
+      users = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+    }
+
+    const existingClient = users.find(
+      (u) =>
+        u.role === "CLIENT" &&
+        ((email && u.email && u.email.trim().toLowerCase() === email) ||
+          (phone && u.phone && u.phone.trim() === phone))
+    );
+
+    if (!existingClient) {
+      users.unshift({
+        id: `dstech_usr_${order.userId || "client_" + Date.now()}`,
+        name: name,
+        email: email || `client_${phone.replace(/\D/g, "")}@dstechsmart.com`,
+        role: "CLIENT",
+        password: "dstech" + Math.floor(100 + Math.random() * 900),
+        phone: phone || order.shippingAddress?.phone || "",
+        status: "ACTIVE",
+        expiresAt: null,
+        attendanceLocationLock: "ANY",
+        officeRadius: 100,
+        position: "Pelanggan E-Store",
+        createdAt: order.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+    }
+  } catch (err) {
+    console.error("Gagal sinkronisasi data pembeli ke users:", err);
   }
 }
 
@@ -180,6 +223,7 @@ export async function POST(req: Request) {
 
     orders.unshift(newOrder);
     writeOrders(orders);
+    syncOrderCustomerToUsers(newOrder);
 
     return NextResponse.json({
       success: true,

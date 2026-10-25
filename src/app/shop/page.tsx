@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -155,27 +155,34 @@ const SHIPPING_COURIERS = [
   },
 ];
 
-const PAYMENT_BANKS = [
+export interface BankOption {
+  id: string;
+  name: string;
+  accountNumber: string;
+  accountName: string;
+  branch?: string;
+  entityType?: "PT" | "NON_PT";
+  logo: string;
+}
+
+const DEFAULT_PAYMENT_BANKS: BankOption[] = [
   {
-    id: "BCA",
+    id: "dstech_bank_bca_pt",
     name: "Bank BCA",
-    accountNumber: "1234567890",
-    accountName: "PT. DSTECH SMART PERKASA",
+    accountNumber: "295-074-0321",
+    accountName: "PT. DSTech Smart Perkasa",
+    branch: "KCU Cilegon",
+    entityType: "PT",
     logo: "BCA",
   },
   {
-    id: "MANDIRI",
-    name: "Bank Mandiri",
-    accountNumber: "9876543210123",
-    accountName: "PT. DSTECH SMART PERKASA",
-    logo: "MANDIRI",
-  },
-  {
-    id: "BRI",
-    name: "Bank BRI",
-    accountNumber: "001234567890530",
-    accountName: "PT. DSTECH SMART PERKASA",
-    logo: "BRI",
+    id: "dstech_bank_bca_owner",
+    name: "Bank BCA",
+    accountNumber: "6520490131",
+    accountName: "RAMADHANI ST",
+    branch: "KCU Cilegon",
+    entityType: "NON_PT",
+    logo: "BCA",
   },
 ];
 
@@ -209,7 +216,7 @@ export default function ShopPage() {
   const [isCheckoutStep, setIsCheckoutStep] = useState(false);
   const [includeInstallation, setIncludeInstallation] = useState(false);
   const [selectedCourierId, setSelectedCourierId] = useState<string>("ARMADA_DSTECH");
-  const [selectedBankId, setSelectedBankId] = useState<string>("BCA");
+  const [selectedBankId, setSelectedBankId] = useState<string>("dstech_bank_bca_pt");
   const [shippingForm, setShippingForm] = useState({
     recipientName: "",
     phone: "",
@@ -259,6 +266,36 @@ export default function ShopPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   // Site branding settings
   const [siteSettings, setSiteSettings] = useState<any>(null);
+
+  // Daftar Rekening Resmi Perusahaan Dinamis dari Pengaturan Sistem (Bukan Dummy)
+  const paymentBanks: BankOption[] = useMemo(() => {
+    if (siteSettings?.bankAccounts && Array.isArray(siteSettings.bankAccounts) && siteSettings.bankAccounts.length > 0) {
+      const active = siteSettings.bankAccounts.filter((b: any) => b.status === "Aktif" || !b.status);
+      if (active.length > 0) {
+        return active.map((b: any) => ({
+          id: b.id || b.accountNumber,
+          name: b.bankName || "Bank BCA",
+          accountNumber: b.accountNumber,
+          accountName: b.accountHolder || siteSettings.companyName || "PT. DSTech Smart Perkasa",
+          branch: b.branch || "KCU Cilegon",
+          entityType: b.entityType || "PT",
+          logo: (b.bankName || "").toUpperCase().includes("MANDIRI")
+            ? "MANDIRI"
+            : (b.bankName || "").toUpperCase().includes("BRI")
+            ? "BRI"
+            : "BCA",
+        }));
+      }
+    }
+    return DEFAULT_PAYMENT_BANKS;
+  }, [siteSettings]);
+
+  // Sinkronisasi otomatis default rekening tujuan
+  useEffect(() => {
+    if (paymentBanks.length > 0 && (!selectedBankId || !paymentBanks.some((b) => b.id === selectedBankId))) {
+      setSelectedBankId(paymentBanks[0].id);
+    }
+  }, [paymentBanks, selectedBankId]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -547,7 +584,7 @@ export default function ShopPage() {
     setIsSubmittingOrder(true);
 
     try {
-      const selectedBank = PAYMENT_BANKS.find((b) => b.id === selectedBankId) || PAYMENT_BANKS[0];
+      const selectedBank = paymentBanks.find((b) => b.id === selectedBankId) || paymentBanks[0];
 
       const payload = {
         userId: currentUser.id,
@@ -569,7 +606,7 @@ export default function ShopPage() {
         shippingCost: selectedCourier.cost,
         uniqueCode,
         paymentMethod: "TRANSFER_BANK",
-        paymentBank: `${selectedBank.name} - ${selectedBank.accountNumber} a.n ${selectedBank.accountName}`,
+        paymentBank: `${selectedBank.name} - ${selectedBank.accountNumber} a.n ${selectedBank.accountName} (${selectedBank.branch || "Cilegon"})`,
         notes: shippingForm.notes,
       };
 
@@ -1584,26 +1621,47 @@ export default function ShopPage() {
                   </div>
                 </div>
 
-                {/* Pilihan Rekening Pembayaran */}
+                {/* Pilihan Rekening Pembayaran Resmi */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                    <CreditCard className="w-3.5 h-3.5 text-dstech-blue" />
-                    Rekening Resmi Tujuan Transfer
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {PAYMENT_BANKS.map((b) => (
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <CreditCard className="w-3.5 h-3.5 text-dstech-blue" />
+                      Rekening Resmi Tujuan Transfer PT. DSTech Smart Perkasa
+                    </h4>
+                    <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      ✓ Terverifikasi Otomatis
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {paymentBanks.map((b) => (
                       <button
                         type="button"
                         key={b.id}
                         onClick={() => setSelectedBankId(b.id)}
-                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                           selectedBankId === b.id
-                            ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                            ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-dstech-blue/40"
                             : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
                         }`}
                       >
-                        <div className="text-xs font-black">{b.name}</div>
-                        <div className="text-[10px] font-mono mt-0.5 opacity-80">{b.accountNumber}</div>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-black">{b.name}</span>
+                          <span
+                            className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                              selectedBankId === b.id
+                                ? "bg-blue-500/30 text-blue-300"
+                                : "bg-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {b.entityType === "PT" ? "Akun Resmi PT" : "Rekening Usaha"}
+                          </span>
+                        </div>
+                        <div className="text-sm font-mono font-black tracking-wider text-amber-400">
+                          {b.accountNumber}
+                        </div>
+                        <div className="text-[10.5px] opacity-80 mt-0.5 line-clamp-1">
+                          a.n {b.accountName} {b.branch ? `(${b.branch})` : ""}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -2029,7 +2087,7 @@ export default function ShopPage() {
                         <h4 className="text-xs sm:text-sm font-black text-amber-900">Menunggu Bukti Transfer Pembayaran</h4>
                         <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
                           Silakan transfer tepat sebesar <strong className="font-mono text-amber-950 text-xs sm:text-sm bg-amber-100 px-1.5 py-0.5 rounded">{formatRupiah(trackedOrder.grandTotal)}</strong> ke rekening
-                          tujuan: <strong>{trackedOrder.paymentBank || "BCA 1234567890 a.n PT DSTech Smart Perkasa"}</strong>.
+                          tujuan: <strong>{trackedOrder.paymentBank || "Bank BCA - 295-074-0321 a.n PT. DSTech Smart Perkasa (KCU Cilegon)"}</strong>.
                           {trackedOrder.uniqueCode && (
                             <span className="block mt-1 text-[11px] font-bold text-amber-900">
                               *Wajib transfer tepat hingga 3 digit terakhir (+Rp {trackedOrder.uniqueCode}) agar mutasi bank dapat diverifikasi dengan cepat.

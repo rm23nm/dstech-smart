@@ -4,6 +4,7 @@ import path from "path";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
 const CONTRACTS_FILE = path.join(process.cwd(), "src", "data", "dstech_contracts.json");
+const ORDERS_FILE = path.join(process.cwd(), "src", "data", "dstech_orders.json");
 
 const DEFAULT_USERS = [
   {
@@ -81,6 +82,53 @@ function syncContractsWithUsers(users: any[]): boolean {
   }
 }
 
+function syncOrdersWithUsers(users: any[]): boolean {
+  try {
+    if (!fs.existsSync(ORDERS_FILE)) return false;
+    const ordersData = JSON.parse(fs.readFileSync(ORDERS_FILE, "utf-8"));
+    const orders = ordersData.orders || [];
+    let updated = false;
+
+    for (const order of orders) {
+      const email = (order.customerEmail || "").trim().toLowerCase();
+      const phone = (order.customerPhone || "").trim();
+      const name = (order.customerName || order.shippingAddress?.recipientName || "").trim();
+      if (!email && !phone) continue;
+
+      // Cek apakah sudah ada akun dengan role CLIENT untuk pembeli ini
+      const existingClient = users.find(
+        (u) =>
+          u.role === "CLIENT" &&
+          ((email && u.email && u.email.trim().toLowerCase() === email) ||
+            (phone && u.phone && u.phone.trim() === phone))
+      );
+
+      if (!existingClient) {
+        users.push({
+          id: `dstech_usr_${order.userId || "client_" + Date.now()}`,
+          name: name || "Pelanggan E-Store",
+          email: email || `client_${phone.replace(/\D/g, "")}@dstechsmart.com`,
+          role: "CLIENT",
+          password: "dstech" + Math.floor(100 + Math.random() * 900),
+          phone: phone || order.shippingAddress?.phone || "",
+          status: "ACTIVE",
+          expiresAt: null,
+          attendanceLocationLock: "ANY",
+          officeRadius: 100,
+          position: "Pelanggan E-Store",
+          createdAt: order.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        updated = true;
+      }
+    }
+    return updated;
+  } catch (err) {
+    console.error("Error syncing orders to users:", err);
+    return false;
+  }
+}
+
 function readUsers(): any[] {
   try {
     let users: any[] = [];
@@ -96,7 +144,9 @@ function readUsers(): any[] {
       users = DEFAULT_USERS;
     }
 
-    if (syncContractsWithUsers(users)) {
+    const contractsUpdated = syncContractsWithUsers(users);
+    const ordersUpdated = syncOrdersWithUsers(users);
+    if (contractsUpdated || ordersUpdated) {
       writeUsers(users);
     }
     return users;
@@ -173,10 +223,13 @@ export async function POST(request: Request) {
 
     const users = readUsers();
 
-    const existing = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const targetRole = role || "CLIENT";
+    const existing = users.find(
+      (u) => u.email.toLowerCase() === email.toLowerCase() && u.role === targetRole
+    );
     if (existing) {
       return NextResponse.json(
-        { success: false, message: "Email sudah terdaftar oleh pengguna lain." },
+        { success: false, message: `Email '${email}' sudah terdaftar pada peran ${targetRole}.` },
         { status: 409 }
       );
     }
@@ -185,10 +238,10 @@ export async function POST(request: Request) {
       id: `dstech_usr_${Date.now()}`,
       name: name.trim(),
       email: email.trim().toLowerCase(),
-      role: role || "CLIENT",
+      role: targetRole,
       password: password && password.trim() ? password.trim() : "dstech123",
       phone: phone ? phone.trim() : "",
-      status: status || "ACTIVE",
+      status: (status || "ACTIVE").toUpperCase(),
       expiresAt: expiresAt || null,
       attendanceLocationLock: attendanceLocationLock || "ANY",
       officeRadius: officeRadius ? Number(officeRadius) : 100,
