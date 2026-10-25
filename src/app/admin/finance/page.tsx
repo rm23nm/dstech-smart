@@ -9861,11 +9861,18 @@ export default function AdminFinanceERPPage() {
                                 ? "bg-emerald-100 text-emerald-800"
                                 : po.status === "Dibatalkan"
                                 ? "bg-rose-100 text-rose-800"
+                                : (po as any).supplierApproved || po.status === "Dikonfirmasi Vendor"
+                                ? "bg-emerald-100 text-emerald-800"
                                 : "bg-blue-100 text-blue-800"
                             }`}
                           >
                             {po.status}
                           </span>
+                          {(po as any).supplierApproved && (
+                            <span className="block text-[8px] text-emerald-700 font-bold mt-1">
+                              ✓ Dikonfirmasi Vendor
+                            </span>
+                          )}
                         </td>
                         <td className="p-3 whitespace-nowrap font-bold text-slate-700">
                           {po.paymentStatus}
@@ -22048,18 +22055,40 @@ export default function AdminFinanceERPPage() {
                       </p>
                     </div>
 
-                    <div className="h-11 flex items-center justify-center text-slate-300 text-[9px] italic">
-                      (Tanda Tangan, Nama Jelas & Stempel Vendor)
+                    <div className="h-11 relative flex items-center justify-center">
+                      {(selectedPoForPrint as any).supplierSignatureImage ? (
+                        <>
+                          <img
+                            src={(selectedPoForPrint as any).supplierSignatureImage}
+                            alt="Tanda Tangan Vendor"
+                            className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
+                          />
+                          <div className="absolute right-1 top-0 px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[6.5px] font-bold border border-emerald-300 print:hidden">
+                            DIGITAL CONFIRMED
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-slate-300 text-[9px] italic">
+                          (Tanda Tangan, Nama Jelas &amp; Stempel Vendor)
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
-                        {selectedPoForPrint.supplierContact
+                        {(selectedPoForPrint as any).supplierSignerName
+                          ? `( ${(selectedPoForPrint as any).supplierSignerName} )`
+                          : selectedPoForPrint.supplierContact
                           ? `( ${selectedPoForPrint.supplierContact.split("(")[0].trim()} )`
                           : "( ................................................................ )"}
                       </p>
                       <p className="text-[9px] text-slate-500">
-                        Sales / PIC Rekanan Vendor
+                        {(selectedPoForPrint as any).supplierSignerTitle || "Sales / PIC Rekanan Vendor"}
+                        {(selectedPoForPrint as any).supplierApprovedAt && (
+                          <span className="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">
+                            Dikonfirmasi: {(selectedPoForPrint as any).supplierApprovedAt}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -22127,6 +22156,13 @@ export default function AdminFinanceERPPage() {
                         </p>
                       )}
                     </div>
+                  </div>
+
+                  {/* Legal Disclaimer UU ITE */}
+                  <div className="col-span-2 pt-2 text-center border-t border-slate-100">
+                    <p className="text-[8px] text-slate-500 leading-tight italic">
+                      Dokumen Purchase Order ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT. DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Tahun 2008 Pasal 11 &amp; PP No. 71 Tahun 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -25148,18 +25184,36 @@ export default function AdminFinanceERPPage() {
                     </p>
                     <p className="text-[11px] font-black text-slate-900">{selectedSaleForBast.customerName}</p>
 
-                    <div className="h-11 flex items-center justify-center">
-                      <div className="font-serif italic text-sm text-slate-400 select-none">
-                        ( Tanda Tangan &amp; Materai / Stempel Klien )
-                      </div>
+                    <div className="h-11 relative flex items-center justify-center">
+                      {(selectedSaleForBast as any).bastSignatureImage ? (
+                        <>
+                          <img
+                            src={(selectedSaleForBast as any).bastSignatureImage}
+                            alt="Tanda Tangan Klien BAST"
+                            className="print-signature-img max-h-11 max-w-[130px] object-contain relative z-10"
+                          />
+                          <div className="absolute right-1 top-0 px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[6.5px] font-bold border border-emerald-300 print:hidden">
+                            DIGITAL SIGNED
+                          </div>
+                        </>
+                      ) : (
+                        <div className="font-serif italic text-sm text-slate-400 select-none">
+                          ( Tanda Tangan &amp; Materai / Stempel Klien )
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-[11px]">
-                        ( {bastConfig.receivedByName} )
+                        ( {(selectedSaleForBast as any).bastSignerName || bastConfig.receivedByName} )
                       </p>
                       <p className="text-[9px] text-slate-500 mt-0.5">
-                        {bastConfig.receivedByTitle}
+                        {(selectedSaleForBast as any).bastSignerTitle || bastConfig.receivedByTitle}
+                        {(selectedSaleForBast as any).bastApprovedAt && (
+                          <span className="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">
+                            Disetujui: {(selectedSaleForBast as any).bastApprovedAt}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -25712,18 +25766,36 @@ export default function AdminFinanceERPPage() {
                     </p>
                     <p className="text-[10px] font-black text-slate-900">{selectedSaleForDelivery.customerName}</p>
 
-                    <div className="h-11 flex items-center justify-center">
-                      <div className="font-serif italic text-xs text-slate-400 select-none">
-                        ( Tanda Tangan &amp; Stempel Penerima )
-                      </div>
+                    <div className="h-11 relative flex items-center justify-center">
+                      {(selectedSaleForDelivery as any).deliverySignatureImage ? (
+                        <>
+                          <img
+                            src={(selectedSaleForDelivery as any).deliverySignatureImage}
+                            alt="Tanda Tangan Penerima"
+                            className="print-signature-img max-h-11 max-w-[110px] object-contain relative z-10"
+                          />
+                          <div className="absolute right-0 top-0 px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[6px] font-bold border border-emerald-300 print:hidden">
+                            DIGITAL SIGNED
+                          </div>
+                        </>
+                      ) : (
+                        <div className="font-serif italic text-xs text-slate-400 select-none">
+                          ( Tanda Tangan &amp; Stempel Penerima )
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-[10px]">
-                        ( {deliveryConfig.receivedByName} )
+                        ( {(selectedSaleForDelivery as any).deliverySignerName || deliveryConfig.receivedByName} )
                       </p>
                       <p className="text-[8.5px] text-slate-500 mt-0.5">
-                        {deliveryConfig.receivedByTitle}
+                        {(selectedSaleForDelivery as any).deliverySignerTitle || deliveryConfig.receivedByTitle}
+                        {(selectedSaleForDelivery as any).deliveryApprovedAt && (
+                          <span className="block text-[7.5px] text-emerald-700 font-mono mt-0.5 font-bold">
+                            Diterima: {(selectedSaleForDelivery as any).deliveryApprovedAt}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -30199,14 +30271,34 @@ export default function AdminFinanceERPPage() {
                   <div className="text-center space-y-1">
                     <span className="text-[11px] text-slate-500 font-bold block">Pihak Klien / Penerima:</span>
                     <span className="font-black text-slate-900 block">{selectedInvoiceForPhotoPrint.customerName}</span>
-                    <div className="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
-                      <span className="text-[10px] text-slate-300 italic">( Tanda Tangan & Cap Klien )</span>
+                    <div className="h-20 relative flex items-center justify-center border-b border-dashed border-slate-300">
+                      {(selectedInvoiceForPhotoPrint as any).photosSignatureImage ? (
+                        <>
+                          <img
+                            src={(selectedInvoiceForPhotoPrint as any).photosSignatureImage}
+                            alt="Tanda Tangan Klien"
+                            className="h-16 max-w-[150px] object-contain pointer-events-none z-10"
+                          />
+                          <div className="absolute right-0 top-0 px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[6.5px] font-bold border border-emerald-300 print:hidden">
+                            DIGITAL SIGNED
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap Klien )</span>
+                      )}
                     </div>
                     <div className="pt-1">
                       <p className="font-black text-slate-900 underline text-xs">
-                        ( .................................................... )
+                        ( {(selectedInvoiceForPhotoPrint as any).photosSignerName || "...................................................."} )
                       </p>
-                      <p className="text-[10px] text-slate-500">PIC / Penanggung Jawab Lapangan</p>
+                      <p className="text-[10px] text-slate-500">
+                        {(selectedInvoiceForPhotoPrint as any).photosSignerTitle || "PIC / Penanggung Jawab Lapangan"}
+                        {(selectedInvoiceForPhotoPrint as any).photosApprovedAt && (
+                          <span className="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">
+                            Disetujui: {(selectedInvoiceForPhotoPrint as any).photosApprovedAt}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
 

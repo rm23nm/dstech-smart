@@ -1172,6 +1172,15 @@ export async function GET(req: Request) {
             </div>
           </div>
           <div class="flex items-center gap-2">
+            ${po.supplierApproved ? `
+              <div class="px-3.5 py-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                <span>✅ PO Dikonfirmasi Vendor (${po.supplierSignerName || "Vendor"})</span>
+              </div>
+            ` : `
+              <button onclick="openVendorSignModal()" class="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 shadow-lg shadow-amber-500/30 cursor-pointer transition transform hover:scale-[1.02]">
+                <span>✍️ Konfirmasi &amp; Tanda Tangani PO (Vendor)</span>
+              </button>
+            `}
             <!-- Kop Surat Resmi Terkunci Permanen untuk Klien -->
             <input type="hidden" id="toggle-letterhead" value="1" checked />
             <button onclick="window.print()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition">
@@ -1337,15 +1346,28 @@ export async function GET(req: Request) {
               <!-- Sisi Kiri: Vendor / Supplier -->
               <div class="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-3 bg-white shadow-xs text-center">
                 <div>
-                  <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dikonfirmasi & Diterima Oleh,</p>
+                  <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dikonfirmasi &amp; Diterima Oleh,</p>
                   <p class="text-xs font-black text-slate-900 mt-0.5">${po.supplierName}</p>
                 </div>
-                <div class="h-12 flex items-center justify-center text-slate-300 text-[9px] italic">
-                  (Tanda Tangan & Stempel Vendor)
+                <div class="h-12 flex items-center justify-center text-slate-300 text-[9px] italic relative">
+                  ${po.supplierSignatureImage ? `
+                    <img src="${po.supplierSignatureImage}" alt="Tanda Tangan Vendor" class="max-h-12 max-w-[130px] object-contain relative z-10" />
+                    <span class="absolute bottom-0 text-[6.5px] text-emerald-700 font-bold bg-emerald-50 px-1 rounded border border-emerald-300">✓ Terverifikasi Digital</span>
+                  ` : `
+                    <button type="button" onclick="openVendorSignModal()" class="print-hidden px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-[9.5px] font-black shadow-2xs transition-all cursor-pointer flex items-center gap-1">
+                      <span>✍️ Tanda Tangani Online</span>
+                    </button>
+                    <span class="hidden print:inline text-slate-300 text-[9px] italic">(Tanda Tangan &amp; Stempel Vendor)</span>
+                  `}
                 </div>
                 <div class="pt-1 border-t border-slate-200">
-                  <p class="font-bold text-slate-900 text-xs">${po.supplierContact ? `( ${po.supplierContact.split("(")[0].trim()} )` : "( ................................................ )"}</p>
-                  <p class="text-[9px] text-slate-500">Sales / PIC Vendor</p>
+                  <p class="font-bold text-slate-900 text-xs">
+                    ${po.supplierSignerName ? `( ${po.supplierSignerName} )` : po.supplierContact ? `( ${po.supplierContact.split("(")[0].trim()} )` : "( ................................................ )"}
+                  </p>
+                  <p class="text-[9px] text-slate-500">
+                    ${po.supplierSignerTitle || "Sales / PIC Vendor"}
+                    ${po.supplierApprovedAt ? `<span class="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">Dikonfirmasi: ${po.supplierApprovedAt}</span>` : ""}
+                  </p>
                 </div>
               </div>
 
@@ -1391,7 +1413,205 @@ export async function GET(req: Request) {
           </div> <!-- End po-content-wrapper -->
         </div> <!-- End po-print-sheet -->
 
+        <!-- Modal Konfirmasi & Tanda Tangan Online Vendor / Supplier -->
+        <div id="vendor-approval-modal" class="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs hidden print-hidden">
+          <div class="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div>
+                <h3 class="font-black text-sm sm:text-base text-slate-900 flex items-center gap-1.5">
+                  <span>✍️ Konfirmasi &amp; Tanda Tangan PO (Vendor)</span>
+                </h3>
+                <p class="text-[11px] text-slate-500 font-mono">${po.poNumber} • ${po.supplierName}</p>
+              </div>
+              <button type="button" onclick="closeVendorSignModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-black cursor-pointer">✕</button>
+            </div>
+
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Silakan bubuhkan tanda tangan digital perwakilan Vendor/Supplier di bawah ini sebagai bukti konfirmasi penerimaan dan kesiapan pemrosesan pesanan Purchase Order resmi dari <strong>PT. DSTech Smart Perkasa</strong>.
+            </p>
+
+            <div class="space-y-3">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nama Lengkap PIC / Sales Vendor *</label>
+                <input type="text" id="input-vendor-signer-name" value="${po.supplierContact ? po.supplierContact.split("(")[0].trim() : ''}" placeholder="Nama lengkap Anda..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 font-bold text-slate-900 bg-slate-50" />
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Jabatan *</label>
+                <input type="text" id="input-vendor-signer-title" value="Sales / PIC Rekanan Vendor" placeholder="Contoh: Sales Executive / Branch Manager..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 text-slate-900 bg-slate-50" />
+              </div>
+
+              <!-- Canvas: Tanda Tangan Digital Vendor -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-[11px] font-black text-slate-800 uppercase">Tanda Tangan Digital Vendor *</label>
+                  <button type="button" onclick="clearVendorSignCanvas()" class="text-[10px] font-bold text-rose-600 hover:text-rose-800 underline cursor-pointer">Hapus Goresan</button>
+                </div>
+                <div class="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 p-1 flex justify-center">
+                  <canvas id="canvas-vendor-sign" width="420" height="150" class="w-full max-w-[420px] h-[150px] bg-white rounded-lg cursor-crosshair touch-none shadow-2xs"></canvas>
+                </div>
+                <span class="text-[9.5px] text-slate-400 italic block mt-0.5">*Goreskan tanda tangan menggunakan sentuhan jari layar smartphone atau mouse</span>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Catatan Kesiapan Pengiriman / Nomor Resi (Opsional)</label>
+                <textarea id="input-vendor-note" rows="2" placeholder="Contoh: Barang siap dikirim besok melalui armada ekspedisi..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 text-slate-900 bg-slate-50"></textarea>
+              </div>
+
+              <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-900 leading-tight">
+                ⚖️ <strong>Keabsahan Hukum:</strong> Konfirmasi digital ini sah dan mengikat sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019 sebagai bukti persetujuan order barang.
+              </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+              <button type="button" onclick="closeVendorSignModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer">Batal</button>
+              <button type="button" id="btn-submit-vendor-po" onclick="submitVendorPoApproval()" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                <span>✓ Konfirmasi &amp; Sahkan PO Sekarang</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <script>
+          let isDrawingVendorSign = false;
+          let vendorSignHasContent = false;
+
+          function getVendorCanvasCoords(canvas, e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+              x: (clientX - rect.left) * (canvas.width / rect.width),
+              y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+          }
+
+          function initVendorCanvas(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2.5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            function startDraw(e) {
+              e.preventDefault();
+              isDrawingVendorSign = true;
+              const coords = getVendorCanvasCoords(canvas, e);
+              ctx.beginPath();
+              ctx.moveTo(coords.x, coords.y);
+            }
+
+            function draw(e) {
+              if (!isDrawingVendorSign) return;
+              e.preventDefault();
+              const coords = getVendorCanvasCoords(canvas, e);
+              ctx.lineTo(coords.x, coords.y);
+              ctx.stroke();
+              vendorSignHasContent = true;
+            }
+
+            function stopDraw(e) {
+              if (isDrawingVendorSign) {
+                e.preventDefault();
+                ctx.closePath();
+                isDrawingVendorSign = false;
+              }
+            }
+
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('mousemove', draw);
+            window.addEventListener('mouseup', stopDraw);
+
+            canvas.addEventListener('touchstart', startDraw, { passive: false });
+            canvas.addEventListener('touchmove', draw, { passive: false });
+            window.addEventListener('touchend', stopDraw, { passive: false });
+          }
+
+          function openVendorSignModal() {
+            const modal = document.getElementById('vendor-approval-modal');
+            if (modal) {
+              modal.classList.remove('hidden');
+              setTimeout(() => {
+                initVendorCanvas('canvas-vendor-sign');
+              }, 100);
+            }
+          }
+
+          function closeVendorSignModal() {
+            const modal = document.getElementById('vendor-approval-modal');
+            if (modal) modal.classList.add('hidden');
+          }
+
+          function clearVendorSignCanvas() {
+            const canvas = document.getElementById('canvas-vendor-sign');
+            if (canvas) {
+              const ctx = canvas.getContext('2d');
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              vendorSignHasContent = false;
+            }
+          }
+
+          async function submitVendorPoApproval() {
+            const signerName = document.getElementById('input-vendor-signer-name')?.value.trim();
+            const signerTitle = document.getElementById('input-vendor-signer-title')?.value.trim();
+            const supplierNote = document.getElementById('input-vendor-note')?.value.trim();
+            const canvasSign = document.getElementById('canvas-vendor-sign');
+
+            if (!signerName) {
+              alert('Mohon isi nama lengkap perwakilan penandatangan Vendor!');
+              return;
+            }
+
+            if (!vendorSignHasContent || !canvasSign) {
+              alert('Mohon goreskan tanda tangan digital Vendor terlebih dahulu!');
+              return;
+            }
+
+            const signatureImage = canvasSign.toDataURL('image/png');
+            const submitBtn = document.getElementById('btn-submit-vendor-po');
+            if (submitBtn) {
+              submitBtn.disabled = true;
+              submitBtn.innerHTML = 'Memproses Persetujuan PO...';
+            }
+
+            try {
+              const res = await fetch('/api/finance', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  actionType: 'supplier_approve_po',
+                  payload: {
+                    poNumber: '${po.poNumber}',
+                    id: '${po.id || ""}',
+                    supplierSignerName: signerName,
+                    supplierSignerTitle: signerTitle,
+                    supplierSignatureImage: signatureImage,
+                    supplierNote: supplierNote
+                  }
+                })
+              });
+
+              const result = await res.json();
+              if (result.success) {
+                alert('Persetujuan Berhasil! Purchase Order telah resmi dikonfirmasi dan ditandatangani.');
+                window.location.reload();
+              } else {
+                alert('Gagal menyimpan persetujuan: ' + (result.error || 'Terjadi kesalahan sistem'));
+                if (submitBtn) {
+                  submitBtn.disabled = false;
+                  submitBtn.innerHTML = '✓ Konfirmasi & Sahkan PO Sekarang';
+                }
+              }
+            } catch (err) {
+              alert('Terjadi kendala jaringan: ' + err.message);
+              if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '✓ Konfirmasi & Sahkan PO Sekarang';
+              }
+            }
+          }
           function toggleLetterhead(enabled) {
             const bgImg = document.getElementById('letterhead-bg-po');
             const wrapper = document.getElementById('po-content-wrapper');
@@ -1777,11 +1997,24 @@ export async function GET(req: Request) {
           <div>
             <span class="text-xs text-slate-500 block mb-1">PIHAK KEDUA (Penerima):</span>
             <span class="font-bold text-slate-800 block">${sale.customerName}</span>
-            <div class="h-24 flex items-center justify-center border-b border-dashed border-slate-300">
-              <span class="text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap Klien )</span>
+            <div class="h-24 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+              ${sale.bastSignatureImage ? `
+                <img src="${sale.bastSignatureImage}" alt="Tanda Tangan Klien" class="h-20 object-contain z-10" />
+                <span class="absolute bottom-1 right-2 text-[7px] text-emerald-700 font-bold bg-emerald-50 px-1 rounded border border-emerald-300">✓ Terverifikasi Digital</span>
+              ` : `
+                <button type="button" onclick="openDocApprovalModal('bast')" class="print-hidden px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl text-xs font-black shadow-2xs transition cursor-pointer flex items-center gap-1">
+                  <span>✍️ Tanda Tangani Online</span>
+                </button>
+                <span class="hidden print:inline text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap Klien )</span>
+              `}
             </div>
-            <p class="font-black text-slate-900 text-xs mt-2 underline">( .................................................... )</p>
-            <p class="text-[10px] text-slate-500">Penanggung Jawab / PIC</p>
+            <p class="font-black text-slate-900 text-xs mt-2 underline">
+              ${sale.bastSignerName ? `( ${sale.bastSignerName} )` : "( .................................................... )"}
+            </p>
+            <p class="text-[10px] text-slate-500">
+              ${sale.bastSignerTitle || "Penanggung Jawab / PIC Klien"}
+              ${sale.bastApprovedAt ? `<span class="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">Disetujui: ${sale.bastApprovedAt}</span>` : ""}
+            </p>
           </div>
           <div>
             <span class="text-xs text-slate-500 block mb-1">PIHAK PERTAMA (Pelaksana):</span>
@@ -1871,12 +2104,25 @@ export async function GET(req: Request) {
             <p class="font-bold text-slate-900 text-[11px] mt-1.5 underline">( ............................ )</p>
           </div>
           <div>
-            <span class="text-[11px] text-slate-500 block mb-1">Diterima Oleh:</span>
-            <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
-              <span class="text-[9px] text-slate-400 italic">Cap &amp; Tanda Tangan</span>
+            <span class="text-[11px] text-slate-500 block mb-1">Diterima Oleh (Klien / Lapangan):</span>
+            <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+              ${sale.deliverySignatureImage ? `
+                <img src="${sale.deliverySignatureImage}" alt="Tanda Tangan Penerima" class="h-16 object-contain z-10" />
+                <span class="absolute bottom-1 right-2 text-[6.5px] text-emerald-700 font-bold bg-emerald-50 px-1 rounded border border-emerald-300">✓ Diterima Sah</span>
+              ` : `
+                <button type="button" onclick="openDocApprovalModal('delivery')" class="print-hidden px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-lg text-[10px] font-black shadow-2xs transition cursor-pointer flex items-center gap-1">
+                  <span>✍️ Tanda Tangani Online</span>
+                </button>
+                <span class="hidden print:inline text-[9px] text-slate-400 italic">Cap &amp; Tanda Tangan</span>
+              `}
             </div>
-            <p class="font-bold text-slate-900 text-[11px] mt-1.5 underline">( ............................ )</p>
-            <p class="text-[9px] text-slate-400">${sale.customerName}</p>
+            <p class="font-bold text-slate-900 text-[11px] mt-1.5 underline">
+              ${sale.deliverySignerName ? `( ${sale.deliverySignerName} )` : "( ............................ )"}
+            </p>
+            <p class="text-[9px] text-slate-500">
+              ${sale.deliverySignerTitle || sale.customerName}
+              ${sale.deliveryApprovedAt ? `<span class="block text-[7.5px] text-emerald-700 font-mono mt-0.5 font-bold">Diterima: ${sale.deliveryApprovedAt}</span>` : ""}
+            </p>
           </div>
         </div>
 
@@ -1930,10 +2176,24 @@ export async function GET(req: Request) {
           <div>
             <span class="text-xs text-slate-500 block mb-1">Pihak Klien / Pengawas:</span>
             <span class="font-bold text-slate-800 block">${sale.customerName}</span>
-            <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
-              <span class="text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap )</span>
+            <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+              ${sale.photosSignatureImage ? `
+                <img src="${sale.photosSignatureImage}" alt="Tanda Tangan Pengawas" class="h-16 object-contain z-10" />
+                <span class="absolute bottom-1 right-2 text-[7px] text-emerald-700 font-bold bg-emerald-50 px-1 rounded border border-emerald-300">✓ Disetujui</span>
+              ` : `
+                <button type="button" onclick="openDocApprovalModal('photos')" class="print-hidden px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-black shadow-2xs transition cursor-pointer flex items-center gap-1">
+                  <span>✍️ Tanda Tangani Online</span>
+                </button>
+                <span class="hidden print:inline text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap )</span>
+              `}
             </div>
-            <p class="font-black text-slate-900 text-xs mt-2 underline">( .................................................... )</p>
+            <p class="font-black text-slate-900 text-xs mt-2 underline">
+              ${sale.photosSignerName ? `( ${sale.photosSignerName} )` : "( .................................................... )"}
+            </p>
+            <p class="text-[10px] text-slate-500">
+              ${sale.photosSignerTitle || "PIC Lapangan / Klien"}
+              ${sale.photosApprovedAt ? `<span class="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">Disetujui: ${sale.photosApprovedAt}</span>` : ""}
+            </p>
           </div>
           <div>
             <span class="text-xs text-slate-500 block mb-1">Pelaksana Teknis Lapangan:</span>
@@ -2192,6 +2452,39 @@ export async function GET(req: Request) {
               </button>
             </div>
           ` : ''}
+
+          <!-- Tombol Tanda Tangan Online Klien (BAST, Surat Jalan, Dokumentasi Foto) -->
+          ${docType === 'bast' ? (`
+            ${sale.bastApproved ? `
+              <div class="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                <span>✅ BAST Ditandatangani Klien (${sale.bastSignerName || "Klien"})</span>
+              </div>
+            ` : `
+              <button type="button" onclick="openDocApprovalModal('bast')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 transition transform hover:scale-[1.02] cursor-pointer">
+                <span>✍️ Tanda Tangani BAST (Klien)</span>
+              </button>
+            `}
+          `) : docType === 'delivery' ? (`
+            ${sale.deliveryApproved ? `
+              <div class="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                <span>✅ Surat Jalan Diterima (${sale.deliverySignerName || "Penerima"})</span>
+              </div>
+            ` : `
+              <button type="button" onclick="openDocApprovalModal('delivery')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs flex items-center gap-1.5 shadow-lg shadow-blue-600/30 transition transform hover:scale-[1.02] cursor-pointer">
+                <span>✍️ Tanda Tangani Surat Jalan (Penerima)</span>
+              </button>
+            `}
+          `) : docType === 'photos' ? (`
+            ${sale.photosApproved ? `
+              <div class="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                <span>✅ Dokumentasi Disetujui (${sale.photosSignerName || "Klien"})</span>
+              </div>
+            ` : `
+              <button type="button" onclick="openDocApprovalModal('photos')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs flex items-center gap-1.5 shadow-lg shadow-purple-600/30 transition transform hover:scale-[1.02] cursor-pointer">
+                <span>✍️ Tanda Tangani Laporan Foto (Klien)</span>
+              </button>
+            `}
+          `) : ''}
 
           <!-- Kop Surat Gambar Resmi Terkunci Permanen untuk Klien -->
           <input type="hidden" id="toggle-letterhead" value="1" checked />
@@ -2508,6 +2801,228 @@ export async function GET(req: Request) {
             jsPDF:        { unit: 'mm', format: jsPdfFormat, orientation: jsPdfOrientation }
           };
           html2pdf().set(opt).from(element).save();
+        }
+      </script>
+
+      <!-- Modal Serbaguna Tanda Tangan Dokumen Klien (BAST, Surat Jalan, Laporan Foto) -->
+      <div id="doc-approval-modal" class="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-xs hidden print-hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+            <div>
+              <h3 id="modal-doc-title" class="font-black text-sm sm:text-base text-slate-900 flex items-center gap-1.5">
+                <span>✍️ Tanda Tangan Dokumen Klien</span>
+              </h3>
+              <p class="text-[11px] text-slate-500 font-mono">${sale.invoiceNumber} • ${sale.customerName}</p>
+            </div>
+            <button type="button" onclick="closeDocApprovalModal()" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-black cursor-pointer">✕</button>
+          </div>
+
+          <p id="modal-doc-desc" class="text-xs text-slate-600 leading-relaxed">
+            Silakan bubuhkan tanda tangan digital Anda di bawah ini sebagai bukti persetujuan resmi.
+          </p>
+
+          <div class="space-y-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nama Lengkap Penandatangan *</label>
+              <input type="text" id="input-doc-signer-name" value="${sale.customerPic || sale.customerName || ''}" placeholder="Nama lengkap Anda..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 bg-slate-50" />
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Jabatan / Status *</label>
+              <input type="text" id="input-doc-signer-title" value="Penanggung Jawab / PIC Klien" placeholder="Contoh: Manajer Operasional / Penerima Barang..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-900 bg-slate-50" />
+            </div>
+
+            <!-- Canvas Tanda Tangan Digital -->
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-[11px] font-black text-slate-800 uppercase">Goreskan Tanda Tangan Digital *</label>
+                <button type="button" onclick="clearDocSignCanvas()" class="text-[10px] font-bold text-rose-600 hover:text-rose-800 underline cursor-pointer">Hapus Goresan</button>
+              </div>
+              <div class="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 p-1 flex justify-center">
+                <canvas id="canvas-doc-sign" width="420" height="150" class="w-full max-w-[420px] h-[150px] bg-white rounded-lg cursor-crosshair touch-none shadow-2xs"></canvas>
+              </div>
+              <span class="text-[9.5px] text-slate-400 italic block mt-0.5">*Goreskan tanda tangan langsung menggunakan sentuhan jari smartphone atau mouse</span>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Catatan Tambahan (Opsional)</label>
+              <textarea id="input-doc-note" rows="2" placeholder="Catatan kondisi serah terima / pemeriksaan..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 text-slate-900 bg-slate-50"></textarea>
+            </div>
+
+            <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[10px] text-slate-600 leading-tight">
+              ⚖️ <strong>Keabsahan Hukum:</strong> Dokumen ini ditandatangani secara digital dan sah mengikat secara hukum sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019 tanpa memerlukan stempel basah.
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+            <button type="button" onclick="closeDocApprovalModal()" class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer">Batal</button>
+            <button type="button" id="btn-submit-doc-sign" onclick="submitDocApproval()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-md transition flex items-center gap-1.5 cursor-pointer">
+              <span>✓ Tanda Tangani &amp; Sahkan Dokumen</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        let currentTargetDocType = 'bast';
+        let isDrawingDocSign = false;
+        let docSignHasContent = false;
+
+        function getDocCanvasCoords(canvas, e) {
+          const rect = canvas.getBoundingClientRect();
+          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+          return {
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height)
+          };
+        }
+
+        function initDocCanvas() {
+          const canvas = document.getElementById('canvas-doc-sign');
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+
+          function start(e) {
+            e.preventDefault();
+            isDrawingDocSign = true;
+            const c = getDocCanvasCoords(canvas, e);
+            ctx.beginPath();
+            ctx.moveTo(c.x, c.y);
+          }
+
+          function move(e) {
+            if (!isDrawingDocSign) return;
+            e.preventDefault();
+            const c = getDocCanvasCoords(canvas, e);
+            ctx.lineTo(c.x, c.y);
+            ctx.stroke();
+            docSignHasContent = true;
+          }
+
+          function stop(e) {
+            if (isDrawingDocSign) {
+              e.preventDefault();
+              ctx.closePath();
+              isDrawingDocSign = false;
+            }
+          }
+
+          canvas.addEventListener('mousedown', start);
+          canvas.addEventListener('mousemove', move);
+          window.addEventListener('mouseup', stop);
+
+          canvas.addEventListener('touchstart', start, { passive: false });
+          canvas.addEventListener('touchmove', move, { passive: false });
+          window.addEventListener('touchend', stop, { passive: false });
+        }
+
+        function openDocApprovalModal(type) {
+          currentTargetDocType = type;
+          const modal = document.getElementById('doc-approval-modal');
+          const title = document.getElementById('modal-doc-title');
+          const desc = document.getElementById('modal-doc-desc');
+          const titleInput = document.getElementById('input-doc-signer-title');
+
+          if (type === 'bast') {
+            if (title) title.innerHTML = '<span>✍️ Tanda Tangan Berita Acara Serah Terima (BAST)</span>';
+            if (desc) desc.innerHTML = 'Dengan menandatangani BAST ini, Pihak Klien menyatakan pekerjaan dan perangkat telah diterima dalam kondisi 100% baik, lengkap, dan lulus uji operasional.';
+            if (titleInput) titleInput.value = 'Penanggung Jawab / PIC Klien';
+          } else if (type === 'delivery') {
+            if (title) title.innerHTML = '<span>✍️ Tanda Tangan Surat Jalan Penerimaan Barang</span>';
+            if (desc) desc.innerHTML = 'Dengan menandatangani Surat Jalan ini, Penerima menyatakan barang-barang kiriman telah tiba di lokasi dan diterima dalam kondisi tersegel baik.';
+            if (titleInput) titleInput.value = 'Penerima Barang / Petugas Lapangan';
+          } else if (type === 'photos') {
+            if (title) title.innerHTML = '<span>✍️ Tanda Tangan Laporan Dokumentasi Foto</span>';
+            if (desc) desc.innerHTML = 'Dengan menandatangani lembar ini, Pengawas Klien mengesahkan dokumentasi foto fisik hasil pekerjaan dan pergantian spare part.';
+            if (titleInput) titleInput.value = 'Pengawas Lapangan / PIC Klien';
+          }
+
+          if (modal) {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+              initDocCanvas();
+            }, 100);
+          }
+        }
+
+        function closeDocApprovalModal() {
+          const modal = document.getElementById('doc-approval-modal');
+          if (modal) modal.classList.add('hidden');
+        }
+
+        function clearDocSignCanvas() {
+          const canvas = document.getElementById('canvas-doc-sign');
+          if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            docSignHasContent = false;
+          }
+        }
+
+        async function submitDocApproval() {
+          const signerName = document.getElementById('input-doc-signer-name')?.value.trim();
+          const signerTitle = document.getElementById('input-doc-signer-title')?.value.trim();
+          const notes = document.getElementById('input-doc-note')?.value.trim();
+          const canvas = document.getElementById('canvas-doc-sign');
+
+          if (!signerName) {
+            alert('Mohon isi nama lengkap penandatangan!');
+            return;
+          }
+
+          if (!docSignHasContent || !canvas) {
+            alert('Mohon goreskan tanda tangan digital terlebih dahulu!');
+            return;
+          }
+
+          const signatureImage = canvas.toDataURL('image/png');
+          const submitBtn = document.getElementById('btn-submit-doc-sign');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Memproses Tanda Tangan...';
+          }
+
+          try {
+            const res = await fetch('/api/finance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                actionType: 'client_approve_doc',
+                payload: {
+                  docType: currentTargetDocType,
+                  invoiceNumber: '${sale.invoiceNumber}',
+                  id: '${sale.id || ""}',
+                  signerName: signerName,
+                  signerTitle: signerTitle,
+                  signatureImage: signatureImage,
+                  notes: notes
+                }
+              })
+            });
+
+            const result = await res.json();
+            if (result.success) {
+              alert('Tanda Tangan Berhasil! Dokumen resmi telah disahkan.');
+              window.location.reload();
+            } else {
+              alert('Gagal: ' + (result.error || 'Terjadi kesalahan sistem'));
+              if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '✓ Tanda Tangani &amp; Sahkan Dokumen';
+              }
+            }
+          } catch (err) {
+            alert('Kendala koneksi: ' + err.message);
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.innerHTML = '✓ Tanda Tangani &amp; Sahkan Dokumen';
+            }
+          }
         }
       </script>
     </body>

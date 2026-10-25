@@ -723,6 +723,102 @@ export async function POST(request: Request) {
       });
     }
 
+    if (actionType === "supplier_approve_po" || actionType === "vendor_approve_po") {
+      const {
+        id,
+        poId,
+        poNumber,
+        supplierSignerName,
+        supplierSignerTitle,
+        supplierSignatureImage,
+        supplierNote,
+      } = payload;
+
+      const pId = id || poId || poNumber;
+      const purchases = data.purchases || [];
+      const index = purchases.findIndex((p: any) => p.id === pId || p.poNumber === pId);
+
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Purchase Order tidak ditemukan" }, { status: 404 });
+      }
+
+      const now = new Date();
+      const approvedAt = `${now.toISOString().split("T")[0]} ${now.toTimeString().slice(0, 5)} WIB`;
+      purchases[index].supplierApproved = true;
+      purchases[index].supplierApprovedAt = approvedAt;
+      purchases[index].supplierSignerName = supplierSignerName || purchases[index].supplierContact || "Vendor / Supplier";
+      purchases[index].supplierSignerTitle = supplierSignerTitle || "Sales / PIC Vendor / Manajer Operasional";
+      if (supplierSignatureImage) {
+        purchases[index].supplierSignatureImage = supplierSignatureImage;
+      }
+      if (supplierNote) {
+        purchases[index].supplierNote = supplierNote;
+      }
+
+      // Perbarui status konfirmasi PO
+      purchases[index].status = "Dikonfirmasi Vendor";
+      purchases[index].confirmedDate = now.toISOString().split("T")[0];
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Purchase Order ${purchases[index].poNumber} telah berhasil dikonfirmasi & ditandatangani oleh ${purchases[index].supplierSignerName}!`,
+        data: purchases[index],
+      });
+    }
+
+    if (actionType === "client_approve_doc") {
+      const {
+        docType,
+        invoiceNumber,
+        id,
+        signerName,
+        signerTitle,
+        signatureImage,
+        notes,
+      } = payload;
+
+      const sales = data.sales || [];
+      const index = sales.findIndex((s: any) => s.id === id || s.invoiceNumber === invoiceNumber || s.invoiceNumber?.toLowerCase() === invoiceNumber?.toLowerCase());
+
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Faktur/Dokumen tidak ditemukan" }, { status: 404 });
+      }
+
+      const now = new Date();
+      const approvedAt = `${now.toISOString().split("T")[0]} ${now.toTimeString().slice(0, 5)} WIB`;
+
+      if (docType === "bast") {
+        sales[index].bastApproved = true;
+        sales[index].bastApprovedAt = approvedAt;
+        sales[index].bastSignerName = signerName || sales[index].customerName || "Pihak Kedua / Klien";
+        sales[index].bastSignerTitle = signerTitle || "Penanggung Jawab / PIC Klien";
+        sales[index].bastSignatureImage = signatureImage;
+        sales[index].bastNotes = notes || "";
+      } else if (docType === "delivery") {
+        sales[index].deliveryApproved = true;
+        sales[index].deliveryApprovedAt = approvedAt;
+        sales[index].deliverySignerName = signerName || sales[index].customerName || "Penerima Barang";
+        sales[index].deliverySignerTitle = signerTitle || "Penerima di Lapangan";
+        sales[index].deliverySignatureImage = signatureImage;
+        sales[index].deliveryNotes = notes || "";
+      } else if (docType === "photos") {
+        sales[index].photosApproved = true;
+        sales[index].photosApprovedAt = approvedAt;
+        sales[index].photosSignerName = signerName || sales[index].customerName || "Pemeriksa Pekerjaan";
+        sales[index].photosSignerTitle = signerTitle || "PIC Lapangan / Klien";
+        sales[index].photosSignatureImage = signatureImage;
+        sales[index].photosNotes = notes || "";
+      }
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Dokumen ${docType.toUpperCase()} berhasil disetujui & ditandatangani oleh ${signerName || "Klien"}!`,
+        data: sales[index],
+      });
+    }
+
     if (actionType === "record_payment") {
       const { invoiceId, paymentAmount, paymentMethod, paymentDate, notes, terminId } = payload;
       const sales = data.sales || [];
