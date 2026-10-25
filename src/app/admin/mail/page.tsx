@@ -125,7 +125,7 @@ export default function AdminMailPage() {
       if (json.success && json.data) {
         setAccounts(json.data);
         if (!selectedAccountEmail && json.data.length > 0) {
-          setSelectedAccountEmail(json.data[0].email);
+          setSelectedAccountEmail("ALL");
           setComposeForm((prev) => ({ ...prev, fromEmail: json.data[0].email }));
         }
       }
@@ -606,6 +606,22 @@ export default function AdminMailPage() {
   };
 
   const selectedAccount = useMemo(() => {
+    if (selectedAccountEmail === "ALL") {
+      const totalUsed = accounts.reduce((acc, a) => acc + (a.usedMb || 0), 0);
+      const totalQuota = accounts.reduce((acc, a) => acc + (a.quotaMb || 5120), 0);
+      return {
+        id: "all",
+        email: "Semua Akun Perusahaan",
+        username: "*",
+        domain: "dstechsmart.com / dstechsmart.id",
+        fullName: `Seluruh Akun (${accounts.length} Akun)`,
+        quotaMb: totalQuota,
+        usedMb: totalUsed,
+        isActive: true,
+        isAdmin: true,
+        createdAt: new Date().toISOString(),
+      };
+    }
     return accounts.find((a) => a.email === selectedAccountEmail) || accounts[0];
   }, [accounts, selectedAccountEmail]);
 
@@ -640,7 +656,10 @@ export default function AdminMailPage() {
                 setActiveTab("compose");
                 setComposeForm((prev) => ({
                   ...prev,
-                  fromEmail: selectedAccountEmail || accounts[0]?.email || "",
+                  fromEmail:
+                    selectedAccountEmail && selectedAccountEmail !== "ALL"
+                      ? selectedAccountEmail
+                      : accounts[0]?.email || "",
                 }));
               }}
               className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer"
@@ -752,6 +771,7 @@ export default function AdminMailPage() {
                 }}
                 className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-black text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none cursor-pointer"
               >
+                <option value="ALL">🌐 Semua Akun Perusahaan ({accounts.length})</option>
                 {accounts.map((acc) => (
                   <option key={acc.id} value={acc.email}>
                     {acc.email} ({acc.fullName})
@@ -1074,6 +1094,14 @@ export default function AdminMailPage() {
                               {currentFolder === "sent" ? `Ke: ${msg.toEmail}` : msg.fromName || msg.fromEmail}
                             </span>
                             <div className="flex items-center gap-1 shrink-0">
+                              {selectedAccountEmail === "ALL" && (
+                                <span
+                                  className="inline-block px-1.5 py-0.5 rounded-md bg-indigo-50 border border-indigo-200 text-indigo-700 text-[9px] font-mono font-bold"
+                                  title={`Akun: ${msg.accountEmail || msg.toEmail}`}
+                                >
+                                  {msg.accountEmail ? msg.accountEmail.split("@")[0] : "all"}
+                                </span>
+                              )}
                               {msg.isSpam && (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[9px] font-black">
                                   <AlertTriangle className="w-2.5 h-2.5" />

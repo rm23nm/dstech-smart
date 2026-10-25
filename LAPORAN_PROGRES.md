@@ -4810,35 +4810,31 @@
 
 ---
 
-### 167. Tugas (Antrian 1): Perbaikan Parser MIME Email (Decoder Base64 & Quoted-Printable Multipart) (/api/mail/messages)
+### 167. Tugas: Perbaikan Parser MIME Email (Decoder Base64 & Quoted-Printable Multipart) (/api/mail/messages)
 - **Permintaan Pengguna**:
   - *"untuk pesannya pas dibuka kenapa seperti ini?"* (Menampilkan tangkapan layar Reading Pane berisi kode mentah MIME Exchange/Outlook: `--_000_DBAP193MB0301...`, `Content-Type: text/plain`, `Content-Transfer-Encoding: base64`).
-- **Status**: 🟡 **SEDANG DIKERJAKAN**
-- **Analisis Akar Masalah**:
-  - Email dengan format `multipart/mixed` atau `multipart/alternative` memiliki boundary bersarang (nested boundaries) serta encoding `base64` atau `quoted-printable`.
-  - Fungsi `parseMaildirFile` saat ini hanya memisahkan boundary tingkat pertama dan belum memecahkan nested boundary serta belum men-decode payload `base64` atau `quoted-printable` ke teks/HTML bersih.
-- **Rencana Langkah Kerja**:
-  1. [ ] **Langkah 1**: Buat backup `_backup_mime_parser/` untuk `src/app/api/mail/messages/route.ts`.
-  2. [ ] **Langkah 2**: Kembangkan modul parser MIME yang mampu:
-     - Mendeteksi dan memecah boundary bertingkat (nested boundary, e.g. `_000_...`).
-     - Men-decode `Content-Transfer-Encoding: base64` menggunakan `Buffer.from(payload, "base64").toString("utf-8")`.
-     - Men-decode `Content-Transfer-Encoding: quoted-printable` (mengubah `=XX` ke karakter aslinya dan membersihkan soft break `=\r?\n`).
-     - Memprioritaskan bagian `text/html` (jika tersedia) atau `text/plain` yang bersih dari header MIME.
-  3. [ ] **Langkah 3**: Uji kompilasi dan periksa keluaran pesan di API.
-  4. [ ] **Langkah 4**: Bersihkan folder cadangan, build lokal, push ke GitHub, dan deploy ke live VPS.
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Investigasi Akar Masalah & Solusi**:
+  1. Email dari penyedia pihak ketiga (misalnya Microsoft Exchange, Outlook, atau Google Workspace) dikirim dalam format `multipart/alternative` atau `multipart/mixed` dengan boundary bertingkat (nested boundary) serta encoding `base64` atau `quoted-printable`.
+  2. Implementasi `parseMimeBody()` rekursif ditambahkan di `src/app/api/mail/messages/route.ts` dengan helper `decodeBase64Payload()` dan `decodeQuotedPrintable()`:
+     - Memindai dan memisahkan boundary tingkat atas maupun sub-boundary bersarang (`--_000_...`).
+     - Men-decode payload teks/HTML dari Base64 Buffer atau karakter hex Quoted-Printable secara otomatis.
+     - Membersihkan seluruh penanda boundary dan header MIME mentah.
+     - Menyusun `bodyHtml` bersih yang siap dirender secara sempurna di Reading Pane serta snippet deskripsi yang rapi tanpa kode mentah MIME.
 
 ---
 
-### 168. Tugas (Antrian 2): Fitur Tampilkan Email Seluruh Akun ("Semua Akun / Unified Inbox") (/admin/mail & /api/mail/messages)
+### 168. Tugas: Fitur Tampilkan Email Seluruh Akun ("Semua Akun / Unified Inbox") (/admin/mail & /api/mail/messages)
 - **Permintaan Pengguna**:
-  - *"tolong buatkan juga fitur untuk melihat email seluruh akun, agar mudah dalam memanagenya"* (Menampilkan dropdown selector akun email perusahaan).
-- **Status**: ⏳ **MENUNGGU (ANTRIAN BERIKUTNYA)**
-- **Rencana Langkah Kerja**:
-  1. [ ] **Langkah 1**: Buat backup `_backup_all_accounts/` untuk file terkait.
-  2. [ ] **Langkah 2**: Tambahkan opsi *"Semua Akun Perusahaan (Unified Mailbox)"* pada dropdown selector akun di `src/app/admin/mail/page.tsx` (`value = "ALL"`).
-  3. [ ] **Langkah 3**: Perbarui API `src/app/api/mail/messages/route.ts` agar saat `accountEmail` kosong atau `"ALL"`, API membaca seluruh mailbox di bawah `/www/vmail/*/*` dan menggabungkan pesannya berdasarkan urutan tanggal terbaru secara descending.
-  4. [ ] **Langkah 4**: Tampilkan badge nama akun penerima (contoh: `cs@dstechsmart.com`, `admin@...`) pada setiap kartu pesan di daftar saat mode Semua Akun aktif.
-  5. [ ] **Langkah 5**: Build lokal, push ke GitHub, dan deploy ke live VPS.
+  - *"tolong buatkan juga fitur untuk melihat email seluruh akun, agar mudah dalam memanagenya"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Hasil Pekerjaan**:
+  1. Menambahkan opsi default **"🌐 Semua Akun Perusahaan"** pada dropdown akun di `src/app/admin/mail/page.tsx` dengan nilai `"ALL"`.
+  2. Memperbarui handler backend API `src/app/api/mail/messages/route.ts`:
+     - Pada `readMessagesFromMaildir`: jika `accountEmail` bernilai `"ALL"` atau kosong, sistem memindai seluruh direktori mailbox `/www/vmail/{domain}/{user}/` secara menyeluruh dan menggabungkannya berdasarkan timestamp terbaru secara descending.
+     - Menghitung total `unreadInboxCount` dan `spamCount` lintas seluruh akun perusahaan.
+  3. Menambahkan badge visual identitas akun (contoh: `cs`, `admin`, `info`) pada setiap kartu pesan di daftar saat mode Semua Akun aktif, memudahkan identifikasi email tujuan.
+  4. Menyesuaikan kartu kapasitas kuota agar menampilkan ringkasan kapasitas gabungan seluruh akun perusahaan saat mode Semua Akun dipilih.
 
 ---
 

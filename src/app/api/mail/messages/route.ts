@@ -141,6 +141,166 @@ function parseMimeHeader(raw: string): string {
   });
 }
 
+function decodeQuotedPrintable(str: string): string {
+  if (!str) return "";
+  const noSoft = str.replace(/=\r?\n/g, "").replace(/=\r/g, "");
+  try {
+    return noSoft.replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => {
+      try {
+        return String.fromCharCode(parseInt(hex, 16));
+      } catch {
+        return _;
+      }
+    });
+  } catch {
+    return noSoft;
+  }
+}
+
+function decodeBase64Payload(str: string): string {
+  if (!str) return "";
+  try {
+    const cleanB64 = str.replace(/[\r\n\s]/g, "");
+    return Buffer.from(cleanB64, "base64").toString("utf-8");
+  } catch {
+    return str;
+  }
+}
+
+function decodePartPayload(payload: string, encoding?: string): string {
+  const enc = (encoding || "").toLowerCase().trim();
+  if (enc === "base64") {
+    return decodeBase64Payload(payload);
+  } else if (enc === "quoted-printable") {
+    return decodeQuotedPrintable(payload);
+  }
+  return payload;
+}
+
+function extractBoundary(contentTypeHeader?: string): string | null {
+  if (!contentTypeHeader) return null;
+  const m = contentTypeHeader.match(/boundary="?([^";\r\n\s]+)"?/i);
+  return m ? m[1].trim() : null;
+}
+
+function parseMimeBody(
+  headers: Record<string, string>,
+  rawBody: string
+): { cleanText: string; cleanHtml: string } {
+  let textParts: string[] = [];
+  let htmlParts: string[] = [];
+
+  const topContentType = headers["content-type"] || "text/plain";
+  const topEncoding = headers["content-transfer-encoding"] || "";
+  const topBoundary = extractBoundary(topContentType);
+
+  const processPart = (rawPart: string, fallbackEncoding?: string) => {
+    const trimmed = rawPart.trim();
+    if (!trimmed || trimmed === "--") return;
+
+    const splitMatch = rawPart.match(/\r?\n\r?\n/);
+    let partHeaders: Record<string, string> = {};
+    let partBody = "";
+
+    if (splitMatch && splitMatch.index !== undefined) {
+      const partHeaderSection = rawPart.substring(0, splitMatch.index);
+      partBody = rawPart.substring(splitMatch.index + splitMatch[0].length);
+
+      let curKey = "";
+      for (const line of partHeaderSection.split(/\r?\n/)) {
+        if (/^\s/.test(line) && curKey) {
+          partHeaders[curKey] += " " + line.trim();
+        } else {
+          const colonIdx = line.indexOf(":");
+          if (colonIdx > 0) {
+            curKey = line.substring(0, colonIdx).toLowerCase().trim();
+            partHeaders[curKey] = line.substring(colonIdx + 1).trim();
+          }
+        }
+      }
+    } else {
+      partBody = rawPart;
+    }
+
+    const cType = partHeaders["content-type"] || "text/plain";
+    const cEncoding = partHeaders["content-transfer-encoding"] || fallbackEncoding || "";
+    const innerBoundary = extractBoundary(cType);
+
+    if (innerBoundary && partBody.includes("--" + innerBoundary)) {
+      const subParts = partBody.split("--" + innerBoundary);
+      for (const sp of subParts) {
+        processPart(sp, cEncoding);
+      }
+    } else {
+      const anyBoundary = partBody.match(/--([a-zA-Z0-9_\-+=.]{8,})/);
+      if (anyBoundary && anyBoundary[1] && partBody.includes("--" + anyBoundary[1])) {
+        const discoveredBoundary = anyBoundary[1];
+        const subParts = partBody.split("--" + discoveredBoundary);
+        for (const sp of subParts) {
+          processPart(sp, cEncoding);
+        }
+        return;
+      }
+
+      let cleanedLeafBody = partBody.replace(/--[a-zA-Z0-9_\-+=.]+--?/g, "").trim();
+      const decoded = decodePartPayload(cleanedLeafBody, cEncoding);
+
+      if (cType.toLowerCase().includes("text/html")) {
+        htmlParts.push(decoded);
+      } else if (cType.toLowerCase().includes("text/plain")) {
+        textParts.push(decoded);
+      } else if (!cType.toLowerCase().includes("image/") && !cType.toLowerCase().includes("application/")) {
+        textParts.push(decoded);
+      }
+    }
+  };
+
+  if (topBoundary && rawBody.includes("--" + topBoundary)) {
+    const parts = rawBody.split("--" + topBoundary);
+    for (const part of parts) {
+      processPart(part, topEncoding);
+    }
+  } else {
+    const anyBoundary = rawBody.match(/--([a-zA-Z0-9_\-+=.]{8,})/);
+    if (anyBoundary && anyBoundary[1] && rawBody.split("--" + anyBoundary[1]).length > 2) {
+      const detectedBoundary = anyBoundary[1];
+      const parts = rawBody.split("--" + detectedBoundary);
+      for (const part of parts) {
+        processPart(part, topEncoding);
+      }
+    } else {
+      const decoded = decodePartPayload(rawBody.trim(), topEncoding);
+      if (topContentType.toLowerCase().includes("text/html")) {
+        htmlParts.push(decoded);
+      } else {
+        textParts.push(decoded);
+      }
+    }
+  }
+
+  let cleanText = textParts.filter(Boolean).join("\n\n").trim();
+  let cleanHtml = htmlParts.filter(Boolean).join("<hr/>").trim();
+
+  if (!cleanText && cleanHtml) {
+    cleanText = cleanHtml
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  if (!cleanHtml && cleanText) {
+    cleanHtml = `<div style="white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b;">${cleanText
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")}</div>`;
+  } else if (cleanHtml) {
+    cleanHtml = cleanHtml.replace(/<script[\s\S]*?<\/script>/gi, "");
+  }
+
+  return { cleanText, cleanHtml };
+}
+
 function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox" | "sent" | "trash" | "spam", isNew: boolean): MailMessage | null {
   try {
     const content = fs.readFileSync(filePath, "utf-8");
@@ -172,25 +332,8 @@ function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox
       fromEmail = fromMatch[2].trim();
     }
 
-    let cleanBody = rawBody;
-    const boundaryMatch = headers["content-type"]?.match(/boundary="?([^";\s]+)"?/i);
-    if (boundaryMatch) {
-      const boundary = boundaryMatch[1];
-      const parts = rawBody.split("--" + boundary);
-      for (const part of parts) {
-        if (part.includes("Content-Type: text/plain") || part.includes("text/plain")) {
-          const partSplit = part.match(/\r?\n\r?\n/);
-          if (partSplit && partSplit.index !== undefined) {
-            cleanBody = part.substring(partSplit.index + partSplit[0].length).trim();
-            break;
-          }
-        }
-      }
-    }
-
-    cleanBody = cleanBody.replace(/--[a-zA-Z0-9_-]+--/g, "").trim();
-
-    const snippet = cleanBody.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().substring(0, 160);
+    const { cleanText, cleanHtml } = parseMimeBody(headers, rawBody);
+    const snippet = (cleanText || "").replace(/\s+/g, " ").trim().substring(0, 160) || "(Tidak ada ringkasan teks)";
     const dateStr = headers["date"] || new Date().toISOString();
     const subject = parseMimeHeader(headers["subject"] || "(Tanpa Subjek)");
 
@@ -200,7 +343,7 @@ function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox
       snippet,
       fromEmail: fromEmail || "",
       fromName: fromName || "",
-      bodyHtml: cleanBody,
+      bodyHtml: cleanHtml,
     });
 
     const isFolderSpam = folder === "spam" || (folder === "inbox" && spamCheck.isSpam);
@@ -213,8 +356,8 @@ function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox
       fromEmail: fromEmail || "unknown@mail.com",
       toEmail: headers["to"] || accountEmail,
       subject,
-      snippet: snippet || "(Tidak ada ringkasan teks)",
-      bodyHtml: `<div style="white-space: pre-wrap; font-family: sans-serif; line-height: 1.6;">${cleanBody.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`,
+      snippet,
+      bodyHtml: cleanHtml || cleanText || "(Pesan kosong)",
       date: dateStr,
       isRead: !isNew,
       isStarred: false,
@@ -234,8 +377,10 @@ function readMessagesFromMaildir(accountEmail?: string | null, folder: "inbox" |
   if (!fs.existsSync(vmailRoot)) return [];
 
   const accountsToScan: { email: string; user: string; domain: string }[] = [];
-  if (accountEmail) {
-    const [u, d] = accountEmail.toLowerCase().trim().split("@");
+  const isSpecificAccount = accountEmail && accountEmail.toUpperCase() !== "ALL";
+
+  if (isSpecificAccount) {
+    const [u, d] = (accountEmail || "").toLowerCase().trim().split("@");
     if (u && d) accountsToScan.push({ email: accountEmail.toLowerCase().trim(), user: u, domain: d });
   } else {
     try {
@@ -335,12 +480,15 @@ export async function GET(request: Request) {
     const folder = (searchParams.get("folder") || "inbox") as "inbox" | "sent" | "trash" | "spam";
     const search = searchParams.get("search")?.toLowerCase().trim();
 
+    const isAll = !accountEmail || accountEmail.toUpperCase() === "ALL";
+    const scanAccountParam = isAll ? null : accountEmail;
+
     // 1. Baca pesan nyata dari Maildir server
-    const maildirMessages = readMessagesFromMaildir(accountEmail, folder);
+    const maildirMessages = readMessagesFromMaildir(scanAccountParam, folder);
 
     // 2. Baca pesan lokal dari JSON
     let jsonMessages = readMessages();
-    if (accountEmail) {
+    if (!isAll && accountEmail) {
       jsonMessages = jsonMessages.filter(
         (m) => m.accountEmail.toLowerCase() === accountEmail.toLowerCase()
       );
@@ -395,12 +543,12 @@ export async function GET(request: Request) {
     // Urutkan dari tanggal terbaru
     messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // Hitung unread count untuk account ini di folder inbox
-    const allInbox = readMessagesFromMaildir(accountEmail, "inbox");
+    // Hitung unread count untuk account ini (atau seluruh akun jika ALL) di folder inbox
+    const allInbox = readMessagesFromMaildir(scanAccountParam, "inbox");
     const unreadInboxCount = allInbox.filter((m) => !m.isRead).length;
 
     // Hitung total spam
-    const allSpam = readMessagesFromMaildir(accountEmail, "spam");
+    const allSpam = readMessagesFromMaildir(scanAccountParam, "spam");
     const spamCount = allSpam.length;
 
     return NextResponse.json({
