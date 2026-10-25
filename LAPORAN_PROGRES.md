@@ -5835,6 +5835,31 @@
      - Live deploy ke VPS: PM2 `dstech-main` restart sukses (PID `1203529`), PM2 `smartpro-wa` restart sukses (PID `1202081`).
      - Pembersihan file cadangan `_backup/` tuntas.
 
+- **Tugas 208: Penyelarasan Alur SPH Duluan Sebelum Invoice di CRM SmartPro & Pendaftaran Akun Pelanggan CV. Sentosa Abadi Cilegon [SELESAI]**:
+  - **Latar Belakang & Keluhan Pengguna**:
+    1. Pengguna menanyakan mengapa di papan CRM prospek langsung diarahkan ke tombol "Buat Invoice", padahal standar operasional proyek B2B mewajibkan penerbitan **Surat Penawaran Harga (SPH / Quotation)** terlebih dahulu pada tahap survei dan negosiasi.
+    2. Pengguna melihat ada faktur langganan atas nama **CV. Sentosa Abadi Cilegon** di menu Keuangan Website (`/admin/finance`), tetapi saat membuka SmartPro tidak ditemukan akun konsumen yang berlangganan paket SmartPro tersebut.
+  - **Akar Masalah**:
+    1. Tombol pada kartu prospek SmartPro (`wa-gateway-server/public/index.html`) sebelumnya langsung mengarah ke `openInvoiceModal` ("Buat Invoice"), melewati alur penawaran SPH.
+    2. Faktur `INV-DSTECH-SP-202610-001` atas nama `CV. Sentosa Abadi Cilegon` di sistem Keuangan holding diterbitkan saat simulasi pengujian integrasi penerimaan pembayaran (`orderId: SUB-LIVE-TEST-1`), sehingga saat itu akun pelanggannya belum terdaftar di tabel `wa_users` database SmartPro.
+  - **Tindakan Penyelesaian Tuntas**:
+    1. **Kartu Prospek SmartPro (`renderCRMBoard`)**:
+       - Tahap `NEW`, `FOLLOW_UP`, dan `NEGOTIATION`: Tombol aksi utama kini adalah **`📄 Buat SPH`** (`bg-amber-600 hover:bg-amber-700`) + **`💬 Chat WA`** (Bukan langsung Invoice!).
+       - Tahap `CLOSED_WON` (Deal): Menampilkan tombol **`🧾 Buat Invoice`** (`bg-emerald-600`) dan **`📄 SPH`**.
+    2. **Modal Dokumen Lengkap (SPH & Invoice)**:
+       - Ditambahkan tab switcher interaktif: **`📄 1. Surat Penawaran (SPH)`** vs **`🧾 2. Invoice Tagihan (Deal)`**.
+       - Ketika memilih SPH: Menampilkan nomor penawaran otomatis `SPH-DSTECH-YYYYMM-XXX`, subjek proyek, masa berlaku 14 hari kalender, garansi perangkat 2 tahun, katalog produk terintegrasi, dan tombol **"📄 Terbitkan & Kirim SPH via WhatsApp"**.
+       - Menghubungkan pembuatan SPH ke endpoint holding `dstechsmart.com/api/finance` (`actionType: create_quotation`) dan otomatis menaikkan status prospek ke tahap `NEGOTIATION`.
+       - Menghasilkan draf teks penawaran resmi berformat rapi dan membuka chat WhatsApp klien secara otomatis.
+    3. **Pendaftaran Resmi Akun Pelanggan Langganan SmartPro**:
+       - Mendaftarkan akun **CV. Sentosa Abadi Cilegon** (`sentosa@cilegon.id`, WhatsApp: `081299887766`) ke tabel `wa_users` di database `smartpro`.
+       - Status langganan diset `ACTIVE` dengan paket **`Pro Plan`** (aktif 1 bulan hingga 24 November 2026).
+       - Kini akun CV. Sentosa Abadi Cilegon tampil resmi di menu **Manajemen Pengguna (User Management)** SmartPro.
+  - **Hasil Deployment Live**:
+    - File `wa-gateway-server/public/index.html` berhasil di-upload via SFTP ke VPS.
+    - PM2 `smartpro-wa` reload sukses di VPS (PID `1212062`).
+    - Verifikasi database `smartpro.wa_users`: akun `sentosa@cilegon.id` aktif dengan role `client` dan paket `pro`.
+
 ---
 
 ### 89. Catatan Penting
