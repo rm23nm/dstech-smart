@@ -448,99 +448,105 @@ function findMaildirFile(accountEmail: string, fileName: string): string | null 
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, isRead, isStarred, folder, isSpam, accountEmail } = body;
+    const { id, ids, isRead, isStarred, folder, isSpam, accountEmail } = body;
 
-    if (!id) {
+    const targetIds: string[] = Array.isArray(ids) && ids.length > 0 ? ids : (id ? [id] : []);
+
+    if (targetIds.length === 0) {
       return NextResponse.json(
         { success: false, message: "ID pesan wajib disertakan." },
         { status: 400 }
       );
     }
 
-    // 1. Sinkronisasi berkas fisik di Maildir server jika id adalah maildir_...
-    if (id.startsWith("maildir_") && folder) {
-      const fileName = id.replace("maildir_", "");
-      const foundPath = findMaildirFile(accountEmail || "", fileName);
-      if (foundPath) {
-        const [u, d] = (accountEmail || "").toLowerCase().trim().split("@");
-        const accDir = path.join("/www/vmail", d, u);
-        let targetDir = path.join(accDir, "cur");
-
-        if (folder === "trash") {
-          targetDir = path.join(accDir, ".Trash", "cur");
-        } else if (folder === "spam") {
-          targetDir = path.join(accDir, ".Junk", "cur");
-        } else if (folder === "sent") {
-          targetDir = path.join(accDir, ".Sent", "cur");
-        } else {
-          targetDir = path.join(accDir, "cur");
-        }
-
-        try {
-          fs.mkdirSync(targetDir, { recursive: true });
-          const destPath = path.join(targetDir, fileName);
-          if (foundPath !== destPath) {
-            fs.renameSync(foundPath, destPath);
-          }
-        } catch (moveErr) {
-          console.warn("Could not move physical maildir file:", moveErr);
-        }
-      }
-    }
-
-    // 2. Simpan status di JSON
     const messages = readMessages();
-    const idx = messages.findIndex((m) => m.id === id);
 
-    if (idx !== -1) {
-      if (typeof isRead === "boolean") messages[idx].isRead = isRead;
-      if (typeof isStarred === "boolean") messages[idx].isStarred = isStarred;
-      if (typeof isSpam === "boolean") {
-        messages[idx].isSpam = isSpam;
-        if (isSpam) {
-          messages[idx].folder = "spam";
-          messages[idx].spamScore = 100;
-          messages[idx].spamReason = "Ditandai manual sebagai Spam oleh pengguna";
-        } else {
-          messages[idx].folder = "inbox";
-          messages[idx].spamScore = 0;
-          messages[idx].spamReason = "Ditandai manual sebagai Bukan Spam oleh pengguna (Whitelist)";
-        }
-      } else if (folder && ["inbox", "sent", "trash", "spam"].includes(folder)) {
-        messages[idx].folder = folder as any;
-        if (folder === "spam") {
-          messages[idx].isSpam = true;
-        } else if (folder === "inbox") {
-          messages[idx].isSpam = false;
+    for (const currentId of targetIds) {
+      // 1. Sinkronisasi berkas fisik di Maildir server jika currentId adalah maildir_...
+      if (currentId.startsWith("maildir_") && folder) {
+        const fileName = currentId.replace("maildir_", "");
+        const foundPath = findMaildirFile(accountEmail || "", fileName);
+        if (foundPath) {
+          const [u, d] = (accountEmail || "").toLowerCase().trim().split("@");
+          const accDir = path.join("/www/vmail", d, u);
+          let targetDir = path.join(accDir, "cur");
+
+          if (folder === "trash") {
+            targetDir = path.join(accDir, ".Trash", "cur");
+          } else if (folder === "spam") {
+            targetDir = path.join(accDir, ".Junk", "cur");
+          } else if (folder === "sent") {
+            targetDir = path.join(accDir, ".Sent", "cur");
+          } else {
+            targetDir = path.join(accDir, "cur");
+          }
+
+          try {
+            fs.mkdirSync(targetDir, { recursive: true });
+            const destPath = path.join(targetDir, fileName);
+            if (foundPath !== destPath) {
+              fs.renameSync(foundPath, destPath);
+            }
+          } catch (moveErr) {
+            console.warn("Could not move physical maildir file:", moveErr);
+          }
         }
       }
-      saveMessages(messages);
-    } else {
-      // Jika pesan berasal dari Maildir, buat record override di dstech_mail_messages.json
-      const newOverride: MailMessage = {
-        id,
-        accountEmail: body.accountEmail || "",
-        folder: folder || (isSpam ? "spam" : "inbox"),
-        fromName: body.fromName || "",
-        fromEmail: body.fromEmail || "",
-        toEmail: body.toEmail || "",
-        subject: body.subject || "",
-        snippet: body.snippet || "",
-        bodyHtml: body.bodyHtml || "",
-        date: body.date || new Date().toISOString(),
-        isRead: typeof isRead === "boolean" ? isRead : true,
-        isStarred: typeof isStarred === "boolean" ? isStarred : false,
-        isSpam: typeof isSpam === "boolean" ? isSpam : folder === "spam",
-        spamScore: isSpam ? 100 : 0,
-        spamReason: isSpam ? "Ditandai manual sebagai Spam" : "Ditandai manual sebagai Bukan Spam",
-      };
-      messages.unshift(newOverride);
-      saveMessages(messages);
+
+      // 2. Simpan status di JSON
+      const idx = messages.findIndex((m) => m.id === currentId);
+
+      if (idx !== -1) {
+        if (typeof isRead === "boolean") messages[idx].isRead = isRead;
+        if (typeof isStarred === "boolean") messages[idx].isStarred = isStarred;
+        if (typeof isSpam === "boolean") {
+          messages[idx].isSpam = isSpam;
+          if (isSpam) {
+            messages[idx].folder = "spam";
+            messages[idx].spamScore = 100;
+            messages[idx].spamReason = "Ditandai manual sebagai Spam oleh pengguna";
+          } else {
+            messages[idx].folder = "inbox";
+            messages[idx].spamScore = 0;
+            messages[idx].spamReason = "Ditandai manual sebagai Bukan Spam oleh pengguna (Whitelist)";
+          }
+        } else if (folder && ["inbox", "sent", "trash", "spam"].includes(folder)) {
+          messages[idx].folder = folder as any;
+          if (folder === "spam") {
+            messages[idx].isSpam = true;
+          } else if (folder === "inbox") {
+            messages[idx].isSpam = false;
+          }
+        }
+      } else {
+        // Jika pesan berasal dari Maildir, buat record override di dstech_mail_messages.json
+        const newOverride: MailMessage = {
+          id: currentId,
+          accountEmail: body.accountEmail || "",
+          folder: folder || (isSpam ? "spam" : "inbox"),
+          fromName: body.fromName || "",
+          fromEmail: body.fromEmail || "",
+          toEmail: body.toEmail || "",
+          subject: body.subject || "",
+          snippet: body.snippet || "",
+          bodyHtml: body.bodyHtml || "",
+          date: body.date || new Date().toISOString(),
+          isRead: typeof isRead === "boolean" ? isRead : true,
+          isStarred: typeof isStarred === "boolean" ? isStarred : false,
+          isSpam: typeof isSpam === "boolean" ? isSpam : folder === "spam",
+          spamScore: isSpam ? 100 : 0,
+          spamReason: isSpam ? "Ditandai manual sebagai Spam" : "Ditandai manual sebagai Bukan Spam",
+        };
+        messages.unshift(newOverride);
+      }
     }
+
+    saveMessages(messages);
 
     return NextResponse.json({
       success: true,
-      message: "Status pesan berhasil diperbarui.",
+      count: targetIds.length,
+      message: `${targetIds.length} pesan berhasil diperbarui.`,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -554,9 +560,27 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
-    const accountEmail = searchParams.get("accountEmail");
+    const idsParam = searchParams.get("ids");
+    let accountEmail = searchParams.get("accountEmail") || "";
+    let targetIds: string[] = [];
 
-    if (!id) {
+    if (id) {
+      targetIds.push(id);
+    } else if (idsParam) {
+      targetIds = idsParam.split(",").map((s) => s.trim()).filter(Boolean);
+    } else {
+      try {
+        const body = await request.json();
+        if (body.ids && Array.isArray(body.ids)) {
+          targetIds = body.ids;
+        } else if (body.id) {
+          targetIds = [body.id];
+        }
+        if (body.accountEmail) accountEmail = body.accountEmail;
+      } catch {}
+    }
+
+    if (targetIds.length === 0) {
       return NextResponse.json(
         { success: false, message: "ID pesan wajib disertakan." },
         { status: 400 }
@@ -564,48 +588,51 @@ export async function DELETE(request: Request) {
     }
 
     // 1. Hapus berkas fisik di Maildir server jika id adalah maildir_...
-    if (id.startsWith("maildir_")) {
-      const fileName = id.replace("maildir_", "");
-      let foundPath = findMaildirFile(accountEmail || "", fileName);
+    for (const currentId of targetIds) {
+      if (currentId.startsWith("maildir_")) {
+        const fileName = currentId.replace("maildir_", "");
+        let foundPath = findMaildirFile(accountEmail || "", fileName);
 
-      // Jika accountEmail belum diberikan, cari di seluruh domain/user vmail
-      if (!foundPath && fs.existsSync("/www/vmail")) {
-        try {
-          const domains = fs.readdirSync("/www/vmail");
-          for (const d of domains) {
-            const dPath = path.join("/www/vmail", d);
-            if (fs.statSync(dPath).isDirectory() && d.includes(".")) {
-              const users = fs.readdirSync(dPath);
-              for (const u of users) {
-                const p = findMaildirFile(`${u}@${d}`, fileName);
-                if (p) {
-                  foundPath = p;
-                  break;
+        if (!foundPath && fs.existsSync("/www/vmail")) {
+          try {
+            const domains = fs.readdirSync("/www/vmail");
+            for (const d of domains) {
+              const dPath = path.join("/www/vmail", d);
+              if (fs.statSync(dPath).isDirectory() && d.includes(".")) {
+                const users = fs.readdirSync(dPath);
+                for (const u of users) {
+                  const p = findMaildirFile(`${u}@${d}`, fileName);
+                  if (p) {
+                    foundPath = p;
+                    break;
+                  }
                 }
               }
+              if (foundPath) break;
             }
-            if (foundPath) break;
-          }
-        } catch {}
-      }
+          } catch {}
+        }
 
-      if (foundPath && fs.existsSync(foundPath)) {
-        try {
-          fs.unlinkSync(foundPath);
-        } catch (unlinkErr) {
-          console.warn("Could not delete physical maildir file:", unlinkErr);
+        if (foundPath && fs.existsSync(foundPath)) {
+          try {
+            fs.unlinkSync(foundPath);
+          } catch (unlinkErr) {
+            console.warn("Could not delete physical maildir file:", unlinkErr);
+          }
         }
       }
     }
 
     // 2. Hapus dari berkas JSON lokal
     let messages = readMessages();
-    messages = messages.filter((m) => m.id !== id);
+    const idSet = new Set(targetIds);
+    messages = messages.filter((m) => !idSet.has(m.id));
     saveMessages(messages);
 
     return NextResponse.json({
       success: true,
-      message: "Pesan berhasil dihapus permanen.",
+      count: targetIds.length,
+      message: `${targetIds.length} pesan berhasil dihapus permanen.`,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -614,4 +641,5 @@ export async function DELETE(request: Request) {
     );
   }
 }
+
 

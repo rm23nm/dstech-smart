@@ -4785,6 +4785,63 @@
 
 ---
 
+### 166. Tugas: Fitur Tandai Checklist (Multi-Select & Bulk Actions) untuk Hapus Massal dan Pindahkan ke Folder (/admin/mail & /api/mail/messages)
+- **Permintaan Pengguna**:
+  - *"tambahkan juga fitur tandai chek list agar mudah untuk menghapus atau memindahkan kedalam folder,"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Hasil Pekerjaan**:
+  1. [x] **Langkah 1**: Buat folder cadangan sementara `_backup_bulk_actions/` dan salin file yang akan dimodifikasi (`src/app/api/mail/messages/route.ts` dan `src/app/admin/mail/page.tsx`).
+  2. [x] **Langkah 2**: Perbarui API backend `src/app/api/mail/messages/route.ts` agar mendukung operasi massal (bulk):
+     - Handler `PATCH`: mendukung parameter `ids: string[]` untuk memindahkan banyak berkas fisik Maildir ke folder target (`inbox`, `trash`, `spam`) dan memperbarui status read/unread massal secara sinkron.
+     - Handler `DELETE`: mendukung penghapusan massal berkas fisik Maildir di disk server dan pembersihan data JSON berdasarkan daftar `ids`.
+  3. [x] **Langkah 3**: Perbarui antarmuka pengguna `src/app/admin/mail/page.tsx`:
+     - Menambahkan state `selectedMessageIds: string[]` dan `isBulkMoveOpen: boolean`.
+     - Menambahkan checkbox checklist di setiap kartu email dengan `e.stopPropagation()` agar pengguna dapat mencentang pesan tanpa membuka reading pane.
+     - Menambahkan header toolbar checklist dengan toggle **"Pilih Semua"** (Select All / Deselect All) serta indikator counter jumlah pesan terpilih.
+     - Menampilkan **Bulk Action Toolbar** interaktif:
+       * Dropdown Cepat **Pindahkan ke Folder**: Kotak Masuk, Folder Spam, Kotak Sampah.
+       * Tombol **Tandai Sudah Dibaca** (`CheckCheck`).
+       * Tombol **Hapus Pesan Terpilih** (Pindahkan ke Sampah atau Hapus Permanen jika sedang berada di folder Sampah).
+       * Tombol **Batal / Reset Pilihan**.
+  4. [x] **Langkah 4**: Uji kompilasi dengan `npm run build` lokal dan berhasil 100% (58/58 routes prerendered).
+  5. [x] **Langkah 5**: Hapus folder cadangan sementara `_backup_bulk_actions/` setelah verifikasi berhasil.
+  6. [x] **Langkah 6**: Push commit ke GitHub via `push_with_native_git.js` dan jalankan `deploy_live.js` ke live VPS aaPanel.
+  7. [x] **Langkah 7**: Update status di `LAPORAN_PROGRES.md`.
+
+---
+
+### 167. Tugas (Antrian 1): Perbaikan Parser MIME Email (Decoder Base64 & Quoted-Printable Multipart) (/api/mail/messages)
+- **Permintaan Pengguna**:
+  - *"untuk pesannya pas dibuka kenapa seperti ini?"* (Menampilkan tangkapan layar Reading Pane berisi kode mentah MIME Exchange/Outlook: `--_000_DBAP193MB0301...`, `Content-Type: text/plain`, `Content-Transfer-Encoding: base64`).
+- **Status**: 🟡 **SEDANG DIKERJAKAN**
+- **Analisis Akar Masalah**:
+  - Email dengan format `multipart/mixed` atau `multipart/alternative` memiliki boundary bersarang (nested boundaries) serta encoding `base64` atau `quoted-printable`.
+  - Fungsi `parseMaildirFile` saat ini hanya memisahkan boundary tingkat pertama dan belum memecahkan nested boundary serta belum men-decode payload `base64` atau `quoted-printable` ke teks/HTML bersih.
+- **Rencana Langkah Kerja**:
+  1. [ ] **Langkah 1**: Buat backup `_backup_mime_parser/` untuk `src/app/api/mail/messages/route.ts`.
+  2. [ ] **Langkah 2**: Kembangkan modul parser MIME yang mampu:
+     - Mendeteksi dan memecah boundary bertingkat (nested boundary, e.g. `_000_...`).
+     - Men-decode `Content-Transfer-Encoding: base64` menggunakan `Buffer.from(payload, "base64").toString("utf-8")`.
+     - Men-decode `Content-Transfer-Encoding: quoted-printable` (mengubah `=XX` ke karakter aslinya dan membersihkan soft break `=\r?\n`).
+     - Memprioritaskan bagian `text/html` (jika tersedia) atau `text/plain` yang bersih dari header MIME.
+  3. [ ] **Langkah 3**: Uji kompilasi dan periksa keluaran pesan di API.
+  4. [ ] **Langkah 4**: Bersihkan folder cadangan, build lokal, push ke GitHub, dan deploy ke live VPS.
+
+---
+
+### 168. Tugas (Antrian 2): Fitur Tampilkan Email Seluruh Akun ("Semua Akun / Unified Inbox") (/admin/mail & /api/mail/messages)
+- **Permintaan Pengguna**:
+  - *"tolong buatkan juga fitur untuk melihat email seluruh akun, agar mudah dalam memanagenya"* (Menampilkan dropdown selector akun email perusahaan).
+- **Status**: ⏳ **MENUNGGU (ANTRIAN BERIKUTNYA)**
+- **Rencana Langkah Kerja**:
+  1. [ ] **Langkah 1**: Buat backup `_backup_all_accounts/` untuk file terkait.
+  2. [ ] **Langkah 2**: Tambahkan opsi *"Semua Akun Perusahaan (Unified Mailbox)"* pada dropdown selector akun di `src/app/admin/mail/page.tsx` (`value = "ALL"`).
+  3. [ ] **Langkah 3**: Perbarui API `src/app/api/mail/messages/route.ts` agar saat `accountEmail` kosong atau `"ALL"`, API membaca seluruh mailbox di bawah `/www/vmail/*/*` dan menggabungkan pesannya berdasarkan urutan tanggal terbaru secara descending.
+  4. [ ] **Langkah 4**: Tampilkan badge nama akun penerima (contoh: `cs@dstechsmart.com`, `admin@...`) pada setiap kartu pesan di daftar saat mode Semua Akun aktif.
+  5. [ ] **Langkah 5**: Build lokal, push ke GitHub, dan deploy ke live VPS.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.

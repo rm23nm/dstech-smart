@@ -30,6 +30,11 @@ import {
   AlertTriangle,
   Paperclip,
   CornerUpRight,
+  CheckSquare,
+  Square,
+  FolderInput,
+  CheckCheck,
+  ChevronDown,
 } from "lucide-react";
 
 interface MailAccount {
@@ -79,6 +84,10 @@ export default function AdminMailPage() {
   const [isSending, setIsSending] = useState<boolean>(false);
   const [alertInfo, setAlertInfo] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Multi-Select & Bulk Actions State
+  const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
+  const [isBulkMoveOpen, setIsBulkMoveOpen] = useState(false);
 
   // Form Compose State
   const [showCc, setShowCc] = useState(false);
@@ -160,6 +169,7 @@ export default function AdminMailPage() {
 
   useEffect(() => {
     if (selectedAccountEmail) {
+      setSelectedMessageIds([]);
       fetchMessages();
     }
   }, [selectedAccountEmail, currentFolder, searchQuery]);
@@ -293,6 +303,136 @@ export default function AdminMailPage() {
       }
     } catch (err) {
       showAlert("error", "Gagal menghapus pesan.");
+    }
+  };
+
+  // Multi-Select & Bulk Action Handlers
+  const handleToggleSelectMessage = (msgId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedMessageIds((prev) =>
+      prev.includes(msgId) ? prev.filter((id) => id !== msgId) : [...prev, msgId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    if (selectedMessageIds.length === messages.length && messages.length > 0) {
+      setSelectedMessageIds([]);
+    } else {
+      setSelectedMessageIds(messages.map((m) => m.id));
+    }
+  };
+
+  const handleBulkMoveFolder = async (targetFolder: "inbox" | "trash" | "spam") => {
+    if (selectedMessageIds.length === 0) return;
+    setIsBulkMoveOpen(false);
+    try {
+      const res = await fetch("/api/mail/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: selectedMessageIds,
+          folder: targetFolder,
+          accountEmail: selectedAccountEmail,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        const folderName =
+          targetFolder === "inbox"
+            ? "Kotak Masuk"
+            : targetFolder === "trash"
+            ? "Kotak Sampah"
+            : "Spam";
+        showAlert("success", `${selectedMessageIds.length} pesan berhasil dipindahkan ke ${folderName}.`);
+        if (selectedMessage && selectedMessageIds.includes(selectedMessage.id)) {
+          setSelectedMessage(null);
+        }
+        setSelectedMessageIds([]);
+        fetchMessages();
+      } else {
+        showAlert("error", json.message || "Gagal memindahkan pesan.");
+      }
+    } catch (err) {
+      showAlert("error", "Gagal memindahkan pesan terpilih.");
+    }
+  };
+
+  const handleBulkMarkRead = async (targetIsRead: boolean) => {
+    if (selectedMessageIds.length === 0) return;
+    try {
+      const res = await fetch("/api/mail/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ids: selectedMessageIds,
+          isRead: targetIsRead,
+          accountEmail: selectedAccountEmail,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        showAlert(
+          "success",
+          `${selectedMessageIds.length} pesan ditandai sebagai ${targetIsRead ? "sudah dibaca" : "belum dibaca"}.`
+        );
+        setMessages((prev) =>
+          prev.map((m) =>
+            selectedMessageIds.includes(m.id) ? { ...m, isRead: targetIsRead } : m
+          )
+        );
+        if (selectedMessage && selectedMessageIds.includes(selectedMessage.id)) {
+          setSelectedMessage({ ...selectedMessage, isRead: targetIsRead });
+        }
+        setSelectedMessageIds([]);
+        fetchMessages();
+      } else {
+        showAlert("error", json.message || "Gagal memperbarui status pesan.");
+      }
+    } catch (err) {
+      showAlert("error", "Gagal memperbarui status pesan.");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedMessageIds.length === 0) return;
+
+    if (currentFolder === "trash") {
+      if (
+        !confirm(
+          `Hapus permanen ${selectedMessageIds.length} pesan terpilih dari server? Tindakan ini tidak dapat dibatalkan.`
+        )
+      ) {
+        return;
+      }
+      try {
+        const res = await fetch("/api/mail/messages", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ids: selectedMessageIds,
+            accountEmail: selectedAccountEmail,
+          }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          showAlert(
+            "success",
+            `${selectedMessageIds.length} pesan berhasil dihapus permanen dari server.`
+          );
+          if (selectedMessage && selectedMessageIds.includes(selectedMessage.id)) {
+            setSelectedMessage(null);
+          }
+          setSelectedMessageIds([]);
+          fetchMessages();
+        } else {
+          showAlert("error", json.message || "Gagal menghapus pesan.");
+        }
+      } catch (err) {
+        showAlert("error", "Gagal menghapus pesan terpilih.");
+      }
+    } else {
+      // Pindahkan ke Trash
+      handleBulkMoveFolder("trash");
     }
   };
 
@@ -746,7 +886,7 @@ export default function AdminMailPage() {
           {/* Panel Tengah: Daftar Email (Inbox/Sent List) */}
           <div className="lg:col-span-4 border-b lg:border-b-0 lg:border-r border-slate-200 lg:pr-4 flex flex-col min-h-[480px]">
             {/* Search & Refresh */}
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-2">
               <div className="relative flex-1">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
@@ -766,6 +906,127 @@ export default function AdminMailPage() {
               </button>
             </div>
 
+            {/* Toolbar Checklist & Bulk Actions */}
+            <div className="mb-2.5 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleToggleSelectAll}
+                  disabled={messages.length === 0}
+                  className="flex items-center gap-1.5 text-slate-600 hover:text-indigo-600 font-bold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title={
+                    selectedMessageIds.length === messages.length && messages.length > 0
+                      ? "Batalkan semua pilihan"
+                      : "Pilih semua pesan di folder ini"
+                  }
+                >
+                  {selectedMessageIds.length > 0 && selectedMessageIds.length === messages.length ? (
+                    <CheckSquare className="w-4 h-4 text-indigo-600" />
+                  ) : selectedMessageIds.length > 0 ? (
+                    <div className="w-4 h-4 rounded bg-indigo-600 text-white flex items-center justify-center text-[10px] font-black leading-none">
+                      -
+                    </div>
+                  ) : (
+                    <Square className="w-4 h-4 text-slate-400" />
+                  )}
+                  <span className="text-[11px]">
+                    {selectedMessageIds.length > 0
+                      ? `${selectedMessageIds.length} dipilih`
+                      : "Pilih Semua"}
+                  </span>
+                </button>
+              </div>
+
+              {selectedMessageIds.length > 0 && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* Dropdown Pindahkan ke Folder */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsBulkMoveOpen((prev) => !prev)}
+                      className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 font-bold text-[10px] flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                      title="Pindahkan ke folder lain"
+                    >
+                      <FolderInput className="w-3 h-3 text-indigo-600" />
+                      <span>Pindahkan</span>
+                      <ChevronDown className="w-3 h-3 text-slate-400" />
+                    </button>
+
+                    {isBulkMoveOpen && (
+                      <div className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-20 py-1 text-xs">
+                        <div className="px-3 py-1 text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                          Pindahkan ke
+                        </div>
+                        {currentFolder !== "inbox" && (
+                          <button
+                            type="button"
+                            onClick={() => handleBulkMoveFolder("inbox")}
+                            className="w-full px-3 py-1.5 text-left text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-2 cursor-pointer font-medium"
+                          >
+                            <Inbox className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Kotak Masuk</span>
+                          </button>
+                        )}
+                        {currentFolder !== "spam" && (
+                          <button
+                            type="button"
+                            onClick={() => handleBulkMoveFolder("spam")}
+                            className="w-full px-3 py-1.5 text-left text-rose-700 hover:bg-rose-50 flex items-center gap-2 cursor-pointer font-medium"
+                          >
+                            <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />
+                            <span>Folder Spam</span>
+                          </button>
+                        )}
+                        {currentFolder !== "trash" && (
+                          <button
+                            type="button"
+                            onClick={() => handleBulkMoveFolder("trash")}
+                            className="w-full px-3 py-1.5 text-left text-slate-700 hover:bg-rose-50 hover:text-rose-700 flex items-center gap-2 cursor-pointer font-medium"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                            <span>Kotak Sampah</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tombol Tandai Dibaca */}
+                  <button
+                    type="button"
+                    onClick={() => handleBulkMarkRead(true)}
+                    className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 hover:text-indigo-600 shadow-2xs transition-colors cursor-pointer"
+                    title="Tandai Sudah Dibaca"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  </button>
+
+                  {/* Tombol Hapus */}
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-rose-50 text-rose-600 shadow-2xs transition-colors cursor-pointer"
+                    title={currentFolder === "trash" ? "Hapus Permanen Terpilih" : "Pindahkan ke Sampah"}
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  </button>
+
+                  {/* Tombol Reset Seleksi */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMessageIds([]);
+                      setIsBulkMoveOpen(false);
+                    }}
+                    className="p-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                    title="Batalkan Pilihan"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* List Pesan */}
             <div className="flex-1 overflow-y-auto space-y-2 max-h-[560px] pr-1">
               {messages.length === 0 ? (
@@ -775,6 +1036,7 @@ export default function AdminMailPage() {
               ) : (
                 messages.map((msg) => {
                   const isSelected = selectedMessage?.id === msg.id;
+                  const isMsgChecked = selectedMessageIds.includes(msg.id);
                   return (
                     <div
                       key={msg.id}
@@ -783,55 +1045,74 @@ export default function AdminMailPage() {
                         if (!msg.isRead) handleToggleRead(msg);
                       }}
                       className={`p-3 rounded-2xl cursor-pointer transition-all border ${
-                        isSelected
+                        isMsgChecked
+                          ? "bg-indigo-50/60 border-indigo-400 shadow-xs ring-1 ring-indigo-300"
+                          : isSelected
                           ? "bg-indigo-50/80 border-indigo-200 shadow-xs"
                           : !msg.isRead
                           ? "bg-white border-slate-300 font-bold shadow-2xs hover:border-indigo-200"
                           : "bg-white/60 border-slate-200 hover:bg-slate-50"
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-xs font-black text-slate-800 truncate">
-                          {currentFolder === "sent" ? `Ke: ${msg.toEmail}` : msg.fromName || msg.fromEmail}
-                        </span>
-                        <div className="flex items-center gap-1 shrink-0">
-                          {msg.isSpam && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[9px] font-black">
-                              <AlertTriangle className="w-2.5 h-2.5" />
-                              SPAM
+                      <div className="flex items-start gap-2.5">
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleSelectMessage(msg.id, e)}
+                          className="mt-0.5 text-slate-400 hover:text-indigo-600 transition-colors cursor-pointer shrink-0"
+                          title={isMsgChecked ? "Batalkan pilihan" : "Pilih pesan ini"}
+                        >
+                          {isMsgChecked ? (
+                            <CheckSquare className="w-4 h-4 text-indigo-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-300 hover:text-slate-500" />
+                          )}
+                        </button>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-xs font-black text-slate-800 truncate">
+                              {currentFolder === "sent" ? `Ke: ${msg.toEmail}` : msg.fromName || msg.fromEmail}
                             </span>
-                          )}
-                          <span className="text-[10px] text-slate-400 font-medium">
-                            {msg.date.split(" ")[0]}
-                          </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {msg.isSpam && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[9px] font-black">
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  SPAM
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-400 font-medium">
+                                {msg.date.split(" ")[0]}
+                              </span>
+                            </div>
+                          </div>
+                          <p className={`text-xs mt-1 truncate ${!msg.isRead ? "text-indigo-950 font-black" : "text-slate-700"}`}>
+                            {msg.subject}
+                          </p>
+                          <p className="text-[11px] text-slate-400 truncate mt-0.5 font-normal">
+                            {msg.snippet}
+                          </p>
+                          <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleStar(msg, e)}
+                                className="hover:text-amber-500 cursor-pointer"
+                              >
+                                <Star
+                                  className={`w-3.5 h-3.5 ${
+                                    msg.isStarred ? "text-amber-500 fill-amber-500" : "text-slate-300"
+                                  }`}
+                                />
+                              </button>
+                              {!msg.isRead && (
+                                <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block" />
+                              )}
+                            </div>
+                            <span className="font-mono text-[9px] text-slate-400">
+                              {msg.date.split(" ")[1] || ""}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <p className={`text-xs mt-1 truncate ${!msg.isRead ? "text-indigo-950 font-black" : "text-slate-700"}`}>
-                        {msg.subject}
-                      </p>
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5 font-normal">
-                        {msg.snippet}
-                      </p>
-                      <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(e) => handleToggleStar(msg, e)}
-                            className="hover:text-amber-500 cursor-pointer"
-                          >
-                            <Star
-                              className={`w-3.5 h-3.5 ${
-                                msg.isStarred ? "text-amber-500 fill-amber-500" : "text-slate-300"
-                              }`}
-                            />
-                          </button>
-                          {!msg.isRead && (
-                            <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block" />
-                          )}
-                        </div>
-                        <span className="font-mono text-[9px] text-slate-400">
-                          {msg.date.split(" ")[1] || ""}
-                        </span>
                       </div>
                     </div>
                   );
