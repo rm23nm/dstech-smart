@@ -17265,185 +17265,222 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
-            {/* HALAMAN 2: LAMPIRAN RINCIAN ITEM & SPESIFIKASI TEKNIS PENAWARAN (SPH) */}
-            <div
-              className="relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-3 text-slate-800 overflow-hidden shadow-sm print-document-sheet print-last-sheet mt-6 print:mt-0"
-              style={{
-                  paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
-                  paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
-                }}
-              >
-                {/* Background Kop Surat Resmi DSTech */}
-                {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
-                  <img
-                    src={financeSettings.letterheadUrl}
-                    alt="Kop Surat Resmi"
-                    className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
-                      financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
-                    }`}
+            {/* HALAMAN 2+: LAMPIRAN RINCIAN ITEM & SPESIFIKASI TEKNIS PENAWARAN (SPH) DENGAN PAGINASI RESMI */}
+            {(() => {
+              const allItems = selectedQuotationForPrint.items || [];
+              const sphChunks: (typeof allItems)[] = [];
+              if (allItems.length > 0) {
+                const page2Limit = 13;
+                sphChunks.push(allItems.slice(0, page2Limit));
+                for (let i = page2Limit; i < allItems.length; i += 15) {
+                  sphChunks.push(allItems.slice(i, i + 15));
+                }
+              } else {
+                sphChunks.push([]);
+              }
+
+              return sphChunks.map((chunk, chunkIdx) => {
+                const isLastChunk = chunkIdx === sphChunks.length - 1;
+                const startIdx = chunkIdx === 0 ? 0 : 13 + (chunkIdx - 1) * 15;
+
+                return (
+                  <div
+                    key={`sph-lampiran-sheet-${chunkIdx}`}
+                    className={`relative rounded-2xl border border-slate-300 bg-white px-6 sm:px-10 space-y-4 print:space-y-3 text-slate-800 overflow-hidden shadow-sm print-document-sheet ${
+                      isLastChunk ? "print-last-sheet" : "print-page-break"
+                    } mt-6 print:mt-0`}
                     style={{
-                      objectFit:
-                        financeSettings.letterheadFitMode === "cover"
-                          ? "cover"
-                          : financeSettings.letterheadFitMode === "contain"
-                          ? "contain"
-                          : "fill",
-                      objectPosition: "top center",
-                      width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
-                      height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
-                      top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
-                      left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
-                      opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
-                      WebkitPrintColorAdjust: "exact",
-                      printColorAdjust: "exact",
+                      paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                      paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
                     }}
-                  />
-                )}
+                  >
+                    {/* Background Kop Surat Resmi DSTech */}
+                    {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                      <img
+                        src={financeSettings.letterheadUrl}
+                        alt="Kop Surat Resmi"
+                        className={`absolute pointer-events-none z-0 select-none print-letterhead-img ${
+                          financeSettings.letterheadFitMode === "bleed" ? "mode-bleed" : "inset-0 w-full h-full"
+                        }`}
+                        style={{
+                          objectFit:
+                            financeSettings.letterheadFitMode === "cover"
+                              ? "cover"
+                              : financeSettings.letterheadFitMode === "contain"
+                              ? "contain"
+                              : "fill",
+                          objectPosition: "top center",
+                          width: financeSettings.letterheadFitMode === "bleed" ? "102.5%" : "100%",
+                          height: financeSettings.letterheadFitMode === "bleed" ? "102%" : "100%",
+                          top: financeSettings.letterheadFitMode === "bleed" ? "-1%" : "0",
+                          left: financeSettings.letterheadFitMode === "bleed" ? "-1.25%" : "0",
+                          opacity: financeSettings.watermarkOpacity !== undefined ? financeSettings.watermarkOpacity : 1,
+                          WebkitPrintColorAdjust: "exact",
+                          printColorAdjust: "exact",
+                        }}
+                      />
+                    )}
 
-                <div className="relative z-10 space-y-4 print:space-y-3">
-                  {/* Header Lampiran SPH */}
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-indigo-900 pb-3">
-                    <div>
-                      <span className="text-xs font-black uppercase tracking-widest text-indigo-600 block">
-                        LAMPIRAN SURAT PENAWARAN HARGA (SPH)
-                      </span>
-                      <h4 className="text-base sm:text-lg font-black text-slate-900">
-                        Rincian Item Perangkat, Material & Jasa Instalasi
-                      </h4>
-                      <p className="text-[11px] text-slate-600 font-bold">
-                        PT. DSTECH SMART PERKASA
-                      </p>
-                    </div>
-                    <div className="text-left sm:text-right text-xs space-y-0.5">
-                      <p className="font-mono font-black text-indigo-700">
-                        Lampiran No: {selectedQuotationForPrint.quotationNumber}
-                      </p>
-                      <p className="text-slate-500 text-[11px]">
-                        Tanggal: {selectedQuotationForPrint.date}
-                      </p>
-                      <p className="text-slate-700 font-bold text-[11px]">
-                        Klien: {selectedQuotationForPrint.customerOrg || selectedQuotationForPrint.customerName}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Tabel Lengkap Rincian Item Penawaran */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border border-slate-200">
-                      <thead className="bg-indigo-950 text-white uppercase text-[10px] font-black tracking-wider">
-                        <tr>
-                          <th className="p-2.5 text-center w-8">No</th>
-                          <th className="p-2.5 text-center w-16">Gambar</th>
-                          <th className="p-2.5">Deskripsi Produk / Jasa & Spesifikasi Teknis</th>
-                          <th className="p-2.5 text-center">Qty</th>
-                          <th className="p-2.5 text-center">Satuan</th>
-                          <th className="p-2.5 text-right">Harga Satuan (Rp)</th>
-                          {selectedQuotationForPrint.items.some((it) => (it.discount || 0) > 0) && (
-                            <th className="p-2.5 text-right">Diskon</th>
-                          )}
-                          <th className="p-2.5 text-right">Total (Rp)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 bg-white/70">
-                        {selectedQuotationForPrint.items.map((it, idx) => {
-                          const matchedProd = products.find(
-                            (p) =>
-                              (it.productId && p.id === it.productId) ||
-                              (p.name && it.productName && p.name.trim().toLowerCase() === it.productName.trim().toLowerCase())
-                          );
-                          const itemImg = it.image || matchedProd?.image || "/portfolio-residential.png";
-                          const itemDesc = it.description || matchedProd?.desc || "";
-
-                          return (
-                            <tr key={idx} className="hover:bg-slate-50/50">
-                              <td className="p-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
-                              <td className="p-1.5 text-center w-16">
-                                <div className="w-12 h-12 mx-auto rounded-lg border border-slate-200 bg-white p-0.5 flex items-center justify-center overflow-hidden shadow-2xs">
-                                  <img
-                                    src={itemImg}
-                                    alt={it.productName}
-                                    className="max-h-full max-w-full object-contain"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src = "/portfolio-residential.png";
-                                    }}
-                                  />
-                                </div>
-                              </td>
-                              <td className="p-2.5">
-                                <p className="font-bold text-slate-900 text-xs">{it.productName}</p>
-                                {itemDesc && (
-                                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{itemDesc}</p>
-                                )}
-                              </td>
-                              <td className="p-2.5 text-center font-bold">{it.qty}</td>
-                              <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
-                              <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
-                              {selectedQuotationForPrint.items.some((item) => (item.discount || 0) > 0) && (
-                                <td className="p-2.5 text-right text-red-600 font-bold">
-                                  {it.discount ? `- ${formatRupiah(it.discount)}` : "-"}
-                                </td>
-                              )}
-                              <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Rekapitulasi Total Lampiran */}
-                  <div className="flex justify-end pt-2 text-xs">
-                    <div className="w-full sm:w-80 space-y-1.5 bg-slate-50/90 p-3 rounded-xl border border-slate-200">
-                      <div className="flex items-center justify-between text-slate-600">
-                        <span>Subtotal Barang & Jasa:</span>
-                        <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.subtotal)}</span>
+                    <div className="relative z-10 space-y-3 print:space-y-2">
+                      {/* Header Lampiran SPH */}
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b-2 border-indigo-900 pb-2">
+                        <div>
+                          <span className="text-xs font-black uppercase tracking-widest text-indigo-600 block">
+                            LAMPIRAN SURAT PENAWARAN HARGA (SPH)
+                          </span>
+                          <h4 className="text-base sm:text-lg font-black text-slate-900">
+                            Rincian Item Perangkat, Material & Jasa Instalasi
+                          </h4>
+                          <p className="text-[11px] text-slate-600 font-bold">
+                            PT. DSTECH SMART PERKASA
+                          </p>
+                        </div>
+                        <div className="text-left sm:text-right text-xs space-y-0.5">
+                          <p className="font-mono font-black text-indigo-700">
+                            Lampiran No: {selectedQuotationForPrint.quotationNumber}
+                          </p>
+                          <p className="text-slate-500 text-[11px]">
+                            Tanggal: {selectedQuotationForPrint.date}
+                          </p>
+                          <p className="text-slate-700 font-bold text-[11px]">
+                            Halaman: {chunkIdx + 2} dari {sphChunks.length + 1}
+                          </p>
+                        </div>
                       </div>
-                      {selectedQuotationForPrint.discount > 0 && (
-                        <div className="flex items-center justify-between text-red-600">
-                          <span>Diskon Negosiasi:</span>
-                          <span className="font-bold">- {formatRupiah(selectedQuotationForPrint.discount)}</span>
+
+                      {/* Tabel Lengkap Rincian Item Penawaran */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border border-slate-200">
+                          <thead className="bg-indigo-950 text-white uppercase text-[9px] font-black tracking-wider">
+                            <tr>
+                              <th className="p-1.5 text-center w-8">No</th>
+                              <th className="p-1.5 text-center w-12">Gambar</th>
+                              <th className="p-1.5">Deskripsi Produk / Jasa & Spesifikasi Teknis</th>
+                              <th className="p-1.5 text-center">Qty</th>
+                              <th className="p-1.5 text-center">Satuan</th>
+                              <th className="p-1.5 text-right">Harga Satuan (Rp)</th>
+                              {selectedQuotationForPrint.items.some((it) => (it.discount || 0) > 0) && (
+                                <th className="p-1.5 text-right">Diskon</th>
+                              )}
+                              <th className="p-1.5 text-right">Total (Rp)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200 bg-white/70">
+                            {chunk.map((it, idx) => {
+                              const globalIdx = startIdx + idx + 1;
+                              const matchedProd = products.find(
+                                (p) =>
+                                  (it.productId && p.id === it.productId) ||
+                                  (p.name && it.productName && p.name.trim().toLowerCase() === it.productName.trim().toLowerCase())
+                              );
+                              const itemImg = it.image || matchedProd?.image || "/portfolio-residential.png";
+                              const itemDesc = it.description || matchedProd?.desc || "";
+
+                              return (
+                                <tr key={idx} className="hover:bg-slate-50/50">
+                                  <td className="p-1.5 text-center font-bold text-slate-500 text-[10px]">{globalIdx}</td>
+                                  <td className="p-1 text-center w-12">
+                                    <div className="w-6 h-6 mx-auto rounded border border-slate-300 bg-white flex items-center justify-center overflow-hidden p-0.5">
+                                      <img
+                                        src={itemImg}
+                                        alt={it.productName}
+                                        className="max-w-full max-h-full object-contain"
+                                        onError={(e) => {
+                                          (e.target as HTMLElement).setAttribute("src", "/portfolio-residential.png");
+                                        }}
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="p-1.5">
+                                    <p className="font-bold text-slate-900 text-[10.5px] leading-tight">{it.productName}</p>
+                                    {itemDesc && (
+                                      <p className="text-[8.5px] text-slate-500 mt-0.5 line-clamp-1">
+                                        {itemDesc}
+                                      </p>
+                                    )}
+                                  </td>
+                                  <td className="p-1.5 text-center font-bold text-[10px]">{it.qty}</td>
+                                  <td className="p-1.5 text-center text-slate-600 text-[9.5px]">{it.unit || "Unit"}</td>
+                                  <td className="p-1.5 text-right font-medium text-[10px]">{formatRupiah(it.price)}</td>
+                                  {selectedQuotationForPrint.items.some((item) => (item.discount || 0) > 0) && (
+                                    <td className="p-1.5 text-right text-red-600 font-bold text-[10px]">
+                                      {it.discount ? `- ${formatRupiah(it.discount)}` : "-"}
+                                    </td>
+                                  )}
+                                  <td className="p-1.5 text-right font-black text-[10px]">{formatRupiah(it.total)}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Bagian Bawah: Hanya muncul di chunk terakhir */}
+                      {isLastChunk ? (
+                        <>
+                          {/* Rekapitulasi Total Lampiran */}
+                          <div className="flex justify-end pt-1 text-xs">
+                            <div className="w-full sm:w-80 space-y-1 bg-slate-50/90 p-2.5 rounded-xl border border-slate-200">
+                              <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                                <span>Subtotal Barang & Jasa:</span>
+                                <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.subtotal)}</span>
+                              </div>
+                              {selectedQuotationForPrint.discount > 0 && (
+                                <div className="flex items-center justify-between text-red-600 text-[11px]">
+                                  <span>Diskon Negosiasi:</span>
+                                  <span className="font-bold">- {formatRupiah(selectedQuotationForPrint.discount)}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between text-slate-600 text-[11px]">
+                                <span>PPN ({selectedQuotationForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedQuotationForPrint.taxRate}%`}{(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}):</span>
+                                <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.taxAmount)}</span>
+                              </div>
+                              <div className="border-t-2 border-indigo-950 pt-1 flex items-center justify-between text-xs font-black text-slate-900">
+                                <span className="text-indigo-900 uppercase">Total Penawaran:</span>
+                                <span className="text-sm text-emerald-600">{formatRupiah(selectedQuotationForPrint.grandTotal)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Catatan Garansi & Spek Teknis */}
+                          <div className="p-2.5 bg-indigo-50/50 rounded-xl border border-indigo-150 text-[10.5px] text-slate-700 space-y-0.5">
+                            <p className="font-bold text-indigo-950 text-[10.5px]">Catatan Lampiran & Ketentuan Teknis:</p>
+                            <p className="text-[9.5px] text-slate-600 leading-snug">
+                              • Seluruh unit perangkat hardware baru dan bergaransi resmi distributor/pabrikan selama 1 (satu) tahun.<br />
+                              • Biaya instalasi teknis sudah termasuk penarikan kabel, crimping/konektor, pemasangan bracket, pengujian operasional, dan garansi instalasi 30 hari kalender.<br />
+                              • Lampiran rincian ini merupakan dokumen sah yang tidak terpisahkan dari Surat Penawaran Harga Nomor {selectedQuotationForPrint.quotationNumber}.
+                            </p>
+                          </div>
+
+                          {/* Paraf Pengesahan Lampiran */}
+                          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200 text-xs">
+                            <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
+                              <p className="text-[9.5px] font-bold text-slate-500 uppercase">Paraf Pemesan / Klien</p>
+                              <div className="h-8 flex items-center justify-center text-slate-300 text-[9px] italic">
+                                ( .................................................. )
+                              </div>
+                            </div>
+                            <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
+                              <p className="text-[9.5px] font-bold text-slate-500 uppercase">
+                                Paraf {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                              </p>
+                              <div className="h-8 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
+                                {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
+                              </div>
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex justify-between items-center pt-2 text-[10px] text-slate-500 italic border-t border-slate-200">
+                          <span>* Bersambung ke lembar lampiran berikutnya (Halaman {chunkIdx + 3})...</span>
+                          <span className="font-mono font-bold">{selectedQuotationForPrint.quotationNumber}</span>
                         </div>
                       )}
-                      <div className="flex items-center justify-between text-slate-600">
-                        <span>PPN ({selectedQuotationForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedQuotationForPrint.taxRate}%`}{(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}):</span>
-                        <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.taxAmount)}</span>
-                      </div>
-                      <div className="border-t-2 border-indigo-950 pt-1.5 flex items-center justify-between text-xs font-black text-slate-900">
-                        <span className="text-indigo-900 uppercase">Total Penawaran:</span>
-                        <span className="text-sm text-emerald-600">{formatRupiah(selectedQuotationForPrint.grandTotal)}</span>
-                      </div>
                     </div>
                   </div>
-
-                  {/* Catatan Garansi & Spek Teknis */}
-                  <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-150 text-[11px] text-slate-700 space-y-1">
-                    <p className="font-bold text-indigo-950">Catatan Lampiran & Ketentuan Teknis:</p>
-                    <p className="text-[10px] text-slate-600 leading-relaxed">
-                      • Seluruh unit perangkat hardware baru dan bergaransi resmi distributor/pabrikan selama 1 (satu) tahun.<br />
-                      • Biaya instalasi teknis sudah termasuk penarikan kabel, crimping/konektor, pemasangan bracket, pengujian operasional, dan garansi instalasi 30 hari kalender.<br />
-                      • Lampiran rincian ini merupakan dokumen sah yang tidak terpisahkan dari Surat Penawaran Harga Nomor {selectedQuotationForPrint.quotationNumber}.
-                    </p>
-                  </div>
-
-                  {/* Paraf Pengesahan Lampiran */}
-                  <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
-                    <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">Paraf Pemesan / Klien</p>
-                      <div className="h-10 flex items-center justify-center text-slate-300 text-[9px] italic">
-                        ( .................................................. )
-                      </div>
-                    </div>
-                    <div className="text-center p-2 rounded-lg bg-slate-50/80 border border-slate-200">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase">
-                        Paraf {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
-                      </p>
-                      <div className="h-10 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
-                        {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                );
+              });
+            })()}
             </div>
             </div>
         </div>

@@ -203,11 +203,14 @@ export async function GET(req: Request) {
       };
     });
 
-    // Bagi rincian item per lembar A4 (maksimal 7 item per lembar) agar pas dan kop surat tidak melar/rusak
-    const chunkSize = 7;
+    // Paginasi Lampiran SPH: Halaman 2 memuat maksimal 13 item, Halaman 3 dan seterusnya memuat 15 item
     const itemChunks: any[][] = [];
-    for (let i = 0; i < itemsWithImages.length; i += chunkSize) {
-      itemChunks.push(itemsWithImages.slice(i, i + chunkSize));
+    if (itemsWithImages.length > 0) {
+      const page2Limit = 13;
+      itemChunks.push(itemsWithImages.slice(0, page2Limit));
+      for (let i = page2Limit; i < itemsWithImages.length; i += 15) {
+        itemChunks.push(itemsWithImages.slice(i, i + 15));
+      }
     }
 
     const documentTitle = `Surat Penawaran Harga - ${sph.quotationNumber}`;
@@ -224,18 +227,32 @@ export async function GET(req: Request) {
         <style>
           @page { size: A4 portrait; margin: 0; }
           @media print {
-            body { background: white !important; padding: 0 !important; margin: 0 !important; }
+            html, body {
+              background: white !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              width: 210mm !important;
+            }
             .print-hidden { display: none !important; }
             .print-sheet {
               box-shadow: none !important;
               border: none !important;
               margin: 0 !important;
               width: 210mm !important;
-              height: 296.5mm !important;
-              max-height: 296.5mm !important;
-              page-break-after: always;
-              break-after: page;
+              height: 297mm !important;
+              min-height: 297mm !important;
+              max-height: 297mm !important;
+              box-sizing: border-box !important;
               overflow: hidden !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
+              page-break-after: always !important;
+              break-after: page !important;
+            }
+            .print-sheet.print-last-sheet,
+            .print-sheet:last-of-type {
+              page-break-after: avoid !important;
+              break-after: avoid !important;
             }
           }
           .letterhead-bg {
@@ -296,12 +313,11 @@ export async function GET(req: Request) {
         </div>
         
         <!-- WRAPPER DOKUMEN CETAK SPH -->
-        <div id="sph-full-document">
-        <!-- LEMBAR 1: SURAT PENGANTAR PENAWARAN HARGA -->
+        <div id="sph-f        <!-- LEMBAR 1: SURAT PENGANTAR PENAWARAN HARGA -->
         <div
           id="print-sheet-sph"
-          class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8"
-          style="width: 210mm; min-height: 297mm; max-width: 100%; box-sizing: border-box;"
+          class="print-sheet print-page-break relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8"
+          style="width: 210mm; height: 297mm; max-height: 297mm; box-sizing: border-box; page-break-after: always; break-after: page;"
         >
           <!-- Background Kop Surat -->
           <img
@@ -313,21 +329,21 @@ export async function GET(req: Request) {
           />
 
           <div
-            class="content-wrapper relative z-10 space-y-4"
-            style="padding-top: ${letterheadEnabled ? '120px' : '30px'}; padding-bottom: ${letterheadEnabled ? '90px' : '30px'}; padding-left: 45px; padding-right: 45px;"
+            class="content-wrapper relative z-10 space-y-2.5"
+            style="padding-top: ${letterheadEnabled ? '80px' : '24px'}; padding-bottom: ${letterheadEnabled ? '75px' : '24px'}; padding-left: 45px; padding-right: 45px;"
           >
             <!-- Kop Surat Perusahaan DSTech -->
-            <div class="flex justify-between items-start border-b-2 border-slate-900 pb-4">
-              <div class="space-y-1">
+            <div class="flex justify-between items-start border-b-2 border-slate-900 pb-3">
+              <div class="space-y-0.5">
                 <div class="flex items-center gap-2">
-                  <span class="text-2xl font-black text-red-600 tracking-tight">
+                  <span class="text-xl font-black text-red-600 tracking-tight">
                     ${sph.businessEntity === "NON_PT" ? "DSTECH SMART" : "PT. DSTECH SMART PERKASA"}
                   </span>
                 </div>
-                <p class="text-[11px] font-bold text-slate-600">
+                <p class="text-[10.5px] font-bold text-slate-600">
                   Solusi Security System, CCTV AI, Barrier Gate, IoT &amp; IT Infrastructure
                 </p>
-                <p class="text-[10px] text-slate-500 leading-relaxed max-w-md">
+                <p class="text-[9.5px] text-slate-500 leading-snug max-w-md">
                   Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
                   <br />
                   ${sph.businessEntity === "NON_PT" ? `<span>Usaha Mandiri Non-PKP (Bebas PPN 0%)</span>` : `<strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>`}
@@ -337,24 +353,24 @@ export async function GET(req: Request) {
               </div>
 
               <div class="text-right space-y-1">
-                <span class="px-3 py-1 rounded-md bg-indigo-900 text-white font-black text-xs uppercase tracking-wider inline-block">
+                <span class="px-2.5 py-0.5 rounded bg-indigo-900 text-white font-black text-[11px] uppercase tracking-wider inline-block">
                   SURAT PENAWARAN HARGA (SPH)
                 </span>
                 <p class="font-mono font-black text-sm text-indigo-700">
                   ${sph.quotationNumber} ${sph.revision ? `- Rev. 0${sph.revision}` : ''}
                 </p>
-                <p class="text-[11px] text-slate-500 font-medium">
+                <p class="text-[10.5px] text-slate-500 font-medium">
                   Tanggal: ${sph.date}
                 </p>
-                <p class="text-[11px] text-slate-700 font-bold">
+                <p class="text-[10.5px] text-slate-700 font-bold">
                   Masa Berlaku: s/d ${sph.validUntil || '-'}
                 </p>
               </div>
             </div>
 
             <!-- Nomor, Lampiran, Perihal & Info Penerima -->
-            <div class="grid grid-cols-2 gap-4 text-xs pt-2">
-              <div class="space-y-1">
+            <div class="grid grid-cols-2 gap-4 text-xs pt-1">
+              <div class="space-y-0.5">
                 <table class="text-xs">
                   <tbody>
                     <tr>
@@ -376,17 +392,17 @@ export async function GET(req: Request) {
                 </table>
               </div>
 
-              <div class="text-right bg-slate-50/90 p-3 rounded-xl border border-slate-200 text-xs">
-                <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Kepada Yth:</p>
-                <p class="font-black text-slate-900 text-sm mt-0.5">${sph.customerName}</p>
-                ${sph.customerOrg && sph.customerOrg !== sph.customerName ? `<p class="font-bold text-slate-700">${sph.customerOrg}</p>` : ''}
-                <p class="text-slate-600 text-[11px] mt-0.5">${sph.customerPhone || '-'}</p>
-                <p class="text-slate-500 text-[10px]">${sph.customerAddress || 'Lokasi Klien'}</p>
+              <div class="text-right bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 text-xs">
+                <p class="text-[9.5px] font-black text-slate-400 uppercase tracking-wider">Kepada Yth:</p>
+                <p class="font-black text-slate-900 text-xs mt-0.5">${sph.customerName}</p>
+                ${sph.customerOrg && sph.customerOrg !== sph.customerName ? `<p class="font-bold text-slate-700 text-[11px]">${sph.customerOrg}</p>` : ''}
+                <p class="text-slate-600 text-[10px] mt-0.5">${sph.customerPhone || '-'}</p>
+                <p class="text-slate-500 text-[9.5px]">${sph.customerAddress || 'Lokasi Klien'}</p>
               </div>
             </div>
 
             <!-- Paragraf Pembuka Resmi -->
-            <div class="text-xs leading-relaxed text-slate-700 space-y-1.5 border-t border-slate-100 pt-3">
+            <div class="text-[11px] leading-relaxed text-slate-700 space-y-1 border-t border-slate-100 pt-2">
               <p class="font-bold text-slate-900">Dengan hormat,</p>
               <p>
                 Sehubungan dengan rencana pengadaan dan kebutuhan sistem pengamanan / teknologi informasi pada instansi Bapak/Ibu, bersama surat ini kami PT. DSTech Smart Perkasa bermaksud mengajukan penawaran harga pengadaan unit perangkat, material pendukung, serta jasa instalasi teknis dengan rincian spesifikasi sebagai berikut:
@@ -394,35 +410,33 @@ export async function GET(req: Request) {
             </div>
 
             <!-- Referensi Resmi ke Lampiran Halaman 2 -->
-            <div class="p-3.5 rounded-2xl bg-purple-50/90 border border-purple-300 text-xs text-purple-950 flex items-center justify-between gap-3 shadow-xs">
-              <div class="flex items-center gap-2.5">
-                <div>
-                  <p class="font-black text-slate-900">Rincian Perangkat, Material &amp; Jasa Teknis:</p>
-                  <p class="text-[11px] text-purple-800">
-                    Rincian spesifikasi teknis lengkap, kuantiti, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> surat penawaran ini (${itemsWithImages.length} item penawaran).
-                  </p>
-                </div>
+            <div class="p-2.5 rounded-xl bg-purple-50/90 border border-purple-300 text-xs text-purple-950 flex items-center justify-between gap-3 shadow-xs">
+              <div>
+                <p class="font-black text-slate-900">Rincian Perangkat, Material &amp; Jasa Teknis:</p>
+                <p class="text-[10.5px] text-purple-800">
+                  Rincian spesifikasi teknis lengkap, kuantiti, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> surat penawaran ini (${itemsWithImages.length} item penawaran).
+                </p>
               </div>
-              <span class="px-2.5 py-1 rounded-lg bg-purple-200/90 text-purple-900 font-mono font-black text-[10px] shrink-0">
+              <span class="px-2 py-0.5 rounded-lg bg-purple-200/90 text-purple-900 font-mono font-black text-[10px] shrink-0">
                 ${itemsWithImages.length} ITEM
               </span>
             </div>
 
             <!-- Rincian Perhitungan & Terbilang -->
-            <div class="flex flex-col sm:flex-row justify-between gap-4 pt-2 text-xs">
+            <div class="flex flex-col sm:flex-row justify-between gap-3 pt-1 text-xs">
               <!-- Kotak Terbilang & Rekening Bank -->
-              <div class="space-y-3 max-w-sm flex-1">
-                <div class="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px]">
-                  <span class="font-bold text-amber-900 uppercase text-[10px] block mb-0.5">Terbilang:</span>
+              <div class="space-y-2 max-w-sm flex-1">
+                <div class="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[10.5px]">
+                  <span class="font-bold text-amber-900 uppercase text-[9.5px] block mb-0.5">Terbilang:</span>
                   <p class="font-serif italic font-bold text-slate-800">
                     "${terbilangRupiah}"
                   </p>
                 </div>
 
-                <div class="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] space-y-1">
+                <div class="p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[10.5px] space-y-0.5">
                   <p class="font-bold text-blue-900">Rekening Resmi Pembayaran ${sph.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}:</p>
                   ${getFilteredBankAccounts(bankAccounts, sph.businessEntity).map((acc: any) => `
-                    <p class="text-slate-700 text-[10px]">
+                    <p class="text-slate-700 text-[9.5px]">
                       • <strong>${acc.bankName}</strong>: ${acc.accountNumber} a/n ${acc.accountHolder} (${acc.branch || 'KCU Cilegon'})
                     </p>
                   `).join("")}
@@ -430,107 +444,107 @@ export async function GET(req: Request) {
               </div>
 
               <!-- Summary Totals -->
-              <div class="space-y-1.5 sm:w-72 bg-slate-50/90 p-3.5 rounded-xl border border-slate-200">
-                <div class="flex items-center justify-between text-slate-600">
+              <div class="space-y-1 sm:w-72 bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 text-xs">
+                <div class="flex items-center justify-between text-slate-600 text-[11px]">
                   <span>Subtotal Barang &amp; Jasa:</span>
                   <span class="font-bold text-slate-900">${formatRupiah(sph.subtotal)}</span>
                 </div>
                 ${sph.discount && sph.discount > 0 ? `
-                  <div class="flex items-center justify-between text-red-600">
+                  <div class="flex items-center justify-between text-red-600 text-[11px]">
                     <span>${sph.discountLabel || 'Diskon Khusus Negosiasi'}:</span>
                     <span class="font-bold">- ${formatRupiah(sph.discount)}</span>
                   </div>
-                  <div class="flex items-center justify-between text-slate-600 text-[11px] pt-0.5 border-t border-dashed border-slate-200">
+                  <div class="flex items-center justify-between text-slate-600 text-[10px] pt-0.5 border-t border-dashed border-slate-200">
                     <span>DPP / Netto Kesepakatan:</span>
                     <span class="font-bold text-slate-900">
                       ${formatRupiah(Math.max(0, sph.subtotal - sph.discount))}
                     </span>
                   </div>
                 ` : ''}
-                <div class="flex items-center justify-between text-slate-600">
-                  <span>PPN (${sph.taxRate === 11.12 ? '12% (11/12)' : `${sph.taxRate || 11}%`}):</span>
+                <div class="flex items-center justify-between text-slate-600 text-[11px]">
+                  <span>PPN (${sph.taxRate === 11.12 ? '12%' : `${sph.taxRate || 11}%`}):</span>
                   <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
                 </div>
-                <div class="border-t-2 border-indigo-950 pt-2 flex items-center justify-between text-sm font-black text-slate-900">
-                  <span class="text-indigo-900">TOTAL PENAWARAN:</span>
-                  <span class="text-base text-emerald-600">${formatRupiah(sph.grandTotal)}</span>
+                <div class="border-t-2 border-indigo-950 pt-1.5 flex items-center justify-between font-black text-slate-900">
+                  <span class="text-indigo-900 text-xs">TOTAL PENAWARAN:</span>
+                  <span class="text-sm text-emerald-600">${formatRupiah(sph.grandTotal)}</span>
                 </div>
               </div>
             </div>
 
             <!-- Syarat & Ketentuan Teknis Penawaran -->
             ${sph.terms ? `
-              <div class="p-4 rounded-xl bg-slate-50/90 border border-slate-200 text-xs space-y-1.5">
-                <h5 class="font-black text-slate-900 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+              <div class="p-2.5 rounded-xl bg-slate-50/90 border border-slate-200 text-xs space-y-1">
+                <h5 class="font-black text-slate-900 text-[10px] uppercase tracking-wider flex items-center gap-1.5">
                   <span>Syarat &amp; Ketentuan Teknis (Terms &amp; Conditions):</span>
                 </h5>
-                <div class="text-[10px] text-slate-600 whitespace-pre-line leading-relaxed font-sans">
+                <div class="text-[9.5px] text-slate-600 whitespace-pre-line leading-relaxed font-sans">
                   ${sph.terms}
                 </div>
               </div>
             ` : ''}
 
             <!-- Penutup Surat -->
-            <div class="text-xs leading-relaxed text-slate-700">
+            <div class="text-[10.5px] leading-relaxed text-slate-700">
               <p>
                 Demikian surat penawaran harga ini kami sampaikan. Besar harapan kami agar usulan solusi teknologi ini dapat memenuhi ekspektasi dan menjadi awal kerjasama yang baik antara PT. DSTech Smart Perkasa dengan ${sph.customerOrg || sph.customerName}. Atas perhatian dan kerjasamanya, kami ucapkan terima kasih.
               </p>
             </div>
 
             <!-- Tanda Tangan Dual Approval (Klien & Direktur DSTech) -->
-            <div class="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
+            <div class="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200 text-xs">
               <!-- Sisi Kiri: Penerima / Klien -->
-              <div class="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
+              <div class="flex flex-col justify-between h-28 border border-slate-200/80 rounded-xl p-2 bg-white/70 shadow-sm text-center">
                 <div>
-                  <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Disetujui &amp; Diterima Oleh,</p>
-                  <p class="text-xs font-black text-slate-900 mt-0.5">
+                  <p class="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">Disetujui &amp; Diterima Oleh,</p>
+                  <p class="text-[11px] font-black text-slate-900 mt-0.5">
                     ${sph.customerOrg || sph.customerName}
                   </p>
                 </div>
 
-                <div class="h-11 flex items-center justify-center text-slate-300 text-[9px] italic">
+                <div class="h-8 flex items-center justify-center text-slate-300 text-[8.5px] italic">
                   (Tanda Tangan, Nama Jelas &amp; Stempel Klien)
                 </div>
 
                 <div class="pt-1 border-t border-slate-300">
-                  <p class="font-bold text-slate-900 text-xs">
+                  <p class="font-bold text-slate-900 text-[11px]">
                     ${sph.customerName ? `( ${sph.customerName} )` : "( ................................................................ )"}
                   </p>
-                  <p class="text-[9px] text-slate-500">
+                  <p class="text-[8.5px] text-slate-500">
                     PIC / Purchasing / Manajer Terkait
                   </p>
                 </div>
               </div>
 
               <!-- Sisi Kanan: Hormat Kami -->
-              <div class="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
+              <div class="flex flex-col justify-between h-28 border border-slate-200/80 rounded-xl p-2 bg-white/70 shadow-sm text-center">
                 <div>
-                  <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
-                  <p class="text-xs font-black text-indigo-700 mt-0.5">
+                  <p class="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
+                  <p class="text-[11px] font-black text-indigo-700 mt-0.5">
                     ${sph.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
                   </p>
                 </div>
 
-                <div class="h-11 relative flex items-center justify-center">
+                <div class="h-8 relative flex items-center justify-center">
                   <!-- Stempel Bulat Digital Resmi -->
-                  <div class="print-stamp-circle absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[6px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
-                    <span class="font-black text-[5.5px]">PT. DSTECH</span>
-                    <span class="text-[4.5px] tracking-tight">SMART PERKASA</span>
-                    <span class="text-[4px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL SPH</span>
+                  <div class="print-stamp-circle absolute right-1 w-10 h-10 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[5.5px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
+                    <span class="font-black text-[5px]">PT. DSTECH</span>
+                    <span class="text-[4px] tracking-tight">SMART PERKASA</span>
+                    <span class="text-[3.5px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL SPH</span>
                   </div>
 
                   ${signatureImage ? `
-                    <img src="${signatureImage}" alt="Tanda Tangan" class="max-h-11 max-w-[130px] object-contain relative z-10" />
+                    <img src="${signatureImage}" alt="Tanda Tangan" class="max-h-8 max-w-[120px] object-contain relative z-10" />
                   ` : `
-                    <div class="font-serif italic text-base text-slate-800 font-black relative z-10 tracking-wider">
+                    <div class="font-serif italic text-sm text-slate-800 font-black relative z-10 tracking-wider">
                       ${signerName}
                     </div>
                   `}
                 </div>
 
-                <div class="pt-2 border-t border-slate-300">
-                  <p class="font-black text-slate-900 text-xs underline">( ${signerName} )</p>
-                  <p class="text-[9px] text-slate-500">${signerTitle}</p>
+                <div class="pt-1 border-t border-slate-300">
+                  <p class="font-black text-slate-900 text-[11px] underline">( ${signerName} )</p>
+                  <p class="text-[8.5px] text-slate-500">${signerTitle}</p>
                 </div>
               </div>
             </div>
@@ -538,110 +552,124 @@ export async function GET(req: Request) {
         </div>
 
         <!-- LEMBAR LAMPIRAN TABEL RINCIAN ITEM PENAWARAN (DIPAGINASI PER LEMBAR A4 RESMI) -->
-        ${itemsWithImages.length > 0 ? itemChunks.map((chunk, chunkIdx) => `
-        <div
-          class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8"
-          style="width: 210mm; min-height: 297mm; max-width: 100%; box-sizing: border-box; page-break-after: always;"
-        >
-          <!-- Background Kop Surat Resmi DSTech -->
-          <img
-            src="${letterheadUrl}"
-            alt="Kop Surat"
-            class="letterhead-bg absolute inset-0 w-full h-full pointer-events-none select-none z-0"
-            style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${letterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
-          />
-
+        ${itemsWithImages.length > 0 ? itemChunks.map((chunk, chunkIdx) => {
+          const isLastChunk = chunkIdx === itemChunks.length - 1;
+          return `
           <div
-            class="content-wrapper relative z-10 space-y-4"
-            style="padding-top: ${letterheadEnabled ? '120px' : '30px'}; padding-bottom: ${letterheadEnabled ? '90px' : '30px'}; padding-left: 45px; padding-right: 45px;"
+            class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8 ${isLastChunk ? 'print-last-sheet' : 'print-page-break'}"
+            style="width: 210mm; height: 297mm; max-height: 297mm; box-sizing: border-box; page-break-after: ${isLastChunk ? 'avoid' : 'always'}; break-after: ${isLastChunk ? 'avoid' : 'page'};"
           >
-            <div class="flex justify-between items-start pb-3 border-b-2 border-indigo-950">
-              <div>
-                <span class="text-xs font-black uppercase tracking-widest text-indigo-700 block">
-                  LAMPIRAN SURAT PENAWARAN HARGA (SPH)
-                </span>
-                <h3 class="text-base font-black text-slate-900 mt-0.5">
-                  Rincian Item Perangkat, Material &amp; Jasa Instalasi
-                </h3>
-                <p class="text-[11px] text-slate-600 font-bold">PT. DSTECH SMART PERKASA</p>
-              </div>
-              <div class="text-right text-xs space-y-0.5">
-                <p class="font-mono font-black text-indigo-700">Lampiran No: ${sph.quotationNumber}</p>
-                <p class="text-slate-500 text-[11px]">Tanggal: ${sph.date}</p>
-                <p class="text-slate-700 font-bold text-[11px]">Halaman: ${chunkIdx + 2} dari ${itemChunks.length + 1}</p>
-              </div>
-            </div>
+            <!-- Background Kop Surat Resmi DSTech -->
+            <img
+              src="${letterheadUrl}"
+              alt="Kop Surat"
+              class="letterhead-bg absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+              style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${letterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+            />
 
-            <!-- Tabel Rincian Item Penawaran dengan Gambar Produk -->
-            <table class="w-full text-xs border border-slate-300">
-              <thead class="bg-indigo-950 text-white font-bold text-[10px] uppercase tracking-wider">
-                <tr>
-                  <th class="border border-slate-300 p-2 text-center w-8">No</th>
-                  <th class="border border-slate-300 p-2 text-center w-16">Gambar</th>
-                  <th class="border border-slate-300 p-2 text-left">Deskripsi Produk / Jasa &amp; Spesifikasi Teknis</th>
-                  <th class="border border-slate-300 p-2 text-center w-12">Qty</th>
-                  <th class="border border-slate-300 p-2 text-center w-14">Satuan</th>
-                  <th class="border border-slate-300 p-2 text-right w-28">Harga Satuan (Rp)</th>
-                  <th class="border border-slate-300 p-2 text-right w-28">Total (Rp)</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-200">
-                ${chunk.map((item: any, cIdx: number) => {
-                  const globalIdx = chunkIdx * chunkSize + cIdx + 1;
-                  return `
-                  <tr class="hover:bg-slate-50/50">
-                    <td class="border border-slate-300 p-2 text-center font-bold text-slate-500">${globalIdx}</td>
-                    <td class="border border-slate-300 p-1.5 text-center w-16">
-                      <div style="width: 44px; height: 44px; margin: 0 auto; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; padding: 2px;">
-                        <img src="${item.image || '/portfolio-residential.png'}" alt="${item.productName || item.name}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='/portfolio-residential.png'" />
-                      </div>
-                    </td>
-                    <td class="border border-slate-300 p-2">
-                      <div class="font-bold text-slate-900 text-xs">${item.productName || item.name}</div>
-                      ${item.description ? `<div class="text-[10px] text-slate-500 mt-0.5 leading-snug">${item.description}</div>` : ''}
-                    </td>
-                    <td class="border border-slate-300 p-2 text-center font-bold">${item.qty}</td>
-                    <td class="border border-slate-300 p-2 text-center text-slate-600">${item.unit || 'Unit'}</td>
-                    <td class="border border-slate-300 p-2 text-right font-medium">${formatRupiah(item.price)}</td>
-                    <td class="border border-slate-300 p-2 text-right font-black text-slate-900">${formatRupiah(item.total || item.qty * item.price)}</td>
+            <div
+              class="content-wrapper relative z-10 space-y-3"
+              style="padding-top: ${letterheadEnabled ? '80px' : '24px'}; padding-bottom: ${letterheadEnabled ? '75px' : '24px'}; padding-left: 45px; padding-right: 45px;"
+            >
+              <div class="flex justify-between items-start pb-2 border-b-2 border-indigo-950">
+                <div>
+                  <span class="text-xs font-black uppercase tracking-widest text-indigo-700 block">
+                    LAMPIRAN SURAT PENAWARAN HARGA (SPH)
+                  </span>
+                  <h3 class="text-base font-black text-slate-900 mt-0.5">
+                    Rincian Item Perangkat, Material &amp; Jasa Instalasi
+                  </h3>
+                  <p class="text-[11px] text-slate-600 font-bold">PT. DSTECH SMART PERKASA</p>
+                </div>
+                <div class="text-right text-xs space-y-0.5">
+                  <p class="font-mono font-black text-indigo-700">Lampiran No: ${sph.quotationNumber}</p>
+                  <p class="text-slate-500 text-[11px]">Tanggal: ${sph.date}</p>
+                  <p class="text-slate-700 font-bold text-[11px]">Halaman: ${chunkIdx + 2} dari ${itemChunks.length + 1}</p>
+                </div>
+              </div>
+
+              <!-- Tabel Rincian Item Penawaran dengan Gambar Produk -->
+              <table class="w-full text-xs border border-slate-300">
+                <thead class="bg-indigo-950 text-white font-bold text-[9px] uppercase tracking-wider">
+                  <tr>
+                    <th class="border border-slate-300 p-1 text-center w-8">No</th>
+                    <th class="border border-slate-300 p-1 text-center w-12">Gambar</th>
+                    <th class="border border-slate-300 p-1.5 text-left">Deskripsi Produk / Jasa &amp; Spesifikasi Teknis</th>
+                    <th class="border border-slate-300 p-1 text-center w-12">Qty</th>
+                    <th class="border border-slate-300 p-1 text-center w-14">Satuan</th>
+                    <th class="border border-slate-300 p-1 text-right w-28">Harga Satuan (Rp)</th>
+                    <th class="border border-slate-300 p-1 text-right w-28">Total (Rp)</th>
                   </tr>
-                  `;
-                }).join("")}
-              </tbody>
-            </table>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                  ${chunk.map((item: any, cIdx: number) => {
+                    const startIdx = chunkIdx === 0 ? 0 : 13 + (chunkIdx - 1) * 15;
+                    const globalIdx = startIdx + cIdx + 1;
+                    return `
+                    <tr class="hover:bg-slate-50/50">
+                      <td class="border border-slate-300 p-1 text-center font-bold text-slate-500 text-[10px]">${globalIdx}</td>
+                      <td class="border border-slate-300 p-1 text-center w-12">
+                        <div style="width: 26px; height: 26px; margin: 0 auto; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; padding: 1px;">
+                          <img src="${item.image || '/portfolio-residential.png'}" alt="${item.productName || item.name}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='/portfolio-residential.png'" />
+                        </div>
+                      </td>
+                      <td class="border border-slate-300 p-1.5">
+                        <div class="font-bold text-slate-900 text-[10px] leading-tight">${item.productName || item.name}</div>
+                        ${item.description ? `<div class="text-[8.5px] text-slate-500 mt-0.5 leading-none line-clamp-1">${item.description}</div>` : ''}
+                      </td>
+                      <td class="border border-slate-300 p-1 text-center font-bold text-[10px]">${item.qty}</td>
+                      <td class="border border-slate-300 p-1 text-center text-slate-600 text-[9.5px]">${item.unit || 'Unit'}</td>
+                      <td class="border border-slate-300 p-1 text-right font-medium text-[10px]">${formatRupiah(item.price)}</td>
+                      <td class="border border-slate-300 p-1 text-right font-black text-slate-900 text-[10px]">${formatRupiah(item.total || item.qty * item.price)}</td>
+                    </tr>
+                    `;
+                  }).join("")}
+                </tbody>
+              </table>
 
-            ${chunkIdx === itemChunks.length - 1 ? `
-            <!-- Rekapitulasi Total pada Lembar Terakhir -->
-            <div class="flex justify-end pt-2 text-xs">
-              <div class="w-72 space-y-1 bg-slate-50/90 p-3 rounded-xl border border-slate-200">
-                <div class="flex justify-between text-slate-600">
-                  <span>Subtotal Barang &amp; Jasa:</span>
-                  <span class="font-bold text-slate-900">${formatRupiah(sph.subtotal)}</span>
+              <!-- Rekapitulasi Nilai & Catatan Pengesahan Lampiran (HANYA MUNCUL DI LEMBAR TERAKHIR) -->
+              ${isLastChunk ? `
+              <div class="flex flex-col sm:flex-row justify-between items-start gap-4 pt-2 text-xs">
+                <div class="text-[9.5px] text-slate-500 space-y-1 max-w-sm">
+                  <p class="font-bold text-slate-700 uppercase tracking-wider">Catatan Teknis:</p>
+                  <p>Seluruh unit perangkat yang tertera dijamin 100% baru, bergaransi resmi pabrik, dan sesuai spesifikasi teknis penawaran.</p>
                 </div>
-                ${sph.discount && sph.discount > 0 ? `
-                <div class="flex justify-between text-red-600">
-                  <span>${sph.discountLabel || "Diskon Negosiasi"}:</span>
-                  <span class="font-bold">-${formatRupiah(sph.discount)}</span>
-                </div>` : ""}
-                ${sph.taxAmount && sph.taxAmount > 0 ? `
-                <div class="flex justify-between text-slate-600">
-                  <span>PPN (${sph.taxRate === 11.12 ? '12% (11/12)' : `${sph.taxRate || 11}%`}):</span>
-                  <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
-                </div>` : ""}
-                <div class="border-t-2 border-slate-900 pt-1 flex justify-between font-black text-sm text-slate-900">
-                  <span class="text-indigo-900">GRAND TOTAL:</span>
-                  <span class="text-emerald-700">${formatRupiah(sph.grandTotal)}</span>
+
+                <div class="w-72 space-y-1 bg-slate-50/90 p-2.5 rounded-xl border border-slate-200 ml-auto">
+                  <div class="flex justify-between text-slate-600 text-[11px]">
+                    <span>Subtotal Barang &amp; Jasa:</span>
+                    <span class="font-bold text-slate-900">${formatRupiah(sph.subtotal)}</span>
+                  </div>
+                  ${sph.discount && sph.discount > 0 ? `
+                  <div class="flex justify-between text-red-600 text-[11px]">
+                    <span>${sph.discountLabel || "Diskon Negosiasi"}:</span>
+                    <span class="font-bold">-${formatRupiah(sph.discount)}</span>
+                  </div>` : ""}
+                  ${sph.taxAmount && sph.taxAmount > 0 ? `
+                  <div class="flex justify-between text-slate-600 text-[11px]">
+                    <span>PPN (${sph.taxRate === 11.12 ? '12%' : `${sph.taxRate || 11}%`}):</span>
+                    <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
+                  </div>` : ""}
+                  <div class="border-t-2 border-slate-900 pt-1 flex justify-between font-black text-xs text-slate-900">
+                    <span class="text-indigo-900">TOTAL PENAWARAN:</span>
+                    <span class="text-emerald-700 text-sm">${formatRupiah(sph.grandTotal)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            ` : ""}
+              ` : `
+              <div class="flex justify-between items-center pt-2 text-[10px] text-slate-500 italic border-t border-slate-200">
+                <span>* Bersambung ke lembar lampiran berikutnya (Halaman ${chunkIdx + 3})...</span>
+                <span class="font-mono font-bold">${sph.quotationNumber}</span>
+              </div>
+              `}
 
-            <div class="pt-4 border-t border-slate-200 text-center text-[10px] text-slate-400">
-              Seluruh spesifikasi perangkat di atas terjamin keasliannya dan bergaransi resmi PT. DSTech Smart Perkasa.
+              <div class="pt-2 border-t border-slate-200 text-center text-[9px] text-slate-400">
+                Seluruh spesifikasi perangkat di atas terjamin keasliannya dan bergaransi resmi PT. DSTech Smart Perkasa.
+              </div>
             </div>
           </div>
-        </div>
-        `).join("") : ""}
+          `;
+        }).join("") : ""}
         </div> <!-- End sph-full-document -->
 
         <script>
@@ -650,8 +678,8 @@ export async function GET(req: Request) {
               el.style.display = enabled ? 'block' : 'none';
             });
             document.querySelectorAll('.content-wrapper').forEach(function(el) {
-              el.style.paddingTop = enabled ? '120px' : '30px';
-              el.style.paddingBottom = enabled ? '90px' : '30px';
+              el.style.paddingTop = enabled ? '80px' : '24px';
+              el.style.paddingBottom = enabled ? '75px' : '24px';
             });
           }
 
@@ -662,7 +690,8 @@ export async function GET(req: Request) {
               filename:     '${documentTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf',
               image:        { type: 'jpeg', quality: 0.85 },
               html2canvas:  { scale: 2, useCORS: true },
-              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
             };
             html2pdf().set(opt).from(element).save();
           }
