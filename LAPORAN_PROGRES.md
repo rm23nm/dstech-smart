@@ -4946,6 +4946,29 @@
 
 ---
 
+### 174. Tugas: Otomatisasi & Sinkronisasi Alamat Email Penerima Dokumen Bisnis (SPH, Faktur, PO) dengan Master Klien Terdaftar
+- **Permintaan Pengguna**:
+  - *"untuk alamat emailnya ambil langsung sinkron dengan daftar client yang dipilih"* (Menyertakan screenshot modal pengiriman SPH Karyoto di mana kolom Alamat Email Penerima masih kosong).
+- **Status**: 🟡 **SEDANG DIKERJAKAN**
+- **Analisis & Rencana Solusi**:
+  1. Pada pemanggilan `handleOpenSendDocModal` saat tombol kirim SPH / Faktur diklik, properti `recipientEmail` sebelumnya belum disertakan, dan fungsi pembuka modal belum melakukan auto-lookup ke state master `clients` / `suppliers`.
+  2. Solusi yang akan diimplementasikan:
+     - **Auto-Lookup di `handleOpenSendDocModal`**: Jika `recipientEmail` tidak dikirim atau kosong, sistem secara otomatis mencocokkan nama penerima (`recipientName`), instansi (`recipientOrg`), atau PIC dengan daftar `clients` (`clients.find(c => ...)`). Jika cocok dan memiliki email, kolom email penerima langsung terisi otomatis seketika modal terbuka.
+     - **Penerusan Parameter di Seluruh Tombol Pemanggil**: Menambahkan pencarian email klien di setiap tombol aksi kirim SPH (tabel & modal cetak), Faktur (tabel & modal cetak), serta PO Supplier.
+     - **Dropdown Sinkronisasi / Pilih Cepat Klien di Dalam Modal**: Menambahkan fitur dropdown pemilihan klien terdaftar di tab email modal. Ketika staf memilih klien dari dropdown, email, telepon, dan nama penerima langsung tersinkronisasi otomatis dalam 1 klik.
+- **Rencana Kerja Step-by-Step**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 174 di `LAPORAN_PROGRES.md`.
+  2. [ ] **Langkah 2**: Buat folder cadangan sementara `_backup_sync_client_email/` dan cadangkan `src/app/admin/finance/page.tsx`.
+  3. [ ] **Langkah 3**: Implementasikan auto-lookup master `clients` dan `suppliers` pada `handleOpenSendDocModal`.
+  4. [ ] **Langkah 4**: Perbarui seluruh pemanggilan `handleOpenSendDocModal` pada baris SPH, Faktur, dan PO agar menyertakan email klien/supplier.
+  5. [ ] **Langkah 5**: Tambahkan dropdown pemilih / sinkronisasi klien cepat di UI Tab Email modal `sendDocModal`.
+  6. [ ] **Langkah 6**: Validasi kompilasi lokal `npm run build` di `dstech-smart` (wajib 100% lulus).
+  7. [ ] **Langkah 7**: Bersihkan folder cadangan sementara `_backup_sync_client_email/`.
+  8. [ ] **Langkah 8**: Push commit ke GitHub repository via `push_with_native_git.js` dan deploy ke live VPS via `deploy_live.js`.
+  9. [ ] **Langkah 9**: Berikan laporan lengkap kepada pengguna.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.

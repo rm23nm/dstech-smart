@@ -502,6 +502,7 @@ interface ClientItem {
   totalPaid: number;
   unpaidReceivable: number;
   notes: string;
+  company?: string;
 }
 
 interface SupplierItem {
@@ -1940,6 +1941,7 @@ export default function AdminFinanceERPPage() {
   const [selectedMailSender, setSelectedMailSender] = useState<string>("");
   const [isSendingInAppMail, setIsSendingInAppMail] = useState<boolean>(false);
   const [docMailSendAlert, setDocMailSendAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [selectedRecipientClientId, setSelectedRecipientClientId] = useState<string>("");
 
   const fetchInternalMailAccounts = async () => {
     try {
@@ -1979,6 +1981,7 @@ export default function AdminFinanceERPPage() {
     recipientOrg?: string;
     recipientPhone?: string;
     recipientEmail?: string;
+    clientId?: string;
     date: string;
     dueDate?: string;
     subject: string;
@@ -1993,6 +1996,42 @@ export default function AdminFinanceERPPage() {
     notes?: string;
     initialTab?: "whatsapp" | "email";
   }) => {
+    // 1. Auto-lookup email & phone dari master clients / suppliers jika belum terisi
+    let resolvedEmail = (params.recipientEmail || "").trim();
+    let resolvedPhone = (params.recipientPhone || "").trim();
+    let matchedId = params.clientId || "";
+
+    if (params.docType === "PO") {
+      const matchSupplier = suppliers.find((s) =>
+        (matchedId && s.id === matchedId) ||
+        (s.name && s.name.trim().toLowerCase() === params.recipientName?.trim().toLowerCase()) ||
+        (params.recipientOrg && s.name && s.name.trim().toLowerCase() === params.recipientOrg.trim().toLowerCase())
+      );
+      if (matchSupplier) {
+        matchedId = matchSupplier.id;
+        if (!resolvedEmail && matchSupplier.email) resolvedEmail = matchSupplier.email.trim();
+        if (!resolvedPhone && matchSupplier.phone) resolvedPhone = matchSupplier.phone.trim();
+      }
+    } else {
+      // Dokumen untuk Klien (SPH, Invoice, BAST, dll)
+      const matchClient = clients.find((c) =>
+        (matchedId && c.id === matchedId) ||
+        (c.name && c.name.trim().toLowerCase() === params.recipientName?.trim().toLowerCase()) ||
+        (params.recipientOrg && c.name && c.name.trim().toLowerCase() === params.recipientOrg.trim().toLowerCase()) ||
+        (c.company && c.company.trim().toLowerCase() === params.recipientName?.trim().toLowerCase()) ||
+        (params.recipientOrg && c.company && c.company.trim().toLowerCase() === params.recipientOrg.trim().toLowerCase()) ||
+        (c.pic && c.pic.trim().toLowerCase() === params.recipientName?.trim().toLowerCase()) ||
+        (params.recipientPic && c.pic && c.pic.trim().toLowerCase() === params.recipientPic.trim().toLowerCase())
+      );
+      if (matchClient) {
+        matchedId = matchClient.id;
+        if (!resolvedEmail && matchClient.email) resolvedEmail = matchClient.email.trim();
+        if (!resolvedPhone && matchClient.phone) resolvedPhone = matchClient.phone.trim();
+      }
+    }
+
+    setSelectedRecipientClientId(matchedId);
+
     const newModalState = {
       isOpen: true,
       docType: params.docType,
@@ -2001,8 +2040,8 @@ export default function AdminFinanceERPPage() {
       recipientName: params.recipientName,
       recipientPic: params.recipientPic || "",
       recipientOrg: params.recipientOrg || "",
-      recipientPhone: params.recipientPhone || "",
-      recipientEmail: params.recipientEmail || "",
+      recipientPhone: resolvedPhone,
+      recipientEmail: resolvedEmail,
       date: params.date,
       dueDate: params.dueDate || "",
       subject: params.subject,
@@ -2018,8 +2057,8 @@ export default function AdminFinanceERPPage() {
     };
 
     setSendDocModal(newModalState);
-    setCustomPhoneInput(params.recipientPhone || "");
-    setCustomEmailInput(params.recipientEmail || "");
+    setCustomPhoneInput(resolvedPhone);
+    setCustomEmailInput(resolvedEmail);
     setCustomCcInput("");
     setDocMailSendAlert(null);
     setSendTab(params.initialTab || "whatsapp");
@@ -2031,6 +2070,53 @@ export default function AdminFinanceERPPage() {
 
     // Muat akun email internal resmi
     fetchInternalMailAccounts();
+  };
+
+  const handleSelectClientForEmail = (clientId: string) => {
+    setSelectedRecipientClientId(clientId);
+    if (!clientId) return;
+
+    if (sendDocModal.docType === "PO") {
+      const target = suppliers.find((s) => s.id === clientId);
+      if (target) {
+        if (target.email) setCustomEmailInput(target.email.trim());
+        if (target.phone) setCustomPhoneInput(target.phone.trim());
+        setSendDocModal((prev) => {
+          const updated = {
+            ...prev,
+            recipientName: target.name,
+            recipientPhone: target.phone || prev.recipientPhone,
+            recipientEmail: target.email || prev.recipientEmail,
+          };
+          const content = generateDocShareContent(updated);
+          setCustomSubjectInput(content.emailSubject);
+          setCustomBodyInput(content.emailBody);
+          return updated;
+        });
+        showToast(`✅ Disinkronkan dengan Supplier ${target.name} (${target.email || "Email belum diset"})`);
+      }
+    } else {
+      const target = clients.find((c) => c.id === clientId);
+      if (target) {
+        if (target.email) setCustomEmailInput(target.email.trim());
+        if (target.phone) setCustomPhoneInput(target.phone.trim());
+        setSendDocModal((prev) => {
+          const updated = {
+            ...prev,
+            recipientName: target.name,
+            recipientOrg: target.company || target.name,
+            recipientPic: target.pic || prev.recipientPic,
+            recipientPhone: target.phone || prev.recipientPhone,
+            recipientEmail: target.email || prev.recipientEmail,
+          };
+          const content = generateDocShareContent(updated);
+          setCustomSubjectInput(content.emailSubject);
+          setCustomBodyInput(content.emailBody);
+          return updated;
+        });
+        showToast(`✅ Disinkronkan dengan Klien ${target.name} (${target.email || "Email belum diset"})`);
+      }
+    }
   };
 
   const generateDocShareContent = (doc: typeof sendDocModal) => {
@@ -8705,6 +8791,8 @@ export default function AdminFinanceERPPage() {
                                     recipientName: sale.customerName,
                                     recipientPic: sale.customerPic || sale.picName || (clients.find(c => c.name.toLowerCase() === sale.customerName.toLowerCase())?.pic) || "",
                                     recipientPhone: sale.customerPhone,
+                                    recipientEmail: (sale as any).customerEmail || (clients.find(c => c.name.toLowerCase() === sale.customerName?.toLowerCase() || (sale.clientId && c.id === sale.clientId))?.email) || "",
+                                    clientId: sale.clientId || (clients.find(c => c.name.toLowerCase() === sale.customerName?.toLowerCase())?.id) || "",
                                     date: sale.date,
                                     dueDate: sale.dueDate,
                                     subject: sale.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${sale.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
@@ -8734,6 +8822,8 @@ export default function AdminFinanceERPPage() {
                                     recipientName: sale.customerName,
                                     recipientPic: sale.customerPic || sale.picName || (clients.find(c => c.name.toLowerCase() === sale.customerName.toLowerCase())?.pic) || "",
                                     recipientPhone: sale.customerPhone,
+                                    recipientEmail: (sale as any).customerEmail || (clients.find(c => c.name.toLowerCase() === sale.customerName?.toLowerCase() || (sale.clientId && c.id === sale.clientId))?.email) || "",
+                                    clientId: sale.clientId || (clients.find(c => c.name.toLowerCase() === sale.customerName?.toLowerCase())?.id) || "",
                                     date: sale.date,
                                     dueDate: sale.dueDate,
                                     subject: sale.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${sale.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
@@ -9173,6 +9263,8 @@ export default function AdminFinanceERPPage() {
                                     recipientName: sph.customerName,
                                     recipientOrg: sph.customerOrg,
                                     recipientPhone: sph.customerPhone,
+                                    recipientEmail: (sph as any).customerEmail || (clients.find(c => c.name?.toLowerCase() === sph.customerName?.toLowerCase() || (sph.customerOrg && c.name?.toLowerCase() === sph.customerOrg.toLowerCase()) || (sph.clientId && c.id === sph.clientId))?.email) || "",
+                                    clientId: sph.clientId || (clients.find(c => c.name?.toLowerCase() === sph.customerName?.toLowerCase() || (sph.customerOrg && c.name?.toLowerCase() === sph.customerOrg.toLowerCase()))?.id) || "",
                                     date: sph.date,
                                     dueDate: sph.validUntil,
                                     subject: sph.subject,
@@ -9200,6 +9292,8 @@ export default function AdminFinanceERPPage() {
                                     recipientName: sph.customerName,
                                     recipientOrg: sph.customerOrg,
                                     recipientPhone: sph.customerPhone,
+                                    recipientEmail: (sph as any).customerEmail || (clients.find(c => c.name?.toLowerCase() === sph.customerName?.toLowerCase() || (sph.customerOrg && c.name?.toLowerCase() === sph.customerOrg.toLowerCase()) || (sph.clientId && c.id === sph.clientId))?.email) || "",
+                                    clientId: sph.clientId || (clients.find(c => c.name?.toLowerCase() === sph.customerName?.toLowerCase() || (sph.customerOrg && c.name?.toLowerCase() === sph.customerOrg.toLowerCase()))?.id) || "",
                                     date: sph.date,
                                     dueDate: sph.validUntil,
                                     subject: sph.subject,
@@ -9578,6 +9672,8 @@ export default function AdminFinanceERPPage() {
                                     docNumber: po.poNumber,
                                     recipientName: po.supplierName,
                                     recipientPhone: po.supplierContact,
+                                    recipientEmail: (po as any).supplierEmail || (suppliers.find(s => s.name?.toLowerCase() === po.supplierName?.toLowerCase() || ((po as any).supplierId && s.id === (po as any).supplierId))?.email) || "",
+                                    clientId: (po as any).supplierId || (suppliers.find(s => s.name?.toLowerCase() === po.supplierName?.toLowerCase())?.id) || "",
                                     date: po.date,
                                     dueDate: po.expectedDelivery,
                                     subject: po.notes || "Pesanan Pengadaan Perangkat & Material Logistik",
@@ -9603,6 +9699,8 @@ export default function AdminFinanceERPPage() {
                                     docNumber: po.poNumber,
                                     recipientName: po.supplierName,
                                     recipientPhone: po.supplierContact,
+                                    recipientEmail: (po as any).supplierEmail || (suppliers.find(s => s.name?.toLowerCase() === po.supplierName?.toLowerCase() || ((po as any).supplierId && s.id === (po as any).supplierId))?.email) || "",
+                                    clientId: (po as any).supplierId || (suppliers.find(s => s.name?.toLowerCase() === po.supplierName?.toLowerCase())?.id) || "",
                                     date: po.date,
                                     dueDate: po.expectedDelivery,
                                     subject: po.notes || "Pesanan Pengadaan Perangkat & Material Logistik",
@@ -14357,6 +14455,8 @@ export default function AdminFinanceERPPage() {
                       recipientPic: inv.customerPic || inv.picName || (clients.find(c => c.name.toLowerCase() === inv.customerName.toLowerCase())?.pic) || "",
                       recipientOrg: inv.customerName,
                       recipientPhone: inv.customerPhone,
+                      recipientEmail: (inv as any).customerEmail || (clients.find(c => c.name.toLowerCase() === inv.customerName?.toLowerCase() || (inv.clientId && c.id === inv.clientId))?.email) || "",
+                      clientId: inv.clientId || (clients.find(c => c.name.toLowerCase() === inv.customerName?.toLowerCase())?.id) || "",
                       date: inv.date,
                       dueDate: inv.dueDate,
                       subject: inv.invoiceType === "DP" ? `Pengajuan Termin Uang Muka DP ${inv.dpPercentage}%` : `Tagihan Penjualan & Pengadaan Sistem Keamanan`,
@@ -16739,6 +16839,8 @@ export default function AdminFinanceERPPage() {
                       recipientName: selectedQuotationForPrint.customerName,
                       recipientOrg: selectedQuotationForPrint.customerOrg,
                       recipientPhone: selectedQuotationForPrint.customerPhone,
+                      recipientEmail: (selectedQuotationForPrint as any).customerEmail || (clients.find(c => c.name?.toLowerCase() === selectedQuotationForPrint.customerName?.toLowerCase() || (selectedQuotationForPrint.customerOrg && c.name?.toLowerCase() === selectedQuotationForPrint.customerOrg.toLowerCase()) || (selectedQuotationForPrint.clientId && c.id === selectedQuotationForPrint.clientId))?.email) || "",
+                      clientId: selectedQuotationForPrint.clientId || (clients.find(c => c.name?.toLowerCase() === selectedQuotationForPrint.customerName?.toLowerCase() || (selectedQuotationForPrint.customerOrg && c.name?.toLowerCase() === selectedQuotationForPrint.customerOrg.toLowerCase()))?.id) || "",
                       date: selectedQuotationForPrint.date,
                       dueDate: selectedQuotationForPrint.validUntil,
                       subject: selectedQuotationForPrint.subject,
@@ -28136,6 +28238,54 @@ export default function AdminFinanceERPPage() {
                   <span className="text-[10px] bg-white px-2 py-0.5 rounded-md border border-indigo-200 font-mono font-bold text-indigo-700">
                     Otomatis Masuk Sent Folder
                   </span>
+                </div>
+
+                {/* Panel Sinkronisasi Klien / Supplier */}
+                <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>
+                        {sendDocModal.docType === "PO"
+                          ? `Sinkronkan dengan Master Supplier (${suppliers.length}):`
+                          : `Sinkronkan dengan Master Klien (${clients.length}):`}
+                      </span>
+                    </label>
+                    {customEmailInput ? (
+                      <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>Email Terisi</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-amber-600" />
+                        <span>Pilih Klien untuk Sinkronkan</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <select
+                    value={selectedRecipientClientId}
+                    onChange={(e) => handleSelectClientForEmail(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">
+                      {sendDocModal.docType === "PO"
+                        ? "-- Pilih Supplier dari Database untuk Sinkronisasi Otomatis --"
+                        : "-- Pilih Klien dari Database untuk Sinkronisasi Otomatis --"}
+                    </option>
+                    {sendDocModal.docType === "PO"
+                      ? suppliers.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} - {s.email ? s.email : "(Email belum diset di database)"}
+                          </option>
+                        ))
+                      : clients.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.company ? `(${c.company})` : ""} - {c.email ? c.email : "(Email belum diset di database)"}
+                          </option>
+                        ))}
+                  </select>
                 </div>
 
                 {/* Akun Pengirim Resmi & Penerima */}
