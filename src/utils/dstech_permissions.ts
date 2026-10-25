@@ -233,6 +233,8 @@ export function getDefaultPermissionsByRole(role: string): UserPermissions {
     perms.portfolios = { view: true, create: false, edit: false, delete: false, print: false, send: false };
     // Contracts: view kontrak diri sendiri
     perms.contracts = { view: true, create: false, edit: false, delete: false, print: true, send: false };
+    // Email: view surat masuk, tanpa izin hapus/kirim/forward default
+    perms.mail = { view: true, create: false, edit: false, delete: false, print: true, send: false };
     return perms;
   }
 

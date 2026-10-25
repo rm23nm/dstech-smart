@@ -36,6 +36,7 @@ import {
   CheckCheck,
   ChevronDown,
 } from "lucide-react";
+import { checkUserPermission } from "@/utils/dstech_permissions";
 
 interface MailAccount {
   id: string;
@@ -79,6 +80,7 @@ interface MailMessage {
 }
 
 export default function AdminMailPage() {
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"inbox" | "compose" | "accounts">("inbox");
   const [currentFolder, setCurrentFolder] = useState<"inbox" | "sent" | "trash" | "spam">("inbox");
   const [accounts, setAccounts] = useState<MailAccount[]>([]);
@@ -96,6 +98,21 @@ export default function AdminMailPage() {
   // Multi-Select & Bulk Actions State
   const [selectedMessageIds, setSelectedMessageIds] = useState<string[]>([]);
   const [isBulkMoveOpen, setIsBulkMoveOpen] = useState(false);
+
+  // Load Current User Auth for Granular Permissions
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("dstech_admin_auth");
+      if (raw) setCurrentUser(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  // Granular Permission Flags
+  const canView = currentUser ? checkUserPermission(currentUser.permissions, currentUser.role, "mail", "view") : true;
+  const canCreate = currentUser ? checkUserPermission(currentUser.permissions, currentUser.role, "mail", "create") : true;
+  const canSend = currentUser ? (checkUserPermission(currentUser.permissions, currentUser.role, "mail", "send") || canCreate) : true;
+  const canForward = currentUser ? (checkUserPermission(currentUser.permissions, currentUser.role, "mail", "edit") || canSend) : true;
+  const canDelete = currentUser ? checkUserPermission(currentUser.permissions, currentUser.role, "mail", "delete") : true;
 
   // Form Compose State
   const [showCc, setShowCc] = useState(false);
@@ -275,6 +292,10 @@ export default function AdminMailPage() {
 
   const handleMoveToTrash = async (msg: MailMessage, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!canDelete) {
+      showAlert("error", "Akses Ditolak: Anda tidak memiliki izin untuk memindahkan email ke sampah.");
+      return;
+    }
     try {
       const nextFolder = msg.folder === "trash" ? "inbox" : "trash";
       await fetch("/api/mail/messages", {
@@ -300,6 +321,10 @@ export default function AdminMailPage() {
   };
 
   const handleDeletePermanent = async (msgId: string, accountEmail?: string) => {
+    if (!canDelete) {
+      showAlert("error", "Akses Ditolak: Anda tidak memiliki izin untuk menghapus permanen email.");
+      return;
+    }
     if (!confirm("Hapus pesan ini secara permanen dari server? Tindakan ini tidak dapat dibatalkan.")) return;
     try {
       const acc = accountEmail || selectedAccountEmail;
@@ -337,6 +362,10 @@ export default function AdminMailPage() {
 
   const handleBulkMoveFolder = async (targetFolder: "inbox" | "trash" | "spam") => {
     if (selectedMessageIds.length === 0) return;
+    if (targetFolder === "trash" && !canDelete) {
+      showAlert("error", "Akses Ditolak: Anda tidak memiliki izin untuk memindahkan email ke sampah.");
+      return;
+    }
     setIsBulkMoveOpen(false);
     try {
       const res = await fetch("/api/mail/messages", {
@@ -408,6 +437,10 @@ export default function AdminMailPage() {
 
   const handleBulkDelete = async () => {
     if (selectedMessageIds.length === 0) return;
+    if (!canDelete) {
+      showAlert("error", "Akses Ditolak: Anda tidak memiliki izin untuk menghapus email terpilih.");
+      return;
+    }
 
     if (currentFolder === "trash") {
       if (
@@ -491,6 +524,10 @@ export default function AdminMailPage() {
   // Send Email Handler
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canSend) {
+      showAlert("error", "Akses Ditolak: Anda tidak memiliki izin untuk mengirim email.");
+      return;
+    }
     if (!composeForm.fromEmail || !composeForm.toEmail || !composeForm.subject || !composeForm.bodyText) {
       showAlert("error", "Harap lengkapi semua kolom email (Pengirim, Penerima, Subjek, dan Pesan).");
       return;
@@ -594,6 +631,10 @@ export default function AdminMailPage() {
 
   // Quick Reply
   const handleQuickReply = (msg: MailMessage) => {
+    if (!canForward && !canSend) {
+      showAlert("error", "Akses Ditolak: Anda tidak memiliki izin untuk membalas email.");
+      return;
+    }
     setComposeForm({
       fromEmail: msg.toEmail || selectedAccountEmail,
       toEmail: msg.fromEmail,
@@ -607,6 +648,10 @@ export default function AdminMailPage() {
 
   // Forward Message
   const handleForwardMessage = (msg: MailMessage) => {
+    if (!canForward) {
+      showAlert("error", "Akses Ditolak: Anda tidak memiliki izin untuk meneruskan email.");
+      return;
+    }
     setComposeForm({
       fromEmail: selectedAccountEmail || accounts[0]?.email || "",
       toEmail: "",
@@ -638,6 +683,27 @@ export default function AdminMailPage() {
     return accounts.find((a) => a.email === selectedAccountEmail) || accounts[0];
   }, [accounts, selectedAccountEmail]);
 
+  if (currentUser && !canView) {
+    return (
+      <div className="min-h-[500px] flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-xl p-8 text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-xl font-black text-slate-900">Akses Email Dibatasi</h2>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Akun Anda ({currentUser.email || currentUser.username}) tidak memiliki izin untuk membuka modul Kotak Surat &amp; Webmail.
+            </p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+            Hubungi Administrator atau Supervisor Anda untuk mengaktifkan izin modul <b>mail (view)</b> pada pengaturan Peran &amp; Hak Akses.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Banner & Header */}
@@ -664,29 +730,33 @@ export default function AdminMailPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              onClick={() => {
-                setActiveTab("compose");
-                setComposeForm((prev) => ({
-                  ...prev,
-                  fromEmail:
-                    selectedAccountEmail && selectedAccountEmail !== "ALL"
-                      ? selectedAccountEmail
-                      : accounts[0]?.email || "",
-                }));
-              }}
-              className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Send className="w-4 h-4" />
-              <span>Tulis Email Baru</span>
-            </button>
-            <button
-              onClick={() => setIsCreateAccountOpen(true)}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4 text-indigo-400" />
-              <span>Buat Akun Email</span>
-            </button>
+            {(canCreate || canSend) && (
+              <button
+                onClick={() => {
+                  setActiveTab("compose");
+                  setComposeForm((prev) => ({
+                    ...prev,
+                    fromEmail:
+                      selectedAccountEmail && selectedAccountEmail !== "ALL"
+                        ? selectedAccountEmail
+                        : accounts[0]?.email || "",
+                  }));
+                }}
+                className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs shadow-lg shadow-indigo-600/30 transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Send className="w-4 h-4" />
+                <span>Tulis Email Baru</span>
+              </button>
+            )}
+            {(currentUser?.role === "SUPERADMIN" || currentUser?.role === "ADMIN") && (
+              <button
+                onClick={() => setIsCreateAccountOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4 text-indigo-400" />
+                <span>Buat Akun Email</span>
+              </button>
+            )}
             <a
               href="https://mail.dstechsmart.com:8443"
               target="_blank"
@@ -718,28 +788,32 @@ export default function AdminMailPage() {
               </span>
             )}
           </button>
-          <button
-            onClick={() => setActiveTab("compose")}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "compose"
-                ? "bg-white text-slate-900 shadow-md"
-                : "text-slate-300 hover:bg-white/10"
-            }`}
-          >
-            <Send className="w-4 h-4" />
-            <span>Tulis & Kirim Email</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("accounts")}
-            className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "accounts"
-                ? "bg-white text-slate-900 shadow-md"
-                : "text-slate-300 hover:bg-white/10"
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Kelola Akun Email Perusahaan ({accounts.length})</span>
-          </button>
+          {(canCreate || canSend) && (
+            <button
+              onClick={() => setActiveTab("compose")}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === "compose"
+                  ? "bg-white text-slate-900 shadow-md"
+                  : "text-slate-300 hover:bg-white/10"
+              }`}
+            >
+              <Send className="w-4 h-4" />
+              <span>Tulis & Kirim Email</span>
+            </button>
+          )}
+          {(currentUser?.role === "SUPERADMIN" || currentUser?.role === "ADMIN") && (
+            <button
+              onClick={() => setActiveTab("accounts")}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === "accounts"
+                  ? "bg-white text-slate-900 shadow-md"
+                  : "text-slate-300 hover:bg-white/10"
+              }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>Kelola Akun Email Perusahaan ({accounts.length})</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -794,16 +868,18 @@ export default function AdminMailPage() {
             </div>
 
             {/* Tombol Tulis Cepat */}
-            <button
-              onClick={() => {
-                setActiveTab("compose");
-                setComposeForm((prev) => ({ ...prev, fromEmail: selectedAccountEmail }));
-              }}
-              className="w-full py-2.5 rounded-xl bg-linear-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Tulis Email Baru</span>
-            </button>
+            {(canCreate || canSend) && (
+              <button
+                onClick={() => {
+                  setActiveTab("compose");
+                  setComposeForm((prev) => ({ ...prev, fromEmail: selectedAccountEmail }));
+                }}
+                className="w-full py-2.5 rounded-xl bg-linear-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Tulis Email Baru</span>
+              </button>
+            )}
 
             {/* Folder Navigasi */}
             <div className="space-y-1 pt-2">
@@ -1010,7 +1086,7 @@ export default function AdminMailPage() {
                             <span>Folder Spam</span>
                           </button>
                         )}
-                        {currentFolder !== "trash" && (
+                        {currentFolder !== "trash" && canDelete && (
                           <button
                             type="button"
                             onClick={() => handleBulkMoveFolder("trash")}
@@ -1035,14 +1111,16 @@ export default function AdminMailPage() {
                   </button>
 
                   {/* Tombol Hapus */}
-                  <button
-                    type="button"
-                    onClick={handleBulkDelete}
-                    className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-rose-50 text-rose-600 shadow-2xs transition-colors cursor-pointer"
-                    title={currentFolder === "trash" ? "Hapus Permanen Terpilih" : "Pindahkan ke Sampah"}
-                  >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={handleBulkDelete}
+                      className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-rose-50 text-rose-600 shadow-2xs transition-colors cursor-pointer"
+                      title={currentFolder === "trash" ? "Hapus Permanen Terpilih" : "Pindahkan ke Sampah"}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    </button>
+                  )}
 
                   {/* Tombol Reset Seleksi */}
                   <button
@@ -1153,21 +1231,23 @@ export default function AdminMailPage() {
                               <span className="font-mono text-[9px] text-slate-400">
                                 {msg.date.split(" ")[1] || ""}
                               </span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (currentFolder === "trash") {
-                                    handleDeletePermanent(msg.id, msg.accountEmail);
-                                  } else {
-                                    handleMoveToTrash(msg, e);
-                                  }
-                                }}
-                                className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                                title={currentFolder === "trash" ? "Hapus Permanen Pesan Ini" : "Pindahkan ke Kotak Sampah"}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                              {canDelete && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (currentFolder === "trash") {
+                                      handleDeletePermanent(msg.id, msg.accountEmail);
+                                    } else {
+                                      handleMoveToTrash(msg, e);
+                                    }
+                                  }}
+                                  className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                  title={currentFolder === "trash" ? "Hapus Permanen Pesan Ini" : "Pindahkan ke Kotak Sampah"}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1204,23 +1284,25 @@ export default function AdminMailPage() {
                     >
                       <Check className="w-4 h-4" />
                     </button>
-                    {selectedMessage.folder === "trash" ? (
-                      <button
-                        onClick={() => handleDeletePermanent(selectedMessage.id, selectedMessage.accountEmail)}
-                        className="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
-                        title="Hapus Permanen Pesan Ini dari Server"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Hapus Permanen</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleMoveToTrash(selectedMessage)}
-                        className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 cursor-pointer"
-                        title="Pindahkan ke Kotak Sampah"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    {canDelete && (
+                      selectedMessage.folder === "trash" ? (
+                        <button
+                          onClick={() => handleDeletePermanent(selectedMessage.id, selectedMessage.accountEmail)}
+                          className="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                          title="Hapus Permanen Pesan Ini dari Server"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus Permanen</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleMoveToTrash(selectedMessage)}
+                          className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 cursor-pointer"
+                          title="Pindahkan ke Kotak Sampah"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )
                     )}
 
                     {/* Tombol Tindakan Spam */}
@@ -1245,22 +1327,26 @@ export default function AdminMailPage() {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleForwardMessage(selectedMessage)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                      title="Teruskan pesan ini ke penerima lain"
-                    >
-                      <CornerUpRight className="w-3.5 h-3.5 text-slate-600" />
-                      <span>Teruskan</span>
-                    </button>
-                    <button
-                      onClick={() => handleQuickReply(selectedMessage)}
-                      className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                      title="Balas pesan ini"
-                    >
-                      <Reply className="w-3.5 h-3.5" />
-                      <span>Balas Pesan</span>
-                    </button>
+                    {canForward && (
+                      <button
+                        onClick={() => handleForwardMessage(selectedMessage)}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                        title="Teruskan pesan ini ke penerima lain"
+                      >
+                        <CornerUpRight className="w-3.5 h-3.5 text-slate-600" />
+                        <span>Teruskan</span>
+                      </button>
+                    )}
+                    {(canForward || canSend) && (
+                      <button
+                        onClick={() => handleQuickReply(selectedMessage)}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                        title="Balas pesan ini"
+                      >
+                        <Reply className="w-3.5 h-3.5" />
+                        <span>Balas Pesan</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1393,24 +1479,26 @@ export default function AdminMailPage() {
                 </div>
 
                 {/* Form Balas Cepat di Bawah */}
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                    Balas Cepat ke {selectedMessage.fromEmail}:
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Tulis balasan singkat..."
-                      className="flex-1 p-2 bg-white rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
-                    />
-                    <button
-                      onClick={() => handleQuickReply(selectedMessage)}
-                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors"
-                    >
-                      Buka Editor Penuh
-                    </button>
+                {(canForward || canSend) && (
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                      Balas Cepat ke {selectedMessage.fromEmail}:
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Tulis balasan singkat..."
+                        className="flex-1 p-2 bg-white rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => handleQuickReply(selectedMessage)}
+                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold cursor-pointer transition-colors"
+                      >
+                        Buka Editor Penuh
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400 border border-dashed border-slate-200 rounded-2xl">

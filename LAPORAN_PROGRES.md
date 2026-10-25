@@ -4899,6 +4899,53 @@
 
 ---
 
+### 172. Tugas: Fitur Hak Akses Role & Permission Granular Modul Email (Lihat, Kirim, Teruskan/Forward, Hapus) (/admin/mail & /utils/dstech_permissions.ts)
+- **Permintaan Pengguna**:
+  - *"bisakah kamu buatkan juga fitur roll penghapusan, kirim, forward dan lihat untuk user yang bisa buka emial?"*
+- **Status**: 🟡 **SEDANG DIKERJAKAN**
+- **Analisis & Kebutuhan Fitur**:
+  1. Pengguna memerlukan kontrol hak akses berbasis peran (Role-Based Access Control / RBAC) dan per-user yang terhubung dengan modul manajemen user (`/admin/users`).
+  2. Modul Email Perusahaan (`id: "mail"`) memiliki 4 hak akses utama:
+     - **Lihat (`view`)**: Izin membuka halaman Email dan membaca isi surat. Jika tidak ada izin, route guard memblokir akses dan menampilkan kartu peringatan "Akses Dibatasi".
+     - **Kirim (`create` / `send`)**: Izin membuat draft baru dan mengirim email (`Tulis Pesan Baru` & tombol `Kirim Pesan`).
+     - **Teruskan (`edit` / `send`)**: Izin meneruskan pesan (`Teruskan / Forward`) dan membalas (`Balas Pesan`).
+     - **Hapus (`delete`)**: Izin memindahkan pesan ke kotak sampah, hapus permanen, dan hapus massal (bulk delete).
+  3. Mengintegrasikan izin `mail` ke data `src/data/dstech_role_permissions.json` dan `src/utils/dstech_permissions.ts` sehingga Super Admin dapat mencentang/mengatur izin aksi email ini untuk semua peran (SUPERADMIN, ADMIN, EMPLOYEE, AFFILIATE, CLIENT).
+- **Rencana Kerja Step-by-Step**:
+  1. [ ] **Langkah 1**: Buat folder cadangan sementara `_backup_mail_role_permissions/` dan cadangkan file yang akan dimodifikasi (`src/utils/dstech_permissions.ts`, `src/data/dstech_role_permissions.json`, dan `src/app/admin/mail/page.tsx`).
+  2. [ ] **Langkah 2**: Tambahkan konfigurasi default permission menu `mail` pada seluruh peran di `src/data/dstech_role_permissions.json` dan helper `getDefaultPermissionsByRole()` di `src/utils/dstech_permissions.ts`.
+  3. [ ] **Langkah 3**: Di `src/app/admin/mail/page.tsx`, muat data user login (`currentUser`), hitung status hak akses efektif (`canView`, `canCreate`, `canSend`, `canForward`, `canDelete`), dan pasang proteksi bersyarat:
+     - Jika `!canView`: Tampilkan halaman penolakan akses ramah (Access Denied Card) dengan tombol kembali ke dashboard.
+     - Proteksi tombol **"Tulis Pesan Baru"** & aksi kirim form email (hanya aktif jika `canCreate || canSend`).
+     - Proteksi tombol **"Teruskan (Forward)"** & **"Balas Pesan"** (hanya aktif jika `canForward`).
+     - Proteksi tombol **"Hapus"** pada setiap kartu pesan, tombol **"Pindahkan ke Sampah / Hapus Permanen"** di reading pane, dan tombol **"Hapus Terpilih"** di floating checklist toolbar (hanya aktif jika `canDelete`).
+  4. [ ] **Langkah 4**: Uji kompilasi dengan `npm run build` lokal hingga sukses 100%.
+  5. [ ] **Langkah 5**: Hapus folder cadangan sementara `_backup_mail_role_permissions/`.
+  6. [ ] **Langkah 6**: Push commit ke GitHub repository via `push_with_native_git.js` dan jalankan `deploy_live.js` ke server VPS live.
+  7. [ ] **Langkah 7**: Update status di `LAPORAN_PROGRES.md` menjadi SELESAI.
+
+---
+
+### 173. Tugas: Integrasi Pengiriman Email Dokumen Bisnis (SPH, Faktur, PO Supplier, SPK) Langsung via Sistem Email Internal Dashboard (/api/mail/send)
+- **Permintaan Pengguna**:
+  - *"untuk fitur kirim email SPH, faktur, PO dan lain sebaginya. tolong koneksikan langsung dengan sistem email kita yang ada didasbord, sehongga tidak harus lagi membuka email luar"* (Menyertakan screenshot jendela popup sign in Gmail eksternal saat klik kirim email dokumen).
+- **Status**: ⏳ **DALAM ANTREAN (Dikerjakan Segera Setelah Tugas 172 Selesai)**
+- **Analisis & Rencana Solusi**:
+  1. Tombol "Kirim Email" pada modal Keuangan (Faktur, SPH Penawaran, PO Pembelian) dan Modul Terkait saat ini masih menggunakan `window.open('mailto:...')` yang memicu pembukaan aplikasi email desktop luar / web Gmail browser.
+  2. Modul email perusahaan internal kita sudah memiliki API `/api/mail/send` yang terhubung langsung ke Postfix SMTP SSL internal VPS (`mail.dstechsmart.com`).
+  3. Mengganti mekanisme `mailto:` dengan modal pengiriman email langsung (In-App Email Sender Modal) yang memanggil `/api/mail/send`:
+     - Memilih akun pengirim resmi internal (contoh: `cs@dstechsmart.com` / `noreplay@...`).
+     - Mengisi alamat email tujuan pelanggan/supplier secara otomatis.
+     - Melampirkan ringkasan faktur/SPH/PO dalam format HTML profesional atau lampiran PDF dokumen secara langsung.
+     - Menyimpan jejak pengiriman di folder **Terkirim (Sent)** pada Webmail Center internal.
+- **Rencana Kerja Step-by-Step**:
+  1. [ ] **Langkah 1**: Catat dan mulai eksekusi setelah Tugas 172 selesai.
+  2. [ ] **Langkah 2**: Buat backup modul keuangan & dokumen terkait.
+  3. [ ] **Langkah 3**: Hubungkan tombol kirim email SPH, Faktur, dan PO langsung ke API `/api/mail/send`.
+  4. [ ] **Langkah 4**: Uji build lokal dan deploy ke live server.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
@@ -4915,6 +4962,7 @@
 
 ---
 *Laporan ini dibuat untuk memudahkan Agen AI selanjutnya melanjutkan pekerjaan.*
+
 
 
 
