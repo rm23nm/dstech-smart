@@ -1933,6 +1933,31 @@ export default function AdminFinanceERPPage() {
   const [sendTab, setSendTab] = useState<"whatsapp" | "email">("whatsapp");
   const [customPhoneInput, setCustomPhoneInput] = useState<string>("");
   const [customEmailInput, setCustomEmailInput] = useState<string>("");
+  const [customCcInput, setCustomCcInput] = useState<string>("");
+  const [customSubjectInput, setCustomSubjectInput] = useState<string>("");
+  const [customBodyInput, setCustomBodyInput] = useState<string>("");
+  const [internalMailAccounts, setInternalMailAccounts] = useState<{ id?: string; email: string; fullName: string }[]>([]);
+  const [selectedMailSender, setSelectedMailSender] = useState<string>("");
+  const [isSendingInAppMail, setIsSendingInAppMail] = useState<boolean>(false);
+  const [docMailSendAlert, setDocMailSendAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const fetchInternalMailAccounts = async () => {
+    try {
+      const res = await fetch("/api/mail/accounts");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+        setInternalMailAccounts(json.data);
+        if (!selectedMailSender) {
+          const defaultAcc = json.data.find((a: any) =>
+            a.email.toLowerCase().startsWith("cs@") ||
+            a.email.toLowerCase().startsWith("finance@") ||
+            a.email.toLowerCase().startsWith("noreplay@")
+          ) || json.data[0];
+          setSelectedMailSender(defaultAcc.email);
+        }
+      }
+    } catch {}
+  };
 
   const normalizeWhatsAppNumber = (phone: string): string => {
     if (!phone) return "";
@@ -1968,7 +1993,7 @@ export default function AdminFinanceERPPage() {
     notes?: string;
     initialTab?: "whatsapp" | "email";
   }) => {
-    setSendDocModal({
+    const newModalState = {
       isOpen: true,
       docType: params.docType,
       docTitle: params.docTitle,
@@ -1990,10 +2015,22 @@ export default function AdminFinanceERPPage() {
       paymentMethod: params.paymentMethod || "",
       approvalStatus: params.approvalStatus || "",
       notes: params.notes || "",
-    });
+    };
+
+    setSendDocModal(newModalState);
     setCustomPhoneInput(params.recipientPhone || "");
     setCustomEmailInput(params.recipientEmail || "");
+    setCustomCcInput("");
+    setDocMailSendAlert(null);
     setSendTab(params.initialTab || "whatsapp");
+
+    // Pre-generate subject & body
+    const initialContent = generateDocShareContent(newModalState);
+    setCustomSubjectInput(initialContent.emailSubject);
+    setCustomBodyInput(initialContent.emailBody);
+
+    // Muat akun email internal resmi
+    fetchInternalMailAccounts();
   };
 
   const generateDocShareContent = (doc: typeof sendDocModal) => {
@@ -2142,7 +2179,116 @@ export default function AdminFinanceERPPage() {
     const { emailSubject, emailBody } = generateDocShareContent(sendDocModal);
     const mailtoUrl = `mailto:${email || ""}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
     window.location.href = mailtoUrl;
-    showToast(`Membuka aplikasi Email untuk ${sendDocModal.recipientName}...`);
+    showToast(`Membuka aplikasi Email eksternal untuk ${sendDocModal.recipientName}...`);
+  };
+
+  const generateDocShareHtml = (doc: typeof sendDocModal, bodyText: string) => {
+    const companyName = "PT. DSTech Smart Perkasa";
+    const portalUrl = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
+    const encodedNo = encodeURIComponent(doc.docNumber);
+
+    let downloadButtons = "";
+    const dt = (doc.docType || "").toUpperCase();
+    const isInvoice = dt === "INVOICE" || (doc.docNumber || "").toUpperCase().startsWith("INV");
+    const isSph = dt === "SPH" || dt === "QUOTATION" || (doc.docNumber || "").toUpperCase().startsWith("SPH") || (doc.docTitle || "").toLowerCase().includes("penawaran");
+    const isPo = dt === "PO" || dt === "PURCHASE_ORDER" || (doc.docNumber || "").toUpperCase().startsWith("PO") || (doc.docTitle || "").toLowerCase().includes("pembelian");
+
+    if (isInvoice) {
+      downloadButtons = `
+        <div style="margin: 24px 0; text-align: center;">
+          <a href="${portalUrl}/api/finance/print?doc=invoice&no=${encodedNo}" target="_blank" style="display: inline-block; background-color: #4f46e5; color: #ffffff; padding: 12px 22px; font-weight: bold; font-size: 13px; text-decoration: none; border-radius: 8px; margin: 4px;">📄 Buka & Unduh Faktur Penjualan</a>
+          <a href="${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}" target="_blank" style="display: inline-block; background-color: #0f172a; color: #ffffff; padding: 12px 22px; font-weight: bold; font-size: 13px; text-decoration: none; border-radius: 8px; margin: 4px;">📝 Unduh Lembar BAST</a>
+        </div>
+      `;
+    } else if (isSph) {
+      downloadButtons = `
+        <div style="margin: 24px 0; text-align: center;">
+          <a href="${portalUrl}/api/finance/print?doc=sph&no=${encodedNo}" target="_blank" style="display: inline-block; background-color: #4f46e5; color: #ffffff; padding: 12px 24px; font-weight: bold; font-size: 13px; text-decoration: none; border-radius: 8px; margin: 4px;">📄 Buka & Unduh Surat Penawaran (SPH)</a>
+        </div>
+      `;
+    } else if (isPo) {
+      downloadButtons = `
+        <div style="margin: 24px 0; text-align: center;">
+          <a href="${portalUrl}/api/finance/print?doc=po&no=${encodedNo}" target="_blank" style="display: inline-block; background-color: #d97706; color: #ffffff; padding: 12px 24px; font-weight: bold; font-size: 13px; text-decoration: none; border-radius: 8px; margin: 4px;">📦 Buka & Unduh Purchase Order (PO)</a>
+        </div>
+      `;
+    }
+
+    return `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; background-color: #ffffff; color: #1e293b;">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); padding: 24px 28px; color: #ffffff;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.5px;">${companyName}</h2>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #cbd5e1;">Sistem Pengiriman Dokumen Resmi Bisnis &amp; Keuangan</p>
+        </div>
+        <div style="padding: 24px 28px;">
+          <div style="padding: 14px 18px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 20px;">
+            <p style="margin: 0 0 6px; font-size: 13px; color: #334155;"><strong>Dokumen:</strong> ${doc.docTitle}</p>
+            <p style="margin: 0 0 6px; font-size: 13px; color: #334155;"><strong>Nomor:</strong> <span style="font-family: monospace; font-weight: bold; color: #4338ca;">${doc.docNumber}</span></p>
+            <p style="margin: 0 0 6px; font-size: 13px; color: #334155;"><strong>Tanggal:</strong> ${doc.date}</p>
+            ${doc.grandTotal > 0 ? `<p style="margin: 0; font-size: 14px; color: #059669;"><strong>Nilai Total:</strong> ${formatRupiah(doc.grandTotal)}</p>` : ""}
+          </div>
+          <div style="font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: #334155;">${bodyText}</div>
+          ${downloadButtons}
+          <div style="border-top: 1px solid #e2e8f0; margin-top: 24px; padding-top: 16px; font-size: 11px; color: #64748b; text-align: center;">
+            <p style="margin: 0;">Email ini dikirim secara resmi melalui Server SMTP Terenkripsi SSL PT. DSTech Smart Perkasa.</p>
+            <p style="margin: 4px 0 0;">Website: <a href="https://dstechsmart.com" style="color: #4f46e5; text-decoration: none;">https://dstechsmart.com</a> | Port 465 SSL</p>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  const handleSendInAppEmail = async () => {
+    const toEmail = customEmailInput.trim();
+    if (!toEmail) {
+      showToast("Alamat email penerima belum diisi!");
+      setDocMailSendAlert({ type: "error", message: "Alamat email penerima (To) wajib diisi." });
+      return;
+    }
+    const sender = selectedMailSender || internalMailAccounts[0]?.email || "cs@dstechsmart.com";
+    const subject = customSubjectInput.trim() || generateDocShareContent(sendDocModal).emailSubject;
+    const bodyText = customBodyInput.trim() || generateDocShareContent(sendDocModal).emailBody;
+    const bodyHtml = generateDocShareHtml(sendDocModal, bodyText);
+
+    setIsSendingInAppMail(true);
+    setDocMailSendAlert(null);
+
+    try {
+      const res = await fetch("/api/mail/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromEmail: sender,
+          toEmail: toEmail,
+          cc: customCcInput.trim() || undefined,
+          subject: subject,
+          bodyText: bodyText,
+          bodyHtml: bodyHtml,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDocMailSendAlert({
+          type: "success",
+          message: `Berhasil! Dokumen ${sendDocModal.docTitle} berhasil dikirim ke ${toEmail} melalui akun resmi ${sender}. Pesan tersimpan di Kotak Terkirim (Sent) Dashboard.`,
+        });
+        showToast(`✅ Email dokumen ${sendDocModal.docNumber} berhasil terkirim!`);
+      } else {
+        setDocMailSendAlert({
+          type: "error",
+          message: json.message || "Gagal mengirim email melalui server internal.",
+        });
+        showToast(`❌ Gagal kirim email: ${json.message || "Kesalahan server"}`);
+      }
+    } catch (err: any) {
+      setDocMailSendAlert({
+        type: "error",
+        message: err.message || "Terjadi kesalahan jaringan saat mengirim email.",
+      });
+      showToast("❌ Terjadi kesalahan jaringan saat mengirim email.");
+    } finally {
+      setIsSendingInAppMail(false);
+    }
   };
 
   const handleCopyContent = (text: string, label?: string) => {
@@ -27952,91 +28098,211 @@ export default function AdminFinanceERPPage() {
 
             {/* Konten Tab Email */}
             {sendTab === "email" && (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Alamat Email Penerima:
-                  </label>
-                  <div className="flex gap-2">
+              <div className="space-y-3.5">
+                {/* Alert Status Pengiriman Internal */}
+                {docMailSendAlert && (
+                  <div
+                    className={`p-3.5 rounded-2xl border text-xs flex items-start gap-2.5 shadow-2xs animate-fadeIn ${
+                      docMailSendAlert.type === "success"
+                        ? "bg-emerald-50 text-emerald-900 border-emerald-200"
+                        : "bg-rose-50 text-rose-900 border-rose-200"
+                    }`}
+                  >
+                    {docMailSendAlert.type === "success" ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    )}
+                    <div className="flex-1 font-medium leading-relaxed">
+                      {docMailSendAlert.message}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDocMailSendAlert(null)}
+                      className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Info Server Internal */}
+                <div className="p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200 text-indigo-900 text-xs flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="font-bold">Sistem Mail Dashboard Terhubung</span>
+                    <span className="text-[10px] text-indigo-600 font-mono hidden sm:inline">(SMTP 465 SSL internal)</span>
+                  </div>
+                  <span className="text-[10px] bg-white px-2 py-0.5 rounded-md border border-indigo-200 font-mono font-bold text-indigo-700">
+                    Otomatis Masuk Sent Folder
+                  </span>
+                </div>
+
+                {/* Akun Pengirim Resmi & Penerima */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1">
+                      Akun Pengirim (Internal VPS):
+                    </label>
+                    <select
+                      value={selectedMailSender}
+                      onChange={(e) => setSelectedMailSender(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-300 font-mono text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none cursor-pointer"
+                    >
+                      {internalMailAccounts.length > 0 ? (
+                        internalMailAccounts.map((acc, idx) => (
+                          <option key={acc.id || idx} value={acc.email}>
+                            {acc.email} ({acc.fullName})
+                          </option>
+                        ))
+                      ) : (
+                        <>
+                          <option value="cs@dstechsmart.com">cs@dstechsmart.com (Customer Service)</option>
+                          <option value="noreplay@dstechsmart.com">noreplay@dstechsmart.com (Automated Mailer)</option>
+                          <option value="ramadhanist@dstechsmart.com">ramadhanist@dstechsmart.com (Direksi)</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1">
+                      Alamat Email Penerima (To):
+                    </label>
                     <input
                       type="email"
                       value={customEmailInput}
                       onChange={(e) => setCustomEmailInput(e.target.value)}
-                      placeholder="Contoh: procurement@klien.co.id"
-                      className="flex-1 px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      placeholder="Contoh: klien@perusahaan.co.id"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                      required
                     />
-                    <button
-                      type="button"
-                      onClick={() => handleSendEmail(customEmailInput)}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
-                    >
-                      <Mail className="w-3.5 h-3.5" />
-                      <span>Buka Mailto</span>
-                    </button>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                    Subjek Email:
-                  </label>
-                  <div className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800">
-                    {generateDocShareContent(sendDocModal).emailSubject}
+                {/* Tembusan (CC) & Subjek */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-1">
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1">
+                      Tembusan (CC - Opsional):
+                    </label>
+                    <input
+                      type="text"
+                      value={customCcInput}
+                      onChange={(e) => setCustomCcInput(e.target.value)}
+                      placeholder="finance@dstechsmart.com"
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1">
+                      Subjek Email:
+                    </label>
+                    <input
+                      type="text"
+                      value={customSubjectInput}
+                      onChange={(e) => setCustomSubjectInput(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                    />
                   </div>
                 </div>
 
+                {/* Editor / Pratinjau Isi Surat Pengantar */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="text-[11px] font-bold text-slate-700">
-                      Isi Surat Pengantar:
+                    <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider">
+                      Isi Surat Pengantar Dokumen:
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const { emailBody } = generateDocShareContent(sendDocModal);
-                        handleCopyContent(emailBody, "Isi Email");
-                      }}
-                      className="text-[10px] font-bold text-blue-700 hover:text-blue-800 flex items-center gap-1 cursor-pointer bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"
-                    >
-                      <Copy className="w-3 h-3" />
-                      <span>Salin Body Email</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const initialContent = generateDocShareContent(sendDocModal);
+                          setCustomSubjectInput(initialContent.emailSubject);
+                          setCustomBodyInput(initialContent.emailBody);
+                          showToast("Format surat di-reset ke template default.");
+                        }}
+                        className="text-[10px] text-slate-500 hover:text-slate-800 cursor-pointer underline"
+                      >
+                        Reset Template
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyContent(customBodyInput, "Isi Surat Email")}
+                        className="text-[10px] font-bold text-indigo-700 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Salin Teks</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="p-3 rounded-2xl bg-slate-900 text-slate-200 font-sans text-xs whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto border border-slate-800 shadow-inner select-all">
-                    {generateDocShareContent(sendDocModal).emailBody}
-                  </div>
+                  <textarea
+                    rows={7}
+                    value={customBodyInput}
+                    onChange={(e) => setCustomBodyInput(e.target.value)}
+                    className="w-full p-3 rounded-2xl bg-slate-900 text-slate-100 font-sans text-xs whitespace-pre-wrap leading-relaxed border border-slate-800 shadow-inner focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    * Berkas lampiran dan tombol tautan unduh dokumen resmi otomatis disertakan dalam format HTML elegan saat dikirim.
+                  </p>
                 </div>
               </div>
             )}
 
             {/* Footer Modal */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setSendDocModal((prev) => ({ ...prev, isOpen: false }))}
-                className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs cursor-pointer"
-              >
-                Tutup
-              </button>
-              {sendTab === "whatsapp" ? (
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-slate-100">
+              <div>
+                {sendTab === "email" && (
+                  <button
+                    type="button"
+                    onClick={() => handleSendEmail(customEmailInput)}
+                    className="px-3 py-1.5 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    title="Buka aplikasi email luar / mailto jika diperlukan"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Buka di Email Luar (Mailto)</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleSendWhatsApp(customPhoneInput)}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all"
+                  onClick={() => setSendDocModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs cursor-pointer"
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>Buka WhatsApp Web / App</span>
+                  Tutup
                 </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleSendEmail(customEmailInput)}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all"
-                >
-                  <Mail className="w-4 h-4" />
-                  <span>Kirim via Email Client</span>
-                </button>
-              )}
+                {sendTab === "whatsapp" ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSendWhatsApp(customPhoneInput)}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Buka WhatsApp Web / App</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSendInAppEmail}
+                    disabled={isSendingInAppMail}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs flex items-center gap-2 cursor-pointer shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isSendingInAppMail ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Mengirim Email...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>Kirim Email Langsung (Sistem Internal)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
