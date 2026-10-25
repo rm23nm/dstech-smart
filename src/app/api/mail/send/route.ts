@@ -17,7 +17,7 @@ const defaultPasswords: Record<string, string> = {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { fromEmail, toEmail, subject, bodyHtml, bodyText, cc, bcc } = body;
+    const { fromEmail, toEmail, subject, bodyHtml, bodyText, cc, bcc, attachments } = body;
 
     if (!fromEmail || !toEmail || !subject || (!bodyHtml && !bodyText)) {
       return NextResponse.json(
@@ -59,6 +59,25 @@ export async function POST(request: Request) {
       greetingTimeout: 10000,
     });
 
+    // Format lampiran berkas jika ada
+    let mailAttachments: any[] = [];
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      mailAttachments = attachments.map((att: any) => {
+        let contentBuffer: Buffer;
+        if (typeof att.content === "string") {
+          const base64Data = att.content.includes("base64,") ? att.content.split("base64,")[1] : att.content;
+          contentBuffer = Buffer.from(base64Data, "base64");
+        } else {
+          contentBuffer = Buffer.from(att.content);
+        }
+        return {
+          filename: att.filename || att.name || "lampiran",
+          content: contentBuffer,
+          contentType: att.contentType || att.type || undefined,
+        };
+      });
+    }
+
     // Kirim pesan
     const info = await transporter.sendMail({
       from: `"${fromEmail.split("@")[0].toUpperCase()} - PT. DSTech Smart Perkasa" <${fromEmail}>`,
@@ -66,8 +85,9 @@ export async function POST(request: Request) {
       cc: cc || undefined,
       bcc: bcc || undefined,
       subject: subject,
-      text: bodyText || bodyHtml.replace(/<[^>]*>?/gm, ""),
-      html: bodyHtml || `<p>${bodyText}</p>`,
+      text: bodyText || bodyHtml?.replace(/<[^>]*>?/gm, "") || "",
+      html: bodyHtml || `<div style="white-space: pre-wrap; font-family: sans-serif; line-height: 1.6;">${bodyText}</div>`,
+      attachments: mailAttachments.length > 0 ? mailAttachments : undefined,
     });
 
     // Simpan pesan ke folder sent
@@ -79,12 +99,12 @@ export async function POST(request: Request) {
       fromEmail: fromEmail,
       toEmail: toEmail,
       subject: subject,
-      snippet: (bodyText || bodyHtml.replace(/<[^>]*>?/gm, "")).substring(0, 120) + "...",
-      bodyHtml: bodyHtml || `<p>${bodyText}</p>`,
+      snippet: (bodyText || (bodyHtml ? bodyHtml.replace(/<[^>]*>?/gm, "") : "")).substring(0, 120) + "...",
+      bodyHtml: bodyHtml || `<div style="white-space: pre-wrap; font-family: sans-serif; line-height: 1.6;">${bodyText}</div>`,
       date: new Date().toISOString().replace("T", " ").substring(0, 19),
       isRead: true,
       isStarred: false,
-      hasAttachments: false,
+      hasAttachments: mailAttachments.length > 0,
     };
 
     try {

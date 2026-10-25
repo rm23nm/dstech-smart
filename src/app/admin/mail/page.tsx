@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Mail,
   Send,
@@ -28,6 +28,8 @@ import {
   Lock,
   ShieldAlert,
   AlertTriangle,
+  Paperclip,
+  CornerUpRight,
 } from "lucide-react";
 
 interface MailAccount {
@@ -79,11 +81,15 @@ export default function AdminMailPage() {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Form Compose State
+  const [showCc, setShowCc] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [composeForm, setComposeForm] = useState({
     fromEmail: "",
     toEmail: "",
+    ccEmail: "",
     subject: "",
     bodyText: "",
+    attachments: [] as { name: string; size: number; type: string; content: string }[],
   });
 
   // Modal Create Account State
@@ -256,12 +262,19 @@ export default function AdminMailPage() {
       await fetch("/api/mail/messages", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: msg.id, folder: nextFolder }),
+        body: JSON.stringify({
+          id: msg.id,
+          folder: nextFolder,
+          accountEmail: msg.accountEmail || selectedAccountEmail,
+        }),
       });
       showAlert(
         "success",
         nextFolder === "trash" ? "Pesan dipindahkan ke Kotak Sampah." : "Pesan dikembalikan ke Kotak Masuk."
       );
+      if (selectedMessage?.id === msg.id) {
+        setSelectedMessage(null);
+      }
       fetchMessages();
     } catch (err) {
       showAlert("error", "Gagal memindahkan pesan.");
@@ -269,12 +282,12 @@ export default function AdminMailPage() {
   };
 
   const handleDeletePermanent = async (msgId: string) => {
-    if (!confirm("Hapus pesan ini secara permanen?")) return;
+    if (!confirm("Hapus pesan ini secara permanen dari server? Tindakan ini tidak dapat dibatalkan.")) return;
     try {
-      const res = await fetch(`/api/mail/messages?id=${msgId}`, { method: "DELETE" });
+      const res = await fetch(`/api/mail/messages?id=${encodeURIComponent(msgId)}&accountEmail=${encodeURIComponent(selectedAccountEmail)}`, { method: "DELETE" });
       const json = await res.json();
       if (json.success) {
-        showAlert("success", "Pesan berhasil dihapus permanen.");
+        showAlert("success", "Pesan berhasil dihapus permanen dari server.");
         setSelectedMessage(null);
         fetchMessages();
       }
@@ -283,11 +296,50 @@ export default function AdminMailPage() {
     }
   };
 
+  // Attachments Handler
+  const handleAttachmentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      if (file.size > 25 * 1024 * 1024) {
+        showAlert("error", `Ukuran file ${file.name} melebihi batas 25MB.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Content = reader.result as string;
+        setComposeForm((prev) => ({
+          ...prev,
+          attachments: [
+            ...prev.attachments,
+            {
+              name: file.name,
+              size: file.size,
+              type: file.type || "application/octet-stream",
+              content: base64Content,
+            },
+          ],
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = "";
+  };
+
+  const handleRemoveAttachment = (idx: number) => {
+    setComposeForm((prev) => ({
+      ...prev,
+      attachments: prev.attachments.filter((_, i) => i !== idx),
+    }));
+  };
+
   // Send Email Handler
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!composeForm.fromEmail || !composeForm.toEmail || !composeForm.subject || !composeForm.bodyText) {
-      showAlert("error", "Harap lengkapi semua kolom email.");
+      showAlert("error", "Harap lengkapi semua kolom email (Pengirim, Penerima, Subjek, dan Pesan).");
       return;
     }
 
@@ -296,7 +348,14 @@ export default function AdminMailPage() {
       const res = await fetch("/api/mail/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(composeForm),
+        body: JSON.stringify({
+          fromEmail: composeForm.fromEmail,
+          toEmail: composeForm.toEmail,
+          cc: composeForm.ccEmail || undefined,
+          subject: composeForm.subject,
+          bodyText: composeForm.bodyText,
+          attachments: composeForm.attachments,
+        }),
       });
       const json = await res.json();
       if (json.success) {
@@ -304,9 +363,12 @@ export default function AdminMailPage() {
         setComposeForm({
           fromEmail: selectedAccountEmail || accounts[0]?.email || "",
           toEmail: "",
+          ccEmail: "",
           subject: "",
           bodyText: "",
+          attachments: [],
         });
+        setShowCc(false);
         setActiveTab("inbox");
         setCurrentFolder("sent");
         fetchMessages();
@@ -382,8 +444,23 @@ export default function AdminMailPage() {
     setComposeForm({
       fromEmail: msg.toEmail || selectedAccountEmail,
       toEmail: msg.fromEmail,
+      ccEmail: "",
       subject: msg.subject.startsWith("Re:") ? msg.subject : `Re: ${msg.subject}`,
       bodyText: `\n\n--- Pada ${msg.date}, ${msg.fromName} (${msg.fromEmail}) menulis:\n> ${msg.snippet}`,
+      attachments: [],
+    });
+    setActiveTab("compose");
+  };
+
+  // Forward Message
+  const handleForwardMessage = (msg: MailMessage) => {
+    setComposeForm({
+      fromEmail: selectedAccountEmail || accounts[0]?.email || "",
+      toEmail: "",
+      ccEmail: "",
+      subject: msg.subject.startsWith("Fwd:") ? msg.subject : `Fwd: ${msg.subject}`,
+      bodyText: `\n\n---------- Pesan yang Diteruskan (Forwarded Message) ---------\nDari: ${msg.fromName} <${msg.fromEmail}>\nTanggal: ${msg.date}\nSubjek: ${msg.subject}\nKepada: ${msg.toEmail}\n\n${msg.snippet}`,
+      attachments: [],
     });
     setActiveTab("compose");
   };
@@ -826,13 +903,24 @@ export default function AdminMailPage() {
                     )}
                   </div>
 
-                  <button
-                    onClick={() => handleQuickReply(selectedMessage)}
-                    className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <Reply className="w-3.5 h-3.5" />
-                    <span>Balas Pesan</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleForwardMessage(selectedMessage)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                      title="Teruskan pesan ini ke penerima lain"
+                    >
+                      <CornerUpRight className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Teruskan</span>
+                    </button>
+                    <button
+                      onClick={() => handleQuickReply(selectedMessage)}
+                      className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                      title="Balas pesan ini"
+                    >
+                      <Reply className="w-3.5 h-3.5" />
+                      <span>Balas Pesan</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Banner Peringatan Keamanan Spam */}
@@ -973,9 +1061,20 @@ export default function AdminMailPage() {
               </div>
 
               <div>
-                <label className="text-xs font-black text-slate-700 block mb-1">
-                  Alamat Penerima (To):
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-black text-slate-700">
+                    Alamat Penerima (To):
+                  </label>
+                  {!showCc && !composeForm.ccEmail && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCc(true)}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                    >
+                      + Tambah CC
+                    </button>
+                  )}
+                </div>
                 <input
                   type="email"
                   placeholder="contoh: klien@perusahaan.com"
@@ -986,6 +1085,37 @@ export default function AdminMailPage() {
                 />
               </div>
             </div>
+
+            {/* Kolom CC (Carbon Copy) */}
+            {(showCc || composeForm.ccEmail) && (
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-black text-slate-700">
+                    Tembusan (CC - Carbon Copy):
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCc(false);
+                      setComposeForm((prev) => ({ ...prev, ccEmail: "" }));
+                    }}
+                    className="text-[11px] text-slate-400 hover:text-rose-600 cursor-pointer"
+                  >
+                    Tutup CC
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="contoh: manajer@dstechsmart.com, finance@dstechsmart.com"
+                  value={composeForm.ccEmail}
+                  onChange={(e) => setComposeForm({ ...composeForm, ccEmail: e.target.value })}
+                  className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Pisahkan beberapa email tembusan dengan tanda koma (,).
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="text-xs font-black text-slate-700 block mb-1">
@@ -999,6 +1129,58 @@ export default function AdminMailPage() {
                 className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
                 required
               />
+            </div>
+
+            {/* Lampiran Berkas (Attachments) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-black text-slate-700 flex items-center gap-1.5">
+                  <Paperclip className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Lampiran Pesan (Opsional):</span>
+                </label>
+                <input
+                  type="file"
+                  multiple
+                  ref={fileInputRef}
+                  onChange={handleAttachmentSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <Paperclip className="w-3.5 h-3.5" />
+                  <span>Pilih & Unggah Berkas</span>
+                </button>
+              </div>
+
+              {composeForm.attachments.length > 0 && (
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex flex-wrap gap-2 mt-2">
+                  {composeForm.attachments.map((att, idx) => (
+                    <div
+                      key={idx}
+                      className="px-3 py-1.5 rounded-xl bg-white border border-slate-200 shadow-2xs flex items-center gap-2 text-xs"
+                    >
+                      <Paperclip className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="font-bold text-slate-800 max-w-[180px] truncate">
+                        {att.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {(att.size / 1024).toFixed(0)} KB
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAttachment(idx)}
+                        className="text-slate-400 hover:text-rose-600 cursor-pointer ml-1"
+                        title="Hapus lampiran ini"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>

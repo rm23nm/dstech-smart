@@ -417,10 +417,38 @@ export async function GET(request: Request) {
   }
 }
 
+function findMaildirFile(accountEmail: string, fileName: string): string | null {
+  const vmailRoot = "/www/vmail";
+  if (!fs.existsSync(vmailRoot)) return null;
+  const [u, d] = (accountEmail || "").toLowerCase().trim().split("@");
+  if (!u || !d) return null;
+  const accDir = path.join(vmailRoot, d, u);
+  if (!fs.existsSync(accDir)) return null;
+
+  const candidateDirs = [
+    path.join(accDir, "new"),
+    path.join(accDir, "cur"),
+    path.join(accDir, ".Trash", "new"),
+    path.join(accDir, ".Trash", "cur"),
+    path.join(accDir, ".Junk", "new"),
+    path.join(accDir, ".Junk", "cur"),
+    path.join(accDir, ".Sent", "new"),
+    path.join(accDir, ".Sent", "cur"),
+  ];
+
+  for (const cDir of candidateDirs) {
+    if (fs.existsSync(cDir)) {
+      const p = path.join(cDir, fileName);
+      if (fs.existsSync(p)) return p;
+    }
+  }
+  return null;
+}
+
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, isRead, isStarred, folder, isSpam } = body;
+    const { id, isRead, isStarred, folder, isSpam, accountEmail } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -429,6 +457,38 @@ export async function PATCH(request: Request) {
       );
     }
 
+    // 1. Sinkronisasi berkas fisik di Maildir server jika id adalah maildir_...
+    if (id.startsWith("maildir_") && folder) {
+      const fileName = id.replace("maildir_", "");
+      const foundPath = findMaildirFile(accountEmail || "", fileName);
+      if (foundPath) {
+        const [u, d] = (accountEmail || "").toLowerCase().trim().split("@");
+        const accDir = path.join("/www/vmail", d, u);
+        let targetDir = path.join(accDir, "cur");
+
+        if (folder === "trash") {
+          targetDir = path.join(accDir, ".Trash", "cur");
+        } else if (folder === "spam") {
+          targetDir = path.join(accDir, ".Junk", "cur");
+        } else if (folder === "sent") {
+          targetDir = path.join(accDir, ".Sent", "cur");
+        } else {
+          targetDir = path.join(accDir, "cur");
+        }
+
+        try {
+          fs.mkdirSync(targetDir, { recursive: true });
+          const destPath = path.join(targetDir, fileName);
+          if (foundPath !== destPath) {
+            fs.renameSync(foundPath, destPath);
+          }
+        } catch (moveErr) {
+          console.warn("Could not move physical maildir file:", moveErr);
+        }
+      }
+    }
+
+    // 2. Simpan status di JSON
     const messages = readMessages();
     const idx = messages.findIndex((m) => m.id === id);
 
@@ -494,6 +554,7 @@ export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
+    const accountEmail = searchParams.get("accountEmail");
 
     if (!id) {
       return NextResponse.json(
@@ -502,6 +563,42 @@ export async function DELETE(request: Request) {
       );
     }
 
+    // 1. Hapus berkas fisik di Maildir server jika id adalah maildir_...
+    if (id.startsWith("maildir_")) {
+      const fileName = id.replace("maildir_", "");
+      let foundPath = findMaildirFile(accountEmail || "", fileName);
+
+      // Jika accountEmail belum diberikan, cari di seluruh domain/user vmail
+      if (!foundPath && fs.existsSync("/www/vmail")) {
+        try {
+          const domains = fs.readdirSync("/www/vmail");
+          for (const d of domains) {
+            const dPath = path.join("/www/vmail", d);
+            if (fs.statSync(dPath).isDirectory() && d.includes(".")) {
+              const users = fs.readdirSync(dPath);
+              for (const u of users) {
+                const p = findMaildirFile(`${u}@${d}`, fileName);
+                if (p) {
+                  foundPath = p;
+                  break;
+                }
+              }
+            }
+            if (foundPath) break;
+          }
+        } catch {}
+      }
+
+      if (foundPath && fs.existsSync(foundPath)) {
+        try {
+          fs.unlinkSync(foundPath);
+        } catch (unlinkErr) {
+          console.warn("Could not delete physical maildir file:", unlinkErr);
+        }
+      }
+    }
+
+    // 2. Hapus dari berkas JSON lokal
     let messages = readMessages();
     messages = messages.filter((m) => m.id !== id);
     saveMessages(messages);
