@@ -119,6 +119,13 @@ export const DSTECH_SYSTEM_MENUS: MenuItemConfig[] = [
     desc: "Proses pesanan e-store, verifikasi bukti bayar, cetak surat jalan & input no. resi kurir / armada DSTech",
   },
   {
+    id: "mail",
+    name: "Email Perusahaan",
+    category: "Operasional",
+    path: "/admin/mail",
+    desc: "Kelola akun email resmi, kotak masuk webmail dan kirim email via SMTP SSL",
+  },
+  {
     id: "users",
     name: "User Management & Role",
     category: "Sistem & Legalitas",

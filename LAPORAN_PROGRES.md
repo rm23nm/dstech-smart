@@ -4604,6 +4604,42 @@
 
 ---
 
+### 157. Tugas: Pembuatan Modul DSTech Email Center (Mail Suite) Terintegrasi di Dashboard Admin (/admin/mail)
+- **Permintaan Pengguna**:
+  - *"bisakah kamu membuatkan saya sebuah fitur untuk mengelola user email dan juga email masuk langsung, dan kirim email langsung dari dasbord aplikasi kita dstechsmart.com?"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & SIAP DEPLOY LIVE)**
+- **Analisis Kebutuhan & Desain Arsitektur**:
+  1. **Backend API (`/api/mail/...`)**:
+     - `GET /api/mail/accounts`: Mengambil daftar akun email perusahaan dari skema `src/data/dstech_mail_accounts.json` dan tersinkronisasi dengan database mail server `/www/vmail/postfixadmin.db`.
+     - `POST /api/mail/accounts`: Menambah akun email baru (domain `@dstechsmart.com` / `@dstechsmart.id`), mengatur password, dan kuota.
+     - `PATCH /api/mail/accounts`: Mengubah password akun email atau memperbarui profil.
+     - `DELETE /api/mail/accounts`: Menonaktifkan atau menghapus akun email.
+     - `GET /api/mail/messages`: Membaca email masuk (Inbox), email terkirim (Sent), dan sampah (Trash) berdasarkan akun email aktif yang dipilih pengguna.
+     - `POST /api/mail/send`: Mengirim email langsung via SMTP port 465 SSL resmi `mail.dstechsmart.com` menggunakan kredensial akun aktif pengirim.
+  2. **Antarmuka Pengguna Admin Mail Center (`/admin/mail`)**:
+     - Desain visual modern berstandar enterprise:
+       * **Tab 1: Kotak Surat (Webmail Inbox)**: Navigasi folder (Inbox, Sent, Trash), selector akun email aktif, pencarian email instan, daftar pesan dengan badge belum dibaca/sudah dibaca, panel pratinjau pesan (*reading pane*), dan tombol balas cepat (*Quick Reply*).
+       * **Tab 2: Tulis Email (Compose Mail)**: Formulir pengiriman email terpadu (Pengirim, Kepada, Subjek, Isi Pesan HTML/teks, tombol Kirim Email Langsung).
+       * **Tab 3: Kelola Akun Email (Email Accounts Manager)**: Tabel seluruh akun email, status kuota, indikator aktif, tombol *Buat Akun Baru*, tombol *Ubah Password*, dan info parameter server (SMTP/IMAP).
+  3. **Navigasi Sidebar & Role Permissions**:
+     - Menu baru *"Email Perusahaan"* (ikon `Mail` dengan badge counter belum dibaca) di sidebar Admin Control Center `src/app/admin/layout.tsx`.
+     - Tambahkan izin `mail` ke sistem hak akses terpusat `src/utils/dstech_permissions.ts` dan `src/data/dstech_role_permissions.json`.
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat folder cadangan `_backup_mail_suite/` untuk file-file yang akan dimodifikasi.
+  3. [x] **Langkah 3**: Siapkan data store awal `src/data/dstech_mail_accounts.json` dengan akun-akun resmi aktif.
+  4. [x] **Langkah 4**: Pasang dependensi `nodemailer` di `dstech-smart` untuk pengiriman email SMTP terpercaya.
+  5. [x] **Langkah 5**: Buat endpoint API `/api/mail/accounts`, `/api/mail/messages`, dan `/api/mail/send`.
+  6. [x] **Langkah 6**: Buat halaman antarmuka pengguna `src/app/admin/mail/page.tsx` lengkap dengan 3 tab interaktif.
+  7. [x] **Langkah 7**: Tambahkan menu *"Email Perusahaan"* di `src/app/admin/layout.tsx` dan konfigurasikan permissions.
+  8. [x] **Langkah 8**: Uji kompilasi lokal `npx tsc --noEmit` & `npm run build` (58/58 static & dynamic routes 100% sukses).
+  9. [x] **Langkah 9**: Bersihkan folder cadangan sementara `_backup_mail_suite/`.
+  10. [x] **Langkah 10**: Push commit ke GitHub repository via `push_with_native_git.js`.
+  11. [x] **Langkah 11**: Deploy live ke VPS aaPanel via `deploy_live.js` dan restart PM2 `dstech-main`.
+  12. [x] **Langkah 12**: Verifikasi halaman live dan tandai status Selesai.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.

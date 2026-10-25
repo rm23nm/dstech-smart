@@ -29,6 +29,7 @@ import {
   FileSignature,
   Banknote,
   ShoppingBag,
+  Mail,
 } from "lucide-react";
 import { checkUserPermission } from "@/utils/dstech_permissions";
 
@@ -41,6 +42,7 @@ interface SearchResult {
 
 const SEARCH_CATALOG: SearchResult[] = [
   { title: "Dashboard Overview", category: "Navigasi", url: "/admin", desc: "Ringkasan metrik omset, stok, dan partner" },
+  { title: "Email & Webmail Perusahaan", category: "Operasional", url: "/admin/mail", desc: "Kelola akun email resmi, kotak masuk webmail dan kirim email via SMTP SSL" },
   { title: "Kontrak Kerja & Rekrutmen", category: "Operasional", url: "/admin/contracts", desc: "Kelola kontrak kerja staf bulanan/tahunan dan teknisi harian (Tipe 1 & 2), cetak PKWT resmi A4" },
   { title: "Rekap Absensi Karyawan & Teknisi", category: "Operasional", url: "/admin/attendance", desc: "Pantau presensi masuk/pulang, titik GPS Google Maps, dan riwayat kehadiran" },
   { title: "Download Laporan Absensi (Excel & PDF)", category: "Operasional", url: "/admin/attendance", desc: "Unduh file CSV/Excel dan cetak lembar rekapitulasi kehadiran A4 resmi" },
@@ -106,6 +108,7 @@ export default function AdminLayout({
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [logoUrl, setLogoUrl] = useState<string>("/logo.png");
   const [pendingOrdersCount, setPendingOrdersCount] = useState<number>(0);
+  const [unreadMailCount, setUnreadMailCount] = useState<number>(0);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -138,6 +141,16 @@ export default function AdminLayout({
         }
       })
       .catch((err) => console.error("Gagal load orders count:", err));
+
+    // Ambil jumlah email belum dibaca di inbox
+    fetch("/api/mail/messages?folder=inbox&t=" + Date.now())
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.success && typeof data.unreadInboxCount === "number") {
+          setUnreadMailCount(data.unreadInboxCount);
+        }
+      })
+      .catch((err) => console.error("Gagal load mail count:", err));
   }, []);
 
   // Search filter
@@ -247,6 +260,13 @@ export default function AdminLayout({
       active: pathname.startsWith("/admin/orders"),
     },
     {
+      id: "mail",
+      label: "Email Perusahaan",
+      href: "/admin/mail",
+      icon: Mail,
+      active: pathname.startsWith("/admin/mail"),
+    },
+    {
       id: "categories",
       label: "Kategori & Sub-Kategori",
       href: "/admin/categories",
@@ -344,6 +364,10 @@ export default function AdminLayout({
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-dstech-red text-white shadow-sm animate-pulse">
                     {pendingOrdersCount}
                   </span>
+                ) : item.id === "mail" && unreadMailCount > 0 ? (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-600 text-white shadow-sm animate-pulse">
+                    {unreadMailCount}
+                  </span>
                 ) : (
                   <ChevronRight
                     className={`w-4 h-4 transition-transform ${
@@ -412,6 +436,10 @@ export default function AdminLayout({
                     {item.id === "orders" && pendingOrdersCount > 0 ? (
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-dstech-red text-white shadow-sm">
                         {pendingOrdersCount}
+                      </span>
+                    ) : item.id === "mail" && unreadMailCount > 0 ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-600 text-white shadow-sm">
+                        {unreadMailCount}
                       </span>
                     ) : (
                       <ChevronRight className="w-3.5 h-3.5 opacity-50" />
