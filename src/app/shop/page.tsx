@@ -1813,26 +1813,22 @@ export default function ShopPage() {
                   </label>
                 </div>
 
-                {/* Opsi PPN 11% Resmi (Tugas 200) */}
-                <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 flex items-start gap-3">
-                  <input
-                    type="checkbox"
-                    id="add-tax-cart"
-                    checked={includeTax}
-                    onChange={(e) => setIncludeTax(e.target.checked)}
-                    className="w-4 h-4 mt-0.5 text-dstech-blue rounded cursor-pointer"
-                  />
-                  <label htmlFor="add-tax-cart" className="text-xs cursor-pointer select-none">
-                    <span className="font-black text-slate-900 flex flex-wrap items-center gap-1.5">
-                      <span>Sertakan PPN 11% &amp; Faktur Pajak Resmi</span>
-                      <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.2 rounded border border-amber-300">
-                        PT. DSTech Smart Perkasa
+                {/* Info PPN 11% Wajib Pajak PKP Resmi (Perusahaan PKP Resmi) */}
+                <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-200/90 flex items-start gap-3">
+                  <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="text-xs">
+                    <div className="font-black text-slate-900 flex flex-wrap items-center gap-1.5">
+                      <span>Wajib PPN 11% &amp; Penerbitan Faktur Pajak Sah</span>
+                      <span className="text-[10px] bg-amber-200 text-amber-950 font-black px-2 py-0.5 rounded-full border border-amber-300">
+                        Perusahaan PKP Resmi
                       </span>
-                    </span>
-                    <span className="text-[11px] text-slate-600 leading-relaxed block mt-0.5">
-                      Menerbitkan Faktur Penjualan resmi, Surat Jalan (DO), dan Kuitansi bertanda tangan sah untuk laporan keuangan.
-                    </span>
-                  </label>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed mt-0.5">
+                      PT. DSTech Smart Perkasa merupakan Pengusaha Kena Pajak (PKP) resmi. Seluruh transaksi wajib dikenakan PPN 11% dan otomatis diterbitkan Faktur Penjualan / e-Faktur sah, Surat Jalan (DO), serta Kuitansi resmi.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Ringkasan Subtotal */}
