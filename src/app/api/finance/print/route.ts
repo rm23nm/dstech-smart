@@ -301,9 +301,9 @@ export async function GET(req: Request) {
         <!-- Action Toolbar -->
         <div class="max-w-[210mm] mx-auto mb-4 bg-white rounded-2xl p-4 shadow-md border border-slate-200 flex flex-wrap items-center justify-between gap-3 print-hidden">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow">
-              SPH
-            </div>
+            <a href="/" class="shrink-0 transition-transform hover:scale-105 block" title="PT. DSTech Smart Perkasa">
+              <img src="/logo.png" alt="PT. DSTech Smart Perkasa" class="h-10 w-auto object-contain max-w-[150px]" />
+            </a>
             <div>
               <h1 class="font-black text-sm sm:text-base text-slate-900">${documentTitle}</h1>
               <p class="text-[11px] text-slate-500">PT. DSTech Smart Perkasa • Surat Penawaran Harga Resmi</p>
@@ -1163,11 +1163,11 @@ export async function GET(req: Request) {
         <!-- Floating Action Toolbar (Hanya Tampil di Layar / Tidak Tercetak) -->
         <div class="no-print max-w-4xl mx-auto mb-6 bg-slate-900 text-white rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-black text-lg">
-              PO
-            </div>
+            <a href="/" class="shrink-0 bg-white px-2 py-1 rounded-xl shadow-xs border border-slate-700 transition-transform hover:scale-105 block" title="PT. DSTech Smart Perkasa">
+              <img src="/logo.png" alt="PT. DSTech Smart Perkasa" class="h-8 w-auto object-contain max-w-[130px]" />
+            </a>
             <div>
-              <div class="font-black text-sm tracking-wide">Purchase Order Resmi PT. DSTech Smart Perkasa</div>
+              <div class="font-black text-sm tracking-wide text-amber-400">Purchase Order Resmi PT. DSTech Smart Perkasa</div>
               <div class="text-[11px] text-slate-400 font-mono">Nomor: ${po.poNumber} • Vendor: ${po.supplierName || "-"}</div>
             </div>
           </div>
@@ -1793,9 +1793,7 @@ export async function GET(req: Request) {
             <!-- Header Bar: Kop Ringkas Teks Bawaan (Tampil jika Kop Gambar Dimatikan) -->
             <div id="receipt-letterhead-text-box" class="px-6 pt-3 pb-1.5 border-b-2 border-slate-900 flex justify-between items-start gap-2" style="display: ${letterheadEnabled ? 'none' : 'flex'};">
               <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs shadow-xs shrink-0">
-                  DST
-                </div>
+                <img src="/logo.png" alt="PT. DSTech Smart Perkasa" class="h-8 w-auto object-contain shrink-0" />
                 <div>
                   <h3 class="text-[11px] font-black tracking-wide text-slate-950 uppercase leading-none">PT. DSTECH SMART PERKASA</h3>
                   <p class="text-[8px] text-slate-500 mt-0.5 leading-none">Solusi Teknologi, Jaringan &amp; Keamanan • Cilegon, Banten</p>
@@ -2429,9 +2427,9 @@ export async function GET(req: Request) {
       <!-- Top Action Toolbar (Layar saja, print:hidden) -->
       <div class="max-w-[210mm] mx-auto mb-4 bg-white rounded-2xl p-4 shadow-md border border-slate-200 flex flex-wrap items-center justify-between gap-3 print-hidden">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-sm shadow">
-            DST
-          </div>
+          <a href="/" class="shrink-0 transition-transform hover:scale-105 block" title="PT. DSTech Smart Perkasa">
+            <img src="/logo.png" alt="Logo PT. DSTech Smart Perkasa" class="h-10 w-auto object-contain max-w-[150px]" />
+          </a>
           <div>
             <h1 class="font-black text-sm sm:text-base text-slate-900">${documentTitle}</h1>
             <p class="text-[11px] text-slate-500">PT. DSTech Smart Perkasa • Portal Dokumen Resmi</p>
