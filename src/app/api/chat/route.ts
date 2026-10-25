@@ -49,7 +49,15 @@ export async function POST(req: Request) {
           secret: process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026",
           message: message.trim(),
           history: Array.isArray(history) ? history.slice(-8) : [],
-          visitorInfo: visitorInfo || {}
+          visitorInfo: visitorInfo || {},
+          companyProfile: {
+            companyName: settings.companyName || "PT. DSTech Smart Perkasa",
+            address: settings.address || "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON, KOTA CILEGON - BANTEN",
+            googleMapsUrl: settings.googleMapsUrl || "https://maps.google.com/?q=Perum+Bukit+Cilegon+Asri+Cilegon+Banten",
+            serviceArea: settings.serviceArea || "Banten (Cilegon, Serang, Tangerang), Jabodetabek, dan Seluruh Wilayah Indonesia (Nasional)",
+            whatsapp: settings.whatsappDisplay || "+62 822-5949-4242",
+            email: settings.email || "cs@dstechsmart.com"
+          }
         }),
         signal: AbortSignal.timeout(18000)
       });
