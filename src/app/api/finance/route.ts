@@ -809,6 +809,20 @@ export async function POST(request: Request) {
         sales[index].photosSignerTitle = signerTitle || "PIC Lapangan / Klien";
         sales[index].photosSignatureImage = signatureImage;
         sales[index].photosNotes = notes || "";
+      } else if (docType === "driver" || docType === "driver_delivery") {
+        sales[index].driverApproved = true;
+        sales[index].driverApprovedAt = approvedAt;
+        sales[index].driverSignerName = signerName || "Supir / Petugas Ekspedisi";
+        sales[index].driverSignerTitle = signerTitle || "Driver / Kurir Pengantar";
+        sales[index].driverSignatureImage = signatureImage;
+        sales[index].driverNotes = notes || "";
+      } else if (docType === "invoice" || docType === "faktur") {
+        sales[index].clientApproved = true;
+        sales[index].clientApprovedAt = approvedAt;
+        sales[index].clientSignerName = signerName || sales[index].customerName || "Penerima Faktur";
+        sales[index].clientSignerTitle = signerTitle || "Bagian Keuangan / PIC Penerima";
+        sales[index].clientSignatureImage = signatureImage;
+        sales[index].clientNotes = notes || "";
       }
 
       writeFinanceData(data);

@@ -15435,16 +15435,29 @@ export default function AdminFinanceERPPage() {
                       <p className="text-xs font-black text-slate-900 mt-0.5">{selectedInvoiceForPrint.customerName}</p>
                     </div>
 
-                    <div className="h-11 flex items-center justify-center text-slate-300 text-[9px] italic">
-                      (Tanda Tangan & Stempel Resmi Klien)
+                    <div className="h-11 relative flex items-center justify-center text-slate-300 text-[9px] italic">
+                      {(selectedInvoiceForPrint as any).clientSignatureImage ? (
+                        <>
+                          <img
+                            src={(selectedInvoiceForPrint as any).clientSignatureImage}
+                            alt="Tanda Tangan Penerima"
+                            className="max-h-11 max-w-[140px] object-contain relative z-10"
+                          />
+                          <span className="absolute bottom-0 text-[7px] text-purple-700 font-bold bg-purple-50 px-1 rounded border border-purple-300">
+                            ✓ Disahkan: {(selectedInvoiceForPrint as any).clientApprovedAt || "Digital"}
+                          </span>
+                        </>
+                      ) : (
+                        <span>(Tanda Tangan &amp; Stempel Resmi Klien)</span>
+                      )}
                     </div>
 
                     <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
-                        ( ................................................................ )
+                        ( {(selectedInvoiceForPrint as any).clientSignerName || selectedInvoiceForPrint.customerName || "................................................................"} )
                       </p>
                       <p className="text-[9px] text-slate-500">
-                        Nama & Jabatan Penandatangan Klien
+                        {(selectedInvoiceForPrint as any).clientSignerTitle || "Penerima / Bagian Keuangan"}
                       </p>
                     </div>
                   </div>
@@ -25743,18 +25756,36 @@ export default function AdminFinanceERPPage() {
                     </p>
                     <p className="text-[10px] font-black text-slate-900">Driver / Teknisi Pengantar</p>
 
-                    <div className="h-11 flex items-center justify-center">
-                      <div className="font-serif italic text-xs text-slate-400 select-none">
-                        ( Tanda Tangan Supir )
-                      </div>
+                    <div className="h-11 relative flex items-center justify-center">
+                      {(selectedSaleForDelivery as any).driverSignatureImage ? (
+                        <>
+                          <img
+                            src={(selectedSaleForDelivery as any).driverSignatureImage}
+                            alt="Tanda Tangan Supir"
+                            className="print-signature-img max-h-11 max-w-[110px] object-contain relative z-10"
+                          />
+                          <div className="absolute right-0 top-0 px-1 py-0.5 rounded bg-blue-100 text-blue-800 text-[6px] font-bold border border-blue-300 print:hidden">
+                            DIGITAL SIGNED
+                          </div>
+                        </>
+                      ) : (
+                        <div className="font-serif italic text-xs text-slate-400 select-none">
+                          ( Tanda Tangan Supir )
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-[10px]">
-                        ( {deliveryConfig.driverName} )
+                        ( {(selectedSaleForDelivery as any).driverSignerName || deliveryConfig.driverName} )
                       </p>
                       <p className="text-[8.5px] text-slate-500 mt-0.5">
-                        {deliveryConfig.vehicleNumber}
+                        {(selectedSaleForDelivery as any).driverSignerTitle || deliveryConfig.vehicleNumber}
+                        {(selectedSaleForDelivery as any).driverApprovedAt && (
+                          <span className="block text-[7.5px] text-blue-700 font-mono mt-0.5 font-bold">
+                            Terkirim: {(selectedSaleForDelivery as any).driverApprovedAt}
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>

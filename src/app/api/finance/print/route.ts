@@ -2098,10 +2098,24 @@ export async function GET(req: Request) {
           </div>
           <div>
             <span class="text-[11px] text-slate-500 block mb-1">Pengemudi / Ekspedisi:</span>
-            <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
-              <span class="text-[9px] text-slate-400 italic">Supir / Ekspedisi</span>
+            <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+              ${sale.driverSignatureImage ? `
+                <img src="${sale.driverSignatureImage}" alt="Tanda Tangan Supir" class="h-16 object-contain z-10" />
+                <span class="absolute bottom-1 right-2 text-[6.5px] text-blue-700 font-bold bg-blue-50 px-1 rounded border border-blue-300">✓ Supir / Ekspedisi</span>
+              ` : `
+                <button type="button" onclick="openDocApprovalModal('driver')" class="print-hidden px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-lg text-[10px] font-black shadow-2xs transition cursor-pointer flex items-center gap-1">
+                  <span>✍️ Tanda Tangani Supir</span>
+                </button>
+                <span class="hidden print:inline text-[9px] text-slate-400 italic">Supir / Ekspedisi</span>
+              `}
             </div>
-            <p class="font-bold text-slate-900 text-[11px] mt-1.5 underline">( ............................ )</p>
+            <p class="font-bold text-slate-900 text-[11px] mt-1.5 underline">
+              ${sale.driverSignerName ? `( ${sale.driverSignerName} )` : "( ............................ )"}
+            </p>
+            <p class="text-[9px] text-slate-500">
+              ${sale.driverSignerTitle || "Driver / Kurir Pengantar"}
+              ${sale.driverApprovedAt ? `<span class="block text-[7.5px] text-blue-700 font-mono mt-0.5 font-bold">Terkirim: ${sale.driverApprovedAt}</span>` : ""}
+            </p>
           </div>
           <div>
             <span class="text-[11px] text-slate-500 block mb-1">Diterima Oleh (Klien / Lapangan):</span>
@@ -2339,10 +2353,19 @@ export async function GET(req: Request) {
       <div class="grid grid-cols-2 gap-8 pt-4 mt-4 border-t border-slate-200 text-center">
         <div>
           <span class="text-[10px] text-slate-500 block mb-1">Penerima / Klien:</span>
-          <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
-            <span class="text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap )</span>
+          <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+            ${sale.clientSignatureImage ? `
+              <img src="${sale.clientSignatureImage}" alt="Tanda Tangan Penerima" class="h-16 object-contain z-10" />
+              <span class="absolute bottom-1 bg-purple-50 text-purple-700 border border-purple-200 text-[8px] font-bold px-1.5 py-0.5 rounded shadow-2xs">✓ Disahkan Digital: ${sale.clientApprovedAt || ""}</span>
+            ` : `
+              <button type="button" onclick="openDocApprovalModal('invoice')" class="print-hidden px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-300 rounded-lg text-[10px] font-bold shadow-2xs transition-all cursor-pointer flex items-center gap-1">
+                <span>✍️ Tanda Tangan Penerima</span>
+              </button>
+              <span class="hidden print:inline text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap )</span>
+            `}
           </div>
-          <p class="font-bold text-slate-900 text-xs mt-1 underline">${sale.customerName}</p>
+          <p class="font-bold text-slate-900 text-xs mt-1 underline">${sale.clientSignerName ? `( ${sale.clientSignerName} )` : `( ${sale.customerName} )`}</p>
+          <p class="text-[10px] text-slate-500">${sale.clientSignerTitle || "Penerima / Bagian Keuangan"}</p>
         </div>
         <div>
           <span class="text-[10px] text-slate-500 block mb-1">Hormat Kami,</span>
@@ -2460,7 +2483,7 @@ export async function GET(req: Request) {
             </div>
           ` : ''}
 
-          <!-- Tombol Tanda Tangan Online Klien (BAST, Surat Jalan, Dokumentasi Foto) -->
+          <!-- Tombol Tanda Tangan Online (BAST, Surat Jalan, Dokumentasi Foto, Faktur) -->
           ${docType === 'bast' ? (`
             ${sale.bastApproved ? `
               <div class="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
@@ -2472,15 +2495,26 @@ export async function GET(req: Request) {
               </button>
             `}
           `) : docType === 'delivery' ? (`
-            ${sale.deliveryApproved ? `
-              <div class="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
-                <span>✅ Surat Jalan Diterima (${sale.deliverySignerName || "Penerima"})</span>
-              </div>
-            ` : `
-              <button type="button" onclick="openDocApprovalModal('delivery')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-xs flex items-center gap-1.5 shadow-lg shadow-blue-600/30 transition transform hover:scale-[1.02] cursor-pointer">
-                <span>✍️ Tanda Tangani Surat Jalan (Penerima)</span>
-              </button>
-            `}
+            <div class="flex items-center gap-2">
+              ${sale.driverSignatureImage ? `
+                <div class="px-3 py-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                  <span>🚚 Supir: ${sale.driverSignerName || "Driver"}</span>
+                </div>
+              ` : `
+                <button type="button" onclick="openDocApprovalModal('driver')" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-blue-600/30 transition transform hover:scale-[1.02] cursor-pointer">
+                  <span>✍️ TTD Supir Ekspedisi</span>
+                </button>
+              `}
+              ${sale.deliveryApproved ? `
+                <div class="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                  <span>✅ Diterima: ${sale.deliverySignerName || "Penerima"}</span>
+                </div>
+              ` : `
+                <button type="button" onclick="openDocApprovalModal('delivery')" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition transform hover:scale-[1.02] cursor-pointer">
+                  <span>✍️ TTD Penerima (Klien)</span>
+                </button>
+              `}
+            </div>
           `) : docType === 'photos' ? (`
             ${sale.photosApproved ? `
               <div class="px-3.5 py-2 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
@@ -2489,6 +2523,16 @@ export async function GET(req: Request) {
             ` : `
               <button type="button" onclick="openDocApprovalModal('photos')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs flex items-center gap-1.5 shadow-lg shadow-purple-600/30 transition transform hover:scale-[1.02] cursor-pointer">
                 <span>✍️ Tanda Tangani Laporan Foto (Klien)</span>
+              </button>
+            `}
+          `) : (!isReceipt && docType !== 'bast' && docType !== 'delivery' && docType !== 'photos') ? (`
+            ${sale.clientSignatureImage ? `
+              <div class="px-3.5 py-2 rounded-xl bg-purple-50 text-purple-800 border border-purple-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                <span>✅ Faktur Diterima (${sale.clientSignerName || "Klien"})</span>
+              </div>
+            ` : `
+              <button type="button" onclick="openDocApprovalModal('invoice')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black text-xs flex items-center gap-1.5 shadow-lg shadow-purple-600/30 transition transform hover:scale-[1.02] cursor-pointer">
+                <span>✍️ Tanda Tangani Faktur (Penerima)</span>
               </button>
             `}
           `) : ''}
@@ -2947,6 +2991,18 @@ export async function GET(req: Request) {
             if (title) title.innerHTML = '<span>✍️ Tanda Tangan Laporan Dokumentasi Foto</span>';
             if (desc) desc.innerHTML = 'Dengan menandatangani lembar ini, Pengawas Klien mengesahkan dokumentasi foto fisik hasil pekerjaan dan pergantian spare part.';
             if (titleInput) titleInput.value = 'Pengawas Lapangan / PIC Klien';
+          } else if (type === 'driver' || type === 'driver_delivery') {
+            if (title) title.innerHTML = '<span>✍️ Tanda Tangan Supir / Kurir Ekspedisi</span>';
+            if (desc) desc.innerHTML = 'Dengan menandatangani Surat Jalan ini, Pengemudi/Ekspedisi menyatakan telah menerima barang dari gudang pengirim dan bertanggung jawab mengantarkannya ke lokasi tujuan.';
+            if (titleInput) titleInput.value = 'Driver / Petugas Ekspedisi';
+            const nameEl = document.getElementById('input-doc-signer-name');
+            if (nameEl) nameEl.value = '${sale.salesPerson || "Supir Ekspedisi"}';
+          } else if (type === 'invoice' || type === 'faktur') {
+            if (title) title.innerHTML = '<span>✍️ Tanda Tangan Penerima Faktur Penjualan</span>';
+            if (desc) desc.innerHTML = 'Dengan menandatangani faktur ini, Penerima/Klien menyatakan telah menerima tagihan/dokumen invoice ini secara sah dan resmi.';
+            if (titleInput) titleInput.value = 'Bagian Keuangan / PIC Penerima';
+            const nameEl = document.getElementById('input-doc-signer-name');
+            if (nameEl) nameEl.value = '${sale.customerName || ""}';
           }
 
           if (modal) {
