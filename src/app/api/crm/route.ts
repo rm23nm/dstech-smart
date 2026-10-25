@@ -295,6 +295,26 @@ export async function GET(req: Request) {
               hasChanges = true;
             }
           }
+
+          // PRUNING: Hapus leads di website yang berasal dari SmartPro namun sudah dihapus oleh pengguna di SmartPro
+          const spPhoneSet = new Set(jsonSp.leads.map((l: any) => (l.phone || l.wa_phone || "").replace(/\D/g, "")).filter(Boolean));
+          const spIdSet = new Set(jsonSp.leads.map((l: any) => l.id || l.wa_id).filter(Boolean));
+
+          const beforeCount = data.leads.length;
+          data.leads = data.leads.filter((l: any) => {
+            const cleanP = (l.phone || "").replace(/\D/g, "");
+            const isSpOrigin = l.source === "SmartPro WA Gateway" || l.id?.startsWith("lead_") || l.id?.startsWith("prospect-");
+            if (isSpOrigin) {
+              const stillExistsInSp = spIdSet.has(l.id) || (cleanP && spPhoneSet.has(cleanP));
+              return stillExistsInSp;
+            }
+            return true; // Simpan prospek manual / website resmi
+          });
+
+          if (data.leads.length !== beforeCount) {
+            hasChanges = true;
+          }
+
           if (hasChanges) {
             writeCrmData(data);
           }
@@ -370,39 +390,70 @@ export async function POST(req: Request) {
     const data = readCrmData();
     const nowIso = new Date().toISOString();
 
-    if (action === "log_activity") {
-      const { leadId, type, title, notes, createdBy = "DSTech Team" } = body;
-      if (!leadId || !title) {
-        return NextResponse.json({ success: false, error: "ID Lead dan Judul Aktivitas wajib diisi" }, { status: 400 });
+    if (action === "bulk_delete") {
+      const { ids = [] } = body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return NextResponse.json({ success: false, error: "Daftar ID prospek wajib disertakan" }, { status: 400 });
       }
 
-      const leadIndex = data.leads.findIndex((l) => l.id === leadId);
-      if (leadIndex === -1) {
-        return NextResponse.json({ success: false, error: "Lead tidak ditemukan" }, { status: 404 });
-      }
-
-      if (!Array.isArray(data.leads[leadIndex].activities)) {
-        data.leads[leadIndex].activities = [];
-      }
-
-      const newActivity = {
-        id: `act_${Date.now()}`,
-        type: type || "NOTE",
-        title,
-        notes: notes || "",
-        createdAt: nowIso,
-        createdBy,
-      };
-
-      data.leads[leadIndex].activities.unshift(newActivity);
-      data.leads[leadIndex].updatedAt = nowIso;
+      const idSet = new Set(ids);
+      const beforeLen = data.leads.length;
+      data.leads = data.leads.filter((l) => !idSet.has(l.id));
+      const deletedCount = beforeLen - data.leads.length;
       writeCrmData(data);
+
+      // Sinkronkan penghapusan massal ke SmartPro
+      const SMARTPRO_URL = process.env.SMARTPRO_BASE_URL || "https://smartpro.dstechsmart.com";
+      const MASTER_SECRET = process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026";
+      try {
+        await fetch(`${SMARTPRO_URL}/api/leads/bulk-delete?key=${MASTER_SECRET}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids }),
+          signal: AbortSignal.timeout(4000)
+        });
+      } catch (_) {}
 
       return NextResponse.json({
         success: true,
-        message: "Aktivitas berhasil dicatat!",
-        data: newActivity,
+        message: `${deletedCount} prospek berhasil dihapus dari sistem!`,
+        deletedCount
       });
+    }
+
+    if (action === "clean_deleted_smartpro") {
+      const SMARTPRO_URL = process.env.SMARTPRO_BASE_URL || "https://smartpro.dstechsmart.com";
+      const MASTER_SECRET = process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026";
+      const resSp = await fetch(`${SMARTPRO_URL}/api/external/get-crm-leads?secret=${MASTER_SECRET}`, {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (resSp.ok) {
+        const jsonSp = await resSp.json();
+        if (jsonSp.success && Array.isArray(jsonSp.leads)) {
+          const spPhoneSet = new Set(jsonSp.leads.map((l: any) => (l.phone || l.wa_phone || "").replace(/\D/g, "")).filter(Boolean));
+          const spIdSet = new Set(jsonSp.leads.map((l: any) => l.id || l.wa_id).filter(Boolean));
+
+          const beforeCount = data.leads.length;
+          data.leads = data.leads.filter((l: any) => {
+            const cleanP = (l.phone || "").replace(/\D/g, "");
+            const isSpOrigin = l.source === "SmartPro WA Gateway" || l.id?.startsWith("lead_") || l.id?.startsWith("prospect-");
+            if (isSpOrigin) {
+              return spIdSet.has(l.id) || (cleanP && spPhoneSet.has(cleanP));
+            }
+            return true;
+          });
+
+          writeCrmData(data);
+          const removedCount = beforeCount - data.leads.length;
+          return NextResponse.json({
+            success: true,
+            message: `Berhasil membersihkan ${removedCount} prospek lama yang sudah dihapus di SmartPro. Total sisa: ${data.leads.length}`,
+            removedCount,
+            activeCount: data.leads.length
+          });
+        }
+      }
+      return NextResponse.json({ success: false, error: "Gagal menyelaraskan dengan server SmartPro" }, { status: 502 });
     }
 
     // Default action: Create Lead
@@ -472,6 +523,21 @@ export async function POST(req: Request) {
 
     data.leads.unshift(newLead);
     writeCrmData(data);
+
+    // DUA ARAH OTOMATIS: Kirim otomatis prospek baru ke SmartPro WA Gateway (Zero-Click Sync)
+    const SMARTPRO_URL = process.env.SMARTPRO_BASE_URL || "https://smartpro.dstechsmart.com";
+    const MASTER_SECRET = process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026";
+    try {
+      fetch(`${SMARTPRO_URL}/api/external/sync-crm-leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          secret: MASTER_SECRET,
+          leads: [newLead]
+        }),
+        signal: AbortSignal.timeout(3000)
+      }).catch(() => {});
+    } catch (_) {}
 
     return NextResponse.json({
       success: true,
@@ -558,6 +624,21 @@ export async function PATCH(req: Request) {
     data.leads[index] = targetLead;
     writeCrmData(data);
 
+    // DUA ARAH OTOMATIS: Kirim pembaruan status ke SmartPro WA Gateway secara instan (Zero-Click Sync)
+    const SMARTPRO_URL = process.env.SMARTPRO_BASE_URL || "https://smartpro.dstechsmart.com";
+    const MASTER_SECRET = process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026";
+    try {
+      fetch(`${SMARTPRO_URL}/api/external/sync-crm-leads`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          secret: MASTER_SECRET,
+          leads: [targetLead]
+        }),
+        signal: AbortSignal.timeout(3000)
+      }).catch(() => {});
+    } catch (_) {}
+
     return NextResponse.json({
       success: true,
       message: "Data prospek berhasil diperbarui!",
@@ -587,6 +668,16 @@ export async function DELETE(req: Request) {
 
     data.leads = filtered;
     writeCrmData(data);
+
+    // DUA ARAH: Hapus juga dari SmartPro WA Gateway agar 100% konsisten
+    const SMARTPRO_URL = process.env.SMARTPRO_BASE_URL || "https://smartpro.dstechsmart.com";
+    const MASTER_SECRET = process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026";
+    try {
+      await fetch(`${SMARTPRO_URL}/api/leads/${encodeURIComponent(id)}?key=${MASTER_SECRET}`, {
+        method: "DELETE",
+        signal: AbortSignal.timeout(3000)
+      });
+    } catch (_) {}
 
     return NextResponse.json({
       success: true,

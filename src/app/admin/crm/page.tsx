@@ -166,6 +166,69 @@ export default function AdminCrmPage() {
   });
   const [isSubmittingActivity, setIsSubmittingActivity] = useState(false);
   const [isSyncingSmartPro, setIsSyncingSmartPro] = useState(false);
+  const [isCleaningSmartPro, setIsCleaningSmartPro] = useState(false);
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+
+  const handleToggleSelectLead = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedLeadIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllLeads = () => {
+    if (selectedLeadIds.length === leads.length) {
+      setSelectedLeadIds([]);
+    } else {
+      setSelectedLeadIds(leads.map((l) => l.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedLeadIds.length === 0) return;
+    if (!window.confirm(`Yakin ingin menghapus ${selectedLeadIds.length} prospek terpilih? Data akan dihapus permanen dari website dan SmartPro.`)) return;
+    try {
+      const res = await fetch("/api/crm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "bulk_delete", ids: selectedLeadIds })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || `${selectedLeadIds.length} prospek berhasil dihapus.`);
+        setSelectedLeadIds([]);
+        fetchCrmData();
+      } else {
+        showToast(data.error || "Gagal menghapus prospek");
+      }
+    } catch (err) {
+      showToast("Gagal menghubungi server.");
+    }
+  };
+
+  const handleCleanDeletedSmartPro = async () => {
+    if (!window.confirm("Sinkronkan ulang dan bersihkan seluruh prospek lama di website yang sudah dihapus di SmartPro?")) return;
+    setIsCleaningSmartPro(true);
+    try {
+      const res = await fetch("/api/crm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clean_deleted_smartpro" })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || "Data CRM berhasil diselaraskan dengan SmartPro!");
+        setSelectedLeadIds([]);
+        fetchCrmData();
+      } else {
+        showToast(data.error || "Gagal menyelaraskan data.");
+      }
+    } catch (err) {
+      showToast("Gagal menghubungi server.");
+    } finally {
+      setIsCleaningSmartPro(false);
+    }
+  };
 
   const handleSyncToSmartPro = async () => {
     setIsSyncingSmartPro(true);
@@ -221,6 +284,36 @@ export default function AdminCrmPage() {
 
   useEffect(() => {
     fetchCrmData();
+
+    // ZERO-CLICK AUTO SYNC: Sinkronisasi otomatis di latar belakang setiap 12 detik
+    const timer = setInterval(() => {
+      let url = `/api/crm?t=${Date.now()}`;
+      if (selectedCategory !== "ALL") {
+        url += `&category=${encodeURIComponent(selectedCategory)}`;
+      }
+      if (searchQuery.trim()) {
+        url += `&q=${encodeURIComponent(searchQuery.trim())}`;
+      }
+      fetch(url)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.data)) {
+            setLeads(data.data);
+            if (data.metrics) setMetrics(data.metrics);
+          }
+        })
+        .catch(() => {});
+    }, 12000);
+
+    const onFocus = () => {
+      fetchCrmData();
+    };
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [selectedCategory, searchQuery]);
 
   const formatRupiah = (val: number) => {
@@ -446,6 +539,27 @@ export default function AdminCrmPage() {
             </button>
           </div>
 
+          {selectedLeadIds.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="px-3.5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md shadow-rose-500/20 transition flex items-center gap-1.5 cursor-pointer animate-pulse"
+              title="Hapus prospek yang dicentang"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Hapus Terpilih ({selectedLeadIds.length})</span>
+            </button>
+          )}
+
+          <button
+            onClick={handleCleanDeletedSmartPro}
+            disabled={isCleaningSmartPro}
+            className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Bersihkan seluruh data yang sudah dihapus di SmartPro agar website 100% sinkron"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isCleaningSmartPro ? "animate-spin" : ""}`} />
+            <span>{isCleaningSmartPro ? "Menyelaraskan..." : "🧹 Pruning Hapus SmartPro"}</span>
+          </button>
+
           <button
             onClick={handleSyncToSmartPro}
             disabled={isSyncingSmartPro}
@@ -661,9 +775,17 @@ export default function AdminCrmPage() {
                           className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-2xs hover:shadow-md hover:border-dstech-blue transition-all cursor-pointer group space-y-2.5 relative"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-mono font-bold text-slate-400">
-                              {lead.leadNumber}
-                            </span>
+                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedLeadIds.includes(lead.id)}
+                                onChange={(e) => handleToggleSelectLead(lead.id, e as any)}
+                                className="w-3.5 h-3.5 rounded border-slate-300 text-dstech-blue focus:ring-0 cursor-pointer accent-dstech-blue"
+                              />
+                              <span className="text-[10px] font-mono font-bold text-slate-400">
+                                {lead.leadNumber}
+                              </span>
+                            </div>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 line-clamp-1 max-w-[130px]">
                               {lead.category}
                             </span>
@@ -724,6 +846,13 @@ export default function AdminCrmPage() {
                                 title="Edit Lead"
                               >
                                 <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteLead(lead.id, lead.clientName)}
+                                className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                                title="Hapus Prospek"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
@@ -1151,6 +1280,15 @@ export default function AdminCrmPage() {
                 >
                   <Edit className="w-3.5 h-3.5" />
                   <span>Edit Data</span>
+                </button>
+
+                <button
+                  onClick={() => handleDeleteLead(selectedDetailLead.id, selectedDetailLead.clientName)}
+                  className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  title="Hapus Prospek"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus Prospek</span>
                 </button>
               </div>
             </div>
