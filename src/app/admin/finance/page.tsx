@@ -77,6 +77,7 @@ import {
   Camera,
   Wrench,
   Loader2,
+  FileSpreadsheet,
 } from "lucide-react";
 
 interface ProductCatalogItem {
@@ -1715,6 +1716,15 @@ export default function AdminFinanceERPPage() {
     projectId: "",
     projectName: "",
   });
+
+  // State Import & Convert Excel untuk Daftar Penawaran SPH (Tugas 178)
+  const [isImportExcelModalOpen, setIsImportExcelModalOpen] = useState(false);
+  const [importExcelTarget, setImportExcelTarget] = useState<"quotation" | "sale">("quotation");
+  const [importExcelData, setImportExcelData] = useState<QuotationItem[]>([]);
+  const [importExcelFileName, setImportExcelFileName] = useState("");
+  const [importExcelMode, setImportExcelMode] = useState<"replace" | "append">("append");
+  const [isImportExcelProcessing, setIsImportExcelProcessing] = useState(false);
+  const [importExcelError, setImportExcelError] = useState("");
 
   // New Sale Form State
   const [saleForm, setSaleForm] = useState<{
@@ -3636,6 +3646,243 @@ export default function AdminFinanceERPPage() {
       }
     }
     return { subtotal, discountVal, afterDiscount, taxAmount, grandTotal };
+  };
+
+  // Handler Buka Modal Import Excel
+  const handleOpenImportExcelModal = (target: "quotation" | "sale" = "quotation") => {
+    setImportExcelTarget(target);
+    setImportExcelData([]);
+    setImportExcelFileName("");
+    setImportExcelError("");
+    setImportExcelMode("append");
+    setIsImportExcelModalOpen(true);
+  };
+
+  // Unduh Template Resmi Excel SPH
+  const handleDownloadQuotationExcelTemplate = async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const templateData = [
+        {
+          "No": 1,
+          "Nama Barang / Jasa": "IP Camera PTZ 4MP Smart AI Auto Tracking ColorVu",
+          "Qty": 4,
+          "Satuan": "Unit",
+          "Harga Satuan (Rp)": 1850000,
+          "Diskon (Rp)": 50000,
+          "Spesifikasi / Keterangan": "Resolusi 4MP, Motorized Pan-Tilt-Zoom 25x, Smart AI Person/Vehicle Detection, IR 100m, PoE"
+        },
+        {
+          "No": 2,
+          "Nama Barang / Jasa": "Network Video Recorder (NVR) 16 Channel 4K H.265+ AI",
+          "Qty": 1,
+          "Satuan": "Unit",
+          "Harga Satuan (Rp)": 3450000,
+          "Diskon (Rp)": 0,
+          "Spesifikasi / Keterangan": "Support 16 IP Camera 4K, 2x SATA HDD up to 16TB, Smart Face Recognition & Perimeter Protection"
+        },
+        {
+          "No": 3,
+          "Nama Barang / Jasa": "Harddisk Khusus Surveillance 4TB WD Purple / Seagate SkyHawk",
+          "Qty": 2,
+          "Satuan": "Unit",
+          "Harga Satuan (Rp)": 1750000,
+          "Diskon (Rp)": 0,
+          "Spesifikasi / Keterangan": "Dirancang untuk perekaman CCTV 24/7 non-stop, 64MB Cache, SATA 6Gb/s"
+        },
+        {
+          "No": 4,
+          "Nama Barang / Jasa": "Jasa Instalasi, Penarikan Kabel UTP & Konfigurasi Sistem",
+          "Qty": 4,
+          "Satuan": "Titik",
+          "Harga Satuan (Rp)": 175000,
+          "Diskon (Rp)": 0,
+          "Spesifikasi / Keterangan": "Termasuk instalasi kabel pelindung pipa konduit, konektor RJ45 Belden Cat6, labeling & garansi 30 hari"
+        }
+      ];
+
+      const ws = XLSX.utils.json_to_sheet(templateData);
+      ws["!cols"] = [
+        { wch: 6 },
+        { wch: 45 },
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 20 },
+        { wch: 15 },
+        { wch: 65 }
+      ];
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Daftar Item SPH");
+      XLSX.writeFile(wb, "Template_Daftar_Item_SPH_DSTech.xlsx");
+    } catch (err: any) {
+      console.error("Gagal membuat template Excel:", err);
+      alert("Gagal mengunduh template Excel: " + (err?.message || "Terjadi kesalahan"));
+    }
+  };
+
+  // Proses Berkas Excel yang Diunggah Pengguna
+  const handleProcessExcelUpload = async (file: File) => {
+    setIsImportExcelProcessing(true);
+    setImportExcelError("");
+    try {
+      const XLSX = await import("xlsx");
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+      if (!firstSheetName) {
+        throw new Error("Berkas Excel tidak memiliki lembar kerja (sheet).");
+      }
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1, defval: "" });
+
+      if (!rows || rows.length === 0) {
+        throw new Error("Berkas Excel kosong atau tidak memiliki data yang dapat dibaca.");
+      }
+
+      // Deteksi baris header secara cerdas
+      let headerRowIndex = -1;
+      let colNameIdx = -1;
+      let colQtyIdx = -1;
+      let colUnitIdx = -1;
+      let colPriceIdx = -1;
+      let colDiscIdx = -1;
+      let colDescIdx = -1;
+
+      for (let r = 0; r < Math.min(rows.length, 6); r++) {
+        const row = rows[r] || [];
+        const strRow = row.map((cell: any) => String(cell || "").toLowerCase().trim());
+
+        const nameMatch = strRow.findIndex((c: string) =>
+          c.includes("nama") || c.includes("produk") || c.includes("barang") || c.includes("item") || c.includes("deskripsi") || c.includes("description") || c.includes("uraian")
+        );
+        const qtyMatch = strRow.findIndex((c: string) =>
+          c.includes("qty") || c.includes("jumlah") || c.includes("kuantitas") || c.includes("vol") || c.includes("volume")
+        );
+        const priceMatch = strRow.findIndex((c: string) =>
+          c.includes("harga") || c.includes("price") || c.includes("tarif") || c.includes("biaya") || c.includes("satuan (rp)") || c.includes("rate")
+        );
+
+        if (nameMatch !== -1 || (qtyMatch !== -1 && priceMatch !== -1)) {
+          headerRowIndex = r;
+          colNameIdx = nameMatch;
+          colQtyIdx = qtyMatch;
+          colPriceIdx = priceMatch;
+          colUnitIdx = strRow.findIndex((c: string) => c.includes("satuan") || c.includes("unit") || c.includes("uom"));
+          colDiscIdx = strRow.findIndex((c: string) => c.includes("diskon") || c.includes("discount") || c.includes("potongan"));
+          colDescIdx = strRow.findIndex((c: string) => c.includes("spek") || c.includes("spesifikasi") || c.includes("keterangan") || c.includes("catatan") || c.includes("detail"));
+          break;
+        }
+      }
+
+      // Fallback jika tidak ada baris header yang cocok
+      if (headerRowIndex === -1) {
+        headerRowIndex = 0;
+        colNameIdx = 0;
+        colQtyIdx = 1;
+        colUnitIdx = 2;
+        colPriceIdx = 3;
+        colDiscIdx = 4;
+        colDescIdx = 5;
+      } else {
+        if (colNameIdx === -1) colNameIdx = 1;
+        if (colQtyIdx === -1) colQtyIdx = 2;
+        if (colUnitIdx === -1) colUnitIdx = 3;
+        if (colPriceIdx === -1) colPriceIdx = 4;
+      }
+
+      const parsedItems: QuotationItem[] = [];
+      const dataRows = rows.slice(headerRowIndex + 1);
+
+      for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
+        if (!row || row.length === 0) continue;
+
+        const rawName = colNameIdx !== -1 && row[colNameIdx] !== undefined ? String(row[colNameIdx]).trim() : "";
+        if (!rawName) continue; // Lewati baris kosong tanpa nama
+
+        // Bersihkan Qty
+        let rawQty = colQtyIdx !== -1 && row[colQtyIdx] !== undefined ? String(row[colQtyIdx]).replace(/[^0-9.,]/g, "").replace(",", ".") : "1";
+        let qty = parseFloat(rawQty) || 1;
+        if (qty <= 0) qty = 1;
+
+        // Bersihkan Unit
+        let unit = colUnitIdx !== -1 && row[colUnitIdx] !== undefined ? String(row[colUnitIdx]).trim() : "Unit";
+        if (!unit) unit = "Unit";
+
+        // Bersihkan Harga
+        let rawPrice = colPriceIdx !== -1 && row[colPriceIdx] !== undefined ? String(row[colPriceIdx]).replace(/[^0-9]/g, "") : "0";
+        let price = parseInt(rawPrice, 10) || 0;
+
+        // Bersihkan Diskon
+        let rawDisc = colDiscIdx !== -1 && row[colDiscIdx] !== undefined ? String(row[colDiscIdx]).replace(/[^0-9]/g, "") : "0";
+        let discount = parseInt(rawDisc, 10) || 0;
+
+        // Bersihkan Deskripsi / Spek
+        let description = colDescIdx !== -1 && row[colDescIdx] !== undefined ? String(row[colDescIdx]).trim() : "";
+
+        // Auto-match dengan produk yang sudah ada di master produk jika nama cocok
+        const matchedProd = products.find(
+          (p) => p.name.trim().toLowerCase() === rawName.toLowerCase()
+        );
+
+        const total = Math.max(0, qty * price - discount);
+
+        parsedItems.push({
+          id: `imp_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+          productId: matchedProd?.id || "",
+          productName: rawName,
+          qty,
+          unit: unit || matchedProd?.unit || "Unit",
+          price: price > 0 ? price : (matchedProd?.price || 0),
+          discount,
+          total,
+          image: matchedProd?.image || "",
+          description: description || matchedProd?.desc || ""
+        });
+      }
+
+      if (parsedItems.length === 0) {
+        throw new Error("Tidak ada baris data barang / jasa yang berhasil dibaca. Pastikan format kolom sesuai.");
+      }
+
+      setImportExcelData(parsedItems);
+      setImportExcelFileName(file.name);
+    } catch (err: any) {
+      console.error("Gagal memproses berkas Excel:", err);
+      setImportExcelError(err?.message || "Gagal membaca berkas Excel. Pastikan format berkas valid.");
+    } finally {
+      setIsImportExcelProcessing(false);
+    }
+  };
+
+  // Terapkan Data Hasil Import ke Formulir SPH
+  const handleApplyImportExcel = () => {
+    if (importExcelData.length === 0) return;
+
+    if (importExcelTarget === "quotation") {
+      setQuotationForm((prev) => {
+        let newItems: QuotationItem[] = [];
+        if (importExcelMode === "replace") {
+          newItems = [...importExcelData];
+        } else {
+          // Buang baris pertama jika masih kosong bawaan form
+          const existingNonEmpty = prev.items.filter((it) => it.productName.trim() !== "");
+          newItems = [...existingNonEmpty, ...importExcelData];
+        }
+
+        return {
+          ...prev,
+          items: newItems
+        };
+      });
+    }
+
+    setIsImportExcelModalOpen(false);
+    const count = importExcelData.length;
+    setImportExcelData([]);
+    setImportExcelFileName("");
+    alert(`Berhasil mengimpor ${count} item barang/jasa ke dalam daftar penawaran SPH!`);
   };
 
   const handleClientSelectForQuotation = (clientId: string) => {
@@ -15916,7 +16163,16 @@ export default function AdminFinanceERPPage() {
                     <Package className="w-3.5 h-3.5 text-indigo-600" />
                     <span>Daftar Barang & Jasa Teknis ({quotationForm.items.length} Item)</span>
                   </label>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenImportExcelModal("quotation")}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-black text-xs shadow-sm transition-all cursor-pointer hover:scale-105 active:scale-95"
+                      title="Upload file Excel (.xlsx / .xls / .csv) untuk memasukkan ratusan item penawaran secara otomatis"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5" />
+                      <span>📥 Convert dari Excel</span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => handleOpenProductCatalogPicker("quotation")}
@@ -17265,23 +17521,45 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
-            {/* HALAMAN 2+: LAMPIRAN RINCIAN ITEM & SPESIFIKASI TEKNIS PENAWARAN (SPH) DENGAN PAGINASI RESMI */}
+            {/* HALAMAN 2+: LAMPIRAN RINCIAN ITEM & SPESIFIKASI TEKNIS PENAWARAN (SPH) DENGAN AUTO-FIT PAGINASI */}
             {(() => {
               const allItems = selectedQuotationForPrint.items || [];
-              const sphChunks: (typeof allItems)[] = [];
+              const sphChunks: { items: typeof allItems; startIndex: number }[] = [];
               if (allItems.length > 0) {
-                const page2Limit = 13;
-                sphChunks.push(allItems.slice(0, page2Limit));
-                for (let i = page2Limit; i < allItems.length; i += 15) {
-                  sphChunks.push(allItems.slice(i, i + 15));
+                const total = allItems.length;
+                if (total <= 18) {
+                  sphChunks.push({ items: allItems, startIndex: 0 });
+                } else {
+                  let remaining = [...allItems];
+                  let curIdx = 0;
+                  while (remaining.length > 0) {
+                    if (remaining.length <= 18) {
+                      sphChunks.push({ items: remaining, startIndex: curIdx });
+                      break;
+                    }
+                    if (remaining.length <= 26) {
+                      const half = Math.ceil(remaining.length / 2);
+                      const part1 = remaining.slice(0, half);
+                      const part2 = remaining.slice(half);
+                      sphChunks.push({ items: part1, startIndex: curIdx });
+                      curIdx += part1.length;
+                      sphChunks.push({ items: part2, startIndex: curIdx });
+                      break;
+                    }
+                    const chunkSlice = remaining.slice(0, 22);
+                    sphChunks.push({ items: chunkSlice, startIndex: curIdx });
+                    curIdx += chunkSlice.length;
+                    remaining = remaining.slice(22);
+                  }
                 }
               } else {
-                sphChunks.push([]);
+                sphChunks.push({ items: [], startIndex: 0 });
               }
 
-              return sphChunks.map((chunk, chunkIdx) => {
+              return sphChunks.map((chunkObj, chunkIdx) => {
+                const chunk = chunkObj.items;
                 const isLastChunk = chunkIdx === sphChunks.length - 1;
-                const startIdx = chunkIdx === 0 ? 0 : 13 + (chunkIdx - 1) * 15;
+                const startIdx = chunkObj.startIndex;
 
                 return (
                   <div
@@ -29890,6 +30168,269 @@ export default function AdminFinanceERPPage() {
           </div>
         </div>
       )}
+
+      {/* ====== MODAL IMPORT & CONVERT EXCEL SPH (Tugas 178) — z-[200] ====== */}
+      {isImportExcelModalOpen && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center p-4 overflow-y-auto"
+          style={{ background: "rgba(15,23,42,0.8)", backdropFilter: "blur(6px)" }}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between border-b border-indigo-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shadow-inner">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black tracking-tight flex items-center gap-2">
+                    <span>Convert & Import dari Excel / CSV</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                      SPH Penawaran
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-300 font-medium">
+                    Upload daftar ratusan material & jasa teknis sekaligus secara instan ke lembar penawaran
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsImportExcelModalOpen(false)}
+                className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1 text-slate-700 text-sm">
+              {/* Petunjuk & Download Template */}
+              <div className="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <p className="font-black text-indigo-950 text-xs flex items-center gap-1.5 uppercase tracking-wide">
+                    <span>Format Kolom Excel Standar</span>
+                  </p>
+                  <p className="text-xs text-indigo-800 leading-relaxed">
+                    Sistem otomatis mendeteksi kolom: <b>Nama Barang/Jasa</b>, <b>Qty</b>, <b>Satuan</b>, <b>Harga Satuan</b>, <b>Diskon</b>, dan <b>Spesifikasi</b>.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadQuotationExcelTemplate}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs shadow-md shadow-emerald-500/20 transition-all cursor-pointer whitespace-nowrap active:scale-95 shrink-0"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh Template Contoh (.xlsx)</span>
+                </button>
+              </div>
+
+              {/* Upload Dropzone */}
+              <div className="space-y-2">
+                <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+                  Pilih atau Drop Berkas Excel (.xlsx, .xls, .csv)
+                </label>
+                <div
+                  className="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-2xl p-6 text-center transition-all bg-slate-50/50 hover:bg-indigo-50/30 cursor-pointer relative group"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleProcessExcelUpload(file);
+                  }}
+                >
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls, .csv"
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleProcessExcelUpload(file);
+                    }}
+                  />
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-100 group-hover:bg-indigo-200 text-indigo-600 flex items-center justify-center transition-transform group-hover:scale-110">
+                      <UploadCloud className="w-6 h-6" />
+                    </div>
+                    {importExcelFileName ? (
+                      <div className="space-y-0.5">
+                        <p className="font-black text-slate-800 text-sm">{importExcelFileName}</p>
+                        <p className="text-xs text-emerald-600 font-bold">
+                          ✓ Berhasil dianalisis • {importExcelData.length} item ditemukan
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5">
+                        <p className="font-bold text-slate-700 text-xs">
+                          Klik untuk memilih berkas atau geser berkas Excel ke sini
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          Mendukung Microsoft Excel 97-2024 (.xlsx, .xls) dan CSV (.csv)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {importExcelError && (
+                <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium flex items-center gap-2">
+                  <span className="font-bold">⚠️ Gagal:</span>
+                  <span>{importExcelError}</span>
+                </div>
+              )}
+
+              {/* Mode Penggabungan */}
+              {importExcelData.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <label className="text-xs font-black text-slate-700 uppercase tracking-wider block">
+                    Metode Penambahan ke Daftar Item SPH
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label
+                      className={`p-3 rounded-2xl border-2 cursor-pointer flex items-center gap-3 transition-all ${
+                        importExcelMode === "append"
+                          ? "border-indigo-600 bg-indigo-50/50 shadow-xs"
+                          : "border-slate-200 hover:border-slate-300 bg-white"
+                      }`}
+                      onClick={() => setImportExcelMode("append")}
+                    >
+                      <input
+                        type="radio"
+                        name="importExcelMode"
+                        checked={importExcelMode === "append"}
+                        onChange={() => setImportExcelMode("append")}
+                        className="accent-indigo-600 w-4 h-4"
+                      />
+                      <div>
+                        <p className="font-black text-slate-800 text-xs">Tambahkan ke Item yang Sudah Ada</p>
+                        <p className="text-[11px] text-slate-500">
+                          Pertahankan baris item yang sebelumnya ada di form
+                        </p>
+                      </div>
+                    </label>
+
+                    <label
+                      className={`p-3 rounded-2xl border-2 cursor-pointer flex items-center gap-3 transition-all ${
+                        importExcelMode === "replace"
+                          ? "border-amber-600 bg-amber-50/50 shadow-xs"
+                          : "border-slate-200 hover:border-slate-300 bg-white"
+                      }`}
+                      onClick={() => setImportExcelMode("replace")}
+                    >
+                      <input
+                        type="radio"
+                        name="importExcelMode"
+                        checked={importExcelMode === "replace"}
+                        onChange={() => setImportExcelMode("replace")}
+                        className="accent-amber-600 w-4 h-4"
+                      />
+                      <div>
+                        <p className="font-black text-slate-800 text-xs">Gantikan Seluruh Daftar Item</p>
+                        <p className="text-[11px] text-slate-500">
+                          Hapus baris lama dan gunakan hanya data dari Excel ini
+                        </p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Preview Tabel Item Hasil Parsing */}
+              {importExcelData.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Preview Data ({importExcelData.length} Item Terbaca)</span>
+                    </p>
+                    <p className="text-xs text-slate-500 font-bold">
+                      Estimasi Subtotal:{" "}
+                      <span className="text-indigo-600 font-black">
+                        Rp{" "}
+                        {importExcelData
+                          .reduce((sum, it) => sum + it.total, 0)
+                          .toLocaleString("id-ID")}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-56 overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-100 text-slate-600 font-black uppercase text-[10px] sticky top-0 border-b border-slate-200">
+                        <tr>
+                          <th className="py-2 px-3 w-10 text-center">No</th>
+                          <th className="py-2 px-3">Nama Barang / Jasa</th>
+                          <th className="py-2 px-3 w-20 text-center">Qty / Satuan</th>
+                          <th className="py-2 px-3 w-28 text-right">Harga Satuan</th>
+                          <th className="py-2 px-3 w-28 text-right">Subtotal</th>
+                          <th className="py-2 px-3">Spesifikasi / Detail</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {importExcelData.map((item, idx) => (
+                          <tr key={item.id || idx} className="hover:bg-slate-50/80">
+                            <td className="py-1.5 px-3 text-center font-bold text-slate-400">
+                              {idx + 1}
+                            </td>
+                            <td className="py-1.5 px-3 font-bold text-slate-800">
+                              {item.productName}
+                            </td>
+                            <td className="py-1.5 px-3 text-center text-slate-600">
+                              {item.qty} {item.unit}
+                            </td>
+                            <td className="py-1.5 px-3 text-right font-medium text-slate-600">
+                              Rp {item.price.toLocaleString("id-ID")}
+                            </td>
+                            <td className="py-1.5 px-3 text-right font-bold text-slate-900">
+                              Rp {item.total.toLocaleString("id-ID")}
+                            </td>
+                            <td className="py-1.5 px-3 text-slate-500 truncate max-w-[200px]" title={item.description}>
+                              {item.description || "-"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setIsImportExcelModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={importExcelData.length === 0 || isImportExcelProcessing}
+                onClick={handleApplyImportExcel}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white font-black text-xs shadow-md shadow-indigo-500/25 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>
+                  {isImportExcelProcessing
+                    ? "Memproses Berkas..."
+                    : `Terapkan ${importExcelData.length} Item ke Formulir SPH`}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ====== MODAL KATALOG PICKER PRODUK — z-[200] tampil di atas semua modal ====== */}
       {isProductCatalogPickerOpen && (
         <div

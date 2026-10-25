@@ -203,13 +203,33 @@ export async function GET(req: Request) {
       };
     });
 
-    // Paginasi Lampiran SPH: Halaman 2 memuat maksimal 13 item, Halaman 3 dan seterusnya memuat 15 item
+    // Paginasi Cerdas Lampiran SPH (Auto-Fit Ukuran Kertas A4):
+    // Jika total item <= 18: muat seluruhnya di Halaman 2 bersama kotak rekapitulasi nilai tanpa pecah halaman.
+    // Jika total item > 18:
+    // - Halaman reguler (tanpa rekap) memuat hingga 22 item agar mengisi lembar A4 secara proporsional ke atas.
+    // - Halaman terakhir (dengan rekap nilai) memuat hingga 18 item.
+    // - Auto-balancing: jika sisa item 19-26 item, dibagi merata dua lembar agar halaman terakhir tidak jomplang/kosong.
     const itemChunks: any[][] = [];
     if (itemsWithImages.length > 0) {
-      const page2Limit = 13;
-      itemChunks.push(itemsWithImages.slice(0, page2Limit));
-      for (let i = page2Limit; i < itemsWithImages.length; i += 15) {
-        itemChunks.push(itemsWithImages.slice(i, i + 15));
+      const total = itemsWithImages.length;
+      if (total <= 18) {
+        itemChunks.push(itemsWithImages);
+      } else {
+        let remaining = [...itemsWithImages];
+        while (remaining.length > 0) {
+          if (remaining.length <= 18) {
+            itemChunks.push(remaining);
+            break;
+          }
+          if (remaining.length <= 26) {
+            const half = Math.ceil(remaining.length / 2);
+            itemChunks.push(remaining.slice(0, half));
+            itemChunks.push(remaining.slice(half));
+            break;
+          }
+          itemChunks.push(remaining.slice(0, 22));
+          remaining = remaining.slice(22);
+        }
       }
     }
 
@@ -239,9 +259,9 @@ export async function GET(req: Request) {
               border: none !important;
               margin: 0 !important;
               width: 210mm !important;
-              height: 297mm !important;
-              min-height: 297mm !important;
+              min-height: 296mm !important;
               max-height: 297mm !important;
+              height: auto !important;
               box-sizing: border-box !important;
               overflow: hidden !important;
               page-break-inside: avoid !important;
@@ -253,6 +273,13 @@ export async function GET(req: Request) {
             .print-sheet:last-of-type {
               page-break-after: avoid !important;
               break-after: avoid !important;
+            }
+            table {
+              page-break-inside: auto;
+            }
+            tr {
+              page-break-inside: avoid !important;
+              break-inside: avoid !important;
             }
           }
           .letterhead-bg {
@@ -603,8 +630,11 @@ export async function GET(req: Request) {
                 </thead>
                 <tbody class="divide-y divide-slate-200">
                   ${chunk.map((item: any, cIdx: number) => {
-                    const startIdx = chunkIdx === 0 ? 0 : 13 + (chunkIdx - 1) * 15;
-                    const globalIdx = startIdx + cIdx + 1;
+                    let itemOffset = 0;
+                    for (let ci = 0; ci < chunkIdx; ci++) {
+                      itemOffset += itemChunks[ci].length;
+                    }
+                    const globalIdx = itemOffset + cIdx + 1;
                     return `
                     <tr class="hover:bg-slate-50/50">
                       <td class="border border-slate-300 p-1 text-center font-bold text-slate-500 text-[10px]">${globalIdx}</td>
