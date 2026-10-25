@@ -349,7 +349,7 @@ export async function POST(req: Request) {
       category = "B2B Industri",
       projectTitle,
       estimatedValue = 0,
-      stage = "NEW_LEAD",
+      stage = "NEW",
       probability = 30,
       source = "Website / Chat WA",
       assignedTo = "RAMADHANI ST",

@@ -21,6 +21,8 @@ export const metadata: Metadata = {
   },
 };
 
+import AIChatWidget from "@/components/AIChatWidget";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,7 +33,10 @@ export default function RootLayout({
       lang="id"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased scroll-smooth`}
     >
-      <body className="min-h-full flex flex-col overflow-x-hidden selection:bg-red-600 selection:text-white">{children}</body>
+      <body className="min-h-full flex flex-col overflow-x-hidden selection:bg-red-600 selection:text-white">
+        {children}
+        <AIChatWidget />
+      </body>
     </html>
   );
 }

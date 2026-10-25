@@ -80,6 +80,9 @@ export interface SiteSettingsData {
   npwp: string;
   whatsapp: string;
   whatsappDisplay: string;
+  whatsappSales?: string;
+  whatsappTechnical?: string;
+  whatsappComplaint?: string;
   email: string;
   emailSupport: string;
   phone: string;
@@ -109,6 +112,9 @@ export default function AdminSettingsPage() {
     npwp: "01.234.567.8-417.000",
     whatsapp: "6282259494242",
     whatsappDisplay: "+62 822-5949-4242",
+    whatsappSales: "6282259494242",
+    whatsappTechnical: "6282259494242",
+    whatsappComplaint: "6282259494242",
     email: "cs@dstechsmart.com",
     emailSupport: "support@dstechsmart.com",
     phone: "0822-5949-4242",
@@ -849,6 +855,59 @@ export default function AdminSettingsPage() {
                     onChange={(e) => setSettings({ ...settings, whatsappDisplay: e.target.value })}
                     className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:border-dstech-blue"
                   />
+                </div>
+
+                {/* Sub-Section: WhatsApp Khusus Handover AI Chat Departemen */}
+                <div className="sm:col-span-2 pt-3 border-t border-slate-100">
+                  <p className="text-xs font-black uppercase text-dstech-blue tracking-wider mb-1">
+                    🤖 Jalur Handover WhatsApp AI Chat Per Departemen:
+                  </p>
+                  <p className="text-xs text-slate-500 mb-3">
+                    Ketika AI Chatbot Dani selesai menyaring kebutuhan pengunjung, chat akan langsung diteruskan ke nomor WhatsApp tim departemen yang sesuai:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-2xl bg-blue-50/50 border border-blue-100">
+                      <label className="block text-[11px] font-black text-blue-900 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                        1. Tim Support Sales &amp; SPH
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.whatsappSales || ""}
+                        onChange={(e) => setSettings({ ...settings, whatsappSales: e.target.value })}
+                        placeholder="Contoh: 6282259494242"
+                        className="w-full px-3 py-2 text-xs bg-white border border-blue-200 rounded-xl font-mono font-bold text-slate-900 focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-amber-50/50 border border-amber-100">
+                      <label className="block text-[11px] font-black text-amber-900 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                        2. Tim Teknikal Maintenance
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.whatsappTechnical || ""}
+                        onChange={(e) => setSettings({ ...settings, whatsappTechnical: e.target.value })}
+                        placeholder="Contoh: 6282259494242"
+                        className="w-full px-3 py-2 text-xs bg-white border border-amber-200 rounded-xl font-mono font-bold text-slate-900 focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-rose-50/50 border border-rose-100">
+                      <label className="block text-[11px] font-black text-rose-900 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+                        3. Tim Penanganan Komplain
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.whatsappComplaint || ""}
+                        onChange={(e) => setSettings({ ...settings, whatsappComplaint: e.target.value })}
+                        placeholder="Contoh: 6282259494242"
+                        className="w-full px-3 py-2 text-xs bg-white border border-rose-200 rounded-xl font-mono font-bold text-slate-900 focus:ring-2 focus:ring-rose-500"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>

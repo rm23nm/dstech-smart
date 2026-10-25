@@ -26,19 +26,30 @@ export async function POST() {
     // Format data untuk SmartPro (akun admin)
     const payload = {
       secret: MASTER_SECRET,
-      leads: leads.map((l: any) => ({
-        id: l.id,
-        leadNumber: l.leadNumber,
-        name: l.clientName + (l.company ? ` (${l.company})` : ""),
-        phone: l.phone,
-        email: l.email || "",
-        category: l.category,
-        projectTitle: l.projectTitle,
-        value: Number(l.estimatedValue) || 0,
-        status: l.stage,
-        source: l.source || "Website DSTech",
-        notes: `[CRM DSTech #${l.leadNumber}] ${l.projectTitle} - Lokasi: ${l.location || "-"} - Estimasi: Rp ${(l.estimatedValue || 0).toLocaleString("id-ID")}\nCatatan: ${l.notes || "-"}`,
-      })),
+      leads: leads.map((l: any) => {
+        let mappedStatus = l.stage || "NEW";
+        let mappedTeam = l.team || "SALES";
+        if (mappedStatus === "NEW_LEAD") mappedStatus = "NEW";
+        if (mappedStatus === "QUALIFIED") mappedStatus = "FOLLOW_UP";
+        if (mappedStatus === "PROPOSAL_SENT") mappedStatus = "NEGOTIATION";
+        if (mappedStatus === "SUPPORT") mappedTeam = "SUPPORT";
+        if (mappedStatus === "COMPLAINT") mappedTeam = "COMPLAINT";
+
+        return {
+          id: l.id,
+          leadNumber: l.leadNumber,
+          name: l.clientName + (l.company ? ` (${l.company})` : ""),
+          phone: l.phone,
+          email: l.email || "",
+          category: l.category,
+          projectTitle: l.projectTitle,
+          value: Number(l.estimatedValue) || 0,
+          status: mappedStatus,
+          team: mappedTeam,
+          source: l.source || "Website DSTech AI Chat",
+          notes: `[CRM DSTech #${l.leadNumber}] ${l.projectTitle} - Lokasi: ${l.location || "-"} - Estimasi: Rp ${(l.estimatedValue || 0).toLocaleString("id-ID")}\nCatatan: ${l.notes || "-"}`,
+        };
+      }),
     };
 
     const res = await fetch(`${SMARTPRO_URL}/api/external/sync-crm-leads`, {

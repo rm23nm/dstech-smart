@@ -56,7 +56,8 @@ export interface Lead {
   category: string;
   projectTitle: string;
   estimatedValue: number;
-  stage: "NEW_LEAD" | "QUALIFIED" | "PROPOSAL_SENT" | "NEGOTIATION" | "WON" | "LOST";
+  stage: "NEW" | "FOLLOW_UP" | "NEGOTIATION" | "SUPPORT" | "COMPLAINT" | "WON" | "LOST" | "NEW_LEAD" | "QUALIFIED" | "PROPOSAL_SENT";
+  team?: "SALES" | "SUPPORT" | "COMPLAINT" | "COMMERCIAL";
   probability: number;
   source: string;
   assignedTo: string;
@@ -81,13 +82,14 @@ interface CrmMetrics {
   avgDealSize: number;
 }
 
-const STAGES = [
-  { id: "NEW_LEAD", label: "1. Prospek Baru", color: "border-sky-500 bg-sky-50/40 text-sky-900", badge: "bg-sky-100 text-sky-800" },
-  { id: "QUALIFIED", label: "2. Kualifikasi & Survey", color: "border-blue-500 bg-blue-50/40 text-blue-900", badge: "bg-blue-100 text-blue-800" },
-  { id: "PROPOSAL_SENT", label: "3. Penawaran SPH Terkirim", color: "border-amber-500 bg-amber-50/40 text-amber-900", badge: "bg-amber-100 text-amber-900" },
-  { id: "NEGOTIATION", label: "4. Negosiasi Kontrak", color: "border-purple-500 bg-purple-50/40 text-purple-900", badge: "bg-purple-100 text-purple-900" },
-  { id: "WON", label: "5. Closing (Deal Berhasil)", color: "border-emerald-500 bg-emerald-50/40 text-emerald-900", badge: "bg-emerald-100 text-emerald-800" },
-  { id: "LOST", label: "6. Batal / Lost", color: "border-slate-300 bg-slate-50/40 text-slate-700", badge: "bg-slate-200 text-slate-700" },
+const STAGES: { id: string; aliases: string[]; label: string; color: string; badge: string }[] = [
+  { id: "NEW", aliases: ["NEW", "NEW_LEAD"], label: "1. Leads Masuk (Screening)", color: "border-sky-500 bg-sky-50/40 text-sky-900", badge: "bg-sky-100 text-sky-800" },
+  { id: "FOLLOW_UP", aliases: ["FOLLOW_UP", "QUALIFIED"], label: "2. Ditangani AI (Kualifikasi)", color: "border-blue-500 bg-blue-50/40 text-blue-900", badge: "bg-blue-100 text-blue-800" },
+  { id: "NEGOTIATION", aliases: ["NEGOTIATION", "PROPOSAL_SENT"], label: "3. Tim Support Sales & SPH", color: "border-indigo-500 bg-indigo-50/40 text-indigo-900", badge: "bg-indigo-100 text-indigo-900" },
+  { id: "SUPPORT", aliases: ["SUPPORT"], label: "4. Tim Teknikal Maintenance", color: "border-amber-500 bg-amber-50/40 text-amber-900", badge: "bg-amber-100 text-amber-900" },
+  { id: "COMPLAINT", aliases: ["COMPLAINT"], label: "5. Tim Penanganan Komplain", color: "border-rose-500 bg-rose-50/40 text-rose-900", badge: "bg-rose-100 text-rose-900" },
+  { id: "WON", aliases: ["WON", "CLOSED_WON"], label: "6. Closing (Deal Berhasil)", color: "border-emerald-500 bg-emerald-50/40 text-emerald-900", badge: "bg-emerald-100 text-emerald-800" },
+  { id: "LOST", aliases: ["LOST", "CLOSED_LOST"], label: "7. Batal / Lost", color: "border-slate-300 bg-slate-50/40 text-slate-700", badge: "bg-slate-200 text-slate-700" },
 ];
 
 const CATEGORIES = [
@@ -133,7 +135,7 @@ export default function AdminCrmPage() {
     category: "B2B Industri",
     projectTitle: "",
     estimatedValue: 0,
-    stage: "NEW_LEAD",
+    stage: "NEW",
     probability: 30,
     source: "Website / Chat WA",
     assignedTo: "RAMADHANI ST",
@@ -559,9 +561,9 @@ export default function AdminCrmPage() {
 
       {/* MODE TAMPILAN 1: KANBAN PIPELINE BOARD */}
       {viewMode === "kanban" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 overflow-x-auto pb-4 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3.5 overflow-x-auto pb-4 items-start">
           {STAGES.map((st) => {
-            const stageLeads = leads.filter((l) => l.stage === st.id);
+            const stageLeads = leads.filter((l) => st.aliases.includes(l.stage) || l.stage === st.id);
             const stageValue = stageLeads.reduce((acc, l) => acc + (Number(l.estimatedValue) || 0), 0);
 
             return (
