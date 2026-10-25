@@ -4969,6 +4969,28 @@
 
 ---
 
+### 175. Tugas: Penyesuaian Format Tabel Rincian SPH dengan Kolom Gambar Produk di Samping Nomor Item (Dashboard & Print Route)
+- **Permintaan Pengguna**:
+  - *"untuk rincian buat seperti ini saja, namun disamping nanti buat gambar setelah nomor item"* (Menyertakan screenshot tabel Lampiran SPH Halaman 2 yang memuat No, Deskripsi Produk & Spesifikasi, Qty, Satuan, Harga Satuan, dan Total).
+- **Status**: 🟡 **SEDANG DIKERJAKAN**
+- **Analisis & Rencana Solusi**:
+  1. Pengguna menginginkan tabel rincian penawaran harga SPH diformat persis seperti tabel Lampiran SPH resmi (header tabel biru gelap / indigo-950, perataan rapi, kolom kuantiti, satuan, harga satuan, diskon opsional, dan total nilai), dengan penambahan kolom **Foto / Gambar Produk** tepat setelah kolom **No** (`No` -> `Gambar Produk` -> `Deskripsi Produk & Spesifikasi Teknis` -> `Qty` -> `Satuan` -> `Harga Satuan` -> `Total`).
+  2. Penyesuaian ini diterapkan secara konsisten pada dua lokasi:
+     - **Modal Cetak SPH Dashboard** (`src/app/admin/finance/page.tsx`): Baik di lembar utama penawaran maupun lampiran.
+     - **Halaman Cetak / Unduh PDF Publik** (`src/app/api/finance/print/route.ts`): Pada lembar penawaran SPH resmi (`doc=sph`).
+  3. Mengambil foto thumbnail dari field `item.image` atau dicocokkan otomatis ke katalog produk (`products.find(...)`) dengan fallback gambar placeholder perangkat keamanan yang elegan.
+- **Rencana Kerja Step-by-Step**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 175 di `LAPORAN_PROGRES.md`.
+  2. [ ] **Langkah 2**: Buat folder cadangan sementara `_backup_sph_table_format/` dan cadangkan `src/app/admin/finance/page.tsx` serta `src/app/api/finance/print/route.ts`.
+  3. [ ] **Langkah 3**: Perbarui tabel rincian SPH pada modal cetak dashboard (`src/app/admin/finance/page.tsx`) dengan menyisipkan kolom Gambar Produk setelah kolom Nomor item.
+  4. [ ] **Langkah 4**: Perbarui tabel rincian SPH pada template cetak publik (`src/app/api/finance/print/route.ts`) agar menyertakan kolom Gambar Produk setelah nomor item dan merapikan header kop resmi.
+  5. [ ] **Langkah 5**: Validasi kompilasi lokal `npm run build` di `dstech-smart` (wajib 100% lulus tanpa error).
+  6. [ ] **Langkah 6**: Bersihkan folder cadangan sementara `_backup_sph_table_format/`.
+  7. [ ] **Langkah 7**: Push commit ke GitHub repository via `push_with_native_git.js` dan deploy ke live server VPS via `deploy_live.js`.
+  8. [ ] **Langkah 8**: Berikan laporan dan konfirmasi hasil tampilan kepada pengguna.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
