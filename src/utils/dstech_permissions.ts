@@ -42,6 +42,13 @@ export const DSTECH_SYSTEM_MENUS: MenuItemConfig[] = [
     desc: "Faktur Penjualan, SPH, PO Supplier, Retur, Arus Kas & Laba Rugi",
   },
   {
+    id: "crm",
+    name: "CRM & Prospek Klien",
+    category: "Keuangan",
+    path: "/admin/crm",
+    desc: "Pipeline penjualan leads, Kanban prospek, aktivitas klien & deal closing",
+  },
+  {
     id: "maintenance",
     name: "Jadwal & Maintenance",
     category: "Operasional",

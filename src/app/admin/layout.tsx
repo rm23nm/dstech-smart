@@ -30,6 +30,7 @@ import {
   Banknote,
   ShoppingBag,
   Mail,
+  Target,
 } from "lucide-react";
 import { checkUserPermission } from "@/utils/dstech_permissions";
 
@@ -53,6 +54,7 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Jadwal & Tiket Maintenance", category: "Operasional", url: "/admin/maintenance", desc: "Kelola jadwal kunjungan rutin, servis darurat CCTV, dan penugasan teknisi lapangan" },
   { title: "Surat Tugas & BAST Maintenance", category: "Operasional", url: "/admin/maintenance", desc: "Cetak Berita Acara Kunjungan Pemeliharaan & SPK Teknisi ber-Kop Surat DSTech" },
   { title: "Keuangan & ERP Dashboard", category: "Keuangan", url: "/admin/finance", desc: "Ringkasan finansial, omset penjualan, pembelian PO, laba rugi, dan arus kas" },
+  { title: "CRM & Prospek Klien", category: "Keuangan", url: "/admin/crm", desc: "Pipeline penjualan leads, Kanban prospek, aktivitas meeting/survey & deal closing" },
   { title: "Faktur & Penjualan", category: "Keuangan", url: "/admin/finance", desc: "Kelola faktur penjualan, status pelunasan, PPN, dan cetak invoice resmi" },
   { title: "Pembelian & Purchase Order (PO)", category: "Keuangan", url: "/admin/finance", desc: "Kelola pesanan pembelian material ke supplier dan status hutang" },
   { title: "Retur Penjualan & Pembelian", category: "Keuangan", url: "/admin/finance", desc: "Kelola klaim retur barang garansi pelanggan dan retur supplier" },
@@ -209,6 +211,13 @@ export default function AdminLayout({
       href: "/admin/finance",
       icon: Scale,
       active: pathname.startsWith("/admin/finance"),
+    },
+    {
+      id: "crm",
+      label: "CRM & Prospek Klien",
+      href: "/admin/crm",
+      icon: Target,
+      active: pathname.startsWith("/admin/crm"),
     },
     {
       id: "maintenance",
