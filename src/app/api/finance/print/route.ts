@@ -311,16 +311,8 @@ export async function GET(req: Request) {
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100">
-              <input
-                type="checkbox"
-                id="toggle-letterhead"
-                ${letterheadEnabled ? 'checked' : ''}
-                onchange="toggleLetterhead(this.checked)"
-                class="w-4 h-4 text-indigo-600 rounded cursor-pointer"
-              />
-              <span>Kop Surat Resmi</span>
-            </label>
+            <!-- Kop Surat Resmi Terkunci Permanen untuk Klien -->
+            <input type="hidden" id="toggle-letterhead" value="1" checked />
 
             <button
               type="button"
@@ -340,7 +332,8 @@ export async function GET(req: Request) {
         </div>
         
         <!-- WRAPPER DOKUMEN CETAK SPH -->
-        <div id="sph-f        <!-- LEMBAR 1: SURAT PENGANTAR PENAWARAN HARGA -->
+        <div id="sph-full-document" class="w-full overflow-x-auto pb-6">
+        <!-- LEMBAR 1: SURAT PENGANTAR PENAWARAN HARGA -->
         <div
           id="print-sheet-sph"
           class="print-sheet print-page-break relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8"
@@ -760,8 +753,15 @@ export async function GET(req: Request) {
             const opt = {
               margin:       0,
               filename:     '${documentTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf',
-              image:        { type: 'jpeg', quality: 0.85 },
-              html2canvas:  { scale: 2, useCORS: true },
+              image:        { type: 'jpeg', quality: 0.95 },
+              html2canvas:  {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                windowWidth: 1024,
+                scrollX: 0,
+                scrollY: 0
+              },
               jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
               pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
             };
@@ -890,16 +890,8 @@ export async function GET(req: Request) {
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <label class="flex items-center gap-1.5 cursor-pointer bg-slate-800 border border-slate-700 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 hover:bg-slate-700 transition">
-              <input
-                type="checkbox"
-                id="toggle-letterhead"
-                ${letterheadEnabled ? 'checked' : ''}
-                onchange="toggleLetterhead(this.checked)"
-                class="w-4 h-4 text-amber-500 rounded cursor-pointer"
-              />
-              <span>Kop Surat Resmi</span>
-            </label>
+            <!-- Kop Surat Resmi Terkunci Permanen untuk Klien -->
+            <input type="hidden" id="toggle-letterhead" value="1" checked />
             <button onclick="window.print()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition">
               🖨️ Cetak Lembar A4
             </button>
@@ -1887,17 +1879,8 @@ export async function GET(req: Request) {
             </div>
           ` : ''}
 
-          <!-- Toggle Kop Gambar Resmi (Tersedia untuk semua dokumen termasuk Kuitansi) -->
-          <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 shadow-2xs">
-            <input
-              type="checkbox"
-              id="toggle-letterhead"
-              ${letterheadEnabled ? 'checked' : ''}
-              onchange="toggleLetterhead(this.checked)"
-              class="w-4 h-4 text-indigo-600 rounded cursor-pointer"
-            />
-            <span>Kop Gambar Resmi</span>
-          </label>
+          <!-- Kop Surat Gambar Resmi Terkunci Permanen untuk Klien -->
+          <input type="hidden" id="toggle-letterhead" value="1" checked />
 
           <button
             type="button"
@@ -2200,7 +2183,14 @@ export async function GET(req: Request) {
             margin:       0,
             filename:     '${documentTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf',
             image:        { type: 'jpeg', quality: 0.95 },
-            html2canvas:  { scale: 2, useCORS: true },
+            html2canvas:  {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+              windowWidth: 1024,
+              scrollX: 0,
+              scrollY: 0
+            },
             jsPDF:        { unit: 'mm', format: jsPdfFormat, orientation: jsPdfOrientation }
           };
           html2pdf().set(opt).from(element).save();
