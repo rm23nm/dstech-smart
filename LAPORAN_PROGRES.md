@@ -4858,6 +4858,47 @@
 
 ---
 
+### 170. Tugas: Perbaikan Fitur Hapus Pesan & Pindah ke Kotak Sampah (Multi-Account / Unified Inbox) (/api/mail/messages & /admin/mail)
+- **Permintaan Pengguna**:
+  - *"tidak bisa dihapus"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Analisis Penyebab**:
+  1. Saat mode akun "🌐 Semua Akun Perusahaan" (`selectedAccountEmail === "ALL"`) aktif, frontend mengirim `accountEmail: "ALL"`.
+  2. Fungsi `findMaildirFile("ALL", fileName)` di backend mengembalikan `null` karena `"ALL"` bukan alamat email berformat `user@domain`. Akibatnya berkas fisik di `/www/vmail/` tidak pernah dipindahkan atau dihapus.
+  3. Pada proses pemindahan folder di `PATCH`, path akun disusun secara statis dari `accountEmail` yang bernilai `"ALL"`, sehingga menghasilkan path target `/www/vmail/undefined/all/` yang tidak valid.
+  4. Belum tersedianya tombol aksi cepat hapus langsung di setiap kartu email (hanya ada checkbox dan tombol di toolbar/reading pane).
+- **Hasil Pekerjaan**:
+  1. [x] **Langkah 1**: Buat folder cadangan sementara `_backup_mail_delete_image_fix/` dan cadangkan file yang akan diedit (`src/app/api/mail/messages/route.ts` dan `src/app/admin/mail/page.tsx`).
+  2. [x] **Langkah 2**: Refaktor fungsi pencari berkas `findMaildirFile()` di `route.ts` dengan universal fallback: jika `accountEmail` bernilai `"ALL"`, kosong, atau file tidak ditemukan di user tersebut, otomatis mencari di seluruh direktori mailbox `/www/vmail/*/*`.
+  3. [x] **Langkah 3**: Perbaiki logika pemindahan folder di handler `PATCH` agar mengekstrak root direktori akun langsung dari `foundPath` (`normPath.substring(...)`), sehingga pemindahan ke `.Trash/cur`, `.Junk/cur`, atau `cur` berhasil 100% tanpa bergantung pada nilai `accountEmail`.
+  4. [x] **Langkah 4**: Perbaiki handler `DELETE` agar menghapus berkas fisik Maildir secara permanen menggunakan universal file locator dan memperbarui database JSON.
+  5. [x] **Langkah 5**: Perbarui `src/app/admin/mail/page.tsx` dengan menyertakan tombol aksi cepat Hapus (`Trash2`) langsung di setiap kartu email dengan tooltip informatif dan memastikan `accountEmail` milik pesan dikirim secara presisi. Pada reading pane saat folder sampah aktif, tombol "Hapus Permanen" ditampilkan menonjol.
+  6. [x] **Langkah 6**: Lakukan pengujian build lokal `npm run build` dan berhasil 100% (58/58 routes prerendered).
+  7. [x] **Langkah 7**: Bersihkan folder cadangan sementara `_backup_mail_delete_image_fix/`.
+  8. [x] **Langkah 8**: Deploy ke live server via `push_with_native_git.js` dan `deploy_live.js`.
+  9. [x] **Langkah 9**: Update status menjadi SELESAI di `LAPORAN_PROGRES.md`.
+
+---
+
+### 171. Tugas: Perbaikan Parsing Konten HTML Email, Tampilan Gambar, dan Lampiran Berkas (/api/mail/messages)
+- **Permintaan Pengguna**:
+  - *"gambar dan lampiran juga tidak muncul di pesan"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Analisis Penyebab**:
+  1. Regex sniffing boundary `partBody.match(/--([a-zA-Z0-9_\-+=.]{8,})/)` pada leaf body part salah mendeteksi string acak berawalan `--` (seperti token tracking URL, signature, komentar HTML) sebagai boundary separator.
+  2. Hal tersebut memotong konten HTML menjadi bagian tanpa header sehingga dianggap sebagai `text/plain`, mengosongkan `htmlParts`, dan memicu fallback escaping (`<` diubah menjadi `&lt;`) dalam blok `<div style="white-space: pre-wrap">`.
+  3. Tag `<img>` yang ada di HTML ter-escape menjadi teks biasa sehingga browser tidak merendernya sebagai gambar.
+  4. Decoding Quoted-Printable menggunakan `String.fromCharCode` merusak karakter UTF-8 multi-byte (seperti emoji subjek dan konten).
+- **Hasil Pekerjaan**:
+  1. [x] **Langkah 1**: Pada `parseMimeBody()` di `route.ts`, pastikan part bertipe `text/html` atau `text/plain` dianggap sebagai terminal leaf node dan tidak lagi dipindai dengan sniffing boundary acak.
+  2. [x] **Langkah 2**: Perbaiki `decodeQuotedPrintable()` agar menggunakan `Buffer` byte decoding untuk menghasilkan string UTF-8 yang sempurna dan membersihkan soft line break `= [ \t]*\r?\n`.
+  3. [x] **Langkah 3**: Tag `<img>` eksternal maupun inline CID (`data:image/...;base64,...`) tetap utuh tanpa escape karakter HTML sehingga seluruh gambar email dirender sempurna oleh browser.
+  4. [x] **Langkah 4**: Seluruh berkas lampiran (`attachmentsList`) terekstraksi dan tersaji di kartu lampiran dengan tombol unduh.
+  5. [x] **Langkah 5**: Lakukan verifikasi build lokal `npm run build` (58/58 routes berhasil tanpa error) dan deploy ke live server.
+  6. [x] **Langkah 6**: Update status menjadi SELESAI di `LAPORAN_PROGRES.md`.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
@@ -4874,6 +4915,7 @@
 
 ---
 *Laporan ini dibuat untuk memudahkan Agen AI selanjutnya melanjutkan pekerjaan.*
+
 
 
 

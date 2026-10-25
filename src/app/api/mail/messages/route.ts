@@ -151,15 +151,18 @@ function parseMimeHeader(raw: string): string {
 
 function decodeQuotedPrintable(str: string): string {
   if (!str) return "";
-  const noSoft = str.replace(/=\r?\n/g, "").replace(/=\r/g, "");
+  const noSoft = str.replace(/=[ \t]*\r?\n/g, "").replace(/=\r/g, "");
   try {
-    return noSoft.replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => {
-      try {
-        return String.fromCharCode(parseInt(hex, 16));
-      } catch {
-        return _;
+    const bytes: number[] = [];
+    for (let i = 0; i < noSoft.length; i++) {
+      if (noSoft[i] === "=" && /^[0-9A-Fa-f]{2}$/.test(noSoft.substr(i + 1, 2))) {
+        bytes.push(parseInt(noSoft.substr(i + 1, 2), 16));
+        i += 2;
+      } else {
+        bytes.push(noSoft.charCodeAt(i));
       }
-    });
+    }
+    return Buffer.from(bytes).toString("utf-8");
   } catch {
     return noSoft;
   }
@@ -237,6 +240,11 @@ function parseMimeBody(
     const cDisp = partHeaders["content-disposition"] || "";
     const cId = (partHeaders["content-id"] || "").replace(/[<>]/g, "").trim();
 
+    const isImage = cType.toLowerCase().startsWith("image/");
+    const isAttachment =
+      cDisp.toLowerCase().includes("attachment") ||
+      (!cType.toLowerCase().includes("text/") && !cType.toLowerCase().includes("multipart/"));
+
     const innerBoundary = extractBoundary(cType);
 
     if (innerBoundary && partBody.includes("--" + innerBoundary)) {
@@ -244,9 +252,13 @@ function parseMimeBody(
       for (const sp of subParts) {
         processPart(sp, cEncoding);
       }
-    } else {
-      const anyBoundary = partBody.match(/--([a-zA-Z0-9_\-+=.]{8,})/);
-      if (anyBoundary && anyBoundary[1] && partBody.includes("--" + anyBoundary[1])) {
+      return;
+    }
+
+    // Hanya sniffing boundary jika part bertipe multipart (jangan potong leaf text/html atau text/plain)
+    if (cType.toLowerCase().includes("multipart/")) {
+      const anyBoundary = partBody.match(/(?:\r?\n|^)--([a-zA-Z0-9_\-+=.]{8,})(?:\r?\n|--)/);
+      if (anyBoundary && anyBoundary[1] && partBody.split("--" + anyBoundary[1]).length > 2) {
         const discoveredBoundary = anyBoundary[1];
         const subParts = partBody.split("--" + discoveredBoundary);
         for (const sp of subParts) {
@@ -254,55 +266,50 @@ function parseMimeBody(
         }
         return;
       }
+    }
 
-      let cleanedLeafBody = partBody.replace(/--[a-zA-Z0-9_\-+=.]+--?/g, "").trim();
+    let cleanedLeafBody = partBody.replace(/--[a-zA-Z0-9_\-+=.]+--?/g, "").trim();
 
-      // Ekstraksi nama berkas
-      let fileName = "";
-      const fnMatch = cDisp.match(/filename="?([^";\r\n]+)"?/i) || cType.match(/name="?([^";\r\n]+)"?/i);
-      if (fnMatch) fileName = parseMimeHeader(fnMatch[1].trim());
+    // Ekstraksi nama berkas
+    let fileName = "";
+    const fnMatch = cDisp.match(/filename="?([^";\r\n]+)"?/i) || cType.match(/name="?([^";\r\n]+)"?/i);
+    if (fnMatch) fileName = parseMimeHeader(fnMatch[1].trim());
 
-      const isImage = cType.toLowerCase().startsWith("image/");
-      const isAttachment =
-        cDisp.toLowerCase().includes("attachment") ||
-        (!cType.toLowerCase().includes("text/") && !cType.toLowerCase().includes("multipart/"));
+    // Jika bertipe gambar atau berkas lampiran
+    if (isImage || isAttachment) {
+      const mime = cType.split(";")[0].toLowerCase().trim() || (isImage ? "image/png" : "application/octet-stream");
+      const cleanB64 = cleanedLeafBody.replace(/[\r\n\s]/g, "");
+      const isBase64 = cEncoding.toLowerCase() === "base64" || /^[A-Za-z0-9+/=]+$/.test(cleanB64);
+      const dataUrl = isBase64
+        ? `data:${mime};base64,${cleanB64}`
+        : `data:${mime};charset=utf-8,${encodeURIComponent(cleanedLeafBody)}`;
 
-      // Jika bertipe gambar atau berkas lampiran
-      if (isImage || isAttachment) {
-        const mime = cType.split(";")[0].toLowerCase().trim() || (isImage ? "image/png" : "application/octet-stream");
-        const cleanB64 = cleanedLeafBody.replace(/[\r\n\s]/g, "");
-        const isBase64 = cEncoding.toLowerCase() === "base64" || /^[A-Za-z0-9+/=]+$/.test(cleanB64);
-        const dataUrl = isBase64
-          ? `data:${mime};base64,${cleanB64}`
-          : `data:${mime};charset=utf-8,${encodeURIComponent(cleanedLeafBody)}`;
-
-        if (cId) {
-          inlineImages.set(cId.toLowerCase(), dataUrl);
-          const atIdx = cId.indexOf("@");
-          if (atIdx > 0) {
-            inlineImages.set(cId.substring(0, atIdx).toLowerCase(), dataUrl);
-          }
+      if (cId) {
+        inlineImages.set(cId.toLowerCase(), dataUrl);
+        const atIdx = cId.indexOf("@");
+        if (atIdx > 0) {
+          inlineImages.set(cId.substring(0, atIdx).toLowerCase(), dataUrl);
         }
-        if (fileName) {
-          inlineImages.set(fileName.toLowerCase(), dataUrl);
-        }
-
-        attachmentsList.push({
-          name: fileName || (cId ? `${cId}.png` : `lampiran_${attachmentsList.length + 1}${isImage ? ".png" : ""}`),
-          size: Math.round(cleanB64.length * 0.75),
-          type: mime,
-          dataUrl,
-        });
-        return;
+      }
+      if (fileName) {
+        inlineImages.set(fileName.toLowerCase(), dataUrl);
       }
 
-      const decoded = decodePartPayload(cleanedLeafBody, cEncoding);
+      attachmentsList.push({
+        name: fileName || (cId ? `${cId}.png` : `lampiran_${attachmentsList.length + 1}${isImage ? ".png" : ""}`),
+        size: Math.round(cleanB64.length * 0.75),
+        type: mime,
+        dataUrl,
+      });
+      return;
+    }
 
-      if (cType.toLowerCase().includes("text/html")) {
-        htmlParts.push(decoded);
-      } else if (cType.toLowerCase().includes("text/plain")) {
-        textParts.push(decoded);
-      }
+    const decoded = decodePartPayload(cleanedLeafBody, cEncoding);
+
+    if (cType.toLowerCase().includes("text/html")) {
+      htmlParts.push(decoded);
+    } else if (cType.toLowerCase().includes("text/plain")) {
+      textParts.push(decoded);
     }
   };
 
@@ -311,8 +318,8 @@ function parseMimeBody(
     for (const part of parts) {
       processPart(part, topEncoding);
     }
-  } else {
-    const anyBoundary = rawBody.match(/--([a-zA-Z0-9_\-+=.]{8,})/);
+  } else if (topContentType.toLowerCase().includes("multipart/")) {
+    const anyBoundary = rawBody.match(/(?:\r?\n|^)--([a-zA-Z0-9_\-+=.]{8,})(?:\r?\n|--)/);
     if (anyBoundary && anyBoundary[1] && rawBody.split("--" + anyBoundary[1]).length > 2) {
       const detectedBoundary = anyBoundary[1];
       const parts = rawBody.split("--" + detectedBoundary);
@@ -327,12 +334,19 @@ function parseMimeBody(
         textParts.push(decoded);
       }
     }
+  } else {
+    const decoded = decodePartPayload(rawBody.trim(), topEncoding);
+    if (topContentType.toLowerCase().includes("text/html")) {
+      htmlParts.push(decoded);
+    } else {
+      textParts.push(decoded);
+    }
   }
 
   let cleanText = textParts.filter(Boolean).join("\n\n").trim();
   let cleanHtml = htmlParts.filter(Boolean).join("<hr/>").trim();
 
-  // Gantukan referensi CID gambar inline dengan Data URL Base64 yang sesuai
+  // Gantikan referensi CID gambar inline dengan Data URL Base64 yang sesuai
   if (cleanHtml && inlineImages.size > 0) {
     cleanHtml = cleanHtml.replace(/src=["']cid:([^"'\s>]+)["']/gi, (fullMatch, cidVal) => {
       const cleanCid = cidVal.replace(/[<>]/g, "").trim().toLowerCase();
@@ -635,28 +649,58 @@ export async function GET(request: Request) {
 function findMaildirFile(accountEmail: string, fileName: string): string | null {
   const vmailRoot = "/www/vmail";
   if (!fs.existsSync(vmailRoot)) return null;
-  const [u, d] = (accountEmail || "").toLowerCase().trim().split("@");
-  if (!u || !d) return null;
-  const accDir = path.join(vmailRoot, d, u);
-  if (!fs.existsSync(accDir)) return null;
 
-  const candidateDirs = [
-    path.join(accDir, "new"),
-    path.join(accDir, "cur"),
-    path.join(accDir, ".Trash", "new"),
-    path.join(accDir, ".Trash", "cur"),
-    path.join(accDir, ".Junk", "new"),
-    path.join(accDir, ".Junk", "cur"),
-    path.join(accDir, ".Sent", "new"),
-    path.join(accDir, ".Sent", "cur"),
+  const candidateRelativeDirs = [
+    "new",
+    "cur",
+    path.join(".Trash", "new"),
+    path.join(".Trash", "cur"),
+    path.join(".Junk", "new"),
+    path.join(".Junk", "cur"),
+    path.join(".Sent", "new"),
+    path.join(".Sent", "cur"),
   ];
 
-  for (const cDir of candidateDirs) {
-    if (fs.existsSync(cDir)) {
-      const p = path.join(cDir, fileName);
-      if (fs.existsSync(p)) return p;
+  // 1. Coba cari di akun yang spesifik jika akun valid
+  if (accountEmail && accountEmail.includes("@") && accountEmail.toUpperCase() !== "ALL") {
+    const [u, d] = accountEmail.toLowerCase().trim().split("@");
+    if (u && d) {
+      const accDir = path.join(vmailRoot, d, u);
+      if (fs.existsSync(accDir)) {
+        for (const rel of candidateRelativeDirs) {
+          const cDir = path.join(accDir, rel);
+          if (fs.existsSync(cDir)) {
+            const p = path.join(cDir, fileName);
+            if (fs.existsSync(p)) return p;
+          }
+        }
+      }
     }
   }
+
+  // 2. Universal fallback: cari di seluruh domain dan user jika accountEmail="ALL" atau belum ketemu
+  try {
+    const domains = fs.readdirSync(vmailRoot);
+    for (const d of domains) {
+      const dPath = path.join(vmailRoot, d);
+      if (fs.statSync(dPath).isDirectory() && d.includes(".")) {
+        const users = fs.readdirSync(dPath);
+        for (const u of users) {
+          const accDir = path.join(dPath, u);
+          if (fs.statSync(accDir).isDirectory() && !u.startsWith(".")) {
+            for (const rel of candidateRelativeDirs) {
+              const cDir = path.join(accDir, rel);
+              if (fs.existsSync(cDir)) {
+                const p = path.join(cDir, fileName);
+                if (fs.existsSync(p)) return p;
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch {}
+
   return null;
 }
 
@@ -682,28 +726,38 @@ export async function PATCH(request: Request) {
         const fileName = currentId.replace("maildir_", "");
         const foundPath = findMaildirFile(accountEmail || "", fileName);
         if (foundPath) {
-          const [u, d] = (accountEmail || "").toLowerCase().trim().split("@");
-          const accDir = path.join("/www/vmail", d, u);
-          let targetDir = path.join(accDir, "cur");
-
-          if (folder === "trash") {
-            targetDir = path.join(accDir, ".Trash", "cur");
-          } else if (folder === "spam") {
-            targetDir = path.join(accDir, ".Junk", "cur");
-          } else if (folder === "sent") {
-            targetDir = path.join(accDir, ".Sent", "cur");
-          } else {
-            targetDir = path.join(accDir, "cur");
+          // Cari root mailbox user direktori (/www/vmail/{domain}/{user})
+          const normPath = foundPath.replace(/\\/g, "/");
+          const vmailIdx = normPath.indexOf("/www/vmail/");
+          let accDir = "";
+          if (vmailIdx !== -1) {
+            const relParts = normPath.substring(vmailIdx + "/www/vmail/".length).split("/");
+            if (relParts.length >= 2) {
+              accDir = path.join("/www/vmail", relParts[0], relParts[1]);
+            }
           }
 
-          try {
-            fs.mkdirSync(targetDir, { recursive: true });
-            const destPath = path.join(targetDir, fileName);
-            if (foundPath !== destPath) {
-              fs.renameSync(foundPath, destPath);
+          if (accDir && fs.existsSync(accDir)) {
+            let targetDir = path.join(accDir, "cur");
+            if (folder === "trash") {
+              targetDir = path.join(accDir, ".Trash", "cur");
+            } else if (folder === "spam") {
+              targetDir = path.join(accDir, ".Junk", "cur");
+            } else if (folder === "sent") {
+              targetDir = path.join(accDir, ".Sent", "cur");
+            } else {
+              targetDir = path.join(accDir, "cur");
             }
-          } catch (moveErr) {
-            console.warn("Could not move physical maildir file:", moveErr);
+
+            try {
+              fs.mkdirSync(targetDir, { recursive: true });
+              const destPath = path.join(targetDir, fileName);
+              if (foundPath !== destPath) {
+                fs.renameSync(foundPath, destPath);
+              }
+            } catch (moveErr) {
+              console.warn("Could not move physical maildir file:", moveErr);
+            }
           }
         }
       }
@@ -806,27 +860,7 @@ export async function DELETE(request: Request) {
     for (const currentId of targetIds) {
       if (currentId.startsWith("maildir_")) {
         const fileName = currentId.replace("maildir_", "");
-        let foundPath = findMaildirFile(accountEmail || "", fileName);
-
-        if (!foundPath && fs.existsSync("/www/vmail")) {
-          try {
-            const domains = fs.readdirSync("/www/vmail");
-            for (const d of domains) {
-              const dPath = path.join("/www/vmail", d);
-              if (fs.statSync(dPath).isDirectory() && d.includes(".")) {
-                const users = fs.readdirSync(dPath);
-                for (const u of users) {
-                  const p = findMaildirFile(`${u}@${d}`, fileName);
-                  if (p) {
-                    foundPath = p;
-                    break;
-                  }
-                }
-              }
-              if (foundPath) break;
-            }
-          } catch {}
-        }
+        const foundPath = findMaildirFile(accountEmail || "", fileName);
 
         if (foundPath && fs.existsSync(foundPath)) {
           try {

@@ -299,15 +299,20 @@ export default function AdminMailPage() {
     }
   };
 
-  const handleDeletePermanent = async (msgId: string) => {
+  const handleDeletePermanent = async (msgId: string, accountEmail?: string) => {
     if (!confirm("Hapus pesan ini secara permanen dari server? Tindakan ini tidak dapat dibatalkan.")) return;
     try {
-      const res = await fetch(`/api/mail/messages?id=${encodeURIComponent(msgId)}&accountEmail=${encodeURIComponent(selectedAccountEmail)}`, { method: "DELETE" });
+      const acc = accountEmail || selectedAccountEmail;
+      const res = await fetch(`/api/mail/messages?id=${encodeURIComponent(msgId)}&accountEmail=${encodeURIComponent(acc)}`, { method: "DELETE" });
       const json = await res.json();
       if (json.success) {
         showAlert("success", "Pesan berhasil dihapus permanen dari server.");
-        setSelectedMessage(null);
+        if (selectedMessage?.id === msgId) {
+          setSelectedMessage(null);
+        }
         fetchMessages();
+      } else {
+        showAlert("error", json.message || "Gagal menghapus pesan.");
       }
     } catch (err) {
       showAlert("error", "Gagal menghapus pesan.");
@@ -1144,9 +1149,26 @@ export default function AdminMailPage() {
                                 <span className="w-2 h-2 rounded-full bg-indigo-600 inline-block" />
                               )}
                             </div>
-                            <span className="font-mono text-[9px] text-slate-400">
-                              {msg.date.split(" ")[1] || ""}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-[9px] text-slate-400">
+                                {msg.date.split(" ")[1] || ""}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (currentFolder === "trash") {
+                                    handleDeletePermanent(msg.id, msg.accountEmail);
+                                  } else {
+                                    handleMoveToTrash(msg, e);
+                                  }
+                                }}
+                                className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                title={currentFolder === "trash" ? "Hapus Permanen Pesan Ini" : "Pindahkan ke Kotak Sampah"}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1182,13 +1204,24 @@ export default function AdminMailPage() {
                     >
                       <Check className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={() => handleMoveToTrash(selectedMessage)}
-                      className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 cursor-pointer"
-                      title="Pindahkan ke Sampah"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {selectedMessage.folder === "trash" ? (
+                      <button
+                        onClick={() => handleDeletePermanent(selectedMessage.id, selectedMessage.accountEmail)}
+                        className="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                        title="Hapus Permanen Pesan Ini dari Server"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Hapus Permanen</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleMoveToTrash(selectedMessage)}
+                        className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 cursor-pointer"
+                        title="Pindahkan ke Kotak Sampah"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
 
                     {/* Tombol Tindakan Spam */}
                     {selectedMessage.isSpam || selectedMessage.folder === "spam" ? (
@@ -1207,15 +1240,6 @@ export default function AdminMailPage() {
                         title="Tandai Sebagai Spam & Pindahkan ke Folder Spam"
                       >
                         <ShieldAlert className="w-4 h-4 text-rose-500" />
-                      </button>
-                    )}
-
-                    {selectedMessage.folder === "trash" && (
-                      <button
-                        onClick={() => handleDeletePermanent(selectedMessage.id)}
-                        className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold cursor-pointer"
-                      >
-                        Hapus Permanen
                       </button>
                     )}
                   </div>
