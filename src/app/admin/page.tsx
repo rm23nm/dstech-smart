@@ -29,6 +29,22 @@ import {
   X,
   Sparkles,
   User,
+  ShoppingBag,
+  FolderTree,
+  FolderKanban,
+  FileDown,
+  BookOpen,
+  Wrench,
+  Warehouse,
+  FileSignature,
+  Banknote,
+  Mail,
+  Settings,
+  UserCog,
+  Briefcase,
+  Truck,
+  Shield,
+  Layers,
 } from "lucide-react";
 
 interface ProductItem {
@@ -711,6 +727,400 @@ export default function AdminDashboard() {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* PUSAT PINTAS OPERASIONAL & MENU CEPAT SISTEM */}
+      <div className="p-8 sm:p-10 rounded-[48px] bg-white border border-slate-200/90 shadow-sm space-y-8">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-black uppercase tracking-wider mb-2">
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+              <span>Pusat Kendali Pintas Operasional</span>
+            </div>
+            <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              Akses Cepat Modul &amp; Fitur Penting
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 max-w-3xl">
+              Buka formulir, penerbitan dokumen, pencatatan transaksi, dan kelola operasional PT. DSTech Smart Perkasa secara langsung dalam 1 klik.
+            </p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <a
+              href="/admin/finance"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all shadow-md shadow-indigo-600/20 active:scale-95"
+            >
+              <span>Dashboard Keuangan</span>
+              <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
+        </div>
+
+        {/* 4 Kluster Kategori Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          {/* Kluster 1: Finansial, ERP & Transaksi */}
+          <div className="p-6 rounded-3xl bg-slate-50/70 border border-slate-200/80 flex flex-col justify-between space-y-5 hover:border-indigo-300 transition-all">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Scale className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-900 text-sm leading-tight">Keuangan &amp; ERP</h4>
+                  <span className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider">Faktur, SPH &amp; Kas</span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-bold">8 Menu</span>
+            </div>
+
+            <div className="space-y-2">
+              <a
+                href="/admin/finance?tab=quotations"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-indigo-50 border border-slate-200/70 hover:border-indigo-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FileText className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-indigo-900">Surat Penawaran (SPH)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-indigo-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/finance?tab=sales"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200/70 hover:border-emerald-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Receipt className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-emerald-900">Faktur Penjualan (Invoice)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-emerald-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/finance?tab=purchases"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-blue-50 border border-slate-200/70 hover:border-blue-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <ShoppingCart className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-blue-900">Purchase Order (PO Supplier)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-blue-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/finance?tab=pl_report"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-purple-50 border border-slate-200/70 hover:border-purple-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Scale className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-purple-900">Laporan Laba Rugi (P&amp;L)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-purple-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/finance?tab=cash_flow"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-cyan-50 border border-slate-200/70 hover:border-cyan-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Wallet className="w-4 h-4 text-cyan-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-cyan-900">Buku Arus Kas (Bank &amp; Tunai)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-cyan-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/finance?tab=clients"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-teal-50 border border-slate-200/70 hover:border-teal-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Users className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-teal-900">Daftar Klien &amp; PIC</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-teal-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/finance?tab=suppliers"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-amber-50 border border-slate-200/70 hover:border-amber-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-amber-900">Daftar Supplier &amp; Rekanan</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-amber-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/finance?tab=returns"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-rose-50 border border-slate-200/70 hover:border-rose-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <RotateCcw className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-rose-900">Retur Barang &amp; Garansi</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-rose-600">Buka &rarr;</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Kluster 2: Katalog Produk, Gudang & E-Commerce */}
+          <div className="p-6 rounded-3xl bg-slate-50/70 border border-slate-200/80 flex flex-col justify-between space-y-5 hover:border-emerald-300 transition-all">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-900 text-sm leading-tight">Produk &amp; Gudang</h4>
+                  <span className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Inventori &amp; Toko</span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">6 Menu</span>
+            </div>
+
+            <div className="space-y-2">
+              <a
+                href="/admin/products"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200/70 hover:border-emerald-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Package className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-emerald-900">Katalog Produk &amp; Stok</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-emerald-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/categories"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-teal-50 border border-slate-200/70 hover:border-teal-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FolderTree className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-teal-900">Kategori &amp; Sub-Kategori</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-teal-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/finance?tab=warehouses"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-blue-50 border border-slate-200/70 hover:border-blue-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Warehouse className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-blue-900">Multi-Gudang &amp; Cabang</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-blue-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/orders"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-purple-50 border border-slate-200/70 hover:border-purple-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <ShoppingBag className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-purple-900">Pesanan Online (E-Store)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-purple-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/promotions"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-amber-50 border border-slate-200/70 hover:border-amber-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FileDown className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-amber-900">Materi Promosi &amp; Katalog PDF</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-amber-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/portfolios"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-indigo-50 border border-slate-200/70 hover:border-indigo-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FolderKanban className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-indigo-900">Portofolio Proyek &amp; Video</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-indigo-600">Buka &rarr;</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Kluster 3: SDM, Teknisi & Operasional Lapangan */}
+          <div className="p-6 rounded-3xl bg-slate-50/70 border border-slate-200/80 flex flex-col justify-between space-y-5 hover:border-amber-300 transition-all">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs">
+                  <CalendarCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-900 text-sm leading-tight">SDM &amp; Lapangan</h4>
+                  <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">Presensi, Gaji &amp; SOP</span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">6 Menu</span>
+            </div>
+
+            <div className="space-y-2">
+              <a
+                href="/admin/attendance"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-amber-50 border border-slate-200/70 hover:border-amber-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <CalendarCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-amber-900">Rekap Presensi &amp; GPS Maps</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-amber-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/payroll"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200/70 hover:border-emerald-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Banknote className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-emerald-900">Penggajian &amp; Slip Gaji</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-emerald-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/contracts"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-blue-50 border border-slate-200/70 hover:border-blue-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <FileSignature className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-blue-900">Kontrak Kerja (PKWT/PKWTT)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-blue-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/maintenance"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-orange-50 border border-slate-200/70 hover:border-orange-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Wrench className="w-4 h-4 text-orange-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-orange-900">Tiket Maintenance &amp; Servis</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-orange-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/kms"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-teal-50 border border-slate-200/70 hover:border-teal-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <BookOpen className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-teal-900">Portal KMS &amp; Panduan K3</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-teal-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/partners"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-purple-50 border border-slate-200/70 hover:border-purple-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Users className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-purple-900">Mitra Afiliasi &amp; Komisi</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-purple-600">Buka &rarr;</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Kluster 4: Komunikasi, Administrasi & Pengaturan */}
+          <div className="p-6 rounded-3xl bg-slate-50/70 border border-slate-200/80 flex flex-col justify-between space-y-5 hover:border-purple-300 transition-all">
+            <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-xs">
+                  <Settings className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-900 text-sm leading-tight">Sistem &amp; Komunikasi</h4>
+                  <span className="text-[10px] text-purple-700 font-bold uppercase tracking-wider">Email, User &amp; Setting</span>
+                </div>
+              </div>
+              <span className="px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-bold">6 Menu</span>
+            </div>
+
+            <div className="space-y-2">
+              <a
+                href="/admin/mail"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-purple-50 border border-slate-200/70 hover:border-purple-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Mail className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-purple-900">Webmail &amp; Inbox Perusahaan</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-purple-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/users"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-indigo-50 border border-slate-200/70 hover:border-indigo-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <UserCog className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-indigo-900">Manajemen Pengguna &amp; Akses</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-indigo-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/admin/settings"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-blue-50 border border-slate-200/70 hover:border-blue-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Settings className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-blue-900">Pengaturan PT &amp; Rekening</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-blue-600">Buka &rarr;</span>
+              </a>
+
+              <a
+                href="/shop"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200/70 hover:border-emerald-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <ShoppingBag className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-emerald-900">Lihat Toko Online (/shop)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-emerald-600">Tab Baru &rarr;</span>
+              </a>
+
+              <a
+                href="/employee"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-amber-50 border border-slate-200/70 hover:border-amber-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Briefcase className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-amber-900">Portal Teknisi (/employee)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-amber-600">Tab Baru &rarr;</span>
+              </a>
+
+              <a
+                href="/affiliate"
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between p-2.5 rounded-xl bg-white hover:bg-teal-50 border border-slate-200/70 hover:border-teal-300 text-slate-800 transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Users className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span className="text-xs font-bold group-hover:text-teal-900">Portal Mitra (/affiliate)</span>
+                </div>
+                <span className="text-[9.5px] font-bold text-slate-400 group-hover:text-teal-600">Tab Baru &rarr;</span>
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Finance & ERP Quick Command Center */}
