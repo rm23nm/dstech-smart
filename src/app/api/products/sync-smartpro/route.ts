@@ -11,13 +11,25 @@ const MASTER_SECRET = process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026"
 
 export async function POST() {
   try {
-    if (!fs.existsSync(PRODUCTS_FILE)) {
-      return NextResponse.json({ success: false, error: "Database produk tidak ditemukan" }, { status: 404 });
+    let products: any[] = [];
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      const content = fs.readFileSync(PRODUCTS_FILE, "utf-8");
+      try {
+        const parsed = JSON.parse(content);
+        products = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.products) ? parsed.products : []);
+      } catch (e) {
+        console.error("Gagal parse dstech_products.json:", e);
+      }
     }
 
-    const content = fs.readFileSync(PRODUCTS_FILE, "utf-8");
-    const parsed = JSON.parse(content);
-    const products = Array.isArray(parsed.products) ? parsed.products : [];
+    if (products.length === 0) {
+      // Fallback: ambil produk via endpoint lokal internal atau default
+      const resLocal = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "https://dstechsmart.com"}/api/products`);
+      if (resLocal.ok) {
+        const j = await resLocal.json();
+        if (j.success && Array.isArray(j.data)) products = j.data;
+      }
+    }
 
     if (products.length === 0) {
       return NextResponse.json({ success: false, error: "Tidak ada produk untuk disinkronkan" }, { status: 400 });
