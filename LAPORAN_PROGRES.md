@@ -4838,6 +4838,26 @@
 
 ---
 
+### 169. Tugas: Dukungan Menampilkan Gambar Inline (CID / Content-ID) dan Pratinjau Lampiran Gambar/Berkas (/api/mail/messages & /admin/mail)
+- **Permintaan Pengguna**:
+  - *"untuk gambar tidak bisa muncul ya?"*
+- **Status**: ✅ **SELESAI (100% SUKSES DIVERIFIKASI & DIDEPLOY KE LIVE VPS)**
+- **Hasil Pekerjaan**:
+  1. [x] **Langkah 1**: Buat folder cadangan sementara `_backup_image_display/` dan salin file yang akan dimodifikasi (`src/app/api/mail/messages/route.ts` dan `src/app/admin/mail/page.tsx`).
+  2. [x] **Langkah 2**: Memperbarui parser MIME di `src/app/api/mail/messages/route.ts`:
+     - Ekstraksi bagian MIME bertipe `image/*` maupun berkas lampiran dengan membaca `Content-ID` (CID), nama berkas, ukuran, dan konversi payload Base64 ke Data URL (`data:image/...;base64,...`).
+     - Penggantian referensi `src="cid:..."` pada `cleanHtml` secara otomatis dengan Data URL gambar yang bersesuaian sehingga gambar inline (tanda tangan, tangkapan layar, logo, dsb.) langsung tampil utuh di badan email.
+     - Mengumpulkan seluruh berkas lampiran ke properti `attachmentsList` pada objek pesan `MailMessage`.
+  3. [x] **Langkah 3**: Memperbarui Reading Pane di `src/app/admin/mail/page.tsx`:
+     - Menambahkan aturan CSS responsif `.email-content-rendered img` (`max-width: 100%`, `height: auto`, `border-radius: 8px`) agar gambar tidak meluap ke luar kontainer pembacaan.
+     - Menambahkan seksi kartu **"Lampiran Berkas / Gambar"** di bawah pesan lengkap dengan thumbnail pratinjau gambar, nama berkas, ukuran KB, dan tombol **Unduh** berkas langsung.
+  4. [x] **Langkah 4**: Uji kompilasi dengan `npm run build` lokal dan berhasil 100% (58/58 routes prerendered).
+  5. [x] **Langkah 5**: Hapus folder cadangan sementara `_backup_image_display/` setelah verifikasi berhasil.
+  6. [x] **Langkah 6**: Push commit ke GitHub via `push_with_native_git.js` dan jalankan `deploy_live.js` ke live VPS aaPanel.
+  7. [x] **Langkah 7**: Update status di `LAPORAN_PROGRES.md`.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.

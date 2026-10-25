@@ -51,6 +51,13 @@ interface MailAccount {
   description?: string;
 }
 
+interface MailAttachmentItem {
+  name: string;
+  size: number;
+  type: string;
+  dataUrl?: string;
+}
+
 interface MailMessage {
   id: string;
   accountEmail: string;
@@ -65,6 +72,7 @@ interface MailMessage {
   isRead: boolean;
   isStarred: boolean;
   hasAttachments?: boolean;
+  attachmentsList?: MailAttachmentItem[];
   isSpam?: boolean;
   spamScore?: number;
   spamReason?: string;
@@ -1288,11 +1296,76 @@ export default function AdminMailPage() {
                 </div>
 
                 {/* Konten Isi Email (Rendered HTML) */}
-                <div className="flex-1 p-4 rounded-2xl bg-white border border-slate-200 overflow-y-auto max-h-[380px] text-xs text-slate-800 leading-relaxed space-y-2 shadow-2xs">
+                <div className="flex-1 p-4 rounded-2xl bg-white border border-slate-200 overflow-y-auto max-h-[420px] text-xs text-slate-800 leading-relaxed space-y-3 shadow-2xs">
+                  <style>{`
+                    .email-content-rendered img {
+                      max-width: 100% !important;
+                      height: auto !important;
+                      display: inline-block;
+                      border-radius: 8px;
+                      margin: 8px 0;
+                    }
+                    .email-content-rendered table {
+                      max-width: 100% !important;
+                      border-collapse: collapse;
+                    }
+                  `}</style>
                   <div
                     dangerouslySetInnerHTML={{ __html: selectedMessage.bodyHtml }}
-                    className="prose prose-sm max-w-none"
+                    className="email-content-rendered prose prose-sm max-w-none"
                   />
+
+                  {/* Lampiran Berkas / Gambar jika ada */}
+                  {selectedMessage.attachmentsList && selectedMessage.attachmentsList.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
+                      <p className="text-[11px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <Paperclip className="w-3.5 h-3.5 text-indigo-600" />
+                        Lampiran Berkas ({selectedMessage.attachmentsList.length}):
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selectedMessage.attachmentsList.map((att, idx) => {
+                          const isImg = att.type.startsWith("image/");
+                          return (
+                            <div
+                              key={idx}
+                              className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2 text-xs hover:border-indigo-200 transition-colors"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {isImg && att.dataUrl ? (
+                                  <img
+                                    src={att.dataUrl}
+                                    alt={att.name}
+                                    className="w-9 h-9 rounded-lg object-cover border border-slate-200 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center shrink-0">
+                                    <FileText className="w-4 h-4 text-indigo-600" />
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="font-bold text-slate-800 truncate text-[11px]">
+                                    {att.name}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400">
+                                    {(att.size / 1024).toFixed(1)} KB
+                                  </p>
+                                </div>
+                              </div>
+                              {att.dataUrl && (
+                                <a
+                                  href={att.dataUrl}
+                                  download={att.name}
+                                  className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-[10px] shrink-0 cursor-pointer shadow-xs transition-colors"
+                                >
+                                  Unduh
+                                </a>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Form Balas Cepat di Bawah */}

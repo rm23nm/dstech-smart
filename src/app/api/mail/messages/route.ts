@@ -4,6 +4,13 @@ import path from "path";
 
 const messagesFilePath = path.join(process.cwd(), "src", "data", "dstech_mail_messages.json");
 
+interface MailAttachment {
+  name: string;
+  size: number;
+  type: string;
+  dataUrl?: string;
+}
+
 interface MailMessage {
   id: string;
   accountEmail: string;
@@ -18,6 +25,7 @@ interface MailMessage {
   isRead: boolean;
   isStarred: boolean;
   hasAttachments?: boolean;
+  attachmentsList?: MailAttachment[];
   isSpam?: boolean;
   spamScore?: number;
   spamReason?: string;
@@ -186,9 +194,11 @@ function extractBoundary(contentTypeHeader?: string): string | null {
 function parseMimeBody(
   headers: Record<string, string>,
   rawBody: string
-): { cleanText: string; cleanHtml: string } {
+): { cleanText: string; cleanHtml: string; attachmentsList: MailAttachment[] } {
   let textParts: string[] = [];
   let htmlParts: string[] = [];
+  const inlineImages = new Map<string, string>();
+  const attachmentsList: MailAttachment[] = [];
 
   const topContentType = headers["content-type"] || "text/plain";
   const topEncoding = headers["content-transfer-encoding"] || "";
@@ -224,6 +234,9 @@ function parseMimeBody(
 
     const cType = partHeaders["content-type"] || "text/plain";
     const cEncoding = partHeaders["content-transfer-encoding"] || fallbackEncoding || "";
+    const cDisp = partHeaders["content-disposition"] || "";
+    const cId = (partHeaders["content-id"] || "").replace(/[<>]/g, "").trim();
+
     const innerBoundary = extractBoundary(cType);
 
     if (innerBoundary && partBody.includes("--" + innerBoundary)) {
@@ -243,13 +256,51 @@ function parseMimeBody(
       }
 
       let cleanedLeafBody = partBody.replace(/--[a-zA-Z0-9_\-+=.]+--?/g, "").trim();
+
+      // Ekstraksi nama berkas
+      let fileName = "";
+      const fnMatch = cDisp.match(/filename="?([^";\r\n]+)"?/i) || cType.match(/name="?([^";\r\n]+)"?/i);
+      if (fnMatch) fileName = parseMimeHeader(fnMatch[1].trim());
+
+      const isImage = cType.toLowerCase().startsWith("image/");
+      const isAttachment =
+        cDisp.toLowerCase().includes("attachment") ||
+        (!cType.toLowerCase().includes("text/") && !cType.toLowerCase().includes("multipart/"));
+
+      // Jika bertipe gambar atau berkas lampiran
+      if (isImage || isAttachment) {
+        const mime = cType.split(";")[0].toLowerCase().trim() || (isImage ? "image/png" : "application/octet-stream");
+        const cleanB64 = cleanedLeafBody.replace(/[\r\n\s]/g, "");
+        const isBase64 = cEncoding.toLowerCase() === "base64" || /^[A-Za-z0-9+/=]+$/.test(cleanB64);
+        const dataUrl = isBase64
+          ? `data:${mime};base64,${cleanB64}`
+          : `data:${mime};charset=utf-8,${encodeURIComponent(cleanedLeafBody)}`;
+
+        if (cId) {
+          inlineImages.set(cId.toLowerCase(), dataUrl);
+          const atIdx = cId.indexOf("@");
+          if (atIdx > 0) {
+            inlineImages.set(cId.substring(0, atIdx).toLowerCase(), dataUrl);
+          }
+        }
+        if (fileName) {
+          inlineImages.set(fileName.toLowerCase(), dataUrl);
+        }
+
+        attachmentsList.push({
+          name: fileName || (cId ? `${cId}.png` : `lampiran_${attachmentsList.length + 1}${isImage ? ".png" : ""}`),
+          size: Math.round(cleanB64.length * 0.75),
+          type: mime,
+          dataUrl,
+        });
+        return;
+      }
+
       const decoded = decodePartPayload(cleanedLeafBody, cEncoding);
 
       if (cType.toLowerCase().includes("text/html")) {
         htmlParts.push(decoded);
       } else if (cType.toLowerCase().includes("text/plain")) {
-        textParts.push(decoded);
-      } else if (!cType.toLowerCase().includes("image/") && !cType.toLowerCase().includes("application/")) {
         textParts.push(decoded);
       }
     }
@@ -281,6 +332,21 @@ function parseMimeBody(
   let cleanText = textParts.filter(Boolean).join("\n\n").trim();
   let cleanHtml = htmlParts.filter(Boolean).join("<hr/>").trim();
 
+  // Gantukan referensi CID gambar inline dengan Data URL Base64 yang sesuai
+  if (cleanHtml && inlineImages.size > 0) {
+    cleanHtml = cleanHtml.replace(/src=["']cid:([^"'\s>]+)["']/gi, (fullMatch, cidVal) => {
+      const cleanCid = cidVal.replace(/[<>]/g, "").trim().toLowerCase();
+      if (inlineImages.has(cleanCid)) {
+        return `src="${inlineImages.get(cleanCid)}"`;
+      }
+      const atIdx = cleanCid.indexOf("@");
+      if (atIdx > 0 && inlineImages.has(cleanCid.substring(0, atIdx))) {
+        return `src="${inlineImages.get(cleanCid.substring(0, atIdx))}"`;
+      }
+      return fullMatch;
+    });
+  }
+
   if (!cleanText && cleanHtml) {
     cleanText = cleanHtml
       .replace(/<style[\s\S]*?<\/style>/gi, "")
@@ -298,7 +364,7 @@ function parseMimeBody(
     cleanHtml = cleanHtml.replace(/<script[\s\S]*?<\/script>/gi, "");
   }
 
-  return { cleanText, cleanHtml };
+  return { cleanText, cleanHtml, attachmentsList };
 }
 
 function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox" | "sent" | "trash" | "spam", isNew: boolean): MailMessage | null {
@@ -332,7 +398,7 @@ function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox
       fromEmail = fromMatch[2].trim();
     }
 
-    const { cleanText, cleanHtml } = parseMimeBody(headers, rawBody);
+    const { cleanText, cleanHtml, attachmentsList } = parseMimeBody(headers, rawBody);
     const snippet = (cleanText || "").replace(/\s+/g, " ").trim().substring(0, 160) || "(Tidak ada ringkasan teks)";
     const dateStr = headers["date"] || new Date().toISOString();
     const subject = parseMimeHeader(headers["subject"] || "(Tanpa Subjek)");
@@ -361,7 +427,8 @@ function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox
       date: dateStr,
       isRead: !isNew,
       isStarred: false,
-      hasAttachments: !!headers["content-type"]?.includes("multipart/mixed"),
+      hasAttachments: attachmentsList.length > 0 || !!headers["content-type"]?.includes("multipart/mixed"),
+      attachmentsList: attachmentsList.length > 0 ? attachmentsList : undefined,
       isSpam: spamCheck.isSpam,
       spamScore: spamCheck.spamScore,
       spamReason: spamCheck.spamReason,
