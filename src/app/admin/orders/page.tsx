@@ -59,6 +59,17 @@ interface TimelineItem {
   timestamp: string;
 }
 
+interface ComplaintData {
+  category: string;
+  description: string;
+  expectedSolution: string;
+  proofImage?: string | null;
+  status: "OPEN" | "IN_PROGRESS" | "RESOLVED";
+  submittedAt: string;
+  resolvedAt?: string | null;
+  adminNotes?: string;
+}
+
 interface Order {
   id: string;
   orderNumber: string;
@@ -83,6 +94,8 @@ interface Order {
   subtotal: number;
   grandTotal: number;
   status: "PAYMENT_PENDING" | "PAID" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "RETURN";
+  hasComplaint?: boolean;
+  complaint?: ComplaintData;
   trackingTimeline: TimelineItem[];
   createdAt: string;
   updatedAt: string;
@@ -106,6 +119,44 @@ export default function AdminOrdersPage() {
   const [actionNote, setActionNote] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Tanggapan Komplain
+  const [complaintAdminNotes, setComplaintAdminNotes] = useState<string>("");
+  const [isResolvingComplaint, setIsResolvingComplaint] = useState<boolean>(false);
+
+  const handleResolveComplaint = async (orderId: string, status: "IN_PROGRESS" | "RESOLVED") => {
+    setIsResolvingComplaint(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: orderId,
+          action: "resolve_complaint",
+          complaintStatus: status,
+          note:
+            complaintAdminNotes.trim() ||
+            (status === "RESOLVED"
+              ? "Komplain telah berhasil diselesaikan oleh Customer Support."
+              : "Komplain sedang dalam penanganan oleh Customer Support."),
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        showToast(
+          `✓ Status komplain berhasil diubah menjadi: ${status === "RESOLVED" ? "Selesai" : "Sedang Diproses"}!`
+        );
+        setSelectedOrder(data.data);
+        fetchOrders();
+      } else {
+        alert("Gagal update komplain: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Error update komplain: " + err.message);
+    } finally {
+      setIsResolvingComplaint(false);
+    }
+  };
 
   useEffect(() => {
     fetchOrders();
@@ -164,16 +215,19 @@ export default function AdminOrdersPage() {
   const deliveredCount = orders.filter((o) => o.status === "DELIVERED").length;
   const cancelledCount = orders.filter((o) => o.status === "CANCELLED").length;
   const returnCount = orders.filter((o) => o.status === "RETURN").length;
+  const complaintCount = orders.filter((o) => o.hasComplaint || !!o.complaint).length;
   const totalOmsetSelesai = orders
     .filter((o) => o.status === "PAID" || o.status === "PROCESSING" || o.status === "SHIPPED" || o.status === "DELIVERED")
     .reduce((acc, curr) => acc + (curr.grandTotal || 0), 0);
 
   // Filter & Search
   const filteredOrders = orders.filter((order) => {
-    // Status Filter 7 Kategori
+    // Status Filter 8 Kategori
     if (statusFilter !== "ALL") {
       if (statusFilter === "PROCESSING") {
         if (order.status !== "PROCESSING" && order.status !== "PAID") return false;
+      } else if (statusFilter === "COMPLAINT") {
+        if (!order.hasComplaint && !order.complaint) return false;
       } else if (order.status !== statusFilter) {
         return false;
       }
@@ -461,6 +515,7 @@ export default function AdminOrdersPage() {
             { id: "DELIVERED", label: "Selesai", count: deliveredCount },
             { id: "CANCELLED", label: "Dibatalkan", count: cancelledCount },
             { id: "RETURN", label: "Pengembalian", count: returnCount, highlight: returnCount > 0 },
+            { id: "COMPLAINT", label: "Komplain", count: complaintCount, highlight: complaintCount > 0 },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -661,9 +716,23 @@ export default function AdminOrdersPage() {
                       )}
                     </td>
 
-                    {/* Status */}
+                    {/* Status & Komplain */}
                     <td className="py-4 px-5 align-top">
-                      {getStatusBadge(order.status, order.paymentProof)}
+                      <div>{getStatusBadge(order.status, order.paymentProof)}</div>
+                      {order.complaint && (
+                        <div className="mt-1.5">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                              order.complaint.status === "RESOLVED"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                : "bg-amber-100 text-amber-900 border border-amber-300 animate-pulse"
+                            }`}
+                          >
+                            <AlertCircle className="w-3 h-3 text-amber-600" />
+                            Komplain: {order.complaint.status === "RESOLVED" ? "Selesai" : "Aktif"}
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Tombol Aksi */}
@@ -755,6 +824,95 @@ export default function AdminOrdersPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Panel Komplain Pelanggan jika ada */}
+                {selectedOrder.complaint && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-300 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-black text-amber-900">
+                        <AlertCircle className="w-4 h-4 text-amber-600" />
+                        <span>Komplain Pelanggan: {selectedOrder.complaint.category}</span>
+                      </div>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          selectedOrder.complaint.status === "RESOLVED"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                            : "bg-amber-100 text-amber-900 border border-amber-300 animate-pulse"
+                        }`}
+                      >
+                        Status: {selectedOrder.complaint.status}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-slate-700 bg-white/80 p-3 rounded-xl border border-amber-200">
+                      <strong>Keluhan:</strong> {selectedOrder.complaint.description}
+                    </div>
+
+                    {selectedOrder.complaint.expectedSolution && (
+                      <div className="text-xs text-amber-900">
+                        Solusi Diharapkan: <strong>{selectedOrder.complaint.expectedSolution}</strong>
+                      </div>
+                    )}
+
+                    {selectedOrder.complaint.proofImage && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-600">Foto Bukti Kendala:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProofImageSrc(selectedOrder.complaint!.proofImage!);
+                            setIsPreviewProofOpen(true);
+                          }}
+                          className="text-xs text-dstech-blue font-bold underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Lihat Foto
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Tindak Lanjut CS */}
+                    <div className="pt-2 border-t border-amber-200 space-y-2">
+                      <label className="block text-[11px] font-bold text-slate-700">
+                        Catatan Tanggapan / Solusi dari CS:
+                      </label>
+                      <input
+                        type="text"
+                        value={complaintAdminNotes}
+                        onChange={(e) => setComplaintAdminNotes(e.target.value)}
+                        placeholder="Contoh: Unit pengganti sudah dikirim / Jadwal teknisi perbaikan besok..."
+                        className="w-full px-3 py-2 text-xs bg-white border border-amber-300 rounded-xl font-medium focus:outline-none focus:border-amber-500"
+                      />
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={isResolvingComplaint}
+                          onClick={() => handleResolveComplaint(selectedOrder.id, "IN_PROGRESS")}
+                          className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs cursor-pointer shadow-xs"
+                        >
+                          Tandai Sedang Diproses
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isResolvingComplaint}
+                          onClick={() => handleResolveComplaint(selectedOrder.id, "RESOLVED")}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs cursor-pointer shadow-xs"
+                        >
+                          ✓ Tandai Komplain Selesai
+                        </button>
+                        <a
+                          href={`https://wa.me/${(selectedOrder.customerPhone || "").replace(/^0/, "62")}?text=${encodeURIComponent(
+                            `Halo Bpk/Ibu ${selectedOrder.customerName}, kami dari CS PT DSTech Smart Perkasa ingin menindaklanjuti komplain pesanan #${selectedOrder.orderNumber}: "${selectedOrder.complaint.category}".`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-300 font-black text-xs flex items-center gap-1 hover:bg-emerald-100"
+                        >
+                          <Phone className="w-3 h-3 text-emerald-600" /> WhatsApp Klien
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {selectedOrder.paymentProof && (
                   <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex items-center justify-between gap-3">

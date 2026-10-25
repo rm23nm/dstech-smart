@@ -32,6 +32,7 @@ import {
   CreditCard,
   ChevronRight,
   AlertCircle,
+  AlertTriangle,
   Upload,
   Check,
   RefreshCw,
@@ -244,6 +245,15 @@ export default function ShopPage() {
   const [returnReason, setReturnReason] = useState("Barang Rusak / Cacat Fisik");
   const [returnNotes, setReturnNotes] = useState("");
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+
+  // Modal Pengajuan Komplain Pesanan Pelanggan
+  const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+  const [complaintTargetOrder, setComplaintTargetOrder] = useState<any | null>(null);
+  const [complaintCategory, setComplaintCategory] = useState("Barang Rusak / Cacat Fisik");
+  const [complaintDetails, setComplaintDetails] = useState("");
+  const [complaintSolution, setComplaintSolution] = useState("Penggantian Unit Baru");
+  const [complaintProofBase64, setComplaintProofBase64] = useState<string | null>(null);
+  const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -751,6 +761,59 @@ export default function ShopPage() {
     }
   };
 
+  // Handler Membuka Modal Pengajuan Komplain
+  const handleOpenComplaintModal = (order: any) => {
+    setComplaintTargetOrder(order);
+    setComplaintCategory(order.complaint?.category || "Barang Rusak / Cacat Fisik");
+    setComplaintDetails(order.complaint?.description || "");
+    setComplaintSolution(order.complaint?.expectedSolution || "Penggantian Unit Baru");
+    setComplaintProofBase64(order.complaint?.proofImage || null);
+    setIsComplaintModalOpen(true);
+  };
+
+  // Handler Kirim Komplain Pesanan Pelanggan
+  const handleSubmitComplaint = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!complaintTargetOrder) return;
+    if (!complaintDetails.trim()) {
+      alert("Silakan tuliskan rincian keluhan / kendala pesanan Anda.");
+      return;
+    }
+    setIsSubmittingComplaint(true);
+
+    try {
+      const res = await fetch("/api/orders", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: complaintTargetOrder.id,
+          action: "submit_complaint",
+          complaintCategory,
+          complaintDetails: complaintDetails.trim(),
+          complaintSolution,
+          complaintProof: complaintProofBase64,
+          note: `Komplain pelanggan: [${complaintCategory}]. Solusi diharapkan: [${complaintSolution}]. Rincian: ${complaintDetails.trim()}`,
+        }),
+      });
+
+      const data = await res.json();
+      if (data && data.success && data.data) {
+        if (trackedOrder && trackedOrder.id === complaintTargetOrder.id) {
+          setTrackedOrder(data.data);
+        }
+        setIsComplaintModalOpen(false);
+        showToast("✓ Komplain berhasil dikirim. Tim After-Sales akan segera meninjau.");
+        fetchUserOrders(currentUser);
+      } else {
+        alert("Gagal mengirim komplain: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Error kirim komplain: " + err.message);
+    } finally {
+      setIsSubmittingComplaint(false);
+    }
+  };
+
   // Handler Beli Lagi (Reorder)
   const handleBuyAgain = (order: any) => {
     if (!order || !Array.isArray(order.items)) return;
@@ -831,23 +894,37 @@ export default function ShopPage() {
           {/* Quick Tracking & Account Actions */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Tombol Lacak Pesanan Live */}
-            <button
-              onClick={() => {
-                setIsTrackingModalOpen(true);
-                if (userOrders.length > 0 && !trackedOrder) {
-                  setTrackedOrder(userOrders[0]);
-                }
-              }}
-              className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black flex items-center gap-2 transition-all cursor-pointer"
-            >
-              <Truck className="w-3.5 h-3.5 text-dstech-blue" />
-              <span className="hidden sm:inline">Lacak Pengiriman</span>
-              {userOrders.length > 0 && (
-                <span className="w-5 h-5 rounded-full bg-dstech-blue text-white text-[10px] font-bold flex items-center justify-center">
-                  {userOrders.length}
-                </span>
-              )}
-            </button>
+            {(() => {
+              const activeOrders = userOrders.filter(
+                (ord) => ord.status !== "DELIVERED" && ord.status !== "CANCELLED"
+              );
+              return (
+                <button
+                  onClick={() => {
+                    setIsTrackingModalOpen(true);
+                    if (activeOrders.length > 0 && !trackedOrder) {
+                      setTrackedOrder(activeOrders[0]);
+                    } else if (userOrders.length > 0 && !trackedOrder) {
+                      setTrackedOrder(userOrders[0]);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black flex items-center gap-2 transition-all cursor-pointer"
+                  title={
+                    activeOrders.length > 0
+                      ? `${activeOrders.length} pesanan aktif sedang berjalan`
+                      : "Lacak pengiriman pesanan Anda"
+                  }
+                >
+                  <Truck className="w-3.5 h-3.5 text-dstech-blue" />
+                  <span className="hidden sm:inline">Lacak Pengiriman</span>
+                  {activeOrders.length > 0 && (
+                    <span className="w-5 h-5 rounded-full bg-dstech-blue text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
+                      {activeOrders.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
 
             {/* Tombol Keranjang Belanja */}
             <button
@@ -2022,16 +2099,57 @@ export default function ShopPage() {
                   </div>
                 </div>
 
-                {/* Tombol Aksi Bawah: Ajukan Retur, Beli Lagi, Chat CS */}
+                {/* Panel Status Komplain jika ada */}
+                {trackedOrder.complaint && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-300 text-xs space-y-1.5 animate-in fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="font-black text-amber-900 flex items-center gap-1.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        Komplain: {trackedOrder.complaint.category}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          trackedOrder.complaint.status === "RESOLVED"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                            : "bg-amber-100 text-amber-900 border border-amber-300 animate-pulse"
+                        }`}
+                      >
+                        {trackedOrder.complaint.status === "RESOLVED" ? "✓ Selesai Ditangani" : "⏳ Sedang Ditinjau CS"}
+                      </span>
+                    </div>
+                    <p className="text-slate-700 leading-relaxed">{trackedOrder.complaint.description}</p>
+                    {trackedOrder.complaint.expectedSolution && (
+                      <div className="text-[11px] text-amber-800">
+                        Ekspektasi: <strong>{trackedOrder.complaint.expectedSolution}</strong>
+                      </div>
+                    )}
+                    {trackedOrder.complaint.adminNotes && (
+                      <div className="mt-2 p-2.5 rounded-xl bg-white/90 border border-amber-200 text-[11px] text-slate-800">
+                        <strong>Tanggapan CS DSTech:</strong> {trackedOrder.complaint.adminNotes}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Tombol Aksi Bawah: Ajukan Retur, Komplain, Beli Lagi, Chat CS */}
                 <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Tombol Komplain Pesanan */}
+                    <button
+                      onClick={() => handleOpenComplaintModal(trackedOrder)}
+                      className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl text-xs font-black flex items-center gap-1.5 border border-amber-300 transition cursor-pointer"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                      <span>{trackedOrder.complaint ? "Ubah / Update Komplain" : "Ajukan Komplain"}</span>
+                    </button>
+
                     {trackedOrder.status === "DELIVERED" && (
                       <button
                         onClick={() => handleOpenReturnModal(trackedOrder)}
                         className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-black flex items-center gap-1.5 border border-rose-200 transition cursor-pointer"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Ajukan Pengembalian / Retur</span>
+                        <span>Ajukan Retur</span>
                       </button>
                     )}
 
@@ -2280,6 +2398,16 @@ export default function ShopPage() {
                                 </button>
                               )}
 
+                              {/* Tombol Komplain Pesanan */}
+                              <button
+                                onClick={() => handleOpenComplaintModal(ord)}
+                                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-black flex items-center gap-1 transition cursor-pointer"
+                                title="Laporkan kendala / ajukan komplain pesanan"
+                              >
+                                <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                <span>{ord.complaint ? "Cek Komplain" : "Komplain"}</span>
+                              </button>
+
                               {/* Tombol Ajukan Retur jika DELIVERED */}
                               {ord.status === "DELIVERED" && (
                                 <button
@@ -2423,6 +2551,169 @@ export default function ShopPage() {
                 >
                   {isSubmittingReturn ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                   <span>Kirim Pengajuan Retur</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* MODAL 6: PUSAT BANTUAN & KOMPLAIN PESANAN PELANGGAN          */}
+      {/* ============================================================ */}
+      {isComplaintModalOpen && complaintTargetOrder && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setIsComplaintModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto animate-in zoom-in-95 duration-200 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Pusat Komplain &amp; Bantuan Pesanan</h3>
+                  <p className="text-[11px] text-slate-400">Layanan after-sales resmi PT. DSTech Smart Perkasa</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsComplaintModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center cursor-pointer transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Info Singkat Pesanan */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-1">
+              <div className="flex justify-between font-bold text-slate-700">
+                <span>Nomor Pesanan:</span>
+                <span className="font-mono text-dstech-blue">#{complaintTargetOrder.orderNumber}</span>
+              </div>
+              <div className="flex justify-between text-slate-500">
+                <span>Total Nilai Pesanan:</span>
+                <span className="font-mono font-bold text-slate-900">{formatRupiah(complaintTargetOrder.grandTotal)}</span>
+              </div>
+              {complaintTargetOrder.items && complaintTargetOrder.items.length > 0 && (
+                <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
+                  Produk: {complaintTargetOrder.items.map((it: any) => `${it.productName} (${it.qty}x)`).join(", ")}
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleSubmitComplaint} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Kategori Kendala / Komplain:
+                </label>
+                <select
+                  value={complaintCategory}
+                  onChange={(e) => setComplaintCategory(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:border-dstech-blue"
+                >
+                  <option value="Barang Rusak / Cacat Fisik">Barang Rusak / Cacat Fisik Saat Diterima</option>
+                  <option value="Tipe / Varian Barang Salah">Tipe / Varian Barang Tidak Sesuai Pesanan</option>
+                  <option value="Kelengkapan / Aksesoris Kurang">Kelengkapan / Aksesoris / Baut Kurang</option>
+                  <option value="Keterlambatan Ekspedisi / Paket Nyasar">Keterlambatan Ekspedisi / Kendala Kurir</option>
+                  <option value="Kerusakan Fungsi / Kendala Pemasangan">Kendala Fungsi / Butuh Bantuan Pemasangan Teknisi</option>
+                  <option value="Klaim Garansi Purna Jual 1 Tahun">Klaim Garansi Resmi Purna Jual (1 Tahun)</option>
+                  <option value="Permintaan Pengembalian Dana">Permintaan Pengembalian Dana (Refund)</option>
+                  <option value="Komplain Lainnya">Komplain Lainnya</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Solusi yang Anda Harapkan:
+                </label>
+                <select
+                  value={complaintSolution}
+                  onChange={(e) => setComplaintSolution(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 focus:outline-none focus:border-dstech-blue"
+                >
+                  <option value="Penggantian Unit Baru">Penggantian Unit Baru (Tukar Barang)</option>
+                  <option value="Kirimkan Part / Aksesoris yang Kurang">Kirimkan Part / Aksesoris yang Kurang</option>
+                  <option value="Kunjungan Teknisi Lapangan untuk Cek/Perbaikan">Kunjungan Teknisi Lapangan untuk Pengecekan</option>
+                  <option value="Pengembalian Dana (Refund)">Pengembalian Dana (Refund Penuh/Sebagian)</option>
+                  <option value="Bantuan Panduan Teknis & SOP">Bantuan Panduan Teknis &amp; SOP dari CS</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Rincian Penjelasan Kendala:
+                </label>
+                <textarea
+                  rows={3}
+                  value={complaintDetails}
+                  onChange={(e) => setComplaintDetails(e.target.value)}
+                  placeholder="Ceritakan kendala yang Anda alami secara jelas..."
+                  className="w-full p-3 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-800 focus:outline-none focus:border-dstech-blue resize-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  Unggah Foto Bukti Kendala (Opsional):
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onloadend = () => {
+                        setComplaintProofBase64(reader.result as string);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
+                />
+                {complaintProofBase64 && (
+                  <div className="mt-2 relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200">
+                    <img src={complaintProofBase64} alt="Bukti Komplain" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setComplaintProofBase64(null)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-slate-900/80 text-white flex items-center justify-center text-[10px]"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 space-y-1">
+                <span className="font-black block flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600" /> Jaminan Layanan DSTech:
+                </span>
+                <p className="leading-relaxed">
+                  Laporan komplain Anda langsung diprioritaskan ke supervisor CS &amp; After-Sales. Kami akan menghubungi nomor WhatsApp Anda dalam 1x24 jam kerja.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsComplaintModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingComplaint}
+                  className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-amber-600/20 cursor-pointer disabled:bg-slate-300"
+                >
+                  {isSubmittingComplaint ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                  <span>Kirim Komplain Pesanan</span>
                 </button>
               </div>
             </form>

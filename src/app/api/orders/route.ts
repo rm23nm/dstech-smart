@@ -195,7 +195,22 @@ export async function POST(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, orderNumber, action, paymentProof, trackingNumber, shippingCourier, courierPhone, status, note } = body;
+    const {
+      id,
+      orderNumber,
+      action,
+      paymentProof,
+      trackingNumber,
+      shippingCourier,
+      courierPhone,
+      status,
+      note,
+      complaintCategory,
+      complaintDetails,
+      complaintSolution,
+      complaintProof,
+      complaintStatus,
+    } = body;
 
     if (!id && !orderNumber) {
       return NextResponse.json({ success: false, error: "ID atau Nomor Pesanan wajib disertakan" }, { status: 400 });
@@ -279,6 +294,38 @@ export async function PATCH(req: Request) {
         status: "RETURN",
         title: "Pengajuan Pengembalian / Retur Barang",
         description: note || "Pengajuan pengembalian barang & dana telah diajukan dan sedang diproses tim QC & Keuangan DSTech Smart.",
+        timestamp: nowIso,
+      });
+    } else if (action === "submit_complaint") {
+      // Pembeli mengajukan komplain pesanan
+      targetOrder.hasComplaint = true;
+      targetOrder.complaint = {
+        category: complaintCategory || "Kendala Pesanan",
+        description: complaintDetails || note || "Komplain diajukan oleh pembeli.",
+        expectedSolution: complaintSolution || "Penyelesaian CS",
+        proofImage: complaintProof || null,
+        status: complaintStatus || "OPEN", // OPEN | IN_PROGRESS | RESOLVED
+        submittedAt: nowIso,
+        resolvedAt: null,
+        adminNotes: "",
+      };
+      targetOrder.trackingTimeline.push({
+        status: targetOrder.status,
+        title: `Komplain Diajukan: ${complaintCategory || "Kendala Pesanan"}`,
+        description: complaintDetails || note || "Pengajuan komplain pesanan telah diterima dan sedang ditinjau oleh tim After-Sales Customer Support PT DSTech Smart Perkasa.",
+        timestamp: nowIso,
+      });
+    } else if (action === "resolve_complaint") {
+      // Admin / CS menyelesaikan komplain
+      if (targetOrder.complaint) {
+        targetOrder.complaint.status = complaintStatus || "RESOLVED";
+        targetOrder.complaint.resolvedAt = nowIso;
+        targetOrder.complaint.adminNotes = note || "Komplain telah diselesaikan.";
+      }
+      targetOrder.trackingTimeline.push({
+        status: targetOrder.status,
+        title: "Status Komplain Diperbarui",
+        description: note || `Penanganan komplain telah ditindaklanjuti dengan status: ${complaintStatus || "RESOLVED"}.`,
         timestamp: nowIso,
       });
     } else if (status) {
