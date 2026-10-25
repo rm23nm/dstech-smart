@@ -26,6 +26,8 @@ import {
   ShieldCheck,
   Star,
   Sparkles,
+  FileText,
+  Download,
 } from "lucide-react";
 
 interface InventoryProduct {
@@ -36,6 +38,10 @@ interface InventoryProduct {
   stock?: number;
   commission?: string;
   image?: string;
+  images?: string[];
+  brochureUrl?: string;
+  brochureName?: string;
+  brochureSize?: string;
   desc?: string;
 }
 
@@ -167,6 +173,7 @@ export default function ProductSection() {
   const [products, setProducts] = useState<InventoryProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<InventoryProduct | null>(null);
+  const [activeImage, setActiveImage] = useState<string>("");
 
   // Fetch dynamic products from /api/products (Hanya Entitas PT untuk Website Publik)
   useEffect(() => {
@@ -258,7 +265,10 @@ export default function ProductSection() {
                 {products.map((prod) => (
                   <div
                     key={prod.id}
-                    onClick={() => setSelectedProduct(prod)}
+                    onClick={() => {
+                      setSelectedProduct(prod);
+                      setActiveImage(prod.image || (prod.images?.[0] || ""));
+                    }}
                     className="group bg-white border border-slate-200/90 hover:border-dstech-blue/50 rounded-3xl overflow-hidden flex flex-col transition-all duration-300 hover:shadow-2xl shadow-sm cursor-pointer relative"
                   >
                     {/* Thumbnail Image */}
@@ -312,6 +322,7 @@ export default function ProductSection() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedProduct(prod);
+                              setActiveImage(prod.image || (prod.images?.[0] || ""));
                             }}
                             className="h-10 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider transition-colors"
                           >
@@ -435,11 +446,11 @@ export default function ProductSection() {
             </button>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-              {/* Product Image */}
-              <div className="space-y-4">
+              {/* Product Image & Multi-Image Thumbnails */}
+              <div className="space-y-3">
                 <div className="relative h-72 sm:h-80 w-full rounded-3xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
                   <Image
-                    src={selectedProduct.image || "/service-cctv.png"}
+                    src={activeImage || selectedProduct.image || "/service-cctv.png"}
                     alt={selectedProduct.name}
                     fill
                     className="object-cover"
@@ -450,6 +461,27 @@ export default function ProductSection() {
                     </span>
                   </div>
                 </div>
+
+                {/* Thumbnail Galeri Foto Produk */}
+                {selectedProduct.images && selectedProduct.images.length > 1 && (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    {selectedProduct.images.map((imgUrl, idx) => {
+                      const isCurrent = (activeImage || selectedProduct.image) === imgUrl;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setActiveImage(imgUrl)}
+                          className={`relative w-14 h-14 rounded-xl overflow-hidden border-2 flex-shrink-0 cursor-pointer transition-all ${
+                            isCurrent ? "border-dstech-blue ring-2 ring-blue-400/40" : "border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100"
+                          }`}
+                        >
+                          <Image src={imgUrl} alt={`Thumbnail ${idx + 1}`} fill className="object-cover" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs font-bold text-slate-700">
                   <div className="flex items-center gap-2">
@@ -489,6 +521,34 @@ export default function ProductSection() {
                     {selectedProduct.desc || "Perangkat teknologi resmi berkualitas prima dari PT. DSTech Smart Perkasa."}
                   </p>
                 </div>
+
+                {/* Unduh Berkas Brosur / E-Katalog PDF Spesifikasi */}
+                {selectedProduct.brochureUrl && (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-emerald-950 block truncate">
+                          {selectedProduct.brochureName || "Brosur & Spesifikasi Teknis"}
+                        </span>
+                        <span className="text-[10px] text-emerald-700 block">
+                          {selectedProduct.brochureSize || "Format PDF"} • Resmi dari DSTech
+                        </span>
+                      </div>
+                    </div>
+                    <a
+                      href={selectedProduct.brochureUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all shrink-0 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Unduh Brosur</span>
+                    </a>
+                  </div>
+                )}
 
                 <ul className="space-y-2.5 text-xs font-bold text-slate-700 pt-2 border-t border-slate-100">
                   <li className="flex items-center gap-2.5">

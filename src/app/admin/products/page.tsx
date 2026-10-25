@@ -19,7 +19,10 @@ import {
   FolderTree,
   Tag,
   Building2,
-  Store
+  Store,
+  FileText,
+  Download,
+  Star
 } from "lucide-react";
 
 export interface ProductItem {
@@ -36,6 +39,10 @@ export interface ProductItem {
   commissionRate?: number;
   commissionType?: string;
   image?: string;
+  images?: string[];
+  brochureUrl?: string;
+  brochureName?: string;
+  brochureSize?: string;
   desc?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -87,6 +94,10 @@ export default function ProductAdmin() {
     commission: string;
     commissionType: string;
     image: string;
+    images: string[];
+    brochureUrl: string;
+    brochureName: string;
+    brochureSize: string;
     desc: string;
   }>({
     name: "",
@@ -100,11 +111,17 @@ export default function ProductAdmin() {
     commission: "10",
     commissionType: "ONETIME",
     image: "",
+    images: [],
+    brochureUrl: "",
+    brochureName: "",
+    brochureSize: "",
     desc: ""
   });
 
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingMultipleImages, setUploadingMultipleImages] = useState(false);
+  const [uploadingBrochure, setUploadingBrochure] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   // Show auto-dismissing toast
@@ -224,7 +241,10 @@ export default function ProductAdmin() {
       const result = await res.json();
 
       if (result.success && result.url) {
-        setFormData((prev) => ({ ...prev, image: result.url }));
+        setFormData((prev) => {
+          const newImages = prev.images.includes(result.url) ? prev.images : [result.url, ...prev.images];
+          return { ...prev, image: result.url, images: newImages };
+        });
         showToast("Gambar produk berhasil diunggah!");
       } else {
         showToast(result.message || "Gagal mengunggah gambar.", "error");
@@ -233,6 +253,105 @@ export default function ProductAdmin() {
       showToast("Terjadi kesalahan saat mengunggah gambar.", "error");
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  // Handle Multi-Images Upload via API (Tugas 204)
+  const handleMultipleImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingMultipleImages(true);
+    showToast(`Mengunggah ${files.length} foto galeri produk...`);
+    const newUrls: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const data = new FormData();
+      data.append("file", file);
+      try {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: data,
+        });
+        const result = await res.json();
+        if (result.success && result.url) {
+          newUrls.push(result.url);
+        }
+      } catch (err) {
+        console.error("Gagal mengunggah foto:", err);
+      }
+    }
+
+    if (newUrls.length > 0) {
+      setFormData((prev) => {
+        const combined = Array.from(new Set([...prev.images, ...newUrls]));
+        return {
+          ...prev,
+          images: combined,
+          image: prev.image || combined[0] || "",
+        };
+      });
+      showToast(`✓ Berhasil menambahkan ${newUrls.length} foto ke galeri produk!`);
+    } else {
+      showToast("Gagal mengunggah foto galeri.", "error");
+    }
+    setUploadingMultipleImages(false);
+  };
+
+  // Hapus foto tertentu dari galeri
+  const handleRemoveGalleryImage = (idxToRemove: number) => {
+    setFormData((prev) => {
+      const updated = prev.images.filter((_, i) => i !== idxToRemove);
+      return {
+        ...prev,
+        images: updated,
+        image: prev.image === prev.images[idxToRemove] ? (updated[0] || "") : prev.image,
+      };
+    });
+  };
+
+  // Jadikan foto tertentu sebagai foto utama
+  const handleSetPrimaryImage = (imgUrl: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      image: imgUrl,
+    }));
+    showToast("✓ Foto utama berhasil dipilih!");
+  };
+
+  // Handle Upload Berkas Brosur / E-Katalog PDF (Tugas 204)
+  const handleBrochureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingBrochure(true);
+    showToast("Mengunggah berkas brosur / e-katalog...");
+    const data = new FormData();
+    data.append("file", file);
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: data,
+      });
+      const result = await res.json();
+      if (result.success && result.url) {
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+        setFormData((prev) => ({
+          ...prev,
+          brochureUrl: result.url,
+          brochureName: file.name,
+          brochureSize: sizeMb,
+        }));
+        showToast("✓ Berkas brosur / e-katalog PDF berhasil diunggah!");
+      } else {
+        showToast(result.message || "Gagal mengunggah berkas brosur.", "error");
+      }
+    } catch {
+      showToast("Terjadi kesalahan saat mengunggah berkas brosur.", "error");
+    } finally {
+      setUploadingBrochure(false);
     }
   };
 
@@ -254,6 +373,10 @@ export default function ProductAdmin() {
       commission: "10",
       commissionType: "ONETIME",
       image: "",
+      images: [],
+      brochureUrl: "",
+      brochureName: "",
+      brochureSize: "",
       desc: ""
     });
     setIsAddModalOpen(true);
@@ -262,6 +385,10 @@ export default function ProductAdmin() {
   // Handle Open Edit Modal
   const handleOpenEdit = (product: ProductItem) => {
     setSelectedProduct(product);
+    const prodImages = Array.isArray(product.images) && product.images.length > 0
+      ? product.images
+      : (product.image ? [product.image] : []);
+
     setFormData({
       name: product.name,
       category: product.category,
@@ -273,7 +400,11 @@ export default function ProductAdmin() {
       stock: String(product.stock),
       commission: String(product.commissionRate || parseInt(String(product.commission).replace(/[^0-9]/g, ""), 10) || 10),
       commissionType: product.commissionType || "ONETIME",
-      image: product.image || "",
+      image: product.image || (prodImages[0] || ""),
+      images: prodImages,
+      brochureUrl: product.brochureUrl || "",
+      brochureName: product.brochureName || "",
+      brochureSize: product.brochureSize || "",
       desc: product.desc || ""
     });
     setIsEditModalOpen(true);
@@ -306,7 +437,11 @@ export default function ProductAdmin() {
       commission: `${formData.commission}%`,
       commissionRate: parseInt(formData.commission, 10) || 10,
       commissionType: formData.commissionType,
-      image: formData.image.trim(),
+      image: formData.image.trim() || (formData.images[0] || ""),
+      images: formData.images,
+      brochureUrl: formData.brochureUrl.trim(),
+      brochureName: formData.brochureName.trim(),
+      brochureSize: formData.brochureSize.trim(),
       desc: formData.desc.trim()
     };
 
@@ -367,7 +502,11 @@ export default function ProductAdmin() {
       commission: `${formData.commission}%`,
       commissionRate: parseInt(formData.commission, 10) || 10,
       commissionType: formData.commissionType,
-      image: formData.image.trim(),
+      image: formData.image.trim() || (formData.images[0] || ""),
+      images: formData.images,
+      brochureUrl: formData.brochureUrl.trim(),
+      brochureName: formData.brochureName.trim(),
+      brochureSize: formData.brochureSize.trim(),
       desc: formData.desc.trim()
     };
 
@@ -687,6 +826,23 @@ export default function ProductAdmin() {
                                 {p.subCategory}
                               </span>
                             )}
+                            {Array.isArray(p.images) && p.images.length > 1 && (
+                              <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                📸 {p.images.length} Foto
+                              </span>
+                            )}
+                            {p.brochureUrl && (
+                              <a
+                                href={p.brochureUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-emerald-100 transition"
+                                title="Unduh Berkas Brosur / E-Katalog PDF"
+                              >
+                                <FileText className="w-2.5 h-2.5" /> Brosur PDF
+                              </a>
+                            )}
                             {p.commissionType && (
                               <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
                                 {p.commissionType}
@@ -837,70 +993,173 @@ export default function ProductAdmin() {
                 />
               </div>
 
-              {/* Upload Gambar Produk */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Foto / Gambar Produk
-                </label>
-                <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70">
-                  {formData.image ? (
-                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm flex-shrink-0 group">
-                      <img
-                        src={formData.image}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, image: "" })}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-colors shadow"
-                        title="Hapus gambar"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="w-24 h-24 rounded-2xl border border-dashed border-slate-300 bg-white flex flex-col items-center justify-center text-slate-400 flex-shrink-0">
-                      <UploadCloud className="w-8 h-8 text-slate-300 mb-1" />
-                      <span className="text-[10px] font-bold text-slate-400">Belum Ada</span>
-                    </div>
-                  )}
+              {/* Upload Gambar & Galeri Multi-Foto Produk (Tugas 204) */}
+              <div className="space-y-3 p-4 rounded-2xl border border-slate-200 bg-slate-50/70">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-black text-slate-900 uppercase tracking-wider">
+                      📸 Galeri Foto &amp; Gambar Produk
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      Unggah beberapa foto produk untuk tampilan galeri interaktif. Foto bertanda bintang adalah foto utama.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold bg-blue-100 text-dstech-blue px-2.5 py-0.5 rounded-full">
+                    {formData.images.length} Foto
+                  </span>
+                </div>
 
-                  <div className="flex-1 w-full space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue text-xs font-bold text-slate-700 hover:text-dstech-blue shadow-sm transition-all">
-                        <UploadCloud className="w-4 h-4 text-dstech-blue" />
-                        <span>{uploadingImage ? "Mengunggah..." : "Pilih File Gambar..."}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={uploadingImage}
-                          onChange={handleImageUpload}
-                          className="hidden"
-                        />
-                      </label>
-                      {formData.image && (
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, image: "" })}
-                          className="px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 transition-colors"
+                {/* Grid Galeri Thumbnail */}
+                {formData.images.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 pt-2">
+                    {formData.images.map((imgUrl, imgIdx) => {
+                      const isPrimary = formData.image === imgUrl;
+                      return (
+                        <div
+                          key={imgIdx}
+                          className={`relative group rounded-xl overflow-hidden border-2 bg-white aspect-square shadow-2xs transition-all ${
+                            isPrimary ? "border-dstech-blue ring-2 ring-blue-400/40" : "border-slate-200 hover:border-slate-300"
+                          }`}
                         >
-                          Hapus
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={formData.image}
-                        onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                        placeholder="Atau tempelkan URL gambar (https://...)"
-                        className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-dstech-blue"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-400">Format: JPG, PNG, WEBP (Maksimal 10MB)</p>
+                          <img
+                            src={imgUrl}
+                            alt={`Foto ${imgIdx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          {isPrimary && (
+                            <div className="absolute top-1 left-1 bg-dstech-blue text-white text-[9px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shadow-sm">
+                              <Star className="w-2.5 h-2.5 fill-amber-300 text-amber-300" />
+                              <span>Utama</span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1">
+                            {!isPrimary && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetPrimaryImage(imgUrl)}
+                                className="px-2 py-0.5 rounded bg-white text-slate-900 text-[10px] font-black hover:bg-blue-50 transition cursor-pointer"
+                              >
+                                Set Utama
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveGalleryImage(imgIdx)}
+                              className="p-1 rounded-full bg-red-600 hover:bg-red-700 text-white transition cursor-pointer shadow"
+                              title="Hapus foto ini"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Upload Buttons */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/80">
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue text-xs font-bold text-slate-700 hover:text-dstech-blue shadow-xs transition-all">
+                    <UploadCloud className="w-4 h-4 text-dstech-blue" />
+                    <span>{uploadingMultipleImages ? "Mengunggah Galeri..." : "Upload Beberapa Foto (Multi-Upload)..."}</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      disabled={uploadingMultipleImages}
+                      onChange={handleMultipleImagesUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-600 transition-all">
+                    <ImageIcon className="w-4 h-4 text-slate-500" />
+                    <span>{uploadingImage ? "Mengunggah..." : "Tambah 1 Foto..."}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={uploadingImage}
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="URL foto utama atau tempel tautan gambar (https://...)"
+                    className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-dstech-blue"
+                  />
+                </div>
+              </div>
+
+              {/* Upload Berkas Brosur / E-Katalog PDF Spesifikasi (Tugas 204) */}
+              <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-black text-emerald-950 uppercase tracking-wider">
+                      📄 Berkas Brosur / E-Katalog PDF Spesifikasi Produk
+                    </label>
+                    <p className="text-[11px] text-slate-600">
+                      Unggah brosur resmi / datasheet spesifikasi teknis untuk dapat diunduh oleh pembeli &amp; mitra di website.
+                    </p>
                   </div>
                 </div>
+
+                {formData.brochureUrl ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-emerald-200 shadow-2xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {formData.brochureName || "Brosur-Spesifikasi-Produk.pdf"}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {formData.brochureSize || "Format PDF"} • Siap Diunduh Pengunjung
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a
+                        href={formData.brochureUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center gap-1 transition"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Pratinjau</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, brochureUrl: "", brochureName: "", brochureSize: "" })}
+                        className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition cursor-pointer"
+                        title="Hapus Brosur"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-emerald-300 hover:border-emerald-600 text-xs font-bold text-emerald-800 shadow-xs transition-all">
+                      <FileText className="w-4 h-4 text-emerald-600" />
+                      <span>{uploadingBrochure ? "Mengunggah PDF..." : "Pilih Berkas Brosur (PDF)..."}</span>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        disabled={uploadingBrochure}
+                        onChange={handleBrochureUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <span className="text-[11px] text-slate-400">Format: Dokumen PDF (Maksimal 25MB)</span>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1179,70 +1438,173 @@ export default function ProductAdmin() {
                 />
               </div>
 
-              {/* Upload Gambar Produk */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Foto / Gambar Produk
-                </label>
-                <div className="flex flex-col sm:flex-row items-center gap-4 p-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70">
-                  {formData.image ? (
-                    <div className="relative w-24 h-24 rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-sm flex-shrink-0 group">
-                      <img
-                        src={formData.image}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, image: "" })}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center hover:bg-red-700 transition-colors shadow"
-                        title="Hapus gambar"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="w-24 h-24 rounded-2xl border border-dashed border-slate-300 bg-white flex flex-col items-center justify-center text-slate-400 flex-shrink-0">
-                      <UploadCloud className="w-8 h-8 text-slate-300 mb-1" />
-                      <span className="text-[10px] font-bold text-slate-400">Belum Ada</span>
-                    </div>
-                  )}
+              {/* Upload Gambar & Galeri Multi-Foto Produk (Tugas 204) */}
+              <div className="space-y-3 p-4 rounded-2xl border border-slate-200 bg-slate-50/70">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-black text-slate-900 uppercase tracking-wider">
+                      📸 Galeri Foto &amp; Gambar Produk
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      Unggah beberapa foto produk untuk tampilan galeri interaktif. Foto bertanda bintang adalah foto utama.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold bg-blue-100 text-dstech-blue px-2.5 py-0.5 rounded-full">
+                    {formData.images.length} Foto
+                  </span>
+                </div>
 
-                  <div className="flex-1 w-full space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue text-xs font-bold text-slate-700 hover:text-dstech-blue shadow-sm transition-all">
-                        <UploadCloud className="w-4 h-4 text-dstech-blue" />
-                        <span>{uploadingImage ? "Mengunggah..." : "Ganti Gambar..."}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={uploadingImage}
-                          onChange={handleImageUpload}
-                          className="hidden"
-                        />
-                      </label>
-                      {formData.image && (
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, image: "" })}
-                          className="px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 border border-red-200 transition-colors"
+                {/* Grid Galeri Thumbnail */}
+                {formData.images.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5 pt-2">
+                    {formData.images.map((imgUrl, imgIdx) => {
+                      const isPrimary = formData.image === imgUrl;
+                      return (
+                        <div
+                          key={imgIdx}
+                          className={`relative group rounded-xl overflow-hidden border-2 bg-white aspect-square shadow-2xs transition-all ${
+                            isPrimary ? "border-dstech-blue ring-2 ring-blue-400/40" : "border-slate-200 hover:border-slate-300"
+                          }`}
                         >
-                          Hapus
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={formData.image}
-                        onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                        placeholder="Atau tempelkan URL gambar (https://...)"
-                        className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-dstech-blue"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-400">Format: JPG, PNG, WEBP (Maksimal 10MB)</p>
+                          <img
+                            src={imgUrl}
+                            alt={`Foto ${imgIdx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          {isPrimary && (
+                            <div className="absolute top-1 left-1 bg-dstech-blue text-white text-[9px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shadow-sm">
+                              <Star className="w-2.5 h-2.5 fill-amber-300 text-amber-300" />
+                              <span>Utama</span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1">
+                            {!isPrimary && (
+                              <button
+                                type="button"
+                                onClick={() => handleSetPrimaryImage(imgUrl)}
+                                className="px-2 py-0.5 rounded bg-white text-slate-900 text-[10px] font-black hover:bg-blue-50 transition cursor-pointer"
+                              >
+                                Set Utama
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveGalleryImage(imgIdx)}
+                              className="p-1 rounded-full bg-red-600 hover:bg-red-700 text-white transition cursor-pointer shadow"
+                              title="Hapus foto ini"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Upload Buttons */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-200/80">
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue text-xs font-bold text-slate-700 hover:text-dstech-blue shadow-xs transition-all">
+                    <UploadCloud className="w-4 h-4 text-dstech-blue" />
+                    <span>{uploadingMultipleImages ? "Mengunggah Galeri..." : "Upload Beberapa Foto (Multi-Upload)..."}</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      disabled={uploadingMultipleImages}
+                      onChange={handleMultipleImagesUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <label className="cursor-pointer inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-600 transition-all">
+                    <ImageIcon className="w-4 h-4 text-slate-500" />
+                    <span>{uploadingImage ? "Mengunggah..." : "Tambah 1 Foto..."}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={uploadingImage}
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.image}
+                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    placeholder="URL foto utama atau tempel tautan gambar (https://...)"
+                    className="w-full h-9 px-3 text-xs rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-dstech-blue"
+                  />
+                </div>
+              </div>
+
+              {/* Upload Berkas Brosur / E-Katalog PDF Spesifikasi (Tugas 204) */}
+              <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-xs font-black text-emerald-950 uppercase tracking-wider">
+                      📄 Berkas Brosur / E-Katalog PDF Spesifikasi Produk
+                    </label>
+                    <p className="text-[11px] text-slate-600">
+                      Unggah brosur resmi / datasheet spesifikasi teknis untuk dapat diunduh oleh pembeli &amp; mitra di website.
+                    </p>
                   </div>
                 </div>
+
+                {formData.brochureUrl ? (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-emerald-200 shadow-2xs">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {formData.brochureName || "Brosur-Spesifikasi-Produk.pdf"}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {formData.brochureSize || "Format PDF"} • Siap Diunduh Pengunjung
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a
+                        href={formData.brochureUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold flex items-center gap-1 transition"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Pratinjau</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, brochureUrl: "", brochureName: "", brochureSize: "" })}
+                        className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition cursor-pointer"
+                        title="Hapus Brosur"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-emerald-300 hover:border-emerald-600 text-xs font-bold text-emerald-800 shadow-xs transition-all">
+                      <FileText className="w-4 h-4 text-emerald-600" />
+                      <span>{uploadingBrochure ? "Mengunggah PDF..." : "Pilih Berkas Brosur (PDF)..."}</span>
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        disabled={uploadingBrochure}
+                        onChange={handleBrochureUpload}
+                        className="hidden"
+                      />
+                    </label>
+                    <span className="text-[11px] text-slate-400">Format: Dokumen PDF (Maksimal 25MB)</span>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

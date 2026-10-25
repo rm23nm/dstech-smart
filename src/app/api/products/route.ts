@@ -129,16 +129,27 @@ function readProducts() {
     const parsed = JSON.parse(content);
     if (!Array.isArray(parsed)) return DEFAULT_PRODUCTS;
 
-    // Normalisasi field installationFee dan hasInstallationService
-    return parsed.map((p: any) => ({
-      ...p,
-      installationFee: typeof p.installationFee === "number"
-        ? p.installationFee
-        : getCategoryDefaultInstallationFee(p.category, p.name),
-      hasInstallationService: p.hasInstallationService !== undefined
-        ? Boolean(p.hasInstallationService)
-        : (p.category?.toLowerCase().includes("software") ? false : true),
-    }));
+    // Normalisasi field images (multi-image), brochureUrl, installationFee dan hasInstallationService
+    return parsed.map((p: any) => {
+      const rawImages = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+      const primaryImg = p.image || (rawImages.length > 0 ? rawImages[0] : "");
+      const finalImages = rawImages.length > 0 ? rawImages : (primaryImg ? [primaryImg] : []);
+
+      return {
+        ...p,
+        image: primaryImg,
+        images: finalImages,
+        brochureUrl: p.brochureUrl || "",
+        brochureName: p.brochureName || "",
+        brochureSize: p.brochureSize || "",
+        installationFee: typeof p.installationFee === "number"
+          ? p.installationFee
+          : getCategoryDefaultInstallationFee(p.category, p.name),
+        hasInstallationService: p.hasInstallationService !== undefined
+          ? Boolean(p.hasInstallationService)
+          : (p.category?.toLowerCase().includes("software") ? false : true),
+      };
+    });
   } catch (err) {
     console.error("Error reading products data:", err);
     return DEFAULT_PRODUCTS;
@@ -196,6 +207,12 @@ export async function POST(req: Request) {
       ? Boolean(body.hasInstallationService)
       : (category?.toLowerCase().includes("software") ? false : true);
 
+    const rawImages = Array.isArray(body.images)
+      ? body.images.filter((img: any) => typeof img === "string" && img.trim() !== "")
+      : [];
+    const primaryImage = (image?.trim()) || (rawImages.length > 0 ? rawImages[0] : "");
+    const finalImages = rawImages.length > 0 ? rawImages : (primaryImage ? [primaryImage] : []);
+
     const newProduct = {
       id: `dstech_prod_${Date.now()}`,
       name: name.trim(),
@@ -215,7 +232,11 @@ export async function POST(req: Request) {
       commission: `${commRate}%`,
       commissionRate: commRate,
       commissionType: commissionType === "RECURRING" ? "RECURRING" : "ONETIME",
-      image: image?.trim() || "",
+      image: primaryImage,
+      images: finalImages,
+      brochureUrl: body.brochureUrl?.trim() || "",
+      brochureName: body.brochureName?.trim() || "",
+      brochureSize: body.brochureSize?.trim() || "",
       desc: desc?.trim() || "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -251,6 +272,17 @@ export async function PUT(req: Request) {
     const parsedStock = stock !== undefined ? (typeof stock === "number" ? stock : parseInt(stock, 10) || 0) : products[index].stock;
     const commRate = commission !== undefined ? (typeof commission === "number" ? commission : parseInt(String(commission).replace(/[^0-9]/g, ""), 10) || 10) : products[index].commissionRate;
 
+    let updatedImages = products[index].images || (products[index].image ? [products[index].image] : []);
+    if (Array.isArray(body.images)) {
+      updatedImages = body.images.filter((img: any) => typeof img === "string" && img.trim() !== "");
+    }
+    const updatedPrimaryImage = image !== undefined
+      ? image.trim()
+      : (updatedImages.length > 0 ? updatedImages[0] : (products[index].image || ""));
+    if (updatedPrimaryImage && !updatedImages.includes(updatedPrimaryImage)) {
+      updatedImages.unshift(updatedPrimaryImage);
+    }
+
     products[index] = {
       ...products[index],
       name: name !== undefined ? name.trim() : products[index].name,
@@ -270,7 +302,11 @@ export async function PUT(req: Request) {
       commission: `${commRate}%`,
       commissionRate: commRate,
       commissionType: commissionType !== undefined ? commissionType : products[index].commissionType,
-      image: image !== undefined ? image.trim() : (products[index].image || ""),
+      image: updatedPrimaryImage,
+      images: updatedImages,
+      brochureUrl: body.brochureUrl !== undefined ? body.brochureUrl.trim() : (products[index].brochureUrl || ""),
+      brochureName: body.brochureName !== undefined ? body.brochureName.trim() : (products[index].brochureName || ""),
+      brochureSize: body.brochureSize !== undefined ? body.brochureSize.trim() : (products[index].brochureSize || ""),
       desc: desc !== undefined ? desc.trim() : products[index].desc,
       updatedAt: new Date().toISOString(),
     };

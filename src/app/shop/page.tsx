@@ -60,6 +60,10 @@ interface Product {
   commissionRate?: number;
   commissionType?: string;
   image?: string;
+  images?: string[];
+  brochureUrl?: string;
+  brochureName?: string;
+  brochureSize?: string;
   desc?: string;
 }
 
@@ -196,6 +200,7 @@ export default function ShopPage() {
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [showOnlyWishlist, setShowOnlyWishlist] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [shopActiveImage, setShopActiveImage] = useState<string>("");
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [promotions, setPromotions] = useState<any[]>([]);
 
@@ -1142,7 +1147,10 @@ export default function ShopPage() {
               return (
                 <div
                   key={prod.id}
-                  onClick={() => setSelectedProduct(prod)}
+                  onClick={() => {
+                    setSelectedProduct(prod);
+                    setShopActiveImage(prod.image || (prod.images?.[0] || ""));
+                  }}
                   className="group bg-white rounded-3xl border border-slate-200 overflow-hidden hover:shadow-xl hover:border-slate-300 transition-all flex flex-col cursor-pointer relative"
                 >
                   {/* Image Container */}
@@ -2829,10 +2837,10 @@ export default function ShopPage() {
             </button>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="relative h-72 sm:h-80 w-full rounded-3xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
                   <Image
-                    src={selectedProduct.image || "/service-cctv.png"}
+                    src={shopActiveImage || selectedProduct.image || "/service-cctv.png"}
                     alt={selectedProduct.name}
                     fill
                     className="object-cover"
@@ -2843,6 +2851,27 @@ export default function ShopPage() {
                     </span>
                   </div>
                 </div>
+
+                {/* Thumbnail Galeri Foto Produk */}
+                {selectedProduct.images && selectedProduct.images.length > 1 && (
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                    {selectedProduct.images.map((imgUrl, idx) => {
+                      const isCurrent = (shopActiveImage || selectedProduct.image) === imgUrl;
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setShopActiveImage(imgUrl)}
+                          className={`relative w-14 h-14 rounded-xl overflow-hidden border-2 flex-shrink-0 cursor-pointer transition-all ${
+                            isCurrent ? "border-dstech-blue ring-2 ring-blue-400/40" : "border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100"
+                          }`}
+                        >
+                          <Image src={imgUrl} alt={`Thumbnail ${idx + 1}`} fill className="object-cover" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs font-bold text-slate-700">
                   <div className="flex items-center gap-2">
@@ -2902,6 +2931,34 @@ export default function ShopPage() {
                     {selectedProduct.desc || "Perangkat teknologi resmi berkualitas prima dari PT. DSTech Smart Perkasa."}
                   </p>
                 </div>
+
+                {/* Unduh Berkas Brosur / E-Katalog PDF Spesifikasi */}
+                {selectedProduct.brochureUrl && (
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-bold text-emerald-950 block truncate">
+                          {selectedProduct.brochureName || "Brosur & Spesifikasi Teknis (PDF)"}
+                        </span>
+                        <span className="text-[10px] text-emerald-700 block">
+                          {selectedProduct.brochureSize || "Format PDF"} • Resmi dari DSTech
+                        </span>
+                      </div>
+                    </div>
+                    <a
+                      href={selectedProduct.brochureUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all shrink-0 cursor-pointer"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Unduh Brosur</span>
+                    </a>
+                  </div>
+                )}
 
                 <div className="space-y-3 pt-4 border-t border-slate-100">
                   <div className="flex gap-2">
