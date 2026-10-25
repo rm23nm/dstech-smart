@@ -661,7 +661,7 @@ export async function GET(req: Request) {
               ${isLastChunk ? `
               <div class="flex flex-col sm:flex-row justify-between items-start gap-4 pt-2 text-xs">
                 <div class="text-[9.5px] text-slate-500 space-y-1 max-w-sm">
-                  <p class="font-bold text-slate-700 uppercase tracking-wider">Catatan Teknis:</p>
+                  <p class="font-bold text-slate-700 uppercase tracking-wider">Catatan Teknis &amp; Garansi:</p>
                   <p>Seluruh unit perangkat yang tertera dijamin 100% baru, bergaransi resmi pabrik, dan sesuai spesifikasi teknis penawaran.</p>
                 </div>
 
@@ -686,10 +686,52 @@ export async function GET(req: Request) {
                   </div>
                 </div>
               </div>
+
+              <!-- Paraf Pengesahan Lembar Lampiran Terakhir -->
+              <div class="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200 text-xs">
+                <div class="text-center p-1.5 rounded-lg bg-slate-50/80 border border-slate-200">
+                  <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                    Paraf Pemesan / Klien (${sph.customerName || "Klien"})
+                  </p>
+                  <div class="h-7 flex items-center justify-center text-slate-300 text-[9px] italic">
+                    ( .................................................. )
+                  </div>
+                </div>
+                <div class="text-center p-1.5 rounded-lg bg-slate-50/80 border border-slate-200">
+                  <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                    Paraf ${sph.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                  </p>
+                  <div class="h-7 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
+                    ${sph.approvedBy || signerName || "H. Agus Supriyadi, S.T."}
+                  </div>
+                </div>
+              </div>
               ` : `
-              <div class="flex justify-between items-center pt-2 text-[10px] text-slate-500 italic border-t border-slate-200">
-                <span>* Bersambung ke lembar lampiran berikutnya (Halaman ${chunkIdx + 3})...</span>
-                <span class="font-mono font-bold">${sph.quotationNumber}</span>
+              <!-- Paraf Pengesahan Lembar Lampiran Bersambung (Halaman 2 dan Seterusnya) -->
+              <div class="space-y-2 pt-2 border-t border-slate-200">
+                <div class="grid grid-cols-2 gap-4 text-xs">
+                  <div class="text-center p-1.5 rounded-lg bg-slate-50/80 border border-slate-200">
+                    <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      Paraf Pemesan / Klien (${sph.customerName || "Klien"})
+                    </p>
+                    <div class="h-7 flex items-center justify-center text-slate-300 text-[9px] italic">
+                      ( .................................................. )
+                    </div>
+                  </div>
+                  <div class="text-center p-1.5 rounded-lg bg-slate-50/80 border border-slate-200">
+                    <p class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                      Paraf ${sph.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                    </p>
+                    <div class="h-7 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
+                      ${sph.approvedBy || signerName || "H. Agus Supriyadi, S.T."}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-1 text-[10px] text-slate-500 italic border-t border-slate-100">
+                  <span>* Bersambung ke lembar lampiran berikutnya (Halaman ${chunkIdx + 3})...</span>
+                  <span class="font-mono font-bold">${sph.quotationNumber}</span>
+                </div>
               </div>
               `}
 

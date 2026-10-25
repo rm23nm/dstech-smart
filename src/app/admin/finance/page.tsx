@@ -17749,9 +17749,31 @@ export default function AdminFinanceERPPage() {
                           </div>
                         </>
                       ) : (
-                        <div className="flex justify-between items-center pt-2 text-[10px] text-slate-500 italic border-t border-slate-200">
-                          <span>* Bersambung ke lembar lampiran berikutnya (Halaman {chunkIdx + 3})...</span>
-                          <span className="font-mono font-bold">{selectedQuotationForPrint.quotationNumber}</span>
+                        <div className="space-y-2 pt-2 border-t border-slate-200">
+                          {/* Paraf Pengesahan Tiap Lembar Lampiran (Halaman 2 dan Seterusnya) */}
+                          <div className="grid grid-cols-2 gap-4 text-xs">
+                            <div className="text-center p-1.5 rounded-lg bg-slate-50/80 border border-slate-200">
+                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                Paraf Pemesan / Klien ({selectedQuotationForPrint.customerName || "Klien"})
+                              </p>
+                              <div className="h-7 flex items-center justify-center text-slate-300 text-[9px] italic">
+                                ( .................................................. )
+                              </div>
+                            </div>
+                            <div className="text-center p-1.5 rounded-lg bg-slate-50/80 border border-slate-200">
+                              <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                Paraf {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                              </p>
+                              <div className="h-7 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
+                                {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-between items-center pt-1 text-[10px] text-slate-500 italic border-t border-slate-100">
+                            <span>* Bersambung ke lembar lampiran berikutnya (Halaman {chunkIdx + 3})...</span>
+                            <span className="font-mono font-bold">{selectedQuotationForPrint.quotationNumber}</span>
+                          </div>
                         </div>
                       )}
                     </div>
