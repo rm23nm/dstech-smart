@@ -8836,6 +8836,24 @@ export default function AdminFinanceERPPage() {
                         <td className="p-3 font-black text-slate-900 whitespace-nowrap">
                           <div className="flex flex-wrap items-center gap-1.5">
                             <span className="font-mono text-dstech-blue">{sale.invoiceNumber}</span>
+                            {((sale as any).sourceApp || (sale as any).sourceAppLabel) && (
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider inline-flex items-center gap-1 border ${
+                                  (sale as any).sourceApp === "SMARTPRO"
+                                    ? "bg-indigo-100 text-indigo-900 border-indigo-300"
+                                    : (sale as any).sourceApp === "POS"
+                                    ? "bg-amber-100 text-amber-900 border-amber-300"
+                                    : (sale as any).sourceApp === "MASJIDKUSMART"
+                                    ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                                    : (sale as any).sourceApp === "SMARTBOT"
+                                    ? "bg-sky-100 text-sky-900 border-sky-300"
+                                    : "bg-purple-100 text-purple-900 border-purple-300"
+                                }`}
+                                title={`Transaksi Satelit: ${(sale as any).sourceAppLabel || (sale as any).sourceApp}`}
+                              >
+                                🌐 {(sale as any).sourceAppLabel || (sale as any).sourceApp}
+                              </span>
+                            )}
                             {(sale.businessEntity || "PT") === "NON_PT" ? (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wider inline-flex items-center gap-1" title="Entitas Non-PT (Bebas PPN)">
                                 🏬 DSTech Smart

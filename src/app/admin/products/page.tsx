@@ -22,7 +22,8 @@ import {
   Store,
   FileText,
   Download,
-  Star
+  Star,
+  Send
 } from "lucide-react";
 
 export interface ProductItem {
@@ -130,6 +131,25 @@ export default function ProductAdmin() {
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  };
+
+  const [isSyncingSmartPro, setIsSyncingSmartPro] = useState(false);
+
+  const handleSyncToSmartPro = async () => {
+    setIsSyncingSmartPro(true);
+    try {
+      const res = await fetch("/api/products/sync-smartpro", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || "Katalog berhasil disinkronkan ke SmartPro WA!");
+      } else {
+        showToast(data.error || "Gagal sinkron katalog ke SmartPro", "error");
+      }
+    } catch {
+      showToast("Kendala jaringan saat sinkron ke SmartPro", "error");
+    } finally {
+      setIsSyncingSmartPro(false);
+    }
   };
 
   // Fetch products from API on mount
@@ -599,7 +619,16 @@ export default function ProductAdmin() {
             Kelola inventaris hardware CCTV, Smart Home, Running Text, Barrier Gate, dan Software
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleSyncToSmartPro}
+            disabled={isSyncingSmartPro}
+            className="h-12 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 active:scale-95 transition-all self-start sm:self-auto cursor-pointer disabled:opacity-50"
+            title="Sinkronkan seluruh katalog produk ke akun utama SmartPro WA Gateway"
+          >
+            <Send className={`w-4 h-4 ${isSyncingSmartPro ? "animate-spin" : ""}`} />
+            <span>{isSyncingSmartPro ? "Menyinkronkan..." : "⚡ Sync ke SmartPro"}</span>
+          </button>
           <Link
             href="/admin/categories"
             className="h-12 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-all self-start sm:self-auto"

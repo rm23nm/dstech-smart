@@ -150,6 +150,25 @@ export default function AdminCrmPage() {
     notes: "",
   });
   const [isSubmittingActivity, setIsSubmittingActivity] = useState(false);
+  const [isSyncingSmartPro, setIsSyncingSmartPro] = useState(false);
+
+  const handleSyncToSmartPro = async () => {
+    setIsSyncingSmartPro(true);
+    try {
+      const res = await fetch("/api/crm/sync-smartpro", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || "Berhasil sinkron ke SmartPro WA!");
+      } else {
+        showToast(data.error || "Gagal sinkron ke SmartPro WA");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Kendala jaringan saat sinkron ke SmartPro.");
+    } finally {
+      setIsSyncingSmartPro(false);
+    }
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -411,6 +430,16 @@ export default function AdminCrmPage() {
               <span>Tabel</span>
             </button>
           </div>
+
+          <button
+            onClick={handleSyncToSmartPro}
+            disabled={isSyncingSmartPro}
+            className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-500/20 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Sinkronkan seluruh prospek CRM ke akun utama SmartPro WA Gateway"
+          >
+            <Send className={`w-3.5 h-3.5 ${isSyncingSmartPro ? "animate-spin" : ""}`} />
+            <span>{isSyncingSmartPro ? "Menyinkronkan..." : "⚡ Sync ke SmartPro WA"}</span>
+          </button>
 
           <button
             onClick={handleOpenAddModal}
