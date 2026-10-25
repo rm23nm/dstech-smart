@@ -4724,6 +4724,71 @@
 
 ---
 
+### 162. Tugas: Implementasi Fitur Pendeteksi Spam Cerdas (Spam & Phishing Shield) pada Email Center (/admin/mail)
+- **Permintaan Pengguna**:
+  - *"tolong tambahkan fitur pendeteksi spam"*
+- **Status**: 🟡 **SEDANG DIKERJAKAN**
+- **Analisis Kebutuhan & Desain Solusi**:
+  1. **Mesin Evaluasi Spam (Spam & Phishing Scoring Engine)**:
+     - Memeriksa indikator pengirim, subjek, dan badan email untuk mendeteksi penipuan, phishing, promosi agresif, dan malware links.
+     - Perhitungan `spamScore` (0 - 100) dan klasifikasi otomatis `isSpam: boolean` serta `spamReason: string`.
+  2. **Dukungan Folder Spam (`spam`) di Backend & Maildir**:
+     - Membaca pesan fisik dari subdirektori Maildir `.Junk` di `/www/vmail/{domain}/{user}/.Junk/` serta pesan yang dievaluasi sebagai spam.
+     - Mendukung aksi pemindahan pesan ke folder `spam` dan pengembalian (*"Tandai Bukan Spam"*).
+  3. **Antarmuka Pengguna Email Center (`/admin/mail`)**:
+     - Menu navigasi folder baru: **"Spam / Phishing"** dengan ikon `ShieldAlert` dan badge penghitung unread spam.
+     - Badge peringatan spam pada daftar email inbox/spam.
+     - Banner peringatan keamanan mencolok pada tampilan baca email yang terdeteksi spam.
+     - Tombol aksi cepat: *"Tandai Sebagai Spam"* dan *"Tandai Bukan Spam"*.
+- **Rincian Step-by-Step Pelaksanaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [ ] **Langkah 2**: Buat cadangan file `src/app/api/mail/messages/route.ts` dan `src/app/admin/mail/page.tsx` ke folder `_backup_spam_detector/`.
+  3. [ ] **Langkah 3**: Kembangkan modul deteksi spam dan pembacaan folder `spam` / `.Junk` di `src/app/api/mail/messages/route.ts`.
+  4. [ ] **Langkah 4**: Perbarui UI `src/app/admin/mail/page.tsx` dengan tab folder Spam, badge spam, security warning banner, dan aksi tandai spam/bukan spam.
+  5. [ ] **Langkah 5**: Uji validasi TypeScript (`tsc --noEmit`) dan build Next.js lokal `npm run build` (58/58 routes).
+  6. [ ] **Langkah 6**: Bersihkan folder cadangan sementara `_backup_spam_detector/`.
+  7. [ ] **Langkah 7**: Push ke repository GitHub via `push_with_native_git.js` dan deploy ke live VPS aaPanel via `deploy_live.js`.
+  8. [ ] **Langkah 8**: Verifikasi fitur deteksi spam di live server dan update `LAPORAN_PROGRES.md` menjadi Selesai.
+
+---
+
+### 163. Tugas (Antrian Berikutnya): Fitur Penerima CC (Carbon Copy) dan Unggah Lampiran Berkas pada Pengiriman Email (/admin/mail)
+- **Permintaan Pengguna**:
+  - *"untuk pengiriman pesan buatkan cc to dan juga lampiran pesan"*
+- **Status**: ⏳ **DALAM ANTRIAN (Akan Dikerjakan Segera Setelah Tugas 162 Selesai)**
+- **Rencana Pekerjaan**:
+  1. Tambahkan kolom input `ccEmail` (Carbon Copy) pada antarmuka penulisan email (`composeForm`) di `src/app/admin/mail/page.tsx`.
+  2. Tambahkan komponen unggah lampiran berkas (Attachments Dropzone / File Picker) yang mendukung multi-file (PDF, Word, Excel, Gambar, ZIP hingga batas ukuran tertentu) dengan pratinjau daftar lampiran & tombol hapus lampiran.
+  3. Perbarui backend API `src/app/api/mail/send/route.ts` untuk memproses header `Cc` pada pengiriman SMTP dan menyisipkan lampiran berkas multipart/form-data ke server mail.
+  4. Uji pengiriman email ber-CC dan berlampiran, validasi build, dan deploy ke live VPS.
+
+---
+
+### 164. Tugas (Antrian Berikutnya): Perbaikan Sinkronisasi Hapus Pesan Email ke Maildir Fisik Server (/admin/mail & /api/mail/messages)
+- **Permintaan Pengguna**:
+  - *"untuk hapus pesan belum bisa"* (Tangkapan layar menunjukkan klik tombol hapus / sampah belum memindahkan atau menghapus berkas fisik email di server).
+- **Status**: ⏳ **DALAM ANTRIAN (Akan Dikerjakan Segera Setelah Tugas 163 Selesai)**
+- **Investigasi Akar Masalah & Rencana Pekerjaan**:
+  1. File email yang diterima dari Maildir disimpan secara fisik di folder server `/www/vmail/{domain}/{user}/new/` atau `cur/`.
+  2. Handler `PATCH` sebelumnya hanya memperbarui folder di database lokal `dstech_mail_messages.json`, belum memindahkan berkas fisik Maildir ke subfolder `.Trash/cur/`.
+  3. Handler `DELETE` sebelumnya hanya menghapus dari JSON, belum melakukan `fs.unlinkSync` pada berkas fisik di server VPS.
+  4. Perlu sinkronisasi operasi berkas fisik:
+     - Ketika dipindahkan ke Trash: Pindahkan file dari `new` / `cur` ke `.Trash/cur`.
+     - Ketika dihapus permanen: Hapus file fisik dari direktori Maildir server.
+
+---
+
+### 165. Tugas (Antrian Berikutnya): Fitur Teruskan Email (Forward Message) dengan Lampiran & Riwayat Pesan Asli (/admin/mail)
+- **Permintaan Pengguna**:
+  - *"fitur forward tidak ada"*
+- **Status**: ⏳ **DALAM ANTRIAN (Akan Dikerjakan Segera Setelah Tugas 164 Selesai)**
+- **Rencana Pekerjaan**:
+  1. Tambahkan tombol **"Teruskan (Forward)"** (ikon `CornerUpRight` / `Share2`) di action bar detail pesan `Reading Pane`.
+  2. Handler `handleForwardMessage`: Membuka tab compose dengan subjek berawalan `Fwd: [Subject Asli]`, mengosongkan kolom penerima `toEmail` agar diisi tujuan baru, dan menyalin format kutipan pesan asli (*"---------- Forwarded message ---------"* lengkap dengan pengirim, tanggal, subjek, penerima, dan isi pesan) serta menyertakan lampiran yang ada.
+  3. Uji coba teruskan email ke alamat baru dan verifikasi di live.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
@@ -4740,5 +4805,6 @@
 
 ---
 *Laporan ini dibuat untuk memudahkan Agen AI selanjutnya melanjutkan pekerjaan.*
+
 
 

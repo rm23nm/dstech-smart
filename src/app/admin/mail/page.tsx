@@ -26,6 +26,8 @@ import {
   FileText,
   Server,
   Lock,
+  ShieldAlert,
+  AlertTriangle,
 } from "lucide-react";
 
 interface MailAccount {
@@ -45,7 +47,7 @@ interface MailAccount {
 interface MailMessage {
   id: string;
   accountEmail: string;
-  folder: "inbox" | "sent" | "trash";
+  folder: "inbox" | "sent" | "trash" | "spam";
   fromName: string;
   fromEmail: string;
   toEmail: string;
@@ -56,17 +58,21 @@ interface MailMessage {
   isRead: boolean;
   isStarred: boolean;
   hasAttachments?: boolean;
+  isSpam?: boolean;
+  spamScore?: number;
+  spamReason?: string;
 }
 
 export default function AdminMailPage() {
   const [activeTab, setActiveTab] = useState<"inbox" | "compose" | "accounts">("inbox");
-  const [currentFolder, setCurrentFolder] = useState<"inbox" | "sent" | "trash">("inbox");
+  const [currentFolder, setCurrentFolder] = useState<"inbox" | "sent" | "trash" | "spam">("inbox");
   const [accounts, setAccounts] = useState<MailAccount[]>([]);
   const [selectedAccountEmail, setSelectedAccountEmail] = useState<string>("");
   const [messages, setMessages] = useState<MailMessage[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<MailMessage | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [spamCount, setSpamCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSending, setIsSending] = useState<boolean>(false);
   const [alertInfo, setAlertInfo] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -128,6 +134,7 @@ export default function AdminMailPage() {
       if (json.success && json.data) {
         setMessages(json.data);
         setUnreadCount(json.unreadInboxCount || 0);
+        setSpamCount(json.spamCount || 0);
         if (json.data.length > 0 && !selectedMessage) {
           setSelectedMessage(json.data[0]);
         } else if (json.data.length === 0) {
@@ -198,6 +205,47 @@ export default function AdminMailPage() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleToggleSpam = async (msg: MailMessage, targetIsSpam: boolean, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      await fetch("/api/mail/messages", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: msg.id,
+          accountEmail: msg.accountEmail || selectedAccountEmail,
+          folder: targetIsSpam ? "spam" : "inbox",
+          isSpam: targetIsSpam,
+          fromName: msg.fromName,
+          fromEmail: msg.fromEmail,
+          toEmail: msg.toEmail,
+          subject: msg.subject,
+          snippet: msg.snippet,
+          bodyHtml: msg.bodyHtml,
+          date: msg.date,
+        }),
+      });
+      showAlert(
+        "success",
+        targetIsSpam
+          ? "Pesan berhasil ditandai sebagai Spam dan dipindahkan ke folder Spam."
+          : "Pesan berhasil ditandai Bukan Spam dan dipindahkan ke Kotak Masuk."
+      );
+      if (selectedMessage?.id === msg.id) {
+        setSelectedMessage({
+          ...selectedMessage,
+          isSpam: targetIsSpam,
+          folder: targetIsSpam ? "spam" : "inbox",
+          spamScore: targetIsSpam ? 100 : 0,
+          spamReason: targetIsSpam ? "Ditandai manual sebagai Spam" : "Ditandai manual sebagai Bukan Spam",
+        });
+      }
+      fetchMessages();
+    } catch (err) {
+      showAlert("error", "Gagal memperbarui status spam pesan.");
     }
   };
 
@@ -550,6 +598,28 @@ export default function AdminMailPage() {
 
               <button
                 onClick={() => {
+                  setCurrentFolder("spam");
+                  setSelectedMessage(null);
+                }}
+                className={`w-full px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                  currentFolder === "spam"
+                    ? "bg-rose-50 text-rose-700 font-black shadow-2xs"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <span className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-rose-600" />
+                  <span>Spam & Phishing</span>
+                </span>
+                {spamCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black">
+                    {spamCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
                   setCurrentFolder("trash");
                   setSelectedMessage(null);
                 }}
@@ -647,9 +717,17 @@ export default function AdminMailPage() {
                         <span className="text-xs font-black text-slate-800 truncate">
                           {currentFolder === "sent" ? `Ke: ${msg.toEmail}` : msg.fromName || msg.fromEmail}
                         </span>
-                        <span className="text-[10px] text-slate-400 font-medium shrink-0">
-                          {msg.date.split(" ")[0]}
-                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {msg.isSpam && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-700 text-[9px] font-black">
+                              <AlertTriangle className="w-2.5 h-2.5" />
+                              SPAM
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {msg.date.split(" ")[0]}
+                          </span>
+                        </div>
                       </div>
                       <p className={`text-xs mt-1 truncate ${!msg.isRead ? "text-indigo-950 font-black" : "text-slate-700"}`}>
                         {msg.subject}
@@ -717,6 +795,27 @@ export default function AdminMailPage() {
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+
+                    {/* Tombol Tindakan Spam */}
+                    {selectedMessage.isSpam || selectedMessage.folder === "spam" ? (
+                      <button
+                        onClick={() => handleToggleSpam(selectedMessage, false)}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Tandai Bukan Spam & Pindahkan ke Inbox"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Bukan Spam</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleToggleSpam(selectedMessage, true)}
+                        className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 cursor-pointer transition-colors"
+                        title="Tandai Sebagai Spam & Pindahkan ke Folder Spam"
+                      >
+                        <ShieldAlert className="w-4 h-4 text-rose-500" />
+                      </button>
+                    )}
+
                     {selectedMessage.folder === "trash" && (
                       <button
                         onClick={() => handleDeletePermanent(selectedMessage.id)}
@@ -735,6 +834,39 @@ export default function AdminMailPage() {
                     <span>Balas Pesan</span>
                   </button>
                 </div>
+
+                {/* Banner Peringatan Keamanan Spam */}
+                {selectedMessage.isSpam && (
+                  <div className="p-3.5 rounded-2xl bg-linear-to-r from-rose-50 to-amber-50 border border-rose-200 text-xs space-y-2 shadow-2xs">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="p-2 rounded-xl bg-rose-500 text-white shrink-0 shadow-xs">
+                          <ShieldAlert className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-black text-rose-900 flex items-center gap-2">
+                            <span>Peringatan Keamanan: Terdeteksi Sebagai Spam / Phishing</span>
+                            <span className="px-1.5 py-0.5 rounded-md bg-rose-200 text-rose-800 text-[10px] font-black">
+                              Skor Risiko: {selectedMessage.spamScore || 85}%
+                            </span>
+                          </h4>
+                          <p className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+                            {selectedMessage.spamReason || "Email ini terdeteksi memiliki pola penipuan, promosi agresif, atau pengirim berisiko."}
+                          </p>
+                          <p className="text-[10px] text-slate-500 mt-1 italic">
+                            ⚠️ Waspada: Jangan pernah mengklik tautan tidak dikenal atau memasukkan kata sandi Anda.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleToggleSpam(selectedMessage, false)}
+                        className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-rose-300 text-rose-700 font-bold text-xs shrink-0 cursor-pointer shadow-2xs transition-all"
+                      >
+                        Bukan Spam
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Info Pengirim & Subjek */}
                 <div>

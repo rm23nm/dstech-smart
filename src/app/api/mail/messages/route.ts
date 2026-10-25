@@ -7,7 +7,7 @@ const messagesFilePath = path.join(process.cwd(), "src", "data", "dstech_mail_me
 interface MailMessage {
   id: string;
   accountEmail: string;
-  folder: "inbox" | "sent" | "trash";
+  folder: "inbox" | "sent" | "trash" | "spam";
   fromName: string;
   fromEmail: string;
   toEmail: string;
@@ -18,6 +18,111 @@ interface MailMessage {
   isRead: boolean;
   isStarred: boolean;
   hasAttachments?: boolean;
+  isSpam?: boolean;
+  spamScore?: number;
+  spamReason?: string;
+}
+
+export function detectSpam(msg: {
+  subject: string;
+  snippet: string;
+  fromEmail: string;
+  fromName: string;
+  bodyHtml?: string;
+}): { isSpam: boolean; spamScore: number; spamReason: string } {
+  let score = 0;
+  const reasons: string[] = [];
+
+  const subjectLower = (msg.subject || "").toLowerCase();
+  const bodyTextLower = ((msg.snippet || "") + " " + (msg.bodyHtml || "")).toLowerCase();
+  const fromEmailLower = (msg.fromEmail || "").toLowerCase();
+
+  // 1. Indikasi Phishing / Rekayasa Sosial
+  const phishingKeywords = [
+    { word: "verify your account", reason: "Permintaan verifikasi akun mencurigakan" },
+    { word: "confirm your password", reason: "Permintaan konfirmasi kata sandi" },
+    { word: "account suspended", reason: "Ancaman penangguhan akun palsu" },
+    { word: "urgent action required", reason: "Taktik kepanikan darurat" },
+    { word: "security alert: verify", reason: "Peringatan keamanan verifikasi palsu" },
+    { word: "klik di sini untuk verifikasi", reason: "Tautan verifikasi kredensial mencurigakan" },
+    { word: "reset password segera", reason: "Peringatan reset kata sandi mendesak" },
+    { word: "login credentials", reason: "Permintaan kredensial login" },
+  ];
+  for (const k of phishingKeywords) {
+    if (subjectLower.includes(k.word) || bodyTextLower.includes(k.word)) {
+      score += 50;
+      reasons.push(k.reason);
+      break;
+    }
+  }
+
+  // 2. Indikasi Penipuan Hadiah / Lotere / Kripto Finansial
+  const fraudKeywords = [
+    { word: "congratulations you won", reason: "Klaim pemenang undian fiktif" },
+    { word: "claim your prize", reason: "Klaim hadiah fiktif" },
+    { word: "lottery winner", reason: "Pemberitahuan pemenang lotere" },
+    { word: "fund transfer of", reason: "Tawaran transfer dana ilegal" },
+    { word: "inheritance notification", reason: "Penipuan warisan dana" },
+    { word: "bitcoin investment profit", reason: "Investasi kripto tidak wajar" },
+    { word: "guaranteed return", reason: "Janji keuntungan investasi instan" },
+    { word: "pinjaman dana tanpa jaminan", reason: "Tawaran pinjaman online ilegal" },
+    { word: "menang undian tunai", reason: "Klaim undian tunai" },
+    { word: "klaim bonus", reason: "Promosi klaim bonus uang" },
+    { word: "slot gacor", reason: "Promosi judi online / kasino" },
+    { word: "judi online", reason: "Promosi perjudian tanpa izin" },
+    { word: "casino online", reason: "Tawaran kasino online" },
+    { word: "viagra", reason: "Promosi obat ilegal / tidak sah" },
+    { word: "cialis", reason: "Promosi obat ilegal / tidak sah" },
+  ];
+  for (const f of fraudKeywords) {
+    if (subjectLower.includes(f.word) || bodyTextLower.includes(f.word)) {
+      score += 55;
+      reasons.push(f.reason);
+      break;
+    }
+  }
+
+  // 3. Bounce / Spamhaus / Blacklist Detection
+  if (
+    bodyTextLower.includes("spamhaus's list") ||
+    bodyTextLower.includes("blocked by spamhaus") ||
+    bodyTextLower.includes("553 5.7.1") ||
+    bodyTextLower.includes("550-5.7.1")
+  ) {
+    score += 45;
+    reasons.push("IP pengirim masuk daftar blokir Spamhaus");
+  }
+
+  // 4. Huruf Kapital Berlebih pada Subjek
+  if (msg.subject && msg.subject.length > 12) {
+    const letters = msg.subject.replace(/[^a-zA-Z]/g, "");
+    if (letters.length > 8) {
+      const upperCount = letters.split("").filter((c) => c === c.toUpperCase()).length;
+      if (upperCount / letters.length > 0.75) {
+        score += 25;
+        reasons.push("Subjek menggunakan huruf kapital berlebih");
+      }
+    }
+  }
+
+  // 5. Tanda Baca / Simbol Berlebih
+  if (/((\$\$\$|\!\!\!|\?\?\?|€€€|£££))/.test(msg.subject)) {
+    score += 20;
+    reasons.push("Penggunaan simbol mencolok berlebih ($$$, !!!)");
+  }
+
+  // 6. Domain pengirim mencurigakan (disposable / spammy TLD)
+  const suspiciousTlds = [".xyz", ".top", ".click", ".monster", ".buzz", ".work", ".link", ".rest", ".fit", ".gq", ".cf", ".tk", ".ml"];
+  if (suspiciousTlds.some((tld) => fromEmailLower.endsWith(tld))) {
+    score += 30;
+    reasons.push("Domain pengirim menggunakan ekstensi TLD berisiko tinggi");
+  }
+
+  const finalScore = Math.min(score, 100);
+  const isSpam = finalScore >= 50;
+  const spamReason = reasons.length > 0 ? reasons.join(" • ") : "Pola email normal";
+
+  return { isSpam, spamScore: finalScore, spamReason };
 }
 
 function parseMimeHeader(raw: string): string {
@@ -36,7 +141,7 @@ function parseMimeHeader(raw: string): string {
   });
 }
 
-function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox" | "sent" | "trash", isNew: boolean): MailMessage | null {
+function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox" | "sent" | "trash" | "spam", isNew: boolean): MailMessage | null {
   try {
     const content = fs.readFileSync(filePath, "utf-8");
     const splitMatch = content.match(/\r?\n\r?\n/);
@@ -87,28 +192,43 @@ function parseMaildirFile(filePath: string, accountEmail: string, folder: "inbox
 
     const snippet = cleanBody.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim().substring(0, 160);
     const dateStr = headers["date"] || new Date().toISOString();
+    const subject = parseMimeHeader(headers["subject"] || "(Tanpa Subjek)");
+
+    // Jalankan deteksi spam otomatis
+    const spamCheck = detectSpam({
+      subject,
+      snippet,
+      fromEmail: fromEmail || "",
+      fromName: fromName || "",
+      bodyHtml: cleanBody,
+    });
+
+    const isFolderSpam = folder === "spam" || (folder === "inbox" && spamCheck.isSpam);
 
     return {
       id: `maildir_${path.basename(filePath)}`,
       accountEmail,
-      folder,
+      folder: isFolderSpam && folder === "spam" ? "spam" : folder,
       fromName: fromName || fromEmail || "Pengirim",
       fromEmail: fromEmail || "unknown@mail.com",
       toEmail: headers["to"] || accountEmail,
-      subject: parseMimeHeader(headers["subject"] || "(Tanpa Subjek)"),
+      subject,
       snippet: snippet || "(Tidak ada ringkasan teks)",
       bodyHtml: `<div style="white-space: pre-wrap; font-family: sans-serif; line-height: 1.6;">${cleanBody.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>`,
       date: dateStr,
       isRead: !isNew,
       isStarred: false,
       hasAttachments: !!headers["content-type"]?.includes("multipart/mixed"),
+      isSpam: spamCheck.isSpam,
+      spamScore: spamCheck.spamScore,
+      spamReason: spamCheck.spamReason,
     };
   } catch {
     return null;
   }
 }
 
-function readMessagesFromMaildir(accountEmail?: string | null, folder: "inbox" | "sent" | "trash" = "inbox"): MailMessage[] {
+function readMessagesFromMaildir(accountEmail?: string | null, folder: "inbox" | "sent" | "trash" | "spam" = "inbox"): MailMessage[] {
   const result: MailMessage[] = [];
   const vmailRoot = "/www/vmail";
   if (!fs.existsSync(vmailRoot)) return [];
@@ -149,7 +269,12 @@ function readMessagesFromMaildir(accountEmail?: string | null, folder: "inbox" |
     } else if (folder === "trash") {
       dirsToScan.push({ dir: path.join(accDir, ".Trash", "new"), isNew: false });
       dirsToScan.push({ dir: path.join(accDir, ".Trash", "cur"), isNew: false });
+    } else if (folder === "spam") {
+      dirsToScan.push({ dir: path.join(accDir, ".Junk", "new"), isNew: true });
       dirsToScan.push({ dir: path.join(accDir, ".Junk", "cur"), isNew: false });
+      // Juga scan inbox untuk pesan yang skor spamnya tinggi
+      dirsToScan.push({ dir: path.join(accDir, "new"), isNew: true });
+      dirsToScan.push({ dir: path.join(accDir, "cur"), isNew: false });
     }
 
     for (const { dir, isNew } of dirsToScan) {
@@ -161,7 +286,21 @@ function readMessagesFromMaildir(accountEmail?: string | null, folder: "inbox" |
             const fullPath = path.join(dir, file);
             if (fs.statSync(fullPath).isFile()) {
               const msg = parseMaildirFile(fullPath, acc.email, folder, isNew);
-              if (msg) result.push(msg);
+              if (msg) {
+                if (folder === "spam") {
+                  if (msg.isSpam || dir.includes(".Junk")) {
+                    msg.folder = "spam";
+                    result.push(msg);
+                  }
+                } else if (folder === "inbox") {
+                  // Jangan tampilkan email yang terdeteksi spam di inbox utama agar inbox bersih
+                  if (!msg.isSpam) {
+                    result.push(msg);
+                  }
+                } else {
+                  result.push(msg);
+                }
+              }
             }
           }
         } catch {}
@@ -193,7 +332,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const accountEmail = searchParams.get("accountEmail");
-    const folder = (searchParams.get("folder") || "inbox") as "inbox" | "sent" | "trash";
+    const folder = (searchParams.get("folder") || "inbox") as "inbox" | "sent" | "trash" | "spam";
     const search = searchParams.get("search")?.toLowerCase().trim();
 
     // 1. Baca pesan nyata dari Maildir server
@@ -206,7 +345,32 @@ export async function GET(request: Request) {
         (m) => m.accountEmail.toLowerCase() === accountEmail.toLowerCase()
       );
     }
-    if (folder) {
+
+    // Evaluasi spam pada json messages jika belum ada status spam
+    jsonMessages = jsonMessages.map((m) => {
+      if (m.isSpam === undefined) {
+        const sc = detectSpam({
+          subject: m.subject,
+          snippet: m.snippet,
+          fromEmail: m.fromEmail,
+          fromName: m.fromName,
+          bodyHtml: m.bodyHtml,
+        });
+        return {
+          ...m,
+          isSpam: sc.isSpam,
+          spamScore: sc.spamScore,
+          spamReason: sc.spamReason,
+        };
+      }
+      return m;
+    });
+
+    if (folder === "spam") {
+      jsonMessages = jsonMessages.filter((m) => m.folder === "spam" || (m.folder === "inbox" && m.isSpam));
+    } else if (folder === "inbox") {
+      jsonMessages = jsonMessages.filter((m) => m.folder === "inbox" && !m.isSpam);
+    } else {
       jsonMessages = jsonMessages.filter((m) => m.folder === folder);
     }
 
@@ -232,13 +396,18 @@ export async function GET(request: Request) {
     messages.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     // Hitung unread count untuk account ini di folder inbox
-    const allInboxMaildir = readMessagesFromMaildir(accountEmail, "inbox");
-    const unreadInboxCount = allInboxMaildir.filter((m) => !m.isRead).length;
+    const allInbox = readMessagesFromMaildir(accountEmail, "inbox");
+    const unreadInboxCount = allInbox.filter((m) => !m.isRead).length;
+
+    // Hitung total spam
+    const allSpam = readMessagesFromMaildir(accountEmail, "spam");
+    const spamCount = allSpam.length;
 
     return NextResponse.json({
       success: true,
       data: messages,
       unreadInboxCount,
+      spamCount,
     });
   } catch (error: any) {
     return NextResponse.json(
@@ -251,7 +420,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { id, isRead, isStarred, folder } = body;
+    const { id, isRead, isStarred, folder, isSpam } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -266,9 +435,46 @@ export async function PATCH(request: Request) {
     if (idx !== -1) {
       if (typeof isRead === "boolean") messages[idx].isRead = isRead;
       if (typeof isStarred === "boolean") messages[idx].isStarred = isStarred;
-      if (folder && ["inbox", "sent", "trash"].includes(folder)) {
-        messages[idx].folder = folder;
+      if (typeof isSpam === "boolean") {
+        messages[idx].isSpam = isSpam;
+        if (isSpam) {
+          messages[idx].folder = "spam";
+          messages[idx].spamScore = 100;
+          messages[idx].spamReason = "Ditandai manual sebagai Spam oleh pengguna";
+        } else {
+          messages[idx].folder = "inbox";
+          messages[idx].spamScore = 0;
+          messages[idx].spamReason = "Ditandai manual sebagai Bukan Spam oleh pengguna (Whitelist)";
+        }
+      } else if (folder && ["inbox", "sent", "trash", "spam"].includes(folder)) {
+        messages[idx].folder = folder as any;
+        if (folder === "spam") {
+          messages[idx].isSpam = true;
+        } else if (folder === "inbox") {
+          messages[idx].isSpam = false;
+        }
       }
+      saveMessages(messages);
+    } else {
+      // Jika pesan berasal dari Maildir, buat record override di dstech_mail_messages.json
+      const newOverride: MailMessage = {
+        id,
+        accountEmail: body.accountEmail || "",
+        folder: folder || (isSpam ? "spam" : "inbox"),
+        fromName: body.fromName || "",
+        fromEmail: body.fromEmail || "",
+        toEmail: body.toEmail || "",
+        subject: body.subject || "",
+        snippet: body.snippet || "",
+        bodyHtml: body.bodyHtml || "",
+        date: body.date || new Date().toISOString(),
+        isRead: typeof isRead === "boolean" ? isRead : true,
+        isStarred: typeof isStarred === "boolean" ? isStarred : false,
+        isSpam: typeof isSpam === "boolean" ? isSpam : folder === "spam",
+        spamScore: isSpam ? 100 : 0,
+        spamReason: isSpam ? "Ditandai manual sebagai Spam" : "Ditandai manual sebagai Bukan Spam",
+      };
+      messages.unshift(newOverride);
       saveMessages(messages);
     }
 
@@ -311,3 +517,4 @@ export async function DELETE(request: Request) {
     );
   }
 }
+
