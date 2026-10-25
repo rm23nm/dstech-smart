@@ -93,13 +93,21 @@ export async function POST(request: Request) {
     const dbPath = "/www/vmail/postfixadmin.db";
     if (fs.existsSync(dbPath)) {
       try {
+        let md5CryptHash = "";
+        try {
+          const { stdout } = await execPromise(`openssl passwd -1 "${password.replace(/"/g, '\\"')}"`);
+          md5CryptHash = stdout.trim();
+        } catch {
+          md5CryptHash = password;
+        }
+
         const hexEncoded = Buffer.from(Buffer.from(password).toString("base64")).toString("hex");
         const maildir = `${email}/`;
         const quotaBytes = (Number(quotaMb) || 5120) * 1024 * 1024;
         const now = new Date().toISOString().replace("T", " ").substring(0, 19);
 
-        // Eksekusi insert langsung ke sqlite3 postfixadmin
-        const sqlCmd = `sqlite3 ${dbPath} "INSERT OR REPLACE INTO mailbox (username, password, password_encode, full_name, is_admin, maildir, quota, current_usage, quota_active, local_part, domain, created, modified, active) VALUES ('${email}', 'MD5-CRYPT', '${hexEncoded}', '${fullName.trim()}', 0, '${maildir}', ${quotaBytes}, 0, 1, '${cleanUsername}', '${domain}', '${now}', '${now}', 1);"`;
+        // Eksekusi insert langsung ke sqlite3 postfixadmin dengan hash MD5-CRYPT valid
+        const sqlCmd = `sqlite3 ${dbPath} "INSERT OR REPLACE INTO mailbox (username, password, password_encode, full_name, is_admin, maildir, quota, current_usage, quota_active, local_part, domain, created, modified, active) VALUES ('${email}', '${md5CryptHash}', '${hexEncoded}', '${fullName.trim()}', 0, '${maildir}', ${quotaBytes}, 0, 1, '${cleanUsername}', '${domain}', '${now}', '${now}', 1);"`;
         await execPromise(sqlCmd);
 
         // Buat folder Maildir jika belum ada
@@ -153,8 +161,16 @@ export async function PATCH(request: Request) {
       const dbPath = "/www/vmail/postfixadmin.db";
       if (fs.existsSync(dbPath)) {
         try {
+          let md5CryptHash = "";
+          try {
+            const { stdout } = await execPromise(`openssl passwd -1 "${newPassword.replace(/"/g, '\\"')}"`);
+            md5CryptHash = stdout.trim();
+          } catch {
+            md5CryptHash = newPassword;
+          }
+
           const hexEncoded = Buffer.from(Buffer.from(newPassword).toString("base64")).toString("hex");
-          const sqlCmd = `sqlite3 ${dbPath} "UPDATE mailbox SET password_encode='${hexEncoded}', modified=datetime('now') WHERE username='${email}';"`;
+          const sqlCmd = `sqlite3 ${dbPath} "UPDATE mailbox SET password='${md5CryptHash}', password_encode='${hexEncoded}', modified=datetime('now') WHERE username='${email}';"`;
           await execPromise(sqlCmd);
         } catch (dbErr) {
           console.warn("Notice: PostfixAdmin password update warning:", dbErr);
