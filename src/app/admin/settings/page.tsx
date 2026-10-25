@@ -84,6 +84,7 @@ export interface SiteSettingsData {
   emailSupport: string;
   phone: string;
   address: string;
+  serviceArea?: string;
   googleMapsUrl: string;
   instagram: string;
   facebook: string;
@@ -112,6 +113,7 @@ export default function AdminSettingsPage() {
     emailSupport: "support@dstechsmart.com",
     phone: "0822-5949-4242",
     address: "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON, KOTA CILEGON - BANTEN",
+    serviceArea: "Banten (Cilegon, Serang, Tangerang), Jabodetabek, dan Seluruh Wilayah Indonesia (Nasional)",
     googleMapsUrl: "https://maps.google.com/?q=Perum+Bukit+Cilegon+Asri+Cilegon+Banten",
     instagram: "https://instagram.com/dstechsmart",
     facebook: "https://facebook.com/dstechsmart",
@@ -898,6 +900,22 @@ export default function AdminSettingsPage() {
                     onChange={(e) => setSettings({ ...settings, address: e.target.value })}
                     className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:border-dstech-blue leading-relaxed"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-slate-700 uppercase tracking-wider mb-2">
+                    Cakupan Wilayah Layanan (Nasional / Daerah)
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.serviceArea || "Banten (Cilegon, Serang, Tangerang), Jabodetabek, dan Seluruh Wilayah Indonesia (Nasional)"}
+                    onChange={(e) => setSettings({ ...settings, serviceArea: e.target.value })}
+                    placeholder="Contoh: Banten, Jabodetabek, dan Seluruh Wilayah Indonesia (Nasional)"
+                    className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:border-dstech-blue font-medium text-slate-800"
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Ditampilkan pada informasi jangkauan instalasi, e-store, dan footer website resmi.
+                  </p>
                 </div>
 
                 <div>

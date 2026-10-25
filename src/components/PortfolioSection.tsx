@@ -368,9 +368,14 @@ export default function PortfolioSection() {
         <div className="mt-16 sm:mt-20 p-6 sm:p-10 rounded-3xl bg-slate-50 border border-slate-200/80 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 text-center md:text-left leading-relaxed">
             <div className="space-y-2">
-              <h4 className="text-slate-900 font-black uppercase tracking-wider text-xs">Wilayah Layanan</h4>
+              <div className="flex items-center gap-1.5 justify-center md:justify-start">
+                <h4 className="text-slate-900 font-black uppercase tracking-wider text-xs">Wilayah Layanan</h4>
+                <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full">
+                  Nasional
+                </span>
+              </div>
               <p className="text-slate-600 text-xs sm:text-sm font-medium">
-                Banten (Cilegon, Serang, Merak, Pandeglang) & Area Jabodetabek.
+                Banten (Cilegon, Serang, Merak, Pandeglang), Area Jabodetabek, dan <strong className="text-slate-900 font-bold">Seluruh Wilayah Indonesia (Nasional)</strong>.
               </p>
             </div>
             <div className="space-y-2 border-slate-200 md:border-x px-0 md:px-8">

@@ -31,6 +31,9 @@ import {
   MapPin,
   CreditCard,
   ChevronRight,
+  ChevronLeft,
+  Flame,
+  Globe,
   AlertCircle,
   AlertTriangle,
   Upload,
@@ -140,24 +143,85 @@ const FALLBACK_PRODUCTS: Product[] = [
 const SHIPPING_COURIERS = [
   {
     id: "ARMADA_DSTECH",
-    name: "Armada Teknisi DSTech (Cilegon, Serang & Banten)",
+    name: "Armada Teknisi DSTech (Cilegon, Serang, Banten & Jabodetabek)",
     cost: 25000,
-    etd: "Hari Ini / Besok (Bisa Langsung Pasang)",
+    etd: "Hari Ini / Besok (Bisa Langsung Pasang Teknisi)",
     desc: "Diantar langsung oleh staf teknisi resmi PT DSTech Smart Perkasa.",
   },
   {
     id: "JNE_REG",
-    name: "JNE Express / J&T Regular",
-    cost: 30000,
-    etd: "2 - 3 Hari Kerja",
-    desc: "Pengiriman paket standar nasional dengan asuransi keamanan barang.",
+    name: "Ekspedisi Seluruh Indonesia (JNE / J&T / SiCepat)",
+    cost: 35000,
+    etd: "2 - 4 Hari Kerja (Seluruh Wilayah Indonesia)",
+    desc: "Pengiriman paket terasuransi ke seluruh pulau & provinsi di Indonesia.",
+  },
+  {
+    id: "CARGO_NASIONAL",
+    name: "Kargo Nasional / Proyek Industri (Indah Cargo / J&T Cargo)",
+    cost: 75000,
+    etd: "3 - 5 Hari Kerja (Antar Pulau & Nasional)",
+    desc: "Khusus pengiriman paket berat, barrier gate, tiang, & perangkat infrastruktur.",
   },
   {
     id: "INSTANT_EXPRESS",
-    name: "Instant Kurir Khusus Industri / Pabrik",
+    name: "Instant Kurir Khusus Industri / Urgent Cilegon",
     cost: 50000,
     etd: "3 - 5 Jam Tiba",
     desc: "Pengantaran prioritas kilat untuk kebutuhan mendesak industri Cilegon.",
+  },
+];
+
+const FEATURED_HERO_PRODUCTS = [
+  {
+    id: "dstech_hero_1",
+    badge: "🔥 BEST SELLER • CCTV AI",
+    badgeColor: "bg-red-500 text-white shadow-red-500/30",
+    title: "CCTV Proview 2 Lensa SM-PR5260-PT Dual-Cam",
+    subtitle: "Solusi Pengawasan Ultra HD Siang & Malam dengan AI Auto-Tracking",
+    desc: "Dilengkapi dua lensa optik simultan, zoom cerdas, audio dua arah jernih, dan penglihatan malam Full-Color aktif 24 jam dengan sertifikasi resmi PT. DSTech.",
+    price: 317000,
+    originalPrice: 450000,
+    discount: "30% OFF",
+    rating: 4.9,
+    reviews: 142,
+    image: "/service-cctv.png",
+    category: "Security System",
+    features: ["Dual-Lens 5MP Full-Color", "AI Humanoid Auto-Tracking", "Komunikasi Audio 2 Arah", "Garansi Sah 1 Tahun"],
+    installationFee: 150000,
+  },
+  {
+    id: "dstech_hero_2",
+    badge: "⭐ SMART HOME UNGGULAN",
+    badgeColor: "bg-blue-600 text-white shadow-blue-600/30",
+    title: "Smart Doorlock Biometrik X-100 Face & Fingerprint",
+    subtitle: "Akses Pintu Cerdas Biometrik Multi-Faktor Tanpa Kunci Fisik",
+    desc: "Mendukung pengenalan wajah 3D, sensor sidik jari ultra responsif 0.3 detik, kartu RFID, PIN acak anti-intip, dan pemantauan jarak jauh via aplikasi smartphone.",
+    price: 1850000,
+    originalPrice: 2450000,
+    discount: "25% OFF",
+    rating: 5.0,
+    reviews: 98,
+    image: "/service-smarthome.png",
+    category: "Smart Home",
+    features: ["3D Biometric Face Scan", "Sidik Jari 0.3s Anti-Palsu", "Kendali Jarak Jauh via WiFi", "Emergency USB-C Port"],
+    installationFee: 250000,
+  },
+  {
+    id: "dstech_hero_3",
+    badge: "🛡️ INDUSTRIAL & CLUSTER GATE",
+    badgeColor: "bg-emerald-600 text-white shadow-emerald-600/30",
+    title: "Automatic Barrier Gate High-Speed 1.8s Industrial",
+    subtitle: "Palang Parkir Otomatis Kecepatan Tinggi untuk Kawasan Industri & Cluster",
+    desc: "Ditenagai motor servo brushless berdaya tahan 5 juta siklus buka-tutup, sensor anti-bentur canggih, dan kompatibel penuh dengan sistem tiket serta kartu akses RFID.",
+    price: 8500000,
+    originalPrice: 9800000,
+    discount: "13% OFF",
+    rating: 4.9,
+    reviews: 64,
+    image: "/portfolio-industrial.png",
+    category: "Commercial Gate",
+    features: ["Kecepatan Buka 1.8 Detik", "Motor Servo Brushless", "Loop Detector Keamanan", "Integrasi RFID & ANPR"],
+    installationFee: 1500000,
   },
 ];
 
@@ -201,8 +265,17 @@ export default function ShopPage() {
   const [showOnlyWishlist, setShowOnlyWishlist] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [shopActiveImage, setShopActiveImage] = useState<string>("");
+  const [heroSlide, setHeroSlide] = useState(0);
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
   const [promotions, setPromotions] = useState<any[]>([]);
+
+  // Auto slide Hero Produk Unggulan setiap 6 detik
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setHeroSlide((prev) => (prev + 1) % FEATURED_HERO_PRODUCTS.length);
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Autentikasi Pengguna & Pembeli
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
@@ -1037,59 +1110,261 @@ export default function ShopPage() {
         </div>
       </header>
 
-      {/* HERO BANNER MARKETPLACE */}
-      <section className="bg-gradient-to-b from-white to-slate-100 py-10 px-4 sm:px-6 lg:px-8 border-b border-slate-200">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-3 max-w-2xl text-center md:text-left">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-dstech-blue text-xs font-black tracking-wide border border-blue-200">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              100% Original • Garansi Resmi 1 Tahun • Dukungan Teknisi Lapangan
-            </span>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-950 tracking-tight leading-tight">
-              Belanja Perangkat Cerdas &amp; IT <span className="text-dstech-blue italic">Bergaransi Sah.</span>
-            </h1>
-            <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">
-              Pusat pengadaan CCTV, Smart Doorlock, Palang Parkir Otomatis, dan Solusi Jaringan untuk rumah tinggal,
-              instansi, hingga kawasan industri dengan opsi pengiriman langsung + instalasi teknisi profesional.
-            </p>
+      {/* Top Banner: Cakupan Wilayah Layanan Nasional (Tugas 198) */}
+      <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 text-white text-[11px] sm:text-xs py-2 px-4 border-b border-blue-900/40">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1.5 text-center sm:text-left">
+          <div className="flex items-center gap-2 font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <Globe className="w-3.5 h-3.5 text-blue-400" />
+            <span>Melayani Pengiriman &amp; Pengadaan Perangkat ke <strong>Seluruh Wilayah Indonesia (Nasional)</strong></span>
           </div>
+          <div className="flex items-center gap-4 text-slate-300 font-medium">
+            <span>🛠️ Tersedia Layanan Pasang Teknisi</span>
+            <span className="hidden md:inline">|</span>
+            <span className="hidden md:inline">📞 CS Resmi: 0822-5949-4242</span>
+          </div>
+        </div>
+      </div>
 
-          {/* Quick Track Input Bar */}
-          <div className="w-full md:w-96 bg-white p-4 rounded-3xl shadow-xl border border-slate-200 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
-                <Truck className="w-4 h-4" />
+      {/* HERO BANNER SHOWCASE & PROMO SLIDER (Tugas 199) */}
+      <section className="bg-slate-950 text-white py-8 sm:py-12 px-4 sm:px-6 lg:px-8 border-b border-slate-800 relative overflow-hidden">
+        {/* Glow Ambient Lights */}
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="max-w-7xl mx-auto space-y-6 relative z-10">
+          {/* Header Bar Hero */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-dstech-blue mb-1">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>Featured Showcase • Produk Unggulan &amp; Promo Resmi</span>
               </div>
-              <div>
-                <h4 className="text-xs font-black text-slate-900">Lacak Pengiriman Anda</h4>
-                <p className="text-[10px] text-slate-500">Cek status pesanan secara real-time</p>
-              </div>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
+                Katalog Produk Pilihan <span className="text-dstech-blue italic">DSTech Smart</span>
+              </h1>
             </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                placeholder="No. Pesanan / No. Resi..."
-                value={trackingQuery}
-                onChange={(e) => setTrackingQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+
+            {/* Quick Track Input Bar */}
+            <div className="w-full md:w-80 bg-slate-900/90 p-3 rounded-2xl border border-slate-700/80 shadow-xl space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <Truck className="w-3.5 h-3.5" />
+                </div>
+                <div className="text-[11px] font-bold text-slate-300">Lacak Pengiriman Anda</div>
+              </div>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  placeholder="No. Pesanan / Resi..."
+                  value={trackingQuery}
+                  onChange={(e) => setTrackingQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setIsTrackingModalOpen(true);
+                      handleTrackOrder(trackingQuery);
+                    }
+                  }}
+                  className="flex-1 px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-xl font-bold text-white placeholder-slate-500 focus:outline-none focus:border-dstech-blue"
+                />
+                <button
+                  onClick={() => {
                     setIsTrackingModalOpen(true);
                     handleTrackOrder(trackingQuery);
-                  }
-                }}
-                className="flex-1 px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30"
-              />
-              <button
-                onClick={() => {
-                  setIsTrackingModalOpen(true);
-                  handleTrackOrder(trackingQuery);
-                }}
-                className="px-4 py-2 bg-dstech-blue hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all cursor-pointer shadow-xs"
-              >
-                Lacak
-              </button>
+                  }}
+                  className="px-3 py-1.5 bg-dstech-blue hover:bg-blue-600 text-white rounded-xl text-xs font-black transition cursor-pointer"
+                >
+                  Lacak
+                </button>
+              </div>
             </div>
           </div>
+
+          {/* Carousel Slide Container */}
+          {(() => {
+            const currentItem = FEATURED_HERO_PRODUCTS[heroSlide] || FEATURED_HERO_PRODUCTS[0];
+            return (
+              <div className="relative rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800 p-6 sm:p-10 shadow-2xl transition-all duration-500">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                  {/* Left Column: Product Info & Actions */}
+                  <div className="lg:col-span-7 space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1 ${currentItem.badgeColor}`}>
+                        <Flame className="w-3 h-3" />
+                        {currentItem.badge}
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[10px] font-bold flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        {currentItem.rating} ({currentItem.reviews} Ulasan)
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                        {currentItem.discount}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white leading-tight tracking-tight">
+                        {currentItem.title}
+                      </h2>
+                      <p className="text-slate-400 text-xs sm:text-sm font-medium mt-1">
+                        {currentItem.subtitle}
+                      </p>
+                    </div>
+
+                    <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-xl">
+                      {currentItem.desc}
+                    </p>
+
+                    {/* Features Chips */}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {currentItem.features.map((feat, fIdx) => (
+                        <span
+                          key={fIdx}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700/80 text-[11px] font-semibold text-slate-200 flex items-center gap-1.5"
+                        >
+                          <Check className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <span>{feat}</span>
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Price and CTA Buttons */}
+                    <div className="pt-3 flex flex-wrap items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-500 line-through font-mono">
+                            {formatRupiah(currentItem.originalPrice)}
+                          </span>
+                          <span className="text-[10px] bg-red-500/20 text-red-400 font-bold px-1.5 py-0.5 rounded">
+                            Hemat {formatRupiah(currentItem.originalPrice - currentItem.price)}
+                          </span>
+                        </div>
+                        <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-400">
+                          {formatRupiah(currentItem.price)}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addToCart({
+                              id: currentItem.id,
+                              name: currentItem.title,
+                              category: currentItem.category,
+                              price: currentItem.price,
+                              image: currentItem.image,
+                              desc: currentItem.desc,
+                              hasInstallationService: true,
+                              installationFee: currentItem.installationFee,
+                            }, 1);
+                            setIsCartOpen(true);
+                            showToast(`✓ ${currentItem.title} ditambahkan ke keranjang belanja!`);
+                          }}
+                          className="px-5 py-3 rounded-2xl bg-dstech-blue hover:bg-blue-600 text-white font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-blue-600/30 active:scale-95 transition cursor-pointer"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          <span>Beli Sekarang</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const matchedProd = products.find((p) => p.name.toLowerCase().includes(currentItem.category.toLowerCase())) || {
+                              id: currentItem.id,
+                              name: currentItem.title,
+                              category: currentItem.category,
+                              price: currentItem.price,
+                              image: currentItem.image,
+                              desc: currentItem.desc,
+                              hasInstallationService: true,
+                              installationFee: currentItem.installationFee,
+                            };
+                            setSelectedProduct(matchedProd);
+                            setShopActiveImage(currentItem.image);
+                          }}
+                          className="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Eye className="w-4 h-4" />
+                          <span>Detail &amp; Brosur</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Hero Visual Graphic */}
+                  <div className="lg:col-span-5 relative flex items-center justify-center">
+                    <div className="relative w-full max-w-sm aspect-square rounded-3xl overflow-hidden border border-slate-700 bg-slate-900 shadow-2xl group">
+                      <Image
+                        src={currentItem.image}
+                        alt={currentItem.title}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-700"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+                      
+                      {/* Floating Category Pill */}
+                      <div className="absolute top-4 left-4">
+                        <span className="px-3 py-1 rounded-full bg-slate-900/90 backdrop-blur-md border border-slate-700 text-white text-[11px] font-black uppercase tracking-wider">
+                          {currentItem.category}
+                        </span>
+                      </div>
+
+                      {/* Floating Warranty Pill */}
+                      <div className="absolute bottom-4 left-4 right-4 p-3 rounded-2xl bg-slate-900/90 backdrop-blur-md border border-slate-700/80 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                          <span className="font-bold text-slate-200">Garansi Sah DSTech</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold">100% Original</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Slider Controls: Arrows & Dots */}
+                <div className="flex items-center justify-between pt-6 border-t border-slate-800/80 mt-6">
+                  {/* Dot Indicators */}
+                  <div className="flex items-center gap-2">
+                    {FEATURED_HERO_PRODUCTS.map((_, dotIdx) => (
+                      <button
+                        key={dotIdx}
+                        type="button"
+                        onClick={() => setHeroSlide(dotIdx)}
+                        className={`h-2 rounded-full transition-all cursor-pointer ${
+                          heroSlide === dotIdx ? "w-8 bg-dstech-blue" : "w-2 bg-slate-700 hover:bg-slate-500"
+                        }`}
+                        title={`Slide ${dotIdx + 1}`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Prev / Next Arrows */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setHeroSlide((prev) => (prev - 1 + FEATURED_HERO_PRODUCTS.length) % FEATURED_HERO_PRODUCTS.length)}
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                      title="Slide Sebelumnya"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-xs font-mono text-slate-400 font-bold px-1">
+                      {heroSlide + 1} / {FEATURED_HERO_PRODUCTS.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setHeroSlide((prev) => (prev + 1) % FEATURED_HERO_PRODUCTS.length)}
+                      className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                      title="Slide Selanjutnya"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </section>
 

@@ -58,6 +58,7 @@ const DEFAULT_SETTINGS = {
   emailSupport: "support@dstechsmart.com",
   phone: "0822-5949-4242",
   address: "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON, KOTA CILEGON - BANTEN",
+  serviceArea: "Banten (Cilegon, Serang, Tangerang), Jabodetabek, dan Seluruh Wilayah Indonesia (Nasional)",
   googleMapsUrl: "https://maps.google.com/?q=Perum+Bukit+Cilegon+Asri+Cilegon+Banten",
   instagram: "https://instagram.com/dstechsmart",
   facebook: "https://facebook.com/dstechsmart",

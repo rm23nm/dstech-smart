@@ -482,16 +482,28 @@ export default function Home() {
                </ul>
             </div>
             
-            {/* Col 3: Address */}
+            {/* Col 3: Address & Coverage */}
             <div className="space-y-4 sm:space-y-6">
-               <h4 className="text-dstech-blue font-black tracking-wider text-xs uppercase">ALAMAT KANTOR</h4>
+               <h4 className="text-dstech-blue font-black tracking-wider text-xs uppercase">ALAMAT &amp; WILAYAH LAYANAN</h4>
                <div className="flex items-start gap-3 text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
                   <MapPin className="w-5 h-5 text-dstech-red flex-shrink-0 mt-0.5" />
                   <span>
                      {settings.address}
                   </span>
                </div>
-               <div className="pt-4 border-t border-slate-100 text-xs font-bold text-slate-400">
+
+               <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-slate-900 uppercase tracking-wider">
+                     <Globe className="w-3.5 h-3.5 text-dstech-blue" />
+                     <span>Cakupan Layanan:</span>
+                     <span className="text-[9px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">Nasional</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                     Banten (Cilegon, Serang, Tangerang), Jabodetabek, dan <strong className="text-slate-800 font-bold">Seluruh Wilayah Indonesia</strong>.
+                  </p>
+               </div>
+
+               <div className="pt-2 text-xs font-bold text-slate-400">
                   {settings.companyName} &bull; Est. 2017
                </div>
             </div>
