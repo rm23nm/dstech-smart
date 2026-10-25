@@ -238,6 +238,72 @@ export async function GET(req: Request) {
     const q = searchParams.get("q")?.toLowerCase();
 
     const data = readCrmData();
+
+    // AUTO-SYNC DUA ARAH: Ambil data dari SmartPro WA Gateway agar 100% sinkron kedua belah pihak
+    const SMARTPRO_URL = process.env.SMARTPRO_BASE_URL || "https://smartpro.dstechsmart.com";
+    const MASTER_SECRET = process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026";
+    try {
+      const resSp = await fetch(`${SMARTPRO_URL}/api/external/get-crm-leads?secret=${MASTER_SECRET}`, {
+        signal: AbortSignal.timeout(4000)
+      });
+      if (resSp.ok) {
+        const jsonSp = await resSp.json();
+        if (jsonSp.success && Array.isArray(jsonSp.leads)) {
+          let hasChanges = false;
+          for (const spLead of jsonSp.leads) {
+            const cleanPhone = (spLead.phone || spLead.wa_phone || "").replace(/\D/g, "");
+            const spId = spLead.id || spLead.wa_id;
+            
+            const existingIdx = data.leads.findIndex((l: any) => 
+              (spId && l.id === spId) || (cleanPhone && (l.phone || "").replace(/\D/g, "") === cleanPhone)
+            );
+
+            // Normalisasi stage ke format standar
+            let mappedStage = spLead.status || spLead.wa_status || "NEW";
+            if (mappedStage === "NEW_LEAD" || mappedStage === "DISCOVERY") mappedStage = "NEW";
+            if (mappedStage === "QUALIFIED") mappedStage = "FOLLOW_UP";
+            if (mappedStage === "PROPOSAL_SENT") mappedStage = "NEGOTIATION";
+            if (mappedStage === "WON") mappedStage = "CLOSED_WON";
+            if (mappedStage === "LOST") mappedStage = "CLOSED_LOST";
+
+            const leadObj = {
+              id: existingIdx >= 0 ? data.leads[existingIdx].id : (spId || `dstech_crm_lead_${cleanPhone || Date.now()}`),
+              leadNumber: existingIdx >= 0 ? data.leads[existingIdx].leadNumber : `LEAD-DST-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(data.leads.length + 1).padStart(3, "0")}`,
+              clientName: spLead.name || spLead.wa_name || "Klien SmartPro",
+              company: existingIdx >= 0 ? (data.leads[existingIdx].company || "") : "",
+              position: existingIdx >= 0 ? (data.leads[existingIdx].position || "Client") : "Client",
+              phone: cleanPhone || spLead.phone || "",
+              email: spLead.email || spLead.wa_email || "",
+              category: existingIdx >= 0 ? (data.leads[existingIdx].category || "B2B Industri") : "B2B Industri",
+              projectTitle: existingIdx >= 0 ? data.leads[existingIdx].projectTitle : (spLead.notes ? spLead.notes.slice(0, 80) : "Prospek SmartPro WA"),
+              estimatedValue: Number(spLead.value || spLead.wa_value) || (existingIdx >= 0 ? (Number(data.leads[existingIdx].estimatedValue) || 5000000) : 5000000),
+              stage: mappedStage,
+              team: spLead.team || spLead.wa_team || (existingIdx >= 0 ? data.leads[existingIdx].team : "SALES"),
+              probability: mappedStage === "CLOSED_WON" ? 100 : mappedStage === "CLOSED_LOST" ? 0 : (existingIdx >= 0 ? data.leads[existingIdx].probability : 50),
+              source: spLead.source || spLead.wa_source || "SmartPro WA Gateway",
+              assignedTo: spLead.assigned_to || spLead.wa_assigned_to || (existingIdx >= 0 ? data.leads[existingIdx].assignedTo : "RAMADHANI ST"),
+              notes: spLead.notes || spLead.wa_notes || "",
+              activities: existingIdx >= 0 ? (data.leads[existingIdx].activities || []) : [],
+              createdAt: spLead.createdAt || spLead.wa_created_at || new Date().toISOString(),
+              updatedAt: spLead.updatedAt || spLead.wa_updated_at || new Date().toISOString()
+            };
+
+            if (existingIdx >= 0) {
+              data.leads[existingIdx] = { ...data.leads[existingIdx], ...leadObj };
+            } else {
+              data.leads.push(leadObj);
+              hasChanges = true;
+            }
+          }
+          if (hasChanges) {
+            writeCrmData(data);
+          }
+        }
+      }
+    } catch (spErr) {
+      // Abaikan jika SmartPro offline sesaat
+    }
+
     let leads = data.leads;
 
     if (category && category !== "ALL") {

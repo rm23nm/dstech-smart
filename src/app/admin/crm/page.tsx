@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import {
   Target,
@@ -18,6 +18,7 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  ChevronLeft,
   ChevronRight,
   ArrowRight,
   ExternalLink,
@@ -56,8 +57,8 @@ export interface Lead {
   category: string;
   projectTitle: string;
   estimatedValue: number;
-  stage: "NEW" | "FOLLOW_UP" | "NEGOTIATION" | "SUPPORT" | "COMPLAINT" | "WON" | "LOST" | "NEW_LEAD" | "QUALIFIED" | "PROPOSAL_SENT";
-  team?: "SALES" | "SUPPORT" | "COMPLAINT" | "COMMERCIAL";
+  stage: "NEW" | "FOLLOW_UP" | "NEGOTIATION" | "SUPPORT" | "COMPLAINT" | "WON" | "LOST" | "NEW_LEAD" | "QUALIFIED" | "PROPOSAL_SENT" | "CLOSED_WON" | "CLOSED_LOST" | "TICKET_OPEN" | string;
+  team?: "SALES" | "SUPPORT" | "COMPLAINT" | "COMMERCIAL" | string;
   probability: number;
   source: string;
   assignedTo: string;
@@ -82,14 +83,15 @@ interface CrmMetrics {
   avgDealSize: number;
 }
 
-const STAGES: { id: string; aliases: string[]; label: string; color: string; badge: string }[] = [
-  { id: "NEW", aliases: ["NEW", "NEW_LEAD"], label: "1. Leads Masuk (Screening)", color: "border-sky-500 bg-sky-50/40 text-sky-900", badge: "bg-sky-100 text-sky-800" },
-  { id: "FOLLOW_UP", aliases: ["FOLLOW_UP", "QUALIFIED"], label: "2. Ditangani AI (Kualifikasi)", color: "border-blue-500 bg-blue-50/40 text-blue-900", badge: "bg-blue-100 text-blue-800" },
-  { id: "NEGOTIATION", aliases: ["NEGOTIATION", "PROPOSAL_SENT"], label: "3. Tim Support Sales & SPH", color: "border-indigo-500 bg-indigo-50/40 text-indigo-900", badge: "bg-indigo-100 text-indigo-900" },
-  { id: "SUPPORT", aliases: ["SUPPORT"], label: "4. Tim Teknikal Maintenance", color: "border-amber-500 bg-amber-50/40 text-amber-900", badge: "bg-amber-100 text-amber-900" },
-  { id: "COMPLAINT", aliases: ["COMPLAINT"], label: "5. Tim Penanganan Komplain", color: "border-rose-500 bg-rose-50/40 text-rose-900", badge: "bg-rose-100 text-rose-900" },
-  { id: "WON", aliases: ["WON", "CLOSED_WON"], label: "6. Closing (Deal Berhasil)", color: "border-emerald-500 bg-emerald-50/40 text-emerald-900", badge: "bg-emerald-100 text-emerald-800" },
-  { id: "LOST", aliases: ["LOST", "CLOSED_LOST"], label: "7. Batal / Lost", color: "border-slate-300 bg-slate-50/40 text-slate-700", badge: "bg-slate-200 text-slate-700" },
+const STAGES: { id: string; aliases: string[]; label: string; color: string; badge: string; dotColor: string }[] = [
+  { id: "NEW", aliases: ["NEW", "NEW_LEAD", "DISCOVERY"], label: "Leads Baru", color: "border-blue-500/40 bg-blue-50/30 text-blue-900", badge: "bg-blue-100 text-blue-800", dotColor: "bg-blue-500" },
+  { id: "FOLLOW_UP", aliases: ["FOLLOW_UP", "QUALIFIED"], label: "Follow Up", color: "border-yellow-500/40 bg-yellow-50/30 text-yellow-900", badge: "bg-yellow-100 text-yellow-800", dotColor: "bg-yellow-500" },
+  { id: "NEGOTIATION", aliases: ["NEGOTIATION", "PROPOSAL_SENT"], label: "Negosiasi", color: "border-orange-500/40 bg-orange-50/30 text-orange-900", badge: "bg-orange-100 text-orange-900", dotColor: "bg-orange-500" },
+  { id: "CLOSED_WON", aliases: ["CLOSED_WON", "WON"], label: "Closing (Won)", color: "border-emerald-500/40 bg-emerald-50/30 text-emerald-900", badge: "bg-emerald-100 text-emerald-800", dotColor: "bg-emerald-500" },
+  { id: "CLOSED_LOST", aliases: ["CLOSED_LOST", "LOST"], label: "Gagal (Lost)", color: "border-red-500/40 bg-red-50/30 text-red-900", badge: "bg-red-100 text-red-800", dotColor: "bg-red-500" },
+  { id: "COMPLAINT", aliases: ["COMPLAINT"], label: "Komplain", color: "border-purple-500/40 bg-purple-50/30 text-purple-900", badge: "bg-purple-100 text-purple-900", dotColor: "bg-purple-500" },
+  { id: "TICKET_OPEN", aliases: ["TICKET_OPEN", "TICKET"], label: "Tiket", color: "border-amber-500/40 bg-amber-50/30 text-amber-900", badge: "bg-amber-100 text-amber-900", dotColor: "bg-amber-500" },
+  { id: "SUPPORT", aliases: ["SUPPORT", "MAINTENANCE"], label: "Support", color: "border-slate-500/40 bg-slate-50/30 text-slate-800", badge: "bg-slate-200 text-slate-800", dotColor: "bg-slate-500" },
 ];
 
 const CATEGORIES = [
@@ -118,6 +120,17 @@ export default function AdminCrmPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Kanban Horizontal Scroll Ref & Control
+  const kanbanScrollRef = useRef<HTMLDivElement>(null);
+  const scrollKanban = (dir: "left" | "right") => {
+    if (kanbanScrollRef.current) {
+      kanbanScrollRef.current.scrollBy({
+        left: dir === "left" ? -330 : 330,
+        behavior: "smooth",
+      });
+    }
+  };
 
   // Modal State
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false);
@@ -561,116 +574,167 @@ export default function AdminCrmPage() {
 
       {/* MODE TAMPILAN 1: KANBAN PIPELINE BOARD */}
       {viewMode === "kanban" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3.5 overflow-x-auto pb-4 items-start">
-          {STAGES.map((st) => {
-            const stageLeads = leads.filter((l) => st.aliases.includes(l.stage) || l.stage === st.id);
-            const stageValue = stageLeads.reduce((acc, l) => acc + (Number(l.estimatedValue) || 0), 0);
+        <div className="space-y-3">
+          {/* Bar Kontrol Navigasi Geser & Sinkronisasi */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-slate-800">
+                Papan Pipeline CRM (8 Kolom Selaras SmartPro)
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                Sinkron Dua Arah Aktif
+              </span>
+            </div>
 
-            return (
-              <div
-                key={st.id}
-                className="bg-slate-100/80 rounded-2xl border border-slate-200/80 p-3 flex flex-col min-w-[240px] max-h-[800px]"
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => scrollKanban("left")}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                title="Geser Kiri"
               >
-                {/* Header Kolom Stage */}
-                <div className="pb-2.5 mb-2.5 border-b border-slate-200 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-xs font-black text-slate-800">{st.label}</h3>
-                    <span className="text-[10px] text-slate-500 font-mono font-bold block mt-0.5">
-                      {formatRupiah(stageValue)}
+                <ChevronLeft className="w-4 h-4" />
+                <span>Geser Kiri</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollKanban("right")}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer flex items-center gap-1 text-xs font-bold"
+                title="Geser Kanan"
+              >
+                <span>Geser Kanan</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleSyncToSmartPro}
+                disabled={isSyncingSmartPro}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSmartPro ? "animate-spin" : ""}`} />
+                <span>{isSyncingSmartPro ? "Menyinkronkan..." : "⚡ Sync SmartPro"}</span>
+              </button>
+            </div>
+          </div>
+
+          <div
+            ref={kanbanScrollRef}
+            className="flex gap-4 overflow-x-auto pb-6 scroll-smooth items-start kanban-scroll"
+          >
+            {STAGES.map((st) => {
+              const stageLeads = leads.filter((l) => st.aliases.includes(l.stage) || l.stage === st.id);
+              const stageValue = stageLeads.reduce((acc, l) => acc + (Number(l.estimatedValue) || 0), 0);
+
+              return (
+                <div
+                  key={st.id}
+                  className="bg-slate-100/90 rounded-3xl border border-slate-200/90 p-4 flex flex-col min-w-[310px] w-[310px] shrink-0 max-h-[820px] shadow-2xs"
+                >
+                  {/* Header Kolom Stage */}
+                  <div className="pb-3 mb-3 border-b border-slate-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-3 h-3 rounded-full ${st.dotColor}`}></span>
+                      <div>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">{st.label}</h3>
+                        <span className="text-[10px] text-slate-500 font-mono font-bold block mt-0.5">
+                          {formatRupiah(stageValue)}
+                        </span>
+                      </div>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black ${st.badge}`}>
+                      {stageLeads.length}
                     </span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${st.badge}`}>
-                    {stageLeads.length}
-                  </span>
-                </div>
 
-                {/* List Kartu Lead dalam Kolom */}
-                <div className="space-y-2.5 overflow-y-auto flex-1 pr-0.5">
-                  {stageLeads.length === 0 ? (
-                    <div className="py-8 text-center text-[11px] text-slate-400 italic">
-                      Tidak ada prospek
-                    </div>
-                  ) : (
-                    stageLeads.map((lead) => (
-                      <div
-                        key={lead.id}
-                        onClick={() => setSelectedDetailLead(lead)}
-                        className="bg-white rounded-2xl border border-slate-200 p-3 shadow-2xs hover:shadow-md hover:border-dstech-blue transition-all cursor-pointer group space-y-2 relative"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-mono font-bold text-slate-400">
-                            {lead.leadNumber}
-                          </span>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 line-clamp-1 max-w-[110px]">
-                            {lead.category}
-                          </span>
-                        </div>
+                  {/* List Kartu Lead dalam Kolom */}
+                  <div className="space-y-3 overflow-y-auto flex-1 pr-1">
+                    {stageLeads.length === 0 ? (
+                      <div className="py-12 text-center text-xs text-slate-400 italic bg-white/50 rounded-2xl border border-dashed border-slate-200">
+                        Belum ada prospek
+                      </div>
+                    ) : (
+                      stageLeads.map((lead) => (
+                        <div
+                          key={lead.id}
+                          onClick={() => setSelectedDetailLead(lead)}
+                          className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-2xs hover:shadow-md hover:border-dstech-blue transition-all cursor-pointer group space-y-2.5 relative"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-mono font-bold text-slate-400">
+                              {lead.leadNumber}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 line-clamp-1 max-w-[130px]">
+                              {lead.category}
+                            </span>
+                          </div>
 
-                        <div>
-                          <h4 className="text-xs font-black text-slate-900 group-hover:text-dstech-blue transition-colors line-clamp-2">
-                            {lead.projectTitle}
-                          </h4>
-                          <p className="text-[11px] font-bold text-slate-600 mt-0.5 line-clamp-1">
-                            {lead.clientName} {lead.company ? `• ${lead.company}` : ""}
-                          </p>
-                        </div>
+                          <div>
+                            <h4 className="text-xs font-black text-slate-900 group-hover:text-dstech-blue transition-colors line-clamp-2 leading-snug">
+                              {lead.projectTitle}
+                            </h4>
+                            <p className="text-[11px] font-bold text-slate-600 mt-1 line-clamp-1">
+                              {lead.clientName} {lead.company ? `• ${lead.company}` : ""}
+                            </p>
+                          </div>
 
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                          <span className="text-xs font-black font-mono text-emerald-600">
-                            {formatRupiah(lead.estimatedValue)}
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-400">
-                            Prob: <strong className="text-slate-800 font-mono">{lead.probability}%</strong>
-                          </span>
-                        </div>
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                            <span className="text-xs font-black font-mono text-emerald-600">
+                              {formatRupiah(lead.estimatedValue)}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400">
+                              Prob: <strong className="text-slate-800 font-mono">{lead.probability}%</strong>
+                            </span>
+                          </div>
 
-                        {/* Progress Bar Probabilitas */}
-                        <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${
-                              lead.probability >= 80
-                                ? "bg-emerald-500"
-                                : lead.probability >= 50
-                                ? "bg-amber-500"
-                                : "bg-sky-500"
-                            }`}
-                            style={{ width: `${lead.probability}%` }}
-                          />
-                        </div>
+                          {/* Progress Bar Probabilitas */}
+                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                lead.probability >= 80
+                                  ? "bg-emerald-500"
+                                  : lead.probability >= 50
+                                  ? "bg-amber-500"
+                                  : "bg-sky-500"
+                              }`}
+                              style={{ width: `${lead.probability}%` }}
+                            />
+                          </div>
 
-                        {/* Footer Kartu & Navigasi Stage */}
-                        <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-                          <span className="truncate max-w-[100px] flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-slate-400" />
-                            {lead.expectedClosingDate || "Belum diatur"}
-                          </span>
+                          {/* Footer Kartu & Navigasi Stage */}
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
+                            <span className="truncate max-w-[120px] flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {lead.expectedClosingDate || "Belum diatur"}
+                            </span>
 
-                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                            {lead.stage !== "WON" && (
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              {lead.stage !== "CLOSED_WON" && lead.stage !== "WON" && (
+                                <button
+                                  onClick={() => handleMoveStage(lead.id, "CLOSED_WON")}
+                                  className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
+                                  title="Tandai Closing (Won)"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               <button
-                                onClick={() => handleMoveStage(lead.id, "WON")}
-                                className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"
-                                title="Tandai Closing (Won)"
+                                onClick={() => handleOpenEditModal(lead)}
+                                className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded"
+                                title="Edit Lead"
                               >
-                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <Edit className="w-3.5 h-3.5" />
                               </button>
-                            )}
-                            <button
-                              onClick={() => handleOpenEditModal(lead)}
-                              className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-50 rounded"
-                              title="Edit Lead"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
