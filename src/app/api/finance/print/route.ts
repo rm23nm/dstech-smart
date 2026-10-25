@@ -331,9 +331,11 @@ export async function GET(req: Request) {
           </div>
         </div>
         
-        <!-- WRAPPER DOKUMEN CETAK SPH -->
-        <div id="sph-full-document" class="w-full overflow-x-auto pb-6">
-        <!-- LEMBAR 1: SURAT PENGANTAR PENAWARAN HARGA -->
+        <!-- SCROLL CONTAINER MOBILE DI LUAR TARGET PDF -->
+        <div class="w-full overflow-x-auto pb-8">
+          <!-- ELEMEN TARGET HTML2PDF YANG BERSIH DARI OVERFLOW CLIPPING -->
+          <div id="sph-full-document" class="mx-auto" style="width: 210mm; min-width: 210mm;">
+            <!-- LEMBAR 1: SURAT PENGANTAR PENAWARAN HARGA -->
         <div
           id="print-sheet-sph"
           class="print-sheet print-page-break relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8"
@@ -575,6 +577,8 @@ export async function GET(req: Request) {
         ${itemsWithImages.length > 0 ? itemChunks.map((chunk, chunkIdx) => {
           const isLastChunk = chunkIdx === itemChunks.length - 1;
           return `
+          <!-- PEMISAH HALAMAN RESMI HTML2PDF UNTUK LAMPIRAN HALAMAN ${chunkIdx + 2} -->
+          <div class="html2pdf__page-break" style="page-break-before: always; break-before: page; height: 0; margin: 0; padding: 0;"></div>
           <div
             class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8 ${isLastChunk ? 'print-last-sheet' : 'print-page-break'}"
             style="width: 210mm; height: 297mm; max-height: 297mm; box-sizing: border-box; page-break-after: ${isLastChunk ? 'avoid' : 'always'}; break-after: ${isLastChunk ? 'avoid' : 'page'};"
@@ -735,7 +739,8 @@ export async function GET(req: Request) {
           </div>
           `;
         }).join("") : ""}
-        </div> <!-- End sph-full-document -->
+          </div> <!-- End sph-full-document -->
+        </div> <!-- End scroll container mobile -->
 
         <script>
           function toggleLetterhead(enabled) {
@@ -749,11 +754,13 @@ export async function GET(req: Request) {
           }
 
           function downloadAsPdf() {
-            const element = document.getElementById('sph-full-document') || document.getElementById('print-sheet-sph') || document.body;
+            const element = document.getElementById('sph-full-document');
+            if (!element) return;
+
             const opt = {
               margin:       0,
               filename:     '${documentTitle.replace(/[^a-zA-Z0-9_-]/g, "_")}.pdf',
-              image:        { type: 'jpeg', quality: 0.95 },
+              image:        { type: 'jpeg', quality: 0.98 },
               html2canvas:  {
                 scale: 2,
                 useCORS: true,
@@ -763,9 +770,19 @@ export async function GET(req: Request) {
                 scrollY: 0
               },
               jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-              pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+              pagebreak:    { mode: ['css', 'legacy'], before: '.html2pdf__page-break' }
             };
-            html2pdf().set(opt).from(element).save();
+
+            const sheets = element.querySelectorAll('.print-sheet');
+            sheets.forEach(function(s) { s.classList.remove('mb-8'); });
+
+            html2pdf().set(opt).from(element).save().then(function() {
+              sheets.forEach(function(s) { s.classList.add('mb-8'); });
+            }).catch(function(err) {
+              console.error("html2pdf catch:", err);
+              sheets.forEach(function(s) { s.classList.add('mb-8'); });
+              window.print();
+            });
           }
         </script>
       </body>
