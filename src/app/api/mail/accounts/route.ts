@@ -20,6 +20,11 @@ interface MailAccount {
   createdAt: string;
   description?: string;
   password?: string;
+  provider?: "internal" | "gmail" | "yahoo" | "custom";
+  smtpHost?: string;
+  smtpPort?: number;
+  imapHost?: string;
+  imapPort?: number;
 }
 
 function readAccounts(): MailAccount[] {
@@ -54,17 +59,75 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { username, domain = "dstechsmart.com", fullName, password, quotaMb = 5120, description = "" } = body;
+    const {
+      provider = "internal",
+      username,
+      domain = "dstechsmart.com",
+      fullEmail,
+      fullName,
+      password,
+      quotaMb,
+      description = "",
+    } = body;
 
-    if (!username || !password || !fullName) {
+    if (!fullName || !password) {
       return NextResponse.json(
-        { success: false, message: "Username email, nama lengkap, dan password wajib diisi." },
+        { success: false, message: "Nama lengkap dan password / sandi aplikasi wajib diisi." },
         { status: 400 }
       );
     }
 
-    const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9._-]/g, "");
-    const email = `${cleanUsername}@${domain}`;
+    let email = "";
+    let cleanUsername = "";
+    let targetDomain = domain;
+    let finalQuotaMb = Number(quotaMb) || 5120;
+    let smtpHost = "";
+    let smtpPort = 465;
+    let imapHost = "";
+    let imapPort = 993;
+
+    if (provider === "gmail") {
+      // Akun Google Gmail
+      if (fullEmail && fullEmail.includes("@")) {
+        email = fullEmail.toLowerCase().trim();
+        cleanUsername = email.split("@")[0];
+        targetDomain = email.split("@")[1];
+      } else {
+        cleanUsername = (username || "").toLowerCase().trim();
+        targetDomain = "gmail.com";
+        email = `${cleanUsername}@gmail.com`;
+      }
+      smtpHost = "smtp.gmail.com";
+      imapHost = "imap.gmail.com";
+      finalQuotaMb = Number(quotaMb) || 15360; // 15 GB default Google
+    } else if (provider === "yahoo") {
+      // Akun Yahoo Mail / Ymail
+      if (fullEmail && fullEmail.includes("@")) {
+        email = fullEmail.toLowerCase().trim();
+        cleanUsername = email.split("@")[0];
+        targetDomain = email.split("@")[1];
+      } else {
+        cleanUsername = (username || "").toLowerCase().trim();
+        targetDomain = domain && (domain.includes("yahoo") || domain.includes("ymail")) ? domain : "yahoo.com";
+        email = `${cleanUsername}@${targetDomain}`;
+      }
+      smtpHost = "smtp.mail.yahoo.com";
+      imapHost = "imap.mail.yahoo.com";
+      finalQuotaMb = Number(quotaMb) || 1024000; // 1 TB default Yahoo
+    } else {
+      // Akun internal domain DSTech (@dstechsmart.com / @dstechsmart.id)
+      cleanUsername = (username || "").toLowerCase().trim().replace(/[^a-z0-9._-]/g, "");
+      targetDomain = domain || "dstechsmart.com";
+      email = `${cleanUsername}@${targetDomain}`;
+    }
+
+    if (!email || !cleanUsername) {
+      return NextResponse.json(
+        { success: false, message: "Alamat email tidak valid. Mohon periksa kembali." },
+        { status: 400 }
+      );
+    }
+
     const accounts = readAccounts();
 
     if (accounts.some((acc) => acc.email.toLowerCase() === email)) {
@@ -74,47 +137,56 @@ export async function POST(request: Request) {
       );
     }
 
+    const cleanPassword = password.trim();
+
     const newAccount: MailAccount = {
       id: `dstech_mail_acc_${Date.now()}`,
       email,
       username: cleanUsername,
-      domain,
+      domain: targetDomain,
       fullName: fullName.trim(),
-      quotaMb: Number(quotaMb) || 5120,
+      quotaMb: finalQuotaMb,
       usedMb: 0,
       isActive: true,
       isAdmin: false,
       createdAt: new Date().toISOString().replace("T", " ").substring(0, 19),
       description: description.trim(),
-      password, // disimpan untuk credential auth lokal / internal
+      password: cleanPassword, // Disimpan untuk autentikasi SMTP & IMAP
+      provider: provider as "internal" | "gmail" | "yahoo",
+      smtpHost: smtpHost || undefined,
+      smtpPort: smtpPort || undefined,
+      imapHost: imapHost || undefined,
+      imapPort: imapPort || undefined,
     };
 
-    // Sinkronisasi otomatis ke database postfixadmin di live VPS jika tersedia
-    const dbPath = "/www/vmail/postfixadmin.db";
-    if (fs.existsSync(dbPath)) {
-      try {
-        let md5CryptHash = "";
+    // Sinkronisasi otomatis ke database postfixadmin di live VPS hanya untuk akun internal
+    if (provider === "internal") {
+      const dbPath = "/www/vmail/postfixadmin.db";
+      if (fs.existsSync(dbPath)) {
         try {
-          const { stdout } = await execPromise(`openssl passwd -1 "${password.replace(/"/g, '\\"')}"`);
-          md5CryptHash = stdout.trim();
-        } catch {
-          md5CryptHash = password;
+          let md5CryptHash = "";
+          try {
+            const { stdout } = await execPromise(`openssl passwd -1 "${cleanPassword.replace(/"/g, '\\"')}"`);
+            md5CryptHash = stdout.trim();
+          } catch {
+            md5CryptHash = cleanPassword;
+          }
+
+          const hexEncoded = Buffer.from(Buffer.from(cleanPassword).toString("base64")).toString("hex");
+          const maildir = `${email}/`;
+          const quotaBytes = finalQuotaMb * 1024 * 1024;
+          const now = new Date().toISOString().replace("T", " ").substring(0, 19);
+
+          // Eksekusi insert langsung ke sqlite3 postfixadmin dengan hash MD5-CRYPT valid
+          const sqlCmd = `sqlite3 ${dbPath} "INSERT OR REPLACE INTO mailbox (username, password, password_encode, full_name, is_admin, maildir, quota, current_usage, quota_active, local_part, domain, created, modified, active) VALUES ('${email}', '${md5CryptHash}', '${hexEncoded}', '${fullName.trim()}', 0, '${maildir}', ${quotaBytes}, 0, 1, '${cleanUsername}', '${targetDomain}', '${now}', '${now}', 1);"`;
+          await execPromise(sqlCmd);
+
+          // Buat folder Maildir jika belum ada
+          const maildirPath = `/www/vmail/${targetDomain}/${cleanUsername}`;
+          await execPromise(`mkdir -p ${maildirPath}/cur ${maildirPath}/new ${maildirPath}/tmp && chown -R vmail:mail ${maildirPath} && chmod -R 700 ${maildirPath}`);
+        } catch (dbErr) {
+          console.warn("Notice: PostfixAdmin direct sync warning:", dbErr);
         }
-
-        const hexEncoded = Buffer.from(Buffer.from(password).toString("base64")).toString("hex");
-        const maildir = `${email}/`;
-        const quotaBytes = (Number(quotaMb) || 5120) * 1024 * 1024;
-        const now = new Date().toISOString().replace("T", " ").substring(0, 19);
-
-        // Eksekusi insert langsung ke sqlite3 postfixadmin dengan hash MD5-CRYPT valid
-        const sqlCmd = `sqlite3 ${dbPath} "INSERT OR REPLACE INTO mailbox (username, password, password_encode, full_name, is_admin, maildir, quota, current_usage, quota_active, local_part, domain, created, modified, active) VALUES ('${email}', '${md5CryptHash}', '${hexEncoded}', '${fullName.trim()}', 0, '${maildir}', ${quotaBytes}, 0, 1, '${cleanUsername}', '${domain}', '${now}', '${now}', 1);"`;
-        await execPromise(sqlCmd);
-
-        // Buat folder Maildir jika belum ada
-        const maildirPath = `/www/vmail/${domain}/${cleanUsername}`;
-        await execPromise(`mkdir -p ${maildirPath}/cur ${maildirPath}/new ${maildirPath}/tmp && chown -R vmail:mail ${maildirPath} && chmod -R 700 ${maildirPath}`);
-      } catch (dbErr) {
-        console.warn("Notice: PostfixAdmin direct sync warning:", dbErr);
       }
     }
 
@@ -123,7 +195,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: `Akun email ${email} berhasil dibuat dan diaktifkan.`,
+      message: `Akun email ${email} (${provider === "gmail" ? "Google Gmail" : provider === "yahoo" ? "Yahoo Mail" : "Domain Perusahaan"}) berhasil didaftarkan.`,
       data: newAccount,
     });
   } catch (error: any) {

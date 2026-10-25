@@ -26,38 +26,81 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cari akun pengirim untuk password
+    // Cari data akun pengirim untuk password, provider, dan konfigurasi SMTP
     let senderPassword = defaultPasswords[fromEmail.toLowerCase()] || "M4m4cantik@";
+    let senderProvider = "internal";
+    let customSmtpHost = "";
+    let customSmtpPort = 465;
+
     try {
       if (fs.existsSync(accountsFilePath)) {
         const accountsData = JSON.parse(fs.readFileSync(accountsFilePath, "utf-8"));
         const acc = accountsData.find((a: any) => a.email.toLowerCase() === fromEmail.toLowerCase());
-        if (acc && acc.password) {
-          senderPassword = acc.password;
+        if (acc) {
+          if (acc.password) senderPassword = acc.password;
+          if (acc.provider) senderProvider = acc.provider;
+          if (acc.smtpHost) customSmtpHost = acc.smtpHost;
+          if (acc.smtpPort) customSmtpPort = acc.smtpPort;
         }
       }
     } catch (e) {
-      console.warn("Could not read specific account password:", e);
+      console.warn("Could not read specific account settings:", e);
     }
 
-    // Host SMTP: jika di live VPS gunakan 127.0.0.1 atau mail.dstechsmart.com
-    const isLiveServer = fs.existsSync("/www/server/panel");
-    const smtpHost = isLiveServer ? "127.0.0.1" : "mail.dstechsmart.com";
+    // Tentukan konfigurasi SMTP dinamis berdasarkan provider akun
+    const lowerFrom = fromEmail.toLowerCase();
+    let transportConfig: any;
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: 465,
-      secure: true, // SSL
-      auth: {
-        user: fromEmail,
-        pass: senderPassword,
-      },
-      tls: {
-        rejectUnauthorized: false, // Menghindari isu self-signed / SNI internal
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-    });
+    if (senderProvider === "gmail" || lowerFrom.endsWith("@gmail.com")) {
+      // Google Gmail SMTP
+      transportConfig = {
+        host: "smtp.gmail.com",
+        port: 465,
+        secure: true,
+        auth: {
+          user: fromEmail,
+          pass: senderPassword.replace(/\s+/g, ""), // Bersihkan spasi format 4x4 App Password Google
+        },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+      };
+    } else if (senderProvider === "yahoo" || lowerFrom.endsWith("@yahoo.com") || lowerFrom.endsWith("@ymail.com")) {
+      // Yahoo Mail / Ymail SMTP
+      transportConfig = {
+        host: "smtp.mail.yahoo.com",
+        port: 465,
+        secure: true,
+        auth: {
+          user: fromEmail,
+          pass: senderPassword.replace(/\s+/g, ""), // Bersihkan spasi format App Password Yahoo
+        },
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 15000,
+        greetingTimeout: 15000,
+      };
+    } else {
+      // Akun internal domain DSTech (@dstechsmart.com / @dstechsmart.id)
+      const isLiveServer = fs.existsSync("/www/server/panel");
+      const smtpHost = isLiveServer ? "127.0.0.1" : (customSmtpHost || "mail.dstechsmart.com");
+
+      transportConfig = {
+        host: smtpHost,
+        port: customSmtpPort || 465,
+        secure: true, // SSL
+        auth: {
+          user: fromEmail,
+          pass: senderPassword,
+        },
+        tls: {
+          rejectUnauthorized: false, // Menghindari isu self-signed / SNI internal
+        },
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+      };
+    }
+
+    const transporter = nodemailer.createTransport(transportConfig);
 
     // Format lampiran berkas jika ada
     let mailAttachments: any[] = [];

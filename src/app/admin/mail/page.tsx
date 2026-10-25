@@ -50,6 +50,11 @@ interface MailAccount {
   isAdmin: boolean;
   createdAt: string;
   description?: string;
+  provider?: "internal" | "gmail" | "yahoo" | "custom";
+  smtpHost?: string;
+  smtpPort?: number;
+  imapHost?: string;
+  imapPort?: number;
 }
 
 interface MailAttachmentItem {
@@ -129,8 +134,10 @@ export default function AdminMailPage() {
   // Modal Create Account State
   const [isCreateAccountOpen, setIsCreateAccountOpen] = useState(false);
   const [newAccountForm, setNewAccountForm] = useState({
+    provider: "internal" as "internal" | "gmail" | "yahoo",
     username: "",
     domain: "dstechsmart.com",
+    fullEmail: "",
     fullName: "",
     password: "",
     quotaMb: 5120,
@@ -586,8 +593,10 @@ export default function AdminMailPage() {
         showAlert("success", json.message);
         setIsCreateAccountOpen(false);
         setNewAccountForm({
+          provider: "internal",
           username: "",
           domain: "dstechsmart.com",
+          fullEmail: "",
           fullName: "",
           password: "",
           quotaMb: 5120,
@@ -1548,6 +1557,7 @@ export default function AdminMailPage() {
                 >
                   {accounts.map((acc) => (
                     <option key={acc.id} value={acc.email}>
+                      {acc.provider === "gmail" ? "🔴 [Gmail] " : acc.provider === "yahoo" ? "🟣 [Yahoo] " : "🏢 "}
                       {acc.email} ({acc.fullName})
                     </option>
                   ))}
@@ -1801,15 +1811,35 @@ export default function AdminMailPage() {
                     <tr key={acc.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="p-3 font-black text-slate-900">
                         <div className="flex items-center gap-2">
-                          <span className="p-1.5 rounded-lg bg-indigo-100 text-indigo-700 font-mono font-bold text-[10px]">
-                            @
+                          <span className={`p-1.5 rounded-lg font-mono font-bold text-[10px] ${
+                            acc.provider === "gmail"
+                              ? "bg-red-100 text-red-700"
+                              : acc.provider === "yahoo"
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-indigo-100 text-indigo-700"
+                          }`}>
+                            {acc.provider === "gmail" ? "G" : acc.provider === "yahoo" ? "Y" : "@"}
                           </span>
-                          <span className="font-mono text-indigo-950 font-bold">{acc.email}</span>
-                          {acc.isAdmin && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800">
-                              Admin
-                            </span>
-                          )}
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-indigo-950 font-bold">{acc.email}</span>
+                              {acc.provider === "gmail" && (
+                                <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black bg-red-100 text-red-700 border border-red-200">
+                                  Gmail
+                                </span>
+                              )}
+                              {acc.provider === "yahoo" && (
+                                <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black bg-purple-100 text-purple-700 border border-purple-200">
+                                  Yahoo
+                                </span>
+                              )}
+                              {acc.isAdmin && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800">
+                                  Admin
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </td>
                       <td className="p-3 font-bold text-slate-700">{acc.fullName}</td>
@@ -1929,34 +1959,117 @@ export default function AdminMailPage() {
               </button>
             </div>
 
-            <form onSubmit={handleCreateAccount} className="space-y-3.5 text-xs">
+            <form onSubmit={handleCreateAccount} className="space-y-4 text-xs">
+              {/* Pemilih Tipe / Provider Email */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Username Email & Domain:</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="misal: sales, info, support"
-                    value={newAccountForm.username}
-                    onChange={(e) => setNewAccountForm({ ...newAccountForm, username: e.target.value })}
-                    className="flex-1 p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
-                    required
-                  />
-                  <select
-                    value={newAccountForm.domain}
-                    onChange={(e) => setNewAccountForm({ ...newAccountForm, domain: e.target.value })}
-                    className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 font-mono font-bold text-slate-800"
+                <label className="font-bold text-slate-700 block mb-1.5">Tipe / Layanan Email:</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewAccountForm({
+                      ...newAccountForm,
+                      provider: "internal",
+                      domain: "dstechsmart.com",
+                      quotaMb: 5120
+                    })}
+                    className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer ${
+                      newAccountForm.provider === "internal"
+                        ? "border-indigo-600 bg-indigo-50/80 text-indigo-900 font-bold shadow-xs ring-2 ring-indigo-600/20"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                    }`}
                   >
-                    <option value="dstechsmart.com">@dstechsmart.com</option>
-                    <option value="dstechsmart.id">@dstechsmart.id</option>
-                  </select>
+                    <div className="text-sm mb-0.5">🏢</div>
+                    <div className="text-[11px] font-black">DSTech Smart</div>
+                    <div className="text-[9px] text-slate-400">@dstechsmart.com</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewAccountForm({
+                      ...newAccountForm,
+                      provider: "gmail",
+                      domain: "gmail.com",
+                      quotaMb: 15360
+                    })}
+                    className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer ${
+                      newAccountForm.provider === "gmail"
+                        ? "border-red-500 bg-red-50/80 text-red-950 font-bold shadow-xs ring-2 ring-red-500/20"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <div className="text-sm mb-0.5">🔴</div>
+                    <div className="text-[11px] font-black">Google Gmail</div>
+                    <div className="text-[9px] text-slate-400">@gmail.com</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewAccountForm({
+                      ...newAccountForm,
+                      provider: "yahoo",
+                      domain: "yahoo.com",
+                      quotaMb: 1024000
+                    })}
+                    className={`p-2.5 rounded-2xl border text-center transition-all cursor-pointer ${
+                      newAccountForm.provider === "yahoo"
+                        ? "border-purple-600 bg-purple-50/80 text-purple-950 font-bold shadow-xs ring-2 ring-purple-600/20"
+                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    <div className="text-sm mb-0.5">🟣</div>
+                    <div className="text-[11px] font-black">Yahoo / Ymail</div>
+                    <div className="text-[9px] text-slate-400">@yahoo / @ymail</div>
+                  </button>
                 </div>
               </div>
 
+              {/* Input Email / Username */}
+              {newAccountForm.provider === "internal" ? (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Username Email & Domain:</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="misal: sales, info, support"
+                      value={newAccountForm.username}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, username: e.target.value })}
+                      className="flex-1 p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                      required
+                    />
+                    <select
+                      value={newAccountForm.domain}
+                      onChange={(e) => setNewAccountForm({ ...newAccountForm, domain: e.target.value })}
+                      className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 font-mono font-bold text-slate-800"
+                    >
+                      <option value="dstechsmart.com">@dstechsmart.com</option>
+                      <option value="dstechsmart.id">@dstechsmart.id</option>
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Alamat Email {newAccountForm.provider === "gmail" ? "Gmail Perusahaan" : "Yahoo / Ymail Perusahaan"}:
+                  </label>
+                  <input
+                    type="email"
+                    placeholder={newAccountForm.provider === "gmail" ? "misal: dstech.corp@gmail.com" : "misal: dstech_corp@yahoo.com"}
+                    value={newAccountForm.fullEmail}
+                    onChange={(e) => setNewAccountForm({ ...newAccountForm, fullEmail: e.target.value })}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                    required
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Pastikan alamat email aktif dan terdaftar di {newAccountForm.provider === "gmail" ? "Google" : "Yahoo"}.
+                  </p>
+                </div>
+              )}
+
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Nama Lengkap Pemilik / Divisi:</label>
+                <label className="font-bold text-slate-700 block mb-1">Nama Pemilik / Divisi:</label>
                 <input
                   type="text"
-                  placeholder="misal: Tim Sales DSTech"
+                  placeholder="misal: Tim Marketing / Direksi"
                   value={newAccountForm.fullName}
                   onChange={(e) => setNewAccountForm({ ...newAccountForm, fullName: e.target.value })}
                   className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
@@ -1964,30 +2077,74 @@ export default function AdminMailPage() {
                 />
               </div>
 
+              {/* Input Password / App Password */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Password Akun Email:</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-700">
+                    {newAccountForm.provider === "internal"
+                      ? "Password Akun Email:"
+                      : newAccountForm.provider === "gmail"
+                      ? "Sandi Aplikasi Google (App Password 16 Karakter):"
+                      : "Sandi Aplikasi Yahoo (App Password 16 Karakter):"}
+                  </label>
+                  {newAccountForm.provider !== "internal" && (
+                    <a
+                      href={newAccountForm.provider === "gmail" ? "https://myaccount.google.com/apppasswords" : "https://login.yahoo.com/account/security"}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-bold text-indigo-600 hover:underline inline-flex items-center gap-1"
+                    >
+                      Buka Pengaturan Keamanan ↗
+                    </a>
+                  )}
+                </div>
                 <input
                   type="password"
-                  placeholder="Masukkan password yang aman..."
+                  placeholder={
+                    newAccountForm.provider === "internal"
+                      ? "Masukkan password akun..."
+                      : "Contoh: abcd efgh ijkl mnop (16 huruf)"
+                  }
                   value={newAccountForm.password}
                   onChange={(e) => setNewAccountForm({ ...newAccountForm, password: e.target.value })}
-                  className="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+                  className="w-full p-2.5 rounded-xl bg-white border border-slate-200 font-mono text-slate-800 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
                   required
                 />
+                {newAccountForm.provider !== "internal" && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[10px] text-amber-900 space-y-1">
+                    <p className="font-bold flex items-center gap-1">
+                      <span>💡 Cara Mendapatkan Sandi Aplikasi {newAccountForm.provider === "gmail" ? "Google" : "Yahoo"}:</span>
+                    </p>
+                    <p className="text-slate-700 leading-relaxed">
+                      {newAccountForm.provider === "gmail"
+                        ? "1. Aktifkan Verifikasi 2 Langkah di Akun Google > 2. Masuk ke Keamanan > Sandi Aplikasi (App Passwords) > 3. Buat nama 'DSTech Webmail' dan salin 16 karakter yang muncul ke kotak di atas."
+                        : "1. Buka Keamanan Akun Yahoo > 2. Klik 'Generate App Password' > 3. Masukkan nama 'DSTech Webmail' dan salin 16 karakter sandi ke kotak di atas."}
+                    </p>
+                  </div>
+                )}
               </div>
 
+              {/* Kuota Penyimpanan */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Alokasi Kuota Penyimpanan:</label>
-                <select
-                  value={newAccountForm.quotaMb}
-                  onChange={(e) => setNewAccountForm({ ...newAccountForm, quotaMb: Number(e.target.value) })}
-                  className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800"
-                >
-                  <option value={1024}>1 GB (1.024 MB)</option>
-                  <option value={2048}>2 GB (2.048 MB)</option>
-                  <option value={5120}>5 GB (5.120 MB) - Standar Perusahaan</option>
-                  <option value={10240}>10 GB (10.240 MB) - Manajemen</option>
-                </select>
+                <label className="font-bold text-slate-700 block mb-1">Kapasitas Penyimpanan:</label>
+                {newAccountForm.provider === "internal" ? (
+                  <select
+                    value={newAccountForm.quotaMb}
+                    onChange={(e) => setNewAccountForm({ ...newAccountForm, quotaMb: Number(e.target.value) })}
+                    className="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800"
+                  >
+                    <option value={1024}>1 GB (1.024 MB)</option>
+                    <option value={2048}>2 GB (2.048 MB)</option>
+                    <option value={5120}>5 GB (5.120 MB) - Standar Perusahaan</option>
+                    <option value={10240}>10 GB (10.240 MB) - Manajemen</option>
+                  </select>
+                ) : (
+                  <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-[11px] text-slate-600 font-medium">
+                    {newAccountForm.provider === "gmail"
+                      ? "⚡ Kuota Cloud Google Standar: 15 GB (15.360 MB)"
+                      : "⚡ Kuota Cloud Yahoo Standar: 1.000 GB (1 TB)"}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -2013,7 +2170,7 @@ export default function AdminMailPage() {
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black shadow-md cursor-pointer"
                 >
-                  Buat Akun Email
+                  Simpan &amp; Hubungkan Akun
                 </button>
               </div>
             </form>
