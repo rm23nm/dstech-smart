@@ -276,159 +276,229 @@ export async function GET(req: Request) {
             class="content-wrapper relative z-10 space-y-4"
             style="padding-top: ${letterheadEnabled ? '120px' : '30px'}; padding-bottom: ${letterheadEnabled ? '90px' : '30px'}; padding-left: 45px; padding-right: 45px;"
           >
-            <!-- Judul & Nomor SPH -->
-            <div class="flex justify-between items-start pb-4 border-b border-slate-300">
-              <div>
-                <h2 class="text-xl font-black text-slate-900 tracking-wider uppercase">SURAT PENAWARAN HARGA (SPH)</h2>
-                <p class="text-xs font-mono font-bold text-indigo-700 mt-0.5">NOMOR: ${sph.quotationNumber}</p>
-                <div class="mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200">
-                  STATUS: ${sph.approvalStatus || 'RESMI DITERBITKAN'}
+            <!-- Kop Surat Perusahaan DSTech -->
+            <div class="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-2xl font-black text-red-600 tracking-tight">
+                    ${sph.businessEntity === "NON_PT" ? "DSTECH SMART" : "PT. DSTECH SMART PERKASA"}
+                  </span>
+                </div>
+                <p class="text-[11px] font-bold text-slate-600">
+                  Solusi Security System, CCTV AI, Barrier Gate, IoT &amp; IT Infrastructure
+                </p>
+                <p class="text-[10px] text-slate-500 leading-relaxed max-w-md">
+                  Perum Bukit Cilegon Asri Blok DB No. 19, Kel. Bagendung, Kec. Cilegon, Kota Cilegon - Banten
+                  <br />
+                  ${sph.businessEntity === "NON_PT" ? `<span>Usaha Mandiri Non-PKP (Bebas PPN 0%)</span>` : `<strong>NIB: 1909220127034</strong> | <strong>NPWP: 60.648.216.4-102.000</strong>`}
+                  <br />
+                  WhatsApp: 0822-5949-4242 | 0822-7225-6903 | Email: cs@dstechsmart.com | https://dstechsmart.com
+                </p>
+              </div>
+
+              <div class="text-right space-y-1">
+                <span class="px-3 py-1 rounded-md bg-indigo-900 text-white font-black text-xs uppercase tracking-wider inline-block">
+                  SURAT PENAWARAN HARGA (SPH)
+                </span>
+                <p class="font-mono font-black text-sm text-indigo-700">
+                  ${sph.quotationNumber} ${sph.revision ? `- Rev. 0${sph.revision}` : ''}
+                </p>
+                <p class="text-[11px] text-slate-500 font-medium">
+                  Tanggal: ${sph.date}
+                </p>
+                <p class="text-[11px] text-slate-700 font-bold">
+                  Masa Berlaku: s/d ${sph.validUntil || '-'}
+                </p>
+              </div>
+            </div>
+
+            <!-- Nomor, Lampiran, Perihal & Info Penerima -->
+            <div class="grid grid-cols-2 gap-4 text-xs pt-2">
+              <div class="space-y-1">
+                <table class="text-xs">
+                  <tbody>
+                    <tr>
+                      <td class="pr-2 font-bold text-slate-500">Nomor</td>
+                      <td class="pr-2">:</td>
+                      <td class="font-mono font-bold text-slate-900">${sph.quotationNumber}</td>
+                    </tr>
+                    <tr>
+                      <td class="pr-2 font-bold text-slate-500">Lampiran</td>
+                      <td class="pr-2">:</td>
+                      <td class="text-slate-800">1 (Satu) Berkas Penawaran Harga</td>
+                    </tr>
+                    <tr>
+                      <td class="pr-2 font-bold text-slate-500">Perihal</td>
+                      <td class="pr-2">:</td>
+                      <td class="font-bold text-indigo-900">${sph.subject || 'Pengadaan &amp; Instalasi Sistem Teknologi Keamanan'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="text-right bg-slate-50/90 p-3 rounded-xl border border-slate-200 text-xs">
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-wider">Kepada Yth:</p>
+                <p class="font-black text-slate-900 text-sm mt-0.5">${sph.customerName}</p>
+                ${sph.customerOrg && sph.customerOrg !== sph.customerName ? `<p class="font-bold text-slate-700">${sph.customerOrg}</p>` : ''}
+                <p class="text-slate-600 text-[11px] mt-0.5">${sph.customerPhone || '-'}</p>
+                <p class="text-slate-500 text-[10px]">${sph.customerAddress || 'Lokasi Klien'}</p>
+              </div>
+            </div>
+
+            <!-- Paragraf Pembuka Resmi -->
+            <div class="text-xs leading-relaxed text-slate-700 space-y-1.5 border-t border-slate-100 pt-3">
+              <p class="font-bold text-slate-900">Dengan hormat,</p>
+              <p>
+                Sehubungan dengan rencana pengadaan dan kebutuhan sistem pengamanan / teknologi informasi pada instansi Bapak/Ibu, bersama surat ini kami PT. DSTech Smart Perkasa bermaksud mengajukan penawaran harga pengadaan unit perangkat, material pendukung, serta jasa instalasi teknis dengan rincian spesifikasi sebagai berikut:
+              </p>
+            </div>
+
+            <!-- Referensi Resmi ke Lampiran Halaman 2 -->
+            <div class="p-3.5 rounded-2xl bg-purple-50/90 border border-purple-300 text-xs text-purple-950 flex items-center justify-between gap-3 shadow-xs">
+              <div class="flex items-center gap-2.5">
+                <div>
+                  <p class="font-black text-slate-900">Rincian Perangkat, Material &amp; Jasa Teknis:</p>
+                  <p class="text-[11px] text-purple-800">
+                    Rincian spesifikasi teknis lengkap, kuantiti, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> surat penawaran ini (${itemsWithImages.length} item penawaran).
+                  </p>
                 </div>
               </div>
-              <div class="text-right text-xs space-y-1">
-                <p><span class="text-slate-400">Tanggal:</span> <strong class="text-slate-800">${sph.date}</strong></p>
-                <p><span class="text-slate-400">Masa Berlaku:</span> <strong class="text-amber-800">s/d ${sph.validUntil || '-'}</strong></p>
-                <p><span class="text-slate-400">Lampiran:</span> <strong class="text-slate-800">Rincian Harga &amp; Brosur Gambar</strong></p>
-              </div>
-            </div>
-
-            <!-- Perihal & Info Penerima -->
-            <div class="py-3 border-b border-slate-200 grid grid-cols-2 gap-4 text-xs">
-              <div>
-                <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">KEPADA YTH:</span>
-                <p class="font-black text-slate-900 text-sm mt-0.5">${sph.customerName}</p>
-                ${sph.customerOrg && sph.customerOrg !== sph.customerName ? `<p class="font-bold text-indigo-700">${sph.customerOrg}</p>` : ''}
-                <p class="text-slate-600 mt-0.5 leading-relaxed text-[11px]">${sph.customerAddress || 'Lokasi Klien'}</p>
-                <p class="text-slate-500 text-[11px] mt-0.5">Telp/WA: ${sph.customerPhone || '-'}</p>
-              </div>
-              <div>
-                <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">PERIHAL PENGAJUAN:</span>
-                <p class="font-black text-indigo-900 text-sm mt-0.5 leading-snug">${sph.subject || 'Pengadaan & Instalasi Sistem Teknologi Keamanan'}</p>
-                <p class="text-slate-500 text-[10px] mt-1.5 leading-relaxed">
-                  Bersama surat ini, kami menyampaikan proposal penawaran harga pengadaan unit perangkat dan jasa instalasi profesional dengan spesifikasi terbaik.
-                </p>
-              </div>
-            </div>
-
-            <!-- Ringkasan Rincian Penawaran -->
-            <p class="text-xs text-slate-700 leading-relaxed">
-              Dengan hormat,<br/>
-              Berdasarkan kebutuhan sistem di lokasi Bapak/Ibu, berikut kami ajukan penawaran harga untuk paket pengadaan sistem dengan rincian akumulasi sebagai berikut:
-            </p>
-
-            ${itemsWithImages.length <= 5 ? `
-            <table class="w-full text-xs border border-slate-300 mt-2">
-              <thead class="bg-indigo-950 text-white font-bold text-[10px] uppercase tracking-wider">
-                <tr>
-                  <th class="border border-slate-300 p-2 text-center w-8">No</th>
-                  <th class="border border-slate-300 p-2 text-center w-16">Gambar</th>
-                  <th class="border border-slate-300 p-2 text-left">Deskripsi Produk / Jasa &amp; Spesifikasi Teknis</th>
-                  <th class="border border-slate-300 p-2 text-center w-12">Qty</th>
-                  <th class="border border-slate-300 p-2 text-center w-14">Satuan</th>
-                  <th class="border border-slate-300 p-2 text-right w-28">Harga Satuan (Rp)</th>
-                  <th class="border border-slate-300 p-2 text-right w-28">Total (Rp)</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-200">
-                ${itemsWithImages.map((item: any, idx: number) => `
-                  <tr class="hover:bg-slate-50/50">
-                    <td class="border border-slate-300 p-2 text-center font-bold text-slate-500">${idx + 1}</td>
-                    <td class="border border-slate-300 p-1.5 text-center w-16">
-                      <div style="width: 44px; height: 44px; margin: 0 auto; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; padding: 2px;">
-                        <img src="${item.image || '/portfolio-residential.png'}" alt="${item.productName || item.name}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='/portfolio-residential.png'" />
-                      </div>
-                    </td>
-                    <td class="border border-slate-300 p-2">
-                      <div class="font-bold text-slate-900">${item.productName || item.name}</div>
-                      ${item.description ? `<div class="text-[10px] text-slate-500 mt-0.5 leading-snug">${item.description}</div>` : ''}
-                    </td>
-                    <td class="border border-slate-300 p-2 text-center font-bold">${item.qty}</td>
-                    <td class="border border-slate-300 p-2 text-center text-slate-600">${item.unit || 'Unit'}</td>
-                    <td class="border border-slate-300 p-2 text-right font-medium">${formatRupiah(item.price)}</td>
-                    <td class="border border-slate-300 p-2 text-right font-black text-slate-900">${formatRupiah(item.total || item.qty * item.price)}</td>
-                  </tr>
-                `).join("")}
-              </tbody>
-            </table>
-            ` : `
-            <div class="p-3.5 rounded-xl bg-purple-50/90 border border-purple-200 text-xs flex items-center justify-between gap-3 shadow-2xs">
-              <div>
-                <p class="font-black text-slate-900">Rincian Perangkat, Material &amp; Jasa Teknis:</p>
-                <p class="text-[11px] text-purple-900 mt-0.5 leading-relaxed">
-                  Rincian spesifikasi teknis lengkap, kuantiti, foto perangkat, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> surat penawaran ini (${itemsWithImages.length} item penawaran).
-                </p>
-              </div>
-              <span class="px-3 py-1.5 rounded-lg bg-indigo-950 text-white font-mono font-black text-xs shrink-0">
+              <span class="px-2.5 py-1 rounded-lg bg-purple-200/90 text-purple-900 font-mono font-black text-[10px] shrink-0">
                 ${itemsWithImages.length} ITEM
               </span>
             </div>
-            `}
 
-            <!-- Kalkulasi Subtotal & Terbilang -->
-            <div class="grid grid-cols-2 gap-4 mt-2 pt-2 border-t border-slate-200 text-xs">
-              <div class="space-y-2">
-                <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200">
-                  <span class="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">TOTAL TERBILANG:</span>
-                  <p class="font-bold italic text-slate-800 text-[11px] mt-0.5">"# ${terbilangRupiah} #"</p>
+            <!-- Rincian Perhitungan & Terbilang -->
+            <div class="flex flex-col sm:flex-row justify-between gap-4 pt-2 text-xs">
+              <!-- Kotak Terbilang & Rekening Bank -->
+              <div class="space-y-3 max-w-sm flex-1">
+                <div class="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px]">
+                  <span class="font-bold text-amber-900 uppercase text-[10px] block mb-0.5">Terbilang:</span>
+                  <p class="font-serif italic font-bold text-slate-800">
+                    "${terbilangRupiah}"
+                  </p>
                 </div>
-                ${sph.terms ? `
-                  <div class="p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-[10px] text-slate-600">
-                    <span class="font-bold text-slate-800 block uppercase">Syarat &amp; Ketentuan:</span>
-                    <p class="whitespace-pre-line mt-0.5 leading-relaxed">${sph.terms}</p>
-                  </div>
-                ` : ''}
+
+                <div class="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] space-y-1">
+                  <p class="font-bold text-blue-900">Rekening Resmi Pembayaran PT. DSTech Smart Perkasa:</p>
+                  ${bankAccounts.filter((b: any) => b.status === "Aktif").map((acc: any) => `
+                    <p class="text-slate-700 text-[10px]">
+                      • <strong>${acc.bankName}</strong>: ${acc.accountNumber} a/n ${acc.accountHolder} (${acc.branch})
+                    </p>
+                  `).join("")}
+                </div>
               </div>
 
-              <div class="space-y-1 text-right">
-                <div class="flex justify-between py-0.5 text-slate-600">
-                  <span>Subtotal Penawaran:</span>
+              <!-- Summary Totals -->
+              <div class="space-y-1.5 sm:w-72 bg-slate-50/90 p-3.5 rounded-xl border border-slate-200">
+                <div class="flex items-center justify-between text-slate-600">
+                  <span>Subtotal Barang &amp; Jasa:</span>
                   <span class="font-bold text-slate-900">${formatRupiah(sph.subtotal)}</span>
                 </div>
                 ${sph.discount && sph.discount > 0 ? `
-                  <div class="flex justify-between py-0.5 text-red-600">
+                  <div class="flex items-center justify-between text-red-600">
                     <span>${sph.discountLabel || 'Diskon Khusus Negosiasi'}:</span>
-                    <span class="font-bold">-${formatRupiah(sph.discount)}</span>
+                    <span class="font-bold">- ${formatRupiah(sph.discount)}</span>
+                  </div>
+                  <div class="flex items-center justify-between text-slate-600 text-[11px] pt-0.5 border-t border-dashed border-slate-200">
+                    <span>DPP / Netto Kesepakatan:</span>
+                    <span class="font-bold text-slate-900">
+                      ${formatRupiah(Math.max(0, sph.subtotal - sph.discount))}
+                    </span>
                   </div>
                 ` : ''}
-                ${sph.taxAmount && sph.taxAmount > 0 ? `
-                  <div class="flex justify-between py-0.5 text-slate-600">
-                    <span>${sph.taxRate === 11.12 ? 'PPN (12% (11/12))' : `PPN (${sph.taxRate || 11}%)`}${sph.taxType === 'include' ? ' Include' : ''}:</span>
-                    <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
-                  </div>
-                ` : ''}
-                <div class="flex justify-between py-1 border-t-2 border-slate-800 text-sm font-black text-slate-900">
-                  <span>Grand Total Penawaran:</span>
-                  <span class="text-indigo-700">${formatRupiah(sph.grandTotal)}</span>
+                <div class="flex items-center justify-between text-slate-600">
+                  <span>PPN (${sph.taxRate === 11.12 ? '12% (11/12)' : `${sph.taxRate || 11}%`}):</span>
+                  <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
+                </div>
+                <div class="border-t-2 border-indigo-950 pt-2 flex items-center justify-between text-sm font-black text-slate-900">
+                  <span class="text-indigo-900">TOTAL PENAWARAN:</span>
+                  <span class="text-base text-emerald-600">${formatRupiah(sph.grandTotal)}</span>
                 </div>
               </div>
             </div>
 
-            <!-- Tanda Tangan Pengesahan -->
-            <div class="grid grid-cols-2 gap-8 pt-4 mt-4 border-t border-slate-200 text-center">
-              <div>
-                <span class="text-[10px] text-slate-500 block mb-1">Persetujuan Klien (PO / Konfirmasi):</span>
-                <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300">
-                  <span class="text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap Klien )</span>
+            <!-- Syarat & Ketentuan Teknis Penawaran -->
+            ${sph.terms ? `
+              <div class="p-4 rounded-xl bg-slate-50/90 border border-slate-200 text-xs space-y-1.5">
+                <h5 class="font-black text-slate-900 text-[11px] uppercase tracking-wider flex items-center gap-1.5">
+                  <span>Syarat &amp; Ketentuan Teknis (Terms &amp; Conditions):</span>
+                </h5>
+                <div class="text-[10px] text-slate-600 whitespace-pre-line leading-relaxed font-sans">
+                  ${sph.terms}
                 </div>
-                <p class="font-bold text-slate-900 text-xs mt-1 underline">${sph.customerName}</p>
-                <p class="text-[10px] text-slate-500">${sph.customerOrg || 'Klien / Pemesan'}</p>
               </div>
-              <div>
-                <span class="text-[10px] text-slate-500 block mb-1">Hormat Kami,</span>
-                <span class="font-bold text-slate-900 text-xs block">PT. DSTECH SMART PERKASA</span>
-                <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
-                  ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-16 object-contain z-10" />` : ""}
-                  ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-16 opacity-75 absolute right-4" />` : ""}
+            ` : ''}
+
+            <!-- Penutup Surat -->
+            <div class="text-xs leading-relaxed text-slate-700">
+              <p>
+                Demikian surat penawaran harga ini kami sampaikan. Besar harapan kami agar usulan solusi teknologi ini dapat memenuhi ekspektasi dan menjadi awal kerjasama yang baik antara PT. DSTech Smart Perkasa dengan ${sph.customerOrg || sph.customerName}. Atas perhatian dan kerjasamanya, kami ucapkan terima kasih.
+              </p>
+            </div>
+
+            <!-- Tanda Tangan Dual Approval (Klien & Direktur DSTech) -->
+            <div class="grid grid-cols-2 gap-4 pt-3 border-t border-slate-200 text-xs">
+              <!-- Sisi Kiri: Penerima / Klien -->
+              <div class="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
+                <div>
+                  <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Disetujui &amp; Diterima Oleh,</p>
+                  <p class="text-xs font-black text-slate-900 mt-0.5">
+                    ${sph.customerOrg || sph.customerName}
+                  </p>
                 </div>
-                <p class="font-black text-slate-900 text-xs mt-1 underline">( ${signerName} )</p>
-                <p class="text-[10px] text-slate-500">${signerTitle}</p>
+
+                <div class="h-11 flex items-center justify-center text-slate-300 text-[9px] italic">
+                  (Tanda Tangan, Nama Jelas &amp; Stempel Klien)
+                </div>
+
+                <div class="pt-1 border-t border-slate-300">
+                  <p class="font-bold text-slate-900 text-xs">
+                    ${sph.customerName ? `( ${sph.customerName} )` : "( ................................................................ )"}
+                  </p>
+                  <p class="text-[9px] text-slate-500">
+                    PIC / Purchasing / Manajer Terkait
+                  </p>
+                </div>
+              </div>
+
+              <!-- Sisi Kanan: Hormat Kami -->
+              <div class="flex flex-col justify-between h-36 border border-slate-200/80 rounded-xl p-2.5 bg-white/70 shadow-sm text-center">
+                <div>
+                  <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Hormat Kami,</p>
+                  <p class="text-xs font-black text-indigo-700 mt-0.5">
+                    ${sph.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                  </p>
+                </div>
+
+                <div class="h-11 relative flex items-center justify-center">
+                  <!-- Stempel Bulat Digital Resmi -->
+                  <div class="print-stamp-circle absolute right-2 w-12 h-12 rounded-full border-2 border-dashed border-indigo-600/50 flex flex-col items-center justify-center text-[6px] text-indigo-700 font-bold uppercase rotate-[-12deg] pointer-events-none bg-indigo-50/40">
+                    <span class="font-black text-[5.5px]">PT. DSTECH</span>
+                    <span class="text-[4.5px] tracking-tight">SMART PERKASA</span>
+                    <span class="text-[4px] text-emerald-600 font-mono font-black mt-0.5">OFFICIAL SPH</span>
+                  </div>
+
+                  ${signatureImage ? `
+                    <img src="${signatureImage}" alt="Tanda Tangan" class="max-h-11 max-w-[130px] object-contain relative z-10" />
+                  ` : `
+                    <div class="font-serif italic text-base text-slate-800 font-black relative z-10 tracking-wider">
+                      ${signerName}
+                    </div>
+                  `}
+                </div>
+
+                <div class="pt-2 border-t border-slate-300">
+                  <p class="font-black text-slate-900 text-xs underline">( ${signerName} )</p>
+                  <p class="text-[9px] text-slate-500">${signerTitle}</p>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- LEMBAR LAMPIRAN TABEL RINCIAN ITEM PENAWARAN (HANYA JIKA ITEM > 5 DAN DIPAGINASI PER LEMBAR A4 RESMI) -->
-        ${itemsWithImages.length > 5 ? itemChunks.map((chunk, chunkIdx) => `
+        <!-- LEMBAR LAMPIRAN TABEL RINCIAN ITEM PENAWARAN (DIPAGINASI PER LEMBAR A4 RESMI) -->
+        ${itemsWithImages.length > 0 ? itemChunks.map((chunk, chunkIdx) => `
         <div
           class="print-sheet relative bg-white shadow-2xl border border-slate-300 mx-auto overflow-hidden text-slate-800 mb-8"
           style="width: 210mm; min-height: 297mm; max-width: 100%; box-sizing: border-box; page-break-after: always;"

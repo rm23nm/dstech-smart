@@ -17047,68 +17047,20 @@ export default function AdminFinanceERPPage() {
                   </p>
                 </div>
 
-                {/* Tabel Rincian Item Penawaran Harga dengan Gambar Produk */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border border-slate-200">
-                    <thead className="bg-indigo-950 text-white uppercase text-[10px] font-black tracking-wider">
-                      <tr>
-                        <th className="p-2.5 text-center w-8">No</th>
-                        <th className="p-2.5 text-center w-16">Gambar</th>
-                        <th className="p-2.5">Deskripsi Produk / Jasa & Spesifikasi Teknis</th>
-                        <th className="p-2.5 text-center">Qty</th>
-                        <th className="p-2.5 text-center">Satuan</th>
-                        <th className="p-2.5 text-right">Harga Satuan (Rp)</th>
-                        {selectedQuotationForPrint.items.some((it) => (it.discount || 0) > 0) && (
-                          <th className="p-2.5 text-right">Diskon</th>
-                        )}
-                        <th className="p-2.5 text-right">Total (Rp)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white/70">
-                      {selectedQuotationForPrint.items.map((it, idx) => {
-                        const matchedProd = products.find(
-                          (p) =>
-                            (it.productId && p.id === it.productId) ||
-                            (p.name && it.productName && p.name.trim().toLowerCase() === it.productName.trim().toLowerCase())
-                        );
-                        const itemImg = it.image || matchedProd?.image || "/portfolio-residential.png";
-                        const itemDesc = it.description || matchedProd?.desc || "";
-
-                        return (
-                          <tr key={idx} className="hover:bg-slate-50/50">
-                            <td className="p-2.5 text-center font-bold text-slate-500">{idx + 1}</td>
-                            <td className="p-1.5 text-center w-16">
-                              <div className="w-12 h-12 mx-auto rounded-lg border border-slate-200 bg-white p-0.5 flex items-center justify-center overflow-hidden shadow-2xs">
-                                <img
-                                  src={itemImg}
-                                  alt={it.productName}
-                                  className="max-h-full max-w-full object-contain"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = "/portfolio-residential.png";
-                                  }}
-                                />
-                              </div>
-                            </td>
-                            <td className="p-2.5">
-                              <p className="font-bold text-slate-900 text-xs">{it.productName}</p>
-                              {itemDesc && (
-                                <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{itemDesc}</p>
-                              )}
-                            </td>
-                            <td className="p-2.5 text-center font-bold">{it.qty}</td>
-                            <td className="p-2.5 text-center text-slate-600">{it.unit}</td>
-                            <td className="p-2.5 text-right font-medium">{formatRupiah(it.price)}</td>
-                            {selectedQuotationForPrint.items.some((item) => (item.discount || 0) > 0) && (
-                              <td className="p-2.5 text-right text-red-600 font-bold">
-                                {it.discount ? `- ${formatRupiah(it.discount)}` : "-"}
-                              </td>
-                            )}
-                            <td className="p-2.5 text-right font-black">{formatRupiah(it.total)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                {/* Referensi Resmi ke Lampiran Halaman 2 (Detail Item & Spesifikasi Dipisahkan ke Halaman 2) */}
+                <div className="p-3.5 rounded-2xl bg-purple-50/90 border border-purple-300 text-xs text-purple-950 flex items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-2.5">
+                    <Layers className="w-5 h-5 text-purple-600 shrink-0" />
+                    <div>
+                      <p className="font-black text-slate-900">Rincian Perangkat, Material & Jasa Teknis:</p>
+                      <p className="text-[11px] text-purple-800">
+                        Rincian spesifikasi teknis lengkap, kuantiti, dan harga satuan unit tercantum pada <strong>Lampiran Halaman 2</strong> surat penawaran ini ({selectedQuotationForPrint.items.length} item penawaran).
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-purple-200/90 text-purple-900 font-mono font-black text-[10px] shrink-0">
+                    {selectedQuotationForPrint.items.length} ITEM
+                  </span>
                 </div>
 
                 {/* Rincian Perhitungan & Terbilang */}
