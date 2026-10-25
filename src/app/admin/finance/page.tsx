@@ -2188,7 +2188,11 @@ export default function AdminFinanceERPPage() {
       }
 
       waText += `\n💳 *Rekening Resmi Pembayaran Transfer:*\n`;
-      const defaultBank = bankAccounts.find((b) => b.isDefault) || bankAccounts[0];
+      const docEntity = (doc as any).businessEntity === "NON_PT" ? "NON_PT" : "PT";
+      const matchedBanks = bankAccounts.filter(
+        (b) => b.status === "Aktif" && (docEntity === "NON_PT" ? b.entityType === "NON_PT" : (b.entityType || "PT") === "PT" && b.entityType !== "NON_PT")
+      );
+      const defaultBank = matchedBanks.find((b) => b.isDefault) || matchedBanks[0] || bankAccounts[0];
       if (defaultBank) {
         waText += `• ${defaultBank.bankName}: ${defaultBank.accountNumber} a/n ${defaultBank.accountHolder} (${defaultBank.branch})\n`;
       }
@@ -2229,7 +2233,11 @@ export default function AdminFinanceERPPage() {
         emailBody += `• Kuitansi Pembayaran Sah: ${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n`;
       }
       emailBody += `\nInstruksi Pembayaran Transfer Rekening Perusahaan:\n`;
-      bankAccounts.filter((b) => b.status === "Aktif").forEach((acc) => {
+      const docEntity = (doc as any).businessEntity === "NON_PT" ? "NON_PT" : "PT";
+      const matchedBanks = bankAccounts.filter(
+        (b) => b.status === "Aktif" && (docEntity === "NON_PT" ? b.entityType === "NON_PT" : (b.entityType || "PT") === "PT" && b.entityType !== "NON_PT")
+      );
+      matchedBanks.forEach((acc) => {
         emailBody += `- Bank: ${acc.bankName} | No. Rek: ${acc.accountNumber} | a/n: ${acc.accountHolder} (${acc.branch})\n`;
       });
     } else if (isSph) {
@@ -15029,7 +15037,9 @@ export default function AdminFinanceERPPage() {
                   <div className="space-y-2 max-w-sm">
                     <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] space-y-1">
                       <div className="flex items-center justify-between border-b border-blue-200/60 pb-1 mb-1">
-                        <p className="font-bold text-dstech-blue">Instruksi Pembayaran Resmi Transfer Bank:</p>
+                        <p className="font-bold text-dstech-blue">
+                          Instruksi Pembayaran Resmi Transfer Bank ({selectedInvoiceForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}):
+                        </p>
                         <button
                           type="button"
                           onClick={() => setIsBankAccountsModalOpen(true)}
@@ -15038,11 +15048,20 @@ export default function AdminFinanceERPPage() {
                           Atur Rekening
                         </button>
                       </div>
-                      {bankAccounts.filter((b) => b.status === "Aktif").map((acc) => (
-                        <p key={acc.id} className="text-slate-700">
-                          • <strong>{acc.bankName}</strong>: {acc.accountNumber} a/n {acc.accountHolder} ({acc.branch})
-                        </p>
-                      ))}
+                      {(() => {
+                        const isNonPt = selectedInvoiceForPrint.businessEntity === "NON_PT";
+                        const filtered = bankAccounts.filter((b) => b.status === "Aktif" && (isNonPt ? b.entityType === "NON_PT" : (b.entityType || "PT") === "PT" && b.entityType !== "NON_PT"));
+                        const displayList = filtered.length > 0 ? filtered : [
+                          isNonPt
+                            ? { id: "def_nonpt_inv", bankName: "Bank BCA", accountNumber: "6520490131", accountHolder: "RAMADHANI ST", branch: "KCU Cilegon" }
+                            : { id: "def_pt_inv", bankName: "Bank BCA", accountNumber: "295-074-0321", accountHolder: "PT. DSTech Smart Perkasa", branch: "KCU Cilegon" }
+                        ];
+                        return displayList.map((acc) => (
+                          <p key={acc.id} className="text-slate-700">
+                            • <strong>{acc.bankName}</strong>: {acc.accountNumber} a/n {acc.accountHolder} ({acc.branch})
+                          </p>
+                        ));
+                      })()}
                       <p className="text-[10px] text-slate-500 italic mt-1.5">
                         Harap sertakan nomor faktur ({selectedInvoiceForPrint.invoiceNumber}) pada berita transfer.
                       </p>
@@ -17075,12 +17094,23 @@ export default function AdminFinanceERPPage() {
                     </div>
 
                     <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] space-y-1">
-                      <p className="font-bold text-dstech-blue">Rekening Resmi Pembayaran PT. DSTech Smart Perkasa:</p>
-                      {bankAccounts.filter((b) => b.status === "Aktif").map((acc) => (
-                        <p key={acc.id} className="text-slate-700 text-[10px]">
-                          • <strong>{acc.bankName}</strong>: {acc.accountNumber} a/n {acc.accountHolder} ({acc.branch})
-                        </p>
-                      ))}
+                      <p className="font-bold text-dstech-blue">
+                        Rekening Resmi Pembayaran {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}:
+                      </p>
+                      {(() => {
+                        const isNonPt = selectedQuotationForPrint.businessEntity === "NON_PT";
+                        const filtered = bankAccounts.filter((b) => b.status === "Aktif" && (isNonPt ? b.entityType === "NON_PT" : (b.entityType || "PT") === "PT" && b.entityType !== "NON_PT"));
+                        const displayList = filtered.length > 0 ? filtered : [
+                          isNonPt
+                            ? { id: "def_nonpt_sph", bankName: "Bank BCA", accountNumber: "6520490131", accountHolder: "RAMADHANI ST", branch: "KCU Cilegon" }
+                            : { id: "def_pt_sph", bankName: "Bank BCA", accountNumber: "295-074-0321", accountHolder: "PT. DSTech Smart Perkasa", branch: "KCU Cilegon" }
+                        ];
+                        return displayList.map((acc) => (
+                          <p key={acc.id} className="text-slate-700 text-[10px]">
+                            • <strong>{acc.bankName}</strong>: {acc.accountNumber} a/n {acc.accountHolder} ({acc.branch})
+                          </p>
+                        ));
+                      })()}
                     </div>
                   </div>
 

@@ -61,6 +61,46 @@ function angkaKeTerbilang(nilai: number): string {
   return angkaKeTerbilang(Math.floor(n / 1000000000000)) + " Triliun " + angkaKeTerbilang(n % 1000000000000);
 }
 
+function getFilteredBankAccounts(bankAccounts: any[], entityType?: string): any[] {
+  const isNonPt = entityType === "NON_PT";
+  const filtered = (bankAccounts || []).filter((b: any) => {
+    if (b.status && b.status !== "Aktif") return false;
+    if (isNonPt) {
+      return b.entityType === "NON_PT";
+    }
+    // Dokumen PT: Wajib hanya rekening ber-entityType PT dan BUKAN NON_PT
+    return (b.entityType || "PT") === "PT" && b.entityType !== "NON_PT";
+  });
+
+  if (filtered.length > 0) return filtered;
+
+  if (isNonPt) {
+    return [
+      {
+        id: "dstech_bank_nonpt_def",
+        bankName: "Bank BCA",
+        accountNumber: "6520490131",
+        accountHolder: "RAMADHANI ST",
+        branch: "KCU Cilegon",
+        entityType: "NON_PT",
+        status: "Aktif",
+      },
+    ];
+  }
+
+  return [
+    {
+      id: "dstech_bank_pt_def",
+      bankName: "Bank BCA",
+      accountNumber: "295-074-0321",
+      accountHolder: "PT. DSTech Smart Perkasa",
+      branch: "KCU Cilegon",
+      entityType: "PT",
+      status: "Aktif",
+    },
+  ];
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const docType = (searchParams.get("doc") || "invoice").toLowerCase();
@@ -380,10 +420,10 @@ export async function GET(req: Request) {
                 </div>
 
                 <div class="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] space-y-1">
-                  <p class="font-bold text-blue-900">Rekening Resmi Pembayaran PT. DSTech Smart Perkasa:</p>
-                  ${bankAccounts.filter((b: any) => b.status === "Aktif").map((acc: any) => `
+                  <p class="font-bold text-blue-900">Rekening Resmi Pembayaran ${sph.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}:</p>
+                  ${getFilteredBankAccounts(bankAccounts, sph.businessEntity).map((acc: any) => `
                     <p class="text-slate-700 text-[10px]">
-                      • <strong>${acc.bankName}</strong>: ${acc.accountNumber} a/n ${acc.accountHolder} (${acc.branch})
+                      • <strong>${acc.bankName}</strong>: ${acc.accountNumber} a/n ${acc.accountHolder} (${acc.branch || 'KCU Cilegon'})
                     </p>
                   `).join("")}
                 </div>
@@ -1582,12 +1622,18 @@ export async function GET(req: Request) {
             <p class="font-bold italic text-slate-800 text-[11px] mt-0.5">"# ${terbilangRupiah} #"</p>
           </div>
 
-          <div class="p-2.5 bg-indigo-50/70 rounded-xl border border-indigo-100 text-indigo-950 space-y-0.5">
-            <span class="text-[9px] text-indigo-700 font-bold block uppercase tracking-wider">REKENING RESMI TRANSFER:</span>
-            <p class="font-bold text-xs">${defaultBank.bankName}</p>
-            <p class="font-mono text-xs font-black text-indigo-900">${defaultBank.accountNumber}</p>
-            <p class="text-[10px] text-indigo-800">a/n ${defaultBank.accountHolder} (${defaultBank.branch || 'Kantor Cabang'})</p>
-          </div>
+          ${(() => {
+            const saleBanks = getFilteredBankAccounts(bankAccounts, sale.businessEntity);
+            const saleBank = saleBanks.find((b: any) => b.isDefault) || saleBanks[0];
+            return `
+              <div class="p-2.5 bg-indigo-50/70 rounded-xl border border-indigo-100 text-indigo-950 space-y-0.5">
+                <span class="text-[9px] text-indigo-700 font-bold block uppercase tracking-wider">REKENING RESMI TRANSFER (${sale.businessEntity === "NON_PT" ? "DSTECH SMART" : "PT. DSTECH SMART PERKASA"}):</span>
+                <p class="font-bold text-xs">${saleBank.bankName}</p>
+                <p class="font-mono text-xs font-black text-indigo-900">${saleBank.accountNumber}</p>
+                <p class="text-[10px] text-indigo-800">a/n ${saleBank.accountHolder} (${saleBank.branch || 'KCU Cilegon'})</p>
+              </div>
+            `;
+          })()}
         </div>
 
         <div class="space-y-1 text-right">
