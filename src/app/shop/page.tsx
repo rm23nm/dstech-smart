@@ -33,6 +33,9 @@ import {
   CreditCard,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  FolderTree,
+  Grid,
   Flame,
   Globe,
   AlertCircle,
@@ -322,6 +325,21 @@ export default function ShopPage() {
   const [shopActiveImage, setShopActiveImage] = useState<string>("");
   const [heroSlide, setHeroSlide] = useState(0);
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
+  // Dropdown Kategori State & Ref
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const categoryDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Deteksi klik di luar popover kategori untuk menutup otomatis
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setIsCategoryDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Site branding settings
   const [siteSettings, setSiteSettings] = useState<any>(null);
 
@@ -1010,6 +1028,41 @@ export default function ShopPage() {
     return subSet.size > 0 ? ["Semua", ...Array.from(subSet)] : [];
   }, [activeCategory, masterCategories, products]);
 
+  // Helper mendapatkan daftar subkategori dari kategori spesifik untuk menu dropdown
+  const getSubCategoriesForCat = (catName: string): string[] => {
+    if (catName === "Semua") return [];
+    const catLower = catName.toLowerCase().trim();
+    const subSet = new Set<string>();
+
+    const matchedMaster = masterCategories.find(
+      (mc) =>
+        mc.name.toLowerCase() === catLower ||
+        mc.name.toLowerCase().includes(catLower) ||
+        catLower.includes(mc.name.toLowerCase())
+    );
+    if (matchedMaster && Array.isArray(matchedMaster.subCategories)) {
+      matchedMaster.subCategories.forEach((sc: any) => {
+        if (sc.name && sc.name.trim()) subSet.add(sc.name.trim());
+      });
+    }
+
+    products.forEach((p) => {
+      const pCat = (p.category || "").toLowerCase().trim();
+      const isMatch =
+        pCat === catLower ||
+        pCat.includes(catLower) ||
+        catLower.includes(pCat) ||
+        (catLower.includes("parking") && pCat.includes("parking")) ||
+        (catLower.includes("security") && pCat.includes("security")) ||
+        (catLower.includes("smart home") && pCat.includes("smart home"));
+      if (isMatch && p.subCategory && p.subCategory.trim()) {
+        subSet.add(p.subCategory.trim());
+      }
+    });
+
+    return Array.from(subSet);
+  };
+
   // Filter & Sortir Produk Cerdas
   const filteredProducts = useMemo(() => {
     return products
@@ -1690,68 +1743,40 @@ export default function ShopPage() {
         </div>
 
         {/* Search & Filter Bar */}
-        <div className="space-y-3">
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-            {/* Category Tabs Dinamis */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-none">
-              {availableCategories.map((cat) => {
-                const isActive = activeCategory === cat.name;
-                return (
-                  <button
-                    key={cat.name}
-                    onClick={() => {
-                      setActiveCategory(cat.name);
-                      setActiveSubCategory("Semua");
-                    }}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
-                      isActive
-                        ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
-                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                    }`}
-                  >
-                    <span>{cat.name}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                        isActive
-                          ? "bg-white/20 text-white"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {cat.count}
-                    </span>
-                  </button>
-                );
-              })}
+        <div className="space-y-3 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+          {/* Baris 1: Search Box & Sort Filter */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            {/* Search Box */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Cari produk CCTV, Barrier Gate, Smart Home, atau spesifikasi..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-9 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:bg-white transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Controls: Search & Sort Dropdown */}
-            <div className="flex items-center gap-2.5 shrink-0">
-              {/* Search Box */}
-              <div className="relative flex-1 sm:w-64">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Cari produk / spesifikasi..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+            {/* Controls: Info Hasil & Sort Dropdown */}
+            <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+              <div className="text-[11px] font-bold text-slate-400 hidden md:block">
+                Menampilkan <strong className="text-slate-700">{filteredProducts.length}</strong> produk
               </div>
-
-              {/* Sort Dropdown */}
               <div className="relative shrink-0">
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value)}
-                  className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 cursor-pointer shadow-sm"
+                  className="h-10 px-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 cursor-pointer shadow-sm hover:bg-white transition-all"
                 >
                   <option value="default">Urutkan: Rekomendasi</option>
                   <option value="price_low">Harga: Termurah</option>
@@ -1763,9 +1788,177 @@ export default function ShopPage() {
             </div>
           </div>
 
-          {/* Subkategori Pills (Muncul jika ada subkategori) */}
+          {/* Baris 2: Dropdown Menu Kategori Utama (Pojok Kiri Atas) + Quick Access Pills */}
+          <div className="flex items-center gap-2.5 pt-2 border-t border-slate-100">
+            {/* Dropdown Menu Kategori Utama (Pojok Kiri Atas) */}
+            <div className="relative shrink-0" ref={categoryDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                className={`h-9 px-3.5 rounded-xl text-xs font-bold inline-flex items-center gap-2 border transition-all cursor-pointer shadow-sm shrink-0 ${
+                  isCategoryDropdownOpen || activeCategory !== "Semua"
+                    ? "bg-slate-900 text-white border-slate-900 shadow-slate-900/20"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200"
+                }`}
+                title="Buka menu lengkap semua kategori produk"
+              >
+                <FolderTree className="w-3.5 h-3.5 text-dstech-blue" />
+                <span>{activeCategory === "Semua" ? "Semua Kategori" : activeCategory}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                    isCategoryDropdownOpen ? "rotate-180 text-white" : "text-slate-400"
+                  }`}
+                />
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isCategoryDropdownOpen || activeCategory !== "Semua"
+                      ? "bg-white/20 text-white"
+                      : "bg-slate-200 text-slate-600"
+                  }`}
+                >
+                  {availableCategories.length - 1}
+                </span>
+              </button>
+
+              {/* Popover Dropdown Kategori & Subkategori */}
+              {isCategoryDropdownOpen && (
+                <div className="absolute left-0 top-full mt-2 z-50 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 p-3 animate-in fade-in-50 zoom-in-95 duration-150 max-h-[75vh] overflow-y-auto">
+                  <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between mb-2">
+                    <span className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <FolderTree className="w-3.5 h-3.5 text-dstech-blue" /> Daftar Kategori Produk
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveCategory("Semua");
+                        setActiveSubCategory("Semua");
+                        setIsCategoryDropdownOpen(false);
+                      }}
+                      className="text-[11px] font-bold text-dstech-blue hover:underline cursor-pointer"
+                    >
+                      Reset / Semua
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {availableCategories.map((cat) => {
+                      const isCatActive = activeCategory === cat.name;
+                      const subs = getSubCategoriesForCat(cat.name);
+
+                      return (
+                        <div
+                          key={cat.name}
+                          className={`rounded-xl border transition-all ${
+                            isCatActive
+                              ? "bg-blue-50/80 border-blue-200 shadow-sm"
+                              : "bg-slate-50/50 hover:bg-slate-100/80 border-slate-100"
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveCategory(cat.name);
+                              setActiveSubCategory("Semua");
+                              if (subs.length === 0) setIsCategoryDropdownOpen(false);
+                            }}
+                            className="w-full px-3 py-2.5 flex items-center justify-between text-left cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`w-2 h-2 rounded-full ${
+                                  isCatActive ? "bg-dstech-blue" : "bg-slate-300"
+                                }`}
+                              />
+                              <span
+                                className={`text-xs font-bold ${
+                                  isCatActive ? "text-dstech-blue" : "text-slate-800"
+                                }`}
+                              >
+                                {cat.name}
+                              </span>
+                            </div>
+                            <span
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                isCatActive
+                                  ? "bg-blue-100 text-blue-700 font-mono"
+                                  : "bg-slate-200/70 text-slate-500 font-mono"
+                              }`}
+                            >
+                              {cat.count} {cat.name === "Semua" ? "Total" : "Item"}
+                            </span>
+                          </button>
+
+                          {/* Subkategori langsung di dalam kategori */}
+                          {subs.length > 0 && (
+                            <div className="px-3 pb-2.5 pt-0.5 flex flex-wrap gap-1.5 border-t border-slate-100/60 mt-0.5">
+                              {subs.map((subName) => {
+                                const isSubSelected =
+                                  isCatActive && activeSubCategory === subName;
+                                return (
+                                  <button
+                                    key={subName}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveCategory(cat.name);
+                                      setActiveSubCategory(subName);
+                                      setIsCategoryDropdownOpen(false);
+                                    }}
+                                    className={`text-[11px] px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1 ${
+                                      isSubSelected
+                                        ? "bg-dstech-blue text-white shadow-sm"
+                                        : "bg-white text-slate-600 hover:bg-blue-100 hover:text-blue-800 border border-slate-200"
+                                    }`}
+                                  >
+                                    <span>{subName}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Access Pills (Kategori Cepat dengan scroll halus) */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-grow">
+              {availableCategories.map((cat) => {
+                const isActive = activeCategory === cat.name;
+                return (
+                  <button
+                    key={cat.name}
+                    type="button"
+                    onClick={() => {
+                      setActiveCategory(cat.name);
+                      setActiveSubCategory("Semua");
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                      isActive
+                        ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <span>{cat.name}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                        isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {cat.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Baris 3: Subkategori Pills (Muncul jika ada subkategori untuk kategori aktif) */}
           {availableSubCategories.length > 1 && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-2 border-t border-slate-100">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
                 <SlidersHorizontal className="w-3 h-3 text-dstech-blue" />
                 Subkategori:
