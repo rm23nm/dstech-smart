@@ -184,13 +184,21 @@ export async function GET(req: Request) {
     products = products.filter((p: { entityType?: string }) => p.entityType === "NON_PT");
   }
 
+  // Keamanan Finansial: Hapus data costPrice (Harga Modal) pada permintaan publik toko online
+  if (isPublic) {
+    products = products.map((p: any) => {
+      const { costPrice, ...rest } = p;
+      return rest;
+    });
+  }
+
   return NextResponse.json({ success: true, data: products });
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, category, subCategory, price, stock, commission, commissionType, desc, image, entityType } = body;
+    const { name, category, subCategory, price, costPrice, stock, commission, commissionType, desc, image, entityType } = body;
 
     if (!name || name.trim() === "") {
       return NextResponse.json({ success: false, message: "Nama produk wajib diisi" }, { status: 400 });
@@ -198,6 +206,9 @@ export async function POST(req: Request) {
 
     const products = readProducts();
     const parsedPrice = typeof price === "number" ? price : parseFloat(price) || 0;
+    const parsedCostPrice = costPrice !== undefined
+      ? (typeof costPrice === "number" ? costPrice : parseFloat(costPrice) || 0)
+      : 0;
     const parsedStock = typeof stock === "number" ? stock : parseInt(stock, 10) || 0;
     const commRate = typeof commission === "number" ? commission : parseInt(String(commission).replace(/[^0-9]/g, ""), 10) || 10;
     const parsedInstallationFee = body.installationFee !== undefined
@@ -220,6 +231,7 @@ export async function POST(req: Request) {
       subCategory: subCategory?.trim() || "",
       entityType: entityType === "NON_PT" ? "NON_PT" : "PT",
       price: parsedPrice,
+      costPrice: parsedCostPrice,
       installationFee: parsedInstallationFee,
       hasInstallationService: parsedHasInstallation,
       stock: parsedStock,
@@ -255,7 +267,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, category, subCategory, price, stock, commission, commissionType, desc, image, unit, warehouseStock, entityType } = body;
+    const { id, name, category, subCategory, price, costPrice, stock, commission, commissionType, desc, image, unit, warehouseStock, entityType } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, message: "ID produk wajib disertakan" }, { status: 400 });
@@ -269,6 +281,9 @@ export async function PUT(req: Request) {
     }
 
     const parsedPrice = price !== undefined ? (typeof price === "number" ? price : parseFloat(price) || 0) : products[index].price;
+    const parsedCostPrice = costPrice !== undefined
+      ? (typeof costPrice === "number" ? costPrice : parseFloat(costPrice) || 0)
+      : (products[index].costPrice ?? 0);
     const parsedStock = stock !== undefined ? (typeof stock === "number" ? stock : parseInt(stock, 10) || 0) : products[index].stock;
     const commRate = commission !== undefined ? (typeof commission === "number" ? commission : parseInt(String(commission).replace(/[^0-9]/g, ""), 10) || 10) : products[index].commissionRate;
 
@@ -290,6 +305,7 @@ export async function PUT(req: Request) {
       subCategory: subCategory !== undefined ? subCategory.trim() : (products[index].subCategory || ""),
       entityType: entityType === "NON_PT" || entityType === "PT" ? entityType : (products[index].entityType || "PT"),
       price: parsedPrice,
+      costPrice: parsedCostPrice,
       installationFee: body.installationFee !== undefined
         ? (typeof body.installationFee === "number" ? body.installationFee : parseFloat(body.installationFee) || 0)
         : (products[index].installationFee ?? getCategoryDefaultInstallationFee(products[index].category, products[index].name)),

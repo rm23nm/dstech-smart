@@ -33,6 +33,7 @@ export interface ProductItem {
   subCategory?: string;
   entityType?: "PT" | "NON_PT";
   price: number;
+  costPrice?: number;
   installationFee?: number;
   hasInstallationService?: boolean;
   stock: number;
@@ -89,6 +90,7 @@ export default function ProductAdmin() {
     subCategory: string;
     entityType: "PT" | "NON_PT";
     price: string;
+    costPrice: string;
     installationFee: string;
     hasInstallationService: boolean;
     stock: string;
@@ -106,6 +108,7 @@ export default function ProductAdmin() {
     subCategory: "",
     entityType: "PT",
     price: "",
+    costPrice: "",
     installationFee: "150000",
     hasInstallationService: true,
     stock: "10",
@@ -387,6 +390,7 @@ export default function ProductAdmin() {
       subCategory: defaultSub,
       entityType: selectedEntityTab === "NON_PT" ? "NON_PT" : "PT",
       price: "",
+      costPrice: "",
       installationFee: "150000",
       hasInstallationService: true,
       stock: "10",
@@ -415,6 +419,7 @@ export default function ProductAdmin() {
       subCategory: product.subCategory || "",
       entityType: product.entityType || "PT",
       price: String(product.price),
+      costPrice: String(product.costPrice !== undefined ? product.costPrice : ""),
       installationFee: String(product.installationFee !== undefined ? product.installationFee : 150000),
       hasInstallationService: product.hasInstallationService !== false,
       stock: String(product.stock),
@@ -451,6 +456,7 @@ export default function ProductAdmin() {
       subCategory: formData.subCategory?.trim() || "",
       entityType: formData.entityType || "PT",
       price: parseFloat(formData.price) || 0,
+      costPrice: parseFloat(formData.costPrice) || 0,
       installationFee: parseFloat(formData.installationFee) || 0,
       hasInstallationService: formData.hasInstallationService,
       stock: parseInt(formData.stock, 10) || 0,
@@ -516,6 +522,7 @@ export default function ProductAdmin() {
       subCategory: formData.subCategory?.trim() || "",
       entityType: formData.entityType || "PT",
       price: parseFloat(formData.price) || 0,
+      costPrice: parseFloat(formData.costPrice) || 0,
       installationFee: parseFloat(formData.installationFee) || 0,
       hasInstallationService: formData.hasInstallationService,
       stock: parseInt(formData.stock, 10) || 0,
@@ -885,7 +892,24 @@ export default function ProductAdmin() {
                       <div className="font-black text-slate-900 text-sm sm:text-base">
                         Rp {p.price.toLocaleString("id-ID")}
                       </div>
-                      <div className="mt-1">
+                      <div className="mt-1 flex flex-col items-center gap-1">
+                        {p.costPrice ? (
+                          <span
+                            className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full"
+                            title={`Harga Modal Pembelian / HPP: Rp ${p.costPrice.toLocaleString("id-ID")}`}
+                          >
+                            📦 Modal: Rp {p.costPrice.toLocaleString("id-ID")}
+                            {p.price > p.costPrice && (
+                              <span className="text-[9.5px] text-emerald-700 font-black ml-0.5">
+                                (+{Math.round(((p.price - p.costPrice) / p.price) * 100)}%)
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">
+                            Modal: Belum diisi
+                          </span>
+                        )}
                         {p.hasInstallationService !== false && (p.installationFee || 0) > 0 ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full">
                             🛠️ Pasang: Rp {(p.installationFee || 0).toLocaleString("id-ID")}/unit
@@ -1248,10 +1272,27 @@ export default function ProductAdmin() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* 1. Modal Beli (HPP) */}
+                <div>
+                  <label className="block text-xs font-black text-amber-900 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <span>📦 Modal Beli / HPP (Rp)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.costPrice}
+                    onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                    placeholder="Contoh: 2500000"
+                    className="w-full h-12 px-4 rounded-xl border border-amber-300 bg-amber-50/40 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Biaya perolehan dari supplier</p>
+                </div>
+
+                {/* 2. Harga Jual Retail */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Harga (Rp) <span className="text-dstech-red">*</span>
+                    Harga Jual (Rp) <span className="text-dstech-red">*</span>
                   </label>
                   <input
                     type="number"
@@ -1260,10 +1301,12 @@ export default function ProductAdmin() {
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     placeholder="Contoh: 3500000"
-                    className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-dstech-blue"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">Harga tayang ke pembeli</p>
                 </div>
 
+                {/* 3. Stok */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Stok (Unit)
@@ -1276,8 +1319,58 @@ export default function ProductAdmin() {
                     placeholder="10"
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">Jumlah unit fisik tersedia</p>
                 </div>
               </div>
+
+              {/* Kalkulasi Otomatis Laba Kotor & Margin Produk (Tugas 221) */}
+              {(() => {
+                const sellP = parseFloat(formData.price) || 0;
+                const costP = parseFloat(formData.costPrice) || 0;
+                if (sellP > 0 && costP > 0) {
+                  const grossProfit = sellP - costP;
+                  const marginPct = ((grossProfit / sellP) * 100).toFixed(1);
+                  const isProfit = grossProfit >= 0;
+                  return (
+                    <div
+                      className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs font-bold ${
+                        isProfit
+                          ? "bg-emerald-50/80 border-emerald-200 text-emerald-950"
+                          : "bg-red-50/80 border-red-200 text-red-950"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                            isProfit ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          <Check className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="font-black">Estimasi Laba Kotor Satuan (Gross Profit):</p>
+                          <p className="text-[10.5px] font-normal text-slate-500">
+                            Harga Jual ({sellP.toLocaleString("id-ID")}) - Modal HPP ({costP.toLocaleString("id-ID")})
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono text-sm sm:text-base font-black block">
+                          {isProfit ? "+" : ""}Rp {grossProfit.toLocaleString("id-ID")}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isProfit ? "bg-emerald-200 text-emerald-800" : "bg-red-200 text-red-800"
+                          }`}
+                        >
+                          Margin {marginPct}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {/* Opsi Jasa Pemasangan & Setup Teknisi */}
               <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-3">
@@ -1693,10 +1786,27 @@ export default function ProductAdmin() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* 1. Modal Beli (HPP) */}
+                <div>
+                  <label className="block text-xs font-black text-amber-900 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <span>📦 Modal Beli / HPP (Rp)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.costPrice}
+                    onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                    placeholder="Contoh: 2500000"
+                    className="w-full h-12 px-4 rounded-xl border border-amber-300 bg-amber-50/40 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Biaya perolehan dari supplier</p>
+                </div>
+
+                {/* 2. Harga Jual Retail */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Harga (Rp) <span className="text-dstech-red">*</span>
+                    Harga Jual (Rp) <span className="text-dstech-red">*</span>
                   </label>
                   <input
                     type="number"
@@ -1704,10 +1814,12 @@ export default function ProductAdmin() {
                     min="0"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
+                    className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-bold text-slate-900 focus:outline-none focus:border-dstech-blue"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">Harga tayang ke pembeli</p>
                 </div>
 
+                {/* 3. Stok */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                     Stok (Unit)
@@ -1719,8 +1831,58 @@ export default function ProductAdmin() {
                     onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
                     className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
                   />
+                  <p className="text-[10px] text-slate-400 mt-1">Jumlah unit fisik tersedia</p>
                 </div>
               </div>
+
+              {/* Kalkulasi Otomatis Laba Kotor & Margin Produk (Tugas 221) */}
+              {(() => {
+                const sellP = parseFloat(formData.price) || 0;
+                const costP = parseFloat(formData.costPrice) || 0;
+                if (sellP > 0 && costP > 0) {
+                  const grossProfit = sellP - costP;
+                  const marginPct = ((grossProfit / sellP) * 100).toFixed(1);
+                  const isProfit = grossProfit >= 0;
+                  return (
+                    <div
+                      className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs font-bold ${
+                        isProfit
+                          ? "bg-emerald-50/80 border-emerald-200 text-emerald-950"
+                          : "bg-red-50/80 border-red-200 text-red-950"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                            isProfit ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+                          }`}
+                        >
+                          <Check className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="font-black">Estimasi Laba Kotor Satuan (Gross Profit):</p>
+                          <p className="text-[10.5px] font-normal text-slate-500">
+                            Harga Jual ({sellP.toLocaleString("id-ID")}) - Modal HPP ({costP.toLocaleString("id-ID")})
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono text-sm sm:text-base font-black block">
+                          {isProfit ? "+" : ""}Rp {grossProfit.toLocaleString("id-ID")}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isProfit ? "bg-emerald-200 text-emerald-800" : "bg-red-200 text-red-800"
+                          }`}
+                        >
+                          Margin {marginPct}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {/* Opsi Jasa Pemasangan & Setup Teknisi */}
               <div className="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-3">

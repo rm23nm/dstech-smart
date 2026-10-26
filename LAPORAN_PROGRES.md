@@ -6266,6 +6266,36 @@
      - Ditarik dan di-build di live server VPS via PM2 reload `dstech-main`.
      - Verifikasi live respon HTTP 200 dan konten teks terbukti aktif di `https://dstechsmart.com`.
 
+### 221. Tugas: Penambahan Kolom Harga Pembelian / Modal (HPP Satuan), Kalkulasi Margin Otomatis & Proteksi Data Rahasia di Master Produk [SELESAI]
+- **Permintaan Pengguna**:
+  - *"saya melihat pada produk yang di input tidak adanya harga pembelian, saya masih bingung. nantinya bagai mana cara menghtung HPPNya?"*
+  - *"ok, tambahkan"*
+- **Status**: **SELESAI**
+- **Akar Masalah**:
+  1. Pada form Master Produk (`/admin/products`), sebelumnya hanya terdapat field Harga Jual (`price`), Ongkos Pasang, dan Komisi Affiliate. Ketiadaan field Harga Pembelian/Modal (`costPrice`) membuat admin tidak bisa mengetahui estimasi laba kotor per unit dan mempersulit penentuan HPP riil pada transaksi penjualan per produk.
+  2. Data harga beli/modal produk merupakan informasi rahasia internal bisnis (internal confidentiality) sehingga tidak boleh bocor ke publik atau katalog e-store (`/shop`).
+- **Rincian Perbaikan yang Telah Dilakukan**:
+  1. **Folder Cadangan Khusus**:
+     - Dibuat folder cadangan `_backup_product_cost_price` untuk mengamankan `src/app/admin/products/page.tsx`, `src/app/api/products/route.ts`, dan `src/data/dstech_products.json`.
+  2. **Peningkatan Backend API (`src/app/api/products/route.ts`)**:
+     - Ditambahkan penanganan field `costPrice` pada penyimpanan produk baru (`POST`) dan pembaruan produk (`PUT`).
+     - Diterapkan **Proteksi Keamanan Finansial**: Pada pemanggilan publik (`isPublic=true`) di katalog toko online (`/shop`), sistem secara otomatis menghapus/menyaring properti `costPrice` agar margin modal internal tidak bisa diintip oleh publik atau web scraper.
+  3. **Penyempurnaan Antarmuka Frontend Admin (`src/app/admin/products/page.tsx`)**:
+     - Ditambahkan properti `costPrice?: number;` pada interface `ProductItem` dan form state `formData`.
+     - Pada **Modal Tambah Produk** & **Modal Edit Produk**:
+       * Form harga diatur dalam 3 kolom responsif: **Modal Beli / HPP (Rp)**, **Harga Jual (Rp)**, dan **Stok (Unit)**.
+       * Dihadirkan kartu **Kalkulasi Laba Kotor Otomatis (Gross Profit Satuan)** yang langsung menghitung selisih harga jual dikurangi modal HPP beserta persentase margin laba kotor (Margin %) secara real-time saat angka diketik.
+     - Pada **Tabel Inventaris Produk Admin**:
+       * Kolom harga kini menampilkan badge modal: `📦 Modal: Rp [costPrice] (+[Margin]%)` di samping harga jual sehingga memudahkan manajemen dan tim admin mengontrol profitabilitas katalog.
+  4. **Pengujian & Validasi Build Lokal**:
+     - `npx tsc --noEmit` lolos 100% tanpa error kompilasi.
+     - `npm run build` lolos 100% (62/62 static & dynamic routes compiled sukses).
+     - Folder cadangan `_backup_product_cost_price` dibersihkan sesuai SOP.
+  5. **Deployment & Verifikasi Server Live VPS**:
+     - Kode di-commit dan di-push ke GitHub remote repository master branch.
+     - Ditarik dan di-build di live server VPS via PM2 reload `dstech-main`.
+     - Verifikasi live API dan antarmuka produk terbukti aktif normal.
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
