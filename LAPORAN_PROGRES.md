@@ -5975,6 +5975,26 @@
 
 ---
 
+### 212. Tugas: Perbaikan Server Error / Blank Saat Buka Dokumen & Layar Kunci PIN [SEDANG DIKERJAKAN]
+- **Permintaan Pengguna**:
+  - *"malah server eror gak bisa buka"*
+- **Status**: **SEDANG DIKERJAKAN**
+- **Akar Masalah (Root Cause)**:
+  1. Pada `renderSecurityLockScreen` di `src/app/api/finance/print/route.ts`, respons HTTP sebelumnya mengembalikan status `401 Unauthorized` ketika `hasError: true` (saat PIN salah atau belum diverifikasi).
+  2. Menurut spesifikasi RFC HTTP, respons status 401 mewajibkan header `WWW-Authenticate`. Tanpa header tersebut, browser modern (terutama in-app browser WhatsApp, Safari iOS, dan WebView Android) memperlakukan respons sebagai malformed / "Server Error: 401 Unauthorized" dan menolak merender body HTML kita.
+  3. Layar kunci PIN adalah form halaman web kustom, bukan autentikasi header HTTP Basic Auth. Status HTTP yang dikembalikan seharusnya selalu `200 OK` dengan body HTML interaktif yang memuat peringatan *"⚠️ PIN Verifikasi Salah"*.
+  4. Selain itu, seluruh blok `GET` di `src/app/api/finance/print/route.ts` perlu dibungkus dengan blok pengaman `try ... catch` untuk memastikan penanganan exception yang aman dan ramah pengguna.
+- **Rencana Step-by-Step Pengerjaan**:
+  1. [x] **Langkah 1**: Catat rencana di `LAPORAN_PROGRES.md` dan buat backup file `_backup_server_error_fix/route.ts.bak`.
+  2. [ ] **Langkah 2**: Ubah status HTTP pada `renderSecurityLockScreen` menjadi selalu `200 OK` (`status: 200`) agar browser tidak pernah memicu layar internal "Server Error".
+  3. [ ] **Langkah 3**: Bungkus handler `GET` dengan `try ... catch` komprehensif.
+  4. [ ] **Langkah 4**: Jalankan `npx tsc --noEmit` dan `npm run build` lokal.
+  5. [ ] **Langkah 5**: Hapus folder cadangan `_backup_server_error_fix`.
+  6. [ ] **Langkah 6**: Deploy ke VPS live via native git push dan `deploy_live.js`.
+  7. [ ] **Langkah 7**: Uji live endpoint dari browser dan tandai Tugas 212 sebagai `[SELESAI]`.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.

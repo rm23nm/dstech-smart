@@ -186,7 +186,7 @@ function renderSecurityLockScreen(params: {
 </html>`;
 
   return new NextResponse(html, {
-    status: hasError ? 401 : 200,
+    status: 200,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store, max-age=0",
@@ -294,7 +294,8 @@ function getFilteredBankAccounts(bankAccounts: any[], entityType?: string): any[
 }
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
+  try {
+    const { searchParams } = new URL(req.url);
   const docType = (searchParams.get("doc") || "invoice").toLowerCase();
   const isReceipt = docType === "receipt" || docType === "kwitansi";
   const docNo = (searchParams.get("no") || searchParams.get("id") || "").trim();
@@ -3335,4 +3336,34 @@ export async function GET(req: Request) {
       "Cache-Control": "public, max-age=60, s-maxage=60",
     },
   });
+  } catch (err: any) {
+    console.error("Error in /api/finance/print:", err);
+    const friendlyErrorHtml = `<!DOCTYPE html>
+    <html lang="id">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Pemrosesan Dokumen - PT. DSTech Smart Perkasa</title>
+      <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-slate-950 min-h-screen text-slate-100 flex items-center justify-center p-4 font-sans">
+      <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl space-y-4">
+        <div class="w-14 h-14 bg-indigo-500/10 text-indigo-400 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold">📄</div>
+        <h1 class="text-xl font-black text-white">Memuat Dokumen Resmi</h1>
+        <p class="text-xs text-slate-400 leading-relaxed">
+          Sistem sedang memproses berkas resmi Anda. Jika halaman belum termuat sempurna, silakan klik tombol di bawah untuk menyegarkan.
+        </p>
+        <div class="pt-2">
+          <button onclick="window.location.reload()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow transition cursor-pointer">
+            🔄 Muat Ulang Halaman
+          </button>
+        </div>
+      </div>
+    </body>
+    </html>`;
+    return new NextResponse(friendlyErrorHtml, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
 }
