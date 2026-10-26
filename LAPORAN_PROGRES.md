@@ -3,6 +3,7 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-26**: Perbaikan Simpan SPH Paket Instalasi (Dukungan Item Rincian Harga Nol / Termasuk Paket) & Perbaikan Posisi Z-Index Toast Notifikasi. Mengatasi kendala di mana pengguna tidak bisa menyimpan SPH Paket yang memuat item rincian berharga Rp 0 (karena validasi lama menolak harga <= 0 dan input HTML5 ber-atribut required memblokir pengosongan harga) serta toast notifikasi tertutup di belakang backdrop modal form SPH (z-50 vs z-[70]). Meningkatkan z-index Toast ke z-[999999], melonggarkan validasi SPH agar mengizinkan harga Rp 0/kosong untuk rincian paket, menghapus required pada input harga modal SPH dengan placeholder '0 (Termasuk Paket)', serta mempercantik tabel cetak SPH di modal admin dan template resmi /api/finance/print dengan label 'Termasuk Paket' (harga) dan 'Include' (total). Telah divalidasi lokal (npx tsc lolos, npm run build lolos), dideploy sukses ke VPS live PM2 dstech-main (PID 1405304), dan diuji coba nyata membuat SPH-DSTECH-202610-007 dengan 4 item rincian paket berhasil 100%.
 - **2026-04-24**: Inisialisasi Laporan Progres.
 - **2026-04-24**: Pengecekan ketersediaan binary `git` (Hasil: Tidak tersedia).
 - **2026-04-24**: Analisis script `push_to_github.js` yang menggunakan `isomorphic-git`.
@@ -6114,6 +6115,36 @@
   5. [x] **Langkah 5**: Hapus folder cadangan `_backup_chat_trycatch_fix`.
   6. [x] **Langkah 6**: Push ke GitHub (commit `40d8764` dan `5ff8bb9`) dan deploy ke live VPS aaPanel PM2 `dstech-main` (PID 1397045).
   7. [x] **Langkah 7**: Uji coba live via `test_live_quick_replies.js`: SPH, Laporan Laba Rugi, dan Faktur dijawab 100% presisi dan tidak lagi tertimpa error. Status Tugas 216 resmi `[SELESAI]`.
+
+---
+
+### 217. Tugas: Perbaikan Simpan SPH Paket Instalasi (Dukungan Item Rincian Harga Nol / Kosong) & Perbaikan Posisi Z-Index Toast Notifikasi [SELESAI]
+- **Permintaan Pengguna**:
+  - *"saya mau simpan SPH namun tidak bisa kesimpan setelah input. Saya mau buat Paket Instalasi. harga yang saya isi di atas item 1 saja. untuk yang lain saya kosongkan untuk rincian itemnya saja. namun tidak bisa disave, untuk notif kendala tidak tau apa. karena notif muncul dibelakang form yang sekarang"*
+- **Status**: **SELESAI & DEPLOYED KE LIVE VPS**
+- **Analisis Masalah & Kebutuhan Fitur**:
+  1. **Notifikasi Muncul di Belakang Modal Form**:
+     - Pada `src/app/admin/finance/page.tsx`, elemen Toast Notification sebelumnya menggunakan `z-50`.
+     - Padahal backdrop modal pembuatan/edit SPH menggunakan `z-[70]`, sehingga jika validasi gagal, pesan toast peringatan tertutup oleh backdrop hitam modal dan pengguna tidak mengetahui apa penyebabnya.
+     - Solusi: Tingkatkan z-index Toast Notification menjadi `z-[999999]` agar selalu berada di lapisan terdepan di atas seluruh modal.
+  2. **Validasi Item SPH Menolak Harga Rp 0 / Kosong**:
+     - Pada `handleCreateQuotationSubmit`, terdapat validasi kaku:
+       `if (quotationForm.items.some((it) => !it.productName || it.price <= 0))`
+     - Hal ini memblokir skema penawaran Paket / Lumsum yang sangat lazim dalam industri instalasi CCTV, Smart Home, dan Barrier Gate, di mana Item 1 memuat nama paket dan harga total (misal: *Paket Pasang CCTV 4 Titik* Rp 4.500.000), sedangkan Item 2, 3, 4 adalah rincian isi paket (Kamera, DVR, Harddisk, Kabel) yang harganya Rp 0 / dikosongkan karena sudah termasuk di dalam paket utama.
+     - Solusi:
+       * Perbaiki validasi agar memperbolehkan harga `0` untuk baris rincian paket (hanya tolak jika nama deskripsi kosong `!it.productName.trim()` atau harga bernilai negatif `< 0`).
+       * Hapus atribut `required` dari input harga di modal SPH agar input bisa dikosongkan tanpa diblokir oleh browser HTML5 tooltip.
+       * Pada cetak SPH (baik di modal preview admin maupun di `/api/finance/print`), jika item berharga Rp 0, tampilkan dengan label elegan *"Termasuk Paket"* atau *"Include"*.
+- **Rincian Pengerjaan yang Telah Selesai**:
+  1. [x] **Langkah 1**: Buat folder cadangan `_backup_sph_package_save_fix` dan catat rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Ubah z-index Toast Notification di `src/app/admin/finance/page.tsx` dari `z-50` menjadi `z-[999999]`.
+  3. [x] **Langkah 3**: Perbaiki validasi submit `handleCreateQuotationSubmit` agar mengizinkan harga Rp 0 / rincian paket (hanya tolak jika nama barang kosong atau harga minus).
+  4. [x] **Langkah 4**: Hapus atribut `required` pada input harga di form modal SPH, tambahkan placeholder *"0 (Termasuk Paket)"*, dan rapikan tampilan cetak preview modal admin (tampilkan *"Termasuk Paket"* jika item bernilai Rp 0 dan *"Include"* pada total).
+  5. [x] **Langkah 5**: Perbarui template cetak resmi `/api/finance/print/route.ts` agar menampilkan label *"Termasuk Paket"* pada item berharga Rp 0 dan *"Include"* pada total.
+  6. [x] **Langkah 6**: Validasi build lokal `npm run build` di `dstech-smart` (sukses 59/59 halaman terkompilasi, 0 error).
+  7. [x] **Langkah 7**: Hapus folder cadangan `_backup_sph_package_save_fix` dan `_backup_sph_print_beautify`.
+  8. [x] **Langkah 8**: Push ke GitHub (commit `f3bf51e` dan `8061056`) dan deploy ke live VPS aaPanel PM2 `dstech-main` (PID 1405304).
+  9. [x] **Langkah 9**: Uji simpan SPH paket instalasi di live server: berhasil membuat `SPH-DSTECH-202610-007` dengan item paket Rp 4.500.000 + 3 item rincian paket berharga Rp 0. Terverifikasi tampil elegan di cetak SPH resmi dengan label *"Termasuk Paket"* dan *"Include"*. Status Tugas 217 resmi **[SELESAI]**.
 
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
