@@ -35,6 +35,7 @@ interface InventoryProduct {
   id: string;
   name: string;
   category: string;
+  brand?: string;
   price: number;
   stock?: number;
   commission?: string;

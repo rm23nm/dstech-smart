@@ -6421,22 +6421,93 @@
 
 ---
 
-### 226. Tugas: Fitur Ekspor & Impor Massal Excel (Bulk Upload Produk Baru & Update Harga Massal via File Excel/CSV) [ANTRIAN PEKERJAAN BERIKUTNYA]
+### 226. Tugas: Fitur Ekspor & Impor Massal Excel (Bulk Upload Produk Baru & Update Harga Massal via File Excel/CSV) [SELESAI]
 - **Permintaan Pengguna**:
   - *"saya ingin update harga sekaligus dengan excel kemudian saya upload kembali, tolong kamu sediakan fiturnya, termasuk untuk upload barang banyak dengan excel"*
-- **Status**: **DALAM ANTRIAN (Sesuai SOP, diselesaikan setelah Tugas 225 tuntas)**
+- **Status**: **[SELESAI & SUDAH DIDEPLOY LIVE]**
+- **Solusi yang Diterapkan**:
+  1. Dibuat endpoint API `/api/products/bulk` yang mendukung pembacaan dan pembaruan massal produk katalog via JSON payload dari file Excel/CSV.
+  2. Disediakan tombol "📥 Download Excel Katalog" di `/admin/products` untuk mengunduh seluruh data katalog ke format `.xlsx`.
+  3. Disediakan tombol "📄 Download Template Excel" untuk penambahan barang baru dengan panduan kolom.
+  4. Disediakan Modal Upload Excel interaktif dengan pratinjau rekap (berapa produk baru, berapa produk di-update) sebelum diterapkan ke database.
+  5. Telah divalidasi lokal dan dideploy live ke VPS (commit `37c1116`).
+
+---
+
+### 227. Tugas: Perapihan Dropdown Kategori & Dropdown Subkategori Berdampingan di Katalog Toko Online (/shop) [SELESAI]
+- **Permintaan Pengguna**:
+  - *"judul kategory utama terpotong dan tidak lengkap, bagai mana cara kita atur supaya kategorynya bisa terlihat semua? apakah di sebelah kiri atas kita atur baru sub kategori ada di atasnya"*
+  - *"kategori lama masih ada yang terpotong, hilangkan saja agar tidak semak kemudian lanjutkan dengan antrian baru"*
+  - *"oh ia, untuk sub kategori sebaiknya dibuat dropdown juga letakkan disebelah kanan kategori"*
+- **Status**: **[SELESAI & SUDAH DIDEPLOY LIVE]**
+- **Solusi yang Diterapkan**:
+  1. Dirombak total filter bar pada `src/app/shop/page.tsx` menjadi format 2 dropdown berdampingan yang bersih dan modern:
+     - Dropdown Kategori Utama (`[ 📁 Kategori: {activeCategory} ▾ ]`) di sebelah kiri.
+     - Dropdown Subkategori (`[ ⚡ Subkategori: {activeSubCategory} ▾ ]`) tepat di sebelah kanannya.
+  2. Seluruh deretan pills kategori lama yang terpotong dan membuat semak dibersihkan 100%.
+  3. Menambahkan tombol "Reset Filter" yang otomatis muncul jika salah satu filter aktif.
+  4. Telah divalidasi lokal, dideploy live ke VPS (commit `04c6f6d` & `3f26dec`), dan diverifikasi live via browser subagent.
+
+---
+
+### 228. Tugas: Penambahan Kolom Merek (Brand) Produk & Dropdown Filter Merek di Katalog Toko Online (/shop) [SEDANG DIKERJAKAN]
+- **Permintaan Pengguna**:
+  - *"oh ia, pada produk saya melihat tidak adanya kolom merek. tolong tambahkan dan buatkan dropdownya disamping semua sub kategori"*
+- **Status**: **SEDANG DIKERJAKAN**
+- **Analisis & Rencana Solusi**:
+  1. **Toko Online (`src/app/shop/page.tsx`)**:
+     - Sediakan Dropdown Filter Merek (`[ 🛡️ Semua Merek ▾ ]`) tepat di sebelah kanan Dropdown Subkategori.
+     - Ekstraksi merek dinamis (`availableBrands`) dari daftar produk fisik (`p.brand`), dilengkapi algoritma *auto-detection* fallback yang cerdas dari nama produk jika kolom brand belum terisi (misal: *HIKVISION, DAHUA, HILOOK, EZVIZ, IMOU, UNIVIEW, TIANDY, SPC, BARRIER GATE MX, DSTECH SMART, RUIJIE REYEE, UBIQUITI, ZKTECO, TP-LINK*).
+     - Tambahkan filter `activeBrand` ke dalam `filteredProducts`.
+     - Tampilkan badge Merek (*Brand*) di kartu produk katalog dan modal detail produk.
+  2. **Admin Produk (`src/app/admin/products/page.tsx`)**:
+     - Tambahkan kolom Merek (`brand?: string`) pada tipe `ProductItem` dan state `formData`.
+     - Tambahkan field input/select Merek pada Form Modal Tambah Produk dan Form Modal Edit Produk.
+     - Tambahkan badge Merek di kolom tabel data produk admin.
+     - Tambahkan pemetaan kolom "Merek / Brand" pada ekspor Excel dan impor massal Excel.
+  3. **Backend API (`src/app/api/products/route.ts` & `src/app/api/products/bulk/route.ts`)**:
+     - Tambahkan penanganan penyimpanan field `brand` pada method `POST`, `PUT`, dan bulk import.
+- **Rencana Step-by-Step Pengerjaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 228 dan antrian Tugas 229 & 230 di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat folder cadangan `_backup_product_brand_feature/` dan amankan file target.
+  3. [ ] **Langkah 3**: Implementasikan backend field `brand` di `src/app/api/products/route.ts` dan `src/app/api/products/bulk/route.ts`.
+  4. [ ] **Langkah 4**: Implementasikan Dropdown Filter Merek dan badge Brand di `src/app/shop/page.tsx`.
+  5. [ ] **Langkah 5**: Implementasikan input Merek dan kolom tabel di `src/app/admin/products/page.tsx`.
+  6. [ ] **Langkah 6**: Validasi build TypeScript lokal (`npx tsc --noEmit` & `npm run build`).
+  7. [ ] **Langkah 7**: Push ke GitHub repository dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  8. [ ] **Langkah 8**: Verifikasi visual langsung di browser live `https://dstechsmart.com/shop`.
+  9. [ ] **Langkah 9**: Bersihkan folder cadangan dan tandai status Tugas 228 menjadi `[SELESAI]`.
+
+---
+
+### 229. Tugas: Fitur Neraca Saldo (Trial Balance) & Pemotongan Serta Perhitungan Pajak PPh di Modul Finance Admin (/admin/finance) [ANTRIAN PEKERJAAN BERIKUTNYA]
+- **Permintaan Pengguna**:
+  - *"saya butuh fitur neraca saldo, dan pemotongan dan perhitungan pajak PPH tolong kamu tambahkan ke aplikasi"*
+- **Status**: **DALAM ANTRIAN (Akan dikerjakan segera setelah Tugas 228 selesai)**
 - **Rencana Solusi**:
-  1. **Ekspor Excel/CSV Katalog Produk**:
-     - Sediakan tombol **"📥 Download Excel Katalog"** di halaman Admin Produk (`/admin/products`) yang mengunduh data seluruh produk ke format CSV/Excel dengan kolom: ID, Kode/SKU, Nama Produk, Kategori, Subkategori, Modal HPP (`costPrice`), Harga Jual (`price`), Biaya Jasa Pasang, Stok, dan Deskripsi.
-  2. **Template Import Excel**:
-     - Sediakan template kosong **"📄 Download Template Import Excel"** untuk mempermudah admin menambahkan banyak barang sekaligus.
-  3. **Modal & Endpoint Upload Excel/CSV**:
-     - Buat endpoint backend (`/api/products/bulk-import` atau upload handler) dan modal upload interaktif dengan drag-and-drop file di `/admin/products`.
-     - Logika Import:
-       * Jika baris memiliki ID yang sudah ada -> Update harga jual, modal HPP, stok, dll. secara massal.
-       * Jika baris tidak memiliki ID (produk baru) -> Insert produk baru ke katalog secara massal dengan ID unik berprefix `dstech_prod_`.
-  4. **Ringkasan Validasi**:
-     - Menampilkan rekapitulasi: berapa produk baru berhasil ditambahkan, berapa produk berhasil di-update harganya, dan konfirmasi sukses.
+  1. **Tab Neraca Saldo (Trial Balance)**:
+     - Menghitung dan menyajikan posisi Debit & Kredit seimbang dari seluruh akun (Kas & Bank, Piutang Usaha, Valuasi Persediaan Barang, Utang Usaha ke Supplier, Modal & Ekuitas, Pendapatan Penjualan, Beban Pokok Penjualan HPP, dan Beban Operasional).
+     - Menampilkan indikator keseimbangan (Balance Status) dan lembar cetak standar akuntansi.
+  2. **Tab Pemotongan & Perhitungan Pajak PPh**:
+     - Modul pencatatan & kalkulasi otomatis pemotongan pajak penghasilan:
+       * PPh Pasal 21 (Upah/honor tenaga ahli / teknisi lepas).
+       * PPh Pasal 23 (Pemotongan atas jasa instalasi/perawatan 2%).
+       * PPh Final PP 23 / PP 55 UMKM (0.5% dari omzet bruto peredaran usaha).
+       * PPN 11% Faktur Keluaran vs Faktur Masukan.
+     - Ringkasan SPT Masa dan Bukti Potong Pajak.
+
+---
+
+### 230. Tugas: Fitur Pengelolaan Aset Perusahaan (Fixed Asset & Equipment Tracking) [ANTRIAN PEKERJAAN BERIKUTNYA]
+- **Permintaan Pengguna**:
+  - *"setelah semuanya selesai, tolong tambahkan fitur pengelolaan aset perusahaan"*
+- **Status**: **DALAM ANTRIAN (Akan dikerjakan setelah Tugas 229 selesai)**
+- **Rencana Solusi**:
+  1. Modul pencatatan aset tetap perusahaan (peralatan kerja teknisi, armada kendaraan operasional, mesin barcode/tools, komputer & server, inventaris kantor).
+  2. Tracking penanggung jawab (PIC Teknisi/Karyawan), lokasi titik aset, dan kondisi fisik (Baik, Rusak Ringan, Rusak Berat, Perlu Kalibrasi).
+  3. Perhitungan otomatis depresiasi/penyusutan aset (Garis Lurus / Straight-Line Method) dan nilai buku aset saat ini.
+
+---
 
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).

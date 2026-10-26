@@ -60,6 +60,7 @@ interface Product {
   name: string;
   category: string;
   subCategory?: string;
+  brand?: string;
   price: number;
   installationFee?: number;
   hasInstallationService?: boolean;
@@ -316,6 +317,7 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>("Semua");
   const [activeSubCategory, setActiveSubCategory] = useState<string>("Semua");
+  const [activeBrand, setActiveBrand] = useState<string>("Semua");
   const [sortBy, setSortBy] = useState<string>("default");
   const [masterCategories, setMasterCategories] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -325,13 +327,15 @@ export default function ShopPage() {
   const [shopActiveImage, setShopActiveImage] = useState<string>("");
   const [heroSlide, setHeroSlide] = useState(0);
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState(false);
-  // Dropdown Kategori & Subkategori State & Ref
+  // Dropdown Kategori, Subkategori & Merek State & Ref
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const categoryDropdownRef = React.useRef<HTMLDivElement>(null);
   const [isSubCategoryDropdownOpen, setIsSubCategoryDropdownOpen] = useState(false);
   const subCategoryDropdownRef = React.useRef<HTMLDivElement>(null);
+  const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
+  const brandDropdownRef = React.useRef<HTMLDivElement>(null);
 
-  // Deteksi klik di luar popover kategori & subkategori untuk menutup otomatis
+  // Deteksi klik di luar popover kategori, subkategori & merek untuk menutup otomatis
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
@@ -339,6 +343,9 @@ export default function ShopPage() {
       }
       if (subCategoryDropdownRef.current && !subCategoryDropdownRef.current.contains(event.target as Node)) {
         setIsSubCategoryDropdownOpen(false);
+      }
+      if (brandDropdownRef.current && !brandDropdownRef.current.contains(event.target as Node)) {
+        setIsBrandDropdownOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -1068,6 +1075,42 @@ export default function ShopPage() {
     return Array.from(subSet);
   };
 
+  // Helper Deteksi Merek / Brand Produk (Smart Fallback dari Nama & Deskripsi)
+  const detectBrand = (p: Product): string => {
+    if (p.brand && p.brand.trim()) return p.brand.trim();
+    const nameLower = (p.name || "").toLowerCase();
+    const descLower = (p.desc || "").toLowerCase();
+    const text = nameLower + " " + descLower;
+
+    if (text.includes("hikvision")) return "Hikvision";
+    if (text.includes("dahua")) return "Dahua";
+    if (text.includes("hilook")) return "HiLook";
+    if (text.includes("ezviz")) return "Ezviz";
+    if (text.includes("imou")) return "Imou";
+    if (text.includes("zkteco") || text.includes("zk-teco")) return "ZKTeco";
+    if (text.includes("ruijie") || text.includes("reyee")) return "Ruijie Reyee";
+    if (text.includes("ubiquiti") || text.includes("unifi")) return "Ubiquiti";
+    if (text.includes("uniview") || text.includes("unv")) return "Uniview";
+    if (text.includes("tiandy")) return "Tiandy";
+    if (text.includes("tp-link") || text.includes("tplink")) return "TP-Link";
+    if (text.includes("barrier gate") || text.includes("palang gate") || text.includes("mx-80") || text.includes("mx-50") || text.includes("mx-300")) return "Barrier Gate MX";
+    if (text.includes("smart doorlock") || text.includes("dstech") || text.includes("smart home")) return "DSTech Smart";
+    return "Lainnya";
+  };
+
+  // Merek Dinamis dari Produk Aktual & Fallback Deteksi Cerdas
+  const availableBrands = useMemo(() => {
+    const brandMap = new Map<string, number>();
+    products.forEach((p) => {
+      const b = detectBrand(p);
+      brandMap.set(b, (brandMap.get(b) || 0) + 1);
+    });
+    const list = Array.from(brandMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+    return [{ name: "Semua", count: products.length }, ...list];
+  }, [products]);
+
   // Filter & Sortir Produk Cerdas
   const filteredProducts = useMemo(() => {
     return products
@@ -1097,19 +1140,32 @@ export default function ShopPage() {
             prodSub === actSub || prodSub.includes(actSub) || actSub.includes(prodSub);
         }
 
+        // Filter Merek / Brand (Tugas 228)
+        let matchBrand = activeBrand === "Semua" || !activeBrand;
+        if (!matchBrand) {
+          const prodBrand = detectBrand(prod).toLowerCase().trim();
+          const actBrand = activeBrand.toLowerCase().trim();
+          matchBrand =
+            prodBrand === actBrand ||
+            prodBrand.includes(actBrand) ||
+            actBrand.includes(prodBrand);
+        }
+
         // Pencarian Kata Kunci
         const q = searchQuery.toLowerCase().trim();
+        const brandStr = detectBrand(prod).toLowerCase();
         const matchSearch =
           !q ||
           prod.name?.toLowerCase().includes(q) ||
           prod.desc?.toLowerCase().includes(q) ||
           prod.category?.toLowerCase().includes(q) ||
-          prod.subCategory?.toLowerCase().includes(q);
+          prod.subCategory?.toLowerCase().includes(q) ||
+          brandStr.includes(q);
 
         // Filter Wishlist
         const matchWishlist = showOnlyWishlist ? wishlist.includes(prod.id) : true;
 
-        return matchCategory && matchSubCategory && matchSearch && matchWishlist;
+        return matchCategory && matchSubCategory && matchBrand && matchSearch && matchWishlist;
       })
       .sort((a, b) => {
         if (sortBy === "price_low") return a.price - b.price;
@@ -1118,7 +1174,7 @@ export default function ShopPage() {
         if (sortBy === "name_desc") return b.name.localeCompare(a.name);
         return 0;
       });
-  }, [products, activeCategory, activeSubCategory, searchQuery, showOnlyWishlist, wishlist, sortBy]);
+  }, [products, activeCategory, activeSubCategory, activeBrand, searchQuery, showOnlyWishlist, wishlist, sortBy]);
 
   // Handler Membuka Modal Pengajuan Retur
   const handleOpenReturnModal = (order: any) => {
@@ -2005,23 +2061,106 @@ export default function ShopPage() {
               )}
             </div>
 
+            {/* 3. Dropdown Merek / Brand (Tepat di sebelah kanan Subkategori) */}
+            <div className="relative shrink-0" ref={brandDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)}
+                className={`h-9 px-3.5 rounded-xl text-xs font-bold inline-flex items-center gap-2 border transition-all cursor-pointer shadow-sm shrink-0 ${
+                  isBrandDropdownOpen || (activeBrand !== "Semua" && activeBrand !== "")
+                    ? "bg-slate-900 text-white border-slate-900 shadow-slate-900/20"
+                    : "bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-200"
+                }`}
+                title="Filter berdasarkan merek / produsen"
+              >
+                <Award className="w-3.5 h-3.5 text-amber-500" />
+                <span>{activeBrand === "Semua" || !activeBrand ? "Semua Merek" : activeBrand}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                    isBrandDropdownOpen ? "rotate-180 text-white" : "text-slate-400"
+                  }`}
+                />
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    isBrandDropdownOpen || (activeBrand !== "Semua" && activeBrand !== "")
+                      ? "bg-white/20 text-white"
+                      : "bg-slate-200 text-slate-600"
+                  }`}
+                >
+                  {availableBrands.length > 0 ? availableBrands.length - 1 : 0}
+                </span>
+              </button>
+
+              {/* Popover Dropdown Merek */}
+              {isBrandDropdownOpen && (
+                <div className="absolute left-0 top-full mt-2 z-50 w-64 sm:w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 p-3 animate-in fade-in-50 zoom-in-95 duration-150 max-h-[60vh] overflow-y-auto">
+                  <div className="px-3 py-2 border-b border-slate-100 flex items-center justify-between mb-2">
+                    <span className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Award className="w-3.5 h-3.5 text-amber-500" /> Merek &amp; Brand
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveBrand("Semua");
+                        setIsBrandDropdownOpen(false);
+                      }}
+                      className="text-[11px] font-bold text-dstech-blue hover:underline cursor-pointer"
+                    >
+                      Reset / Semua
+                    </button>
+                  </div>
+
+                  <div className="space-y-1">
+                    {availableBrands.map((b) => {
+                      const isBrandActive = (activeBrand || "Semua") === b.name;
+                      return (
+                        <button
+                          key={b.name}
+                          type="button"
+                          onClick={() => {
+                            setActiveBrand(b.name);
+                            setIsBrandDropdownOpen(false);
+                          }}
+                          className={`w-full px-3 py-2 rounded-xl text-left text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                            isBrandActive
+                              ? "bg-amber-50 text-amber-900 border border-amber-200 font-black"
+                              : "text-slate-700 hover:bg-slate-50 border border-transparent"
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                            <span>{b.name}</span>
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-slate-400 font-mono">({b.count})</span>
+                            {isBrandActive && <Check className="w-3.5 h-3.5 text-amber-600" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Active Filter Badges & Reset All Button */}
-            {(activeCategory !== "Semua" || (activeSubCategory !== "Semua" && activeSubCategory !== "")) ? (
+            {(activeCategory !== "Semua" || (activeSubCategory !== "Semua" && activeSubCategory !== "") || (activeBrand !== "Semua" && activeBrand !== "")) ? (
               <button
                 type="button"
                 onClick={() => {
                   setActiveCategory("Semua");
                   setActiveSubCategory("Semua");
+                  setActiveBrand("Semua");
                 }}
                 className="h-9 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ml-auto sm:ml-0"
-                title="Hapus filter kategori & subkategori"
+                title="Hapus semua filter kategori, subkategori, dan merek"
               >
                 <X className="w-3.5 h-3.5" />
                 <span>Reset Filter</span>
               </button>
             ) : (
               <span className="text-[11px] text-slate-400 font-medium hidden md:inline-block ml-2">
-                Pilih kategori &amp; subkategori untuk memfilter produk
+                Pilih kategori, subkategori &amp; merek untuk memfilter
               </span>
             )}
           </div>
@@ -2038,12 +2177,13 @@ export default function ShopPage() {
           <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 max-w-md mx-auto space-y-3">
             <Package className="w-12 h-12 text-slate-300 mx-auto" />
             <h3 className="text-base font-black text-slate-900">Produk Tidak Ditemukan</h3>
-            <p className="text-xs text-slate-500">Coba ubah kata kunci pencarian atau pilih kategori lain.</p>
+            <p className="text-xs text-slate-500">Coba ubah kata kunci pencarian atau pilih kategori / merek lain.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((prod) => {
               const isFav = wishlist.includes(prod.id);
+              const brandLabel = detectBrand(prod);
               return (
                 <div
                   key={prod.id}
@@ -2061,10 +2201,16 @@ export default function ShopPage() {
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
-                    <div className="absolute top-4 left-4">
+                    <div className="absolute top-4 left-4 flex flex-col gap-1 items-start">
                       <span className="px-3 py-1 rounded-full bg-white/95 text-slate-900 font-black text-[10px] uppercase tracking-wider shadow-sm">
                         {prod.category}
                       </span>
+                      {brandLabel && brandLabel !== "Lainnya" && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-slate-900/90 backdrop-blur-sm text-amber-300 font-bold text-[9px] uppercase tracking-wider shadow-sm flex items-center gap-1 border border-amber-400/30">
+                          <Award className="w-2.5 h-2.5 text-amber-400" />
+                          {brandLabel}
+                        </span>
+                      )}
                     </div>
 
                     {/* Wishlist Button */}
@@ -3822,9 +3968,14 @@ export default function ShopPage() {
 
               <div className="space-y-6">
                 <div>
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-dstech-red">
-                    PRODUK RESMI DSTECH SMART
-                  </span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-dstech-red">
+                      PRODUK RESMI DSTECH SMART
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-[10px] uppercase flex items-center gap-1">
+                      <Award className="w-3 h-3 text-amber-600" /> Merek: {detectBrand(selectedProduct)}
+                    </span>
+                  </div>
                   <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mt-1 leading-snug">
                     {selectedProduct.name}
                   </h2>

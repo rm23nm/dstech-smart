@@ -69,6 +69,9 @@ export async function POST(req: Request) {
       const rawCommission = item.commission ?? item.komisi ?? "10%";
       const commRate = parseNumber(rawCommission) || 10;
 
+      const rawBrand = item.brand ?? item.merek ?? item.Brand ?? item.Merek;
+      const parsedBrand = rawBrand ? String(rawBrand).trim() : "";
+
       if (existingIndex !== -1) {
         // UPDATE PRODUK YANG SUDAH ADA
         const current = products[existingIndex];
@@ -77,6 +80,7 @@ export async function POST(req: Request) {
           name: item.name ? String(item.name).trim() : current.name,
           category: item.category ? String(item.category).trim() : current.category,
           subCategory: item.subCategory !== undefined ? String(item.subCategory).trim() : (current.subCategory || ""),
+          brand: parsedBrand || current.brand || "",
           price: parsedPrice > 0 ? parsedPrice : current.price,
           costPrice: parsedCostPrice >= 0 ? parsedCostPrice : (current.costPrice || 0),
           installationFee: parsedInstallFee >= 0 ? parsedInstallFee : (current.installationFee || 0),
@@ -103,6 +107,7 @@ export async function POST(req: Request) {
           name: productName,
           category: item.category ? String(item.category).trim() : "Hardware & IT",
           subCategory: item.subCategory ? String(item.subCategory).trim() : "",
+          brand: parsedBrand,
           entityType: item.entityType === "NON_PT" ? "NON_PT" : "PT",
           price: parsedPrice,
           costPrice: parsedCostPrice,

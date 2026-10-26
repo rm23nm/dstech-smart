@@ -137,6 +137,7 @@ function readProducts() {
 
       return {
         ...p,
+        brand: p.brand || "",
         image: primaryImg,
         images: finalImages,
         brochureUrl: p.brochureUrl || "",
@@ -198,7 +199,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, category, subCategory, price, costPrice, stock, commission, commissionType, desc, image, entityType } = body;
+    const { name, category, subCategory, brand, price, costPrice, stock, commission, commissionType, desc, image, entityType } = body;
 
     if (!name || name.trim() === "") {
       return NextResponse.json({ success: false, message: "Nama produk wajib diisi" }, { status: 400 });
@@ -229,6 +230,7 @@ export async function POST(req: Request) {
       name: name.trim(),
       category: category?.trim() || "Security System",
       subCategory: subCategory?.trim() || "",
+      brand: brand?.trim() || body.brand?.trim() || "",
       entityType: entityType === "NON_PT" ? "NON_PT" : "PT",
       price: parsedPrice,
       costPrice: parsedCostPrice,
@@ -267,7 +269,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, category, subCategory, price, costPrice, stock, commission, commissionType, desc, image, unit, warehouseStock, entityType } = body;
+    const { id, name, category, subCategory, brand, price, costPrice, stock, commission, commissionType, desc, image, unit, warehouseStock, entityType } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, message: "ID produk wajib disertakan" }, { status: 400 });
@@ -303,6 +305,7 @@ export async function PUT(req: Request) {
       name: name !== undefined ? name.trim() : products[index].name,
       category: category !== undefined ? category.trim() : products[index].category,
       subCategory: subCategory !== undefined ? subCategory.trim() : (products[index].subCategory || ""),
+      brand: brand !== undefined ? brand.trim() : (products[index].brand || ""),
       entityType: entityType === "NON_PT" || entityType === "PT" ? entityType : (products[index].entityType || "PT"),
       price: parsedPrice,
       costPrice: parsedCostPrice,

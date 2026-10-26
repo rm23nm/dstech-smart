@@ -1584,6 +1584,43 @@ export async function POST(request: Request) {
       });
     }
 
+    if (actionType === "tax_record" || actionType === "tax") {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const periodMonth = payload.period || `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      
+      const newTaxRecord = {
+        id: payload.id || `dstech_tax_${Date.now()}`,
+        taxType: payload.taxType || "PPH23", // PPH23 | PPH21 | PPH_FINAL_UMKM
+        period: periodMonth,
+        date: payload.date || now.toISOString().split("T")[0],
+        entityType: payload.entityType || "PT",
+        partyName: payload.partyName || "Rekanan DSTech",
+        npwp: payload.npwp || "-",
+        referenceNo: payload.referenceNo || "-",
+        dpp: Number(payload.dpp) || 0,
+        taxRate: Number(payload.taxRate) || (payload.taxType === "PPH_FINAL_UMKM" ? 0.5 : 2),
+        taxAmount: Number(payload.taxAmount) || 0,
+        bupotNumber: payload.bupotNumber || `BUPOT-${payload.taxType || "23"}-${Date.now().toString().slice(-6)}`,
+        status: payload.status || "UNPAID", // UNPAID | BILLING_ISSUED | PAID
+        billingCode: payload.billingCode || "",
+        ntpn: payload.ntpn || "",
+        paidAt: payload.paidAt || "",
+        notes: payload.notes || "",
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+      };
+
+      if (!data.tax_records) data.tax_records = [];
+      data.tax_records.unshift(newTaxRecord);
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Catatan Pajak ${newTaxRecord.taxType} (${newTaxRecord.bupotNumber}) berhasil disimpan`,
+        data: newTaxRecord,
+      });
+    }
+
     return NextResponse.json({ success: false, error: "Tipe aksi (actionType) tidak dikenali" }, { status: 400 });
   } catch (err) {
     console.error("Error creating financial record:", err);
@@ -1994,6 +2031,28 @@ export async function PUT(request: Request) {
         message: `Laporan Progress Resmi untuk Klien berhasil diterbitkan oleh PIC (${newPicReport.picName})`,
         data: prj,
         report: newPicReport,
+      });
+    }
+
+    if (actionType === "tax_record" || actionType === "tax") {
+      const records = data.tax_records || [];
+      const index = records.findIndex((t: any) => t.id === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Catatan pajak tidak ditemukan" }, { status: 404 });
+      }
+
+      records[index] = {
+        ...records[index],
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+
+      data.tax_records = records;
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: "Catatan pajak berhasil diperbarui",
+        data: records[index],
       });
     }
 

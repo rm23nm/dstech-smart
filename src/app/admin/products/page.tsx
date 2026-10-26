@@ -43,6 +43,7 @@ export interface ProductItem {
   name: string;
   category: string;
   subCategory?: string;
+  brand?: string;
   entityType?: "PT" | "NON_PT";
   price: number;
   costPrice?: number;
@@ -113,6 +114,7 @@ export default function ProductAdmin() {
     name: string;
     category: string;
     subCategory: string;
+    brand: string;
     entityType: "PT" | "NON_PT";
     price: string;
     costPrice: string;
@@ -131,6 +133,7 @@ export default function ProductAdmin() {
     name: "",
     category: "Security System",
     subCategory: "",
+    brand: "",
     entityType: "PT",
     price: "",
     costPrice: "",
@@ -462,6 +465,7 @@ export default function ProductAdmin() {
         "No": idx + 1,
         "ID Produk (JANGAN DIUBAH UNTUK UPDATE HARGA)": p.id,
         "Nama Produk": p.name,
+        "Merek / Brand": p.brand || "",
         "Kategori": p.category,
         "Subkategori": p.subCategory || "",
         "Tipe Entitas": p.entityType || "PT",
@@ -538,6 +542,7 @@ export default function ProductAdmin() {
         {
           "ID Produk (KOSONGKAN JIKA PRODUK BARU)": "",
           "Nama Produk": "Barrier Gate Otomatis MX-80 High Speed",
+          "Merek / Brand": "Barrier Gate MX",
           "Kategori": "Parking & Barrier System",
           "Subkategori": "Barrier Gate Otomatis",
           "Tipe Entitas (PT/NON_PT)": "PT",
@@ -555,6 +560,7 @@ export default function ProductAdmin() {
         {
           "ID Produk (KOSONGKAN JIKA PRODUK BARU)": "",
           "Nama Produk": "Kamera CCTV IP 4MP ColorVu 24 Jam",
+          "Merek / Brand": "Hikvision",
           "Kategori": "Security System",
           "Subkategori": "IP Camera",
           "Tipe Entitas (PT/NON_PT)": "PT",
@@ -576,6 +582,7 @@ export default function ProductAdmin() {
       ws["!cols"] = [
         { wch: 38 },
         { wch: 40 },
+        { wch: 20 },
         { wch: 25 },
         { wch: 25 },
         { wch: 24 },
@@ -652,6 +659,7 @@ export default function ProductAdmin() {
           const rawInstall = getColVal(row, "biayapasang", "biayapasangrp", "installationfee", "jasapasang");
           const rawStock = getColVal(row, "stok", "stock", "qty", "jumlah");
           const rawName = getColVal(row, "namaproduk", "name", "nama", "produk");
+          const rawBrand = getColVal(row, "merek", "brand", "merekbrand", "merekproduk");
           const rawCat = getColVal(row, "kategori", "category");
           const rawSubCat = getColVal(row, "subkategori", "subcategory", "subkategoriproduk");
           const rawEntity = getColVal(row, "tipeentitas", "entitas", "entitytype");
@@ -670,6 +678,7 @@ export default function ProductAdmin() {
             isUpdate,
             existingProduct: existing,
             name: rawName ? String(rawName).trim() : (existing?.name || `Produk Baru ${idx + 1}`),
+            brand: rawBrand !== undefined ? String(rawBrand).trim() : (existing?.brand || ""),
             category: rawCat ? String(rawCat).trim() : (existing?.category || "Hardware & IT"),
             subCategory: rawSubCat !== undefined ? String(rawSubCat).trim() : (existing?.subCategory || ""),
             entityType: rawEntity && String(rawEntity).toUpperCase().includes("NON") ? "NON_PT" : (existing?.entityType || "PT"),
@@ -745,6 +754,7 @@ export default function ProductAdmin() {
       name: "",
       category: defaultCat,
       subCategory: defaultSub,
+      brand: "",
       entityType: selectedEntityTab === "NON_PT" ? "NON_PT" : "PT",
       price: "",
       costPrice: "",
@@ -774,6 +784,7 @@ export default function ProductAdmin() {
       name: product.name,
       category: product.category,
       subCategory: product.subCategory || "",
+      brand: product.brand || "",
       entityType: product.entityType || "PT",
       price: String(product.price),
       costPrice: String(product.costPrice !== undefined ? product.costPrice : ""),
@@ -811,6 +822,7 @@ export default function ProductAdmin() {
       name: formData.name.trim(),
       category: formData.category,
       subCategory: formData.subCategory?.trim() || "",
+      brand: formData.brand.trim() || undefined,
       entityType: formData.entityType || "PT",
       price: parseFloat(formData.price) || 0,
       costPrice: parseFloat(formData.costPrice) || 0,
@@ -877,6 +889,7 @@ export default function ProductAdmin() {
       name: formData.name.trim(),
       category: formData.category,
       subCategory: formData.subCategory?.trim() || "",
+      brand: formData.brand.trim() || undefined,
       entityType: formData.entityType || "PT",
       price: parseFloat(formData.price) || 0,
       costPrice: parseFloat(formData.costPrice) || 0,
@@ -1239,6 +1252,11 @@ export default function ProductAdmin() {
                               <span className="text-[10px] font-semibold text-dstech-blue bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 flex items-center gap-1">
                                 <Tag className="w-2.5 h-2.5" />
                                 {p.subCategory}
+                              </span>
+                            )}
+                            {p.brand && (
+                              <span className="text-[10px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
+                                🛡️ {p.brand}
                               </span>
                             )}
                             {Array.isArray(p.images) && p.images.length > 1 && (
@@ -1649,6 +1667,37 @@ export default function ProductAdmin() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Merek / Brand Produk */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Merek / Brand Produk</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Pilih rekomendasi atau ketik bebas</span>
+                </label>
+                <input
+                  type="text"
+                  list="brand-options-list-add"
+                  value={formData.brand}
+                  onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  placeholder="Contoh: Hikvision, Dahua, ZKTeco, Barrier Gate MX, DSTech Smart, dll."
+                  className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue bg-white"
+                />
+                <datalist id="brand-options-list-add">
+                  <option value="Hikvision" />
+                  <option value="Dahua" />
+                  <option value="HiLook" />
+                  <option value="Ezviz" />
+                  <option value="Imou" />
+                  <option value="ZKTeco" />
+                  <option value="Ruijie Reyee" />
+                  <option value="Ubiquiti" />
+                  <option value="Uniview" />
+                  <option value="Tiandy" />
+                  <option value="TP-Link" />
+                  <option value="Barrier Gate MX" />
+                  <option value="DSTech Smart" />
+                </datalist>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2202,6 +2251,37 @@ export default function ProductAdmin() {
                     ))}
                   </select>
                 </div>
+              </div>
+
+              {/* Merek / Brand Produk */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Merek / Brand Produk</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Pilih rekomendasi atau ketik bebas</span>
+                </label>
+                <input
+                  type="text"
+                  list="brand-options-list-edit"
+                  value={formData.brand}
+                  onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                  placeholder="Contoh: Hikvision, Dahua, ZKTeco, Barrier Gate MX, DSTech Smart, dll."
+                  className="w-full h-12 px-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue bg-white"
+                />
+                <datalist id="brand-options-list-edit">
+                  <option value="Hikvision" />
+                  <option value="Dahua" />
+                  <option value="HiLook" />
+                  <option value="Ezviz" />
+                  <option value="Imou" />
+                  <option value="ZKTeco" />
+                  <option value="Ruijie Reyee" />
+                  <option value="Ubiquiti" />
+                  <option value="Uniview" />
+                  <option value="Tiandy" />
+                  <option value="TP-Link" />
+                  <option value="Barrier Gate MX" />
+                  <option value="DSTech Smart" />
+                </datalist>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
