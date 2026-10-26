@@ -32,11 +32,14 @@ export async function POST(request: Request) {
       "image/jpg",
       "image/svg+xml",
       "image/gif",
+      "image/jfif",
+      "image/pjpeg",
       "application/pdf",
     ];
-    if (!validTypes.includes(file.type)) {
+    const isJfifByName = file.name.toLowerCase().endsWith(".jfif");
+    if (!validTypes.includes(file.type) && !isJfifByName) {
       return NextResponse.json(
-        { success: false, message: "Format file tidak didukung. Harap upload gambar (JPG, PNG, WEBP) atau dokumen PDF." },
+        { success: false, message: "Format file tidak didukung. Harap upload gambar (JPG, PNG, WEBP, JFIF) atau dokumen PDF." },
         { status: 400 }
       );
     }
@@ -57,10 +60,15 @@ export async function POST(request: Request) {
     }
 
     // Generate safe filename with mandatory dstech_ prefix
-    const ext = path.extname(file.name) || (file.type === "application/pdf" ? ".pdf" : ".jpg");
-    const cleanExt = ext.startsWith(".") ? ext : `.${ext}`;
+    const rawExt = (path.extname(file.name) || (file.type === "application/pdf" ? ".pdf" : ".jpg")).toLowerCase();
+    let cleanExt = rawExt.startsWith(".") ? rawExt : `.${rawExt}`;
+    // Normalisasi format JFIF/JPEG menjadi .jpg standar agar selalu dikenali Nginx & Next.js Optimizer
+    if (cleanExt === ".jfif" || cleanExt === ".jpeg" || cleanExt === ".pjpeg") {
+      cleanExt = ".jpg";
+    }
+
     const safeBaseName = file.name
-      .replace(cleanExt, "")
+      .replace(path.extname(file.name), "")
       .replace(/[^a-zA-Z0-9_-]/g, "_")
       .substring(0, 30);
 

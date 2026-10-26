@@ -256,6 +256,56 @@ const DEFAULT_PAYMENT_BANKS: BankOption[] = [
   },
 ];
 
+// Komponen Gambar Produk Aman dengan Fallback Graceful & Bypass Optimizer untuk Berkas Upload/JFIF (Tugas 223)
+function SafeProductImage({
+  src,
+  alt,
+  fill = true,
+  className = "object-cover",
+  priority = false,
+}: {
+  src?: string | null;
+  alt: string;
+  fill?: boolean;
+  className?: string;
+  priority?: boolean;
+}) {
+  const fallbackPlaceholder = "/service-cctv.png";
+  const [currentSrc, setCurrentSrc] = useState<string>(src || fallbackPlaceholder);
+  const [hasError, setHasError] = useState<boolean>(false);
+
+  useEffect(() => {
+    setCurrentSrc(src || fallbackPlaceholder);
+    setHasError(false);
+  }, [src]);
+
+  // Bypass Next.js image optimizer jika file berasal dari /uploads/, format .jfif, atau .svg
+  // agar browser memuat langsung dari Nginx tanpa terkena error 400 Bad Request
+  const isBypassOptimizer = Boolean(
+    currentSrc &&
+      (currentSrc.startsWith("/uploads/") ||
+        currentSrc.includes(".jfif") ||
+        currentSrc.includes(".svg"))
+  );
+
+  return (
+    <Image
+      src={currentSrc || fallbackPlaceholder}
+      alt={alt || "Produk DSTech Smart"}
+      fill={fill}
+      className={className}
+      priority={priority}
+      unoptimized={isBypassOptimizer}
+      onError={() => {
+        if (!hasError) {
+          setHasError(true);
+          setCurrentSrc(fallbackPlaceholder);
+        }
+      }}
+    />
+  );
+}
+
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>(FALLBACK_PRODUCTS);
   const [loading, setLoading] = useState(true);
@@ -1373,7 +1423,7 @@ export default function ShopPage() {
                       {/* Right Column: Hero Visual Graphic */}
                       <div className="lg:col-span-5 relative flex items-center justify-center">
                         <div className="relative w-full max-w-sm aspect-square rounded-3xl overflow-hidden border border-slate-700 bg-slate-900 shadow-2xl group">
-                          <Image
+                          <SafeProductImage
                             src={currentItem.image || "/service-cctv.png"}
                             alt={currentItem.title}
                             fill
@@ -1557,7 +1607,7 @@ export default function ShopPage() {
                 >
                   {/* Image Container */}
                   <div className="relative h-60 w-full overflow-hidden bg-slate-100">
-                    <Image
+                    <SafeProductImage
                       src={prod.image || "/service-cctv.png"}
                       alt={prod.name}
                       fill
@@ -1855,7 +1905,7 @@ export default function ShopPage() {
                     >
                       <div className="flex items-center gap-3">
                         <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-white border border-slate-200 shrink-0">
-                          <Image
+                          <SafeProductImage
                             src={item.product.image || "/service-cctv.png"}
                             alt={item.product.name}
                             fill
@@ -2478,7 +2528,7 @@ export default function ShopPage() {
                         <div key={idx} className="flex items-center justify-between text-xs bg-slate-800/50 p-2 rounded-xl">
                           <div className="flex items-center gap-2">
                             <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-slate-700 shrink-0">
-                              <Image
+                              <SafeProductImage
                                 src={it.image || "/service-cctv.png"}
                                 alt={it.productName || "Produk"}
                                 fill
@@ -2846,7 +2896,7 @@ export default function ShopPage() {
                               <div key={idx} className="flex items-center justify-between text-xs">
                                 <div className="flex items-center gap-2.5">
                                   <div className="relative w-10 h-10 rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
-                                    <Image
+                                    <SafeProductImage
                                       src={it.image || "/service-cctv.png"}
                                       alt={it.productName || "Barang"}
                                       fill
@@ -3279,7 +3329,7 @@ export default function ShopPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
               <div className="space-y-3">
                 <div className="relative h-72 sm:h-80 w-full rounded-3xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm">
-                  <Image
+                  <SafeProductImage
                     src={shopActiveImage || selectedProduct.image || "/service-cctv.png"}
                     alt={selectedProduct.name}
                     fill
@@ -3306,7 +3356,7 @@ export default function ShopPage() {
                             isCurrent ? "border-dstech-blue ring-2 ring-blue-400/40" : "border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100"
                           }`}
                         >
-                          <Image src={imgUrl} alt={`Thumbnail ${idx + 1}`} fill className="object-cover" />
+                          <SafeProductImage src={imgUrl} alt={`Thumbnail ${idx + 1}`} fill className="object-cover" />
                         </button>
                       );
                     })}
