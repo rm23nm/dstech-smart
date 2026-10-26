@@ -49,45 +49,48 @@ export async function POST(req: Request) {
     const isInternalUser = portalType === "SUPERADMIN" || portalType === "ADMIN" || portalType === "EMPLOYEE";
     const userName = visitorInfo?.name ? visitorInfo.name.split(" ")[0] : "";
 
-    // Panggil Engine AI Screening & Qualification di SmartPro WA Gateway jika ada
+    // Panggil Engine AI Screening SmartPro HANYA untuk portal PUBLIC
+    // Untuk portal internal (Superadmin, Admin, Employee, Partner), langsung layani via Role-Aware Copilot Engine!
     const SMARTPRO_URL = process.env.SMARTPRO_API_URL || "https://smartpro.dstechsmart.com";
     let aiResponseData: any = null;
 
-    try {
-      const resSmartPro = await fetch(`${SMARTPRO_URL}/api/external/ai-chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          secret: process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026",
-          message: message.trim(),
-          history: Array.isArray(history) ? history.slice(-8) : [],
-          portalType: portalType,
-          isInternalUser: isInternalUser,
-          visitorInfo: {
-            ...visitorInfo,
-            portalType,
-            isInternalUser,
-          },
-          companyProfile: {
-            companyName: settings.companyName || "PT. DSTech Smart Perkasa",
-            address: settings.address || "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON, KOTA CILEGON - BANTEN",
-            googleMapsUrl: settings.googleMapsUrl || "https://maps.google.com/?q=Perum+Bukit+Cilegon+Asri+Cilegon+Banten",
-            serviceArea: settings.serviceArea || "Banten (Cilegon, Serang, Tangerang), Jabodetabek, dan Seluruh Wilayah Indonesia (Nasional)",
-            whatsapp: settings.whatsappDisplay || "+62 822-5949-4242",
-            email: settings.email || "cs@dstechsmart.com"
-          }
-        }),
-        signal: AbortSignal.timeout(18000)
-      });
+    if (portalType === "PUBLIC") {
+      try {
+        const resSmartPro = await fetch(`${SMARTPRO_URL}/api/external/ai-chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            secret: process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026",
+            message: message.trim(),
+            history: Array.isArray(history) ? history.slice(-8) : [],
+            portalType: portalType,
+            isInternalUser: isInternalUser,
+            visitorInfo: {
+              ...visitorInfo,
+              portalType,
+              isInternalUser,
+            },
+            companyProfile: {
+              companyName: settings.companyName || "PT. DSTech Smart Perkasa",
+              address: settings.address || "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON, KOTA CILEGON - BANTEN",
+              googleMapsUrl: settings.googleMapsUrl || "https://maps.google.com/?q=Perum+Bukit+Cilegon+Asri+Cilegon+Banten",
+              serviceArea: settings.serviceArea || "Banten (Cilegon, Serang, Tangerang), Jabodetabek, dan Seluruh Wilayah Indonesia (Nasional)",
+              whatsapp: settings.whatsappDisplay || "+62 822-5949-4242",
+              email: settings.email || "cs@dstechsmart.com"
+            }
+          }),
+          signal: AbortSignal.timeout(18000)
+        });
 
-      if (resSmartPro.ok) {
-        const json = await resSmartPro.json();
-        if (json.success && json.data) {
-          aiResponseData = json.data;
+        if (resSmartPro.ok) {
+          const json = await resSmartPro.json();
+          if (json.success && json.data) {
+            aiResponseData = json.data;
+          }
         }
+      } catch (err: any) {
+        console.warn("[DSTech Chat API] SmartPro AI unreachable or timeout:", err?.message);
       }
-    } catch (err: any) {
-      console.warn("[DSTech Chat API] SmartPro AI unreachable or timeout:", err?.message);
     }
 
     // Engine Cerdas Penanganan Peran Lokal (Role-Aware Local Copilot Engine)
