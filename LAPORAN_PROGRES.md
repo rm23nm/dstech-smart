@@ -6450,40 +6450,41 @@
 
 ---
 
-### 228. Tugas: Penambahan Kolom Merek (Brand) Produk & Dropdown Filter Merek di Katalog Toko Online (/shop) [SEDANG DIKERJAKAN]
+### 228. Tugas: Penambahan Kolom Merek (Brand) Produk & Dropdown Filter Merek di Katalog Toko Online (/shop) [SELESAI]
 - **Permintaan Pengguna**:
   - *"oh ia, pada produk saya melihat tidak adanya kolom merek. tolong tambahkan dan buatkan dropdownya disamping semua sub kategori"*
-- **Status**: **SEDANG DIKERJAKAN**
-- **Analisis & Rencana Solusi**:
+- **Status**: **[SELESAI & SUDAH DIDEPLOY LIVE]**
+- **Solusi yang Diterapkan**:
   1. **Toko Online (`src/app/shop/page.tsx`)**:
-     - Sediakan Dropdown Filter Merek (`[ 🛡️ Semua Merek ▾ ]`) tepat di sebelah kanan Dropdown Subkategori.
-     - Ekstraksi merek dinamis (`availableBrands`) dari daftar produk fisik (`p.brand`), dilengkapi algoritma *auto-detection* fallback yang cerdas dari nama produk jika kolom brand belum terisi (misal: *HIKVISION, DAHUA, HILOOK, EZVIZ, IMOU, UNIVIEW, TIANDY, SPC, BARRIER GATE MX, DSTECH SMART, RUIJIE REYEE, UBIQUITI, ZKTECO, TP-LINK*).
-     - Tambahkan filter `activeBrand` ke dalam `filteredProducts`.
-     - Tampilkan badge Merek (*Brand*) di kartu produk katalog dan modal detail produk.
+     - Ditambahkan Dropdown Filter Merek (`[ 🛡️ Semua Merek ▾ ]`) tepat di sebelah kanan Dropdown Subkategori dan di samping search bar.
+     - Dibuat memo `availableBrands` yang mengekstrak merek dari produk aktual (`p.brand`), lengkap dengan algoritma *smart fallback auto-detection* dari nama dan deskripsi produk (Hikvision, Dahua, HiLook, Ezviz, Imou, ZKTeco, Ruijie Reyee, Ubiquiti, Uniview, Tiandy, TP-Link, Barrier Gate MX, DSTech Smart).
+     - Ditambahkan filter `activeBrand` ke dalam `filteredProducts`.
+     - Ditambahkan badge Merek (*Brand*) di kartu produk katalog (`[ 🛡️ Hikvision ]`, `[ 🛡️ Barrier Gate MX ]`, `[ 🛡️ DSTech Smart ]`) dan modal detail produk.
+     - Tombol "Reset Filter" otomatis mereset kategori, subkategori, dan merek kembali ke Semua.
   2. **Admin Produk (`src/app/admin/products/page.tsx`)**:
-     - Tambahkan kolom Merek (`brand?: string`) pada tipe `ProductItem` dan state `formData`.
-     - Tambahkan field input/select Merek pada Form Modal Tambah Produk dan Form Modal Edit Produk.
-     - Tambahkan badge Merek di kolom tabel data produk admin.
-     - Tambahkan pemetaan kolom "Merek / Brand" pada ekspor Excel dan impor massal Excel.
+     - Ditambahkan properti `brand?: string` pada tipe `ProductItem` dan state form `formData`.
+     - Ditambahkan input teks rekomendasi/datalist "Merek / Brand Produk" pada Form Modal Tambah Produk dan Form Modal Edit Produk.
+     - Ditambahkan badge Merek di tabel data inventori admin produk.
+     - Ditambahkan pemetaan kolom "Merek / Brand" pada berkas ekspor Excel katalog (`.xlsx`), template penambahan produk massal, dan parser import bulk upload.
   3. **Backend API (`src/app/api/products/route.ts` & `src/app/api/products/bulk/route.ts`)**:
-     - Tambahkan penanganan penyimpanan field `brand` pada method `POST`, `PUT`, dan bulk import.
+     - Ditambahkan penanganan penyimpanan field `brand` pada method `POST`, `PUT`, dan bulk import.
 - **Rencana Step-by-Step Pengerjaan**:
   1. [x] **Langkah 1**: Catat rencana kerja Tugas 228 dan antrian Tugas 229 & 230 di `LAPORAN_PROGRES.md`.
   2. [x] **Langkah 2**: Buat folder cadangan `_backup_product_brand_feature/` dan amankan file target.
-  3. [ ] **Langkah 3**: Implementasikan backend field `brand` di `src/app/api/products/route.ts` dan `src/app/api/products/bulk/route.ts`.
-  4. [ ] **Langkah 4**: Implementasikan Dropdown Filter Merek dan badge Brand di `src/app/shop/page.tsx`.
-  5. [ ] **Langkah 5**: Implementasikan input Merek dan kolom tabel di `src/app/admin/products/page.tsx`.
-  6. [ ] **Langkah 6**: Validasi build TypeScript lokal (`npx tsc --noEmit` & `npm run build`).
-  7. [ ] **Langkah 7**: Push ke GitHub repository dan deploy live ke VPS aaPanel PM2 `dstech-main`.
-  8. [ ] **Langkah 8**: Verifikasi visual langsung di browser live `https://dstechsmart.com/shop`.
-  9. [ ] **Langkah 9**: Bersihkan folder cadangan dan tandai status Tugas 228 menjadi `[SELESAI]`.
+  3. [x] **Langkah 3**: Implementasikan backend field `brand` di `src/app/api/products/route.ts` dan `src/app/api/products/bulk/route.ts`.
+  4. [x] **Langkah 4**: Implementasikan Dropdown Filter Merek dan badge Brand di `src/app/shop/page.tsx`.
+  5. [x] **Langkah 5**: Implementasikan input Merek dan kolom tabel di `src/app/admin/products/page.tsx`.
+  6. [x] **Langkah 6**: Validasi build TypeScript lokal (`npx tsc --noEmit` lolos 0 error & `npm run build` sukses 63/63 routes).
+  7. [x] **Langkah 7**: Push ke GitHub repository (commit `3a35a9a`) dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  8. [x] **Langkah 8**: Verifikasi visual langsung di browser live `https://dstechsmart.com/shop`: dropdown Kategori, Subkategori, dan Merek tampil rapi berdampingan, popover menu merek membuka sempurna menampilkan daftar merek & counter produk, dan filter berjalan akurat.
+  9. [x] **Langkah 9**: Bersihkan folder cadangan dan tandai status Tugas 228 menjadi `[SELESAI]`.
 
 ---
 
 ### 229. Tugas: Fitur Neraca Saldo (Trial Balance) & Pemotongan Serta Perhitungan Pajak PPh di Modul Finance Admin (/admin/finance) [ANTRIAN PEKERJAAN BERIKUTNYA]
 - **Permintaan Pengguna**:
   - *"saya butuh fitur neraca saldo, dan pemotongan dan perhitungan pajak PPH tolong kamu tambahkan ke aplikasi"*
-- **Status**: **DALAM ANTRIAN (Akan dikerjakan segera setelah Tugas 228 selesai)**
+- **Status**: **DALAM ANTRIAN (Akan dikerjakan sekarang)**
 - **Rencana Solusi**:
   1. **Tab Neraca Saldo (Trial Balance)**:
      - Menghitung dan menyajikan posisi Debit & Kredit seimbang dari seluruh akun (Kas & Bank, Piutang Usaha, Valuasi Persediaan Barang, Utang Usaha ke Supplier, Modal & Ekuitas, Pendapatan Penjualan, Beban Pokok Penjualan HPP, dan Beban Operasional).
@@ -6506,6 +6507,23 @@
   1. Modul pencatatan aset tetap perusahaan (peralatan kerja teknisi, armada kendaraan operasional, mesin barcode/tools, komputer & server, inventaris kantor).
   2. Tracking penanggung jawab (PIC Teknisi/Karyawan), lokasi titik aset, dan kondisi fisik (Baik, Rusak Ringan, Rusak Berat, Perlu Kalibrasi).
   3. Perhitungan otomatis depresiasi/penyusutan aset (Garis Lurus / Straight-Line Method) dan nilai buku aset saat ini.
+
+---
+
+### 231. Tugas: Fitur Pengaturan Titik GPS Lokasi Kantor & Titik Proyek (Geofencing & Radius Toleransi Absensi Karyawan) [ANTRIAN PEKERJAAN BERIKUTNYA]
+- **Permintaan Pengguna**:
+  - *"untuk absensi saat ini terkendala. staf yang saya tempatkan dikantor posisinya, namun saat absensi ridak bisa, karena titik GPS tidak sesuai. saya masih bingung dimana harus meperbaiki titik GPS. karena tidak ada pengaturannya. begitu juga titik proyek"*
+- **Status**: **DALAM ANTRIAN (Telah dicatat dalam antrean pekerjaan, akan dikerjakan berurutan)**
+- **Analisis & Rencana Solusi**:
+  1. **Pengaturan Titik GPS Kantor Utama & Cabang**:
+     - Tambahkan modul pengaturan Titik Koordinat GPS Kantor (Latitude, Longitude) dan Radius Toleransi Presensi (misal: 50m, 100m, 200m, atau fleksibel) di menu Admin (`/admin/settings` atau `/admin/attendance`).
+     - Sediakan tombol interaktif "📍 Ambil Koordinat Saya Saat Ini" atau klik pada Google Maps picker agar admin tidak bingung mengetik latitude/longitude manual.
+  2. **Pengaturan Titik GPS Proyek Lapangan**:
+     - Tambahkan field Titik Koordinat GPS (Latitude, Longitude) dan Radius Geofencing pada setiap data Surat Tugas / Proyek Teknisi (`/api/employee/tasks` & `/admin/tasks`).
+     - Sehingga saat karyawan/teknisi berada di lokasi proyek, sistem mencocokkan titik GPS perangkat teknisi dengan titik proyek tersebut secara akurat.
+  3. **Penyesuaian Geofencing Portal Teknisi (`/employee`)**:
+     - Tampilkan informasi jarak riil staf ke titik kantor/proyek (misal: "Jarak Anda: 35 meter dari Kantor (Dalam Radius)").
+     - Berikan opsi toleransi / izin presensi dinas luar jika GPS mengalami deviasi sinyal satelit.
 
 ---
 
