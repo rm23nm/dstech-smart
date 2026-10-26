@@ -1452,6 +1452,31 @@ export default function ShopPage() {
 
       {/* FILTER & KATALOG PRODUK */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        {/* Banner Layanan & Wilayah Pengiriman / Pemasangan Teknisi (SEO Lokal & Pelanggan Banten) */}
+        <div className="bg-gradient-to-r from-blue-50 via-slate-50 to-red-50 border border-blue-200/60 rounded-2xl p-3 sm:p-4 flex flex-col md:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-dstech-blue text-white flex items-center justify-center shrink-0 shadow-sm">
+              <MapPin className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-black text-slate-900 leading-tight">
+                Pusat Jasa Pasang &amp; Pengadaan Terdekat: <span className="text-dstech-blue">Serang • Cilegon • Banten</span>
+              </p>
+              <p className="text-[11px] text-slate-600">
+                Melayani Jasa Pasang CCTV, Barrier Gate Otomatis, Fingerprint &amp; Face Recognition, serta Penarikan Jaringan IT &amp; Fiber Optik ke lokasi Anda.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-bold text-[10.5px]">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Teknisi Bersertifikat
+            </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 font-bold text-[10.5px]">
+              <ShieldCheck className="w-3 h-3 text-blue-600" /> Garansi Resmi
+            </span>
+          </div>
+        </div>
+
         {/* Search & Filter Bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           {/* Category Tabs */}

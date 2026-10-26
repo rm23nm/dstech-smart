@@ -6185,7 +6185,48 @@
   8. [x] **Langkah 8**: Hapus folder cadangan `_backup_seo_optimization`.
   9. [x] **Langkah 9**: Push ke GitHub (commit `91e85dc` & `87396fb`) dan deploy ke server live VPS aaPanel PM2 `dstech-main` (PID 1426919).
   10. [x] **Langkah 10**: Uji akses live `https://dstechsmart.com/sitemap.xml` dan `https://dstechsmart.com/robots.txt` serta periksa validasi tag SEO (Status 200 OK, XML & TXT valid).
-  11. [x] **Langkah 11**: Perbarui `LAPORAN_PROGRES.md` menjadi **[SELESAI]** dan susun panduan langkah Google Search Console bagi pengguna.
+  11. [x] **Langkah 11**: Integrasi file verifikasi Google Search Console (`google9d98231f7cf8f02a.html` via route & meta tag) dan verifikasi sukses (status: Kepemilikan diverifikasi). Pengguna telah berhasil submit `sitemap.xml` ke Google Search Console. Status Tugas 218 resmi **[SELESAI]**.
+
+
+
+---
+
+### 219. Tugas: Penguatan Konten SEO Lokal Komprehensif (CCTV, Barrier Gate, Fingerprint & Biometrik, Jasa Pembuatan Software, & IT Infrastructure untuk Wilayah Serang, Cilegon, & Banten) [SELESAI]
+- **Permintaan Pengguna**:
+  - *"saya coba cari cctv serang tidak muncul websitenya"*
+  - *"ok, lanjutkan, barirgate, fingerprint, pembuatan softwer dan lain-lain juga IT tambahkan semua"*
+- **Status**: **SELESAI**
+- **Akar Masalah**:
+  1. Meskipun sitemap dan Search Console telah terdaftar pada Tugas 218, kata kunci spesifik *"CCTV Serang"*, *"Barrier Gate Banten"*, *"Fingerprint"*, *"Pembuatan Software"*, dan *"Fiber Optik"* belum terdistribusi secara mendalam dan terstruktur pada konten halaman utama (heading H2/H3 dan paragraf on-page).
+  2. Googlebot membutuhkan keterkaitan semantik (*semantic on-page relevancy*) antara entitas bisnis lokal dengan cakupan wilayah administratif (Kota Serang, Kota Cilegon, Kab. Serang, Cikande, Anyer, Merak, dsb.) dan katalog penawaran layanan resmi (*Schema.org OfferCatalog*).
+- **Rincian Perbaikan yang Telah Dilakukan**:
+  1. **Folder Cadangan Khusus**:
+     - Dibuat folder cadangan `_backup_local_seo_expansion` untuk mengamankan `src/app/page.tsx`, `src/app/layout.tsx`, dan `src/app/shop/page.tsx`.
+  2. **Seksi Landing SEO Lokal & 5 Pilar Solusi di Beranda (`src/app/page.tsx`)**:
+     - Ditambahkan seksi interaktif modern berkelas korporat dengan badge *"SPESIALIS TEKNOLOGI SERANG & CILEGON"*, heading H2 *"Pusat Solusi CCTV, Barrier Gate, Fingerprint & IT Software Terpercaya"*, dan subdeskripsi lengkap.
+     - Menyediakan 5 kartu pilar layanan unggulan dengan kata kunci target tinggi:
+       * **CCTV & Security System AI**: Jasa Pasang CCTV Serang, Paket Kamera Hikvision/Dahua, ColorVu Full HD Malam Berwarna, Thermal IP Camera Pabrik & Kawasan Industri Cikande/Merak.
+       * **Barrier Gate & Parkir Otomatis**: Palang parkir otomatis servo 1.8 detik, akses kartu tapping RFID cluster perumahan & pabrik, sistem manless ticketing ruko & gedung Serang Banten.
+       * **Fingerprint & Face Recognition Biometrik**: Mesin absensi sidik jari, pengenal wajah anti-spoofing, smart access control magnetik pintu kantor Serang Cilegon.
+       * **Jasa Pembuatan Software Terpadu (Software House Banten)**: Web App kustom, ERP Keuangan & Logistik, Kasir POS Ritel/Resto, SmartPro WhatsApp Gateway, dan integrasi API IoT.
+       * **Infrastruktur IT & Fiber Optik**: Penarikan kabel FO, splicing & uji redaman OTDR, instalasi LAN komputer kantor, penataan rack server, videotron outdoor display.
+     - Dilengkapi chip pencarian populer dan cakupan wilayah terperinci: Kota Serang (Cipocok Jaya, Kasemen, Curug, Serang, Taktakan, Walantaka), Kota Cilegon (Cibeber, Ciwandan, Pulomerak, Grogol), Kab. Serang (Cikande, Anyer, Bojonegara, Kramatwatu), Tangerang, dan Nasional.
+     - Tombol Call-to-Action WhatsApp terhubung langsung ke CS resmi dengan draf pesan survey lokasi gratis.
+  3. **Penyempurnaan Schema.org JSON-LD & Keywords (`src/app/layout.tsx`)**:
+     - Diperkaya array `keywords` mencakup kata kunci lokal: CCTV Serang, Pasang CCTV Serang, Barrier Gate Serang, Palang Parkir Banten, Mesin Absensi Fingerprint Serang, Jasa Pembuatan Software Banten, Tarik Kabel Fiber Optik Banten, dsb.
+     - Ditambahkan `hasOfferCatalog` terstruktur pada Schema.org LocalBusiness JSON-LD merinci 5 penawaran jasa resmi PT. DSTech Smart Perkasa.
+     - Ditambahkan penutup array `areaServed` yang valid dan validasi JSON-LD.
+  4. **Penyisipan Banner Info Wilayah & Instalasi di Katalog (`src/app/shop/page.tsx`)**:
+     - Ditambahkan banner informasi wilayah terdekat di atas filter produk: *"Pusat Jasa Pasang & Pengadaan Terdekat: Serang • Cilegon • Banten (Melayani Jasa Pasang CCTV, Barrier Gate Otomatis, Fingerprint & Face Recognition, serta Penarikan Jaringan IT & Fiber Optik ke lokasi Anda)"*.
+     - Dilengkapi badge *"Teknisi Bersertifikat"* dan *"Garansi Resmi"*.
+  5. **Pengujian & Validasi Build Lokal**:
+     - `npx tsc --noEmit` lolos 100% tanpa error kompilasi.
+     - `npm run build` lolos 100% (62/62 static & dynamic routes compiled sukses).
+     - Folder cadangan `_backup_local_seo_expansion` dibersihkan sesuai SOP.
+  6. **Deployment & Verifikasi Server Live VPS**:
+     - Kode di-commit dan di-push ke GitHub remote repository master branch.
+     - Ditarik dan di-build di live server VPS via PM2 reload `dstech-main`.
+     - Verifikasi live respon HTTP 200 dan konten teks terbukti aktif di `https://dstechsmart.com`.
 
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).

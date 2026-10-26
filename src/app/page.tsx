@@ -418,6 +418,184 @@ export default function Home() {
       {/* Portfolio Section */}
       <PortfolioSection />
 
+      {/* Local SEO & Services Hub: Serang, Cilegon, Banten & Nasional */}
+      <section className="py-20 sm:py-28 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 text-white relative overflow-hidden border-t border-slate-800">
+        {/* Glow ambient */}
+        <div className="absolute top-1/4 -left-40 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute bottom-1/4 -right-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 relative z-10">
+          {/* Header */}
+          <div className="text-center max-w-3xl mx-auto mb-16 space-y-4">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-red-500/10 text-red-400 border border-red-500/20">
+              <MapPin className="w-3.5 h-3.5" />
+              Jangkauan Layanan Wilayah: Serang • Cilegon • Banten • Nasional
+            </span>
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">
+              Pusat Solusi <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-orange-400 to-amber-300">CCTV, Barrier Gate, Fingerprint &amp; IT Software</span> Terpercaya
+            </h2>
+            <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
+              PT. DSTech Smart Perkasa melayani survey lokasi, pengadaan perangkat bergaransi resmi, serta jasa instalasi teknis profesional untuk pabrik industri, instansi pemerintah, perkantoran, perumahan cluster, dan ruko komersial.
+            </p>
+          </div>
+
+          {/* 5 Service Pillars Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 mb-16">
+            {/* Card 1: CCTV AI */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-red-500/50 transition-all group flex flex-col justify-between shadow-xl">
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-black text-white group-hover:text-red-400 transition-colors">
+                  Jasa Pasang CCTV Serang &amp; Cilegon AI System
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Pengadaan paket CCTV Hikvision, Dahua, dan Ezviz Full HD hingga 4K. Dilengkapi fitur ColorVu malam berwarna, deteksi AI pergerakan manusia &amp; kendaraan, audio 2 arah, dan pantauan live streaming via HP.
+                </p>
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">CCTV Kota Serang</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">CCTV Industri Cilegon</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Thermal Camera</span>
+                </div>
+              </div>
+              <div className="pt-6 border-t border-slate-800/80 mt-6 flex justify-between items-center text-xs">
+                <span className="text-slate-400">Garansi 1 Tahun Resmi</span>
+                <Link href="/shop" className="text-red-400 font-bold hover:underline inline-flex items-center gap-1">
+                  Lihat Paket <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Card 2: Barrier Gate */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-blue-500/50 transition-all group flex flex-col justify-between shadow-xl">
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-500">
+                  <Target className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-black text-white group-hover:text-blue-400 transition-colors">
+                  Barrier Gate &amp; Palang Parkir Otomatis Banten
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Pemasangan palang parkir otomatis servo kecepatan 1.8 detik untuk perumahan cluster, pabrik, dan gedung parkir komersial. Mendukung integrasi kartu akses RFID tapping, sensor loop keselamatan, dan sistem manless tiket.
+                </p>
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Palang Parkir Serang</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Barrier Gate Cilegon</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Akses RFID Cluster</span>
+                </div>
+              </div>
+              <div className="pt-6 border-t border-slate-800/80 mt-6 flex justify-between items-center text-xs">
+                <span className="text-slate-400">Bahan Baja Tahan Karat</span>
+                <Link href="/shop" className="text-blue-400 font-bold hover:underline inline-flex items-center gap-1">
+                  Konsultasi Gate <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Card 3: Fingerprint & Face Recognition */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-emerald-500/50 transition-all group flex flex-col justify-between shadow-xl">
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                  <Cpu className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-black text-white group-hover:text-emerald-400 transition-colors">
+                  Mesin Absensi Fingerprint &amp; Face Recognition
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Solusi absensi biometrik sidik jari dan pengenal wajah anti-pemalsuan foto untuk perkantoran dan pabrik. Terintegrasi dengan sistem Access Door Lock kunci magnetik pintu kaca, kayu, dan besi.
+                </p>
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Absensi Fingerprint Serang</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Smart Doorlock Banten</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Access Control Kantor</span>
+                </div>
+              </div>
+              <div className="pt-6 border-t border-slate-800/80 mt-6 flex justify-between items-center text-xs">
+                <span className="text-slate-400">Software Payroll Ready</span>
+                <Link href="/shop" className="text-emerald-400 font-bold hover:underline inline-flex items-center gap-1">
+                  Pilih Mesin <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Card 4: Software House */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-amber-500/50 transition-all group flex flex-col justify-between shadow-xl">
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                  <Smartphone className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-black text-white group-hover:text-amber-400 transition-colors">
+                  Jasa Pembuatan Software, ERP &amp; POS Kasir Banten
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Software house terpercaya untuk pembuatan aplikasi web kustom, sistem ERP manajemen keuangan &amp; inventori, software kasir POS ritel &amp; resto, aplikasi WhatsApp Gateway SmartPro, hingga portal informasi terpadu.
+                </p>
+                <div className="flex flex-wrap gap-1.5 pt-2">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Software House Serang</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Aplikasi Kasir POS</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">SmartPro WA Gateway</span>
+                </div>
+              </div>
+              <div className="pt-6 border-t border-slate-800/80 mt-6 flex justify-between items-center text-xs">
+                <span className="text-slate-400">Custom Sesuai Kebutuhan</span>
+                <Link href="/contact" className="text-amber-400 font-bold hover:underline inline-flex items-center gap-1">
+                  Diskusi Sistem <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Card 5: IT Infrastructure & Fiber Optik */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 hover:border-purple-500/50 transition-all group flex flex-col justify-between shadow-xl md:col-span-2 lg:col-span-2">
+              <div className="space-y-4">
+                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                  <Globe className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-black text-white group-hover:text-purple-400 transition-colors">
+                  Infrastruktur IT, Tarik Kabel Fiber Optik &amp; Jaringan Komputer Kantor
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
+                  Spesialis penggelaran backbone kabel Fiber Optik (FO), penyambungan fusion splicing, pengujian redaman OTDR, instalasi titik LAN internet kantor, penataan server rack PABX, hingga pengadaan running text &amp; Videotron LED display outdoor di kawasan industri Cikande, Cilegon, Merak, dan Bojonegara.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-slate-800 text-purple-300 border border-purple-500/20">Fiber Optik Banten</span>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-slate-800 text-purple-300 border border-purple-500/20">Instalasi Jaringan LAN Serang</span>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-slate-800 text-purple-300 border border-purple-500/20">Splicing &amp; OTDR Cilegon</span>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded bg-slate-800 text-purple-300 border border-purple-500/20">Server &amp; PABX Pabrik</span>
+                </div>
+              </div>
+              <div className="pt-6 border-t border-slate-800/80 mt-6 flex justify-between items-center text-xs">
+                <span className="text-slate-400">Uji Redaman Standar Sertifikasi</span>
+                <Link href="/contact" className="text-purple-400 font-bold hover:underline inline-flex items-center gap-1">
+                  Minta Penawaran SPH <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Area Coverage Badge Bar */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-slate-800 flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="space-y-1.5 text-center lg:text-left">
+              <h4 className="text-sm sm:text-base font-black text-white">
+                Wilayah Jangkauan Layanan Lapangan (Survey &amp; Instalasi Teknisi Langsung):
+              </h4>
+              <p className="text-xs text-slate-400 leading-relaxed max-w-3xl">
+                <strong>Kota Serang</strong> (Cipocok Jaya, Curug, Kasemen, Serang, Taktakan, Walantaka) • <strong>Kota Cilegon</strong> (Cibeber, Citangkil, Ciwandan, Gerogol, Jombang, Pulomerak, Purwakarta) • <strong>Kabupaten Serang &amp; Industri</strong> (Cikande, Bojonegara, Anyer, Kramatwatu, Ciruas, Kragilan) • <strong>Banten &amp; Jabodetabek</strong> (Tangerang, Balaraja, Pandeglang, Lebak Rangkasbitung, DKI Jakarta) &amp; Pengiriman Perangkat ke Seluruh Indonesia.
+              </p>
+            </div>
+            <a
+              href={`https://wa.me/${(settings.whatsapp || "6282259494242").replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Halo PT. DSTech Smart Perkasa, saya ingin konsultasi dan survey pemasangan (CCTV / Barrier Gate / Fingerprint / Software / IT) untuk wilayah Serang / Cilegon.")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-red-600 to-rose-600 text-white font-black text-xs sm:text-sm hover:from-red-500 hover:to-rose-500 transition-all shadow-xl shadow-red-600/30 flex items-center gap-2 flex-shrink-0"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Jadwalkan Survey Lokasi Gratis
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Enhanced Footer */}
       <footer className="bg-white border-t-4 border-dstech-blue pt-16 sm:pt-24 pb-12 overflow-hidden relative">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 sm:gap-12 mb-12 relative z-10">
