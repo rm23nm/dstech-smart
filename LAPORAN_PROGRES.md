@@ -6331,6 +6331,38 @@
      - Ditarik dan di-build di live server VPS via PM2 reload `dstech-main`.
      - Verifikasi live API dan kalkulasi terbukti aktif normal.
 
+
+### 223. Tugas: Investigasi & Perbaikan Gambar Produk Rusak / Gagal Tampil di Katalog Toko Online (Normalisasi Format JFIF/JPEG & Next.js Image Fallback) [SELESAI]
+- **Permintaan Pengguna**:
+  - *"jika foto produk yang di upload gak nampil pada katalog,"*
+  - (Disertai screenshot katalog produk https://dstechsmart.com/shop di mana 2 produk palang gate: "Palang Gate Barrier Gate Panjang 3 Meter Dengan Lampu" dan "Palang Gate Barrier Gate Panjang 3 Meter Tanpa Lampu" menampilkan broken image icon).
+- **Akar Masalah (Root Cause Analysis)**:
+  1. **Format File JFIF (JPEG File Interchange Format)**:
+     - File yang diunggah pengguna berekstensi `.jfif` (`/uploads/dstech_img_1793016884529_Palang_Gate_3_Meter_dengan_Lam.jfif` dan `/uploads/dstech_img_1793016900513_Palang_Gate_Barier_Tanpa_Lampu.jfif`).
+     - File fisik terbukti ada (HTTP 200), namun Nginx di server live menyajikan file `.jfif` dengan header `Content-Type: application/octet-stream` karena belum terdaftar pada MIME types Nginx.
+  2. **Next.js Image Optimizer Error (HTTP 400)**:
+     - Next.js `<Image>` merender melalui `/_next/image?url=...`.
+     - Optimizer Next.js (Sharp) memeriksa header `Content-Type` upstream: karena bernilai `application/octet-stream` (bukan `image/*`), Next.js me-reject dengan error `HTTP 400: "The requested resource isn't a valid image."`.
+  3. **Ketiadaan Error Fallback pada Frontend Toko Online**:
+     - Pada `src/app/shop/page.tsx`, komponen `<Image>` belum memiliki fallback `onError` sehingga ketika optimizer gagal, browser merender broken image icon tanpa beralih ke placeholder.
+  4. **Ekstensi Upload Belum Dinormalisasi**:
+     - Pada `src/app/api/upload/route.ts`, unggahan `.jfif` belum dinormalisasi menjadi `.jpg`.
+- **Rencana & Step-by-Step Perbaikan**:
+  1. [x] **Langkah 1**: Catat rencana kerja dan analisis di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat folder cadangan `_backup_product_image_fix/` dan backup file target.
+  3. [x] **Langkah 3**: Perbaiki backend upload (`src/app/api/upload/route.ts`):
+     - Ditambahkan MIME types ramah JFIF (`image/jfif`, `image/pjpeg`).
+     - Normalisasi otomatis ekstensi `.jfif` dan `.jpeg` menjadi `.jpg` agar selalu tersimpan sebagai JPEG standar.
+  4. [x] **Langkah 4**: Perbaiki frontend katalog (`src/app/shop/page.tsx`):
+     - Dibuat komponen `SafeProductImage` dengan properti `unoptimized` otomatis untuk gambar dinamis upload (`/uploads/`) dan format `.jfif` sehingga tidak terkena restriksi internal optimizer Next.js yang memerlukan build cache statis.
+     - Ditambahkan penanganan `onError` otomatis yang beralih ke placeholder resmi `/service-cctv.png` jika terjadi kegagalan muat.
+  5. [x] **Langkah 5**: Konfigurasi Nginx di VPS:
+     - Didaftarkan ekstensi `jfif` pada `image/jpeg` di `/www/server/nginx/conf/mime.types` sehingga Nginx mengirimkan header `Content-Type: image/jpeg`.
+     - Nginx berhasil di-reload (`Reload service nginx... done`).
+  6. [x] **Langkah 6**: Validasi build lokal (`npx tsc --noEmit` lolos 100% dan `npm run build` 62/62 routes lolos).
+  7. [x] **Langkah 7**: Deploy live ke VPS via native git (commit `d3cfe16`), build live berhasil, dan PM2 `dstech-main` aktif online.
+  8. [x] **Langkah 8**: Verifikasi visual langsung via browser subagent di `https://dstechsmart.com/shop`: terbukti kedua produk Palang Gate Barrier Gate menampilkan foto asli produk dengan sangat jernih dan tanpa broken image icon. Folder cadangan dibersihkan sesuai SOP.
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
