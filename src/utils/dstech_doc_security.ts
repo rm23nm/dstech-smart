@@ -4,10 +4,39 @@
  * Memastikan dokumen diproteksi dengan 6-Digit Kata Sandi / PIN Verifikasi.
  */
 
+function hashSeedToPin(seed: string, caseSensitive: boolean = false): string {
+  let hash = 0;
+  const cleanSeed = caseSensitive ? String(seed || "DSTECH").trim() : String(seed || "DSTECH").trim().toUpperCase();
+  for (let i = 0; i < cleanSeed.length; i++) {
+    hash = ((hash << 5) - hash) + cleanSeed.charCodeAt(i);
+    hash |= 0;
+  }
+  return (Math.abs(hash) % 900000 + 100000).toString();
+}
+
+export function getDocOfficialNumber(doc: any): string {
+  if (!doc) return "";
+  // Prioritaskan nomor dokumen resmi yang dilihat manusia & tercantum di WA/Email/URL
+  const num = String(
+    doc.quotationNumber ||
+    doc.invoiceNumber ||
+    doc.poNumber ||
+    doc.orderNumber ||
+    doc.orderId ||
+    doc.docNumber ||
+    doc.no ||
+    doc.receiptNumber ||
+    doc.deliveryOrderNumber ||
+    doc.id ||
+    ""
+  ).trim();
+  return num;
+}
+
 export function getDocPin(doc: any): string {
   if (!doc) return "123456";
 
-  // 1. Prioritaskan jika sudah tersimpan PIN 6 digit eksplisit
+  // 1. Prioritaskan jika sudah tersimpan PIN eksplisit (4-8 digit)
   const explicitPin = String(doc.accessPin || doc.docPin || "").trim();
   if (/^\d{4,8}$/.test(explicitPin)) {
     return explicitPin;
@@ -19,44 +48,62 @@ export function getDocPin(doc: any): string {
     return code;
   }
 
-  // 3. Deterministik fallback 6 digit angka berbasis string identitas dokumen
-  // Menjamin dokumen yang sama selalu menghasilkan PIN yang konsisten setiap saat
-  const seed = String(
-    doc.id ||
-    doc.quotationNumber ||
-    doc.invoiceNumber ||
-    doc.poNumber ||
-    doc.orderNumber ||
-    doc.receiptNumber ||
-    doc.deliveryOrderNumber ||
-    doc.date ||
-    "DSTECH"
-  );
-
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = ((hash << 5) - hash) + seed.charCodeAt(i);
-    hash |= 0;
-  }
-
-  const pinNumber = Math.abs(hash) % 900000 + 100000;
-  return pinNumber.toString();
+  // 3. Deterministik berbasis Nomor Dokumen Resmi (menjamin identik antara modal frontend, WA, Email, dan backend)
+  const officialNumber = getDocOfficialNumber(doc);
+  return hashSeedToPin(officialNumber);
 }
 
 export function verifyDocPin(doc: any, inputPin?: string | null): boolean {
   if (!inputPin) return false;
-  const cleanInput = String(inputPin).trim();
-  if (!cleanInput) return false;
+  const rawInput = String(inputPin).trim();
+  if (!rawInput) return false;
 
-  const expectedPin = getDocPin(doc);
-  if (cleanInput === expectedPin) return true;
+  // Normalisasi input (hilangkan spasi atau tanda hubung jika diketik pengguna)
+  const normalizedInput = rawInput.replace(/[-\s]/g, "").toUpperCase();
 
-  if (doc?.accessPin && cleanInput === String(doc.accessPin).trim()) return true;
-  if (doc?.docPin && cleanInput === String(doc.docPin).trim()) return true;
+  // 1. Cek langsung terhadap PIN resmi dokumen
+  const officialPin = getDocPin(doc);
+  if (rawInput === officialPin || normalizedInput === officialPin) return true;
 
-  // Jika memasukkan kode verifikasi approval legalitas (misal DST-APP-...)
-  if (doc?.verificationCode && cleanInput.toLowerCase() === String(doc.verificationCode).trim().toLowerCase()) {
-    return true;
+  // 2. Cek terhadap seluruh kemungkinan seed alternatif dokumen (baik case-insensitive maupun case-sensitive)
+  const seeds = [
+    doc?.quotationNumber,
+    doc?.invoiceNumber,
+    doc?.poNumber,
+    doc?.orderNumber,
+    doc?.orderId,
+    doc?.docNumber,
+    doc?.no,
+    doc?.receiptNumber,
+    doc?.deliveryOrderNumber,
+    doc?.id,
+  ].filter(Boolean);
+
+  for (const s of seeds) {
+    const pinUpper = hashSeedToPin(String(s), false);
+    const pinCase = hashSeedToPin(String(s), true);
+    if (rawInput === pinUpper || normalizedInput === pinUpper || rawInput === pinCase || normalizedInput === pinCase) {
+      return true;
+    }
+  }
+
+  // 3. Cek eksplisit accessPin / docPin
+  if (doc?.accessPin) {
+    const ap = String(doc.accessPin).trim();
+    if (rawInput === ap || normalizedInput === ap.replace(/[-\s]/g, "").toUpperCase()) return true;
+  }
+  if (doc?.docPin) {
+    const dp = String(doc.docPin).trim();
+    if (rawInput === dp || normalizedInput === dp.replace(/[-\s]/g, "").toUpperCase()) return true;
+  }
+
+  // 4. Cek verificationCode (misal DST-APP-202610-2415 atau digitnya saja)
+  if (doc?.verificationCode) {
+    const vc = String(doc.verificationCode).trim();
+    if (rawInput.toLowerCase() === vc.toLowerCase()) return true;
+    if (normalizedInput === vc.replace(/[-\s]/g, "").toUpperCase()) return true;
+    const digitsOnly = vc.replace(/\D/g, "");
+    if (digitsOnly && (normalizedInput === digitsOnly || rawInput === digitsOnly)) return true;
   }
 
   return false;

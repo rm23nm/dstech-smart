@@ -113,16 +113,15 @@ function renderSecurityLockScreen(params: {
           </label>
           <div class="relative">
             <input
-              type="password"
+              type="text"
               id="input-pin"
               name="pin"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              maxlength="8"
+              autocomplete="off"
+              maxlength="40"
               required
               autofocus
-              placeholder="••••••"
-              class="w-full py-3.5 px-4 text-center tracking-[0.4em] text-2xl font-black font-mono-code rounded-2xl bg-slate-950 border ${hasError ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30'} text-indigo-300 placeholder-slate-600 focus:outline-none transition-all shadow-inner"
+              placeholder="Ketik 6 Digit PIN Dokumen"
+              class="w-full py-3.5 px-4 text-center tracking-[0.25em] text-xl sm:text-2xl font-black font-mono-code rounded-2xl bg-slate-950 border ${hasError ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30'} text-indigo-300 placeholder-slate-600 focus:outline-none transition-all shadow-inner"
             />
             <button
               type="button"

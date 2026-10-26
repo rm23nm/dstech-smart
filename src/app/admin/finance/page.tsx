@@ -1902,6 +1902,8 @@ export default function AdminFinanceERPPage() {
     docType: "SPH" | "Invoice" | "PO" | "Return" | "Receipt" | "DeliveryOrder";
     docTitle: string;
     docNumber: string;
+    id?: string;
+    verificationCode?: string;
     recipientName: string;
     recipientPic?: string;
     recipientOrg?: string;
@@ -1924,6 +1926,8 @@ export default function AdminFinanceERPPage() {
     docType: "SPH",
     docTitle: "Surat Penawaran Harga (SPH)",
     docNumber: "",
+    id: "",
+    verificationCode: "",
     recipientName: "",
     recipientPic: "",
     recipientOrg: "",
@@ -1987,6 +1991,8 @@ export default function AdminFinanceERPPage() {
     docType: "SPH" | "Invoice" | "PO" | "Return" | "Receipt" | "DeliveryOrder";
     docTitle: string;
     docNumber: string;
+    id?: string;
+    verificationCode?: string;
     recipientName: string;
     recipientPic?: string;
     recipientOrg?: string;
@@ -2048,6 +2054,8 @@ export default function AdminFinanceERPPage() {
       docType: params.docType,
       docTitle: params.docTitle,
       docNumber: params.docNumber,
+      id: params.id || params.docNumber,
+      verificationCode: params.verificationCode || "",
       recipientName: params.recipientName,
       recipientPic: params.recipientPic || "",
       recipientOrg: params.recipientOrg || "",
