@@ -3996,8 +3996,18 @@ export default function AdminFinanceERPPage() {
       return;
     }
 
-    if (quotationForm.items.some((it) => !it.productName || it.price <= 0)) {
-      showToast("Mohon isi deskripsi produk/jasa dan harga valid untuk semua baris!");
+    if (!quotationForm.items || quotationForm.items.length === 0) {
+      showToast("Mohon tambahkan minimal 1 baris produk/jasa penawaran!");
+      return;
+    }
+
+    if (quotationForm.items.some((it) => !it.productName || !it.productName.trim())) {
+      showToast("Mohon isi deskripsi produk/jasa untuk semua baris item!");
+      return;
+    }
+
+    if (quotationForm.items.some((it) => Number(it.price || 0) < 0)) {
+      showToast("Harga satuan tidak boleh bernilai negatif!");
       return;
     }
 
@@ -8384,7 +8394,7 @@ export default function AdminFinanceERPPage() {
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 animate-bounce print:hidden">
+        <div className="fixed top-6 right-6 z-[999999] animate-bounce print:hidden">
           <div className="px-5 py-3 rounded-2xl bg-slate-900 text-white font-bold text-xs shadow-2xl border border-slate-700 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-400" />
             <span>{toastMessage}</span>
@@ -16499,9 +16509,9 @@ export default function AdminFinanceERPPage() {
                         <input
                           type="number"
                           min={0}
-                          required
-                          value={it.price}
-                          onChange={(e) => handleQuotationItemChange(idx, "price", Number(e.target.value))}
+                          placeholder="0 (Termasuk Paket)"
+                          value={it.price === 0 ? "" : it.price}
+                          onChange={(e) => handleQuotationItemChange(idx, "price", e.target.value === "" ? 0 : Number(e.target.value))}
                           className="w-full p-1.5 rounded-lg border border-slate-200 bg-white font-bold text-xs"
                         />
                       </div>
@@ -17869,13 +17879,17 @@ export default function AdminFinanceERPPage() {
                                   </td>
                                   <td className="p-1.5 text-center font-bold text-[10px]">{it.qty}</td>
                                   <td className="p-1.5 text-center text-slate-600 text-[9.5px]">{it.unit || "Unit"}</td>
-                                  <td className="p-1.5 text-right font-medium text-[10px]">{formatRupiah(it.price)}</td>
+                                  <td className="p-1.5 text-right font-medium text-[10px]">
+                                    {it.price > 0 ? formatRupiah(it.price) : <span className="text-slate-500 italic text-[9px]">Termasuk Paket</span>}
+                                  </td>
                                   {selectedQuotationForPrint.items.some((item) => (item.discount || 0) > 0) && (
                                     <td className="p-1.5 text-right text-red-600 font-bold text-[10px]">
                                       {it.discount ? `- ${formatRupiah(it.discount)}` : "-"}
                                     </td>
                                   )}
-                                  <td className="p-1.5 text-right font-black text-[10px]">{formatRupiah(it.total)}</td>
+                                  <td className="p-1.5 text-right font-black text-[10px]">
+                                    {it.total > 0 ? formatRupiah(it.total) : <span className="text-emerald-600 font-bold text-[9px]">Include</span>}
+                                  </td>
                                 </tr>
                               );
                             })}
