@@ -23,8 +23,12 @@ import {
   FileText,
   Download,
   Star,
-  Send
+  Send,
+  Sparkles,
+  Eye,
+  Wand2
 } from "lucide-react";
+import { parseHtmlClipboard, cleanDescriptionText, ProductDescriptionViewer } from "@/utils/dstech_desc_formatter";
 
 export interface ProductItem {
   id: string | number;
@@ -134,6 +138,55 @@ export default function ProductAdmin() {
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
+  };
+
+  const [showDescPreview, setShowDescPreview] = useState(false);
+
+  // Smart Formatter saat User melakukan Paste teks/tabel ke Deskripsi (Tugas 224)
+  const handleDescriptionPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    // 1. Cek apakah clipboard mengandung tabel atau list HTML (dari Gemini/ChatGPT/Word/Excel)
+    const html = e.clipboardData.getData("text/html");
+    if (html && (html.includes("<table") || html.includes("<ul") || html.includes("<ol"))) {
+      const parsed = parseHtmlClipboard(html);
+      if (parsed) {
+        e.preventDefault();
+        const target = e.currentTarget;
+        const start = target.selectionStart || 0;
+        const end = target.selectionEnd || 0;
+        const current = formData.desc || "";
+        const updated = current.substring(0, start) + parsed + current.substring(end);
+        setFormData((prev) => ({ ...prev, desc: updated }));
+        showToast("✨ Format tabel & spesifikasi otomatis dirapikan!");
+        return;
+      }
+    }
+
+    // 2. Cek apakah plain text mengandung tab (copy tabel mentah: Col1\tCol2)
+    const text = e.clipboardData.getData("text/plain");
+    if (text && text.includes("\t")) {
+      const cleaned = cleanDescriptionText(text);
+      if (cleaned !== text) {
+        e.preventDefault();
+        const target = e.currentTarget;
+        const start = target.selectionStart || 0;
+        const end = target.selectionEnd || 0;
+        const current = formData.desc || "";
+        const updated = current.substring(0, start) + cleaned + current.substring(end);
+        setFormData((prev) => ({ ...prev, desc: updated }));
+        showToast("✨ Teks tabel otomatis diubah menjadi daftar poin spesifikasi!");
+      }
+    }
+  };
+
+  // Tombol aksi cepat untuk merapikan teks deskripsi yang sudah ada
+  const handleAutoFormatDesc = () => {
+    if (!formData.desc || !formData.desc.trim()) {
+      showToast("Belum ada teks deskripsi untuk dirapikan.", "error");
+      return;
+    }
+    const formatted = cleanDescriptionText(formData.desc);
+    setFormData((prev) => ({ ...prev, desc: formatted }));
+    showToast("✨ Teks deskripsi & spesifikasi berhasil dirapikan otomatis!");
   };
 
   const [isSyncingSmartPro, setIsSyncingSmartPro] = useState(false);
@@ -1451,16 +1504,55 @@ export default function ProductAdmin() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Deskripsi / Keterangan Produk
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.desc}
-                  onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
-                  placeholder="Keterangan singkat mengenai kelengkapan produk atau layanan..."
-                  className="w-full p-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Deskripsi &amp; Spesifikasi Produk
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAutoFormatDesc}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Rapikan teks yang menyatu atau belum berbaris"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Rapikan Otomatis
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDescPreview(!showDescPreview)}
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1 cursor-pointer ${
+                        showDescPreview
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      {showDescPreview ? "Tutup Pratinjau" : "Pratinjau Toko"}
+                    </button>
+                  </div>
+                </div>
+
+                {showDescPreview ? (
+                  <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/30 max-h-72 overflow-y-auto">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 block mb-2">
+                      👁️ Pratinjau Tampilan Pembeli di Katalog Toko:
+                    </span>
+                    <ProductDescriptionViewer desc={formData.desc} />
+                  </div>
+                ) : (
+                  <textarea
+                    rows={8}
+                    value={formData.desc}
+                    onPaste={handleDescriptionPaste}
+                    onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
+                    placeholder="Contoh:&#10;Palang parkir otomatis kecepatan tinggi...&#10;&#10;Spesifikasi Teknis:&#10;• Model: Barrier Gate MX-80&#10;• Panjang Palang: 3 Meter&#10;• Kecepatan: 1.8 detik"
+                    className="w-full p-4 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-dstech-blue font-mono leading-relaxed"
+                  />
+                )}
+                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                  💡 <span>Dapat langsung <strong>Copy &amp; Paste</strong> dari Gemini / ChatGPT / Excel / Tabel Word. Sistem otomatis mengubahnya menjadi poin spesifikasi rapi.</span>
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
@@ -1962,15 +2054,54 @@ export default function ProductAdmin() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Deskripsi / Keterangan Produk
-                </label>
-                <textarea
-                  rows={3}
-                  value={formData.desc}
-                  onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
-                  className="w-full p-4 rounded-xl border border-slate-200 text-sm font-medium focus:outline-none focus:border-dstech-blue"
-                />
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Deskripsi &amp; Spesifikasi Produk
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAutoFormatDesc}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Rapikan teks yang menyatu atau belum berbaris"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Rapikan Otomatis
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowDescPreview(!showDescPreview)}
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1 cursor-pointer ${
+                        showDescPreview
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                      }`}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      {showDescPreview ? "Tutup Pratinjau" : "Pratinjau Toko"}
+                    </button>
+                  </div>
+                </div>
+
+                {showDescPreview ? (
+                  <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/30 max-h-72 overflow-y-auto">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-600 block mb-2">
+                      👁️ Pratinjau Tampilan Pembeli di Katalog Toko:
+                    </span>
+                    <ProductDescriptionViewer desc={formData.desc} />
+                  </div>
+                ) : (
+                  <textarea
+                    rows={8}
+                    value={formData.desc}
+                    onPaste={handleDescriptionPaste}
+                    onChange={(e) => setFormData({ ...formData, desc: e.target.value })}
+                    className="w-full p-4 rounded-xl border border-slate-200 text-xs sm:text-sm font-medium focus:outline-none focus:border-dstech-blue font-mono leading-relaxed"
+                  />
+                )}
+                <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+                  💡 <span>Dapat langsung <strong>Copy &amp; Paste</strong> dari Gemini / ChatGPT / Excel / Tabel Word. Sistem otomatis mengubahnya menjadi poin spesifikasi rapi.</span>
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">

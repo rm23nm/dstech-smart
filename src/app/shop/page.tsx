@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { ProductDescriptionViewer } from "@/utils/dstech_desc_formatter";
 import {
   ShoppingCart,
   Heart,
@@ -3416,10 +3417,10 @@ export default function ShopPage() {
                 )}
 
                 <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">Deskripsi Produk</h4>
-                  <p className="text-slate-600 text-sm leading-relaxed font-medium">
-                    {selectedProduct.desc || "Perangkat teknologi resmi berkualitas prima dari PT. DSTech Smart Perkasa."}
-                  </p>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-2">
+                    Deskripsi &amp; Spesifikasi Produk
+                  </h4>
+                  <ProductDescriptionViewer desc={selectedProduct.desc} />
                 </div>
 
                 {/* Unduh Berkas Brosur / E-Katalog PDF Spesifikasi */}
