@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 };
 
 import AIChatWidget from "@/components/AIChatWidget";
+import DSTechVisitorTracker from "@/components/DSTechVisitorTracker";
 
 export default function RootLayout({
   children,
@@ -34,6 +35,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased scroll-smooth`}
     >
       <body className="min-h-full flex flex-col overflow-x-hidden selection:bg-red-600 selection:text-white">
+        <DSTechVisitorTracker />
         {children}
         <AIChatWidget />
       </body>

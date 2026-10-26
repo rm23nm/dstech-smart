@@ -62,10 +62,30 @@ export default function AIChatWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([DEFAULT_GREETING]);
   const [visitorName, setVisitorName] = useState("");
   const [visitorPhone, setVisitorPhone] = useState("");
+  const [visitorGeo, setVisitorGeo] = useState<any>(null);
   const [hasUnread, setHasUnread] = useState(true);
   const [showTeaser, setShowTeaser] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Ambil dan dengarkan update geolokasi otomatis dari DSTechVisitorTracker
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem("dstech_visitor_geo");
+      if (cached) {
+        setVisitorGeo(JSON.parse(cached));
+      }
+    } catch (e) {}
+
+    const handleGeoEvent = (e: any) => {
+      if (e.detail) {
+        setVisitorGeo(e.detail);
+      }
+    };
+
+    window.addEventListener("dstech:visitor-geo", handleGeoEvent);
+    return () => window.removeEventListener("dstech:visitor-geo", handleGeoEvent);
+  }, []);
 
   // Auto-scroll ke pesan terbaru
   const scrollToBottom = () => {
@@ -139,7 +159,12 @@ export default function AIChatWidget() {
           history: updatedMessages.map(m => ({ sender: m.sender, text: m.text })),
           visitorInfo: {
             name: visitorName || undefined,
-            phone: visitorPhone || undefined
+            phone: visitorPhone || undefined,
+            city: visitorGeo?.city || undefined,
+            region: visitorGeo?.region || undefined,
+            country: visitorGeo?.country || undefined,
+            currentPath: typeof window !== "undefined" ? window.location.pathname : undefined,
+            pageTitle: typeof document !== "undefined" ? document.title : undefined,
           }
         })
       });
@@ -283,9 +308,14 @@ export default function AIChatWidget() {
                     Gemini 2.5
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-300 flex items-center gap-1.5">
+                <p className="text-[11px] text-slate-300 flex items-center gap-1.5 flex-wrap">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>Online 24/7 • PT. DSTech Smart Perkasa</span>
+                  <span>Online 24/7 • PT. DSTech</span>
+                  {visitorGeo?.city && (
+                    <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-md border border-emerald-400/30">
+                      📍 {visitorGeo.city}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>

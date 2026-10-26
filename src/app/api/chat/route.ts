@@ -93,15 +93,19 @@ export async function POST(req: Request) {
         isReady = lower.includes("cilegon") || lower.includes("serang") || lower.includes("titik") || lower.includes("paket");
       }
 
+      // Personalisasi berbasis geolokasi & halaman aktif pengunjung
+      const locText = visitorInfo?.city ? ` untuk area ${visitorInfo.city}${visitorInfo.region ? `, ${visitorInfo.region}` : ""}` : "";
+      const pageText = visitorInfo?.currentPath && visitorInfo.currentPath !== "/" ? ` (terkait halaman ${visitorInfo.currentPath})` : "";
+
       aiResponseData = {
-        reply: `Halo! Saya Dani, Asisten Virtual AI PT. DSTech Smart Perkasa. Terkait kebutuhan Anda mengenai "${message}", kami siap membantu dengan solusi terbaik. Boleh kami tahu nama dan lokasi Anda agar kami bisa siapkan rekomendasi spesifik?`,
+        reply: `Halo! Saya Dani, Asisten Virtual AI PT. DSTech Smart Perkasa. Terkait kebutuhan Anda mengenai "${message}"${locText}${pageText}, kami siap membantu dengan solusi terbaik. Boleh kami tahu nama dan detail spesifik yang Anda butuhkan agar kami bisa siapkan rekomendasi terbaik?`,
         department: dept,
         department_label: deptLabel,
         client_name: visitorInfo?.name || null,
         client_phone: visitorInfo?.phone || null,
         ready_for_handover: isReady,
         handover_reason: isReady ? "Klien membutuhkan tindak lanjut langsung dari tim terkait." : null,
-        handover_summary: `Halo ${deptLabel} PT. DSTech Smart Perkasa,\nSaya ingin konsultasi lanjutan mengenai: "${message}". Mohon dibantu. Terima kasih!`,
+        handover_summary: `Halo ${deptLabel} PT. DSTech Smart Perkasa,\nSaya ingin konsultasi lanjutan mengenai: "${message}".\n[Info Pengunjung: Kota ${visitorInfo?.city || "Indonesia"}, Halaman: ${visitorInfo?.currentPath || "/"}]\nMohon dibantu. Terima kasih!`,
         matched_products: [],
         quick_replies: ["📹 Rekomendasi Paket CCTV", "🚪 Solusi Smart Home", "🚧 Barrier Gate Otomatis", "🛠️ Bantuan Servis Teknis"]
       };
@@ -117,7 +121,7 @@ export async function POST(req: Request) {
 
     // Susun Link WhatsApp Resmi Handover
     const summaryText = aiResponseData.handover_summary || 
-      `Halo ${aiResponseData.department_label} PT. DSTech Smart Perkasa,\nSaya berkonsultasi via AI Website dstechsmart.com mengenai:\n"${message}".\nMohon bantuannya. Terima kasih!`;
+      `Halo ${aiResponseData.department_label} PT. DSTech Smart Perkasa,\nSaya berkonsultasi via AI Website dstechsmart.com mengenai:\n"${message}".\n[Lokasi: ${visitorInfo?.city || "Indonesia"} | Halaman: ${visitorInfo?.currentPath || "/"}]\nMohon bantuannya. Terima kasih!`;
 
     const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(summaryText)}`;
 
@@ -135,7 +139,7 @@ export async function POST(req: Request) {
             id: existingIdx >= 0 ? leads[existingIdx].id : `dstech_crm_lead_${Date.now()}`,
             leadNumber: existingIdx >= 0 ? leads[existingIdx].leadNumber : `LEAD-DST-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(leads.length + 1).padStart(3, "0")}`,
             clientName: aiResponseData.client_name || visitorInfo?.name || "Klien Web AI Chat",
-            company: visitorInfo?.company || "Perorangan / Bisnis",
+            company: visitorInfo?.company || (visitorInfo?.city ? `Klien Asal ${visitorInfo.city}` : "Perorangan / Bisnis"),
             position: "Client",
             phone: phone,
             email: visitorInfo?.email || "",
@@ -144,9 +148,9 @@ export async function POST(req: Request) {
             estimatedValue: aiResponseData.department === "SALES" ? 5000000 : 0,
             stage: "DISCOVERY",
             probability: 50,
-            source: "Website AI Live Chat",
+            source: `Website AI Live Chat (${visitorInfo?.city || "Online"})`,
             assignedTo: "RAMADHANI ST",
-            notes: `[Departemen: ${aiResponseData.department_label}] Diagnosa AI: ${aiResponseData.handover_reason || "Percakapan awal via website"}. Ringkasan: ${summaryText}`,
+            notes: `[Lokasi: ${visitorInfo?.city || "Area Banten"}, Halaman: ${visitorInfo?.currentPath || "/"}] [Departemen: ${aiResponseData.department_label}] Diagnosa AI: ${aiResponseData.handover_reason || "Percakapan awal via website"}. Ringkasan: ${summaryText}`,
             updatedAt: new Date().toISOString()
           };
 

@@ -46,6 +46,7 @@ import {
   Shield,
   Layers,
 } from "lucide-react";
+import LiveVisitorTrackerCard from "@/components/LiveVisitorTrackerCard";
 
 interface ProductItem {
   id: string;
@@ -728,6 +729,9 @@ export default function AdminDashboard() {
           </div>
         ))}
       </div>
+
+      {/* WEB AUTO-TRACKING PENGUNJUNG REAL-TIME & GEOLOKASI (Tugas 214) */}
+      <LiveVisitorTrackerCard />
 
       {/* PUSAT PINTAS OPERASIONAL & MENU CEPAT SISTEM */}
       <div className="p-8 sm:p-10 rounded-[48px] bg-white border border-slate-200/90 shadow-sm space-y-8">
