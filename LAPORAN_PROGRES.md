@@ -6296,6 +6296,41 @@
      - Ditarik dan di-build di live server VPS via PM2 reload `dstech-main`.
      - Verifikasi live API dan antarmuka produk terbukti aktif normal.
 
+### 222. Tugas: Implementasi Otomatisasi HPP Rata-Rata Bergerak (Weighted/Moving Average COGS) & Sinkronisasi Stok dari PO Supplier [SELESAI]
+- **Permintaan Pengguna**:
+  - *"kemudian, jika kita order 1 misalnya harga 1500, order ke-2 naik 1800, stok 1 masih ada, itu hitungan bagai mana?"*
+  - *"baik kalau begitu buatkan metode avvargenya"*
+- **Status**: **SELESAI**
+- **Formula & Logika Akuntansi Standar yang Diterapkan**:
+  1. **Moving / Weighted Average Method**:
+     $$\text{HPP Baru} = \text{Math.round}\left(\frac{(\text{Stok Lama} \times \text{HPP Lama}) + (\text{Qty Beli PO} \times \text{Harga Beli PO})}{\text{Stok Lama} + \text{Qty Beli PO}}\right)$$
+     - Sesuai contoh pengguna: Stok lama 1 unit @ Rp 1.500, beli baru 1 unit @ Rp 1.800:
+       $$\text{HPP Baru} = \frac{(1 \times 1.500) + (1 \times 1.800)}{1 + 1} = \frac{3.300}{2} = \mathbf{Rp\ 1.650}$$
+     - Menghilangkan distorsi keuntungan dan diakui penuh oleh standar PSAK dan perpajakan Indonesia.
+- **Rincian Perbaikan yang Telah Dilakukan**:
+  1. **Folder Cadangan Khusus**:
+     - Dibuat folder cadangan `_backup_moving_average_cogs` untuk mengamankan `src/app/api/finance/route.ts`, `src/app/admin/finance/page.tsx`, dan `src/app/api/inventory/route.ts`.
+  2. **Implementasi Fungsi Moving Average di Backend (`src/app/api/finance/route.ts`)**:
+     - Dibuat fungsi `syncProductStockAndMovingAverageCost(items, warehouseId)`:
+       * Mencocokkan item PO dengan master produk berdasarkan `productId` atau `productName`.
+       * Menghitung nilai modal gabungan persediaan lama ditambah belanja baru dibagi total jumlah unit.
+       * Meng-update field `costPrice` produk ke nilai HPP rata-rata baru secara otomatis.
+       * Menambah stok unit produk ke gudang terpilih (`warehouseId`) dan total stok fisik.
+     - Diterapkan pada saat:
+       * **POST Purchase Order**: Jika status PO berstatus *"Diterima & Lunas"*, *"Diterima"*, atau *"Selesai"*.
+       * **PUT Purchase Order**: Jika status diperbarui menjadi diterima atau flag `syncInventoryCost=true`.
+       * **Action Khusus**: Ditambahkan endpoint `actionType: "sync_po_stock"` untuk sinkronisasi instan via API.
+  3. **Penyempurnaan Valuasi Aset Persediaan (`src/app/api/inventory/route.ts`)**:
+     - Formula valuasi total aset stok pada modul gudang diperbarui menggunakan modal perolehan riil `costPrice` (HPP Rata-rata), bukan harga jual retail (`valuation = stock * costPrice`).
+  4. **Pengujian & Validasi Build Lokal**:
+     - `npx tsc --noEmit` lolos 100% tanpa error kompilasi.
+     - `npm run build` lolos 100% (62/62 static & dynamic routes compiled sukses).
+     - Folder cadangan `_backup_moving_average_cogs` dibersihkan sesuai SOP.
+  5. **Deployment & Verifikasi Server Live VPS**:
+     - Kode di-commit dan di-push ke GitHub remote repository master branch.
+     - Ditarik dan di-build di live server VPS via PM2 reload `dstech-main`.
+     - Verifikasi live API dan kalkulasi terbukti aktif normal.
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.

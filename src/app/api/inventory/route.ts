@@ -52,8 +52,9 @@ export async function GET() {
         dstech_wh_3: Math.max(0, stock - Math.round(stock * 0.7) - Math.round(stock * 0.2))
       };
       const price = Number(p.price) || 0;
+      const costPrice = Number(p.costPrice) > 0 ? Number(p.costPrice) : (price > 0 ? Math.round(price * 0.7) : 0);
       const isService = p.category?.toLowerCase().includes("jasa") || stock >= 900;
-      const valuation = isService ? 0 : stock * price;
+      const valuation = isService ? 0 : stock * costPrice;
 
       const minStock = Number(p.minStock) || 3;
       let status: "Aman" | "Menipis" | "Habis" = "Aman";

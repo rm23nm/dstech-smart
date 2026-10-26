@@ -53,6 +53,69 @@ function deductProductCatalogStock(items: any[], warehouseId: string = "dstech_w
   }
 }
 
+/**
+ * Otomatisasi HPP Rata-Rata Bergerak (Weighted / Moving Average COGS) & Tambah Stok Masuk
+ * Formula Standar:
+ * HPP Baru = ((Stok Lama * HPP Lama) + (Qty Beli PO * Harga Beli PO)) / (Stok Lama + Qty Beli PO)
+ */
+function syncProductStockAndMovingAverageCost(items: any[], warehouseId: string = "dstech_wh_1") {
+  try {
+    if (!fs.existsSync(PRODUCTS_FILE)) return;
+    const raw = fs.readFileSync(PRODUCTS_FILE, "utf-8");
+    const products: any[] = JSON.parse(raw);
+    let changed = false;
+
+    for (const item of (items || [])) {
+      if (!item) continue;
+      const qtyPurchased = Number(item.qty) || 0;
+      const purchasePrice = Number(item.price) || 0;
+      if (qtyPurchased <= 0 || purchasePrice <= 0) continue;
+
+      const targetProd = products.find((p) => {
+        if (item.productId && String(p.id) === String(item.productId)) return true;
+        if (item.productName && p.name && p.name.trim().toLowerCase() === item.productName.trim().toLowerCase()) return true;
+        return false;
+      });
+
+      if (targetProd) {
+        // Abaikan jasa virtual atau item unlimited (stock >= 900)
+        if (targetProd.stock < 900) {
+          const oldStock = Math.max(0, Number(targetProd.stock) || 0);
+          const oldCost = Number(targetProd.costPrice) > 0 ? Number(targetProd.costPrice) : purchasePrice;
+
+          // Hitung Moving Average HPP
+          const totalInventoryValue = (oldStock * oldCost) + (qtyPurchased * purchasePrice);
+          const totalNewStock = oldStock + qtyPurchased;
+          const newMovingAverageCost = totalNewStock > 0 ? Math.round(totalInventoryValue / totalNewStock) : purchasePrice;
+
+          targetProd.costPrice = newMovingAverageCost;
+          targetProd.stock = totalNewStock;
+
+          if (!targetProd.warehouseStock) {
+            targetProd.warehouseStock = {
+              dstech_wh_1: totalNewStock,
+              dstech_wh_2: 0,
+              dstech_wh_3: 0,
+            };
+          } else {
+            const currentWh = Number(targetProd.warehouseStock[warehouseId]) || 0;
+            targetProd.warehouseStock[warehouseId] = currentWh + qtyPurchased;
+          }
+
+          targetProd.updatedAt = new Date().toISOString();
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf-8");
+    }
+  } catch (err) {
+    console.error("Error in syncProductStockAndMovingAverageCost:", err);
+  }
+}
+
 function readFinanceData() {
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -1028,6 +1091,12 @@ export async function POST(request: Request) {
       if (!data.purchases) data.purchases = [];
       data.purchases.unshift(newPurchase);
 
+      // Otomatisasi Moving Average HPP & Stok Masuk jika status PO diterima
+      const poStatus = String(newPurchase.status || "").toLowerCase();
+      if (poStatus.includes("diterima") || poStatus.includes("lunas") || poStatus.includes("selesai")) {
+        syncProductStockAndMovingAverageCost(newPurchase.items, newPurchase.warehouseId);
+      }
+
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
@@ -1686,11 +1755,35 @@ export async function PUT(request: Request) {
         data.purchases[index].grandTotal = grandTotal;
       }
 
+      // Otomatisasi Moving Average HPP & Stok Masuk jika status PO diperbarui menjadi diterima
+      const updatedStatus = String(data.purchases[index].status || "").toLowerCase();
+      if (
+        updates.syncInventoryCost === true ||
+        updatedStatus.includes("diterima") ||
+        updatedStatus.includes("lunas") ||
+        updatedStatus.includes("selesai")
+      ) {
+        syncProductStockAndMovingAverageCost(data.purchases[index].items, data.purchases[index].warehouseId);
+      }
+
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
         message: `Purchase Order ${data.purchases[index].poNumber} berhasil diperbarui`,
         data: data.purchases[index],
+      });
+    }
+
+    if (actionType === "sync_po_stock") {
+      const targetPo = (data.purchases || []).find((p: any) => p.id === id || p.poNumber === id);
+      if (!targetPo) {
+        return NextResponse.json({ success: false, error: "Purchase Order tidak ditemukan" }, { status: 404 });
+      }
+      syncProductStockAndMovingAverageCost(targetPo.items, targetPo.warehouseId);
+      return NextResponse.json({
+        success: true,
+        message: `✓ Stok masuk & HPP Rata-Rata (Moving Average) untuk PO ${targetPo.poNumber} berhasil disinkronkan ke katalog produk!`,
+        data: targetPo,
       });
     }
 
