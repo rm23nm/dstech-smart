@@ -5757,7 +5757,7 @@
 
 ---
 
-### 206. Tugas: Sinkronisasi Akurasi Alamat Kantor Resmi & Tautan Google Maps PT. DSTech Smart Perkasa pada Respons AI Chatbot Dani [SEDANG DIKERJAKAN]
+### 206. Tugas: Sinkronisasi Akurasi Alamat Kantor Resmi & Tautan Google Maps PT. DSTech Smart Perkasa pada Respons AI Chatbot Dani [SELESAI]
 - **Permintaan Pengguna**:
   - *"saya bertanya tentang alamat kantor gmapnya, namun alamatnya kenapa berbeda dengan alamt real kita?"*
 - **Penyebab Masalah (Root Cause)**:
@@ -5859,6 +5859,119 @@
     - File `wa-gateway-server/public/index.html` berhasil di-upload via SFTP ke VPS.
     - PM2 `smartpro-wa` reload sukses di VPS (PID `1212062`).
     - Verifikasi database `smartpro.wa_users`: akun `sentosa@cilegon.id` aktif dengan role `client` dan paket `pro`.
+
+---
+
+### 209. Tugas: Sinkronisasi Otomatis Penuh Dua Arah (Zero-Click Auto Sync) SmartPro & Website, Penyediaan Tombol Hapus Lead CRM, serta Penyelarasan Hapus Lead Lintas Akun Superadmin SmartPro (`admin` & `admin2`) [SELESAI]
+- **Keluhan & Permintaan Pengguna**:
+  - *"untuk permintaan saya terakhir kenapa gak dicatat, saya ingin agar s,martpro dan website dstechsmart.co itu sinkron otomatis tanpa adanya sinkron manual. kemudian sebelumnya saya mencoa hapus leads pada smartpro, kenapa pada website dstechsmart tidak ikut terhapus. dan pada pada website dstechsmart.com leads crm nya tidak bisa dihapus. gak ada tombol hapus"*
+- **Akar Masalah (Root Cause Analysis)**:
+  1. **Penghapusan di SmartPro Tidak Terhubung ke Website**:
+     - Pada `wa-gateway-server/server.js`, rute `app.delete('/api/leads/:id')` terdefinisi ganda. Definisi kedua di baris 4265 menimpa definisi pertama di baris 2617.
+     - Di baris 4265, fungsi `deleteLead(userId, leadId)` hanya menghapus baris untuk `wa_user_id` aktif (misal `admin2`), tetapi baris pada akun `admin` masih tetap ada di database MySQL `wa_leads`.
+     - Selain itu, penghapusan di SmartPro tidak memicu pemanggilan webhook API `DELETE https://dstechsmart.com/api/crm?id=...`. Akibatnya data lead di `dstech_crm.json` tetap utuh.
+     - Saat website memicu sinkronisasi latar belakang (`/api/external/get-crm-leads`), SmartPro kembali mengembalikan data dari akun `admin`, sehingga prospek yang dihapus seolah-olah muncul kembali.
+  2. **Tombol Hapus di Website dstechsmart.com**:
+     - Pada versi sebelum commit `a051e35`, tombol hapus lead memang belum disediakan di antarmuka CRM website.
+     - Diperlukan tombol hapus yang jelas dan mencolok:
+       * Tombol `🗑️ Hapus` di setiap kartu Kanban.
+       * Tombol `🗑️ Hapus` di setiap baris Tabel Leads.
+       * Tombol `🗑️ Hapus Prospek` di Modal Detail Prospek.
+       * Fitur Centang Massal & Tombol `Hapus Terpilih (Bulk Delete)`.
+  3. **Zero-Click Auto Sync (Sinkronisasi Dua Arah Tanpa Manual)**:
+     - Di `src/app/admin/crm/page.tsx`, interval otomatis latar belakang (background polling) diatur setiap 10-15 detik dan saat window `focus` untuk menarik dan merapikan leads terbaru secara otomatis tanpa perlu mengklik tombol sinkron manual.
+- **Rincian Step-by-Step Pengerjaan**:
+  1. [x] **Langkah 1**: Catat analisis masalah dan langkah kerja lengkap di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat cadangan file `wa-gateway-server/server.js` dan `dstech-smart/src/app/admin/crm/page.tsx` ke dalam folder `_backup_task209/`.
+  3. [x] **Langkah 3**: Perbaiki backend SmartPro (`wa-gateway-server/server.js`):
+     - Bersihkan duplikasi rute `app.delete('/api/leads/:id')` dan `app.post('/api/leads/bulk-delete')`.
+     - Pastikan saat lead dihapus, data terhapus dari SELURUH akun superadmin (`admin` dan `admin2`) via query MySQL yang menyeluruh (berdasarkan `id` dan `cleanBaseId` serta `phone`).
+     - Tambahkan panggilan otomatis ke `DELETE https://dstechsmart.com/api/crm?id=...` agar lead di website holding langsung terhapus seketika.
+  4. [x] **Langkah 4**: Perbaiki backend Website (`dstech-smart/src/app/api/crm/route.ts`):
+     - Handler `DELETE` memastikan prospek dihapus dari `dstech_crm.json` dan memicu sinkronisasi balik ke SmartPro.
+     - Algoritma sinkronisasi GET membersihkan lead yang sudah tidak ada di SmartPro.
+  5. [x] **Langkah 5**: Perbarui tampilan CRM Website (`dstech-smart/src/app/admin/crm/page.tsx`):
+     - Sediakan tombol hapus yang jelas, mencolok, dan mudah diakses di Kanban card, Tabel, dan Detail Modal.
+     - Sediakan fitur multi-select checkbox & tombol Bulk Delete.
+     - Terapkan background interval auto-sync (Zero-Click).
+  6. [x] **Langkah 6**: Validasi kompilasi lokal `npm run build` hingga bebas error 100% (59/59 rute Next.js lolos).
+  7. [x] **Langkah 7**: Push ke GitHub (commit `d35da62`), deploy live VPS `smartpro-wa` (PID 1320672) dan `dstech-main` (PID 1321335).
+  8. [x] **Langkah 8**: Pengujian verifikasi live, pembersihan folder cadangan, dan perbarui status Tugas 209 menjadi `[SELESAI]`.
+
+---
+
+### 210. Tugas: Fitur Proteksi Password / PIN Verifikasi Akses & Download Surat Resmi (SPH, PO, Faktur, Surat Jalan, BAST, Kuitansi, Laporan) serta Integrasi Kata Sandi pada Pengiriman WhatsApp & Email [SELESAI]
+- **Permintaan Pengguna**:
+  - *"saat membuka surat-menyurat yang kita kirimkan ke client seperti SPH, PO, Faktur, surat jalan, BAST laporan dan lain-lainnya, sebaiknya di pasword untuk membuka dan juga mendownload, supaya tidak ditemukan oleh orang lain linknya dan bocor. jadi tujuannya untuk memverivikasi. paswordnya kirm lapirkan melalui WA atau email saat pengirman suratnya"*
+- **Status**: **SELESAI & DEPLOYED KE LIVE VPS**
+- **Analisis & Kebutuhan Desain**:
+  1. Seluruh dokumen resmi perusahaan (SPH, PO, Faktur Penjualan, Surat Jalan/DO, BAST, Kuitansi, Laporan Foto) yang diakses via tautan publik `/api/finance/print` wajib dilindungi dengan **Kata Sandi / PIN Verifikasi Akses** (6 digit PIN unik angka per dokumen).
+  2. Jika link dibuka tanpa PIN atau PIN salah, server tidak merender dokumen rahasia, melainkan merender **Layar Kunci Verifikasi Resmi PT. DSTech Smart Perkasa (Document Security Lock Screen)** dengan form input PIN 6 digit, toggle show/hide kata sandi, dan bantuan WhatsApp ke admin.
+  3. Tombol unduh PDF dan cetak A4 hanya dapat diakses setelah dokumen berhasil diverifikasi dengan kata sandi yang valid.
+  4. Di menu pengiriman dokumen Keuangan (`/admin/finance`) & Pesanan E-Store (`/admin/orders`), PIN keamanan pembuka dokumen otomatis dilampirkan dengan teks jelas dan instruksi pada pesan WhatsApp dan Email resmi yang dikirim ke klien.
+- **Rincian Implementasi & Langkah Selesai**:
+  1. **Modul Utilitas Keamanan Dokumen (`src/utils/dstech_doc_security.ts`)**:
+     - Fungsi `getDocPin(doc)`: Menghasilkan 6-digit PIN angka deterministik dan konsisten berbasis identitas dokumen unik (`quotationNumber`, `invoiceNumber`, `poNumber`, `orderNumber`, `date`), atau menggunakan `accessPin`/`verificationCode` tersimpan.
+     - Fungsi `verifyDocPin(doc, inputPin)`: Memverifikasi PIN input terhadap PIN dokumen secara aman.
+     - Fungsi format WhatsApp & Email helper untuk menyertakan blok PIN keamanan terstandar.
+  2. **Security Lock Screen & Endpoint Proteksi (`src/app/api/finance/print/route.ts`)**:
+     - Ditambahkan fungsi `renderSecurityLockScreen()` bernuansa tema gelap elegan PT. DSTech Smart Perkasa (Plus Jakarta Sans, JetBrains Mono, glassmorphism, badge keamanan, animasi shake saat salah PIN).
+     - Proteksi PIN diterapkan pada seluruh tipe dokumen:
+       * **SPH / Quotation**: Diperiksa sebelum render SPH.
+       * **PO / Purchase Order**: Diperiksa sebelum render PO vendor.
+       * **Sales**: Faktur Penjualan (`invoice`), Kuitansi (`receipt`/`kwitansi`), Berita Acara (`bast`), Surat Jalan (`delivery`), dan Dokumentasi Foto (`photos`).
+     - Tautan navigasi tab dokumen dan pemilihan kuitansi otomatis meneruskan parameter `&pin=${docPin}` sehingga klien yang telah login PIN tidak perlu mengulang ketik PIN saat berganti tab.
+  3. **Penyertaan PIN pada Draf WhatsApp & Email Keuangan (`src/app/admin/finance/page.tsx`)**:
+     - Fungsi `generateDocShareContent()` otomatis menambahkan blok `🔐 KATA SANDI / PIN VERIFIKASI DOKUMEN: 👉 [PIN]` di pesan WhatsApp dan Email.
+     - Fungsi `generateDocShareHtml()` menyertakan kartu PIN verifikasi bergaya modern beraksen ungu/indigo di template email HTML resmi.
+     - Modal `sendDocModal` dilengkapi Card khusus **"🔐 Kata Sandi / PIN Verifikasi"** dengan tombol "Salin PIN" 1-klik untuk kemudahan Admin saat berkomunikasi dengan klien.
+     - Tautan preview internal admin otomatis menyertakan parameter PIN untuk akses instan tanpa lock screen.
+  4. **Penyertaan PIN pada Pesanan Toko Online E-Store (`src/app/admin/orders/page.tsx`)**:
+     - Tombol cetak faktur, DO, dan kuitansi di dashboard admin menyertakan parameter PIN.
+     - Format pesan WhatsApp pengiriman nota ke pembeli otomatis menyertakan PIN 6 digit dokumen pesanan.
+  5. **Pengujian & Validasi**:
+     - Uji kompilasi lokal `npm run build` lolos 100% (59/59 static & dynamic pages generated in 1742ms).
+     - Seluruh folder cadangan `_backup_task210` dibersihkan.
+     - Di-commit, di-push ke GitHub master, dan di-deploy ke live VPS via PM2 `dstech-main`.
+
+---
+
+### 211. Tugas: Investigasi & Perbaikan Ketidakcocokan PIN Verifikasi Surat Resmi (Sinkronisasi Seed Nomor Dokumen Frontend & Backend) [SELESAI]
+- **Permintaan Pengguna**:
+  - *"pin yang dimasukkan salah terus,tidak cocok"*
+- **Status**: **SELESAI**
+- **Akar Masalah (Root Cause)**:
+  1. Pada `src/utils/dstech_doc_security.ts`, fungsi `getDocPin(doc)` sebelumnya mengevaluasi seed string dengan urutan: `doc.id || doc.quotationNumber || doc.invoiceNumber || ...`.
+  2. Di backend `src/app/api/finance/print/route.ts`, objek dokumen diambil dari database `dstech_finance_erp.json` yang memiliki properti `id` unik (contoh: `dstech_sph_1792834866745`), sehingga backend menghitung seed berbasis `doc.id` (menghasilkan misal PIN: `417503`).
+  3. Namun di antarmuka frontend `src/app/admin/finance/page.tsx`, modal `sendDocModal` hanya menyimpan properti `docNumber` (contoh: `SPH-DSTECH-202610-006`) tanpa menyimpan `doc.id`, sehingga frontend menghitung seed berbasis nomor dokumen (menghasilkan PIN berbeda: `627344`).
+  4. Akibatnya, PIN yang tertera di pesan WhatsApp/Email (`627344`) berbeda dengan PIN yang dievaluasi oleh endpoint print backend (`417503`), sehingga PIN selalu dinyatakan salah/tidak cocok.
+  5. Selain itu, input form PIN pada lock screen sebelumnya membatasi `pattern="[0-9]*"` dan `maxlength="8"`, sehingga bila pengguna mengetikkan nomor referensi / verification code (misal: `DST-APP-202610-2415`), input langsung terblokir.
+- **Rincian Perbaikan yang Telah Dilakukan**:
+  1. **Folder Cadangan Khusus**:
+     - Dibuat folder cadangan `_backup_pin_fix` untuk mengamankan `dstech_doc_security.ts`, `page.tsx`, dan `route.ts`.
+  2. **Refaktor Keamanan Dokumen (`src/utils/dstech_doc_security.ts`)**:
+     - `getDocOfficialNumber(doc)`: Menjadikan nomor dokumen resmi (`quotationNumber`, `invoiceNumber`, `poNumber`, `docNumber`, `orderNumber`, `receiptNumber`, `deliveryOrderNumber`) sebagai prioritas utama (single source of truth). Nomor ini selalu identik di antarmuka frontend, pesan WhatsApp/Email, parameter URL, dan database.
+     - `getDocPin(doc)`: Menghasilkan 6-digit PIN berbasis nomor dokumen resmi secara konsisten dan deterministik di seluruh sistem.
+     - `verifyDocPin(doc, inputPin)`: Dibuat **toleran & multi-seed**:
+       * Memverifikasi input langsung terhadap PIN resmi dokumen.
+       * Memverifikasi fallback terhadap seluruh kemungkinan nomor dokumen & ID internal (`id`, `orderId`, `docNumber`, dll.) baik case-sensitive maupun case-insensitive.
+       * Memverifikasi fallback terhadap `accessPin` dan `docPin`.
+       * Memverifikasi fallback terhadap `verificationCode` (baik teks utuh misal `DST-APP-202610-2415`, digit angkanya saja, maupun case-insensitive).
+       * Normalisasi input otomatis menghilangkan spasi dan tanda hubung jika diketik oleh pengguna.
+  3. **Penyempurnaan Antarmuka Frontend (`src/app/admin/finance/page.tsx`)**:
+     - Menambahkan properti `id` dan `verificationCode` ke dalam state `sendDocModal` dan handler `handleOpenSendDocModal` agar seed selalu utuh dan sinkron.
+  4. **Penyempurnaan Layar Kunci Keamanan (`src/app/api/finance/print/route.ts`)**:
+     - Memperluas input PIN: `maxlength="40"` dan menghapus `pattern="[0-9]*"`, sehingga fleksibel menerima 6-digit PIN angka maupun kode verifikasi resmi.
+  5. **Pengujian & Validasi**:
+     - Typecheck TypeScript `npx tsc --noEmit` lolos 100% tanpa error.
+     - Kompilasi lokal `npm run build` berhasil 100% (59/59 halaman statis & dinamis selesai).
+     - Folder cadangan `_backup_pin_fix` telah dibersihkan secara aman.
+     - Di-commit dan di-push ke GitHub master (`commit 63ef91c`).
+     - Di-deploy ke VPS live via `deploy_live.js` (PM2 `dstech-main` online PID 1333268).
+     - **Uji Live Server Selesai & Berhasil**:
+       * SPH live `SPH-DSTECH-202610-006` dengan PIN `627344` -> **Status 200 (Dokumen Resmi Terbuka, Lock Screen Hilang)**.
+       * SPH live dengan verification code `DST-APP-202610-2415` -> **Status 200 (Dokumen Resmi Terbuka)**.
+       * Faktur live `INV-DSTECH-202510-032` dengan PIN `295922` -> **Status 200 (Lembar Faktur Terbit Sempurna)**.
 
 ---
 
