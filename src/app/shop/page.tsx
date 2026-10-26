@@ -1924,36 +1924,29 @@ export default function ShopPage() {
               )}
             </div>
 
-            {/* Quick Access Pills (Kategori Cepat dengan scroll halus) */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-grow">
-              {availableCategories.map((cat) => {
-                const isActive = activeCategory === cat.name;
-                return (
+            {/* Active Category Tag & Reset */}
+            {activeCategory !== "Semua" ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 text-dstech-blue text-xs font-bold shadow-sm">
+                  <span>Kategori: {activeCategory}</span>
                   <button
-                    key={cat.name}
                     type="button"
                     onClick={() => {
-                      setActiveCategory(cat.name);
+                      setActiveCategory("Semua");
                       setActiveSubCategory("Semua");
                     }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                      isActive
-                        ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
-                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                    }`}
+                    className="w-4 h-4 rounded-full hover:bg-blue-200 flex items-center justify-center text-blue-600 transition-colors ml-0.5 cursor-pointer"
+                    title="Hapus filter kategori"
                   >
-                    <span>{cat.name}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
-                        isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {cat.count}
-                    </span>
+                    <X className="w-3 h-3" />
                   </button>
-                );
-              })}
-            </div>
+                </div>
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline-block">
+                Klik tombol di samping untuk memfilter produk berdasarkan kategori spesifik
+              </span>
+            )}
           </div>
 
           {/* Baris 3: Subkategori Pills (Muncul jika ada subkategori untuk kategori aktif) */}
