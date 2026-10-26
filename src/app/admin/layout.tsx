@@ -62,6 +62,7 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Buku Arus Kas (Cash Flow)", category: "Keuangan", url: "/admin/finance", desc: "Mutasi kas masuk dan keluar Bank Mandiri, BCA, dan Kas Tunai / Petty Cash" },
   { title: "Multi-Gudang & Cabang", category: "Keuangan", url: "/admin/finance", desc: "Valuasi stok antar gudang utama Cilegon, Serang, dan transit proyek" },
   { title: "Manajemen Stok & Gudang", category: "Operasional", url: "/admin/inventory", desc: "Kelola kartu stok real-time, stok per gudang Cilegon/Serang, stock opname, dan approval material teknisi" },
+  { title: "Pengelolaan Aset Perusahaan", category: "Operasional", url: "/admin/assets", desc: "Inventaris alat kerja teknisi, armada operasional, depresiasi dan mutasi PIC" },
   { title: "Daftar Klien & Pelanggan (Customers)", category: "Keuangan", url: "/admin/finance", desc: "Direktori klien B2B industri, komersial, instansi, PIC, kontak WhatsApp, dan piutang" },
   { title: "Daftar Supplier & Vendor (Vendors)", category: "Keuangan", url: "/admin/finance", desc: "Direktori vendor CCTV, kabel, biometrik, PIC sales, rekening bank transfer PO, dan hutang" },
   { title: "Manajemen Pesanan E-Store (Orders)", category: "Operasional", url: "/admin/orders", desc: "Kelola pesanan marketplace pembeli, konfirmasi bukti transfer lunas, dan input resi armada DSTech" },
@@ -253,6 +254,13 @@ export default function AdminLayout({
       href: "/admin/inventory",
       icon: Warehouse,
       active: pathname.startsWith("/admin/inventory"),
+    },
+    {
+      id: "assets",
+      label: "Aset & Alat Kerja",
+      href: "/admin/assets",
+      icon: Wrench,
+      active: pathname.startsWith("/admin/assets"),
     },
     {
       id: "products",
