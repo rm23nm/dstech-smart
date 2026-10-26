@@ -6000,6 +6000,41 @@
 
 ---
 
+### 213. Tugas: Pembuatan Panel Pengaturan E-Store Dinamis (Background Hero & Pemilihan Produk Hero Showcase) [SEDANG DIKERJAKAN]
+- **Permintaan Pengguna**:
+  - *"terkait dengan pengaturan estor ada dimana? misalnya saya mau nambah baground hero dan nambah produk hero agar banyak atau saya pilihkan produk pilihan"*
+- **Status**: **SEDANG DIKERJAKAN**
+- **Akar Masalah (Analisis)**:
+  1. Di backend `src/app/api/settings/route.ts`, struktur `DEFAULT_ESTORE_SETTINGS` telah tersedia, namun di antarmuka Admin Settings (`src/app/admin/settings/page.tsx`) belum disediakan tab antarmuka UI untuk mengatur E-Store.
+  2. Di etalase marketplace (`src/app/shop/page.tsx`), carousel hero showcase masih menggunakan array statis `FEATURED_HERO_PRODUCTS` dan belum membaca konfigurasi dinamis `siteSettings?.estoreSettings`.
+  3. Admin belum bisa mengganti background hero (upload gambar / ganti tema) dan belum bisa memilih produk dari katalog untuk dijadikan slide hero showcase.
+- **Rencana Step-by-Step Pengerjaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md` dan buat folder cadangan `_backup_estore_settings`.
+  2. [ ] **Langkah 2**: Tambahkan tab baru **"🛒 Pengaturan E-Store (Shop)"** di `src/app/admin/settings/page.tsx` lengkap dengan kontrol:
+     - Pemilihan mode latar belakang hero (Gradient Modern, Dark Slate, Deep Navy, atau Upload Gambar Kustom).
+     - Input file upload gambar background hero + live preview.
+     - Pengaturan teks judul hero, subjudul, dan kecepatan auto-slide.
+     - Pemilihan & pengelolaan produk hero showcase (bisa ambil langsung dari produk katalog yang ada, tambah slide kustom, atur badge promo, dan hapus/nonaktifkan).
+  3. [ ] **Langkah 3**: Hubungkan pengaturan dinamis `estoreSettings` ke `src/app/shop/page.tsx` agar background hero dan daftar produk hero otomatis ter-render sesuai pilihan admin.
+  4. [ ] **Langkah 4**: Uji validasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`).
+  5. [ ] **Langkah 5**: Hapus folder cadangan `_backup_estore_settings`.
+  6. [ ] **Langkah 6**: Deploy ke VPS live via git push & `deploy_live.js`.
+  7. [ ] **Langkah 7**: Uji live di browser dan perbarui status Tugas 213 menjadi `[SELESAI]`.
+
+---
+
+### 214. Tugas: Pembuatan Fitur Web Auto-Tracking Pengunjung Real-Time (Geolokasi & Halaman) serta Integrasi Cerdas Chat AI [ANTRIAN BERIKUTNYA]
+- **Permintaan Pengguna**:
+  - *"kemudian saya mau buatkan saya sebuah fitur autotracking web, misalnya ada yang membuka dstechsmart.com halaman apa saja, kemudian lokasinya, apakah kamu bisa buatkan? nanti kamu hubungkan dengan fitur chat AI juga,,"*
+- **Status**: **ANTRIAN BERIKUTNYA** (Akan dikerjakan segera setelah Tugas 213 selesai)
+- **Rencana Konsep Fitur**:
+  1. Modul Client Tracker di layout web: Mendeteksi path halaman yang dibuka, referrer, waktu kunjungan, dan lokasi geografis (Kota, Provinsi, Negara) pengunjung.
+  2. Endpoint API Tracking: Menerima dan mencatat riwayat jejak pengunjung dengan prefix `dstech_visitor_sessions`.
+  3. Integrasi Chat AI Floating Widget: Menyuntikkan konteks pengunjung (halaman yang sedang dibuka, asal kota/wilayah, dan riwayat klik) ke prompt sistem Chat AI, sehingga AI dapat menyapa dan menjawab dengan personal dan kontekstual.
+  4. Panel Monitoring Admin: Menampilkan log pengunjung aktif secara real-time di Dashboard Admin.
+
+---
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.

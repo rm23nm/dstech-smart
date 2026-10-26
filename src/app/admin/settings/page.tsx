@@ -29,7 +29,18 @@ import {
   Sparkles,
   RefreshCw,
   Check,
+  ShoppingCart,
+  ChevronUp,
+  ChevronDown,
+  Flame,
+  Star,
+  Layers,
+  Layout,
 } from "lucide-react";
+
+function formatRupiah(amount: number): string {
+  return "Rp " + (amount || 0).toLocaleString("id-ID");
+}
 
 export interface BankAccountItem {
   id: string;
@@ -73,6 +84,40 @@ export interface LetterheadSettingsData {
   signerTitle_NON_PT?: string;
 }
 
+export interface EstoreHeroItem {
+  id: string;
+  badge: string;
+  badgeColor?: string;
+  title: string;
+  subtitle?: string;
+  desc?: string;
+  price: number;
+  originalPrice?: number;
+  discount?: string;
+  rating?: number;
+  reviews?: number;
+  image: string;
+  category?: string;
+  features: string[];
+  installationFee?: number;
+  isActive: boolean;
+}
+
+export interface EstoreSettingsData {
+  heroTitle: string;
+  heroTitleHighlight: string;
+  heroSubtitle: string;
+  heroBackgroundMode: "gradient" | "dark" | "navy" | "image";
+  heroBackgroundImage: string;
+  heroOverlayOpacity?: number; // 0 - 100
+  heroGlowPrimary?: string;
+  heroGlowSecondary?: string;
+  showQuickTracker: boolean;
+  showNationalBanner: boolean;
+  autoPlayInterval: number; // ms
+  featuredHeroes: EstoreHeroItem[];
+}
+
 export interface SiteSettingsData {
   companyName: string;
   tagline: string;
@@ -98,12 +143,13 @@ export interface SiteSettingsData {
   logoHeight?: number;
   bankAccounts?: BankAccountItem[];
   letterheadSettings?: LetterheadSettingsData;
+  estoreSettings?: EstoreSettingsData;
   updatedAt?: string;
 }
 
 export default function AdminSettingsPage() {
   // Tab Aktif Utama
-  const [activeTab, setActiveTab] = useState<"profile" | "branding" | "banks" | "letterhead" | "danger">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "branding" | "banks" | "letterhead" | "estore" | "danger">("profile");
 
   const [settings, setSettings] = useState<SiteSettingsData>({
     companyName: "PT. DSTech Smart Perkasa",
@@ -190,6 +236,83 @@ export default function AdminSettingsPage() {
     signerTitle_NON_PT: "Owner / Pengelola Usaha",
   });
 
+  // State Pengaturan E-Store & Hero Showcase (Tugas 213)
+  const [estoreConfig, setEstoreConfig] = useState<EstoreSettingsData>({
+    heroTitle: "Katalog Produk Pilihan",
+    heroTitleHighlight: "DSTech Smart",
+    heroSubtitle: "Featured Showcase • Produk Unggulan & Promo Resmi",
+    heroBackgroundMode: "gradient",
+    heroBackgroundImage: "",
+    heroOverlayOpacity: 70,
+    heroGlowPrimary: "blue",
+    heroGlowSecondary: "red",
+    showQuickTracker: true,
+    showNationalBanner: true,
+    autoPlayInterval: 6000,
+    featuredHeroes: [
+      {
+        id: "dstech_hero_1",
+        badge: "🔥 BEST SELLER • CCTV AI",
+        badgeColor: "bg-red-500 text-white shadow-red-500/30",
+        title: "CCTV Proview 2 Lensa SM-PR5260-PT Dual-Cam",
+        subtitle: "Solusi Pengawasan Ultra HD Siang & Malam dengan AI Auto-Tracking",
+        desc: "Dilengkapi dua lensa optik simultan, zoom cerdas, audio dua arah jernih, dan penglihatan malam Full-Color aktif 24 jam dengan sertifikasi resmi PT. DSTech.",
+        price: 317000,
+        originalPrice: 450000,
+        discount: "30% OFF",
+        rating: 4.9,
+        reviews: 142,
+        image: "/service-cctv.png",
+        category: "Security System",
+        features: ["Dual-Lens 5MP Full-Color", "AI Humanoid Auto-Tracking", "Komunikasi Audio 2 Arah", "Garansi Sah 1 Tahun"],
+        installationFee: 150000,
+        isActive: true,
+      },
+      {
+        id: "dstech_hero_2",
+        badge: "⭐ SMART HOME UNGGULAN",
+        badgeColor: "bg-blue-600 text-white shadow-blue-600/30",
+        title: "Smart Doorlock Biometrik X-100 Face & Fingerprint",
+        subtitle: "Akses Pintu Cerdas Biometrik Multi-Faktor Tanpa Kunci Fisik",
+        desc: "Mendukung pengenalan wajah 3D, sensor sidik jari ultra responsif 0.3 detik, kartu RFID, PIN acak anti-intip, dan pemantauan jarak jauh via aplikasi smartphone.",
+        price: 1850000,
+        originalPrice: 2450000,
+        discount: "25% OFF",
+        rating: 5.0,
+        reviews: 98,
+        image: "/service-smarthome.png",
+        category: "Smart Home",
+        features: ["3D Biometric Face Scan", "Sidik Jari 0.3s Anti-Palsu", "Kendali Jarak Jauh via WiFi", "Emergency USB-C Port"],
+        installationFee: 250000,
+        isActive: true,
+      },
+      {
+        id: "dstech_hero_3",
+        badge: "🛡️ INDUSTRIAL & CLUSTER GATE",
+        badgeColor: "bg-emerald-600 text-white shadow-emerald-600/30",
+        title: "Automatic Barrier Gate High-Speed 1.8s Industrial",
+        subtitle: "Palang Parkir Otomatis Kecepatan Tinggi untuk Kawasan Industri & Cluster",
+        desc: "Ditenagai motor servo brushless berdaya tahan 5 juta siklus buka-tutup, sensor anti-bentur canggih, dan kompatibel penuh dengan sistem tiket serta kartu akses RFID.",
+        price: 8500000,
+        originalPrice: 9800000,
+        discount: "13% OFF",
+        rating: 4.9,
+        reviews: 64,
+        image: "/portfolio-industrial.png",
+        category: "Access & Barrier",
+        features: ["Kecepatan Buka 1.8 Detik", "Motor Servo Brushless", "Loop Detector Keamanan", "Integrasi RFID & ANPR"],
+        installationFee: 1500000,
+        isActive: true,
+      },
+    ],
+  });
+
+  const [catalogProducts, setCatalogProducts] = useState<any[]>([]);
+  const [isSelectProductModalOpen, setIsSelectProductModalOpen] = useState(false);
+  const [heroSearchQuery, setHeroSearchQuery] = useState("");
+  const [isUploadingHeroBg, setIsUploadingHeroBg] = useState(false);
+  const heroBgFileInputRef = useRef<HTMLInputElement>(null);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -229,6 +352,15 @@ export default function AdminSettingsPage() {
             ...json.data.letterheadSettings,
           }));
         }
+        if (json.data.estoreSettings) {
+          setEstoreConfig((prev) => ({
+            ...prev,
+            ...json.data.estoreSettings,
+            featuredHeroes: Array.isArray(json.data.estoreSettings.featuredHeroes) && json.data.estoreSettings.featuredHeroes.length > 0
+              ? json.data.estoreSettings.featuredHeroes
+              : prev.featuredHeroes,
+          }));
+        }
       }
     } catch (err) {
       console.error("Gagal memuat pengaturan:", err);
@@ -238,8 +370,22 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // Fetch katalog produk aktif untuk pemilihan produk hero
+  const fetchCatalogProducts = async () => {
+    try {
+      const res = await fetch("/api/products?t=" + Date.now());
+      const json = await res.json();
+      if (json && json.success && Array.isArray(json.data)) {
+        setCatalogProducts(json.data);
+      }
+    } catch (e) {
+      console.error("Gagal memuat katalog produk:", e);
+    }
+  };
+
   useEffect(() => {
     fetchSettings();
+    fetchCatalogProducts();
   }, []);
 
   // Save all settings to API
@@ -253,6 +399,7 @@ export default function AdminSettingsPage() {
         ...settings,
         bankAccounts,
         letterheadSettings: letterheadConfig,
+        estoreSettings: estoreConfig,
         ...(customData || {}),
       };
 
@@ -271,6 +418,9 @@ export default function AdminSettingsPage() {
           if (data.data.letterheadSettings) {
             setLetterheadConfig((prev) => ({ ...prev, ...data.data.letterheadSettings }));
           }
+          if (data.data.estoreSettings) {
+            setEstoreConfig((prev) => ({ ...prev, ...data.data.estoreSettings }));
+          }
         }
       } else {
         showToast("error", data.message || "Gagal menyimpan pengaturan.");
@@ -280,6 +430,101 @@ export default function AdminSettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Handler Upload Background Hero E-Store (Tugas 213)
+  const handleUploadHeroBg = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingHeroBg(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("docType", "image");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success && json.url) {
+        setEstoreConfig((prev) => ({
+          ...prev,
+          heroBackgroundMode: "image",
+          heroBackgroundImage: json.url,
+        }));
+        showToast("success", `Gambar background hero berhasil diunggah! Klik 'Simpan Semua Pengaturan' untuk menerapkan.`);
+      } else {
+        showToast("error", json.message || "Gagal mengunggah gambar background.");
+      }
+    } catch {
+      showToast("error", "Terjadi kesalahan koneksi saat mengunggah gambar background.");
+    } finally {
+      setIsUploadingHeroBg(false);
+      if (e.target) e.target.value = "";
+    }
+  };
+
+  // Handler Tambah Produk dari Katalog ke Hero
+  const handleAddProductToHero = (prod: any) => {
+    const newHero: EstoreHeroItem = {
+      id: "dstech_hero_" + Date.now(),
+      badge: "⭐ PRODUK PILIHAN",
+      badgeColor: "bg-blue-600 text-white shadow-blue-600/30",
+      title: prod.name || "Produk Unggulan",
+      subtitle: prod.desc ? prod.desc.slice(0, 75) + "..." : "Perangkat teknologi resmi berkualitas dari PT. DSTech Smart Perkasa",
+      desc: prod.desc || "Perangkat teknologi resmi berkualitas dengan garansi dan instalasi teknisi profesional.",
+      price: prod.price || 0,
+      originalPrice: prod.originalPrice || Math.round((prod.price || 1000000) * 1.25),
+      discount: "Promo Spesial",
+      rating: 5.0,
+      reviews: 50,
+      image: prod.image || (prod.images && prod.images[0]) || "/service-smarthome.png",
+      category: prod.category || "Hardware",
+      features: prod.features && Array.isArray(prod.features) && prod.features.length > 0
+        ? prod.features
+        : ["Garansi Sah 1 Tahun", "Layanan Pemasangan Teknisi", "Produk Original & Prima", "Dukungan Purna Jual"],
+      installationFee: prod.installationFee || 150000,
+      isActive: true,
+    };
+
+    setEstoreConfig((prev) => ({
+      ...prev,
+      featuredHeroes: [...prev.featuredHeroes, newHero],
+    }));
+    setIsSelectProductModalOpen(false);
+    showToast("success", `Produk "${prod.name}" berhasil ditambahkan ke daftar Hero Showcase!`);
+  };
+
+  // Handler Hapus Hero
+  const handleRemoveHeroItem = (id: string) => {
+    setEstoreConfig((prev) => ({
+      ...prev,
+      featuredHeroes: prev.featuredHeroes.filter((h) => h.id !== id),
+    }));
+    showToast("success", "Produk hero berhasil dihapus.");
+  };
+
+  // Handler Toggle Aktif Hero
+  const handleToggleHeroItem = (id: string) => {
+    setEstoreConfig((prev) => ({
+      ...prev,
+      featuredHeroes: prev.featuredHeroes.map((h) =>
+        h.id === id ? { ...h, isActive: !h.isActive } : h
+      ),
+    }));
+  };
+
+  // Handler Geser Urutan Hero
+  const handleMoveHeroItem = (index: number, direction: "up" | "down") => {
+    const items = [...estoreConfig.featuredHeroes];
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= items.length) return;
+    const temp = items[index];
+    items[index] = items[targetIndex];
+    items[targetIndex] = temp;
+    setEstoreConfig((prev) => ({ ...prev, featuredHeroes: items }));
   };
 
   // Handler Upload Logo & Branding
@@ -522,6 +767,19 @@ export default function AdminSettingsPage() {
         >
           <FileText className="w-4 h-4" />
           <span>📑 Kop Surat Dokumen (PT &amp; Non-PT)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("estore")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+            activeTab === "estore"
+              ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+          }`}
+        >
+          <ShoppingCart className="w-4 h-4" />
+          <span>🛒 Pengaturan E-Store &amp; Hero Showcase ({estoreConfig.featuredHeroes.length})</span>
         </button>
 
         <button
@@ -1754,6 +2012,498 @@ export default function AdminSettingsPage() {
               <Trash2 className="w-4 h-4" />
               <span>Bersihkan Data Transaksi (Mulai dari Nol)</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* KONTEN TAB: PENGATURAN E-STORE & HERO SHOWCASE (Tugas 213) */}
+      {activeTab === "estore" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Card */}
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-emerald-600 mb-1">
+                <ShoppingCart className="w-4 h-4" />
+                <span>Pengaturan Tampilan Marketplace (/shop)</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                Hero Showcase &amp; Produk Pilihan E-Store
+              </h2>
+              <p className="text-xs text-slate-500 mt-1 max-w-2xl leading-relaxed">
+                Atur latar belakang banner utama (hero), judul promo, serta pilih produk unggulan dari katalog Anda untuk ditampilkan berputar secara otomatis di etalase belanja resmi.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleSaveAll(undefined, "Pengaturan E-Store berhasil disimpan!")}
+              disabled={saving}
+              className="px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all self-start sm:self-auto cursor-pointer disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              <span>{saving ? "Menyimpan..." : "Simpan Pengaturan E-Store"}</span>
+            </button>
+          </div>
+
+          {/* Grid Pengaturan: Baground Hero & Teks Header */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Kolom Kiri: Latar Belakang (Background) Hero */}
+            <div className="lg:col-span-6 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-5">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <ImageIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">1. Latar Belakang (Background) Hero</h3>
+                  <p className="text-[11px] text-slate-400">Pilih tema warna atau upload gambar background kustom</p>
+                </div>
+              </div>
+
+              {/* Mode Pilihan Background */}
+              <div className="space-y-3">
+                <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider">
+                  Mode Latar Belakang Hero:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: "gradient", label: "Gradient Modern", desc: "Ambient Glow", icon: "✨" },
+                    { id: "dark", label: "Dark Minimalist", desc: "Charcoal Dark", icon: "🌑" },
+                    { id: "navy", label: "Deep Navy", desc: "Cyber Blue", icon: "🌌" },
+                    { id: "image", label: "Gambar Kustom", desc: "Upload Banner", icon: "🖼️" },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setEstoreConfig((prev) => ({ ...prev, heroBackgroundMode: m.id as any }))}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                        estoreConfig.heroBackgroundMode === m.id
+                          ? "border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-xs"
+                          : "border-slate-200 bg-white hover:bg-slate-50"
+                      }`}
+                    >
+                      <span className="text-lg block mb-1">{m.icon}</span>
+                      <span className="text-xs font-black text-slate-900 block leading-tight">{m.label}</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">{m.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Kontrol Khusus Mode Gambar Kustom */}
+              {estoreConfig.heroBackgroundMode === "image" && (
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                      URL Gambar Background Hero:
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={estoreConfig.heroBackgroundImage || ""}
+                        onChange={(e) => setEstoreConfig((prev) => ({ ...prev, heroBackgroundImage: e.target.value }))}
+                        placeholder="Contoh: /uploads/hero_banner.jpg atau https://..."
+                        className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                      />
+                      <input
+                        type="file"
+                        ref={heroBgFileInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleUploadHeroBg}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => heroBgFileInputRef.current?.click()}
+                        disabled={isUploadingHeroBg}
+                        className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0 disabled:opacity-50"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{isUploadingHeroBg ? "Mengunggah..." : "Upload File"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Slider Opasitas Overlay Hitam */}
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="font-bold text-slate-700">Opasitas Lapisan Gelap (Overlay):</span>
+                      <span className="font-mono font-black text-emerald-600">{estoreConfig.heroOverlayOpacity || 70}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="20"
+                      max="90"
+                      step="5"
+                      value={estoreConfig.heroOverlayOpacity || 70}
+                      onChange={(e) => setEstoreConfig((prev) => ({ ...prev, heroOverlayOpacity: Number(e.target.value) }))}
+                      className="w-full accent-emerald-600 cursor-pointer"
+                    />
+                    <span className="text-[10px] text-slate-400 block mt-1">
+                      *Tingkat kegelapan overlay di atas gambar latar belakang agar teks produk selalu terbaca jelas &amp; elegan.
+                    </span>
+                  </div>
+
+                  {/* Preview Gambar Background */}
+                  {estoreConfig.heroBackgroundImage && (
+                    <div className="relative h-28 w-full rounded-xl overflow-hidden border border-slate-300 shadow-inner">
+                      <img
+                        src={estoreConfig.heroBackgroundImage}
+                        alt="Hero Preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <div
+                        className="absolute inset-0 bg-black flex items-center justify-center text-white text-xs font-bold"
+                        style={{ opacity: (estoreConfig.heroOverlayOpacity || 70) / 100 }}
+                      >
+                        Pratinjau Lapisan Teks di Atas Gambar
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Kolom Kanan: Teks Judul & Kecepatan Slide */}
+            <div className="lg:col-span-6 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-5">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">2. Judul Hero &amp; Pengaturan Carousel</h3>
+                  <p className="text-[11px] text-slate-400">Teks sorotan banner dan durasi putar otomatis</p>
+                </div>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1">
+                    Judul Utama Hero:
+                  </label>
+                  <input
+                    type="text"
+                    value={estoreConfig.heroTitle}
+                    onChange={(e) => setEstoreConfig((prev) => ({ ...prev, heroTitle: e.target.value }))}
+                    placeholder="Contoh: Katalog Produk Pilihan"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1">
+                    Teks Sorotan Biru (Highlight):
+                  </label>
+                  <input
+                    type="text"
+                    value={estoreConfig.heroTitleHighlight}
+                    onChange={(e) => setEstoreConfig((prev) => ({ ...prev, heroTitleHighlight: e.target.value }))}
+                    placeholder="Contoh: DSTech Smart"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-dstech-blue focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1">
+                    Subjudul / Tagline Hero:
+                  </label>
+                  <input
+                    type="text"
+                    value={estoreConfig.heroSubtitle}
+                    onChange={(e) => setEstoreConfig((prev) => ({ ...prev, heroSubtitle: e.target.value }))}
+                    placeholder="Contoh: Featured Showcase • Produk Unggulan & Promo Resmi"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1">
+                      Durasi Putar Otomatis:
+                    </label>
+                    <select
+                      value={estoreConfig.autoPlayInterval}
+                      onChange={(e) => setEstoreConfig((prev) => ({ ...prev, autoPlayInterval: Number(e.target.value) }))}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    >
+                      <option value={4000}>Cepat (4 Detik)</option>
+                      <option value={6000}>Standar (6 Detik)</option>
+                      <option value={8000}>Tenang (8 Detik)</option>
+                      <option value={10000}>Lambat (10 Detik)</option>
+                      <option value={0}>Nonaktif (Manual)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1">
+                      Kotak Lacak Pengiriman:
+                    </label>
+                    <select
+                      value={estoreConfig.showQuickTracker ? "true" : "false"}
+                      onChange={(e) => setEstoreConfig((prev) => ({ ...prev, showQuickTracker: e.target.value === "true" }))}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                    >
+                      <option value="true">Tampilkan di Hero</option>
+                      <option value="false">Sembunyikan</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Daftar Produk Hero Showcase (Carousel Items) */}
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Flame className="w-5 h-5 text-amber-500" />
+                  <span>Daftar Produk Hero Showcase ({estoreConfig.featuredHeroes.length} Produk Terpilih)</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Produk-produk ini akan tampil berputar sebagai sorotan utama di halaman belanja. Anda dapat memilih langsung dari master katalog, mengubah urutan, atau menambah produk baru.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHeroSearchQuery("");
+                    setIsSelectProductModalOpen(true);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Pilih dari Katalog Produk</span>
+                </button>
+              </div>
+            </div>
+
+            {/* List Kartu Produk Hero */}
+            <div className="space-y-3">
+              {estoreConfig.featuredHeroes.map((item, idx) => (
+                <div
+                  key={item.id || idx}
+                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                    item.isActive
+                      ? "bg-white border-slate-200 hover:border-emerald-300 shadow-2xs"
+                      : "bg-slate-50/80 border-slate-200 opacity-60"
+                  }`}
+                >
+                  {/* Info Produk & Thumbnail */}
+                  <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                    <div className="flex flex-col items-center gap-0.5 text-slate-400">
+                      <button
+                        type="button"
+                        onClick={() => handleMoveHeroItem(idx, "up")}
+                        disabled={idx === 0}
+                        title="Geser ke atas"
+                        className="p-1 hover:text-slate-900 disabled:opacity-20 cursor-pointer"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <span className="text-[10px] font-black font-mono text-slate-600">#{idx + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleMoveHeroItem(idx, "down")}
+                        disabled={idx === estoreConfig.featuredHeroes.length - 1}
+                        title="Geser ke bawah"
+                        className="p-1 hover:text-slate-900 disabled:opacity-20 cursor-pointer"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 relative">
+                      <img
+                        src={item.image || "/service-smarthome.png"}
+                        alt={item.title}
+                        className="w-full h-full object-contain p-1"
+                        onError={(e: any) => { e.target.src = "/service-smarthome.png"; }}
+                      />
+                    </div>
+
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider ${item.badgeColor || "bg-blue-600 text-white"}`}>
+                          {item.badge}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {item.category || "Hardware"}
+                        </span>
+                        {item.discount && (
+                          <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-600 font-bold text-[9.5px]">
+                            {item.discount}
+                          </span>
+                        )}
+                      </div>
+
+                      <h4 className="text-sm font-black text-slate-900 truncate max-w-md">
+                        {item.title}
+                      </h4>
+                      <p className="text-xs text-slate-500 truncate max-w-lg">
+                        {item.subtitle || item.desc}
+                      </p>
+
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="font-mono font-black text-emerald-600">
+                          {formatRupiah(item.price)}
+                        </span>
+                        {item.originalPrice && item.originalPrice > item.price && (
+                          <span className="line-through text-slate-400 font-mono text-[11px]">
+                            {formatRupiah(item.originalPrice)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Aksi Hero Item */}
+                  <div className="flex items-center gap-2 self-end md:self-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 w-full md:w-auto justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleHeroItem(item.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        item.isActive
+                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                          : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                      }`}
+                    >
+                      {item.isActive ? "✓ Aktif Tampil" : "Nonaktif"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveHeroItem(item.id)}
+                      title="Hapus dari hero"
+                      className="p-2 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 transition cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {estoreConfig.featuredHeroes.length === 0 && (
+                <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-3xl space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-xl">
+                    🛍️
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-700">Belum Ada Produk Hero Terpilih</h4>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    Klik tombol di bawah untuk memilih produk dari katalog agar tampil di slider utama etalase toko.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsSelectProductModalOpen(true)}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/20 hover:bg-emerald-700 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Pilih Produk dari Katalog</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PEMILIHAN PRODUK DARI KATALOG UNTUK HERO SHOWCASE (Tugas 213) */}
+      {isSelectProductModalOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn"
+          onClick={() => setIsSelectProductModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <ShoppingCart className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Pilih Produk untuk Hero Showcase</h3>
+                  <p className="text-[11px] text-slate-400">Pilih dari katalog produk resmi yang sedang aktif</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSelectProductModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Bar Produk */}
+            <div className="shrink-0">
+              <input
+                type="text"
+                value={heroSearchQuery}
+                onChange={(e) => setHeroSearchQuery(e.target.value)}
+                placeholder="Cari nama produk, kategori, atau tipe..."
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              />
+            </div>
+
+            {/* List Produk Katalog */}
+            <div className="overflow-y-auto space-y-2.5 flex-1 pr-1">
+              {catalogProducts
+                .filter((p) => {
+                  if (!heroSearchQuery) return true;
+                  const q = heroSearchQuery.toLowerCase();
+                  return (
+                    p.name?.toLowerCase().includes(q) ||
+                    p.category?.toLowerCase().includes(q) ||
+                    p.desc?.toLowerCase().includes(q)
+                  );
+                })
+                .map((prod) => (
+                  <div
+                    key={prod.id}
+                    className="p-3.5 rounded-2xl border border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/20 transition flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0">
+                        <img
+                          src={prod.image || (prod.images && prod.images[0]) || "/service-smarthome.png"}
+                          alt={prod.name}
+                          className="w-full h-full object-contain p-1"
+                          onError={(e: any) => { e.target.src = "/service-smarthome.png"; }}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          {prod.category || "Hardware"}
+                        </div>
+                        <h4 className="text-xs font-black text-slate-900 truncate max-w-sm">
+                          {prod.name}
+                        </h4>
+                        <div className="font-mono font-bold text-emerald-600 text-xs">
+                          {formatRupiah(prod.price || 0)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAddProductToHero(prod)}
+                      className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Jadikan Hero</span>
+                    </button>
+                  </div>
+                ))}
+
+              {catalogProducts.length === 0 && (
+                <div className="text-center py-8 text-xs text-slate-400">
+                  Tidak ada produk ditemukan di master katalog.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
