@@ -363,6 +363,8 @@ export default function AIChatWidget() {
       } else {
         throw new Error(json.error || "Gagal mendapatkan balasan dari AI");
       }
+    } catch (err: any) {
+      console.error("[AIChatWidget] Error sending chat:", err);
       const errorMsg: ChatMessage = {
         id: "ai_err_" + Date.now(),
         sender: "ai",

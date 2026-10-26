@@ -157,11 +157,13 @@ export async function POST(req: Request) {
                   `3. Pilih Vendor dari Master Supplier (atau tambah supplier baru).\n` +
                   `4. Masukkan item barang belanja pengadaan, tentukan termin dan pajak PPN.\n` +
                   `5. Simpan PO. Anda dapat mencetak lembar resmi PO A4 ber-Kop Surat atau melakukan otorisasi Approval Tanda Tangan Digital Direksi (Canvas Pad).`;
-        } else if (lower.includes("absen") || lower.includes("presensi") || lower.includes("karyawan") || lower.includes("cuti")) {
-          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Berikut pengelolaan Presensi & Karyawan:\n\n` +
-                  `1. Presensi Mandiri Admin: Di halaman Dashboard Utama (/admin), gunakan kartu "Presensi Mandiri" untuk Check-In / Check-Out dengan kamera selfie live WebRTC & GPS satelit.\n` +
-                  `2. Rekap Presensi Tim: Buka menu Presensi (/admin/attendance) untuk melihat log jam kerja, lokasi maps presensi, dan persetujuan lembur teknisi.\n` +
-                  `3. Kontrak & Data Karyawan: Buka menu Kontrak Kerja (/admin/contracts) untuk input PKWT, upload foto diri & KTP, pengaturan kuota cuti tahunan, divisi, dan masa kontrak.`;
+        } else if (lower.includes("laba rugi") || lower.includes("p&l") || lower.includes("pnl") || lower.includes("laporan keuangan")) {
+          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Berikut cara melihat & mengekspor Laporan Laba Rugi (P&L):\n\n` +
+                  `1. Masuk ke Keuangan (/admin/finance) ➔ Tab "Laba Rugi (P&L)".\n` +
+                  `2. Pilih filter Entitas Bisnis: Semua Entitas, Khusus PT. DSTech Smart Perkasa, atau Usaha Mandiri Non-PT.\n` +
+                  `3. Tentukan Rentang Periode Waktu: Bulan Berjalan, Kuartal, Tahun Ini, atau pilih Rentang Tanggal Kustom (Custom Date Range) dengan kalender tanggal mulai & selesai.\n` +
+                  `4. Sistem otomatis mengkalkulasi Pendapatan Penjualan, Harga Pokok Penjualan (HPP / Biaya PO Supplier), Pengeluaran Operasional Kas Keluar, hingga Laba Bersih & Margin Persentase Profit.\n` +
+                  `5. Anda dapat mengklik tombol "Cetak Lembar P&L A4" atau "Unduh PDF" untuk dokumen laporan resmi ber-Kop Surat DSTech.`;
         } else {
           reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Superadmin / Admin DSTech"}! Saya Dani, Copilot AI Sistem ERP PT. DSTech Smart Perkasa. 🛡️\n\n` +
                   `Sebagai rekan pengelola sistem, saya siap memandu Anda cara pemakaian aplikasi, antara lain:\n` +
