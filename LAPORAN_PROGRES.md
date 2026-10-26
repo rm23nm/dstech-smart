@@ -5975,23 +5975,28 @@
 
 ---
 
-### 212. Tugas: Perbaikan Server Error / Blank Saat Buka Dokumen & Layar Kunci PIN [SEDANG DIKERJAKAN]
+### 212. Tugas: Perbaikan Server Error / Blank Saat Buka Dokumen & Layar Kunci PIN [SELESAI]
 - **Permintaan Pengguna**:
   - *"malah server eror gak bisa buka"*
-- **Status**: **SEDANG DIKERJAKAN**
+- **Status**: **SELESAI**
 - **Akar Masalah (Root Cause)**:
   1. Pada `renderSecurityLockScreen` di `src/app/api/finance/print/route.ts`, respons HTTP sebelumnya mengembalikan status `401 Unauthorized` ketika `hasError: true` (saat PIN salah atau belum diverifikasi).
-  2. Menurut spesifikasi RFC HTTP, respons status 401 mewajibkan header `WWW-Authenticate`. Tanpa header tersebut, browser modern (terutama in-app browser WhatsApp, Safari iOS, dan WebView Android) memperlakukan respons sebagai malformed / "Server Error: 401 Unauthorized" dan menolak merender body HTML kita.
-  3. Layar kunci PIN adalah form halaman web kustom, bukan autentikasi header HTTP Basic Auth. Status HTTP yang dikembalikan seharusnya selalu `200 OK` dengan body HTML interaktif yang memuat peringatan *"⚠️ PIN Verifikasi Salah"*.
+  2. Menurut spesifikasi RFC HTTP, respons status 401 mewajibkan header `WWW-Authenticate`. Tanpa header tersebut, browser modern (terutama in-app browser WhatsApp, Safari iOS, dan WebView Android) memperlakukan respons sebagai malformed / "Server Error: 401 Unauthorized" dan menolak merender body HTML kita sehingga pengguna melihat "Server Error".
+  3. Layar kunci PIN adalah form halaman web kustom yang ramah pengguna. Status HTTP yang dikembalikan harus selalu `200 OK` dengan body HTML interaktif yang memuat peringatan *"⚠️ PIN Verifikasi Salah"*.
   4. Selain itu, seluruh blok `GET` di `src/app/api/finance/print/route.ts` perlu dibungkus dengan blok pengaman `try ... catch` untuk memastikan penanganan exception yang aman dan ramah pengguna.
-- **Rencana Step-by-Step Pengerjaan**:
-  1. [x] **Langkah 1**: Catat rencana di `LAPORAN_PROGRES.md` dan buat backup file `_backup_server_error_fix/route.ts.bak`.
-  2. [ ] **Langkah 2**: Ubah status HTTP pada `renderSecurityLockScreen` menjadi selalu `200 OK` (`status: 200`) agar browser tidak pernah memicu layar internal "Server Error".
-  3. [ ] **Langkah 3**: Bungkus handler `GET` dengan `try ... catch` komprehensif.
-  4. [ ] **Langkah 4**: Jalankan `npx tsc --noEmit` dan `npm run build` lokal.
-  5. [ ] **Langkah 5**: Hapus folder cadangan `_backup_server_error_fix`.
-  6. [ ] **Langkah 6**: Deploy ke VPS live via native git push dan `deploy_live.js`.
-  7. [ ] **Langkah 7**: Uji live endpoint dari browser dan tandai Tugas 212 sebagai `[SELESAI]`.
+- **Rincian Perbaikan yang Telah Dilakukan**:
+  1. **Folder Cadangan Khusus**: Dibuat folder cadangan `_backup_server_error_fix` sebelum modifikasi, dan dibersihkan setelah pengujian berhasil.
+  2. **Ubah Status HTTP ke 200 OK**: Mengubah respons `renderSecurityLockScreen` agar selalu mengembalikan status HTTP `200 OK` baik saat belum memasukkan PIN maupun saat PIN salah. Tampilan alert merah kartu peringatan tetap tampil normal di dalam antarmuka UI.
+  3. **Blok Pengaman Try-Catch**: Menyelimuti seluruh handler `GET` di `src/app/api/finance/print/route.ts` dengan blok `try ... catch` elegan yang merender pesan ramah pemulihan jika terjadi gangguan tak terduga.
+  4. **Pengujian & Validasi**:
+     - Typecheck TypeScript `npx tsc --noEmit` lolos 100% tanpa error.
+     - Di-commit dan di-push ke GitHub master (`commit 1299550`).
+     - Di-deploy ke VPS live via `deploy_live.js` (PM2 `dstech-main` online PID 1337312).
+     - **Uji Live Server Selesai & Berhasil**:
+       * SPH live tanpa PIN -> **Status 200 (Layar Kunci Terbuka)**.
+       * SPH live PIN salah (111111) -> **Status 200 (Alert Merah Tampil Normal, Bebas Server Error)**.
+       * SPH live PIN benar (627344) -> **Status 200 (Dokumen Resmi Terbit Sempurna)**.
+       * Faktur live PIN benar (295922) -> **Status 200 (Lembar Faktur Terbit Sempurna)**.
 
 ---
 
