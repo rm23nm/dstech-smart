@@ -6391,6 +6391,53 @@
   6. [x] **Langkah 6**: Deploy live ke VPS via PM2 `dstech-main` (commit `b6b6fa8`).
   7. [x] **Langkah 7**: Folder cadangan dibersihkan dan status Tugas 224 dinyatakan `[SELESAI]`.
 
+
+### 225. Tugas: Perbaikan Kategori & Subkategori Dinamis serta Penyaringan (Filter/Sortir) Produk di Katalog Toko Online (/shop) [SELESAI]
+- **Permintaan Pengguna**:
+  - *"banyak kategori yang sudah ditambahkan tidak kedetek dalam sortirnya"*
+  - (Disertai screenshot halaman katalog https://dstechsmart.com/shop di mana tab kategori masih terpaku pada array statis: "Semua, Smart Home, Security, Parking, Software, Communication", sedangkan kategori baru dari admin seperti "Parking & Barrier System", "Security System", "Smart Home & Automation", "Jaringan & IT Infrastructure", dll. tidak muncul dan tidak terdeteksi dalam filter).
+- **Akar Masalah (Root Cause Analysis)**:
+  1. **Hardcoded Array Kategori di Frontend**:
+     - Pada `src/app/shop/page.tsx` baris 913, daftar kategori di-*hardcode* statis: `const categories = ["Semua", "Smart Home", "Security", "Parking", "Software", "Communication"];`.
+     - Kategori yang didaftarkan di master admin (`/api/categories`) tidak ditarik secara dinamis.
+  2. **Ketidakcocokan String (Exact Match Mismatch)**:
+     - Filter menggunakan `prod.category?.toLowerCase() === activeCategory.toLowerCase()`. Akibatnya, produk berkategori `"Parking & Barrier System"` tidak akan pernah cocok saat pengguna mengklik pill `"Parking"`. Begitu pula `"Security System"` tidak cocok dengan `"Security"`.
+  3. **Belum Ada Filter Subkategori & Sortir**:
+     - Subkategori produk (seperti `Barrier Gate Otomatis`, `GateBarier& Aksesoris`, `Smart Lighting & Switch`) belum memiliki kontrol penyaringan di katalog.
+     - Opsi sortir (Harga Terendah, Harga Tertinggi, Nama A-Z, Produk Terbaru) belum tersedia.
+- **Rencana & Step-by-Step Perbaikan**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 225 dan catat antrian Tugas 226 di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat folder cadangan `_backup_category_sort_fix/` untuk `src/app/shop/page.tsx`.
+  3. [x] **Langkah 3**: Integrasikan Kategori Dinamis dari `/api/categories` dan produk di `src/app/shop/page.tsx`:
+     - Dibuat fungsi `fetchCategories()` yang memanggil `/api/categories` dan digabung secara reaktif dengan kategori produk fisik via `useMemo`.
+     - Ditambahkan fitur pencocokan cerdas (smart matching) dan badge jumlah produk per kategori.
+  4. [x] **Langkah 4**: Ditambahkan Filter Subkategori Dinamis:
+     - Deretan tombol subkategori muncul otomatis di bawah kategori aktif untuk penyaringan produk lebih spesifik.
+  5. [x] **Langkah 5**: Ditambahkan Kontrol Sortir Produk Lengkap:
+     - Dropdown sortir: Rekomendasi, Harga Termurah, Harga Termahal, Nama A-Z, dan Nama Z-A.
+  6. [x] **Langkah 6**: Validasi build lokal `npx tsc --noEmit` lolos 100% dan `npm run build` mengompilasi 62/62 routes sukses.
+  7. [x] **Langkah 7**: Deploy live ke VPS (commit `0c1db03`), PM2 `dstech-main` online, dan verifikasi visual langsung via browser subagent: kategori "Parking & Barrier System" (7 produk) berhasil memfilter dan menampilkan semua barrier gate dengan presisi.
+  8. [x] **Langkah 8**: Folder cadangan dibersihkan dan Tugas 225 dinyatakan `[SELESAI]`.
+
+---
+
+### 226. Tugas: Fitur Ekspor & Impor Massal Excel (Bulk Upload Produk Baru & Update Harga Massal via File Excel/CSV) [ANTRIAN PEKERJAAN BERIKUTNYA]
+- **Permintaan Pengguna**:
+  - *"saya ingin update harga sekaligus dengan excel kemudian saya upload kembali, tolong kamu sediakan fiturnya, termasuk untuk upload barang banyak dengan excel"*
+- **Status**: **DALAM ANTRIAN (Sesuai SOP, diselesaikan setelah Tugas 225 tuntas)**
+- **Rencana Solusi**:
+  1. **Ekspor Excel/CSV Katalog Produk**:
+     - Sediakan tombol **"📥 Download Excel Katalog"** di halaman Admin Produk (`/admin/products`) yang mengunduh data seluruh produk ke format CSV/Excel dengan kolom: ID, Kode/SKU, Nama Produk, Kategori, Subkategori, Modal HPP (`costPrice`), Harga Jual (`price`), Biaya Jasa Pasang, Stok, dan Deskripsi.
+  2. **Template Import Excel**:
+     - Sediakan template kosong **"📄 Download Template Import Excel"** untuk mempermudah admin menambahkan banyak barang sekaligus.
+  3. **Modal & Endpoint Upload Excel/CSV**:
+     - Buat endpoint backend (`/api/products/bulk-import` atau upload handler) dan modal upload interaktif dengan drag-and-drop file di `/admin/products`.
+     - Logika Import:
+       * Jika baris memiliki ID yang sudah ada -> Update harga jual, modal HPP, stok, dll. secara massal.
+       * Jika baris tidak memiliki ID (produk baru) -> Insert produk baru ke katalog secara massal dengan ID unik berprefix `dstech_prod_`.
+  4. **Ringkasan Validasi**:
+     - Menampilkan rekapitulasi: berapa produk baru berhasil ditambahkan, berapa produk berhasil di-update harganya, dan konfirmasi sukses.
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
