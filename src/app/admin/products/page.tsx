@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import * as XLSX from "xlsx";
 import { 
   Plus, 
   Search, 
@@ -26,7 +27,14 @@ import {
   Send,
   Sparkles,
   Eye,
-  Wand2
+  Wand2,
+  FileSpreadsheet,
+  FileUp,
+  CheckCircle2,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw
 } from "lucide-react";
 import { parseHtmlClipboard, cleanDescriptionText, ProductDescriptionViewer } from "@/utils/dstech_desc_formatter";
 
@@ -41,6 +49,7 @@ export interface ProductItem {
   installationFee?: number;
   hasInstallationService?: boolean;
   stock: number;
+  unit?: string;
   commission: string;
   commissionRate?: number;
   commissionType?: string;
@@ -86,6 +95,18 @@ export default function ProductAdmin() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+
+  // Bulk Excel Upload & Export States
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkParsedItems, setBulkParsedItems] = useState<any[]>([]);
+  const [bulkStats, setBulkStats] = useState<{ total: number; updateCount: number; createCount: number }>({
+    total: 0,
+    updateCount: 0,
+    createCount: 0,
+  });
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState<{
@@ -431,6 +452,289 @@ export default function ProductAdmin() {
     }
   };
 
+  // Export Seluruh Katalog Produk ke Excel (.xlsx)
+  const handleExportExcel = () => {
+    try {
+      setIsExportingExcel(true);
+      showToast("Menyiapkan berkas Excel katalog produk...");
+
+      const rows = products.map((p, idx) => ({
+        "No": idx + 1,
+        "ID Produk (JANGAN DIUBAH UNTUK UPDATE HARGA)": p.id,
+        "Nama Produk": p.name,
+        "Kategori": p.category,
+        "Subkategori": p.subCategory || "",
+        "Tipe Entitas": p.entityType || "PT",
+        "Harga Jual (Rp)": p.price,
+        "Modal HPP (Rp)": p.costPrice || 0,
+        "Biaya Pasang (Rp)": p.installationFee || 0,
+        "Layanan Pasang (YA/TIDAK)": p.hasInstallationService ? "YA" : "TIDAK",
+        "Stok": p.stock || 0,
+        "Satuan": p.unit || "Unit",
+        "Komisi": p.commission || "10%",
+        "Tipe Komisi": p.commissionType || "ONETIME",
+        "URL Gambar": p.image || "",
+        "Deskripsi Spesifikasi": p.desc || ""
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+
+      ws["!cols"] = [
+        { wch: 6 },
+        { wch: 38 },
+        { wch: 38 },
+        { wch: 25 },
+        { wch: 25 },
+        { wch: 14 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 24 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 14 },
+        { wch: 30 },
+        { wch: 55 }
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Katalog Produk");
+
+      // Lembar Petunjuk Penggunaan
+      const guideData = [
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "1. CARA UPDATE HARGA / STOK MASSAL:" },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "- Buka sheet 'Katalog Produk'." },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "- JANGAN ubah kolom 'ID Produk (JANGAN DIUBAH UNTUK UPDATE HARGA)' agar sistem mengenali barang." },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "- Ubah nilai di kolom 'Harga Jual (Rp)', 'Modal HPP (Rp)', 'Biaya Pasang (Rp)', atau 'Stok'." },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "- Simpan berkas Excel, lalu buka Admin DSTech -> klik tombol 'Upload Excel / Update Massal' -> Pilih berkas ini." },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "- Periksa tabel pratinjau, lalu klik 'Terapkan Perubahan Massal'." },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "" },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "2. CARA TAMBAH BANYAK PRODUK BARU:" },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "- Buat baris baru di bawah, atau gunakan file Template Tambah Produk." },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "- KOSONGKAN kolom 'ID Produk' pada baris baru tersebut." },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "- Masukkan Nama Produk, Kategori, Harga Jual, Modal HPP, Stok, dll." },
+        { "PANDUAN UPDATE HARGA & MASSAL DSTech SMART": "- Sistem akan otomatis membuatkan ID resmi baru berprefix dstech_prod_." }
+      ];
+      const wsGuide = XLSX.utils.json_to_sheet(guideData);
+      wsGuide["!cols"] = [{ wch: 95 }];
+      XLSX.utils.book_append_sheet(wb, wsGuide, "Petunjuk Penggunaan");
+
+      const todayStr = new Date().toISOString().split("T")[0];
+      XLSX.writeFile(wb, `Katalog_Produk_DSTech_Smart_${todayStr}.xlsx`);
+      showToast("✓ Berkas Excel katalog berhasil diunduh!");
+    } catch (err) {
+      console.error("Gagal export excel:", err);
+      showToast("Gagal mengunduh berkas Excel katalog.", "error");
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  // Unduh Template Excel Kosong Siap Pakai
+  const handleDownloadTemplate = () => {
+    try {
+      const templateRows = [
+        {
+          "ID Produk (KOSONGKAN JIKA PRODUK BARU)": "",
+          "Nama Produk": "Barrier Gate Otomatis MX-80 High Speed",
+          "Kategori": "Parking & Barrier System",
+          "Subkategori": "Barrier Gate Otomatis",
+          "Tipe Entitas (PT/NON_PT)": "PT",
+          "Harga Jual (Rp)": 9500000,
+          "Modal HPP (Rp)": 7500000,
+          "Biaya Pasang (Rp)": 750000,
+          "Layanan Pasang (YA/TIDAK)": "YA",
+          "Stok": 5,
+          "Satuan": "Unit",
+          "Komisi": "10%",
+          "Tipe Komisi (ONETIME/RECURRING)": "ONETIME",
+          "URL Gambar": "/service-cctv.png",
+          "Deskripsi": "• Kecepatan Palang: 1.8 detik\n• Panjang Boom: 3-4 meter\n• Motor: Heavy Duty Brushless DC"
+        },
+        {
+          "ID Produk (KOSONGKAN JIKA PRODUK BARU)": "",
+          "Nama Produk": "Kamera CCTV IP 4MP ColorVu 24 Jam",
+          "Kategori": "Security System",
+          "Subkategori": "IP Camera",
+          "Tipe Entitas (PT/NON_PT)": "PT",
+          "Harga Jual (Rp)": 850000,
+          "Modal HPP (Rp)": 600000,
+          "Biaya Pasang (Rp)": 150000,
+          "Layanan Pasang (YA/TIDAK)": "YA",
+          "Stok": 20,
+          "Satuan": "Unit",
+          "Komisi": "10%",
+          "Tipe Komisi (ONETIME/RECURRING)": "ONETIME",
+          "URL Gambar": "/service-cctv.png",
+          "Deskripsi": "• Resolusi: 4MP 2K\n• ColorVu: Tampilan warna 24 jam penuh\n• Audio: Built-in Mic"
+        }
+      ];
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(templateRows);
+      ws["!cols"] = [
+        { wch: 38 },
+        { wch: 40 },
+        { wch: 25 },
+        { wch: 25 },
+        { wch: 24 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 24 },
+        { wch: 10 },
+        { wch: 10 },
+        { wch: 12 },
+        { wch: 28 },
+        { wch: 28 },
+        { wch: 55 }
+      ];
+
+      XLSX.utils.book_append_sheet(wb, ws, "Template Tambah Produk");
+      XLSX.writeFile(wb, "Template_Import_Produk_DSTech_Smart.xlsx");
+      showToast("✓ Template Excel berhasil diunduh!");
+    } catch (err) {
+      console.error("Gagal download template:", err);
+      showToast("Gagal mengunduh template Excel.", "error");
+    }
+  };
+
+  // Parsing file Excel/CSV yang diunggah
+  const handleExcelFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBulkFile(file);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawJson: any[] = XLSX.utils.sheet_to_json(ws);
+
+        if (!rawJson || rawJson.length === 0) {
+          showToast("Berkas Excel kosong atau lembar pertama tidak memiliki data.", "error");
+          return;
+        }
+
+        const getColVal = (row: any, ...keys: string[]) => {
+          for (const k of keys) {
+            for (const rowKey of Object.keys(row)) {
+              if (rowKey.toLowerCase().replace(/[^a-z0-9]/g, "") === k.toLowerCase().replace(/[^a-z0-9]/g, "")) {
+                return row[rowKey];
+              }
+            }
+          }
+          return undefined;
+        };
+
+        let updateCount = 0;
+        let createCount = 0;
+
+        const parsedItems = rawJson.map((row, idx) => {
+          const rawId = getColVal(row, "id", "idproduk", "kodeproduk", "idprodukjangandiubahuntukupdateharga", "idprodukkosongkanjikaprodukbaru");
+          const cleanedId = rawId ? String(rawId).trim() : "";
+
+          const existing = cleanedId ? products.find((p) => String(p.id).trim() === cleanedId) : null;
+          const isUpdate = Boolean(existing);
+
+          if (isUpdate) {
+            updateCount++;
+          } else {
+            createCount++;
+          }
+
+          const rawPrice = getColVal(row, "hargajual", "hargajualrp", "price", "harga");
+          const rawCost = getColVal(row, "modalhpp", "modalhpprp", "costprice", "hpp", "modal");
+          const rawInstall = getColVal(row, "biayapasang", "biayapasangrp", "installationfee", "jasapasang");
+          const rawStock = getColVal(row, "stok", "stock", "qty", "jumlah");
+          const rawName = getColVal(row, "namaproduk", "name", "nama", "produk");
+          const rawCat = getColVal(row, "kategori", "category");
+          const rawSubCat = getColVal(row, "subkategori", "subcategory", "subkategoriproduk");
+          const rawEntity = getColVal(row, "tipeentitas", "entitas", "entitytype");
+          const rawUnit = getColVal(row, "satuan", "unit");
+          const rawComm = getColVal(row, "komisi", "commission");
+          const rawCommType = getColVal(row, "tipekomisi", "commissiontype");
+          const rawImage = getColVal(row, "urlgambar", "image", "foto", "gambar");
+          const rawDesc = getColVal(row, "deskripsi", "desc", "spesifikasi", "deskripsispesifikasi");
+          const rawHasService = getColVal(row, "layananpasang", "hasinstallationservice");
+
+          const parsedPriceNum = rawPrice !== undefined && rawPrice !== "" ? Number(String(rawPrice).replace(/[^0-9.-]/g, "")) : (existing?.price || 0);
+          const parsedCostNum = rawCost !== undefined && rawCost !== "" ? Number(String(rawCost).replace(/[^0-9.-]/g, "")) : (existing?.costPrice || 0);
+
+          return {
+            id: cleanedId,
+            isUpdate,
+            existingProduct: existing,
+            name: rawName ? String(rawName).trim() : (existing?.name || `Produk Baru ${idx + 1}`),
+            category: rawCat ? String(rawCat).trim() : (existing?.category || "Hardware & IT"),
+            subCategory: rawSubCat !== undefined ? String(rawSubCat).trim() : (existing?.subCategory || ""),
+            entityType: rawEntity && String(rawEntity).toUpperCase().includes("NON") ? "NON_PT" : (existing?.entityType || "PT"),
+            price: parsedPriceNum,
+            costPrice: parsedCostNum,
+            installationFee: rawInstall !== undefined && rawInstall !== "" ? Number(String(rawInstall).replace(/[^0-9.-]/g, "")) : (existing?.installationFee || 0),
+            stock: rawStock !== undefined && rawStock !== "" ? Number(String(rawStock).replace(/[^0-9.-]/g, "")) : (existing?.stock || 0),
+            unit: rawUnit ? String(rawUnit).trim() : (existing?.unit || "Unit"),
+            commission: rawComm ? String(rawComm).trim() : (existing?.commission || "10%"),
+            commissionType: rawCommType ? String(rawCommType).trim() : (existing?.commissionType || "ONETIME"),
+            image: rawImage ? String(rawImage).trim() : (existing?.image || "/service-cctv.png"),
+            desc: rawDesc !== undefined ? String(rawDesc).trim() : (existing?.desc || ""),
+            hasInstallationService: rawHasService ? !String(rawHasService).toUpperCase().includes("TIDAK") : (existing?.hasInstallationService ?? true)
+          };
+        });
+
+        setBulkParsedItems(parsedItems);
+        setBulkStats({
+          total: parsedItems.length,
+          updateCount,
+          createCount
+        });
+        showToast(`✓ Berhasil membaca ${parsedItems.length} produk (${updateCount} update harga, ${createCount} produk baru).`);
+      } catch (err) {
+        console.error("Gagal membaca Excel:", err);
+        showToast("Terjadi kesalahan membaca file Excel.", "error");
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Submit Bulk Import ke API
+  const handleBulkSubmit = async () => {
+    if (bulkParsedItems.length === 0) {
+      showToast("Belum ada data produk dari file Excel.", "error");
+      return;
+    }
+
+    setBulkLoading(true);
+    showToast("Menyimpan data massal ke server...");
+    try {
+      const res = await fetch("/api/products/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: bulkParsedItems })
+      });
+
+      const result = await res.json();
+      if (result.success) {
+        showToast(result.message || "✓ Berhasil memproses data massal!");
+        setIsBulkModalOpen(false);
+        setBulkFile(null);
+        setBulkParsedItems([]);
+        fetchProducts();
+      } else {
+        showToast(result.message || "Gagal menyimpan data massal.", "error");
+      }
+    } catch (err) {
+      console.error("Gagal submit bulk:", err);
+      showToast("Terjadi kesalahan jaringan saat menyimpan data massal.", "error");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
   // Handle Open Add Modal
   const handleOpenAdd = () => {
     const defaultCat = dynamicCategories.length > 0 ? dynamicCategories[0].name : "Security System";
@@ -696,6 +1000,28 @@ export default function ProductAdmin() {
             <FolderTree className="w-4 h-4 text-dstech-blue" />
             <span>Kelola Kategori & Sub</span>
           </Link>
+          <button
+            onClick={handleExportExcel}
+            disabled={isExportingExcel || products.length === 0}
+            className="h-12 px-4 rounded-2xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200/80 font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 transition-all self-start sm:self-auto cursor-pointer disabled:opacity-50"
+            title="Download seluruh katalog produk ke format Excel (.xlsx)"
+          >
+            <Download className="w-4 h-4 text-teal-600" />
+            <span>{isExportingExcel ? "Mengunduh..." : "Export Excel"}</span>
+          </button>
+          <button
+            onClick={() => {
+              setBulkFile(null);
+              setBulkParsedItems([]);
+              setBulkStats({ total: 0, updateCount: 0, createCount: 0 });
+              setIsBulkModalOpen(true);
+            }}
+            className="h-12 px-5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-md shadow-indigo-500/20 active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
+            title="Update harga massal atau upload banyak barang via Excel/CSV"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Upload Excel</span>
+          </button>
           <button
             onClick={handleOpenAdd}
             id="btn-add-product"
@@ -2155,6 +2481,227 @@ export default function ProductAdmin() {
               >
                 {formSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 <span>Ya, Hapus</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Upload & Import Massal Excel */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-5 border-b border-slate-100 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <FileSpreadsheet className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">Upload & Update Massal via Excel</h3>
+                  <p className="text-slate-400 font-medium text-xs mt-0.5">
+                    Update harga jual, modal HPP, stok secara massal atau tambah barang banyak sekaligus
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (!bulkLoading) {
+                    setIsBulkModalOpen(false);
+                    setBulkFile(null);
+                    setBulkParsedItems([]);
+                  }
+                }}
+                className="w-9 h-9 rounded-xl text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body Content */}
+            <div className="py-6 overflow-y-auto space-y-6 flex-grow pr-1">
+              {/* Shortcut Template & Panduan */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-indigo-600 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800">Butuh format kolom yang benar?</p>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Unduh template Excel kosong siap pakai atau ekspor katalog saat ini untuk langsung diedit.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="flex-1 sm:flex-none h-9 px-3.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                  >
+                    <Download className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Download Template</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="flex-1 sm:flex-none h-9 px-3.5 rounded-xl bg-white border border-slate-200 text-teal-700 hover:bg-teal-50 text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Download Katalog</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Upload Drop Zone */}
+              <div className="border-2 border-dashed border-indigo-200 hover:border-indigo-400 bg-indigo-50/30 hover:bg-indigo-50/50 rounded-2xl p-6 transition-all text-center relative group">
+                <input
+                  type="file"
+                  accept=".xlsx, .xls, .csv"
+                  onChange={handleExcelFileChange}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                />
+                <div className="w-14 h-14 rounded-2xl bg-indigo-100/80 text-indigo-600 flex items-center justify-center mx-auto mb-3 group-hover:scale-105 transition-transform">
+                  <FileUp className="w-7 h-7" />
+                </div>
+                <p className="text-sm font-bold text-slate-800">
+                  {bulkFile ? bulkFile.name : "Pilih atau Seret Berkas Excel (.xlsx, .xls, .csv) ke Sini"}
+                </p>
+                <p className="text-xs text-slate-400 font-medium mt-1">
+                  {bulkFile
+                    ? `Ukuran berkas: ${(bulkFile.size / 1024).toFixed(1)} KB`
+                    : "Mendukung format Excel modern (.xlsx) dan CSV"}
+                </p>
+              </div>
+
+              {/* Stats Rekapitulasi */}
+              {bulkParsedItems.length > 0 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Total Baris</p>
+                      <p className="text-2xl font-black text-slate-800 mt-0.5">{bulkStats.total}</p>
+                      <p className="text-[10px] text-slate-500 font-medium">Baris produk dibaca</p>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-2xl">
+                      <p className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1">
+                        <TrendingUp className="w-3.5 h-3.5" /> Update Harga / Data
+                      </p>
+                      <p className="text-2xl font-black text-blue-900 mt-0.5">{bulkStats.updateCount}</p>
+                      <p className="text-[10px] text-blue-700 font-medium">ID produk cocok di katalog</p>
+                    </div>
+                    <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl">
+                      <p className="text-[11px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
+                        <Plus className="w-3.5 h-3.5" /> Produk Baru
+                      </p>
+                      <p className="text-2xl font-black text-emerald-900 mt-0.5">{bulkStats.createCount}</p>
+                      <p className="text-[10px] text-emerald-700 font-medium">ID baru / kosong dibuat otomatis</p>
+                    </div>
+                  </div>
+
+                  {/* Preview Table */}
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="bg-slate-100/80 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Pratinjau Data yang Akan Disimpan ({bulkParsedItems.length} Produk)
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">Maksimal 50 baris ditampilkan</span>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold sticky top-0">
+                          <tr>
+                            <th className="py-2.5 px-3">Aksi</th>
+                            <th className="py-2.5 px-3">Nama Produk</th>
+                            <th className="py-2.5 px-3">Kategori</th>
+                            <th className="py-2.5 px-3 text-right">Harga Jual Baru</th>
+                            <th className="py-2.5 px-3 text-right">Modal HPP</th>
+                            <th className="py-2.5 px-3 text-center">Stok</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {bulkParsedItems.slice(0, 50).map((item, idx) => {
+                            const isPriceChanged =
+                              item.isUpdate &&
+                              item.existingProduct &&
+                              item.existingProduct.price !== item.price;
+                            return (
+                              <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                                <td className="py-2.5 px-3 whitespace-nowrap">
+                                  {item.isUpdate ? (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-700">
+                                      <CheckCircle2 className="w-3 h-3" /> Update
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                                      <Plus className="w-3 h-3" /> Baru
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 font-semibold text-slate-800 max-w-[200px] truncate" title={item.name}>
+                                  {item.name}
+                                </td>
+                                <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap">
+                                  {item.category}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap">
+                                  {isPriceChanged ? (
+                                    <div>
+                                      <span className="text-emerald-600">Rp {item.price?.toLocaleString("id-ID")}</span>
+                                      <span className="block text-[10px] text-slate-400 line-through">
+                                        Rp {item.existingProduct.price?.toLocaleString("id-ID")}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-800">Rp {item.price?.toLocaleString("id-ID")}</span>
+                                  )}
+                                </td>
+                                <td className="py-2.5 px-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                                  Rp {item.costPrice?.toLocaleString("id-ID")}
+                                </td>
+                                <td className="py-2.5 px-3 text-center font-bold text-slate-700 whitespace-nowrap">
+                                  {item.stock} {item.unit || "Unit"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Actions */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3 flex-shrink-0">
+              <button
+                type="button"
+                disabled={bulkLoading}
+                onClick={() => {
+                  setIsBulkModalOpen(false);
+                  setBulkFile(null);
+                  setBulkParsedItems([]);
+                }}
+                className="h-11 px-5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={bulkLoading || bulkParsedItems.length === 0}
+                onClick={handleBulkSubmit}
+                className="h-11 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+              >
+                {bulkLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Menyimpan ke Server...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Terapkan Perubahan Massal ({bulkParsedItems.length})</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
