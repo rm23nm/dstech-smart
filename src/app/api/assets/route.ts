@@ -37,17 +37,120 @@ export interface CorporateAsset {
   updatedAt?: string;
 }
 
+const DEFAULT_ASSETS: CorporateAsset[] = [
+  {
+    id: "dstech_asset_1",
+    assetCode: "AST-DSP-2024-001",
+    name: "Fusion Splicer Fiber Optic & OTDR Kit",
+    category: "Alat Uji & Fiber Optic",
+    brand: "Fujikura / Comway",
+    serialNumber: "FS-CW-98214A",
+    acquisitionDate: "2024-02-15",
+    purchasePrice: 28500000,
+    economicLifeYears: 5,
+    salvageValue: 3500000,
+    currentBookValue: 18500000,
+    depreciationMethod: "Garis Lurus",
+    picName: "Budi Santoso (Lead Engineer)",
+    locationName: "Gudang Utama Cilegon",
+    condition: "Baik",
+    photoUrl: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=400&q=80",
+    notes: "Digunakan untuk penyambungan kabel fiber optic proyek kawasan industri.",
+  },
+  {
+    id: "dstech_asset_2",
+    assetCode: "AST-DSP-2024-002",
+    name: "Armada Operasional Lapangan - Daihatsu Gran Max Blind Van",
+    category: "Kendaraan Operasional",
+    brand: "Daihatsu",
+    serialNumber: "A 8421 DS",
+    acquisitionDate: "2024-05-10",
+    purchasePrice: 165000000,
+    economicLifeYears: 8,
+    salvageValue: 45000000,
+    currentBookValue: 135000000,
+    depreciationMethod: "Garis Lurus",
+    picName: "Ahmad Dani (Driver Logistik)",
+    locationName: "Gudang Utama Cilegon",
+    condition: "Baik",
+    photoUrl: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?auto=format&fit=crop&w=400&q=80",
+    notes: "Kendaraan mobilisasi material proyek barrier gate dan CCTV Banten.",
+  },
+  {
+    id: "dstech_asset_3",
+    assetCode: "AST-DSP-2025-003",
+    name: "Mesin Bor Rotary Hammer SDS-Plus",
+    category: "Peralatan Kerja Teknisi",
+    brand: "Bosch Professional",
+    serialNumber: "GBH-2-28-DFV",
+    acquisitionDate: "2025-01-20",
+    purchasePrice: 3850000,
+    economicLifeYears: 4,
+    salvageValue: 500000,
+    currentBookValue: 2500000,
+    depreciationMethod: "Garis Lurus",
+    picName: "Rizky Pratama (Teknisi Senior)",
+    locationName: "Gudang Cabang Serang",
+    condition: "Baik",
+    photoUrl: "https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=400&q=80",
+    notes: "Peralatan bor beton tiang barrier gate dan camera bracket.",
+  },
+  {
+    id: "dstech_asset_4",
+    assetCode: "AST-DSP-2025-004",
+    name: "Tangga Teleskopik Heavy Duty 5.4 Meter",
+    category: "Peralatan Kerja Teknisi",
+    brand: "Krisbow",
+    serialNumber: "TL-54-HD",
+    acquisitionDate: "2025-03-12",
+    purchasePrice: 2750000,
+    economicLifeYears: 4,
+    salvageValue: 350000,
+    currentBookValue: 1850000,
+    depreciationMethod: "Garis Lurus",
+    picName: "Fajar Nugraha (Teknisi Lapangan)",
+    locationName: "Unit Reaksi Cepat Mobile",
+    condition: "Baik",
+    photoUrl: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=400&q=80",
+    notes: "Tangga lipat aluminium instalasi CCTV outdoor tiang jalan.",
+  },
+  {
+    id: "dstech_asset_5",
+    assetCode: "AST-DSP-2025-005",
+    name: "Laptop Setting & Commissioning CCTV ThinkPad L14",
+    category: "Perangkat IT & Server",
+    brand: "Lenovo",
+    serialNumber: "TP-L14-GEN4-0992",
+    acquisitionDate: "2025-06-18",
+    purchasePrice: 14200000,
+    economicLifeYears: 4,
+    salvageValue: 2500000,
+    currentBookValue: 10500000,
+    depreciationMethod: "Garis Lurus",
+    picName: "Budi Santoso (Lead Engineer)",
+    locationName: "Gudang Utama Cilegon",
+    condition: "Baik",
+    photoUrl: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=400&q=80",
+    notes: "Laptop konfigurasi IP Camera Hikvision, Dahua, dan Barrier Gate Controller.",
+  },
+];
+
 function readAssets(): CorporateAsset[] {
   try {
     if (!fs.existsSync(ASSETS_FILE)) {
-      fs.writeFileSync(ASSETS_FILE, "[]", "utf-8");
-      return [];
+      writeAssets(DEFAULT_ASSETS);
+      return DEFAULT_ASSETS;
     }
     const raw = fs.readFileSync(ASSETS_FILE, "utf-8");
-    return JSON.parse(raw) as CorporateAsset[];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      writeAssets(DEFAULT_ASSETS);
+      return DEFAULT_ASSETS;
+    }
+    return parsed as CorporateAsset[];
   } catch (err) {
     console.error("Error reading dstech_assets.json:", err);
-    return [];
+    return DEFAULT_ASSETS;
   }
 }
 
