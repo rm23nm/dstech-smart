@@ -56,6 +56,7 @@ interface Product {
   id: string;
   name: string;
   category: string;
+  subCategory?: string;
   price: number;
   installationFee?: number;
   hasInstallationService?: boolean;
@@ -311,6 +312,9 @@ export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>(FALLBACK_PRODUCTS);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>("Semua");
+  const [activeSubCategory, setActiveSubCategory] = useState<string>("Semua");
+  const [sortBy, setSortBy] = useState<string>("default");
+  const [masterCategories, setMasterCategories] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [showOnlyWishlist, setShowOnlyWishlist] = useState(false);
@@ -489,6 +493,7 @@ export default function ShopPage() {
   // Fetch katalog, promosi & site settings
   useEffect(() => {
     fetchProducts();
+    fetchCategories();
     fetchPromotions();
     fetchSiteSettings();
     fetchUserOrders();
@@ -538,6 +543,18 @@ export default function ShopPage() {
       console.error("Error fetching products:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch("/api/categories?t=" + Date.now());
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.data)) {
+        setMasterCategories(data.data);
+      }
+    } catch (err) {
+      console.error("Gagal memuat master kategori:", err);
     }
   };
 
@@ -909,17 +926,141 @@ export default function ShopPage() {
     localStorage.setItem("dstech_product_wishlist", JSON.stringify(updated));
   };
 
-  // Filter Categories
-  const categories = ["Semua", "Smart Home", "Security", "Parking", "Software", "Communication"];
+  // Kategori Dinamis dari Master Kategori dan Data Produk Aktual (Tugas 225)
+  const availableCategories = useMemo(() => {
+    const catMap = new Map<string, { name: string; count: number }>();
 
-  const filteredProducts = products.filter((prod) => {
-    const matchCategory = activeCategory === "Semua" || prod.category?.toLowerCase() === activeCategory.toLowerCase();
-    const matchSearch =
-      prod.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      prod.desc?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchWishlist = showOnlyWishlist ? wishlist.includes(prod.id) : true;
-    return matchCategory && matchSearch && matchWishlist;
-  });
+    // 1. Masukkan kategori dari masterCategories
+    masterCategories.forEach((mc) => {
+      if (mc.name && mc.name.trim()) {
+        catMap.set(mc.name.trim().toLowerCase(), { name: mc.name.trim(), count: 0 });
+      }
+    });
+
+    // 2. Hitung jumlah produk aktual per kategori
+    products.forEach((p) => {
+      if (p.category && p.category.trim()) {
+        const catName = p.category.trim();
+        const key = catName.toLowerCase();
+        if (catMap.has(key)) {
+          catMap.get(key)!.count += 1;
+        } else {
+          let matched = false;
+          for (const [k, v] of catMap.entries()) {
+            if (k.includes(key) || key.includes(k)) {
+              v.count += 1;
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) {
+            catMap.set(key, { name: catName, count: 1 });
+          }
+        }
+      }
+    });
+
+    const list = Array.from(catMap.values()).filter(
+      (c) => c.count > 0 || masterCategories.some((mc) => mc.name.toLowerCase() === c.name.toLowerCase())
+    );
+    return [{ name: "Semua", count: products.length }, ...list];
+  }, [masterCategories, products]);
+
+  // Subkategori Dinamis sesuai Kategori Aktif
+  const availableSubCategories = useMemo(() => {
+    const subSet = new Set<string>();
+
+    if (activeCategory === "Semua") {
+      products.forEach((p) => {
+        if (p.subCategory && p.subCategory.trim()) subSet.add(p.subCategory.trim());
+      });
+      return subSet.size > 0 ? ["Semua", ...Array.from(subSet)] : [];
+    }
+
+    const activeCatLower = activeCategory.toLowerCase().trim();
+
+    // Dari masterCategories
+    const matchedMaster = masterCategories.find(
+      (mc) =>
+        mc.name.toLowerCase() === activeCatLower ||
+        mc.name.toLowerCase().includes(activeCatLower) ||
+        activeCatLower.includes(mc.name.toLowerCase())
+    );
+    if (matchedMaster && Array.isArray(matchedMaster.subCategories)) {
+      matchedMaster.subCategories.forEach((sc: any) => {
+        if (sc.name && sc.name.trim()) subSet.add(sc.name.trim());
+      });
+    }
+
+    // Dari produk aktual
+    products.forEach((p) => {
+      const pCatLower = (p.category || "").toLowerCase().trim();
+      const isMatch =
+        pCatLower === activeCatLower ||
+        pCatLower.includes(activeCatLower) ||
+        activeCatLower.includes(pCatLower) ||
+        (activeCatLower.includes("parking") && pCatLower.includes("parking")) ||
+        (activeCatLower.includes("security") && pCatLower.includes("security")) ||
+        (activeCatLower.includes("smart home") && pCatLower.includes("smart home"));
+      if (isMatch && p.subCategory && p.subCategory.trim()) {
+        subSet.add(p.subCategory.trim());
+      }
+    });
+
+    return subSet.size > 0 ? ["Semua", ...Array.from(subSet)] : [];
+  }, [activeCategory, masterCategories, products]);
+
+  // Filter & Sortir Produk Cerdas
+  const filteredProducts = useMemo(() => {
+    return products
+      .filter((prod) => {
+        // Filter Kategori
+        let matchCategory = activeCategory === "Semua";
+        if (!matchCategory && prod.category) {
+          const prodCat = prod.category.toLowerCase().trim();
+          const actCat = activeCategory.toLowerCase().trim();
+          matchCategory =
+            prodCat === actCat ||
+            prodCat.includes(actCat) ||
+            actCat.includes(prodCat) ||
+            (actCat.includes("parking") && prodCat.includes("parking")) ||
+            (actCat.includes("security") && prodCat.includes("security")) ||
+            (actCat.includes("smart home") && prodCat.includes("smart home")) ||
+            (actCat.includes("software") && prodCat.includes("software")) ||
+            (actCat.includes("visual") && prodCat.includes("visual"));
+        }
+
+        // Filter Subkategori
+        let matchSubCategory = activeSubCategory === "Semua" || !activeSubCategory;
+        if (!matchSubCategory && prod.subCategory) {
+          const prodSub = prod.subCategory.toLowerCase().trim();
+          const actSub = activeSubCategory.toLowerCase().trim();
+          matchSubCategory =
+            prodSub === actSub || prodSub.includes(actSub) || actSub.includes(prodSub);
+        }
+
+        // Pencarian Kata Kunci
+        const q = searchQuery.toLowerCase().trim();
+        const matchSearch =
+          !q ||
+          prod.name?.toLowerCase().includes(q) ||
+          prod.desc?.toLowerCase().includes(q) ||
+          prod.category?.toLowerCase().includes(q) ||
+          prod.subCategory?.toLowerCase().includes(q);
+
+        // Filter Wishlist
+        const matchWishlist = showOnlyWishlist ? wishlist.includes(prod.id) : true;
+
+        return matchCategory && matchSubCategory && matchSearch && matchWishlist;
+      })
+      .sort((a, b) => {
+        if (sortBy === "price_low") return a.price - b.price;
+        if (sortBy === "price_high") return b.price - a.price;
+        if (sortBy === "name_asc") return a.name.localeCompare(b.name);
+        if (sortBy === "name_desc") return b.name.localeCompare(a.name);
+        return 0;
+      });
+  }, [products, activeCategory, activeSubCategory, searchQuery, showOnlyWishlist, wishlist, sortBy]);
 
   // Handler Membuka Modal Pengajuan Retur
   const handleOpenReturnModal = (order: any) => {
@@ -1549,35 +1690,105 @@ export default function ShopPage() {
         </div>
 
         {/* Search & Filter Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          {/* Category Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  activeCategory === cat
-                    ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
-                    : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+        <div className="space-y-3">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+            {/* Category Tabs Dinamis */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-none">
+              {availableCategories.map((cat) => {
+                const isActive = activeCategory === cat.name;
+                return (
+                  <button
+                    key={cat.name}
+                    onClick={() => {
+                      setActiveCategory(cat.name);
+                      setActiveSubCategory("Semua");
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                      isActive
+                        ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
+                        : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+                    }`}
+                  >
+                    <span>{cat.name}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono ${
+                        isActive
+                          ? "bg-white/20 text-white"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {cat.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Controls: Search & Sort Dropdown */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              {/* Search Box */}
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari produk / spesifikasi..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Sort Dropdown */}
+              <div className="relative shrink-0">
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="h-9 px-3 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 cursor-pointer shadow-sm"
+                >
+                  <option value="default">Urutkan: Rekomendasi</option>
+                  <option value="price_low">Harga: Termurah</option>
+                  <option value="price_high">Harga: Termahal</option>
+                  <option value="name_asc">Nama: A → Z</option>
+                  <option value="name_desc">Nama: Z → A</option>
+                </select>
+              </div>
+            </div>
           </div>
 
-          {/* Search Box */}
-          <div className="relative min-w-[260px]">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Cari produk atau spesifikasi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-xs bg-white border border-slate-200 rounded-xl font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30"
-            />
-          </div>
+          {/* Subkategori Pills (Muncul jika ada subkategori) */}
+          {availableSubCategories.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-100">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1 mr-1">
+                <SlidersHorizontal className="w-3 h-3 text-dstech-blue" />
+                Subkategori:
+              </span>
+              {availableSubCategories.map((sub) => {
+                const isSubActive = activeSubCategory === sub;
+                return (
+                  <button
+                    key={sub}
+                    type="button"
+                    onClick={() => setActiveSubCategory(sub)}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all cursor-pointer ${
+                      isSubActive
+                        ? "bg-dstech-blue text-white shadow-sm"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200/80"
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Product Grid */}
