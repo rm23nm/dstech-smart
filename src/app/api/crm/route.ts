@@ -654,34 +654,46 @@ export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");
+    const phone = searchParams.get("phone")?.replace(/\D/g, "");
 
-    if (!id) {
-      return NextResponse.json({ success: false, error: "ID Lead wajib disertakan" }, { status: 400 });
+    if (!id && !phone) {
+      return NextResponse.json({ success: false, error: "ID atau No HP Lead wajib disertakan" }, { status: 400 });
     }
 
+    const cleanBaseId = id ? id.replace(/_admin2$/, "").replace(/_admin$/, "") : "";
     const data = readCrmData();
-    const filtered = data.leads.filter((l) => l.id !== id);
+    const beforeLen = data.leads.length;
 
-    if (filtered.length === data.leads.length) {
-      return NextResponse.json({ success: false, error: "Lead tidak ditemukan" }, { status: 404 });
-    }
+    data.leads = data.leads.filter((l) => {
+      const p = (l.phone || "").replace(/\D/g, "");
+      if (id && l.id === id) return false;
+      if (cleanBaseId && (l.id === cleanBaseId || l.id === `${cleanBaseId}_admin2`)) return false;
+      if (phone && p === phone) return false;
+      return true;
+    });
 
-    data.leads = filtered;
     writeCrmData(data);
 
-    // DUA ARAH: Hapus juga dari SmartPro WA Gateway agar 100% konsisten
+    // DUA ARAH: Hapus juga dari SmartPro WA Gateway agar 100% konsisten di semua akun admin
     const SMARTPRO_URL = process.env.SMARTPRO_BASE_URL || "https://smartpro.dstechsmart.com";
     const MASTER_SECRET = process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026";
     try {
-      await fetch(`${SMARTPRO_URL}/api/leads/${encodeURIComponent(id)}?key=${MASTER_SECRET}`, {
-        method: "DELETE",
-        signal: AbortSignal.timeout(3000)
+      await fetch(`${SMARTPRO_URL}/api/external/delete-crm-lead`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          secret: MASTER_SECRET,
+          id: cleanBaseId || id,
+          phone: phone || ""
+        }),
+        signal: AbortSignal.timeout(4000)
       });
     } catch (_) {}
 
     return NextResponse.json({
       success: true,
-      message: "Prospek berhasil dihapus!",
+      message: "Prospek berhasil dihapus dari Website dan SmartPro!",
+      deletedCount: beforeLen - data.leads.length
     });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

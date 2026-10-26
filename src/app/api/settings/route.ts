@@ -47,6 +47,75 @@ const DEFAULT_LETTERHEAD_SETTINGS = {
   signerTitle_NON_PT: "Owner / Pengelola Usaha"
 };
 
+const DEFAULT_ESTORE_SETTINGS = {
+  heroTitle: "Katalog Produk Pilihan",
+  heroTitleHighlight: "DSTech Smart",
+  heroSubtitle: "Featured Showcase • Produk Unggulan & Promo Resmi",
+  heroBackgroundMode: "gradient", // "gradient" | "dark" | "navy" | "image"
+  heroBackgroundImage: "",
+  heroGlowPrimary: "blue", // "blue" | "emerald" | "amber" | "purple" | "red"
+  heroGlowSecondary: "red",
+  showQuickTracker: true,
+  showNationalBanner: true,
+  autoPlayInterval: 6000,
+  featuredHeroes: [
+    {
+      id: "dstech_hero_1",
+      badge: "🔥 BEST SELLER • CCTV AI",
+      badgeColor: "bg-red-500 text-white shadow-red-500/30",
+      title: "CCTV Proview 2 Lensa SM-PR5260-PT Dual-Cam",
+      subtitle: "Solusi Pengawasan Ultra HD Siang & Malam dengan AI Auto-Tracking",
+      desc: "Dilengkapi dua lensa optik simultan, zoom cerdas, audio dua arah jernih, dan penglihatan malam Full-Color aktif 24 jam dengan sertifikasi resmi PT. DSTech.",
+      price: 317000,
+      originalPrice: 450000,
+      discount: "30% OFF",
+      rating: 4.9,
+      reviews: 142,
+      image: "/service-cctv.png",
+      category: "Security System",
+      features: ["Dual-Lens 5MP Full-Color", "AI Humanoid Auto-Tracking", "Komunikasi Audio 2 Arah", "Garansi Sah 1 Tahun"],
+      installationFee: 150000,
+      isActive: true,
+    },
+    {
+      id: "dstech_hero_2",
+      badge: "⭐ SMART HOME UNGGULAN",
+      badgeColor: "bg-blue-600 text-white shadow-blue-600/30",
+      title: "Smart Doorlock Biometrik X-100 Face & Fingerprint",
+      subtitle: "Akses Pintu Cerdas Biometrik Multi-Faktor Tanpa Kunci Fisik",
+      desc: "Mendukung pengenalan wajah 3D, sensor sidik jari ultra responsif 0.3 detik, kartu RFID, PIN acak anti-intip, dan pemantauan jarak jauh via aplikasi smartphone.",
+      price: 1850000,
+      originalPrice: 2450000,
+      discount: "25% OFF",
+      rating: 5.0,
+      reviews: 98,
+      image: "/service-smarthome.png",
+      category: "Smart Home",
+      features: ["3D Biometric Face Scan", "Sidik Jari 0.3s Anti-Palsu", "Kendali Jarak Jauh via WiFi", "Emergency USB-C Port"],
+      installationFee: 250000,
+      isActive: true,
+    },
+    {
+      id: "dstech_hero_3",
+      badge: "🛡️ INDUSTRIAL & CLUSTER GATE",
+      badgeColor: "bg-emerald-600 text-white shadow-emerald-600/30",
+      title: "Automatic Barrier Gate High-Speed 1.8s Industrial",
+      subtitle: "Palang Parkir Otomatis Kecepatan Tinggi untuk Kawasan Industri & Cluster",
+      desc: "Ditenagai motor servo brushless berdaya tahan 5 juta siklus buka-tutup, sensor anti-bentur canggih, dan kompatibel penuh dengan sistem tiket serta kartu akses RFID.",
+      price: 8500000,
+      originalPrice: 9800000,
+      discount: "13% OFF",
+      rating: 4.9,
+      reviews: 64,
+      image: "/portfolio-industrial.png",
+      category: "Access & Barrier",
+      features: ["Motor Servo 1.8 Detik", "Durabilitas 5 Juta Siklus", "Sensor Loop & Anti-Bentur", "Kompatibel Tiket / Kartu"],
+      installationFee: 500000,
+      isActive: true,
+    }
+  ]
+};
+
 const DEFAULT_SETTINGS = {
   companyName: "PT. DSTech Smart Perkasa",
   tagline: "Solusi Security System, Smart Automation & IT Infrastructure Handal",
@@ -72,6 +141,7 @@ const DEFAULT_SETTINGS = {
   logoHeight: 40,
   bankAccounts: DEFAULT_BANK_ACCOUNTS,
   letterheadSettings: DEFAULT_LETTERHEAD_SETTINGS,
+  estoreSettings: DEFAULT_ESTORE_SETTINGS,
   updatedAt: "2026-10-18T22:00:00.000Z"
 };
 
@@ -81,6 +151,14 @@ function readSettings(): any {
     if (fs.existsSync(DATA_FILE)) {
       const data = fs.readFileSync(DATA_FILE, "utf-8");
       settings = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+      // Pastikan nested estoreSettings terisi lengkap
+      settings.estoreSettings = {
+        ...DEFAULT_ESTORE_SETTINGS,
+        ...(settings.estoreSettings || {}),
+        featuredHeroes: Array.isArray(settings.estoreSettings?.featuredHeroes) && settings.estoreSettings.featuredHeroes.length > 0
+          ? settings.estoreSettings.featuredHeroes
+          : DEFAULT_ESTORE_SETTINGS.featuredHeroes,
+      };
     } else {
       const dir = path.dirname(DATA_FILE);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -197,6 +275,7 @@ export async function POST(request: Request) {
       logoHeight: body.logoHeight !== undefined ? Number(body.logoHeight) : (current.logoHeight || 40),
       bankAccounts: body.bankAccounts !== undefined ? body.bankAccounts : current.bankAccounts,
       letterheadSettings: body.letterheadSettings !== undefined ? body.letterheadSettings : current.letterheadSettings,
+      estoreSettings: body.estoreSettings !== undefined ? body.estoreSettings : current.estoreSettings,
       updatedAt: new Date().toISOString(),
     };
 

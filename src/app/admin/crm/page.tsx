@@ -433,15 +433,19 @@ export default function AdminCrmPage() {
     }
   };
 
-  const handleDeleteLead = async (id: string, name: string) => {
-    if (!window.confirm(`Yakin ingin menghapus prospek ${name}?`)) return;
+  const handleDeleteLead = async (id: string, name: string, phone?: string) => {
+    if (!window.confirm(`Yakin ingin menghapus prospek "${name}"?\nData akan dihapus permanen dari Website dan SmartPro.`)) return;
     try {
-      const res = await fetch(`/api/crm?id=${id}`, { method: "DELETE" });
+      const p = phone ? `&phone=${encodeURIComponent(phone)}` : "";
+      const res = await fetch(`/api/crm?id=${encodeURIComponent(id)}${p}`, { method: "DELETE" });
       const data = await res.json();
       if (data.success) {
-        showToast("Prospek berhasil dihapus!");
+        showToast(data.message || "Prospek berhasil dihapus!");
         if (selectedDetailLead?.id === id) setSelectedDetailLead(null);
+        setSelectedLeadIds((prev) => prev.filter((item) => item !== id));
         fetchCrmData();
+      } else {
+        showToast(data.error || "Gagal menghapus prospek.");
       }
     } catch (err) {
       console.error(err);
@@ -686,6 +690,47 @@ export default function AdminCrmPage() {
         </div>
       </div>
 
+      {/* BANNER AKSI MASSAL (BULK ACTION) JIKA ADA PROSPEK TERPILIH */}
+      {selectedLeadIds.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl shadow-sm animate-in fade-in">
+          <div className="flex items-center gap-3">
+            <span className="w-3 h-3 rounded-full bg-rose-600 animate-pulse"></span>
+            <div>
+              <span className="text-xs font-black text-rose-950 block">
+                {selectedLeadIds.length} Prospek Terpilih
+              </span>
+              <span className="text-[11px] text-rose-700">
+                Pilih aksi massal untuk seluruh prospek yang telah dicentang.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleSelectAllLeads}
+              className="text-xs font-black text-rose-800 hover:text-rose-950 underline ml-2 cursor-pointer"
+            >
+              {selectedLeadIds.length === leads.length ? "Batalkan Pilih Semua" : "Pilih Semua (" + leads.length + ")"}
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedLeadIds([])}
+              className="px-3.5 py-2 rounded-xl bg-white border border-rose-200 text-slate-700 hover:bg-slate-50 text-xs font-bold transition cursor-pointer"
+            >
+              Batal
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black flex items-center gap-2 shadow-md shadow-rose-600/20 transition cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Hapus {selectedLeadIds.length} Prospek Terpilih</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* MODE TAMPILAN 1: KANBAN PIPELINE BOARD */}
       {viewMode === "kanban" && (
         <div className="space-y-3">
@@ -848,11 +893,12 @@ export default function AdminCrmPage() {
                                 <Edit className="w-3.5 h-3.5" />
                               </button>
                               <button
-                                onClick={() => handleDeleteLead(lead.id, lead.clientName)}
-                                className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded"
+                                onClick={() => handleDeleteLead(lead.id, lead.clientName, lead.phone)}
+                                className="px-2 py-1 text-[10px] font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
                                 title="Hapus Prospek"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3 h-3 text-rose-600" />
+                                <span>Hapus</span>
                               </button>
                             </div>
                           </div>
@@ -964,11 +1010,12 @@ export default function AdminCrmPage() {
                               <Edit className="w-3.5 h-3.5" />
                             </button>
                             <button
-                              onClick={() => handleDeleteLead(lead.id, lead.clientName)}
-                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                              title="Hapus"
+                              onClick={() => handleDeleteLead(lead.id, lead.clientName, lead.phone)}
+                              className="px-2.5 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                              title="Hapus Prospek"
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                              <span>Hapus</span>
                             </button>
                           </div>
                         </td>
@@ -1283,7 +1330,7 @@ export default function AdminCrmPage() {
                 </button>
 
                 <button
-                  onClick={() => handleDeleteLead(selectedDetailLead.id, selectedDetailLead.clientName)}
+                  onClick={() => handleDeleteLead(selectedDetailLead.id, selectedDetailLead.clientName, selectedDetailLead.phone)}
                   className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm"
                   title="Hapus Prospek"
                 >
