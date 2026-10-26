@@ -41,25 +41,137 @@ interface ChatMessage {
   quickReplies?: string[];
 }
 
-const DEFAULT_GREETING: ChatMessage = {
-  id: "msg_welcome",
-  sender: "ai",
-  text: "Halo! Saya Dani, Virtual AI Consultant resmi PT. DSTech Smart Perkasa. 👋\n\nAda yang bisa saya bantu hari ini? Anda bisa menanyakan spesifikasi produk CCTV, solusi Smart Home & Barrier Gate, bantuan kendala teknis, atau permohonan survei & penawaran.",
-  timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-  quickReplies: [
-    "📹 Rekomendasi Paket CCTV",
-    "🚪 Pasang Smart Doorlock",
-    "🚧 Barrier Gate Otomatis",
-    "🛠️ Kendala Teknis / Perbaikan",
-    "⚠️ Komplain Pesanan Toko"
-  ]
-};
+import { usePathname } from "next/navigation";
+
+export type PortalType = "SUPERADMIN" | "ADMIN" | "EMPLOYEE" | "PARTNER" | "PUBLIC";
+
+export interface PortalRoleConfig {
+  portalType: PortalType;
+  title: string;
+  badge: string;
+  badgeColor: string;
+  avatarBg: string;
+  greetingText: string;
+  quickReplies: string[];
+  placeholder: string;
+  teaserTitle: string;
+  teaserText: string;
+}
+
+export function getPortalRoleConfig(pathname: string, user?: any): PortalRoleConfig {
+  const userName = user?.name ? user.name.split(" ")[0] : "";
+
+  if (pathname.startsWith("/superadmin")) {
+    return {
+      portalType: "SUPERADMIN",
+      title: "Dani — Superadmin Copilot",
+      badge: "🛡️ Superadmin Copilot • Gemini 2.5",
+      badgeColor: "bg-purple-500/20 text-purple-300 border-purple-400/30",
+      avatarBg: "from-purple-600 via-indigo-600 to-blue-600",
+      greetingText: `Halo ${userName ? `Pak/Bu ${userName}` : "Superadmin"}! Saya Copilot AI Sistem DSTech Smart. Saya siap memandu pemakaian seluruh modul backend Superadmin (manajemen hak akses, multi-gudang, database, approval dokumen, hingga integrasi sistem). Butuh panduan cara input data atau penggunaan fitur tertentu?`,
+      quickReplies: [
+        "📄 Cara Buat Faktur Penjualan",
+        "📝 Cara Terbitkan SPH Penawaran",
+        "📦 Cara Input Produk & Stok",
+        "🏢 Panduan Multi-Gudang & Cabang",
+        "💰 Cara Catat Arus Kas Masuk/Keluar"
+      ],
+      placeholder: "Tanya panduan fitur/modul Superadmin...",
+      teaserTitle: "Copilot Superadmin Siap Membantu",
+      teaserText: "Butuh panduan cara input data atau penggunaan modul sistem?"
+    };
+  }
+
+  if (pathname.startsWith("/admin")) {
+    return {
+      portalType: "ADMIN",
+      title: "Dani — Admin ERP Copilot",
+      badge: "💼 Admin ERP Copilot • Gemini 2.5",
+      badgeColor: "bg-blue-500/20 text-blue-300 border-blue-400/30",
+      avatarBg: "from-blue-600 via-indigo-600 to-slate-800",
+      greetingText: `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Saya Copilot AI Operasional ERP DSTech Smart. Saya siap memandu Anda cara pemakaian aplikasi, pembuatan faktur penjualan, penerbitan SPH, pengaturan toko online (E-Store), hingga verifikasi presensi. Ada yang ingin dipelajari langkahnya?`,
+      quickReplies: [
+        "📄 Panduan Buat Faktur",
+        "📝 Panduan Terbitkan SPH",
+        "🛒 Cara Atur E-Store & Hero",
+        "👥 Cara Cek Presensi Karyawan",
+        "📊 Panduan Laporan Laba Rugi"
+      ],
+      placeholder: "Tanya cara pengoperasian modul Admin...",
+      teaserTitle: "Copilot Operasional Admin",
+      teaserText: "Tanyakan cara pengoperasian modul ERP & input data di sini."
+    };
+  }
+
+  if (pathname.startsWith("/employee")) {
+    return {
+      portalType: "EMPLOYEE",
+      title: "Dani — Asisten Teknisi Lapangan",
+      badge: "🛠️ Asisten Lapangan • Gemini 2.5",
+      badgeColor: "bg-amber-500/20 text-amber-300 border-amber-400/30",
+      avatarBg: "from-amber-600 via-orange-600 to-amber-700",
+      greetingText: `Halo Rekan Tim Lapangan ${userName ? userName : "DSTech"}! Saya Asisten AI Portal Karyawan & Teknisi. Butuh bantuan cara absen GPS & selfie wajah, pengajuan material stok gudang, rumus konversi roll ke meter, atau panduan SOP instalasi CCTV & Smart Home?`,
+      quickReplies: [
+        "📍 Cara Absen GPS & Selfie",
+        "📦 Cara Ambil Material Gudang",
+        "🔄 Cara Konversi Satuan (Roll/Meter)",
+        "📋 Lapor Progres Tugas",
+        "🛡️ SOP Pemasangan CCTV & K3"
+      ],
+      placeholder: "Tanya panduan teknisi / SOP lapangan...",
+      teaserTitle: "Asisten Teknisi & SOP",
+      teaserText: "Butuh panduan presensi GPS, ambil material, atau SOP teknis?"
+    };
+  }
+
+  if (pathname.startsWith("/affiliate")) {
+    return {
+      portalType: "PARTNER",
+      title: "Dani — Partner Growth Guide",
+      badge: "🤝 Partner Copilot • Gemini 2.5",
+      badgeColor: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
+      avatarBg: "from-emerald-600 via-teal-600 to-emerald-700",
+      greetingText: `Halo Mitra Resmi ${userName ? userName : "DSTech"}! Saya Asisten AI Program Kemitraan & Afiliasi. Saya siap memandu cara menyebarkan link referral, perhitungan komisi penjualan, cara download materi promosi, dan syarat pencairan reward.`,
+      quickReplies: [
+        "🔗 Cara Sebar Link Referral",
+        "💰 Skema Komisi Mitra",
+        "📥 Unduh Materi Promosi",
+        "💳 Syarat Penarikan Komisi"
+      ],
+      placeholder: "Tanya seputar komisi & kemitraan...",
+      teaserTitle: "Panduan Sukses Mitra Afiliasi",
+      teaserText: "Pelajari cara menyebarkan referral & maksimalkan komisi penjualan."
+    };
+  }
+
+  // Default: Public Client / Prospective Customer
+  return {
+    portalType: "PUBLIC",
+    title: "Dani — AI Consultant",
+    badge: "✨ AI Consultant • Gemini 2.5",
+    badgeColor: "bg-blue-500/20 text-blue-300 border-blue-400/30",
+    avatarBg: "from-blue-500 to-indigo-500",
+    greetingText: "Halo! Saya Dani, Virtual AI Consultant resmi PT. DSTech Smart Perkasa. 👋\n\nAda yang bisa saya bantu hari ini? Anda bisa menanyakan spesifikasi produk CCTV, solusi Smart Home & Barrier Gate, bantuan kendala teknis, atau permohonan survei & penawaran.",
+    quickReplies: [
+      "📹 Rekomendasi Paket CCTV",
+      "🚪 Pasang Smart Doorlock",
+      "🚧 Barrier Gate Otomatis",
+      "🛠️ Kendala Teknis / Perbaikan",
+      "⚠️ Komplain Pesanan Toko"
+    ],
+    placeholder: "Tulis pertanyaan Anda di sini...",
+    teaserTitle: "Konsultasi CCTV & Smart System",
+    teaserText: "Tanyakan estimasi biaya, spesifikasi, dan solusi keamanan untuk kebutuhan Anda."
+  };
+}
 
 export default function AIChatWidget() {
+  const pathname = usePathname() || "/";
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([DEFAULT_GREETING]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [visitorName, setVisitorName] = useState("");
   const [visitorPhone, setVisitorPhone] = useState("");
   const [visitorGeo, setVisitorGeo] = useState<any>(null);
@@ -67,6 +179,50 @@ export default function AIChatWidget() {
   const [showTeaser, setShowTeaser] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Ambil user login aktif dari berbagai sesi
+  useEffect(() => {
+    try {
+      const rawUser = localStorage.getItem("dstech_auth_user") || 
+                      localStorage.getItem("dstech_admin_auth") ||
+                      localStorage.getItem("dstech_employee_auth") ||
+                      localStorage.getItem("dstech_partner_auth") ||
+                      localStorage.getItem("dstech_client_user");
+      if (rawUser) {
+        setCurrentUser(JSON.parse(rawUser));
+      }
+    } catch (e) {}
+  }, []);
+
+  // Konfigurasi dinamis profil AI sesuai portal yang sedang dibuka
+  const portalConfig = React.useMemo(() => {
+    return getPortalRoleConfig(pathname, currentUser);
+  }, [pathname, currentUser]);
+
+  // Inisialisasi atau load pesan sesuai portal yang aktif
+  useEffect(() => {
+    try {
+      const storageKey = `dstech_ai_chat_${portalConfig.portalType.toLowerCase()}`;
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // Default Greeting sesuai peran portal
+    const initialGreeting: ChatMessage = {
+      id: `msg_welcome_${portalConfig.portalType}`,
+      sender: "ai",
+      text: portalConfig.greetingText,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      quickReplies: portalConfig.quickReplies,
+    };
+    setMessages([initialGreeting]);
+  }, [portalConfig]);
 
   // Ambil dan dengarkan update geolokasi otomatis dari DSTechVisitorTracker
   useEffect(() => {
@@ -125,10 +281,11 @@ export default function AIChatWidget() {
     } catch (e) {}
   }, []);
 
-  // Simpan riwayat chat ke localStorage
+  // Simpan riwayat chat ke localStorage per portal
   const saveChatHistory = (newMsgs: ChatMessage[]) => {
     try {
-      localStorage.setItem("dstech_ai_chat_history", JSON.stringify(newMsgs.slice(-20)));
+      const storageKey = `dstech_ai_chat_${portalConfig.portalType.toLowerCase()}`;
+      localStorage.setItem(storageKey, JSON.stringify(newMsgs.slice(-25)));
     } catch (e) {}
   };
 
@@ -158,8 +315,10 @@ export default function AIChatWidget() {
           message: msg,
           history: updatedMessages.map(m => ({ sender: m.sender, text: m.text })),
           visitorInfo: {
-            name: visitorName || undefined,
-            phone: visitorPhone || undefined,
+            name: currentUser?.name || visitorName || undefined,
+            phone: currentUser?.phone || visitorPhone || undefined,
+            userRole: currentUser?.role || portalConfig.portalType,
+            portalType: portalConfig.portalType,
             city: visitorGeo?.city || undefined,
             region: visitorGeo?.region || undefined,
             country: visitorGeo?.country || undefined,
@@ -204,15 +363,16 @@ export default function AIChatWidget() {
       } else {
         throw new Error(json.error || "Gagal mendapatkan balasan dari AI");
       }
-    } catch (err: any) {
       const errorMsg: ChatMessage = {
         id: "ai_err_" + Date.now(),
         sender: "ai",
-        text: "Mohon maaf, sistem AI kami sedang dalam pemeliharaan singkat. Anda dapat langsung berkonsultasi via WhatsApp tim kami melalui tombol di bawah.",
+        text: portalConfig.portalType === "SUPERADMIN" || portalConfig.portalType === "ADMIN"
+          ? "Mohon maaf, sistem AI Copilot sedang memuat modul bantuan. Silakan ulangi pertanyaan Anda atau refresh halaman."
+          : "Mohon maaf, asisten AI kami sedang dalam pemeliharaan singkat. Anda dapat langsung berkonsultasi via WhatsApp tim kami melalui tombol di bawah.",
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        readyForHandover: true,
-        departmentLabel: "Customer Care & Sales PT. DSTech Smart Perkasa",
-        whatsappUrl: `https://wa.me/6282259494242?text=${encodeURIComponent("Halo PT. DSTech Smart Perkasa, saya ingin konsultasi mengenai: " + msg)}`
+        readyForHandover: portalConfig.portalType === "PUBLIC",
+        departmentLabel: "Dukungan Sistem PT. DSTech Smart Perkasa",
+        whatsappUrl: `https://wa.me/6282259494242?text=${encodeURIComponent("Halo PT. DSTech Smart Perkasa, saya membutuhkan bantuan mengenai: " + msg)}`
       };
       const finalMsgs = [...updatedMessages, errorMsg];
       setMessages(finalMsgs);
@@ -223,9 +383,17 @@ export default function AIChatWidget() {
   };
 
   const handleResetChat = () => {
-    if (confirm("Reset seluruh percakapan dengan AI Dani?")) {
-      setMessages([DEFAULT_GREETING]);
-      localStorage.removeItem("dstech_ai_chat_history");
+    if (confirm(`Reset percakapan pada mode ${portalConfig.title}?`)) {
+      const initialGreeting: ChatMessage = {
+        id: `msg_welcome_${portalConfig.portalType}_reset`,
+        sender: "ai",
+        text: portalConfig.greetingText,
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        quickReplies: portalConfig.quickReplies,
+      };
+      setMessages([initialGreeting]);
+      const storageKey = `dstech_ai_chat_${portalConfig.portalType.toLowerCase()}`;
+      localStorage.removeItem(storageKey);
     }
   };
 
@@ -233,24 +401,24 @@ export default function AIChatWidget() {
     <div className="fixed bottom-6 right-6 z-50 print:hidden font-sans">
       {/* Floating Teaser Pop-up Bubble (sebelum chat dibuka) */}
       {!isOpen && showTeaser && (
-        <div className="absolute bottom-20 right-0 w-72 bg-white p-4 rounded-2xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-bottom-3 duration-300">
+        <div className="absolute bottom-20 right-0 w-80 bg-white p-4 rounded-3xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-bottom-3 duration-300">
           <button 
             onClick={() => setShowTeaser(false)} 
-            className="absolute top-2.5 right-2.5 text-slate-400 hover:text-slate-600 p-1"
+            className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 p-1"
           >
             <X className="w-3.5 h-3.5" />
           </button>
           <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+            <div className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${portalConfig.avatarBg} text-white flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20`}>
               <Bot className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-xs font-black text-slate-900">Dani (AI DSTech)</span>
+                <span className="text-xs font-black text-slate-900">{portalConfig.teaserTitle}</span>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Butuh rekomendasi CCTV, Smart Home, atau penawaran resmi? Tanyakan langsung pada saya di sini!
+                {portalConfig.teaserText}
               </p>
               <button
                 onClick={() => {
@@ -259,7 +427,7 @@ export default function AIChatWidget() {
                 }}
                 className="mt-2.5 text-[11px] font-black text-dstech-blue hover:text-blue-700 flex items-center gap-1 cursor-pointer"
               >
-                <span>Mulai Chat Sekarang</span>
+                <span>Buka Panduan</span>
                 <ArrowRight className="w-3 h-3" />
               </button>
             </div>
@@ -271,8 +439,8 @@ export default function AIChatWidget() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-tr from-dstech-blue via-blue-600 to-indigo-600 text-white shadow-2xl shadow-blue-600/40 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer border-2 border-white/20"
-          aria-label="Buka Live Chat AI DSTech"
+          className={`group relative flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-tr ${portalConfig.avatarBg} text-white shadow-2xl shadow-blue-600/40 hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer border-2 border-white/20`}
+          aria-label="Buka Asisten AI DSTech"
         >
           {/* Pulsing ring animation */}
           <span className="absolute -inset-1 rounded-full bg-blue-500/30 animate-ping opacity-75"></span>
@@ -291,26 +459,26 @@ export default function AIChatWidget() {
 
       {/* Main Chat Modal Box */}
       {isOpen && (
-        <div className="relative w-[92vw] sm:w-[410px] h-[600px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="relative w-[92vw] sm:w-[420px] h-[610px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
           {/* Header Widget */}
           <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-5 py-4 flex items-center justify-between border-b border-white/10 shrink-0">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                <div className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${portalConfig.avatarBg} flex items-center justify-center text-white shadow-md shadow-blue-500/20`}>
                   <Bot className="w-6 h-6" />
                 </div>
                 <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="font-black text-sm text-white tracking-wide">Dani — AI Consultant</h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
-                    Gemini 2.5
+                  <h3 className="font-black text-sm text-white tracking-wide">{portalConfig.title}</h3>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${portalConfig.badgeColor}`}>
+                    {portalConfig.badge}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-300 flex items-center gap-1.5 flex-wrap">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>Online 24/7 • PT. DSTech</span>
+                  <span>{currentUser?.name ? `User: ${currentUser.name}` : "Online 24/7"} • DSTech</span>
                   {visitorGeo?.city && (
                     <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-md border border-emerald-400/30">
                       📍 {visitorGeo.city}
@@ -341,10 +509,18 @@ export default function AIChatWidget() {
           </div>
 
           {/* Subheader Context Info */}
-          <div className="bg-blue-50/70 border-b border-blue-100/60 px-4 py-2 flex items-center justify-between text-[11px] text-blue-900 shrink-0">
+          <div className="bg-slate-100/90 border-b border-slate-200/60 px-4 py-2 flex items-center justify-between text-[11px] text-slate-700 shrink-0">
             <span className="flex items-center gap-1.5 font-medium">
               <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-              <span>AI First: Kebutuhan Anda dianalisis sebelum diarahkan ke tim ahli</span>
+              <span>
+                {portalConfig.portalType === "SUPERADMIN" || portalConfig.portalType === "ADMIN"
+                  ? "⚡ Copilot Aktif: Panduan pengoperasian modul ERP & tata cara input data"
+                  : portalConfig.portalType === "EMPLOYEE"
+                  ? "🛠️ Mode Lapangan: Panduan presensi GPS, ambil material & SOP teknisi"
+                  : portalConfig.portalType === "PARTNER"
+                  ? "🤝 Mode Mitra: Panduan link referral, promosi & komisi penjualan"
+                  : "✨ AI First: Kebutuhan Anda dianalisis sebelum diarahkan ke tim ahli"}
+              </span>
             </span>
           </div>
 
@@ -481,30 +657,19 @@ export default function AIChatWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Department Shortcuts Bar */}
-          <div className="px-3 py-2 bg-slate-100/80 border-t border-slate-200/60 flex items-center gap-2 overflow-x-auto text-[11px] shrink-0">
+          {/* Quick Department / Portal Shortcuts Bar */}
+          <div className="px-3 py-2 bg-slate-100/90 border-t border-slate-200/60 flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Pilihan Cepat:</span>
-            <button
-              type="button"
-              onClick={() => handleSendMessage("Saya mau minta penawaran paket CCTV untuk pengadaan baru")}
-              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:text-dstech-blue text-slate-700 font-bold shrink-0 transition-all cursor-pointer"
-            >
-              💼 Sales / SPH
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSendMessage("Saya ada kendala teknis pada perangkat yang sudah terpasang, tolong teknisi bantu")}
-              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-amber-50 hover:text-amber-700 text-slate-700 font-bold shrink-0 transition-all cursor-pointer"
-            >
-              🔧 Maintenance Teknis
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSendMessage("Saya mau mengajukan komplain pesanan e-store saya yang bermasalah")}
-              className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-rose-50 hover:text-rose-700 text-slate-700 font-bold shrink-0 transition-all cursor-pointer"
-            >
-              ⚠️ Komplain Pesanan
-            </button>
+            {portalConfig.quickReplies.map((qr, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => handleSendMessage(qr)}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:text-dstech-blue text-slate-700 font-bold shrink-0 transition-all cursor-pointer whitespace-nowrap"
+              >
+                {qr}
+              </button>
+            ))}
           </div>
 
           {/* Chat Input Bar */}
@@ -519,7 +684,7 @@ export default function AIChatWidget() {
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Ketik pertanyaan atau kebutuhan Anda di sini..."
+              placeholder={portalConfig.placeholder}
               disabled={loading}
               className="flex-1 px-4 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:border-dstech-blue text-slate-900 disabled:opacity-50"
             />
