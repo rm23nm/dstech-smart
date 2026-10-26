@@ -3,6 +3,8 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-27**: Implementasi Fitur Neraca Saldo (Trial Balance) Terkonsolidasi & Manajemen Pemotongan Serta Perhitungan Pajak PPh & PPN Resmi (/admin/finance & /api/finance). Menyediakan Tab '⚖️ Neraca Saldo' dengan agregasi otomatis 9 akun standar akuntansi (Kas & Bank, Piutang Usaha, Persediaan/Valuasi Gudang, Utang Usaha PO, Utang Pajak PPh/PPN, Modal/Ekuitas, Pendapatan Usaha, HPP Material, dan Beban Usaha), 4 kartu KPI, status keseimbangan matematis (Balanced check), dan lembar cetak standar A4 ber-Kop Surat Resmi DSTech Smart. Menyediakan Tab '🏛️ Pajak PPh & PPN' dengan 4 kartu KPI (PPh 21, PPh 23, PPh Final PP 23 0.5%, PPN Keluaran/Masukan), tombol hitung instan 0.5% dari seluruh faktur penjualan bulan ini, modal formulir setor pajak (BUPOT, Kode Billing, NTPN), dan integrasi backend API (/api/finance) dengan prefix data aman `tax_records`. Lolos uji kompilasi tsc (0 error), build 63 rute Next.js, dipush ke GitHub commit `6738d19`, dideploy ke server live VPS PM2 `dstech-main` (PID 1606408), dan diverifikasi visual di browser live.
+- **2026-10-27**: Penambahan Kolom Merek (Brand) Produk, Dropdown Filter Merek di Katalog E-Store (/shop), dan Form Input Merek di Inventori Admin (/admin/products & /api/products). Menambahkan filter merek [ 🛡️ Semua Merek ▾ ] berdampingan dengan kategori dan subkategori di /shop dengan auto-detection cerdas 13 brand terkemuka (Hikvision, Dahua, HiLook, Ezviz, Imou, ZKTeco, Ruijie Reyee, Ubiquiti, Uniview, Tiandy, TP-Link, Barrier Gate MX, DSTech Smart), badge merek di kartu dan modal produk, input datalist merek pada form tambah/edit produk admin, badge merek pada tabel inventori, serta dukungan kolom Merek pada ekspor/impor Excel katalog massal (/api/products/bulk). Lolos uji TypeScript, build 63 rute, dipush ke GitHub (commit `3a35a9a`), dideploy live ke VPS PM2 `dstech-main`, dan diverifikasi visual di browser live.
 - **2026-10-26**: Implementasi Suite Optimasi SEO Mesin Pencari Google Komprehensif (Dynamic XML Sitemap, Robots.txt, Google Schema.org JSON-LD LocalBusiness, & Rich Metadata E-Store /shop & /contact). Membangun pondasi SEO teknis lengkap agar produk dan layanan PT. DSTech Smart Perkasa dapat terindeks dan muncul di halaman utama Google. (1) Menyiapkan dynamic sitemap (`src/app/sitemap.ts`) yang memetakan seluruh rute publik dan katalog produk secara otomatis untuk Googlebot; (2) Menyiapkan crawler directive (`src/app/robots.ts`) yang mengizinkan perayapan halaman publik dan memproteksi rute internal admin; (3) Menyematkan Structured Data resmi Google (JSON-LD Schema.org) `@type: ["LocalBusiness", "SecuritySystemInstallService", "HomeAutomationCompany"]` dan `WebSite` lengkap dengan NIB, NPWP, koordinat GPS Cilegon, alamat kantor, nomor WhatsApp CS, rating, dan area layanan di `src/app/layout.tsx`; (4) Menambahkan OpenGraph, Twitter Cards, dan kata kunci terarah (CCTV Cilegon, Barrier Gate Banten, Smart Home, dll.); (5) Menyediakan dedicated metadata layout pada `/shop` dan `/contact`. Telah divalidasi lokal (`npx tsc` lolos, build 61 rute lolos), dideploy ke live VPS PM2 `dstech-main` (PID 1426919), dan diverifikasi live (`https://dstechsmart.com/sitemap.xml` & `https://dstechsmart.com/robots.txt` respon HTTP 200 OK).
 - **2026-10-26**: Perbaikan Simpan SPH Paket Instalasi (Dukungan Item Rincian Harga Nol / Termasuk Paket) & Perbaikan Posisi Z-Index Toast Notifikasi. Mengatasi kendala di mana pengguna tidak bisa menyimpan SPH Paket yang memuat item rincian berharga Rp 0 (karena validasi lama menolak harga <= 0 dan input HTML5 ber-atribut required memblokir pengosongan harga) serta toast notifikasi tertutup di belakang backdrop modal form SPH (z-50 vs z-[70]). Meningkatkan z-index Toast ke z-[999999], melonggarkan validasi SPH agar mengizinkan harga Rp 0/kosong untuk rincian paket, menghapus required pada input harga modal SPH dengan placeholder '0 (Termasuk Paket)', serta mempercantik tabel cetak SPH di modal admin dan template resmi /api/finance/print dengan label 'Termasuk Paket' (harga) dan 'Include' (total). Telah divalidasi lokal (npx tsc lolos, npm run build lolos), dideploy sukses ke VPS live PM2 dstech-main (PID 1405304), dan diuji coba nyata membuat SPH-DSTECH-202610-007 dengan 4 item rincian paket berhasil 100%.
 - **2026-04-24**: Inisialisasi Laporan Progres.
@@ -6481,10 +6483,10 @@
 
 ---
 
-### 229. Tugas: Fitur Neraca Saldo (Trial Balance) & Pemotongan Serta Perhitungan Pajak PPh di Modul Finance Admin (/admin/finance) [SEDANG DIKERJAKAN]
+### 229. Tugas: Fitur Neraca Saldo (Trial Balance) & Pemotongan Serta Perhitungan Pajak PPh di Modul Finance Admin (/admin/finance) [SELESAI]
 - **Permintaan Pengguna**:
   - *"saya butuh fitur neraca saldo, dan pemotongan dan perhitungan pajak PPH tolong kamu tambahkan ke aplikasi"*
-- **Status**: **SEDANG DIKERJAKAN**
+- **Status**: **SELESAI (SUDAH DIVERIFIKASI LIVE & BROWSER TESTING)**
 - **Analisis & Rencana Solusi**:
   1. **Tab 1: Neraca Saldo (Trial Balance)**:
      - Mengagregasi posisi akun keuangan riil secara otomatis ke format standar akuntansi Debit vs Kredit:
@@ -6506,20 +6508,20 @@
 - **Rencana Step-by-Step Pengerjaan**:
   1. [x] **Langkah 1**: Catat rencana kerja Tugas 229 dan step-by-step di `LAPORAN_PROGRES.md`.
   2. [x] **Langkah 2**: Buat folder cadangan `_backup_finance_trial_tax/` dan amankan file target (`admin/finance/page.tsx` & `api/finance/route.ts`).
-  3. [ ] **Langkah 3**: Siapkan backend endpoint Pajak PPh di `src/app/api/finance/route.ts` (CRUD record pajak `dstech_tax_...`).
-  4. [ ] **Langkah 4**: Implementasikan Tab Neraca Saldo (*Trial Balance*) dengan kalkulasi dinamis Debit/Kredit dan lembar cetak standar di `src/app/admin/finance/page.tsx`.
-  5. [ ] **Langkah 5**: Implementasikan Tab Pemotongan & Perhitungan Pajak PPh (PPh 21, PPh 23, PPh Final PP 23 0.5%, PPN 11%) dengan modal setor pajak di `src/app/admin/finance/page.tsx`.
-  6. [ ] **Langkah 6**: Validasi kompilasi lokal `npx tsc --noEmit` lolos 100% dan `npm run build` sukses.
-  7. [ ] **Langkah 7**: Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
-  8. [ ] **Langkah 8**: Verifikasi visual via browser testing subagent di `https://dstechsmart.com/admin/finance`.
-  9. [ ] **Langkah 9**: Bersihkan folder cadangan dan tandai Tugas 229 sebagai `[SELESAI]`.
+  3. [x] **Langkah 3**: Siapkan backend endpoint Pajak PPh di `src/app/api/finance/route.ts` (CRUD record pajak `dstech_tax_...`).
+  4. [x] **Langkah 4**: Implementasikan Tab Neraca Saldo (*Trial Balance*) dengan kalkulasi dinamis Debit/Kredit dan lembar cetak standar di `src/app/admin/finance/page.tsx`.
+  5. [x] **Langkah 5**: Implementasikan Tab Pemotongan & Perhitungan Pajak PPh (PPh 21, PPh 23, PPh Final PP 23 0.5%, PPN 11%) dengan modal setor pajak di `src/app/admin/finance/page.tsx`.
+  6. [x] **Langkah 6**: Validasi kompilasi lokal `npx tsc --noEmit` lolos 100% dan `npm run build` sukses.
+  7. [x] **Langkah 7**: Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  8. [x] **Langkah 8**: Verifikasi visual via browser testing subagent di `https://dstechsmart.com/admin/finance`.
+  9. [x] **Langkah 9**: Bersihkan folder cadangan dan tandai Tugas 229 sebagai `[SELESAI]`.
 
 ---
 
-### 230. Tugas: Fitur Pengelolaan Aset Perusahaan (Fixed Asset & Equipment Tracking) [ANTRIAN PEKERJAAN BERIKUTNYA]
+### 230. Tugas: Fitur Pengelolaan Aset Perusahaan (Fixed Asset & Equipment Tracking) [SEDANG DIKERJAKAN]
 - **Permintaan Pengguna**:
   - *"setelah semuanya selesai, tolong tambahkan fitur pengelolaan aset perusahaan"*
-- **Status**: **DALAM ANTRIAN (Akan dikerjakan setelah Tugas 229 selesai)**
+- **Status**: **SEDANG DIKERJAKAN**
 - **Rencana Solusi**:
   1. Modul pencatatan aset tetap perusahaan (peralatan kerja teknisi, armada kendaraan operasional, mesin barcode/tools, komputer & server, inventaris kantor).
   2. Tracking penanggung jawab (PIC Teknisi/Karyawan), lokasi titik aset, dan kondisi fisik (Baik, Rusak Ringan, Rusak Berat, Perlu Kalibrasi).
