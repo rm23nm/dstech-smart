@@ -79,6 +79,7 @@ import {
   Loader2,
   FileSpreadsheet,
 } from "lucide-react";
+import { getDocPin } from "@/utils/dstech_doc_security";
 
 interface ProductCatalogItem {
   id: string;
@@ -2186,6 +2187,19 @@ export default function AdminFinanceERPPage() {
     const isPo = dt === "PO" || dt === "PURCHASE_ORDER" || docNo.startsWith("PO") || docTitle.includes("purchase order") || docTitle.includes("pembelian");
     const encodedNo = encodeURIComponent(doc.docNumber || "");
 
+    const docPin = getDocPin({
+      id: doc.docNumber,
+      quotationNumber: doc.docNumber,
+      invoiceNumber: doc.docNumber,
+      poNumber: doc.docNumber,
+      orderNumber: doc.docNumber,
+      date: doc.date,
+      ...(doc as any),
+    });
+
+    // Lampirkan KATA SANDI / PIN VERIFIKASI DOKUMEN RESMI
+    waText += `\n🔐 *KATA SANDI / PIN VERIFIKASI DOKUMEN:*\n👉 *${docPin}*\n_(Gunakan 6-digit kata sandi di atas saat membuka atau mengunduh tautan berkas resmi di bawah demi privasi & keamanan data transaksi Anda)_\n`;
+
     // Jika Dokumen adalah Faktur (Invoice), sertakan Tautan Unduh Langsung Berkas Lengkap
     if (isInvoice) {
       waText += `\n📥 *Tautan Unduh & Cetak Berkas Resmi Pekerjaan:*\n`;
@@ -2232,6 +2246,8 @@ export default function AdminFinanceERPPage() {
     if (doc.grandTotal > 0) emailBody += `• Total Nilai: ${formatRupiah(doc.grandTotal)}\n`;
     if (doc.paymentStatus) emailBody += `• Status Pembayaran: ${doc.paymentStatus}\n`;
     if (doc.approvalStatus) emailBody += `• Pengesahan Direksi: ${doc.approvalStatus}\n`;
+
+    emailBody += `\n🔐 KATA SANDI / PIN VERIFIKASI DOKUMEN:\n👉 PIN: ${docPin}\n(Gunakan 6 digit kata sandi di atas saat membuka atau mengunduh tautan berkas resmi di bawah demi perlindungan privasi transaksi Anda)\n`;
 
     if (isInvoice) {
       emailBody += `\nUnduh Berkas Resmi Pekerjaan:\n`;
@@ -2290,6 +2306,15 @@ export default function AdminFinanceERPPage() {
     const companyName = "PT. DSTech Smart Perkasa";
     const portalUrl = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
     const encodedNo = encodeURIComponent(doc.docNumber);
+    const docPin = getDocPin({
+      id: doc.docNumber,
+      quotationNumber: doc.docNumber,
+      invoiceNumber: doc.docNumber,
+      poNumber: doc.docNumber,
+      orderNumber: doc.docNumber,
+      date: doc.date,
+      ...(doc as any),
+    });
 
     let downloadButtons = "";
     const dt = (doc.docType || "").toUpperCase();
@@ -2318,6 +2343,20 @@ export default function AdminFinanceERPPage() {
       `;
     }
 
+    const pinBoxHtml = `
+      <div style="margin: 20px 0; padding: 16px 20px; background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%); border: 2px dashed #4f46e5; border-radius: 12px; text-align: center;">
+        <p style="margin: 0 0 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #4338ca;">
+          🔐 Kata Sandi / PIN Verifikasi Akses Dokumen
+        </p>
+        <div style="font-size: 28px; font-weight: 900; letter-spacing: 8px; font-family: monospace; color: #1e1b4b; margin: 4px 0;">
+          ${docPin}
+        </div>
+        <p style="margin: 4px 0 0; font-size: 11px; color: #64748b; line-height: 1.4;">
+          Gunakan 6 digit PIN verifikasi di atas saat membuka dan mengunduh berkas resmi demi perlindungan privasi transaksi Anda.
+        </p>
+      </div>
+    `;
+
     return `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; background-color: #ffffff; color: #1e293b;">
         <div style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); padding: 24px 28px; color: #ffffff;">
@@ -2332,6 +2371,7 @@ export default function AdminFinanceERPPage() {
             ${doc.grandTotal > 0 ? `<p style="margin: 0; font-size: 14px; color: #059669;"><strong>Nilai Total:</strong> ${formatRupiah(doc.grandTotal)}</p>` : ""}
           </div>
           <div style="font-size: 13px; line-height: 1.6; white-space: pre-wrap; color: #334155;">${bodyText}</div>
+          ${pinBoxHtml}
           ${downloadButtons}
           <div style="border-top: 1px solid #e2e8f0; margin-top: 24px; padding-top: 16px; font-size: 11px; color: #64748b; text-align: center;">
             <p style="margin: 0;">Email ini dikirim secara resmi melalui Server SMTP Terenkripsi SSL PT. DSTech Smart Perkasa.</p>
@@ -28527,6 +28567,52 @@ export default function AdminFinanceERPPage() {
               </div>
             </div>
 
+            {/* Card Keamanan: Kata Sandi / PIN Dokumen */}
+            {(() => {
+              const modalDocPin = getDocPin({
+                id: sendDocModal.docNumber,
+                quotationNumber: sendDocModal.docNumber,
+                invoiceNumber: sendDocModal.docNumber,
+                poNumber: sendDocModal.docNumber,
+                orderNumber: sendDocModal.docNumber,
+                date: sendDocModal.date,
+                ...(sendDocModal as any),
+              });
+
+              return (
+                <div className="p-3 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border border-indigo-200/90 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
+                      🔐
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-500 font-extrabold uppercase tracking-wider block">
+                          Kata Sandi / PIN Verifikasi:
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.2 bg-indigo-100 text-indigo-700 font-bold rounded-full border border-indigo-200">
+                          Auto Protect
+                        </span>
+                      </div>
+                      <span className="font-mono font-black text-indigo-950 text-base tracking-[0.2em] block leading-tight">
+                        {modalDocPin}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyContent(modalDocPin, "Kata Sandi / PIN Dokumen")}
+                      className="px-3 py-1.5 text-xs font-black bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-300 rounded-xl shadow-2xs transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Salin PIN</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Tombol Tautan Download Dokumen Cepat untuk Klien */}
             {sendDocModal.docType === "Invoice" && (
               <div className="p-3.5 rounded-2xl bg-purple-50/70 border border-purple-200/90 space-y-2">
@@ -28542,6 +28628,15 @@ export default function AdminFinanceERPPage() {
                   {(() => {
                     const portal = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
                     const enc = encodeURIComponent(sendDocModal.docNumber);
+                    const modalDocPin = getDocPin({
+                      id: sendDocModal.docNumber,
+                      quotationNumber: sendDocModal.docNumber,
+                      invoiceNumber: sendDocModal.docNumber,
+                      poNumber: sendDocModal.docNumber,
+                      orderNumber: sendDocModal.docNumber,
+                      date: sendDocModal.date,
+                      ...(sendDocModal as any),
+                    });
                     const invUrl = `${portal}/api/finance/print?doc=invoice&no=${enc}`;
                     const bastUrl = `${portal}/api/finance/print?doc=bast&no=${enc}`;
                     const doUrl = `${portal}/api/finance/print?doc=delivery&no=${enc}`;
@@ -28562,7 +28657,7 @@ export default function AdminFinanceERPPage() {
                               <span>Salin</span>
                             </button>
                             <a
-                              href={invUrl}
+                              href={`${invUrl}&pin=${modalDocPin}`}
                               target="_blank"
                               rel="noreferrer"
                               className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
@@ -28586,7 +28681,7 @@ export default function AdminFinanceERPPage() {
                               <span>Salin</span>
                             </button>
                             <a
-                              href={bastUrl}
+                              href={`${bastUrl}&pin=${modalDocPin}`}
                               target="_blank"
                               rel="noreferrer"
                               className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
@@ -28610,7 +28705,7 @@ export default function AdminFinanceERPPage() {
                               <span>Salin</span>
                             </button>
                             <a
-                              href={doUrl}
+                              href={`${doUrl}&pin=${modalDocPin}`}
                               target="_blank"
                               rel="noreferrer"
                               className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
@@ -28634,7 +28729,7 @@ export default function AdminFinanceERPPage() {
                               <span>Salin</span>
                             </button>
                             <a
-                              href={photoUrl}
+                              href={`${photoUrl}&pin=${modalDocPin}`}
                               target="_blank"
                               rel="noreferrer"
                               className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
@@ -28665,6 +28760,15 @@ export default function AdminFinanceERPPage() {
                   {(() => {
                     const portal = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
                     const enc = encodeURIComponent(sendDocModal.docNumber);
+                    const modalDocPin = getDocPin({
+                      id: sendDocModal.docNumber,
+                      quotationNumber: sendDocModal.docNumber,
+                      invoiceNumber: sendDocModal.docNumber,
+                      poNumber: sendDocModal.docNumber,
+                      orderNumber: sendDocModal.docNumber,
+                      date: sendDocModal.date,
+                      ...(sendDocModal as any),
+                    });
                     const sphUrl = `${portal}/api/finance/print?doc=sph&no=${enc}`;
 
                     return (
@@ -28684,7 +28788,7 @@ export default function AdminFinanceERPPage() {
                             <span>Salin Link</span>
                           </button>
                           <a
-                            href={sphUrl}
+                            href={`${sphUrl}&pin=${modalDocPin}`}
                             target="_blank"
                             rel="noreferrer"
                             className="py-1.5 px-3 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-colors"
@@ -28715,6 +28819,15 @@ export default function AdminFinanceERPPage() {
                   {(() => {
                     const portal = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
                     const enc = encodeURIComponent(sendDocModal.docNumber);
+                    const modalDocPin = getDocPin({
+                      id: sendDocModal.docNumber,
+                      quotationNumber: sendDocModal.docNumber,
+                      invoiceNumber: sendDocModal.docNumber,
+                      poNumber: sendDocModal.docNumber,
+                      orderNumber: sendDocModal.docNumber,
+                      date: sendDocModal.date,
+                      ...(sendDocModal as any),
+                    });
                     const poUrl = `${portal}/api/finance/print?doc=po&no=${enc}`;
 
                     return (
@@ -28734,7 +28847,7 @@ export default function AdminFinanceERPPage() {
                             <span>Salin Link</span>
                           </button>
                           <a
-                            href={poUrl}
+                            href={`${poUrl}&pin=${modalDocPin}`}
                             target="_blank"
                             rel="noreferrer"
                             className="py-1.5 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center justify-center gap-1 cursor-pointer shadow-xs transition-colors"

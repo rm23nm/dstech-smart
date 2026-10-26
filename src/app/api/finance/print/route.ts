@@ -1,6 +1,199 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getDocPin, verifyDocPin } from "@/utils/dstech_doc_security";
+
+function renderSecurityLockScreen(params: {
+  docType: string;
+  docNo: string;
+  docTitle: string;
+  recipientName: string;
+  docDate: string;
+  hasError: boolean;
+  receiptNo?: string;
+}) {
+  const { docType, docNo, docTitle, recipientName, docDate, hasError, receiptNo } = params;
+
+  const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifikasi Akses Dokumen Resmi - PT. DSTech Smart Perkasa</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@600;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-mono-code { font-family: 'JetBrains Mono', monospace; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-6px); }
+      40%, 80% { transform: translateX(6px); }
+    }
+    .animate-shake { animation: shake 0.4s ease-in-out; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 min-h-screen text-slate-100 flex items-center justify-center p-4 selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
+  <!-- Ambient background glow elements -->
+  <div class="absolute top-1/4 -left-20 w-72 h-72 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none"></div>
+  <div class="absolute bottom-1/4 -right-20 w-80 h-80 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+
+  <div class="w-full max-w-md relative z-10 my-8">
+    <!-- Brand / Company Header -->
+    <div class="text-center mb-6">
+      <div class="inline-flex items-center justify-center p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-xl mb-3">
+        <img src="/logo.png" alt="PT. DSTech Smart Perkasa" class="h-10 w-auto object-contain" onerror="this.style.display='none'" />
+        <span class="text-base font-black tracking-tight text-white ml-2">PT. DSTECH SMART PERKASA</span>
+      </div>
+      <p class="text-xs text-indigo-300 font-medium">Enterprise Technology &amp; Security Infrastructure</p>
+    </div>
+
+    <!-- Main Verification Card -->
+    <div class="bg-slate-900/90 backdrop-blur-xl border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-indigo-950/60 relative overflow-hidden">
+      <!-- Top Ribbon / Accent Line -->
+      <div class="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400"></div>
+
+      <!-- Security Status Badge -->
+      <div class="flex items-center justify-center mb-5">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+          <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
+          🔒 Dokumen Resmi Terproteksi PIN
+        </span>
+      </div>
+
+      <div class="text-center mb-6">
+        <h1 class="text-xl sm:text-2xl font-black text-white tracking-tight">Verifikasi Akses Dokumen</h1>
+        <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
+          Dokumen ini dilindungi demi privasi &amp; keamanan transaksi Anda. Silakan masukkan <strong>6 Digit PIN Verifikasi</strong> yang telah dilampirkan via <strong>WhatsApp</strong> atau <strong>Email</strong> Anda.
+        </p>
+      </div>
+
+      <!-- Info Ringkas Dokumen (Aman & Non-Sensitif) -->
+      <div class="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 mb-6 space-y-2 text-xs">
+        <div class="flex items-center justify-between text-slate-400">
+          <span>Jenis Dokumen:</span>
+          <span class="font-bold text-slate-200 text-right">${docTitle}</span>
+        </div>
+        <div class="flex items-center justify-between border-t border-slate-800/80 pt-2 text-slate-400">
+          <span>Nomor Dokumen:</span>
+          <span class="font-mono-code font-black text-indigo-300 text-right">${docNo}</span>
+        </div>
+        <div class="flex items-center justify-between border-t border-slate-800/80 pt-2 text-slate-400">
+          <span>Ditujukan Kepada:</span>
+          <span class="font-bold text-slate-200 text-right truncate max-w-[200px]">${recipientName}</span>
+        </div>
+        <div class="flex items-center justify-between border-t border-slate-800/80 pt-2 text-slate-400">
+          <span>Tanggal Dokumen:</span>
+          <span class="text-slate-300 text-right">${docDate}</span>
+        </div>
+      </div>
+
+      ${hasError ? `
+        <!-- Error Alert -->
+        <div class="mb-5 p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs flex items-start gap-2.5 animate-shake">
+          <span class="text-base shrink-0">⚠️</span>
+          <div class="leading-relaxed">
+            <strong class="font-bold block text-rose-100">PIN Verifikasi Salah</strong>
+            Kode PIN yang dimasukkan tidak cocok. Silakan periksa kembali pesan WhatsApp atau Email resmi yang Anda terima dari PT. DSTech Smart Perkasa.
+          </div>
+        </div>
+      ` : ''}
+
+      <!-- Form Input PIN -->
+      <form method="GET" action="/api/finance/print" class="space-y-4">
+        <input type="hidden" name="doc" value="${docType}" />
+        <input type="hidden" name="no" value="${docNo}" />
+        ${receiptNo ? `<input type="hidden" name="receiptNo" value="${receiptNo}" />` : ''}
+
+        <div>
+          <label for="input-pin" class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 text-center">
+            Ketik 6 Digit Kata Sandi / PIN Dokumen:
+          </label>
+          <div class="relative">
+            <input
+              type="password"
+              id="input-pin"
+              name="pin"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              maxlength="8"
+              required
+              autofocus
+              placeholder="••••••"
+              class="w-full py-3.5 px-4 text-center tracking-[0.4em] text-2xl font-black font-mono-code rounded-2xl bg-slate-950 border ${hasError ? 'border-rose-500 ring-2 ring-rose-500/30' : 'border-slate-700 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30'} text-indigo-300 placeholder-slate-600 focus:outline-none transition-all shadow-inner"
+            />
+            <button
+              type="button"
+              onclick="togglePinVisibility()"
+              class="absolute right-3.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-white transition cursor-pointer"
+              title="Tampilkan / Sembunyikan PIN"
+            >
+              <span id="eye-icon" class="text-base">👁️</span>
+            </button>
+          </div>
+          <span class="text-[10px] text-slate-500 block text-center mt-1.5">
+            *PIN angka tercantum pada pesan WhatsApp / Email resmi
+          </span>
+        </div>
+
+        <button
+          type="submit"
+          class="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-cyan-500 hover:from-indigo-500 hover:to-cyan-400 text-white font-black text-sm tracking-wide shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <span>🔓 Buka &amp; Verifikasi Dokumen</span>
+        </button>
+      </form>
+
+      <!-- Customer Support Section -->
+      <div class="mt-6 pt-5 border-t border-slate-800 text-center">
+        <p class="text-[11px] text-slate-400 mb-2">
+          Belum menerima atau lupa PIN Verifikasi?
+        </p>
+        <a
+          href="https://wa.me/6282213768877?text=${encodeURIComponent(`Halo Admin PT. DSTech Smart Perkasa, saya memerlukan bantuan kata sandi / PIN verifikasi untuk membuka dokumen ${docTitle} Nomor: ${docNo}.`)}"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition"
+        >
+          <span>💬 Bantuan WhatsApp: 0822-1376-8877</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Security & Legal Notice Footer -->
+    <div class="text-center mt-6 text-[10px] text-slate-500 space-y-1">
+      <p>🛡️ Dilindungi oleh Sistem Keamanan Dokumen PT. DSTech Smart Perkasa.</p>
+      <p>Sesuai standar perlindungan data transaksi &amp; UU ITE No. 11 Thn 2008.</p>
+    </div>
+  </div>
+
+  <script>
+    function togglePinVisibility() {
+      const pinInput = document.getElementById('input-pin');
+      const eyeIcon = document.getElementById('eye-icon');
+      if (!pinInput) return;
+      if (pinInput.type === 'password') {
+        pinInput.type = 'text';
+        if (eyeIcon) eyeIcon.textContent = '🔒';
+      } else {
+        pinInput.type = 'password';
+        if (eyeIcon) eyeIcon.textContent = '👁️';
+      }
+    }
+  </script>
+</body>
+</html>`;
+
+  return new NextResponse(html, {
+    status: hasError ? 401 : 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store, max-age=0",
+    },
+  });
+}
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
 const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
@@ -174,6 +367,19 @@ export async function GET(req: Request) {
         </html>
       `;
       return new NextResponse(errorHtml, { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } });
+    }
+
+    const docPin = getDocPin(sph);
+    const pinInput = (searchParams.get("pin") || searchParams.get("password") || searchParams.get("pass") || "").trim();
+    if (!verifyDocPin(sph, pinInput)) {
+      return renderSecurityLockScreen({
+        docType: "sph",
+        docNo: sph.quotationNumber || docNo || "SPH",
+        docTitle: "Surat Penawaran Harga (SPH)",
+        recipientName: sph.customerOrg || sph.customerName || "Klien Terhormat",
+        docDate: sph.date || "-",
+        hasError: Boolean(pinInput),
+      });
     }
 
     const signerName = sph.approvedBy || settings.signerName || "RAMADHANI ST";
@@ -1105,6 +1311,19 @@ export async function GET(req: Request) {
       });
     }
 
+    const docPin = getDocPin(po);
+    const pinInput = (searchParams.get("pin") || searchParams.get("password") || searchParams.get("pass") || "").trim();
+    if (!verifyDocPin(po, pinInput)) {
+      return renderSecurityLockScreen({
+        docType: "po",
+        docNo: po.poNumber || docNo || "PO",
+        docTitle: "Purchase Order (PO)",
+        recipientName: po.vendorName || po.supplierName || "Vendor / Supplier Terhormat",
+        docDate: po.date || "-",
+        hasError: Boolean(pinInput),
+      });
+    }
+
     const signerName = po.approvedBy || settings.signerName || "RAMADHANI ST";
     const signerTitle = po.approvedTitle || settings.signerTitle || "Direktur";
     const signatureImage = po.signatureImage || settings.masterSignatureUrl || "";
@@ -1702,6 +1921,26 @@ export async function GET(req: Request) {
     });
   }
 
+  const docPin = getDocPin(sale);
+  const pinInput = (searchParams.get("pin") || searchParams.get("password") || searchParams.get("pass") || "").trim();
+  if (!verifyDocPin(sale, pinInput)) {
+    let friendlyTitle = "Faktur Penjualan (Invoice)";
+    if (docType === "bast") friendlyTitle = "Berita Acara Serah Terima (BAST)";
+    else if (docType === "delivery" || docType === "do") friendlyTitle = "Surat Jalan Material (Delivery Order)";
+    else if (docType === "receipt" || docType === "kwitansi") friendlyTitle = "Kuitansi Pembayaran Sah";
+    else if (docType === "photos") friendlyTitle = "Laporan Dokumentasi Foto Pekerjaan";
+
+    return renderSecurityLockScreen({
+      docType,
+      docNo: sale.invoiceNumber || docNo || "INV",
+      docTitle: friendlyTitle,
+      recipientName: sale.customerOrg || sale.customerName || "Klien Terhormat",
+      docDate: sale.date || "-",
+      hasError: Boolean(pinInput),
+      receiptNo,
+    });
+  }
+
   const signerName = sale.approvedBy || settings.signerName || "RAMADHANI ST";
   const signerTitle = sale.approvedTitle || settings.signerTitle || "Direktur";
   const signatureImage = sale.signatureImage || settings.masterSignatureUrl || "";
@@ -1822,7 +2061,7 @@ export async function GET(req: Request) {
                   <span class="font-bold text-slate-700">Pilih Pembayaran:</span>
                   ${payments.map((p: any, idx: number) => `
                     <a
-                      href="/api/finance/print?doc=receipt&no=${encNo}&receiptNo=${encodeURIComponent(p.receiptNumber || p.id)}"
+                      href="/api/finance/print?doc=receipt&no=${encNo}&receiptNo=${encodeURIComponent(p.receiptNumber || p.id)}&pin=${docPin}"
                       class="px-1.5 py-0.5 rounded text-[8.5px] font-bold transition-all ${
                         (selectedPayment?.id === p.id || selectedPayment?.receiptNumber === p.receiptNumber)
                           ? 'bg-indigo-600 text-white shadow-xs'
@@ -2559,7 +2798,7 @@ export async function GET(req: Request) {
       <div class="max-w-[210mm] mx-auto mb-4 flex items-center gap-2 overflow-x-auto pb-1 print-hidden">
         ${tabs.map((tab) => `
           <a
-            href="?doc=${tab.id}&no=${encNo}"
+            href="?doc=${tab.id}&no=${encNo}&pin=${docPin}"
             class="px-3.5 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition cursor-pointer ${
               tab.active
                 ? 'bg-indigo-600 text-white shadow-md'

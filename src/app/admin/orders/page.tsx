@@ -32,6 +32,7 @@ import {
   UserCheck,
   RotateCcw
 } from "lucide-react";
+import { getDocPin } from "@/utils/dstech_doc_security";
 
 interface OrderItem {
   productId: string;
@@ -771,7 +772,7 @@ export default function AdminOrdersPage() {
                         </button>
 
                         <a
-                          href={`/api/finance/print?doc=invoice&id=${order.invoiceNumber || order.orderNumber}`}
+                          href={`/api/finance/print?doc=invoice&id=${order.invoiceNumber || order.orderNumber}&pin=${getDocPin(order)}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="p-1.5 rounded-xl bg-blue-50 text-dstech-blue hover:bg-blue-100 border border-blue-200 transition-all cursor-pointer"
@@ -991,7 +992,7 @@ export default function AdminOrdersPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {/* Cetak Faktur Penjualan */}
                     <a
-                      href={`/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}`}
+                      href={`/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}&pin=${getDocPin(selectedOrder)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue hover:shadow-xs text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 transition group"
@@ -1002,7 +1003,7 @@ export default function AdminOrdersPage() {
 
                     {/* Cetak Surat Jalan DO */}
                     <a
-                      href={`/api/finance/print?doc=do&id=${selectedOrder.deliveryOrderNumber || selectedOrder.invoiceNumber || selectedOrder.orderNumber}`}
+                      href={`/api/finance/print?doc=do&id=${selectedOrder.deliveryOrderNumber || selectedOrder.invoiceNumber || selectedOrder.orderNumber}&pin=${getDocPin(selectedOrder)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-600 hover:shadow-xs text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 transition group"
@@ -1013,7 +1014,7 @@ export default function AdminOrdersPage() {
 
                     {/* Cetak Kuitansi Pembayaran */}
                     <a
-                      href={`/api/finance/print?doc=receipt&id=${selectedOrder.receiptNumber || selectedOrder.invoiceNumber || selectedOrder.orderNumber}`}
+                      href={`/api/finance/print?doc=receipt&id=${selectedOrder.receiptNumber || selectedOrder.invoiceNumber || selectedOrder.orderNumber}&pin=${getDocPin(selectedOrder)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-emerald-600 hover:shadow-xs text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 transition group"
@@ -1024,10 +1025,15 @@ export default function AdminOrdersPage() {
                   </div>
 
                   <div className="text-[10px] text-slate-500 flex flex-wrap items-center justify-between pt-1 gap-2">
-                    <span>No. Faktur: <strong className="text-slate-800 font-mono">{selectedOrder.invoiceNumber || "Otomatis Digenerate"}</strong></span>
+                    <span>
+                      No. Faktur: <strong className="text-slate-800 font-mono">{selectedOrder.invoiceNumber || "Otomatis Digenerate"}</strong>
+                      <span className="ml-2 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold border border-indigo-200">
+                        PIN: {getDocPin(selectedOrder)}
+                      </span>
+                    </span>
                     <a
                       href={`https://wa.me/${(selectedOrder.customerPhone || "").replace(/^0/, "62")}?text=${encodeURIComponent(
-                        `Halo Bpk/Ibu ${selectedOrder.customerName}, berikut dokumen resmi pesanan #${selectedOrder.orderNumber} Anda dari PT. DSTech Smart Perkasa:\n\n📄 Faktur: https://dstechsmart.com/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}\n🚚 Surat Jalan: https://dstechsmart.com/api/finance/print?doc=do&id=${selectedOrder.deliveryOrderNumber || selectedOrder.invoiceNumber || selectedOrder.orderNumber}\n\nTerima kasih atas kepercayaan Anda bermitra dengan DSTech Smart.`
+                        `Halo Bpk/Ibu ${selectedOrder.customerName}, berikut dokumen resmi pesanan #${selectedOrder.orderNumber} Anda dari PT. DSTech Smart Perkasa:\n\n📄 Faktur Penjualan: https://dstechsmart.com/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}\n🚚 Surat Jalan (DO): https://dstechsmart.com/api/finance/print?doc=do&id=${selectedOrder.deliveryOrderNumber || selectedOrder.invoiceNumber || selectedOrder.orderNumber}\n\n🔐 *KATA SANDI / PIN VERIFIKASI DOKUMEN:*\n👉 *${getDocPin(selectedOrder)}*\n_(Gunakan 6-digit PIN di atas saat membuka atau mengunduh tautan berkas resmi demi privasi transaksi Anda)_\n\nTerima kasih atas kepercayaan Anda bermitra dengan DSTech Smart.`
                       )}`}
                       target="_blank"
                       rel="noopener noreferrer"
