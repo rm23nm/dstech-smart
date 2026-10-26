@@ -3,6 +3,7 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-27**: Implementasi Modul Pengelolaan Aset Perusahaan & Peralatan Kerja Teknisi (/admin/assets & /api/assets). Menyediakan sistem pencatatan inventaris aset tetap perusahaan (peralatan kerja teknisi, alat uji fiber optic/splicer, armada kendaraan operasional, perangkat IT/server, dan inventaris kantor) dengan perhitungan depresiasi/penyusutan otomatis metode garis lurus (*Straight-Line Depreciation*), kartu KPI (Total Nilai Perolehan Rp 214.300.000, Akumulasi Penyusutan, Nilai Buku Bersih NBV Rp 158.401.042, Kondisi Unit Prima), filter multi-kategori/kondisi/lokasi, tabel inventaris interaktif, modal tambah/edit aset, modal mutasi/peminjaman alat kerja lapangan oleh teknisi, ekspor data CSV/Excel, serta lembar cetak standar resmi A4 ber-Kop Surat DSTech. Ditambahkan menu navigasi 'Aset & Alat Kerja' di sidebar admin (/admin/layout.tsx). Lolos uji TypeScript (0 error), build 65 rute, dipush ke GitHub commit `bbe824b` & `f79a2c3`, dideploy ke live VPS PM2 `dstech-main` (PID 1610100), dan diverifikasi visual di browser live.
 - **2026-10-27**: Implementasi Fitur Neraca Saldo (Trial Balance) Terkonsolidasi & Manajemen Pemotongan Serta Perhitungan Pajak PPh & PPN Resmi (/admin/finance & /api/finance). Menyediakan Tab '⚖️ Neraca Saldo' dengan agregasi otomatis 9 akun standar akuntansi (Kas & Bank, Piutang Usaha, Persediaan/Valuasi Gudang, Utang Usaha PO, Utang Pajak PPh/PPN, Modal/Ekuitas, Pendapatan Usaha, HPP Material, dan Beban Usaha), 4 kartu KPI, status keseimbangan matematis (Balanced check), dan lembar cetak standar A4 ber-Kop Surat Resmi DSTech Smart. Menyediakan Tab '🏛️ Pajak PPh & PPN' dengan 4 kartu KPI (PPh 21, PPh 23, PPh Final PP 23 0.5%, PPN Keluaran/Masukan), tombol hitung instan 0.5% dari seluruh faktur penjualan bulan ini, modal formulir setor pajak (BUPOT, Kode Billing, NTPN), dan integrasi backend API (/api/finance) dengan prefix data aman `tax_records`. Lolos uji kompilasi tsc (0 error), build 63 rute Next.js, dipush ke GitHub commit `6738d19`, dideploy ke server live VPS PM2 `dstech-main` (PID 1606408), dan diverifikasi visual di browser live.
 - **2026-10-27**: Penambahan Kolom Merek (Brand) Produk, Dropdown Filter Merek di Katalog E-Store (/shop), dan Form Input Merek di Inventori Admin (/admin/products & /api/products). Menambahkan filter merek [ 🛡️ Semua Merek ▾ ] berdampingan dengan kategori dan subkategori di /shop dengan auto-detection cerdas 13 brand terkemuka (Hikvision, Dahua, HiLook, Ezviz, Imou, ZKTeco, Ruijie Reyee, Ubiquiti, Uniview, Tiandy, TP-Link, Barrier Gate MX, DSTech Smart), badge merek di kartu dan modal produk, input datalist merek pada form tambah/edit produk admin, badge merek pada tabel inventori, serta dukungan kolom Merek pada ekspor/impor Excel katalog massal (/api/products/bulk). Lolos uji TypeScript, build 63 rute, dipush ke GitHub (commit `3a35a9a`), dideploy live ke VPS PM2 `dstech-main`, dan diverifikasi visual di browser live.
 - **2026-10-26**: Implementasi Suite Optimasi SEO Mesin Pencari Google Komprehensif (Dynamic XML Sitemap, Robots.txt, Google Schema.org JSON-LD LocalBusiness, & Rich Metadata E-Store /shop & /contact). Membangun pondasi SEO teknis lengkap agar produk dan layanan PT. DSTech Smart Perkasa dapat terindeks dan muncul di halaman utama Google. (1) Menyiapkan dynamic sitemap (`src/app/sitemap.ts`) yang memetakan seluruh rute publik dan katalog produk secara otomatis untuk Googlebot; (2) Menyiapkan crawler directive (`src/app/robots.ts`) yang mengizinkan perayapan halaman publik dan memproteksi rute internal admin; (3) Menyematkan Structured Data resmi Google (JSON-LD Schema.org) `@type: ["LocalBusiness", "SecuritySystemInstallService", "HomeAutomationCompany"]` dan `WebSite` lengkap dengan NIB, NPWP, koordinat GPS Cilegon, alamat kantor, nomor WhatsApp CS, rating, dan area layanan di `src/app/layout.tsx`; (4) Menambahkan OpenGraph, Twitter Cards, dan kata kunci terarah (CCTV Cilegon, Barrier Gate Banten, Smart Home, dll.); (5) Menyediakan dedicated metadata layout pada `/shop` dan `/contact`. Telah divalidasi lokal (`npx tsc` lolos, build 61 rute lolos), dideploy ke live VPS PM2 `dstech-main` (PID 1426919), dan diverifikasi live (`https://dstechsmart.com/sitemap.xml` & `https://dstechsmart.com/robots.txt` respon HTTP 200 OK).
@@ -6518,31 +6519,63 @@
 
 ---
 
-### 230. Tugas: Fitur Pengelolaan Aset Perusahaan (Fixed Asset & Equipment Tracking) [SEDANG DIKERJAKAN]
+### 230. Tugas: Fitur Pengelolaan Aset Perusahaan (Fixed Asset & Equipment Tracking) [SELESAI]
 - **Permintaan Pengguna**:
   - *"setelah semuanya selesai, tolong tambahkan fitur pengelolaan aset perusahaan"*
-- **Status**: **SEDANG DIKERJAKAN**
-- **Rencana Solusi**:
-  1. Modul pencatatan aset tetap perusahaan (peralatan kerja teknisi, armada kendaraan operasional, mesin barcode/tools, komputer & server, inventaris kantor).
-  2. Tracking penanggung jawab (PIC Teknisi/Karyawan), lokasi titik aset, dan kondisi fisik (Baik, Rusak Ringan, Rusak Berat, Perlu Kalibrasi).
-  3. Perhitungan otomatis depresiasi/penyusutan aset (Garis Lurus / Straight-Line Method) dan nilai buku aset saat ini.
+- **Status**: **SELESAI (SUDAH DIVERIFIKASI LIVE & BROWSER TESTING)**
+- **Hasil Implementasi & Pembuktian**:
+  1. **Data Store & Backend API (`src/data/dstech_assets.json` & `src/app/api/assets/route.ts`)**:
+     - Struktur data aset lengkap dengan prefix `dstech_asset_`: `id`, `assetCode`, `name`, `category`, `brand`, `serialNumber`, `acquisitionDate`, `purchasePrice`, `economicLifeYears`, `salvageValue`, `currentBookValue`, `depreciationMethod` (Garis Lurus), `picName`, `locationName`, `condition`, `photoUrl`, `notes`, dan `mutationHistory`.
+     - Perhitungan depresiasi otomatis (*Straight-Line Depreciation Method*): Menghitung akumulasi penyusutan per bulan dan sisa nilai buku (*Net Book Value*) secara dinamis.
+     - Penanganan aksi mutasi aset (`actionType: "mutate"`): Mencatat riwayat pemindahan lokasi dan pergantian PIC penanggung jawab alat di lapangan.
+  2. **Halaman Modul Aset (`src/app/admin/assets/page.tsx`)**:
+     - 4 Kartu KPI Analitik: Total Harga Perolehan (Rp 214.300.000), Akumulasi Penyusutan (Rp 55.898.958), Total Nilai Buku Bersih (Rp 158.401.042), dan Kondisi Unit Prima (5/5 Unit).
+     - Filter & Pencarian Cepat: Filter Kategori, Filter Kondisi (Baik, Rusak Ringan, Rusak Berat, Dalam Servis), dan Filter Lokasi.
+     - Tabel Inventaris Lengkap: Menampilkan foto thumbnail, kode aset, nama alat & merek, kategori, PIC & lokasi, harga perolehan, nilai buku (NBV), badge kondisi, dan tombol aksi.
+     - Modal Tambah & Edit Aset: Form lengkap dengan input otomatis kode aset, kategori, merek, tanggal perolehan, umur ekonomis, nilai residu, PIC, lokasi, foto, dan catatan.
+     - Modal Mutasi / Peminjaman Alat Kerja: Catat serah terima alat kerja ke teknisi atau lokasi proyek dengan riwayat audit.
+     - Ekspor CSV/Excel dan Lembar Cetak Rekapitulasi Aset Resmi A4 ber-Kop Surat DSTech Smart.
+  3. **Sidebar Navigasi Admin (`src/app/admin/layout.tsx`)**:
+     - Ditambahkan menu 'Aset & Alat Kerja' (`/admin/assets`) dengan ikon Wrench.
+- **Rincian Step-by-Step Pengerjaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 230 step-by-step di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat folder cadangan `_backup_asset_management/` dan amankan file terkait.
+  3. [x] **Langkah 3**: Siapkan backend API dan data store aset ber-prefix `dstech_` (`src/app/api/assets/route.ts` & `src/data/dstech_assets.json`).
+  4. [x] **Langkah 4**: Bangun antarmuka halaman `/admin/assets` lengkap dengan kartu KPI, filter, tabel aset, modal tambah/edit aset, modal mutasi alat, dan kalkulator penyusutan otomatis.
+  5. [x] **Langkah 5**: Tambahkan menu navigasi 'Aset & Alat Kerja' di sidebar admin (`src/app/admin/layout.tsx`).
+  6. [x] **Langkah 6**: Validasi kompilasi `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses (65/65 routes).
+  7. [x] **Langkah 7**: Push ke GitHub repository (commit `bbe824b` & `f79a2c3`) dan deploy live ke VPS aaPanel PM2 `dstech-main` (PID 1610100).
+  8. [x] **Langkah 8**: Verifikasi visual langsung via browser testing subagent di `https://dstechsmart.com/admin/assets`: KPI, tabel aset, modal tambah aset, dan modal mutasi alat teruji sempurna.
+  9. [x] **Langkah 9**: Bersihkan folder cadangan dan tandai Tugas 230 sebagai `[SELESAI]`.
 
 ---
 
-### 231. Tugas: Fitur Pengaturan Titik GPS Lokasi Kantor & Titik Proyek (Geofencing & Radius Toleransi Absensi Karyawan) [ANTRIAN PEKERJAAN BERIKUTNYA]
+### 231. Tugas: Fitur Pengaturan Titik GPS Lokasi Kantor & Titik Proyek (Geofencing & Radius Toleransi Absensi Karyawan) [SEDANG DIKERJAKAN]
 - **Permintaan Pengguna**:
   - *"untuk absensi saat ini terkendala. staf yang saya tempatkan dikantor posisinya, namun saat absensi ridak bisa, karena titik GPS tidak sesuai. saya masih bingung dimana harus meperbaiki titik GPS. karena tidak ada pengaturannya. begitu juga titik proyek"*
-- **Status**: **DALAM ANTRIAN (Telah dicatat dalam antrean pekerjaan, akan dikerjakan berurutan)**
+- **Status**: **SEDANG DIKERJAKAN**
 - **Analisis & Rencana Solusi**:
   1. **Pengaturan Titik GPS Kantor Utama & Cabang**:
-     - Tambahkan modul pengaturan Titik Koordinat GPS Kantor (Latitude, Longitude) dan Radius Toleransi Presensi (misal: 50m, 100m, 200m, atau fleksibel) di menu Admin (`/admin/settings` atau `/admin/attendance`).
-     - Sediakan tombol interaktif "📍 Ambil Koordinat Saya Saat Ini" atau klik pada Google Maps picker agar admin tidak bingung mengetik latitude/longitude manual.
+     - Tambahkan modul pengaturan Titik Koordinat GPS Kantor (Latitude, Longitude) dan Radius Toleransi Presensi (misal: 50m, 100m, 250m, 500m) di `/admin/settings` dan `/admin/attendance`.
+     - Sediakan tombol interaktif "📍 Ambil Koordinat Saya Saat Ini" (browser geolocation API) dan pencarian alamat/Google Maps picker agar admin tidak bingung mengetik latitude/longitude manual.
   2. **Pengaturan Titik GPS Proyek Lapangan**:
-     - Tambahkan field Titik Koordinat GPS (Latitude, Longitude) dan Radius Geofencing pada setiap data Surat Tugas / Proyek Teknisi (`/api/employee/tasks` & `/admin/tasks`).
+     - Tambahkan field Titik Koordinat GPS (Latitude, Longitude) dan Radius Geofencing pada setiap data Surat Tugas / Proyek Teknisi (`/api/employee/tasks` & `/admin/tasks` / `/admin/finance`).
      - Sehingga saat karyawan/teknisi berada di lokasi proyek, sistem mencocokkan titik GPS perangkat teknisi dengan titik proyek tersebut secara akurat.
   3. **Penyesuaian Geofencing Portal Teknisi (`/employee`)**:
-     - Tampilkan informasi jarak riil staf ke titik kantor/proyek (misal: "Jarak Anda: 35 meter dari Kantor (Dalam Radius)").
+     - Hitung jarak fisik teknisi ke titik kantor/proyek menggunakan formula Haversine (`distanceInMeters`).
+     - Tampilkan informasi jarak riil staf ke titik kantor/proyek (misal: "Jarak Anda: 35 meter dari Kantor (Dalam Radius Toleransi)").
      - Berikan opsi toleransi / izin presensi dinas luar jika GPS mengalami deviasi sinyal satelit.
+- **Rencana Step-by-Step Pengerjaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 231 step-by-step di `LAPORAN_PROGRES.md`.
+  2. [ ] **Langkah 2**: Buat folder cadangan `_backup_gps_attendance/` dan amankan file terkait.
+  3. [ ] **Langkah 3**: Siapkan backend API settings untuk menyimpan titik GPS kantor (`officeLatitude`, `officeLongitude`, `geofenceRadiusMeters`) di `/api/settings` dan data tugas/proyek di `/api/employee/tasks`.
+  4. [ ] **Langkah 4**: Tambahkan antarmuka "Pengaturan Titik GPS Kantor & Radius Presensi" di `/admin/attendance` dan `/admin/settings` lengkap dengan tombol "📍 Ambil Koordinat Saat Ini".
+  5. [ ] **Langkah 5**: Tambahkan input titik koordinat GPS lokasi proyek pada formulir proyek/tugas teknisi.
+  6. [ ] **Langkah 6**: Perbarui alur Check-In / Check-Out di portal teknisi (`/employee`) agar membandingkan posisi GPS staf terhadap titik kantor/proyek secara akurat dengan toleransi radius yang sudah diatur admin.
+  7. [ ] **Langkah 7**: Validasi kompilasi `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses.
+  8. [ ] **Langkah 8**: Push ke GitHub repository dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  9. [ ] **Langkah 9**: Verifikasi visual via browser testing di website live.
+  10. [ ] **Langkah 10**: Bersihkan folder cadangan dan tandai Tugas 231 sebagai `[SELESAI]`.
 
 ---
 
