@@ -6146,6 +6146,46 @@
   8. [x] **Langkah 8**: Push ke GitHub (commit `f3bf51e` dan `8061056`) dan deploy ke live VPS aaPanel PM2 `dstech-main` (PID 1405304).
   9. [x] **Langkah 9**: Uji simpan SPH paket instalasi di live server: berhasil membuat `SPH-DSTECH-202610-007` dengan item paket Rp 4.500.000 + 3 item rincian paket berharga Rp 0. Terverifikasi tampil elegan di cetak SPH resmi dengan label *"Termasuk Paket"* dan *"Include"*. Status Tugas 217 resmi **[SELESAI]**.
 
+
+
+---
+
+### 218. Tugas: Optimasi Mesin Pencari Google (SEO Komprehensif, Dynamic XML Sitemap, Robots.txt, Google Schema.org JSON-LD, & Rich Metadata E-Store) [SEDANG DIKERJAKAN]
+- **Permintaan Pengguna**:
+  - *"bisa kah kamu membantu saya untuk setting agar jika ada yang mencari produk-produk yang kita jual dan tangani saat ini di google atau pencarian, maka nantinya website kita muncul dihalaman utama?"*
+- **Status**: **SEDANG DIKERJAKAN**
+- **Analisis Kebutuhan SEO (Search Engine Optimization)**:
+  1. **Dynamic XML Sitemap (`sitemap.xml` via Next.js `src/app/sitemap.ts`)**:
+     - Membantu Googlebot dan mesin pencari menemukan dan mengindeks seluruh halaman website secara otomatis setiap kali ada pembaruan produk atau konten.
+     - Mengindeks rute utama: Beranda (`/`), Katalog E-Store (`/shop`), Halaman Kontak (`/contact`), Program Kemitraan (`/affiliate`), serta kategori-kategori produk.
+  2. **Robots Directives (`robots.txt` via Next.js `src/app/robots.ts`)**:
+     - Menginstruksikan perayap Googlebot, Bingbot, dll. untuk mengindeks halaman publik.
+     - Memblokir perayapan halaman internal sensitif (`/admin/`, `/superadmin/`, `/employee/`, `/api/`) demi keamanan dan penghematan crawl budget.
+     - Mengarahkan perayap ke URL sitemap resmi `https://dstechsmart.com/sitemap.xml`.
+  3. **Structured Data Google (JSON-LD Schema.org)** di `src/app/layout.tsx`:
+     - Memasang schema resmi `@type: "LocalBusiness"` dan `"SecuritySystemInstallService"` untuk PT. DSTech Smart Perkasa.
+     - Menyertakan NIB, NPWP, alamat fisik Cilegon, nomor WhatsApp resmi, rating agregat, jam operasional, dan area jangkauan layanan (Cilegon, Serang, Banten, Jabodetabek, dan Nasional).
+  4. **Targeting Kata Kunci Emas (Keywords) & Rich OpenGraph / Twitter Cards**:
+     - Menyematkan kata kunci industri keamanan, CCTV, Barrier Gate, Smart Home, dan IoT.
+     - Konfigurasi `metadataBase: new URL("https://dstechsmart.com")` dan canonical URL.
+     - Menyediakan preview gambar banner kaya saat tautan dibagikan ke WhatsApp, Facebook, dan media sosial.
+  5. **Rich Metadata Khusus Toko / E-Store (`src/app/shop/layout.tsx`)**:
+     - Menyediakan title & meta deskripsi komprehensif untuk halaman katalog produk dan paket instalasi agar dapat terindeks maksimal di Google Search.
+  6. **Rich Metadata Khusus Halaman Kontak (`src/app/contact/layout.tsx`)**:
+     - Mengoptimalkan pencarian lokal Google Maps dan nomor kontak CS resmi.
+- **Rencana Step-by-Step Pengerjaan**:
+  1. [x] **Langkah 1**: Buat folder cadangan `_backup_seo_optimization` dan catat rencana kerja di `LAPORAN_PROGRES.md`.
+  2. [ ] **Langkah 2**: Buat file dynamic sitemap `src/app/sitemap.ts` yang memetakan seluruh rute publik dan produk.
+  3. [ ] **Langkah 3**: Buat file `src/app/robots.ts` yang mengatur izin perayapan Googlebot dan link sitemap.
+  4. [ ] **Langkah 4**: Perbarui `src/app/layout.tsx` dengan metadata komprehensif, OpenGraph, Twitter card, dan Google Structured Data (JSON-LD Schema.org).
+  5. [ ] **Langkah 5**: Buat `src/app/shop/layout.tsx` untuk metadata khusus katalog produk & paket instalasi E-Store.
+  6. [ ] **Langkah 6**: Buat `src/app/contact/layout.tsx` untuk metadata khusus kontak & konsultasi resmi.
+  7. [ ] **Langkah 7**: Validasi build lokal (`npx tsc --noEmit` dan `npm run build`).
+  8. [ ] **Langkah 8**: Hapus folder cadangan `_backup_seo_optimization`.
+  9. [ ] **Langkah 9**: Push ke GitHub dan deploy ke server live VPS aaPanel PM2 `dstech-main`.
+  10. [ ] **Langkah 10**: Uji akses live `https://dstechsmart.com/sitemap.xml` dan `https://dstechsmart.com/robots.txt` serta periksa validasi tag SEO.
+  11. [ ] **Langkah 11**: Perbarui `LAPORAN_PROGRES.md` menjadi `[SELESAI]` dan pandu langkah Google Search Console bagi pengguna.
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
