@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Katalog Produk & Paket CCTV, Barrier Gate, Smart Home | PT. DSTech Smart Perkasa",
+  title: "Katalog Produk & Paket CCTV, Barrier Gate, Smart Home",
   description:
     "Katalog resmi produk & paket instalasi CCTV AI Full HD/ColorVu, Palang Parkir Barrier Gate Otomatis, Smart Door Lock, Mesin Absensi Biometrik Wajah, dan Aksesoris Jaringan bergaransi resmi.",
   keywords: [

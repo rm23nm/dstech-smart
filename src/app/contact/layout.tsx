@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Hubungi Kami & Alamat Kantor Resmi | PT. DSTech Smart Perkasa",
+  title: "Hubungi Kami & Alamat Kantor Resmi",
   description:
     "Hubungi customer support resmi PT. DSTech Smart Perkasa melalui WhatsApp 0822-5949-4242 atau kunjungi kantor kami di Perum Bukit Cilegon Asri Blok DB No. 19 Cilegon Banten untuk survey dan konsultasi gratis.",
   keywords: [
