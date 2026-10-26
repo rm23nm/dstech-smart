@@ -150,14 +150,14 @@ export async function POST(req: Request) {
                   `4. Pilih Entitas Bisnis dan Rekening Bank Resmi tujuan (BCA PT, Mandiri, atau Kas Tunai).\n` +
                   `5. Masukkan nominal rupiah, tanggal transaksi, deskripsi keterangan, dan upload foto bukti nota/kuitansi.\n` +
                   `6. Untuk mengatur daftar nomor rekening resmi perusahaan, klik tombol "⚙️ Atur Rekening Resmi" di modal arus kas.`;
-        } else if (lower.includes("po") || lower.includes("purchase order") || lower.includes("beli") || lower.includes("supplier") || lower.includes("vendor")) {
+        } else if (/\bpo\b/i.test(lower) || lower.includes("purchase order") || lower.includes("pembelian") || lower.includes("supplier") || lower.includes("vendor")) {
           reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Untuk menerbitkan Purchase Order (PO) ke Supplier:\n\n` +
                   `1. Buka Keuangan (/admin/finance) ➔ Tab "Pembelian & PO Supplier".\n` +
                   `2. Klik "+ Buat Purchase Order".\n` +
                   `3. Pilih Vendor dari Master Supplier (atau tambah supplier baru).\n` +
                   `4. Masukkan item barang belanja pengadaan, tentukan termin dan pajak PPN.\n` +
                   `5. Simpan PO. Anda dapat mencetak lembar resmi PO A4 ber-Kop Surat atau melakukan otorisasi Approval Tanda Tangan Digital Direksi (Canvas Pad).`;
-        } else if (lower.includes("laba rugi") || lower.includes("p&l") || lower.includes("pnl") || lower.includes("laporan keuangan")) {
+        } else if (lower.includes("laba rugi") || lower.includes("p&l") || lower.includes("pnl") || lower.includes("laporan")) {
           reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Berikut cara melihat & mengekspor Laporan Laba Rugi (P&L):\n\n` +
                   `1. Masuk ke Keuangan (/admin/finance) ➔ Tab "Laba Rugi (P&L)".\n` +
                   `2. Pilih filter Entitas Bisnis: Semua Entitas, Khusus PT. DSTech Smart Perkasa, atau Usaha Mandiri Non-PT.\n` +
