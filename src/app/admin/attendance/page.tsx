@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import GpsGeofenceManager from "@/components/GpsGeofenceManager";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -196,7 +197,7 @@ export default function AdminAttendancePage() {
   const [toastMsg, setToastMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Tab & Filters
-  const [activeTab, setActiveTab] = useState<"attendance" | "overtime" | "payroll" | "summary" | "leave">("attendance");
+  const [activeTab, setActiveTab] = useState<"attendance" | "overtime" | "payroll" | "summary" | "leave" | "geofence">("attendance");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterEmployee, setFilterEmployee] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -1230,6 +1231,19 @@ export default function AdminAttendancePage() {
               <Clock className="w-4 h-4 text-slate-400" />
               <span>Check-Out Pulang</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("geofence")}
+              className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 border ${
+                activeTab === "geofence"
+                  ? "bg-rose-600 text-white border-rose-600 shadow-md shadow-rose-600/20"
+                  : "bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200"
+              }`}
+            >
+              <MapPin className="w-4 h-4 text-rose-500" />
+              <span>📍 Atur Titik GPS &amp; Toleransi</span>
+            </button>
           </div>
         </div>
       </div>
@@ -1382,6 +1396,21 @@ export default function AdminAttendancePage() {
           <span>Laporan & Rekapitulasi Absensi</span>
           <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-800 font-black">
             Laporan
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("geofence")}
+          className={`pb-4 text-sm font-bold flex items-center gap-2.5 transition-all whitespace-nowrap relative ${
+            activeTab === "geofence"
+              ? "text-rose-600 border-b-2 border-rose-600"
+              : "text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <MapPin className="w-4 h-4 text-rose-500" />
+          <span>📍 Pengaturan Titik GPS &amp; Geofencing</span>
+          <span className="px-2 py-0.5 rounded-full text-xs bg-rose-100 text-rose-800 font-black">
+            Kantor &amp; Proyek
           </span>
         </button>
       </div>
@@ -2486,6 +2515,11 @@ export default function AdminAttendancePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB 5: PENGATURAN TITIK GPS & GEOFENCING */}
+      {activeTab === "geofence" && (
+        <GpsGeofenceManager standaloneTitle={true} />
       )}
 
       {/* MODAL 1: PREVIEW GOOGLE MAPS GPS */}

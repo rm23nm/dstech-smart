@@ -7,17 +7,122 @@ export const revalidate = 0;
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_attendance.json");
 const USERS_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
+const SETTINGS_FILE = path.join(process.cwd(), "src", "data", "dstech_settings.json");
+const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
+const TASKS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_tasks.json");
 
-// Koordinat Resmi Kantor Pusat DSTech Cilegon
-const OFFICE_LOCATION = {
-  name: "Kantor Pusat PT DSTech Smart Perkasa (Cilegon)",
-  latitude: -6.031846,
-  longitude: 106.037198,
-  defaultRadius: 100, // 100 meter
-};
+// Helper membaca pengaturan lokasi GPS kantor & radius geofencing secara dinamis dari database settings
+function getOfficeLocationSettings() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      const raw = fs.readFileSync(SETTINGS_FILE, "utf-8");
+      const parsed = JSON.parse(raw);
+      return {
+        name: parsed.officeName || "Kantor Pusat PT DSTech Smart Perkasa (Cilegon)",
+        latitude: typeof parsed.officeLatitude === "number" ? parsed.officeLatitude : -6.031846,
+        longitude: typeof parsed.officeLongitude === "number" ? parsed.officeLongitude : 106.037198,
+        defaultRadius: typeof parsed.geofenceRadiusMeters === "number" ? parsed.geofenceRadiusMeters : 250,
+        address: parsed.officeAddress || parsed.address || "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON",
+        allowFlexibleAttendance: parsed.allowFlexibleAttendance ?? true,
+        projectLocations: Array.isArray(parsed.projectLocations) ? parsed.projectLocations : []
+      };
+    }
+  } catch (err) {
+    console.error("Error reading office location settings:", err);
+  }
+  return {
+    name: "Kantor Pusat PT DSTech Smart Perkasa (Cilegon)",
+    latitude: -6.031846,
+    longitude: 106.037198,
+    defaultRadius: 250,
+    address: "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON",
+    allowFlexibleAttendance: true,
+    projectLocations: []
+  };
+}
+
+// Helper mencari koordinat GPS titik proyek dari daftar proyek finance atau tiket penugasan
+function findProjectCoordinates(projectId?: string | null, projectName?: string | null) {
+  if (!projectId && !projectName) return null;
+  const pId = (projectId || "").trim().toLowerCase();
+  const pName = (projectName || "").trim().toLowerCase();
+
+  // 1. Cek dari projectLocations di settings
+  const officeConfig = getOfficeLocationSettings();
+  if (Array.isArray(officeConfig.projectLocations)) {
+    const matched = officeConfig.projectLocations.find((p: any) =>
+      (p.id && p.id.toLowerCase() === pId) ||
+      (p.name && p.name.toLowerCase() === pName) ||
+      (p.clientName && p.clientName.toLowerCase() === pName)
+    );
+    if (matched && typeof matched.latitude === "number" && typeof matched.longitude === "number") {
+      return {
+        name: matched.name,
+        latitude: matched.latitude,
+        longitude: matched.longitude,
+        radiusMeters: matched.radiusMeters || 350,
+        source: "settings_preset"
+      };
+    }
+  }
+
+  // 2. Cek dari dstech_employee_tasks.json
+  try {
+    if (fs.existsSync(TASKS_FILE)) {
+      const tasks = JSON.parse(fs.readFileSync(TASKS_FILE, "utf-8"));
+      if (Array.isArray(tasks)) {
+        const matched = tasks.find((t: any) =>
+          (t.id && t.id.toLowerCase() === pId) ||
+          (t.ticketNumber && t.ticketNumber.toLowerCase() === pId) ||
+          (t.title && t.title.toLowerCase().includes(pName)) ||
+          (t.client && t.client.toLowerCase().includes(pName))
+        );
+        if (matched && typeof matched.latitude === "number" && typeof matched.longitude === "number" && matched.latitude !== 0) {
+          return {
+            name: matched.title || matched.client || "Proyek Penugasan",
+            latitude: matched.latitude,
+            longitude: matched.longitude,
+            radiusMeters: matched.radiusMeters || 350,
+            source: "task_location"
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Could not read tasks for project coordinates:", e);
+  }
+
+  // 3. Cek dari dstech_finance_erp.json -> projects
+  try {
+    if (fs.existsSync(FINANCE_FILE)) {
+      const fin = JSON.parse(fs.readFileSync(FINANCE_FILE, "utf-8"));
+      if (Array.isArray(fin.projects)) {
+        const matched = fin.projects.find((p: any) =>
+          (p.id && p.id.toLowerCase() === pId) ||
+          (p.projectCode && p.projectCode.toLowerCase() === pId) ||
+          (p.projectName && p.projectName.toLowerCase() === pName)
+        );
+        if (matched && typeof matched.latitude === "number" && typeof matched.longitude === "number" && matched.latitude !== 0) {
+          return {
+            name: matched.projectName || "Proyek ERP",
+            latitude: matched.latitude,
+            longitude: matched.longitude,
+            radiusMeters: matched.radiusMeters || 350,
+            source: "finance_project"
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Could not read finance projects for coordinates:", e);
+  }
+
+  return null;
+}
 
 // Formula Haversine Akurat (menghitung jarak dua titik koordinat satelit dalam meter)
 function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
   const R = 6371e3; // Radius bumi dalam meter
   const φ1 = (lat1 * Math.PI) / 180;
   const φ2 = (lat2 * Math.PI) / 180;
@@ -33,6 +138,7 @@ function calculateDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
 
 // Helper membaca kebijakan lokasi presensi staf dari database users
 function getUserLocationPolicy(employeeName?: string, employeeEmail?: string) {
+  const officeConfig = getOfficeLocationSettings();
   try {
     if (fs.existsSync(USERS_FILE)) {
       const users: any[] = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
@@ -44,7 +150,7 @@ function getUserLocationPolicy(employeeName?: string, employeeEmail?: string) {
       if (user) {
         return {
           locationLock: user.attendanceLocationLock || "ANY",
-          officeRadius: user.officeRadius ? Number(user.officeRadius) : OFFICE_LOCATION.defaultRadius,
+          officeRadius: user.officeRadius ? Number(user.officeRadius) : officeConfig.defaultRadius,
           userName: user.name,
         };
       }
@@ -54,7 +160,7 @@ function getUserLocationPolicy(employeeName?: string, employeeEmail?: string) {
   }
   return {
     locationLock: "ANY",
-    officeRadius: OFFICE_LOCATION.defaultRadius,
+    officeRadius: officeConfig.defaultRadius,
     userName: employeeName,
   };
 }
@@ -124,9 +230,11 @@ function writeAttendance(data: any) {
 
 export async function GET() {
   const data = readAttendance();
+  const officeSettings = getOfficeLocationSettings();
   return NextResponse.json(
     {
       success: true,
+      officeSettings,
       ...data,
     },
     {
@@ -190,24 +298,55 @@ export async function POST(request: Request) {
         );
       }
 
-      // 3. Validasi Geofencing: Jika staf terkunci di kantor, tolak jika di luar radius kantor
+      // 3. Validasi Geofencing: Cek terhadap Titik Kantor Resmi atau Titik Proyek Terkait
+      const officeConfig = getOfficeLocationSettings();
       const userPolicy = getUserLocationPolicy(body.employeeName, body.employeeEmail);
+      const effectiveRadius = userPolicy.officeRadius || officeConfig.defaultRadius || 250;
+
       const distanceToOffice = calculateDistanceMeters(
         Number(latitude),
         Number(longitude),
-        OFFICE_LOCATION.latitude,
-        OFFICE_LOCATION.longitude
+        officeConfig.latitude,
+        officeConfig.longitude
       );
 
+      // Cek apakah staf berada di titik proyek yang ditugaskan/dipilih
+      const matchedProject = findProjectCoordinates(projectId, projectName);
+      let distanceToProject: number | null = null;
+      let isWithinProjectGeofence = false;
+
+      if (matchedProject) {
+        distanceToProject = calculateDistanceMeters(
+          Number(latitude),
+          Number(longitude),
+          matchedProject.latitude,
+          matchedProject.longitude
+        );
+        isWithinProjectGeofence = distanceToProject <= matchedProject.radiusMeters;
+      }
+
+      const isWithinOfficeGeofence = distanceToOffice <= effectiveRadius;
+
       if (userPolicy.locationLock === "OFFICE" && !body.isSuperAdminBypass) {
-        if (distanceToOffice > userPolicy.officeRadius) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: `Presensi Masuk DITOLAK: Anda berada di luar radius kantor resmi! Jarak Anda saat ini ${distanceToOffice} meter dari Kantor DSTech Cilegon (Batas maksimal: ${userPolicy.officeRadius} meter). Anda wajib berada di area kantor untuk melakukan presensi.`,
-            },
-            { status: 403 }
-          );
+        // Jika staf berada di dalam radius kantor ATAU di dalam radius proyek yang sah, izinkan!
+        if (!isWithinOfficeGeofence && !isWithinProjectGeofence) {
+          if (matchedProject) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `Presensi Masuk DITOLAK: Anda berada di luar radius kantor (${distanceToOffice}m > ${effectiveRadius}m) dan di luar radius proyek ${matchedProject.name} (${distanceToProject}m > ${matchedProject.radiusMeters}m). Harap mendekat ke lokasi kantor atau proyek!`,
+              },
+              { status: 403 }
+            );
+          } else {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `Presensi Masuk DITOLAK: Anda berada di luar radius kantor resmi! Jarak Anda saat ini ${distanceToOffice} meter dari ${officeConfig.name} (Batas toleransi maksimal: ${effectiveRadius} meter). Admin dapat menyesuaikan titik GPS kantor di menu Pengaturan GPS Absensi.`,
+              },
+              { status: 403 }
+            );
+          }
         }
       }
 
@@ -222,8 +361,10 @@ export async function POST(request: Request) {
       let computedStatus = "Tepat Waktu";
       if (isLate) {
         computedStatus = `Terlambat (${lateMinutes}m)`;
-      } else if (distanceToOffice <= userPolicy.officeRadius) {
+      } else if (isWithinOfficeGeofence) {
         computedStatus = "Tepat Waktu";
+      } else if (isWithinProjectGeofence) {
+        computedStatus = "Di Lokasi Proyek";
       } else {
         computedStatus = "Hadir Lapangan";
       }
@@ -326,24 +467,54 @@ export async function POST(request: Request) {
         );
       }
 
-      // 3. Validasi Geofencing Pulang: Jika staf terkunci kantor, tolak jika di luar radius
+      // 3. Validasi Geofencing Pulang: Cek terhadap Titik Kantor Resmi atau Titik Proyek Terkait
+      const officeConfig = getOfficeLocationSettings();
       const userPolicy = getUserLocationPolicy(body.employeeName, body.employeeEmail);
+      const effectiveRadius = userPolicy.officeRadius || officeConfig.defaultRadius || 250;
+
       const distanceToOffice = calculateDistanceMeters(
         Number(latitude),
         Number(longitude),
-        OFFICE_LOCATION.latitude,
-        OFFICE_LOCATION.longitude
+        officeConfig.latitude,
+        officeConfig.longitude
       );
 
+      // Cek apakah staf berada di titik proyek
+      const matchedProject = findProjectCoordinates(projectId, projectName);
+      let distanceToProject: number | null = null;
+      let isWithinProjectGeofence = false;
+
+      if (matchedProject) {
+        distanceToProject = calculateDistanceMeters(
+          Number(latitude),
+          Number(longitude),
+          matchedProject.latitude,
+          matchedProject.longitude
+        );
+        isWithinProjectGeofence = distanceToProject <= matchedProject.radiusMeters;
+      }
+
+      const isWithinOfficeGeofence = distanceToOffice <= effectiveRadius;
+
       if (userPolicy.locationLock === "OFFICE" && !body.isSuperAdminBypass) {
-        if (distanceToOffice > userPolicy.officeRadius) {
-          return NextResponse.json(
-            {
-              success: false,
-              error: `Presensi Pulang DITOLAK: Anda berada di luar radius kantor resmi! Jarak Anda saat ini ${distanceToOffice} meter dari Kantor DSTech Cilegon (Batas maksimal: ${userPolicy.officeRadius} meter). Anda wajib berada di area kantor untuk melakukan presensi pulang.`,
-            },
-            { status: 403 }
-          );
+        if (!isWithinOfficeGeofence && !isWithinProjectGeofence) {
+          if (matchedProject) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `Presensi Pulang DITOLAK: Anda berada di luar radius kantor (${distanceToOffice}m > ${effectiveRadius}m) dan di luar radius proyek ${matchedProject.name} (${distanceToProject}m > ${matchedProject.radiusMeters}m). Harap mendekat ke lokasi kantor atau proyek untuk presensi pulang!`,
+              },
+              { status: 403 }
+            );
+          } else {
+            return NextResponse.json(
+              {
+                success: false,
+                error: `Presensi Pulang DITOLAK: Anda berada di luar radius kantor resmi! Jarak Anda saat ini ${distanceToOffice} meter dari ${officeConfig.name} (Batas toleransi: ${effectiveRadius} meter).`,
+              },
+              { status: 403 }
+            );
+          }
         }
       }
 

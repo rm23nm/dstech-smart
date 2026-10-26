@@ -142,6 +142,36 @@ const DEFAULT_SETTINGS = {
   bankAccounts: DEFAULT_BANK_ACCOUNTS,
   letterheadSettings: DEFAULT_LETTERHEAD_SETTINGS,
   estoreSettings: DEFAULT_ESTORE_SETTINGS,
+
+  // Titik GPS Kantor & Geofencing Presensi Pegawai
+  officeName: "Kantor Pusat PT DSTech Smart Perkasa (Cilegon)",
+  officeLatitude: -6.031846,
+  officeLongitude: 106.037198,
+  officeAddress: "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON, KOTA CILEGON - BANTEN",
+  geofenceRadiusMeters: 250,
+  allowFlexibleAttendance: true,
+  projectLocations: [
+    {
+      id: "dstech_loc_cilegon_hq",
+      name: "Kantor Pusat DSTech (Perum BCA)",
+      clientName: "PT. DSTech Smart Perkasa",
+      latitude: -6.031846,
+      longitude: 106.037198,
+      radiusMeters: 250,
+      isDefaultOffice: true,
+      notes: "Kantor Operasional & Workshop"
+    },
+    {
+      id: "dstech_loc_krakatau",
+      name: "Proyek Kawasan Industri Krakatau Steel",
+      clientName: "PT Krakatau Steel Tbk",
+      latitude: -6.0125,
+      longitude: 106.015,
+      radiusMeters: 500,
+      isDefaultOffice: false,
+      notes: "Area Proyek Pabrik Baja & Pipa"
+    }
+  ],
   updatedAt: "2026-10-18T22:00:00.000Z"
 };
 
@@ -276,6 +306,16 @@ export async function POST(request: Request) {
       bankAccounts: body.bankAccounts !== undefined ? body.bankAccounts : current.bankAccounts,
       letterheadSettings: body.letterheadSettings !== undefined ? body.letterheadSettings : current.letterheadSettings,
       estoreSettings: body.estoreSettings !== undefined ? body.estoreSettings : current.estoreSettings,
+
+      // Titik GPS Kantor & Geofencing Presensi Pegawai
+      officeName: body.officeName !== undefined ? body.officeName : (current.officeName || "Kantor Pusat PT DSTech Smart Perkasa (Cilegon)"),
+      officeLatitude: body.officeLatitude !== undefined ? Number(body.officeLatitude) : (current.officeLatitude ?? -6.031846),
+      officeLongitude: body.officeLongitude !== undefined ? Number(body.officeLongitude) : (current.officeLongitude ?? 106.037198),
+      officeAddress: body.officeAddress !== undefined ? body.officeAddress : (current.officeAddress || current.address || ""),
+      geofenceRadiusMeters: body.geofenceRadiusMeters !== undefined ? Number(body.geofenceRadiusMeters) : (current.geofenceRadiusMeters || 250),
+      allowFlexibleAttendance: body.allowFlexibleAttendance !== undefined ? Boolean(body.allowFlexibleAttendance) : (current.allowFlexibleAttendance ?? true),
+      projectLocations: Array.isArray(body.projectLocations) ? body.projectLocations : (current.projectLocations || []),
+
       updatedAt: new Date().toISOString(),
     };
 
@@ -298,4 +338,8 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function PUT(request: Request) {
+  return POST(request);
 }

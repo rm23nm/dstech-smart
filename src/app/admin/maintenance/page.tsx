@@ -43,6 +43,7 @@ import {
   Upload,
   Receipt,
   Navigation,
+  Crosshair,
   Package,
   AlertTriangle as AlertTriangleIcon,
 } from "lucide-react";
@@ -239,6 +240,9 @@ export default function MaintenancePage() {
     equipment: ["Digital Multitester", "Tool Set Obeng", "Cairan Pembersih Lensa"],
     notes: "",
     recommendation: "",
+    latitude: 0,
+    longitude: 0,
+    radiusMeters: 350,
   });
 
   const [newScopeInput, setNewScopeInput] = useState("");
@@ -364,6 +368,9 @@ export default function MaintenancePage() {
       equipment: ["Digital Multitester", "Tool Set Obeng", "Cairan Pembersih Lensa"],
       notes: "Wajib mengenakan APD lengkap dan lapor pos security sebelum memasuki area kerja.",
       recommendation: "",
+      latitude: 0,
+      longitude: 0,
+      radiusMeters: 350,
     });
     setIsModalOpen(true);
   };
@@ -392,6 +399,9 @@ export default function MaintenancePage() {
       equipment: [...task.equipment],
       notes: task.notes || "",
       recommendation: task.recommendation || "",
+      latitude: task.latitude || 0,
+      longitude: task.longitude || 0,
+      radiusMeters: (task as any).radiusMeters || 350,
     });
     setIsModalOpen(true);
   };
@@ -1436,6 +1446,85 @@ export default function MaintenancePage() {
                     placeholder="Contoh: Kawasan Industri Krakatau Steel, Gedung Utama Lt. 2, Cilegon"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+
+                {/* Titik GPS Geofencing Proyek / Lokasi (Opsional) */}
+                <div className="sm:col-span-2 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                      Titik Koordinat GPS &amp; Geofencing Proyek (Untuk Presensi Teknisi)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== "undefined" && navigator.geolocation) {
+                          navigator.geolocation.getCurrentPosition(
+                            (p) => {
+                              setFormData((prev: any) => ({
+                                ...prev,
+                                latitude: Number(p.coords.latitude.toFixed(6)),
+                                longitude: Number(p.coords.longitude.toFixed(6)),
+                              }));
+                            },
+                            (err) => alert("Gagal mengambil GPS: " + err.message),
+                            { enableHighAccuracy: true }
+                          );
+                        }
+                      }}
+                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 hover:bg-blue-100 transition-all cursor-pointer flex items-center gap-1"
+                    >
+                      <Crosshair className="w-3 h-3" />
+                      <span>Kunci GPS Saat Ini</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 block mb-1">Latitude:</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={formData.latitude || ""}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, latitude: parseFloat(e.target.value) || 0 }))}
+                        placeholder="Contoh: -6.012500"
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 block mb-1">Longitude:</label>
+                      <input
+                        type="number"
+                        step="0.000001"
+                        value={formData.longitude || ""}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, longitude: parseFloat(e.target.value) || 0 }))}
+                        placeholder="Contoh: 106.015000"
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 block mb-1">Radius Toleransi (Meter):</label>
+                      <input
+                        type="number"
+                        min="50"
+                        max="2000"
+                        step="50"
+                        value={formData.radiusMeters || 350}
+                        onChange={(e) => setFormData((prev: any) => ({ ...prev, radiusMeters: parseInt(e.target.value) || 350 }))}
+                        placeholder="350"
+                        className="w-full px-3 py-1.5 rounded-lg border border-slate-200 font-mono text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  {formData.latitude && formData.longitude ? (
+                    <p className="text-[10px] text-emerald-700 font-medium">
+                      ✓ Koordinat proyek aktif ({formData.latitude}, {formData.longitude}). Teknisi di lokasi ini dapat presensi sah dalam radius {formData.radiusMeters || 350}m.
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 italic">
+                      Opsional: Kosongkan jika teknisi boleh presensi dengan sistem penugasan dinas umum.
+                    </p>
+                  )}
                 </div>
 
                 {/* PIC Teknisi DSTech */}

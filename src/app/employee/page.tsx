@@ -285,6 +285,23 @@ export default function EmployeeDashboard() {
   const [currentTime, setCurrentTime] = useState<string>("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Dynamic Office & Geofence GPS Settings (loaded from API)
+  const [officeGps, setOfficeGps] = useState<{
+    lat: number;
+    lng: number;
+    radius: number;
+    name: string;
+    allowFlexible: boolean;
+    projectLocations?: any[];
+  }>({
+    lat: -6.031846,
+    lng: 106.037198,
+    radius: 250,
+    name: "Kantor DSTech Cilegon",
+    allowFlexible: true,
+    projectLocations: [],
+  });
+
   // Data states
   const [tasks, setTasks] = useState<EmployeeTask[]>([]);
   const [materials, setMaterials] = useState<MaterialItem[]>([]);
@@ -929,6 +946,16 @@ export default function EmployeeDashboard() {
           if (d.attendance) setAttendanceLogs(d.attendance);
           if (d.overtime) setOvertimeLogs(d.overtime);
           if (d.monthlyStats) setMonthlyStats(d.monthlyStats);
+          if (d.officeSettings) {
+            setOfficeGps({
+              lat: typeof d.officeSettings.latitude === "number" ? d.officeSettings.latitude : -6.031846,
+              lng: typeof d.officeSettings.longitude === "number" ? d.officeSettings.longitude : 106.037198,
+              radius: typeof d.officeSettings.defaultRadius === "number" ? d.officeSettings.defaultRadius : 250,
+              name: d.officeSettings.name || "Kantor DSTech Cilegon",
+              allowFlexible: d.officeSettings.allowFlexibleAttendance ?? true,
+              projectLocations: d.officeSettings.projectLocations || [],
+            });
+          }
         }
         if (resAnn.ok) {
           const d = await resAnn.json();
@@ -967,11 +994,35 @@ export default function EmployeeDashboard() {
           if (d.success && Array.isArray(d.attendance)) {
             setAttendanceLogs(d.attendance);
           }
+          if (d.officeSettings) {
+            setOfficeGps({
+              lat: typeof d.officeSettings.latitude === "number" ? d.officeSettings.latitude : -6.031846,
+              lng: typeof d.officeSettings.longitude === "number" ? d.officeSettings.longitude : 106.037198,
+              radius: typeof d.officeSettings.defaultRadius === "number" ? d.officeSettings.defaultRadius : 250,
+              name: d.officeSettings.name || "Kantor DSTech Cilegon",
+              allowFlexible: d.officeSettings.allowFlexibleAttendance ?? true,
+              projectLocations: d.officeSettings.projectLocations || [],
+            });
+          }
         })
         .catch(() => {});
     };
 
+    const handleGpsSettingsSync = (ev: any) => {
+      if (ev.detail) {
+        setOfficeGps({
+          lat: Number(ev.detail.officeLatitude) || -6.031846,
+          lng: Number(ev.detail.officeLongitude) || 106.037198,
+          radius: Number(ev.detail.geofenceRadiusMeters) || 250,
+          name: ev.detail.officeName || "Kantor DSTech Cilegon",
+          allowFlexible: ev.detail.allowFlexibleAttendance ?? true,
+          projectLocations: ev.detail.projectLocations || [],
+        });
+      }
+    };
+
     window.addEventListener("dstech_attendance_updated", handleAttendanceSync);
+    window.addEventListener("dstech_gps_settings_updated", handleGpsSettingsSync);
     window.addEventListener("storage", (ev) => {
       if (ev.key === "dstech_last_attendance_sync") {
         handleAttendanceSync();
@@ -1864,10 +1915,21 @@ export default function EmployeeDashboard() {
     }
 
     if (currentUser?.attendanceLocationLock === "OFFICE") {
-      const dist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
-      const maxRad = currentUser.officeRadius || 100;
-      if (dist > maxRad) {
-        showToast(`Presensi Masuk DITOLAK: Anda berada ${dist}m di luar radius kantor resmi (Maks: ${maxRad}m)!`);
+      const dist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, officeGps.lat, officeGps.lng);
+      const maxRad = currentUser.officeRadius || officeGps.radius || 250;
+
+      // Cek apakah staf berada di titik proyek yang dipilih
+      const selectedPrj = projectsList.find((p) => p.id === selectedProjectIdCheckIn);
+      let isWithinPrj = false;
+      if (selectedPrj?.latitude && selectedPrj?.longitude) {
+        const prjDist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, selectedPrj.latitude, selectedPrj.longitude);
+        if (prjDist <= (selectedPrj.radiusMeters || 350)) {
+          isWithinPrj = true;
+        }
+      }
+
+      if (dist > maxRad && !isWithinPrj) {
+        showToast(`Presensi Masuk DITOLAK: Anda berada ${dist}m di luar radius kantor (Maks toleransi: ${maxRad}m)!`);
         return;
       }
     }
@@ -1939,10 +2001,20 @@ export default function EmployeeDashboard() {
     }
 
     if (currentUser?.attendanceLocationLock === "OFFICE") {
-      const dist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
-      const maxRad = currentUser.officeRadius || 100;
-      if (dist > maxRad) {
-        showToast(`Presensi Pulang DITOLAK: Anda berada ${dist}m di luar radius kantor resmi (Maks: ${maxRad}m)!`);
+      const dist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, officeGps.lat, officeGps.lng);
+      const maxRad = currentUser.officeRadius || officeGps.radius || 250;
+
+      const selectedPrj = projectsList.find((p) => p.id === selectedProjectIdCheckOut);
+      let isWithinPrj = false;
+      if (selectedPrj?.latitude && selectedPrj?.longitude) {
+        const prjDist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, selectedPrj.latitude, selectedPrj.longitude);
+        if (prjDist <= (selectedPrj.radiusMeters || 350)) {
+          isWithinPrj = true;
+        }
+      }
+
+      if (dist > maxRad && !isWithinPrj) {
+        showToast(`Presensi Pulang DITOLAK: Anda berada ${dist}m di luar radius kantor (Maks toleransi: ${maxRad}m)!`);
         return;
       }
     }
@@ -4597,10 +4669,20 @@ export default function EmployeeDashboard() {
 
               {/* Radar Geofencing Satelit */}
               {checkInCoords.lat !== 0 && (() => {
-                const dist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+                const dist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, officeGps.lat, officeGps.lng);
                 const isOfficeLocked = currentUser?.attendanceLocationLock === "OFFICE";
-                const maxRad = currentUser?.officeRadius || 100;
-                const isViolated = isOfficeLocked && dist > maxRad;
+                const maxRad = currentUser?.officeRadius || officeGps.radius || 250;
+
+                const selectedPrj = projectsList.find((p) => p.id === selectedProjectIdCheckIn);
+                let prjDist: number | null = null;
+                let isWithinPrj = false;
+                if (selectedPrj?.latitude && selectedPrj?.longitude) {
+                  prjDist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, selectedPrj.latitude, selectedPrj.longitude);
+                  isWithinPrj = prjDist <= (selectedPrj.radiusMeters || 350);
+                }
+
+                const isWithinOffice = dist <= maxRad;
+                const isViolated = isOfficeLocked && !isWithinOffice && !isWithinPrj;
 
                 return (
                   <div className={`p-3.5 rounded-2xl border text-xs space-y-1.5 transition-all ${
@@ -4616,7 +4698,12 @@ export default function EmployeeDashboard() {
                         Geofence Radar Satelit:
                       </span>
                       <span className="font-mono text-xs">
-                        Jarak: <strong>{dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${dist} meter`}</strong>
+                        Jarak ke Kantor: <strong>{dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${dist}m`}</strong>
+                        {prjDist !== null && (
+                          <span className="ml-2 text-blue-700">
+                            | Proyek: <strong>{prjDist >= 1000 ? `${(prjDist / 1000).toFixed(2)} km` : `${prjDist}m`}</strong>
+                          </span>
+                        )}
                       </span>
                     </div>
                     {isOfficeLocked ? (
@@ -4624,14 +4711,23 @@ export default function EmployeeDashboard() {
                         <div className="flex items-start gap-2 text-rose-700 font-bold">
                           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                           <p className="text-[11px] leading-relaxed">
-                            PRESENSI DITOLAK: Akun Anda diwajibkan presensi di Kantor DSTech Cilegon (Radius toleransi: maks. {maxRad} meter). Posisi Anda saat ini berjarak {dist} meter dari kantor!
+                            PRESENSI DITOLAK: Posisi Anda berada di luar radius kantor ({dist}m &gt; maks {maxRad}m)
+                            {selectedPrj ? ` dan luar radius proyek ${selectedPrj.projectName} (${prjDist}m &gt; ${selectedPrj.radiusMeters || 350}m)` : ""}.
+                            Dekatilah titik lokasi atau hubungi admin untuk memperbarui koordinat GPS.
+                          </p>
+                        </div>
+                      ) : isWithinOffice ? (
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <p className="text-[11px]">
+                            TERVERIFIKASI DI KANTOR: Posisi Anda berada di area resmi kantor (Jarak: {dist} meter ≤ {maxRad}m). Presensi Diizinkan!
                           </p>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-emerald-700 font-bold">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                           <p className="text-[11px]">
-                            TERVERIFIKASI DI KANTOR: Posisi Anda berada di area resmi kantor (Jarak: {dist} meter ≤ {maxRad}m). Presensi Diizinkan!
+                            TERVERIFIKASI DI LOKASI PROYEK ({selectedPrj?.projectName}): Jarak {prjDist}m ≤ {selectedPrj?.radiusMeters || 350}m. Presensi Diizinkan!
                           </p>
                         </div>
                       )
@@ -4670,9 +4766,16 @@ export default function EmployeeDashboard() {
                   Batal
                 </button>
                 {(() => {
-                  const dist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+                  const dist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, officeGps.lat, officeGps.lng);
                   const isOfficeLocked = currentUser?.attendanceLocationLock === "OFFICE";
-                  const isViolated = isOfficeLocked && checkInCoords.lat !== 0 && dist > (currentUser?.officeRadius || 100);
+                  const maxRad = currentUser?.officeRadius || officeGps.radius || 250;
+                  const selectedPrj = projectsList.find((p) => p.id === selectedProjectIdCheckIn);
+                  let isWithinPrj = false;
+                  if (selectedPrj?.latitude && selectedPrj?.longitude) {
+                    const prjDist = calculateDistanceMeters(checkInCoords.lat, checkInCoords.lng, selectedPrj.latitude, selectedPrj.longitude);
+                    isWithinPrj = prjDist <= (selectedPrj.radiusMeters || 350);
+                  }
+                  const isViolated = isOfficeLocked && checkInCoords.lat !== 0 && dist > maxRad && !isWithinPrj;
                   const isReady = checkInCoords.source === "gps" && !!selfieCheckInPhoto && !isViolated;
 
                   return (
@@ -5002,10 +5105,20 @@ export default function EmployeeDashboard() {
 
               {/* Radar Geofencing Satelit Pulang */}
               {checkOutCoords.lat !== 0 && (() => {
-                const dist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+                const dist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, officeGps.lat, officeGps.lng);
                 const isOfficeLocked = currentUser?.attendanceLocationLock === "OFFICE";
-                const maxRad = currentUser?.officeRadius || 100;
-                const isViolated = isOfficeLocked && dist > maxRad;
+                const maxRad = currentUser?.officeRadius || officeGps.radius || 250;
+
+                const selectedPrj = projectsList.find((p) => p.id === selectedProjectIdCheckOut);
+                let prjDist: number | null = null;
+                let isWithinPrj = false;
+                if (selectedPrj?.latitude && selectedPrj?.longitude) {
+                  prjDist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, selectedPrj.latitude, selectedPrj.longitude);
+                  isWithinPrj = prjDist <= (selectedPrj.radiusMeters || 350);
+                }
+
+                const isWithinOffice = dist <= maxRad;
+                const isViolated = isOfficeLocked && !isWithinOffice && !isWithinPrj;
 
                 return (
                   <div className={`p-3.5 rounded-2xl border text-xs space-y-1.5 transition-all ${
@@ -5021,7 +5134,12 @@ export default function EmployeeDashboard() {
                         Geofence Radar Satelit:
                       </span>
                       <span className="font-mono text-xs">
-                        Jarak: <strong>{dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${dist} meter`}</strong>
+                        Jarak ke Kantor: <strong>{dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${dist}m`}</strong>
+                        {prjDist !== null && (
+                          <span className="ml-2 text-blue-700">
+                            | Proyek: <strong>{prjDist >= 1000 ? `${(prjDist / 1000).toFixed(2)} km` : `${prjDist}m`}</strong>
+                          </span>
+                        )}
                       </span>
                     </div>
                     {isOfficeLocked ? (
@@ -5029,14 +5147,23 @@ export default function EmployeeDashboard() {
                         <div className="flex items-start gap-2 text-rose-700 font-bold">
                           <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                           <p className="text-[11px] leading-relaxed">
-                            PRESENSI PULANG DITOLAK: Akun Anda diwajibkan presensi di Kantor DSTech Cilegon (Radius toleransi: maks. {maxRad} meter). Posisi Anda saat ini berjarak {dist} meter dari kantor!
+                            PRESENSI PULANG DITOLAK: Posisi Anda berada di luar radius kantor ({dist}m &gt; maks {maxRad}m)
+                            {selectedPrj ? ` dan luar radius proyek ${selectedPrj.projectName} (${prjDist}m &gt; ${selectedPrj.radiusMeters || 350}m)` : ""}.
+                            Dekatilah titik lokasi atau hubungi admin.
+                          </p>
+                        </div>
+                      ) : isWithinOffice ? (
+                        <div className="flex items-center gap-2 text-emerald-700 font-bold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <p className="text-[11px]">
+                            TERVERIFIKASI DI KANTOR: Posisi Anda berada di area resmi kantor (Jarak: {dist} meter ≤ {maxRad}m). Presensi Diizinkan!
                           </p>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 text-emerald-700 font-bold">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                           <p className="text-[11px]">
-                            TERVERIFIKASI DI KANTOR: Posisi Anda berada di area resmi kantor (Jarak: {dist} meter ≤ {maxRad}m). Presensi Diizinkan!
+                            TERVERIFIKASI DI LOKASI PROYEK ({selectedPrj?.projectName}): Jarak {prjDist}m ≤ {selectedPrj?.radiusMeters || 350}m. Presensi Diizinkan!
                           </p>
                         </div>
                       )
@@ -5079,9 +5206,16 @@ export default function EmployeeDashboard() {
                   Batal
                 </button>
                 {(() => {
-                  const dist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, OFFICE_COORDS.lat, OFFICE_COORDS.lng);
+                  const dist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, officeGps.lat, officeGps.lng);
                   const isOfficeLocked = currentUser?.attendanceLocationLock === "OFFICE";
-                  const isViolated = isOfficeLocked && checkOutCoords.lat !== 0 && dist > (currentUser?.officeRadius || 100);
+                  const maxRad = currentUser?.officeRadius || officeGps.radius || 250;
+                  const selectedPrj = projectsList.find((p) => p.id === selectedProjectIdCheckOut);
+                  let isWithinPrj = false;
+                  if (selectedPrj?.latitude && selectedPrj?.longitude) {
+                    const prjDist = calculateDistanceMeters(checkOutCoords.lat, checkOutCoords.lng, selectedPrj.latitude, selectedPrj.longitude);
+                    isWithinPrj = prjDist <= (selectedPrj.radiusMeters || 350);
+                  }
+                  const isViolated = isOfficeLocked && checkOutCoords.lat !== 0 && dist > maxRad && !isWithinPrj;
                   const isReady = checkOutCoords.source === "gps" && !!selfieCheckOutPhoto && !isViolated;
 
                   return (
