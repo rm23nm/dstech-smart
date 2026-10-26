@@ -596,6 +596,311 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Section: Pusat Distributor & Supplier Resmi Multi-Merek CCTV Terlengkap (Tugas 220) */}
+      <section className="py-20 sm:py-28 bg-slate-950 text-white relative overflow-hidden border-t border-slate-800">
+        {/* Glow ambient */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-red-600/10 rounded-full blur-[140px] pointer-events-none"></div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 relative z-10 space-y-16">
+          {/* Section Header */}
+          <div className="text-center max-w-3xl mx-auto space-y-4">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <Shield className="w-3.5 h-3.5 text-amber-400" />
+              Pusat Distributor, Supplier &amp; Grosir CCTV Resmi Banten
+            </span>
+            <h2 className="text-2xl sm:text-4xl md:text-5xl font-black tracking-tight leading-tight">
+              Distributor &amp; Supplier Resmi <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 via-amber-400 to-yellow-300">Semua Merek CCTV</span> Terkemuka
+            </h2>
+            <p className="text-slate-400 text-xs sm:text-base leading-relaxed">
+              PT. DSTech Smart Perkasa merupakan mitra supplier dan distributor terpercaya untuk pengadaan perangkat CCTV skala retail, reseller, toko komputer, instalatur, kontraktor tender, pabrik industri, hingga instansi pemerintahan di Serang, Cilegon, Banten, dan seluruh Indonesia.
+            </p>
+          </div>
+
+          {/* Grid Brand CCTV Terlengkap */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Brand 1: Hikvision */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-red-500/60 transition-all group flex flex-col justify-between shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-red-600/10 rounded-bl-full pointer-events-none"></div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-red-500/20 text-red-400 border border-red-500/30">
+                    Market Leader
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Ready Stock
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white group-hover:text-red-400 transition-colors">
+                  HIKVISION
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Distributor Resmi Hikvision Serang &amp; Banten</strong>. Menyediakan kamera CCTV ColorVu malam berwarna, AcuSense AI, Turbo HD 2MP-5MP, IP Camera 4K, NVR, DVR, dan Thermal Camera industri.
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">ColorVu Audio</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">AcuSense AI</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">NVR Enterprise</span>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-800/80 mt-5 flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-medium">Garansi 2 Tahun</span>
+                <Link href="/shop" className="text-red-400 font-bold hover:underline inline-flex items-center gap-1 text-[11px]">
+                  Cek Produk <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Brand 2: Dahua Technology */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/60 transition-all group flex flex-col justify-between shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-blue-600/10 rounded-bl-full pointer-events-none"></div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                    Global Top Tier
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Ready Stock
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white group-hover:text-blue-400 transition-colors">
+                  DAHUA
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Distributor &amp; Supplier Dahua Banten</strong>. Solusi Full-Color LED, WizSense AI, kamera TiOC 3-in-1 (Active Deterrence sirine &amp; lampu strobo), HDCVI Cooper, dan PTZ Speed Dome kawasan pabrik.
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Full-Color 24/7</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">TiOC Active Sirine</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">WizSense AI</span>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-800/80 mt-5 flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-medium">Garansi 2 Tahun</span>
+                <Link href="/shop" className="text-blue-400 font-bold hover:underline inline-flex items-center gap-1 text-[11px]">
+                  Cek Produk <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Brand 3: HiLook */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/60 transition-all group flex flex-col justify-between shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-amber-600/10 rounded-bl-full pointer-events-none"></div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                    By Hikvision
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Best Seller
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white group-hover:text-amber-400 transition-colors">
+                  HILOOK
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Distributor &amp; Master Dealer HiLook Resmi</strong>. Solusi paket CCTV hemat dengan durabilitas teruji dari Hikvision. Sangat diminati untuk rumah tinggal, toko sembako, ruko, dan sekolah.
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Paket 4CH / 8CH</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">1080P Full HD</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Harga Terjangkau</span>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-800/80 mt-5 flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-medium">Garansi 2 Tahun</span>
+                <Link href="/shop" className="text-amber-400 font-bold hover:underline inline-flex items-center gap-1 text-[11px]">
+                  Cek Produk <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Brand 4: Ezviz */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-emerald-500/60 transition-all group flex flex-col justify-between shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-600/10 rounded-bl-full pointer-events-none"></div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    Smart Wi-Fi
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Terlaris
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white group-hover:text-emerald-400 transition-colors">
+                  EZVIZ
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Distributor Ezviz Banten &amp; Supplier Wi-Fi Cam</strong>. Kamera pintar tanpa kabel: Ezviz C6N Pan-Tilt, C3W Pro Color Night Vision, H8c Outdoor 360, serta Battery Camera tenaga surya solar panel.
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Ezviz C6N &amp; H8c</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Audio 2 Arah HP</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Baterai &amp; Solar</span>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-800/80 mt-5 flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-medium">Garansi 1 Tahun</span>
+                <Link href="/shop" className="text-emerald-400 font-bold hover:underline inline-flex items-center gap-1 text-[11px]">
+                  Cek Produk <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Brand 5: Imou */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-orange-500/60 transition-all group flex flex-col justify-between shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-orange-600/10 rounded-bl-full pointer-events-none"></div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                    IoT Wireless
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Populer
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white group-hover:text-orange-400 transition-colors">
+                  IMOU
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Supplier &amp; Distributor Imou CCTV Serang</strong>. Produk smart wireless terpopuler: Imou Ranger 2 auto-tracking, Cruiser Dual Lens, Bullet 2C tahan cuaca hujan, dan kamera 4G Simcard tanpa internet WiFi.
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Ranger 2 Pan Tilt</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Cruiser 360 IP66</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">CCTV 4G Simcard</span>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-800/80 mt-5 flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-medium">Garansi 1 Tahun</span>
+                <Link href="/shop" className="text-orange-400 font-bold hover:underline inline-flex items-center gap-1 text-[11px]">
+                  Cek Produk <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Brand 6: Uniview (UNV) */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-cyan-500/60 transition-all group flex flex-col justify-between shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-600/10 rounded-bl-full pointer-events-none"></div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                    Enterprise IP
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Proyek / B2B
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white group-hover:text-cyan-400 transition-colors">
+                  UNIVIEW (UNV)
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Distributor Uniview (UNV) Banten</strong>. Pionir IP Video Surveillance berkelas industri tinggi dengan fitur SIP (Smart Intrusion Prevention), LightHunter kejernihan malam ultra jernih, dan server NVR rack-mount.
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">LightHunter Tech</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">UNV NVR Enterprise</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">CCTV Pabrik</span>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-800/80 mt-5 flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-medium">Garansi 2 Tahun</span>
+                <Link href="/shop" className="text-cyan-400 font-bold hover:underline inline-flex items-center gap-1 text-[11px]">
+                  Cek Produk <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Brand 7: Tiandy */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-violet-500/60 transition-all group flex flex-col justify-between shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-violet-600/10 rounded-bl-full pointer-events-none"></div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-violet-500/20 text-violet-400 border border-violet-500/30">
+                    Starlight AI
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Certified
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white group-hover:text-violet-400 transition-colors">
+                  TIANDY
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Supplier &amp; Partner Tiandy CCTV</strong>. Terkenal dengan keunggulan Super Starlight (rekaman malam tetap terang meski minim pencahayaan) serta kecerdasan buatan analisa kendaraan &amp; pelat nomor (ANPR).
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Super Starlight</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">ANPR Plat Nomor</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Color Maker</span>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-800/80 mt-5 flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-medium">Garansi 2 Tahun</span>
+                <Link href="/shop" className="text-violet-400 font-bold hover:underline inline-flex items-center gap-1 text-[11px]">
+                  Cek Produk <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+
+            {/* Brand 8: SPC & Others */}
+            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-rose-500/60 transition-all group flex flex-col justify-between shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-rose-600/10 rounded-bl-full pointer-events-none"></div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                    Ekonomis &amp; Pro
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Garansi Nasional
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white group-hover:text-rose-400 transition-colors">
+                  SPC &amp; BRAND LAIN
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  <strong>Distributor SPC CCTV, Hanwha/Samsung &amp; Bosch</strong>. Menyediakan kamera CCTV ekonomis SPC bergaransi resmi luas, serta perangkat high-end Hanwha Vision dan Panasonic untuk fasilitas perbankan.
+                </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">SPC Indonesia</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Hanwha Vision</span>
+                  <span className="text-[9.5px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">Bosch Security</span>
+                </div>
+              </div>
+              <div className="pt-4 border-t border-slate-800/80 mt-5 flex justify-between items-center text-xs">
+                <span className="text-slate-400 font-medium">Garansi 1-3 Tahun</span>
+                <Link href="/shop" className="text-rose-400 font-bold hover:underline inline-flex items-center gap-1 text-[11px]">
+                  Cek Produk <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Banner B2B Supplier / Grosir / Kemitraan Toko & Reseller */}
+          <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-r from-red-950 via-slate-900 to-blue-950 border border-red-500/30 flex flex-col lg:flex-row items-center justify-between gap-8 shadow-2xl">
+            <div className="space-y-3 text-center lg:text-left">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 text-red-300 text-xs font-bold border border-red-500/30">
+                <span>🤝 Peluang Kemitraan Reseller, Instalatur &amp; Tender Proyek B2B</span>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                Butuh Pasokan CCTV Harga Distributor, Grosir, atau Penawaran SPH Tender Resmi?
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
+                Kami siap menjadi supplier utama bagi toko komputer, teknisi freelance, kontraktor MEP, pengembang perumahan, maupun pengadaan kantor BUMN &amp; swasta. Dapatkan faktur pajak PPN 11%, surat dukungan distributor, dan harga margin terbaik.
+              </p>
+            </div>
+            <a
+              href={`https://wa.me/${(settings.whatsapp || "6282259494242").replace(/[^0-9]/g, "")}?text=${encodeURIComponent("Halo PT. DSTech Smart Perkasa, saya ingin minta daftar harga grosir distributor CCTV (Hikvision, Dahua, Hilook, Ezviz, Imou, Uniview) untuk pengadaan / reseller.")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-black text-xs sm:text-sm uppercase tracking-wider transition-all shadow-xl shadow-red-500/30 flex items-center gap-3 shrink-0 active:scale-95 cursor-pointer"
+            >
+              <MessageCircle className="w-5 h-5" />
+              <span>Minta Price List Distributor</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
       {/* Enhanced Footer */}
       <footer className="bg-white border-t-4 border-dstech-blue pt-16 sm:pt-24 pb-12 overflow-hidden relative">
          <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 sm:gap-12 mb-12 relative z-10">

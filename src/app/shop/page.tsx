@@ -1477,6 +1477,26 @@ export default function ShopPage() {
           </div>
         </div>
 
+        {/* Chip Bar Distributor & Supplier Resmi Semua Merek CCTV (Tugas 220) */}
+        <div className="bg-slate-900 text-white p-3 sm:p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-3 text-xs shadow-md">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-bold text-slate-200">
+              Distributor &amp; Supplier Resmi Merek CCTV:
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 justify-center md:justify-end text-[10.5px] font-black">
+            <span className="px-2.5 py-1 rounded-lg bg-red-500/20 text-red-300 border border-red-500/30">HIKVISION</span>
+            <span className="px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-500/30">DAHUA</span>
+            <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30">HILOOK</span>
+            <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">EZVIZ</span>
+            <span className="px-2.5 py-1 rounded-lg bg-orange-500/20 text-orange-300 border border-orange-500/30">IMOU</span>
+            <span className="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">UNIVIEW</span>
+            <span className="px-2.5 py-1 rounded-lg bg-violet-500/20 text-violet-300 border border-violet-500/30">TIANDY</span>
+            <span className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30">SPC</span>
+          </div>
+        </div>
+
         {/* Search & Filter Bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           {/* Category Tabs */}

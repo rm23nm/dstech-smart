@@ -23,6 +23,23 @@ export const metadata: Metadata = {
   description:
     "Pusat pengadaan & instalasi resmi Kamera CCTV HD/IP AI, Barrier Gate Palang Parkir Otomatis, Smart Door Lock, Mesin Absensi Biometrik, Fiber Optik, & Sistem Akses Kontrol di Cilegon, Serang, Banten, dan Seluruh Indonesia. NIB: 1909220127034.",
   keywords: [
+    "Distributor CCTV Serang",
+    "Distributor CCTV Cilegon",
+    "Distributor CCTV Banten",
+    "Supplier CCTV Serang",
+    "Supplier CCTV Banten",
+    "Grosir CCTV Banten",
+    "Distributor Hikvision Banten",
+    "Distributor Dahua Serang",
+    "Distributor Hilook Banten",
+    "Distributor Ezviz Serang",
+    "Distributor Imou Banten",
+    "Distributor Uniview UNV Banten",
+    "Distributor SPC CCTV",
+    "Distributor Tiandy Banten",
+    "Supplier CCTV Proyek Tender Pabrik",
+    "Master Dealer CCTV Banten",
+    "Harga Distributor CCTV Resmi",
     "CCTV Serang",
     "Pasang CCTV Serang",
     "CCTV Cilegon",
@@ -47,7 +64,6 @@ export const metadata: Metadata = {
     "Smart Home Cilegon",
     "Smart Doorlock Banten",
     "Access Control RFID Pabrik",
-    "Distributor CCTV Hikvision Dahua",
     "PT DSTech Smart Perkasa",
     "Paket CCTV Murah Bergaransi Serang",
     "IT Solution Banten",
@@ -189,6 +205,14 @@ const jsonLdSchema = {
           {
             "@type": "Offer",
             "itemOffered": {
+              "@type": "AggregateOffer",
+              "name": "Pusat Distributor, Supplier & Grosir CCTV Semua Merek Banten",
+              "description": "Distributor resmi CCTV Hikvision, Dahua, HiLook, Ezviz, Imou, Uniview UNV, Tiandy, dan SPC untuk reseller, toko retail, tender proyek pabrik dan instansi.",
+            },
+          },
+          {
+            "@type": "Offer",
+            "itemOffered": {
               "@type": "Service",
               "name": "Infrastruktur IT, Tarik Fiber Optik & Splicing Banten",
               "description": "Instalasi kabel backbone fiber optik, uji redaman OTDR, dan perapihan jaringan LAN komputer kantor.",
@@ -196,6 +220,20 @@ const jsonLdSchema = {
           },
         ],
       },
+      "knowsAbout": [
+        "Distributor CCTV Hikvision Banten",
+        "Distributor CCTV Dahua Serang",
+        "Distributor Resmi HiLook",
+        "Distributor Ezviz Wi-Fi Camera",
+        "Distributor & Supplier Imou CCTV",
+        "Distributor Uniview UNV Banten",
+        "Supplier Tiandy Starlight AI",
+        "Distributor SPC CCTV Indonesia",
+        "Barrier Gate Palang Parkir Otomatis",
+        "Mesin Absensi Fingerprint & Face Recognition",
+        "Software ERP & POS Kasir",
+        "Instalasi Fiber Optik & Jaringan LAN"
+      ],
       "sameAs": [
         "https://wa.me/6282259494242",
         "https://www.instagram.com/dstechsmart",

@@ -6228,6 +6228,44 @@
      - Ditarik dan di-build di live server VPS via PM2 reload `dstech-main`.
      - Verifikasi live respon HTTP 200 dan konten teks terbukti aktif di `https://dstechsmart.com`.
 
+### 220. Tugas: Optimasi SEO & On-Page Showcase Distributor & Supplier Resmi Multi-Merek CCTV Terlengkap (Hikvision, Dahua, HiLook, Ezviz, Imou, Uniview, Tiandy, SPC) [SELESAI]
+- **Permintaan Pengguna**:
+  - *"biasanya orang banyak mencari kata kunci, distributor merek cctv, citu yang sangat penting, semua merek"*
+  - *"suplayer"*
+- **Status**: **SELESAI**
+- **Akar Masalah**:
+  1. Kontraktor tender pabrik, instansi pemerintah (pengadaan LPSE / SPH), developer perumahan, toko komputer/retail, dan end-user dengan volume besar selalu mencari vendor dengan kata kunci *"Distributor CCTV"*, *"Supplier CCTV"*, *"Grosir CCTV"*, atau mencari distributor merek resmi tertentu (contoh: *"Distributor Hikvision Banten"*, *"Supplier Dahua Serang"*, *"Distributor Resmi Ezviz Banten"*).
+  2. Kata kunci merek-merek populer dunia (Hikvision, Dahua, HiLook, Ezviz, Imou, Uniview, Tiandy, SPC) sebelumnya belum dipetakan secara terstruktur ke dalam showcase merek, rich snippet schema, dan meta keywords.
+- **Rincian Perbaikan yang Telah Dilakukan**:
+  1. **Folder Cadangan Khusus**:
+     - Dibuat folder cadangan `_backup_distributor_cctv_brands` untuk mengamankan `src/app/page.tsx`, `src/app/layout.tsx`, dan `src/app/shop/page.tsx`.
+  2. **Seksi Showcase Distributor & Supplier Multi-Merek di Beranda (`src/app/page.tsx`)**:
+     - Menghadirkan seksi berkelas korporat bertajuk: *"Distributor & Supplier Resmi Semua Merek CCTV Terkemuka"* dengan badge *"Pusat Distributor, Supplier & Grosir CCTV Resmi Banten"*.
+     - Menyediakan 8 kartu grid brand CCTV terpopuler lengkap dengan spesialisasi:
+       * **Hikvision**: Distributor Resmi Hikvision Serang & Banten (ColorVu malam berwarna, AcuSense AI, Turbo HD 2MP-5MP, IP Camera 4K, NVR/DVR, Thermal industri).
+       * **Dahua Technology**: Distributor & Supplier Dahua Banten (Full-Color LED, WizSense AI, TiOC 3-in-1 Active Deterrence sirine & strobo, HDCVI, PTZ Speed Dome).
+       * **HiLook**: Distributor & Master Dealer HiLook Resmi By Hikvision (Paket CCTV 4CH/8CH hemat kualitas prima untuk toko dan rumah).
+       * **Ezviz**: Distributor Ezviz Banten & Supplier Wi-Fi Cam (Ezviz C6N Pan-Tilt, C3W Pro, H8c Outdoor 360, Battery Solar Camera).
+       * **Imou**: Supplier & Distributor Imou CCTV Serang (Ranger 2 auto-tracking, Cruiser 360 IP66, Bullet 2C, kamera 4G Simcard).
+       * **Uniview (UNV)**: Distributor Uniview (UNV) Banten (IP Video Surveillance Enterprise, LightHunter malam ultra jernih, SIP AI, NVR rack-mount).
+       * **Tiandy**: Supplier & Partner Tiandy CCTV (Super Starlight pemantauan malam tanpa lampu, ANPR pengenal pelat nomor kendaraan).
+       * **SPC & Lainnya**: Distributor SPC CCTV, Hanwha Vision (Samsung), dan Bosch Security bergaransi resmi.
+     - Ditambahkan banner kemitraan B2B: *"Peluang Kemitraan Reseller, Instalatur & Tender Proyek B2B"* lengkap dengan benefit PPN 11%, surat dukungan distributor, dan tombol CTA WhatsApp minta price list grosir/distributor.
+  3. **Peningkatan Keywords & Schema.org JSON-LD (`src/app/layout.tsx`)**:
+     - Ditambahkan kata kunci target tinggi: *"Distributor CCTV Serang"*, *"Distributor CCTV Cilegon"*, *"Distributor CCTV Banten"*, *"Supplier CCTV Serang"*, *"Supplier CCTV Banten"*, *"Grosir CCTV Banten"*, *"Distributor Hikvision Banten"*, *"Distributor Dahua Serang"*, *"Distributor Hilook Banten"*, *"Distributor Ezviz Serang"*, *"Distributor Imou Banten"*, *"Distributor Uniview UNV Banten"*, *"Distributor SPC CCTV"*, *"Distributor Tiandy Banten"*, *"Supplier CCTV Proyek Tender Pabrik"*, *"Master Dealer CCTV Banten"*, *"Harga Distributor CCTV Resmi"*.
+     - Ditambahkan penawaran agregat resmi pada `hasOfferCatalog`: *"Pusat Distributor, Supplier & Grosir CCTV Semua Merek Banten"*.
+     - Ditambahkan array `knowsAbout` yang merinci keahlian distributor seluruh brand di Google Knowledge Graph.
+  4. **Penyempurnaan Chip Bar Merek di Katalog Toko (`src/app/shop/page.tsx`)**:
+     - Ditambahkan chip bar elegan berwarna gelap di atas pencarian produk: *"Distributor & Supplier Resmi Merek CCTV: HIKVISION, DAHUA, HILOOK, EZVIZ, IMOU, UNIVIEW, TIANDY, SPC"*.
+  5. **Pengujian & Validasi Build Lokal**:
+     - `npx tsc --noEmit` lolos 100% tanpa error kompilasi.
+     - `npm run build` lolos 100% (62/62 static & dynamic routes compiled sukses).
+     - Folder cadangan `_backup_distributor_cctv_brands` dibersihkan sesuai SOP.
+  6. **Deployment & Verifikasi Server Live VPS**:
+     - Kode di-commit dan di-push ke GitHub remote repository master branch.
+     - Ditarik dan di-build di live server VPS via PM2 reload `dstech-main`.
+     - Verifikasi live respon HTTP 200 dan konten teks terbukti aktif di `https://dstechsmart.com`.
+
 ### 89. Catatan Penting
 - Binary native `git.exe` tersedia di `C:\Program Files\Git\cmd\git.exe` (Git version 2.54.0.windows.1).
 - Script push `push_with_native_git.js` menggunakan native git dan folder staging `temp_github_push` untuk sinkronisasi cepat dan stabil.
