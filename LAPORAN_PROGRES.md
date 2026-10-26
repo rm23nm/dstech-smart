@@ -6481,21 +6481,38 @@
 
 ---
 
-### 229. Tugas: Fitur Neraca Saldo (Trial Balance) & Pemotongan Serta Perhitungan Pajak PPh di Modul Finance Admin (/admin/finance) [ANTRIAN PEKERJAAN BERIKUTNYA]
+### 229. Tugas: Fitur Neraca Saldo (Trial Balance) & Pemotongan Serta Perhitungan Pajak PPh di Modul Finance Admin (/admin/finance) [SEDANG DIKERJAKAN]
 - **Permintaan Pengguna**:
   - *"saya butuh fitur neraca saldo, dan pemotongan dan perhitungan pajak PPH tolong kamu tambahkan ke aplikasi"*
-- **Status**: **DALAM ANTRIAN (Akan dikerjakan sekarang)**
-- **Rencana Solusi**:
-  1. **Tab Neraca Saldo (Trial Balance)**:
-     - Menghitung dan menyajikan posisi Debit & Kredit seimbang dari seluruh akun (Kas & Bank, Piutang Usaha, Valuasi Persediaan Barang, Utang Usaha ke Supplier, Modal & Ekuitas, Pendapatan Penjualan, Beban Pokok Penjualan HPP, dan Beban Operasional).
-     - Menampilkan indikator keseimbangan (Balance Status) dan lembar cetak standar akuntansi.
-  2. **Tab Pemotongan & Perhitungan Pajak PPh**:
-     - Modul pencatatan & kalkulasi otomatis pemotongan pajak penghasilan:
-       * PPh Pasal 21 (Upah/honor tenaga ahli / teknisi lepas).
-       * PPh Pasal 23 (Pemotongan atas jasa instalasi/perawatan 2%).
-       * PPh Final PP 23 / PP 55 UMKM (0.5% dari omzet bruto peredaran usaha).
-       * PPN 11% Faktur Keluaran vs Faktur Masukan.
-     - Ringkasan SPT Masa dan Bukti Potong Pajak.
+- **Status**: **SEDANG DIKERJAKAN**
+- **Analisis & Rencana Solusi**:
+  1. **Tab 1: Neraca Saldo (Trial Balance)**:
+     - Mengagregasi posisi akun keuangan riil secara otomatis ke format standar akuntansi Debit vs Kredit:
+       * **Aset Lancar**: Kas & Rekening Bank (BCA, Mandiri, Tunai), Piutang Usaha (Sales Invoices Unpaid), Valuasi Persediaan Barang Gudang.
+       * **Kewajiban / Liabilitas**: Utang Usaha ke Supplier (Purchase Orders Unpaid), Utang Pajak PPh/PPN.
+       * **Ekuitas & Modal**: Modal Disetor / Ekuitas Pemilik, Laba Ditahan (Retained Earnings).
+       * **Pendapatan Usaha**: Penjualan Barang & Jasa Instalasi Proyek.
+       * **Beban Usaha (Debit)**: Beban Pokok Penjualan (HPP Persediaan Terjual), Beban Operasional / Kas Keluar.
+     - Menyediakan indikator status keseimbangan (*Balance Check: Total Debit === Total Kredit*).
+     - Menyediakan tombol Cetak Resmi A4 & Download PDF Neraca Saldo ber-Kop Surat DSTech Smart.
+  2. **Tab 2: Pemotongan & Perhitungan Pajak PPh (Tax Management Suite)**:
+     - Menyediakan 4 kartu ringkasan pajak:
+       * **PPh Pasal 21**: Pajak atas upah / honor teknisi lepas, tenaga ahli, dan komisi mitra afiliasi (Tarif efektif 2.5% / 5%).
+       * **PPh Pasal 23**: Pemotongan pajak atas imbalan jasa teknik, instalasi, dan pemeliharaan (Tarif 2%).
+       * **PPh Final UMKM (PP 23/PP 55)**: 0.5% dari omzet bruto peredaran usaha bulanan (otomatis terhitung dari total omzet penjualan faktur).
+       * **Rekapitulasi PPN 11%**: PPN Keluaran Faktur Penjualan vs PPN Masukan PO Supplier.
+     - Menyediakan form Modal Catat / Setor Pajak (NTPN, Masa Pajak, Bukti Bayar/BPN).
+     - Menghubungkan penyimpanan ke backend `/api/finance` (`actionType: "save_tax_record"` & data store `dstech_finance_taxes.json`).
+- **Rencana Step-by-Step Pengerjaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 229 dan step-by-step di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat folder cadangan `_backup_finance_trial_tax/` dan amankan file target (`admin/finance/page.tsx` & `api/finance/route.ts`).
+  3. [ ] **Langkah 3**: Siapkan backend endpoint Pajak PPh di `src/app/api/finance/route.ts` (CRUD record pajak `dstech_tax_...`).
+  4. [ ] **Langkah 4**: Implementasikan Tab Neraca Saldo (*Trial Balance*) dengan kalkulasi dinamis Debit/Kredit dan lembar cetak standar di `src/app/admin/finance/page.tsx`.
+  5. [ ] **Langkah 5**: Implementasikan Tab Pemotongan & Perhitungan Pajak PPh (PPh 21, PPh 23, PPh Final PP 23 0.5%, PPN 11%) dengan modal setor pajak di `src/app/admin/finance/page.tsx`.
+  6. [ ] **Langkah 6**: Validasi kompilasi lokal `npx tsc --noEmit` lolos 100% dan `npm run build` sukses.
+  7. [ ] **Langkah 7**: Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  8. [ ] **Langkah 8**: Verifikasi visual via browser testing subagent di `https://dstechsmart.com/admin/finance`.
+  9. [ ] **Langkah 9**: Bersihkan folder cadangan dan tandai Tugas 229 sebagai `[SELESAI]`.
 
 ---
 

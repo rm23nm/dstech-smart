@@ -326,6 +326,62 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Payload data wajib disertakan" }, { status: 400 });
     }
 
+    if (actionType === "tax_record" || actionType === "tax") {
+      const grossAmount = Number(payload.grossAmount) || 0;
+      const taxRate = Number(payload.taxRate) || 0;
+      const taxAmount = Number(payload.taxAmount) || (grossAmount * taxRate / 100);
+
+      const newTaxRecord = {
+        id: `dstech_tax_${Date.now()}`,
+        taxType: payload.taxType || "PPH_23",
+        taxPeriod: payload.taxPeriod || new Date().toISOString().slice(0, 7),
+        date: payload.date || new Date().toISOString().split("T")[0],
+        taxObject: payload.taxObject || "Jasa Teknik & Instalasi",
+        grossAmount,
+        taxRate,
+        taxAmount,
+        taxPayerName: payload.taxPayerName || "PT. DSTech Smart Perkasa",
+        taxPayerNpwp: payload.taxPayerNpwp || "42.891.203.4-417.000",
+        paymentStatus: payload.paymentStatus || "TERUTANG",
+        ntpn: payload.ntpn || "",
+        billingCode: payload.billingCode || "",
+        paymentDate: payload.paymentDate || "",
+        bankAccount: payload.bankAccount || "",
+        proofUrl: payload.proofUrl || "",
+        businessEntity: payload.businessEntity || "PT",
+        notes: payload.notes || "-",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (!data.tax_records) data.tax_records = [];
+      data.tax_records.unshift(newTaxRecord);
+
+      // Jika status langsung DISETOR dan rekening diisi, catat otomatis ke arus kas keluar
+      if (newTaxRecord.paymentStatus === "DISETOR" && taxAmount > 0 && newTaxRecord.bankAccount) {
+        if (!data.cash_flow) data.cash_flow = [];
+        data.cash_flow.unshift({
+          id: `dstech_cash_${Date.now()}`,
+          date: newTaxRecord.paymentDate || newTaxRecord.date,
+          type: "OUT",
+          category: `Setoran Pajak ${newTaxRecord.taxType}`,
+          amount: taxAmount,
+          account: newTaxRecord.bankAccount,
+          reference: newTaxRecord.ntpn || newTaxRecord.billingCode || newTaxRecord.id,
+          description: `Pembayaran Setor Pajak ${newTaxRecord.taxType} Masa ${newTaxRecord.taxPeriod} - ${newTaxRecord.taxObject}`,
+          balanceAfter: 0,
+          businessEntity: newTaxRecord.businessEntity || "PT",
+        });
+      }
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Catatan Pajak ${newTaxRecord.taxType} berhasil disimpan`,
+        data: newTaxRecord,
+      });
+    }
+
     if (actionType === "client") {
       const newClient = {
         id: `dstech_cli_${Date.now()}`,
@@ -2196,6 +2252,16 @@ export async function DELETE(request: Request) {
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Proyek berhasil dihapus" });
+    }
+
+    if (actionType === "tax_record" || actionType === "tax") {
+      const initialLen = (data.tax_records || []).length;
+      data.tax_records = (data.tax_records || []).filter((t: any) => t.id !== id);
+      if (data.tax_records.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Catatan pajak tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Catatan pajak berhasil dihapus" });
     }
 
     if (actionType === "reset_transactions") {

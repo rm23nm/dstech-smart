@@ -369,6 +369,7 @@ interface PurchaseOrder {
   approvalNotes?: string;
   attachments?: DocumentAttachment[];
   businessEntity?: "PT" | "NON_PT";
+  paidAmount?: number;
   projectId?: string;
   projectName?: string;
   subject?: string;
@@ -485,6 +486,7 @@ interface ExpenseItem {
   amount: number;
   recipient: string;
   notes: string;
+  businessEntity?: "PT" | "NON_PT";
   receiptUrl?: string;
   attachments?: DocumentAttachment[];
 }
@@ -524,6 +526,29 @@ interface SupplierItem {
   notes: string;
 }
 
+export interface TaxRecord {
+  id: string;
+  taxType: "PPH23" | "PPH21" | "PPH_FINAL_UMKM" | "PPN_MASUKAN" | "PPN_KELUARAN" | string;
+  period: string;
+  date: string;
+  entityType?: "PT" | "NON_PT";
+  partyName: string;
+  npwp?: string;
+  referenceNo?: string;
+  dpp: number;
+  taxRate: number;
+  taxAmount: number;
+  bupotNumber?: string;
+  status: "UNPAID" | "BILLING_ISSUED" | "PAID";
+  billingCode?: string;
+  ntpn?: string;
+  paidAt?: string;
+  bankAccount?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 interface FinanceSummary {
   totalSalesRevenue: number;
   totalSalesPaid: number;
@@ -550,7 +575,7 @@ interface FinanceSummary {
 
 export default function AdminFinanceERPPage() {
   const [activeTab, setActiveTab] = useState<
-    "sales" | "quotations" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses" | "clients" | "suppliers" | "projects"
+    "sales" | "quotations" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses" | "clients" | "suppliers" | "projects" | "trial_balance" | "tax"
   >("sales");
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -570,6 +595,56 @@ export default function AdminFinanceERPPage() {
   const [clients, setClients] = useState<ClientItem[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
   const [products, setProducts] = useState<ProductCatalogItem[]>([]);
+  const [taxRecords, setTaxRecords] = useState<TaxRecord[]>([]);
+
+  // Pajak PPh & PPN States
+  const [taxSearchQuery, setTaxSearchQuery] = useState<string>("");
+  const [taxTypeFilter, setTaxTypeFilter] = useState<string>("ALL");
+  const [taxStatusFilter, setTaxStatusFilter] = useState<string>("ALL");
+  const [taxPeriodFilter, setTaxPeriodFilter] = useState<string>("ALL");
+  const [isTaxModalOpen, setIsTaxModalOpen] = useState<boolean>(false);
+  const [editingTaxRecord, setEditingTaxRecord] = useState<TaxRecord | null>(null);
+  const [taxForm, setTaxForm] = useState<{
+    taxType: string;
+    period: string;
+    date: string;
+    entityType: "PT" | "NON_PT";
+    partyName: string;
+    npwp: string;
+    referenceNo: string;
+    dpp: number;
+    taxRate: number;
+    taxAmount: number;
+    bupotNumber: string;
+    status: "UNPAID" | "BILLING_ISSUED" | "PAID";
+    billingCode: string;
+    ntpn: string;
+    paidAt: string;
+    bankAccount: string;
+    notes: string;
+  }>({
+    taxType: "PPH23",
+    period: new Date().toISOString().slice(0, 7),
+    date: new Date().toISOString().split("T")[0],
+    entityType: "PT",
+    partyName: "",
+    npwp: "",
+    referenceNo: "",
+    dpp: 0,
+    taxRate: 2,
+    taxAmount: 0,
+    bupotNumber: "",
+    status: "UNPAID",
+    billingCode: "",
+    ntpn: "",
+    paidAt: "",
+    bankAccount: "",
+    notes: "",
+  });
+
+  // Neraca Saldo States
+  const [isTrialBalancePrintModalOpen, setIsTrialBalancePrintModalOpen] = useState<boolean>(false);
+  const [trialBalanceAsOfDate, setTrialBalanceAsOfDate] = useState<string>(new Date().toISOString().split("T")[0]);
   const [summary, setSummary] = useState<FinanceSummary>({
     totalSalesRevenue: 0,
     totalSalesPaid: 0,
@@ -2933,6 +3008,7 @@ export default function AdminFinanceERPPage() {
           setExpenses(d.data.expenses || []);
           setClients(d.data.clients || []);
           setSuppliers(d.data.suppliers || []);
+          setTaxRecords(d.data.tax_records || []);
           if (d.data.bank_accounts && d.data.bank_accounts.length > 0) {
             setBankAccounts(d.data.bank_accounts);
             const def = d.data.bank_accounts.find((b: any) => b.isDefault && b.status === "Aktif") || d.data.bank_accounts.find((b: any) => b.status === "Aktif") || d.data.bank_accounts[0];
@@ -8321,6 +8397,7 @@ export default function AdminFinanceERPPage() {
       purchases: purchases.filter((p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity).length,
       cashFlow: cashFlow.filter((c) => selectedEntity === "ALL" || (c.businessEntity || "PT") === selectedEntity).length,
       projects: projects.filter((prj) => selectedEntity === "ALL" || (prj.businessEntity || "PT") === selectedEntity).length,
+      taxes: taxRecords.filter((t) => selectedEntity === "ALL" || (t.entityType || "PT") === selectedEntity).length,
     };
   }, [sales, quotations, purchases, cashFlow, projects, selectedEntity]);
 
@@ -8388,6 +8465,323 @@ export default function AdminFinanceERPPage() {
       unpaidReceivable,
       totalSalesCount: relatedSales.length,
     };
+  };
+
+  // ==========================================
+  // PERHITUNGAN NERACA SALDO (TRIAL BALANCE)
+  // ==========================================
+  const trialBalanceAccounts = useMemo(() => {
+    // 1. Kas & Setara Kas (dari Cash Flow / Bank)
+    const cashTotal = cashFlow
+      .filter((c) => selectedEntity === "ALL" || (c.businessEntity || "PT") === selectedEntity)
+      .reduce((acc, c) => acc + (c.type === "IN" ? c.amount : -c.amount), 0);
+
+    // 2. Piutang Usaha Penjualan (Unpaid Invoices)
+    const receivableTotal = sales
+      .filter((s) => selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity)
+      .reduce((acc, s) => {
+        const remaining = (s.grandTotal || 0) - (s.paidAmount || 0);
+        return acc + (remaining > 0 ? remaining : 0);
+      }, 0);
+
+    // 3. Persediaan Barang & Valuasi Stok Gudang
+    const inventoryValuation = warehouses.reduce((acc, w) => acc + (w.totalValuation || 0), 0);
+
+    // 4. Beban Pokok Penjualan (HPP Material / Belanja PO)
+    const cogsTotal = purchases
+      .filter((p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity)
+      .reduce((acc, p) => acc + (p.grandTotal || 0), 0);
+
+    // 5. Beban Operasional & Administrasi
+    const expTotal =
+      expenses
+        .filter((e) => selectedEntity === "ALL" || (e.businessEntity || "PT") === selectedEntity)
+        .reduce((acc, e) => acc + (e.amount || 0), 0) +
+      cashFlow
+        .filter(
+          (c) =>
+            (selectedEntity === "ALL" || (c.businessEntity || "PT") === selectedEntity) &&
+            c.type === "OUT" &&
+            !c.category?.toLowerCase().includes("pembelian") &&
+            !c.category?.toLowerCase().includes("pajak")
+        )
+        .reduce((acc, c) => acc + c.amount, 0);
+
+    // 6. Utang Usaha Pembelian (Unpaid PO Supplier)
+    const payableTotal = purchases
+      .filter((p) => selectedEntity === "ALL" || (p.businessEntity || "PT") === selectedEntity)
+      .reduce((acc, p) => {
+        const paid = p.paidAmount !== undefined ? p.paidAmount : (p.paymentStatus === "Lunas" || p.status.includes("Lunas") ? p.grandTotal : 0);
+        const remaining = (p.grandTotal || 0) - paid;
+        return acc + (remaining > 0 ? remaining : 0);
+      }, 0);
+
+    // 7. Utang Pajak PPh & PPN Terutang
+    const taxPayable = taxRecords
+      .filter((t) => (selectedEntity === "ALL" || (t.entityType || "PT") === selectedEntity) && t.status !== "PAID")
+      .reduce((acc, t) => acc + (t.taxAmount || 0), 0);
+
+    // 8. Pendapatan Penjualan Usaha
+    const revenueTotal = sales
+      .filter((s) => selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity)
+      .reduce((acc, s) => acc + (s.grandTotal || 0), 0);
+
+    // Total Debit & Kredit Balance
+    const debitTotal = Math.max(0, cashTotal) + receivableTotal + inventoryValuation + cogsTotal + expTotal;
+    const creditSubtotal = payableTotal + taxPayable + revenueTotal;
+    const equityBalance = Math.max(0, debitTotal - creditSubtotal);
+    const finalCreditTotal = creditSubtotal + equityBalance;
+
+    return {
+      rows: [
+        { code: "1-100", name: "Kas & Setara Kas (Rekening Bank & Kas Tunai)", group: "Aset Lancar", debit: Math.max(0, cashTotal), credit: 0 },
+        { code: "1-200", name: "Piutang Usaha (Tagihan Faktur Belum Lunas)", group: "Aset Lancar", debit: receivableTotal, credit: 0 },
+        { code: "1-300", name: "Persediaan Barang Dagang & Stok Gudang", group: "Aset Lancar", debit: inventoryValuation, credit: 0 },
+        { code: "2-100", name: "Utang Usaha Pembelian (PO Supplier Belum Lunas)", group: "Kewajiban", debit: 0, credit: payableTotal },
+        { code: "2-200", name: "Utang Pajak PPh & PPN Terutang", group: "Kewajiban", debit: 0, credit: taxPayable },
+        { code: "3-100", name: "Modal Disetor & Ekuitas Pemilik", group: "Ekuitas", debit: 0, credit: equityBalance },
+        { code: "4-100", name: "Pendapatan Usaha (Penjualan Barang & Jasa)", group: "Pendapatan", debit: 0, credit: revenueTotal },
+        { code: "5-100", name: "Beban Pokok Penjualan (HPP Material)", group: "Beban Pokok", debit: cogsTotal, credit: 0 },
+        { code: "6-100", name: "Beban Operasional & Administrasi Umum", group: "Beban Usaha", debit: expTotal, credit: 0 },
+      ],
+      totalDebit: debitTotal,
+      totalCredit: finalCreditTotal,
+      isBalanced: Math.abs(debitTotal - finalCreditTotal) < 1,
+      difference: Math.abs(debitTotal - finalCreditTotal),
+    };
+  }, [cashFlow, sales, warehouses, purchases, expenses, taxRecords, selectedEntity]);
+
+  // ==========================================
+  // PERHITUNGAN & HANDLERS PAJAK PPH & PPN
+  // ==========================================
+  const filteredTaxRecords = useMemo(() => {
+    return taxRecords.filter((t) => {
+      const matchEntity = selectedEntity === "ALL" || (t.entityType || "PT") === selectedEntity;
+      const matchType = taxTypeFilter === "ALL" || t.taxType === taxTypeFilter;
+      const matchStatus = taxStatusFilter === "ALL" || t.status === taxStatusFilter;
+      const matchPeriod = taxPeriodFilter === "ALL" || t.period === taxPeriodFilter;
+      const matchQuery =
+        !taxSearchQuery ||
+        (t.partyName || "").toLowerCase().includes(taxSearchQuery.toLowerCase()) ||
+        (t.bupotNumber || "").toLowerCase().includes(taxSearchQuery.toLowerCase()) ||
+        (t.referenceNo || "").toLowerCase().includes(taxSearchQuery.toLowerCase()) ||
+        (t.billingCode || "").toLowerCase().includes(taxSearchQuery.toLowerCase()) ||
+        (t.ntpn || "").toLowerCase().includes(taxSearchQuery.toLowerCase());
+      return matchEntity && matchType && matchStatus && matchPeriod && matchQuery;
+    });
+  }, [taxRecords, selectedEntity, taxTypeFilter, taxStatusFilter, taxPeriodFilter, taxSearchQuery]);
+
+  const taxSummary = useMemo(() => {
+    const list = taxRecords.filter((t) => selectedEntity === "ALL" || (t.entityType || "PT") === selectedEntity);
+    const pph21List = list.filter((t) => t.taxType === "PPH21");
+    const pph23List = list.filter((t) => t.taxType === "PPH23");
+    const pphFinalList = list.filter((t) => t.taxType === "PPH_FINAL_UMKM");
+    const ppnList = list.filter((t) => t.taxType?.startsWith("PPN"));
+
+    const pph21Total = pph21List.reduce((acc, t) => acc + (t.taxAmount || 0), 0);
+    const pph23Total = pph23List.reduce((acc, t) => acc + (t.taxAmount || 0), 0);
+    const pphFinalTotal = pphFinalList.reduce((acc, t) => acc + (t.taxAmount || 0), 0);
+    const ppnTotal = ppnList.reduce((acc, t) => acc + (t.taxAmount || 0), 0);
+
+    const totalUnpaid = list.filter((t) => t.status !== "PAID").reduce((acc, t) => acc + (t.taxAmount || 0), 0);
+    const totalPaid = list.filter((t) => t.status === "PAID").reduce((acc, t) => acc + (t.taxAmount || 0), 0);
+
+    return {
+      pph21Total,
+      pph23Total,
+      pphFinalTotal,
+      ppnTotal,
+      totalUnpaid,
+      totalPaid,
+      grandTotal: list.reduce((acc, t) => acc + (t.taxAmount || 0), 0),
+    };
+  }, [taxRecords, selectedEntity]);
+
+  const handleOpenAddTax = () => {
+    const now = new Date();
+    setTaxForm({
+      taxType: "PPH23",
+      period: now.toISOString().slice(0, 7),
+      date: now.toISOString().split("T")[0],
+      entityType: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
+      partyName: "",
+      npwp: "",
+      referenceNo: "",
+      dpp: 0,
+      taxRate: 2,
+      taxAmount: 0,
+      bupotNumber: `BUPOT-23-${Date.now().toString().slice(-6)}`,
+      status: "UNPAID",
+      billingCode: "",
+      ntpn: "",
+      paidAt: "",
+      bankAccount: "",
+      notes: "",
+    });
+    setEditingTaxRecord(null);
+    setIsTaxModalOpen(true);
+  };
+
+  const handleEditTaxRecord = (rec: TaxRecord) => {
+    setEditingTaxRecord(rec);
+    setTaxForm({
+      taxType: rec.taxType || "PPH23",
+      period: rec.period || "",
+      date: rec.date || "",
+      entityType: rec.entityType || "PT",
+      partyName: rec.partyName || "",
+      npwp: rec.npwp || "",
+      referenceNo: rec.referenceNo || "",
+      dpp: rec.dpp || 0,
+      taxRate: rec.taxRate || 2,
+      taxAmount: rec.taxAmount || 0,
+      bupotNumber: rec.bupotNumber || "",
+      status: rec.status || "UNPAID",
+      billingCode: rec.billingCode || "",
+      ntpn: rec.ntpn || "",
+      paidAt: rec.paidAt || "",
+      bankAccount: rec.bankAccount || "",
+      notes: rec.notes || "",
+    });
+    setIsTaxModalOpen(true);
+  };
+
+  const handleSaveTaxRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsLoading(true);
+      if (editingTaxRecord) {
+        const res = await fetch("/api/finance", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "tax_record",
+            id: editingTaxRecord.id,
+            updates: taxForm,
+          }),
+        });
+        const d = await res.json();
+        if (d.success) {
+          setToastMessage(d.message || "Catatan pajak berhasil diperbarui");
+          setIsTaxModalOpen(false);
+          setEditingTaxRecord(null);
+          await fetchFinanceData();
+        } else {
+          alert(d.error || "Gagal memperbarui catatan pajak");
+        }
+      } else {
+        const res = await fetch("/api/finance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actionType: "tax_record",
+            payload: taxForm,
+          }),
+        });
+        const d = await res.json();
+        if (d.success) {
+          setToastMessage(d.message || "Catatan pajak berhasil disimpan");
+          setIsTaxModalOpen(false);
+          await fetchFinanceData();
+        } else {
+          alert(d.error || "Gagal menyimpan catatan pajak");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat menyimpan catatan pajak");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteTaxRecord = async (id: string, bupot: string) => {
+    if (!window.confirm(`Yakin ingin menghapus catatan pajak ${bupot}?`)) return;
+    try {
+      setIsLoading(true);
+      const res = await fetch(`/api/finance?actionType=tax_record&id=${id}`, {
+        method: "DELETE",
+      });
+      const d = await res.json();
+      if (d.success) {
+        setToastMessage(d.message || "Catatan pajak berhasil dihapus");
+        await fetchFinanceData();
+      } else {
+        alert(d.error || "Gagal menghapus catatan pajak");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat menghapus catatan pajak");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleMarkTaxPaid = async (record: TaxRecord) => {
+    const ntpnInput = prompt("Masukkan Nomor Bukti Penerimaan Negara (NTPN):", record.ntpn || "");
+    if (ntpnInput === null) return;
+    try {
+      setIsLoading(true);
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "tax_record",
+          id: record.id,
+          updates: {
+            status: "PAID",
+            ntpn: ntpnInput.trim(),
+            paidAt: new Date().toISOString(),
+          },
+        }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setToastMessage("Pajak berhasil disetor & status diperbarui ke LUNAS/PAID");
+        await fetchFinanceData();
+      } else {
+        alert(d.error || "Gagal memperbarui status pajak");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat memproses");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAutoCalculatePphFinal = () => {
+    const now = new Date();
+    const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const thisMonthSales = sales.filter((s) => {
+      const matchEntity = selectedEntity === "ALL" || (s.businessEntity || "PT") === selectedEntity;
+      const invDate = s.date || "";
+      return matchEntity && invDate.startsWith(currentMonthPrefix);
+    });
+    const grossRevenue = thisMonthSales.reduce((acc, s) => acc + (s.grandTotal || 0), 0);
+    const tax05 = Math.round(grossRevenue * 0.005);
+
+    setTaxForm({
+      taxType: "PPH_FINAL_UMKM",
+      period: currentMonthPrefix,
+      date: now.toISOString().split("T")[0],
+      entityType: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
+      partyName: selectedEntity === "NON_PT" ? "DSTech Smart (PPh Final PP 23 0.5%)" : "PT. DSTech Smart Perkasa (PPh Final PP 23 0.5%)",
+      npwp: "84.341.520.1-216.000",
+      referenceNo: `OMZET-${currentMonthPrefix}`,
+      dpp: grossRevenue,
+      taxRate: 0.5,
+      taxAmount: tax05,
+      bupotNumber: `BUPOT-FINAL-${currentMonthPrefix.replace("-", "")}`,
+      status: "UNPAID",
+      billingCode: "",
+      ntpn: "",
+      paidAt: "",
+      bankAccount: "",
+      notes: `Perhitungan otomatis PPh Final UMKM PP 23/55 (0.5% dari omzet bruto ${formatRupiah(grossRevenue)} dari ${thisMonthSales.length} faktur)`,
+    });
+    setEditingTaxRecord(null);
+    setIsTaxModalOpen(true);
   };
 
   return (
@@ -8755,6 +9149,36 @@ export default function AdminFinanceERPPage() {
             <span>Manajemen Proyek</span>
             <span className="px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-[10px] font-black">
               {scopedCounts.projects}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("trial_balance")}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "trial_balance"
+                ? "bg-slate-900 text-white shadow-md"
+                : "bg-teal-50 text-teal-700 hover:bg-teal-100"
+            }`}
+          >
+            <Scale className="w-4 h-4 text-teal-600" />
+            <span>Neraca Saldo</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-teal-500/20 text-[10px] font-black">
+              {trialBalanceAccounts.isBalanced ? "⚖️ Seimbang" : "⚠️ Selisih"}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("tax")}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "tax"
+                ? "bg-slate-900 text-white shadow-md"
+                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+            }`}
+          >
+            <Landmark className="w-4 h-4 text-emerald-600" />
+            <span>Pajak PPh & PPN</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-[10px] font-black">
+              {scopedCounts.taxes}
             </span>
           </button>
         </div>
@@ -12836,6 +13260,450 @@ export default function AdminFinanceERPPage() {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ==================================================== */}
+        {/* TAB 10: NERACA SALDO (TRIAL BALANCE SUMMARY)        */}
+        {/* ==================================================== */}
+        {activeTab === "trial_balance" && (
+          <div className="space-y-6">
+            {/* Header Kontrol Neraca Saldo */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-teal-100 text-teal-800">
+                    Akuntansi Terkonsolidasi
+                  </span>
+                  <span className="text-xs font-bold text-slate-400">
+                    Entitas: {selectedEntity === "NON_PT" ? "Non-PT / Personal" : selectedEntity === "PT" ? "PT. DSTech Smart Perkasa" : "Semua Entitas"}
+                  </span>
+                </div>
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <Scale className="w-5 h-5 text-teal-600" />
+                  Neraca Saldo Usaha (Trial Balance)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Ringkasan debit dan kredit akun riil serta nominal untuk memastikan pembukuan seimbang secara matematis.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-teal-600" />
+                  <span className="text-slate-400 font-semibold">Per Tanggal:</span>
+                  <input
+                    type="date"
+                    value={trialBalanceAsOfDate}
+                    onChange={(e) => setTrialBalanceAsOfDate(e.target.value)}
+                    className="bg-transparent font-bold text-slate-800 focus:outline-none cursor-pointer"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTrialBalancePrintModalOpen(true)}
+                  className="px-4 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs flex items-center gap-2 shadow-sm cursor-pointer transition-all"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Cetak Neraca Saldo Resmi A4</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Kartu KPI Neraca Saldo */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gradient-to-br from-teal-50 to-white p-5 rounded-3xl border border-teal-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-teal-700">Total Debit</span>
+                  <TrendingUp className="w-4 h-4 text-teal-600" />
+                </div>
+                <p className="text-xl font-black text-slate-900 mt-2 font-mono">
+                  {formatRupiah(trialBalanceAccounts.totalDebit)}
+                </p>
+                <p className="text-[11px] text-teal-600 mt-1">Aset, Kas, Persediaan & Beban</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-indigo-50 to-white p-5 rounded-3xl border border-indigo-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-700">Total Kredit</span>
+                  <TrendingDown className="w-4 h-4 text-indigo-600" />
+                </div>
+                <p className="text-xl font-black text-slate-900 mt-2 font-mono">
+                  {formatRupiah(trialBalanceAccounts.totalCredit)}
+                </p>
+                <p className="text-[11px] text-indigo-600 mt-1">Utang, Pajak, Ekuitas & Pendapatan</p>
+              </div>
+
+              <div className={`p-5 rounded-3xl border shadow-xs ${trialBalanceAccounts.isBalanced ? "bg-gradient-to-br from-emerald-50 to-white border-emerald-200" : "bg-gradient-to-br from-amber-50 to-white border-amber-200"}`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-bold ${trialBalanceAccounts.isBalanced ? "text-emerald-700" : "text-amber-700"}`}>Status Keseimbangan</span>
+                  {trialBalanceAccounts.isBalanced ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <AlertTriangle className="w-4 h-4 text-amber-600" />}
+                </div>
+                <p className={`text-lg font-black mt-2 ${trialBalanceAccounts.isBalanced ? "text-emerald-700" : "text-amber-700"}`}>
+                  {trialBalanceAccounts.isBalanced ? "SEIMBANG (BALANCED)" : "SELISIH DEBIT/KREDIT"}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  {trialBalanceAccounts.isBalanced ? "Keseimbangan pembukuan terverifikasi 100%" : `Selisih: ${formatRupiah(trialBalanceAccounts.difference)}`}
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-br from-slate-50 to-white p-5 rounded-3xl border border-slate-200 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">Persediaan & Kas Riil</span>
+                  <Wallet className="w-4 h-4 text-slate-600" />
+                </div>
+                <p className="text-xl font-black text-slate-900 mt-2 font-mono">
+                  {formatRupiah(trialBalanceAccounts.rows[0].debit + trialBalanceAccounts.rows[2].debit)}
+                </p>
+                <p className="text-[11px] text-slate-500 mt-1">Likuiditas Aset Lancar Perusahaan</p>
+              </div>
+            </div>
+
+            {/* Tabel Neraca Saldo */}
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-teal-600" />
+                  Daftar Akun Neraca Saldo Terkonsolidasi
+                </span>
+                <span className="text-[11px] font-bold text-slate-400">
+                  {trialBalanceAccounts.rows.length} Akun Standar Akuntansi
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-100/70 text-[11px] font-black text-slate-600 uppercase tracking-wider">
+                      <th className="px-6 py-3.5">Kode Akun</th>
+                      <th className="px-6 py-3.5">Nama Akun & Uraian</th>
+                      <th className="px-6 py-3.5">Golongan Akun</th>
+                      <th className="px-6 py-3.5 text-right">Debit (Rp)</th>
+                      <th className="px-6 py-3.5 text-right">Kredit (Rp)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {trialBalanceAccounts.rows.map((row, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-6 py-3.5 font-mono font-bold text-teal-700">{row.code}</td>
+                        <td className="px-6 py-3.5 font-bold text-slate-800">{row.name}</td>
+                        <td className="px-6 py-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                            row.group === "Aset Lancar"
+                              ? "bg-blue-100 text-blue-700"
+                              : row.group === "Kewajiban"
+                              ? "bg-rose-100 text-rose-700"
+                              : row.group === "Ekuitas"
+                              ? "bg-purple-100 text-purple-700"
+                              : row.group === "Pendapatan"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-amber-100 text-amber-700"
+                          }`}>
+                            {row.group}
+                          </span>
+                        </td>
+                        <td className="px-6 py-3.5 text-right font-mono font-black text-slate-900">
+                          {row.debit > 0 ? formatRupiah(row.debit) : "-"}
+                        </td>
+                        <td className="px-6 py-3.5 text-right font-mono font-black text-slate-900">
+                          {row.credit > 0 ? formatRupiah(row.credit) : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-900 text-white font-mono font-black text-xs">
+                      <td colSpan={3} className="px-6 py-4 text-left font-sans uppercase tracking-wider">
+                        Total Neraca Saldo (Trial Balance)
+                      </td>
+                      <td className="px-6 py-4 text-right text-emerald-400">
+                        {formatRupiah(trialBalanceAccounts.totalDebit)}
+                      </td>
+                      <td className="px-6 py-4 text-right text-indigo-300">
+                        {formatRupiah(trialBalanceAccounts.totalCredit)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================================================== */}
+        {/* TAB 11: MANAJEMEN PAJAK PPH & PPN                    */}
+        {/* ==================================================== */}
+        {activeTab === "tax" && (
+          <div className="space-y-6">
+            {/* Header & Aksi Pajak */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-slate-200/80 shadow-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                    Kepatuhan Pajak DJP & Perusahaan
+                  </span>
+                  <span className="text-xs font-bold text-slate-400">
+                    Entitas: {selectedEntity === "NON_PT" ? "Non-PT" : selectedEntity === "PT" ? "PT. DSTech Smart Perkasa" : "Semua Entitas"}
+                  </span>
+                </div>
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <Landmark className="w-5 h-5 text-emerald-600" />
+                  Pusat Manajemen Pajak PPh & PPN
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Perhitungan, pencatatan bukti potong PPh 21, PPh 23, PPh Final PP 23 0.5%, PPN, dan pelaporan NTPN kas negara.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleAutoCalculatePphFinal}
+                  className="px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs flex items-center gap-2 shadow-sm cursor-pointer transition-all"
+                  title="Hitung otomatis 0.5% dari seluruh faktur penjualan bulan ini"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Hitung PPh Final 0.5% Bulan Ini</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenAddTax}
+                  className="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-2 shadow-sm cursor-pointer transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Catat / Setor Pajak Baru</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 4 Kartu KPI Pajak */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gradient-to-br from-blue-50 to-white p-5 rounded-3xl border border-blue-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-700">PPh 21 (Tenaga Ahli/Staf)</span>
+                  <Users className="w-4 h-4 text-blue-600" />
+                </div>
+                <p className="text-xl font-black text-slate-900 mt-2 font-mono">
+                  {formatRupiah(taxSummary.pph21Total)}
+                </p>
+                <p className="text-[11px] text-blue-600 mt-1">Tarif 2.5% - 5% Upah Borongan/Gaji</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-indigo-50 to-white p-5 rounded-3xl border border-indigo-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-700">PPh 23 (Jasa Teknik & Sewa)</span>
+                  <Wrench className="w-4 h-4 text-indigo-600" />
+                </div>
+                <p className="text-xl font-black text-slate-900 mt-2 font-mono">
+                  {formatRupiah(taxSummary.pph23Total)}
+                </p>
+                <p className="text-[11px] text-indigo-600 mt-1">Tarif 2% Jasa Instalasi & Maintenance</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-amber-50 to-white p-5 rounded-3xl border border-amber-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-700">PPh Final UMKM (PP 23/55)</span>
+                  <Percent className="w-4 h-4 text-amber-600" />
+                </div>
+                <p className="text-xl font-black text-slate-900 mt-2 font-mono">
+                  {formatRupiah(taxSummary.pphFinalTotal)}
+                </p>
+                <p className="text-[11px] text-amber-600 mt-1">0.5% dari Omzet Bruto Penjualan</p>
+              </div>
+
+              <div className="bg-gradient-to-br from-emerald-50 to-white p-5 rounded-3xl border border-emerald-200/80 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-700">Total Pajak Disetor (NTPN)</span>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                </div>
+                <p className="text-xl font-black text-slate-900 mt-2 font-mono">
+                  {formatRupiah(taxSummary.totalPaid)}
+                </p>
+                <p className="text-[11px] text-emerald-600 mt-1">
+                  Terutang: {formatRupiah(taxSummary.totalUnpaid)}
+                </p>
+              </div>
+            </div>
+
+            {/* Filter Pajak Bar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
+                  type="text"
+                  placeholder="Cari pihak rekanan, nomor BUPOT, NTPN, atau kode billing..."
+                  value={taxSearchQuery}
+                  onChange={(e) => setTaxSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-8 py-2 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-slate-50/50"
+                />
+                {taxSearchQuery && (
+                  <button
+                    onClick={() => setTaxSearchQuery("")}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={taxTypeFilter}
+                  onChange={(e) => setTaxTypeFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-slate-50 focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">🏛️ Semua Jenis Pajak</option>
+                  <option value="PPH21">👤 PPh 21 (Upah/Honor)</option>
+                  <option value="PPH23">🛠️ PPh 23 (Jasa Teknik 2%)</option>
+                  <option value="PPH_FINAL_UMKM">📊 PPh Final PP 23 (0.5%)</option>
+                  <option value="PPN_KELUARAN">📈 PPN Keluaran 11%</option>
+                  <option value="PPN_MASUKAN">📉 PPN Masukan 11%</option>
+                </select>
+
+                <select
+                  value={taxStatusFilter}
+                  onChange={(e) => setTaxStatusFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-slate-50 focus:outline-none cursor-pointer"
+                >
+                  <option value="ALL">📌 Semua Status</option>
+                  <option value="UNPAID">⏳ Terutang (Unpaid)</option>
+                  <option value="BILLING_ISSUED">🧾 Kode Billing Terbit</option>
+                  <option value="PAID">✅ Disetor (Lunas / NTPN)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Tabel Riwayat Pajak */}
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xs">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-emerald-600" />
+                  Daftar Catatan & Bukti Potong Pajak
+                </span>
+                <span className="text-[11px] font-bold text-slate-400">
+                  {filteredTaxRecords.length} Catatan Ditemukan
+                </span>
+              </div>
+
+              {filteredTaxRecords.length === 0 ? (
+                <div className="p-12 text-center space-y-3">
+                  <Landmark className="w-12 h-12 text-slate-300 mx-auto" />
+                  <p className="text-sm font-bold text-slate-600">Belum ada catatan pajak yang sesuai</p>
+                  <p className="text-xs text-slate-400">
+                    Klik tombol &quot;+ Catat / Setor Pajak Baru&quot; atau &quot;Hitung PPh Final 0.5%&quot; di atas untuk memulai.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-100/70 text-[11px] font-black text-slate-600 uppercase tracking-wider">
+                        <th className="px-4 py-3.5">Tanggal & Masa</th>
+                        <th className="px-4 py-3.5">Jenis Pajak</th>
+                        <th className="px-4 py-3.5">Pihak / Rekanan & NPWP</th>
+                        <th className="px-4 py-3.5">No. BUPOT / Ref</th>
+                        <th className="px-4 py-3.5 text-right">DPP (Rp)</th>
+                        <th className="px-4 py-3.5 text-right">Tarif %</th>
+                        <th className="px-4 py-3.5 text-right">Nilai Pajak (Rp)</th>
+                        <th className="px-4 py-3.5 text-center">Status & NTPN</th>
+                        <th className="px-4 py-3.5 text-center">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {filteredTaxRecords.map((t) => (
+                        <tr key={t.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-3.5">
+                            <p className="font-bold text-slate-900">{t.date}</p>
+                            <span className="text-[10px] text-slate-400 font-mono">Masa: {t.period}</span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                              t.taxType === "PPH23"
+                                ? "bg-indigo-100 text-indigo-700"
+                                : t.taxType === "PPH21"
+                                ? "bg-blue-100 text-blue-700"
+                                : t.taxType === "PPH_FINAL_UMKM"
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-emerald-100 text-emerald-700"
+                            }`}>
+                              {t.taxType === "PPH_FINAL_UMKM" ? "PPh Final 0.5%" : t.taxType}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <p className="font-bold text-slate-900">{t.partyName}</p>
+                            <span className="text-[10px] text-slate-400 font-mono">NPWP: {t.npwp || "-"}</span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <p className="font-mono font-bold text-slate-800">{t.bupotNumber || "-"}</p>
+                            <span className="text-[10px] text-slate-400">Ref: {t.referenceNo || "-"}</span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-mono font-bold text-slate-700">
+                            {formatRupiah(t.dpp || 0)}
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-mono font-black text-slate-900">
+                            {t.taxRate}%
+                          </td>
+                          <td className="px-4 py-3.5 text-right font-mono font-black text-emerald-700">
+                            {formatRupiah(t.taxAmount || 0)}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            {t.status === "PAID" ? (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-700 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  LUNAS / DISETOR
+                                </span>
+                                {t.ntpn && <span className="text-[10px] font-mono text-slate-500 mt-0.5">NTPN: {t.ntpn}</span>}
+                              </div>
+                            ) : t.status === "BILLING_ISSUED" ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-700">
+                                KODE BILLING: {t.billingCode || "-"}
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-700">
+                                TERUTANG
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {t.status !== "PAID" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMarkTaxPaid(t)}
+                                  title="Tandai Sudah Disetor (Input NTPN)"
+                                  className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 cursor-pointer"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleEditTaxRecord(t)}
+                                title="Edit Catatan Pajak"
+                                className="p-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteTaxRecord(t.id, t.bupotNumber || t.taxType)}
+                                title="Hapus Catatan Pajak"
+                                className="p-1.5 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -30995,6 +31863,424 @@ export default function AdminFinanceERPPage() {
         </div>
       )}
       {/* ====== END MODAL KATALOG PICKER ====== */}
+
+      {/* ==================================================== */}
+      {/* MODAL: INPUT / EDIT CATATAN PAJAK PPH & PPN          */}
+      {/* ==================================================== */}
+      {isTaxModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsTaxModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-emerald-500 text-white">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-800 text-base">
+                    {editingTaxRecord ? "Edit Catatan Bukti Potong Pajak" : "Catat & Setor Pajak PPh / PPN Baru"}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Modul kepatuhan perpajakan resmi PT. DSTech Smart Perkasa
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTaxModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTaxRecord} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Jenis Pajak</label>
+                  <select
+                    value={taxForm.taxType}
+                    onChange={(e) => {
+                      const tType = e.target.value;
+                      let rate = 2;
+                      if (tType === "PPH_FINAL_UMKM") rate = 0.5;
+                      else if (tType === "PPH21") rate = 2.5;
+                      else if (tType.startsWith("PPN")) rate = 11;
+                      const calculatedTax = Math.round((taxForm.dpp * rate) / 100);
+                      setTaxForm({ ...taxForm, taxType: tType, taxRate: rate, taxAmount: calculatedTax });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="PPH23">PPh Pasal 23 (Jasa Teknik & Maintenance - 2%)</option>
+                    <option value="PPH21">PPh Pasal 21 (Upah Tenaga Ahli / Borongan - 2.5%)</option>
+                    <option value="PPH_FINAL_UMKM">PPh Final UMKM PP 23 / 55 (0.5% Omzet)</option>
+                    <option value="PPN_KELUARAN">PPN Keluaran 11% (Faktur Penjualan)</option>
+                    <option value="PPN_MASUKAN">PPN Masukan 11% (Faktur Pembelian Vendor)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Entitas Usaha</label>
+                  <select
+                    value={taxForm.entityType}
+                    onChange={(e) => setTaxForm({ ...taxForm, entityType: e.target.value as "PT" | "NON_PT" })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="PT">PT. DSTech Smart Perkasa (Ber-NPWP PT)</option>
+                    <option value="NON_PT">DSTech Smart (Non-PT / Personal)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Masa Pajak (Bulan-Tahun)</label>
+                  <input
+                    type="month"
+                    required
+                    value={taxForm.period}
+                    onChange={(e) => setTaxForm({ ...taxForm, period: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Tanggal Pemotongan / Setor</label>
+                  <input
+                    type="date"
+                    required
+                    value={taxForm.date}
+                    onChange={(e) => setTaxForm({ ...taxForm, date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Pihak Rekanan / Objek Pajak</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: PT. Sumber Makmur atau Nama Teknisi"
+                    value={taxForm.partyName}
+                    onChange={(e) => setTaxForm({ ...taxForm, partyName: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">NPWP / NIK Pihak Pemotong</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 84.341.520.1-216.000"
+                    value={taxForm.npwp}
+                    onChange={(e) => setTaxForm({ ...taxForm, npwp: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Dasar Pengenaan Pajak (DPP Rp)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={taxForm.dpp || ""}
+                    onChange={(e) => {
+                      const dppVal = Number(e.target.value) || 0;
+                      const calculatedTax = Math.round((dppVal * taxForm.taxRate) / 100);
+                      setTaxForm({ ...taxForm, dpp: dppVal, taxAmount: calculatedTax });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Tarif Pajak (%)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    required
+                    value={taxForm.taxRate || ""}
+                    onChange={(e) => {
+                      const rateVal = Number(e.target.value) || 0;
+                      const calculatedTax = Math.round((taxForm.dpp * rateVal) / 100);
+                      setTaxForm({ ...taxForm, taxRate: rateVal, taxAmount: calculatedTax });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Jumlah Pajak (Rp)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={taxForm.taxAmount || ""}
+                    onChange={(e) => setTaxForm({ ...taxForm, taxAmount: Number(e.target.value) || 0 })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono font-black text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-emerald-50/50"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">No. Bukti Potong / Faktur</label>
+                  <input
+                    type="text"
+                    placeholder="BUPOT-23-xxxx"
+                    value={taxForm.bupotNumber}
+                    onChange={(e) => setTaxForm({ ...taxForm, bupotNumber: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Nomor Referensi (SPK/PO/Inv)</label>
+                  <input
+                    type="text"
+                    placeholder="INV-2026-..."
+                    value={taxForm.referenceNo}
+                    onChange={(e) => setTaxForm({ ...taxForm, referenceNo: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Status Penyetoran</label>
+                  <select
+                    value={taxForm.status}
+                    onChange={(e) => setTaxForm({ ...taxForm, status: e.target.value as any })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="UNPAID">⏳ Terutang (Belum Disetor)</option>
+                    <option value="BILLING_ISSUED">🧾 Kode Billing Diterbitkan</option>
+                    <option value="PAID">✅ Sudah Disetor ke Kas Negara (Lunas)</option>
+                  </select>
+                </div>
+              </div>
+
+              {taxForm.status !== "UNPAID" && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Kode Billing DJP</label>
+                    <input
+                      type="text"
+                      placeholder="15 digit kode billing"
+                      value={taxForm.billingCode}
+                      onChange={(e) => setTaxForm({ ...taxForm, billingCode: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono font-bold text-slate-800 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">NTPN (Nomor Transaksi Penerimaan Negara)</label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: 16 digit NTPN Bank/Pos"
+                      value={taxForm.ntpn}
+                      onChange={(e) => setTaxForm({ ...taxForm, ntpn: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 font-mono font-bold text-emerald-700 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Catatan / Keterangan Tambahan</label>
+                <textarea
+                  rows={2}
+                  placeholder="Catatan pengerjaan atau detail transaksi pemotongan pajak..."
+                  value={taxForm.notes}
+                  onChange={(e) => setTaxForm({ ...taxForm, notes: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 font-normal text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsTaxModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{isLoading ? "Menyimpan..." : "Simpan Catatan Pajak"}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* MODAL: CETAK RESMI NERACA SALDO A4 BER-KOP SURAT     */}
+      {/* ==================================================== */}
+      {isTrialBalancePrintModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn print-modal-backdrop"
+          onClick={() => setIsTrialBalancePrintModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto print-modal-box"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Action Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3 print:hidden">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Scale className="w-4 h-4 text-teal-600" />
+                Lembar Cetak Neraca Saldo Resmi A4 — {selectedEntity === "NON_PT" ? "DSTech Smart (Non-PT)" : "PT. DSTech Smart Perkasa"}
+              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenSettingsModal}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Kop Surat</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDownloadPdf(
+                      "#print-trial-balance-sheet",
+                      `NERACA_SALDO_${selectedEntity === "NON_PT" ? "NON_PT" : "PT"}_${trialBalanceAsOfDate}.pdf`
+                    )
+                  }
+                  disabled={isDownloadingPdf}
+                  className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingPdf ? "Memproses PDF..." : "Download File PDF"}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const originalTitle = document.title;
+                    document.title = `NERACA_SALDO_${selectedEntity === "NON_PT" ? "NON_PT" : "PT"}_${trialBalanceAsOfDate}`;
+                    window.print();
+                    setTimeout(() => {
+                      document.title = originalTitle;
+                    }, 2000);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs flex items-center gap-1.5 shadow cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Cetak / Print</span>
+                </button>
+                <button
+                  onClick={() => setIsTrialBalancePrintModalOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* A4 Sheet Preview */}
+            <div
+              id="print-trial-balance-sheet"
+              className="bg-white p-8 sm:p-12 border border-slate-300 rounded-2xl shadow-inner text-slate-800 space-y-6 font-sans relative overflow-hidden"
+              style={{
+                paddingTop: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingTop || 80) : 24}px`,
+                paddingBottom: `${financeSettings.letterheadEnabled && financeSettings.letterheadUrl ? (financeSettings.letterheadPaddingBottom || 75) : 24}px`,
+              }}
+            >
+              {financeSettings.letterheadEnabled && financeSettings.letterheadUrl && (
+                <div className="absolute top-0 left-0 right-0 w-full pointer-events-none z-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={financeSettings.letterheadUrl}
+                    alt="Kop Surat Resmi"
+                    className="w-full object-contain object-top"
+                  />
+                </div>
+              )}
+
+              <div className="relative z-10 space-y-6 pt-4">
+                <div className="text-center border-b-2 border-slate-900 pb-4">
+                  <h2 className="text-xl sm:text-2xl font-black uppercase tracking-wider text-slate-900">
+                    NERACA SALDO (TRIAL BALANCE)
+                  </h2>
+                  <p className="text-xs font-bold text-slate-600 mt-1 uppercase">
+                    {selectedEntity === "NON_PT" ? "DSTech Smart Perkasa (Divisi Operasional & Jasa)" : "PT. DSTech Smart Perkasa"}
+                  </p>
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">
+                    Periode Per: {trialBalanceAsOfDate}
+                  </p>
+                </div>
+
+                <table className="w-full border-collapse border border-slate-400 text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-800 font-bold border-b border-slate-400 uppercase text-[10px]">
+                      <th className="border border-slate-400 px-3 py-2 text-center w-16">Kode</th>
+                      <th className="border border-slate-400 px-3 py-2 text-left">Nama Akun & Keterangan</th>
+                      <th className="border border-slate-400 px-3 py-2 text-center w-28">Golongan</th>
+                      <th className="border border-slate-400 px-3 py-2 text-right w-36">Debit (Rp)</th>
+                      <th className="border border-slate-400 px-3 py-2 text-right w-36">Kredit (Rp)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trialBalanceAccounts.rows.map((row, idx) => (
+                      <tr key={idx} className="border-b border-slate-300">
+                        <td className="border border-slate-300 px-3 py-2 text-center font-mono font-bold">{row.code}</td>
+                        <td className="border border-slate-300 px-3 py-2 font-semibold text-slate-800">{row.name}</td>
+                        <td className="border border-slate-300 px-3 py-2 text-center text-[10px] uppercase font-bold text-slate-600">{row.group}</td>
+                        <td className="border border-slate-300 px-3 py-2 text-right font-mono font-bold">
+                          {row.debit > 0 ? formatRupiah(row.debit) : "-"}
+                        </td>
+                        <td className="border border-slate-300 px-3 py-2 text-right font-mono font-bold">
+                          {row.credit > 0 ? formatRupiah(row.credit) : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-200 font-black border-t-2 border-slate-900 font-mono">
+                      <td colSpan={3} className="border border-slate-400 px-3 py-2.5 text-center font-sans uppercase">
+                        TOTAL KESELURUHAN (STATUS: {trialBalanceAccounts.isBalanced ? "SEIMBANG" : "SELISIH"})
+                      </td>
+                      <td className="border border-slate-400 px-3 py-2.5 text-right text-emerald-800">
+                        {formatRupiah(trialBalanceAccounts.totalDebit)}
+                      </td>
+                      <td className="border border-slate-400 px-3 py-2.5 text-right text-indigo-900">
+                        {formatRupiah(trialBalanceAccounts.totalCredit)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                {/* Tanda Tangan Resmi */}
+                <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs">
+                  <div className="space-y-16">
+                    <p className="font-bold text-slate-700">Dibuat Oleh,<br /><span className="text-[10px] font-normal text-slate-500">Staff Keuangan & Akuntansi</span></p>
+                    <p className="font-bold underline text-slate-900">Admin Keuangan DSTech</p>
+                  </div>
+                  <div className="space-y-16">
+                    <p className="font-bold text-slate-700">Mengetahui & Menyetujui,<br /><span className="text-[10px] font-normal text-slate-500">Direktur Utama</span></p>
+                    <p className="font-bold underline text-slate-900">Rudi Meidianto</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
