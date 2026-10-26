@@ -881,8 +881,8 @@ export async function GET(req: Request) {
                       </td>
                       <td class="border border-slate-300 p-1 text-center font-bold text-[10px]">${item.qty}</td>
                       <td class="border border-slate-300 p-1 text-center text-slate-600 text-[9.5px]">${item.unit || 'Unit'}</td>
-                      <td class="border border-slate-300 p-1 text-right font-medium text-[10px]">${formatRupiah(item.price)}</td>
-                      <td class="border border-slate-300 p-1 text-right font-black text-slate-900 text-[10px]">${formatRupiah(item.total || item.qty * item.price)}</td>
+                      <td class="border border-slate-300 p-1 text-right font-medium text-[10px]">${Number(item.price) > 0 ? formatRupiah(item.price) : '<span style="color:#64748b; font-style:italic; font-size:9px;">Termasuk Paket</span>'}</td>
+                      <td class="border border-slate-300 p-1 text-right font-black text-slate-900 text-[10px]">${Number(item.total || item.qty * item.price) > 0 ? formatRupiah(item.total || item.qty * item.price) : '<span style="color:#059669; font-weight:bold; font-size:9px;">Include</span>'}</td>
                     </tr>
                     `;
                   }).join("")}
