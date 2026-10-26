@@ -236,7 +236,8 @@
 - **2026-10-25**: Penggantian Kotak Inisial Teks 'DST'/'SPH'/'PO' di Pojok Kiri Atas Toolbar Cetak Dokumen Publik (/api/finance/print) dengan Logo Korporat Resmi PT. DSTech Smart Perkasa (public/logo.png) (Tugas 194).
 - **2026-10-25**: Penambahan Pusat Pintas Operasional & Menu Cepat Sistem pada Dashboard Utama Admin (/admin) (Tugas 195). Menyediakan akses 1-klik terpadu langsung di halaman beranda Admin Control Center (/admin) yang mencakup 26 modul penting dalam 4 kluster kategori (Keuangan & ERP, Produk & Gudang, SDM & Operasional Lapangan, Komunikasi & Pengaturan Sistem). Dilengkapi filter kategori real-time, badge counter, deskripsi fungsi tiap modul, efek hover interaktif, dan navigasi otomatis ke parameter query `?tab=...` maupun rute mandiri. Lolos kompilasi build lokal 58 rute, push ke GitHub commit `aae07e1`, dan live deploy sukses ke server VPS PM2 `dstech-main` (PID 1140302).
 - **2026-10-25**: Filter Notifikasi Nomor Lacak Pesanan Hanya untuk Pesanan Aktif & Fitur Komplain Pesanan Pelanggan (/shop & /admin/orders) (Tugas 196). Membatasi counter badge pada tombol *"Lacak Pengiriman"* di header toko online (`/shop`) agar hanya menghitung pesanan aktif yang sedang berjalan (`PAYMENT_PENDING`, `PAID`, `PROCESSING`, `SHIPPED`), serta menghilangkan badge jika pesanan sudah selesai (`DELIVERED`) atau dibatalkan (`CANCELLED`). Membangun sistem komplain pesanan terpadu: tombol *"⚠️ Ajukan Komplain"* di kartu rincian & daftar pesanan `/shop`, modal formulir komplain (kategori kendala, ekspektasi solusi, rincian penjelasan, upload bukti foto), integrasi PATCH `/api/orders` (`submit_complaint`), pencatatan ke linimasa status pesanan, serta tab filter *"⚠️ Komplain"*, badge status komplain, dan panel penanganan CS di Admin Orders (`/admin/orders`). Lolos kompilasi build lokal 58 rute, push ke GitHub commit `cc99326`, dan live deploy sukses ke server VPS PM2 `dstech-main` (PID 1144252).
-- **2026-10-25**: Sinkronisasi Otomatis Total Pembelian PO & Hutang PO Belum Lunas pada Daftar Supplier (/admin/finance) (Tugas 145). Mengatasi masalah nilai akumulasi PO dan hutang supplier yang sebelumnya bernilai 0/statis pada ringkasan KPI dan tabel daftar supplier. Menghitung secara dinamis dari data agregasi transaksi Purchase Order (`purchases`) di backend `GET /api/finance` (`src/app/api/finance/route.ts`) dan helper frontend `getSupplierStats` & `getClientStats` di `src/app/admin/finance/page.tsx`. Menambahkan kolom baru "Total Belanja PO & Hutang" pada tabel direktori supplier dan kolom "Akumulasi Faktur & Piutang" pada tabel klien lengkap dengan badge status (Hutang / Piutang / Lunas / Belum Ada Transaksi) dan counter jumlah transaksi terkait. Divalidasi `npx tsc --noEmit` (0 error), build lokal `npm run build` (53/53 routes sukses), commit git GitHub `609c349`, deploy live ke VPS aaPanel (PM2 `dstech-main` restart sukses), dan terverifikasi live di `https://dstechsmart.com/api/finance` (terkonfirmasi `totalSuppliersPurchases: 29164000`, `totalSuppliersPayable: 29164000`).
+- **2026-10-26**: Panel Pengaturan E-Store Dinamis (Background Hero & Pemilihan Produk Hero Showcase) (/admin/settings & /shop) (Tugas 213). Menambahkan tab "🛒 Pengaturan E-Store & Hero Showcase" pada Pengaturan Sistem Admin (`src/app/admin/settings/page.tsx`). Admin dapat memilih mode latar belakang (Gradient Modern, Dark Minimalist, Deep Cyber Navy, atau Upload Gambar Kustom / URL), slider opasitas overlay gelap (10%-90%), live preview hero, kustomisasi judul, teks highlight biru, subjudul promo, toggle quick tracking pesanan, durasi auto-play interval slide, serta memilih produk langsung dari katalog master (`catalogProducts`) dengan modal pencarian instan untuk dimasukkan ke slide hero showcase (atur urutan naik/turun, badge promo, toggle aktif/nonaktif, hapus). Halaman toko online E-Store (`/shop`) telah terhubung secara dinamis membaca `siteSettings.estoreSettings`. Lolos validasi TypeScript (0 error), build lokal `npm run build` sukses 59 rute, push ke GitHub (commit `a7a53c0`), deploy ke live VPS aaPanel PM2 `dstech-main` (PID 1360246), dan live terverifikasi via `check_live_estore.js`.
+- **2026-10-26**: Pembuatan Fitur Web Auto-Tracking Pengunjung Real-Time (Geolokasi & Halaman) serta Integrasi Cerdas Chat AI (Tugas 214). Membangun sistem pelacakan otomatis transparan di root layout (`src/components/DSTechVisitorTracker.tsx` dan `src/app/api/tracking/route.ts`). Server secara otomatis mengekstrak IP asli pengunjung dan mendeteksi geolokasi (Kota, Provinsi, Negara, ISP, Perangkat, dan Browser) serta mencatat riwayat kunjungan halaman ke data store terisolasi ber-prefix `dstech_` (`src/data/dstech_visitor_logs.json`). Mengintegrasikan konteks geolokasi dan URL halaman yang sedang dibuka secara cerdas ke floating widget Chat AI (`src/components/AIChatWidget.tsx`) dan backend AI (`src/app/api/chat/route.ts`), menampilkan badge lokasi pengunjung di header chat widget, memberikan respon AI ramah dan kontekstual terhadap kota dan halaman yang dilihat pengunjung, serta memperkaya data prospek lead CRM otomatis. Membangun dan memasang widget pemantauan real-time `LiveVisitorTrackerCard.tsx` di Dashboard Utama Admin (`/admin`). Lolos validasi TypeScript (0 error), build lokal sukses 59 rute, push ke GitHub (commit `1e02c55`), deploy sukses ke server live VPS PM2 `dstech-main` (PID 1362107), dan uji live POST tracking, GET dashboard feed, serta AI chat geolokasi sukses 100%.
 
 ### 2. Tugas Sebelumnya: Menghubungkan ke GitHub
 **Status**: Selesai
@@ -6000,38 +6001,62 @@
 
 ---
 
-### 213. Tugas: Pembuatan Panel Pengaturan E-Store Dinamis (Background Hero & Pemilihan Produk Hero Showcase) [SEDANG DIKERJAKAN]
+### 213. Tugas: Pembuatan Panel Pengaturan E-Store Dinamis (Background Hero & Pemilihan Produk Hero Showcase) [SELESAI]
 - **Permintaan Pengguna**:
   - *"terkait dengan pengaturan estor ada dimana? misalnya saya mau nambah baground hero dan nambah produk hero agar banyak atau saya pilihkan produk pilihan"*
-- **Status**: **SEDANG DIKERJAKAN**
+- **Status**: **SELESAI & DEPLOYED KE LIVE VPS**
 - **Akar Masalah (Analisis)**:
   1. Di backend `src/app/api/settings/route.ts`, struktur `DEFAULT_ESTORE_SETTINGS` telah tersedia, namun di antarmuka Admin Settings (`src/app/admin/settings/page.tsx`) belum disediakan tab antarmuka UI untuk mengatur E-Store.
   2. Di etalase marketplace (`src/app/shop/page.tsx`), carousel hero showcase masih menggunakan array statis `FEATURED_HERO_PRODUCTS` dan belum membaca konfigurasi dinamis `siteSettings?.estoreSettings`.
   3. Admin belum bisa mengganti background hero (upload gambar / ganti tema) dan belum bisa memilih produk dari katalog untuk dijadikan slide hero showcase.
-- **Rencana Step-by-Step Pengerjaan**:
+- **Rincian Pengerjaan yang Telah Selesai**:
   1. [x] **Langkah 1**: Catat rencana kerja di `LAPORAN_PROGRES.md` dan buat folder cadangan `_backup_estore_settings`.
-  2. [ ] **Langkah 2**: Tambahkan tab baru **"🛒 Pengaturan E-Store (Shop)"** di `src/app/admin/settings/page.tsx` lengkap dengan kontrol:
-     - Pemilihan mode latar belakang hero (Gradient Modern, Dark Slate, Deep Navy, atau Upload Gambar Kustom).
-     - Input file upload gambar background hero + live preview.
-     - Pengaturan teks judul hero, subjudul, dan kecepatan auto-slide.
-     - Pemilihan & pengelolaan produk hero showcase (bisa ambil langsung dari produk katalog yang ada, tambah slide kustom, atur badge promo, dan hapus/nonaktifkan).
-  3. [ ] **Langkah 3**: Hubungkan pengaturan dinamis `estoreSettings` ke `src/app/shop/page.tsx` agar background hero dan daftar produk hero otomatis ter-render sesuai pilihan admin.
-  4. [ ] **Langkah 4**: Uji validasi TypeScript (`npx tsc --noEmit`) dan build lokal (`npm run build`).
-  5. [ ] **Langkah 5**: Hapus folder cadangan `_backup_estore_settings`.
-  6. [ ] **Langkah 6**: Deploy ke VPS live via git push & `deploy_live.js`.
-  7. [ ] **Langkah 7**: Uji live di browser dan perbarui status Tugas 213 menjadi `[SELESAI]`.
+  2. [x] **Langkah 2**: Tambahkan tab baru **"🛒 Pengaturan E-Store & Hero Showcase"** di `src/app/admin/settings/page.tsx` lengkap dengan kontrol:
+     - Pemilihan mode latar belakang hero: *Gradient Modern*, *Dark Minimalist*, *Deep Cyber Navy*, atau *Upload Gambar Kustom / Banner URL*.
+     - Fitur upload gambar background hero (`/api/upload`) + slider opasitas overlay gelap (10% - 90%) + live preview interaktif.
+     - Pengaturan teks judul hero, teks sorotan biru (*highlight*), subjudul promo, toggle lacak pengiriman (*quick tracking bar*), dan durasi auto-play interval slide (4s, 6s, 8s, 10s, atau manual).
+     - Manajemen slide hero showcase dinamis: Admin dapat memilih produk langsung dari katalog master (`catalogProducts`) dengan modal pemilih produk instan & fitur pencarian, mengatur badge promo (Best Seller, Promo Terbatas, Hot Deal, dsb.), mengubah urutan slide naik/turun, mengaktifkan/menonaktifkan slide, dan menghapus slide.
+  3. [x] **Langkah 3**: Hubungkan pengaturan dinamis `estoreSettings` ke `src/app/shop/page.tsx` agar background hero (warna/gambar custom), judul, subjudul, highlight, dan slide hero membaca `siteSettings.estoreSettings` secara dinamis dengan fallback anggun.
+  4. [x] **Langkah 4**: Uji validasi TypeScript (`npx tsc --noEmit` lolos 0 error) dan build lokal Next.js (`npm run build` sukses 59/59 rute).
+  5. [x] **Langkah 5**: Hapus folder cadangan `_backup_estore_settings`.
+  6. [x] **Langkah 6**: Deploy ke server live VPS via Git commit & push (`push_with_native_git.js` commit `a7a53c0`) dan eksekusi `node deploy_live.js` (PM2 `dstech-main` online).
+  7. [x] **Langkah 7**: Uji live server (`check_live_estore.js` -> HTTP 200 OK, `Estore settings: Available`, Hero Title terverifikasi aktif).
 
 ---
 
-### 214. Tugas: Pembuatan Fitur Web Auto-Tracking Pengunjung Real-Time (Geolokasi & Halaman) serta Integrasi Cerdas Chat AI [ANTRIAN BERIKUTNYA]
+### 214. Tugas: Pembuatan Fitur Web Auto-Tracking Pengunjung Real-Time (Geolokasi & Halaman) serta Integrasi Cerdas Chat AI [SELESAI]
 - **Permintaan Pengguna**:
   - *"kemudian saya mau buatkan saya sebuah fitur autotracking web, misalnya ada yang membuka dstechsmart.com halaman apa saja, kemudian lokasinya, apakah kamu bisa buatkan? nanti kamu hubungkan dengan fitur chat AI juga,,"*
-- **Status**: **ANTRIAN BERIKUTNYA** (Akan dikerjakan segera setelah Tugas 213 selesai)
-- **Rencana Konsep Fitur**:
-  1. Modul Client Tracker di layout web: Mendeteksi path halaman yang dibuka, referrer, waktu kunjungan, dan lokasi geografis (Kota, Provinsi, Negara) pengunjung.
-  2. Endpoint API Tracking: Menerima dan mencatat riwayat jejak pengunjung dengan prefix `dstech_visitor_sessions`.
-  3. Integrasi Chat AI Floating Widget: Menyuntikkan konteks pengunjung (halaman yang sedang dibuka, asal kota/wilayah, dan riwayat klik) ke prompt sistem Chat AI, sehingga AI dapat menyapa dan menjawab dengan personal dan kontekstual.
-  4. Panel Monitoring Admin: Menampilkan log pengunjung aktif secara real-time di Dashboard Admin.
+- **Status**: **SELESAI & DEPLOYED KE LIVE VPS**
+- **Analisis Kebutuhan & Konsep Desain**:
+  1. **Komponen Client Tracker (`DSTechVisitorTracker`)**:
+     - Ditempatkan di root layout aplikasi (`dstech-smart/src/app/layout.tsx`) agar aktif di setiap halaman website (`/`, `/shop`, `/contact`, `/affiliate`, dsb.).
+     - Mendeteksi: URL path saat ini (`pathname`), judul halaman, referrer, waktu kunjungan, user-agent/perangkat (Desktop/Mobile/Tablet), dan sesi unik pengunjung (`sessionId` tersimpan di `sessionStorage`).
+     - Menentukan geolokasi pengunjung (Kota, Provinsi, Negara, ISP) via IP lookup berbasis server di backend API tracking tanpa membebani browser pengunjung dan tanpa meminta izin GPS popup yang mengganggu.
+  2. **API Endpoint Auto-Tracking (`/api/tracking`)**:
+     - Menerima log ping halaman dari client dan heartbeat setiap 45 detik.
+     - Mendapatkan IP asli pengunjung dari request header (`x-forwarded-for`, `x-real-ip`).
+     - Melakukan resolusi geolokasi IP cepat dan akurat (Kota, Provinsi/Region, Negara, Nama Jaringan/ISP).
+     - Menyimpan jejak pengunjung dengan prefix wajib `dstech_` di `src/data/dstech_visitor_logs.json` (active sessions, total page views, unique visitors, top cities & pages).
+     - Menyediakan mode GET untuk dashboard pemantauan real-time admin.
+  3. **Integrasi Chat AI Cerdas (`/api/chat` & Floating AI Widget `AIChatWidget`)**:
+     - Komponen `DSTechVisitorTracker` mem-broadcast custom event `dstech:visitor-geo` dan menyimpan cache di `sessionStorage`.
+     - `AIChatWidget` menangkap data geolokasi (Kota, Provinsi, Negara) serta URL path halaman aktif dan menyertakannya pada payload `visitorInfo` ke `/api/chat`.
+     - Header Chat Widget menampilkan badge lokasi pengunjung secara live: `📍 [Nama Kota]`.
+     - Engine AI (`/api/chat/route.ts`) menyapa dan memberikan respon cerdas yang sangat personal dan relevan dengan kota asal pengunjung dan halaman yang sedang dilihat.
+     - Pada pencatatan CRM (`dstech_crm.json`), data prospek lead otomatis diperkaya dengan asal kota dan halaman tempat pengunjung berkonsultasi.
+  4. **Panel Live Visitor Monitoring di Admin Dashboard**:
+     - Dibuat komponen `LiveVisitorTrackerCard.tsx` dan dipasang di Dashboard Utama Admin (`/admin`).
+     - Menampilkan metrik real-time: Jumlah pengunjung online saat ini, total kunjungan halaman, pengunjung unik, dan tabel 10 sesi aktif pengunjung (Kota & ISP, Halaman Terakhir, Perangkat Desktop/Mobile, Browser, Waktu Kunjungan, dan Total Akses).
+- **Rincian Step-by-Step Pengerjaan yang Telah Selesai**:
+  1. [x] **Langkah 1**: Catat rencana kerja lengkap di `LAPORAN_PROGRES.md` dan buat folder cadangan `_backup_autotracking`.
+  2. [x] **Langkah 2**: Buat API Endpoint Tracking `src/app/api/tracking/route.ts` dengan penanganan IP lookup geolokasi, penyimpanan sesi ber-prefix `dstech_visitor_logs`, dan in-memory caching.
+  3. [x] **Langkah 3**: Buat komponen client tracker `src/components/DSTechVisitorTracker.tsx` dan pasang di `src/app/layout.tsx`.
+  4. [x] **Langkah 4**: Hubungkan context tracker pengunjung ke floating widget Chat AI (`src/components/AIChatWidget.tsx`) dan backend Chat AI (`src/app/api/chat/route.ts`).
+  5. [x] **Langkah 5**: Buat dan pasang widget `LiveVisitorTrackerCard.tsx` di dashboard admin (`src/app/admin/page.tsx`).
+  6. [x] **Langkah 6**: Validasi kompilasi lokal `npx tsc --noEmit` (0 error) dan `npm run build` lolos 100%.
+  7. [x] **Langkah 7**: Hapus folder cadangan `_backup_autotracking`.
+  8. [x] **Langkah 8**: Deploy ke server live VPS (`commit 1e02c55`, PM2 `dstech-main` online PID 1362107), uji live pengunjung (`POST /api/tracking` -> Serang/Banten), uji feed admin (`GET /api/tracking` -> Online 1 sesi), serta uji `/api/chat` dengan konteks geolokasi sukses 100%. Status Tugas 214 resmi `[SELESAI]`.
 
 ---
 
