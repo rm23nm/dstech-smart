@@ -33,6 +33,7 @@ import {
   Sparkles,
   Maximize2,
   MessageSquare,
+  ArrowLeft,
 } from "lucide-react";
 
 interface TeamChatMessengerProps {
@@ -55,6 +56,7 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
   const [loading, setLoading] = useState(true);
   const [usersList, setUsersList] = useState<any[]>([]);
   const [leftTab, setLeftTab] = useState<"chats" | "contacts">("chats");
+  const [mobileView, setMobileView] = useState<"list" | "chat">("list");
 
   // Fungsi memulai chat langsung dengan rekan tim
   const handleStartChatWithUser = async (targetUser: any) => {
@@ -71,6 +73,7 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
     if (existing) {
       setActiveChat(existing);
       setLeftTab("chats");
+      setMobileView("chat");
       return;
     }
 
@@ -90,6 +93,7 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
         setChats((prev) => [data.chat, ...prev]);
         setActiveChat(data.chat);
         setLeftTab("chats");
+        setMobileView("chat");
       }
     } catch (err) {
       console.error("Gagal membuat obrolan:", err);
@@ -598,7 +602,7 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
       {/* ================= MAIN CHAT INTERFACE (WHATSAPP WEB STYLE) ================= */}
       <div className="flex-1 flex overflow-hidden">
         {/* PANEL KIRI: DAFTAR KONTAK & THREAD CHAT */}
-        <div className="w-80 md:w-96 border-r border-slate-800 bg-slate-950 flex flex-col">
+        <div className={`w-full md:w-96 border-r border-slate-800 bg-slate-950 flex flex-col ${mobileView === "chat" ? "hidden md:flex" : "flex"}`}>
           {/* Header Panel Kiri */}
           <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
             <div className="flex items-center gap-3">
@@ -671,7 +675,10 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
                   return (
                     <div
                       key={chat.id}
-                      onClick={() => setActiveChat(chat)}
+                      onClick={() => {
+                        setActiveChat(chat);
+                        setMobileView("chat");
+                      }}
                       className={`p-3.5 flex items-start gap-3 cursor-pointer transition select-none ${
                         isSelected
                           ? "bg-slate-850 border-l-4 border-emerald-500"
@@ -787,18 +794,28 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
 
         {/* PANEL KANAN: CHAT ACTIVE / AREA OBROLAN */}
         {activeChat ? (
-          <div className="flex-1 flex flex-col bg-slate-900/40 relative">
+          <div className={`flex-1 flex flex-col bg-slate-900/40 relative ${mobileView === "list" ? "hidden md:flex" : "flex"}`}>
             {/* Header Ruang Obrolan */}
-            <div className="p-3.5 px-6 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md flex items-center justify-between z-10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold">
+            <div className="p-3 px-3 md:px-6 border-b border-slate-800 bg-slate-950/80 backdrop-blur-md flex items-center justify-between z-10">
+              <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                {/* Tombol Back Khusus Layar HP / Mobile Android */}
+                <button
+                  type="button"
+                  onClick={() => setMobileView("list")}
+                  className="md:hidden p-2 -ml-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition cursor-pointer flex-shrink-0"
+                  title="Kembali ke Daftar Percakapan"
+                >
+                  <ArrowLeft className="w-5 h-5 text-emerald-400" />
+                </button>
+
+                <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold flex-shrink-0">
                   {activeChat.isGroup ? (
                     <Users className="w-5 h-5 text-emerald-400" />
                   ) : (
                     <User className="w-5 h-5 text-cyan-400" />
                   )}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
                     {activeChat.name}
                     {activeChat.isGroup && (
@@ -1071,7 +1088,7 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 bg-slate-950/40">
+          <div className={`flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 bg-slate-950/40 ${mobileView === "list" ? "hidden md:flex" : "flex"}`}>
             <div className="w-16 h-16 rounded-full bg-slate-800/80 flex items-center justify-center mb-3 text-emerald-400">
               <Sparkles className="w-8 h-8" />
             </div>
