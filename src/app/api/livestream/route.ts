@@ -5,7 +5,7 @@ import path from "path";
 const DATA_FILE = path.join(process.cwd(), "src/data/dstech_livestream.json");
 const PRODUCTS_FILE = path.join(process.cwd(), "src/data/dstech_products.json");
 const SMARTPRO_URL = process.env.SMARTPRO_BASE_URL || "https://smartpro.dstechsmart.com";
-const MASTER_SECRET = process.env.DSTECH_MASTER_SECRET || "dstech_master_secret_2026";
+const MASTER_SECRET = process.env.LICENSE_MASTER_KEY || process.env.DSTECH_MASTER_SECRET || "DSTECH-MASTER-PRO-2026";
 
 interface LiveStreamData {
   isLive: boolean;

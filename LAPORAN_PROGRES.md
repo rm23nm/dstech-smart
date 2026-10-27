@@ -3,18 +3,26 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
-- **2026-10-27**: [SEDANG BERJALAN] Perbaikan Gambar Produk Tidak Muncul pada Katalog Live Streaming SmartPro Virtual Host (/api/livestream, /api/products/sync-smartpro, & virtual-host.html) [Tugas 237].
+- **2026-10-27**: [SELESAI] Perbaikan Gambar Produk Tidak Muncul pada Katalog Live Streaming SmartPro Virtual Host (/api/livestream, /api/products/sync-smartpro, & virtual-host.html) [Tugas 237].
   *Permintaan User*: "gambar produknya tidak muncul" (dilampirkan screenshot modal SmartPro Virtual Host di mana thumbnail gambar katalog produk di sebelah kiri tidak muncul / kosong).
   *Penyebab Masalah*:
   - Saat sinkronisasi katalog produk dari DSTech Smart ke SmartPro WA Gateway, path gambar produk dikirimkan dalam format URL lokal relatif (seperti `/service-cctv.png`, `/about-image.png`, atau `/portfolio-industrial.png`).
   - Ketika `virtual-host.html` dibuka di domain SmartPro (`https://smartpro.dstechsmart.com/virtual-host.html`), browser mencoba mengambil gambar dari `https://smartpro.dstechsmart.com/service-cctv.png` yang tidak ada di server SmartPro (menghasilkan status HTTP 404). Gambar sebenarnya berada di server DSTech Smart (`https://dstechsmart.com/service-cctv.png`).
-  - Pada `virtual-host.html`, elemen `<img>` pada panel katalog dan presentasi slide tidak memiliki konversi URL absolut otomatis dan fallback `onerror`.
-  *Langkah-langkah yang akan dilakukan*:
-  1. Memodifikasi `src/app/api/livestream/route.ts` dan `src/app/api/products/sync-smartpro/route.ts` agar saat menyinkronkan data katalog ke SmartPro, seluruh path gambar otomatis dikonversi menjadi URL absolut penuh (`https://dstechsmart.com${p.image}`).
-  2. Memperbarui `src/data/dstech_livestream.json` dengan URL gambar absolut resmi yang terverifikasi.
-  3. Memodifikasi `wa-gateway-server/public/virtual-host.html` dengan fungsi konversi URL cerdas `formatProductImageUrl()` dan fallback error `onerror="this.onerror=null;this.src='https://dstechsmart.com/kop_surat_dstech.jpg'"` sehingga thumbnail katalog produk dan slide presentasi 100% selalu muncul sempurna.
-  4. Menguji kompilasi dan build Next.js lokal, push ke GitHub, deploy ke server VPS live, mengunggah pembaruan `virtual-host.html` ke SmartPro di VPS, dan mentrigger re-sync katalog.
-  5. Verifikasi visual di browser live dan memperbarui status laporan menjadi SELESAI.
+  - Pada `virtual-host.html`, terdapat variabel runtime yang belum terdefinisi (`isLockedOnProduct`), fallback fetch yang belum mengarah ke endpoint publik (`/api/catalog-public`), serta elemen `<img>` pada panel katalog dan presentasi slide yang belum memiliki pengubah URL absolut dan penangan kegagalan `onerror`.
+  *Penyelesaian & Hasil*:
+  1. Menambahkan helper `toAbsoluteImageUrl` pada `src/app/api/livestream/route.ts` dan `src/app/api/products/sync-smartpro/route.ts` agar saat menyinkronkan data katalog ke SmartPro, seluruh path gambar produk otomatis dikonversi menjadi URL absolut penuh (`https://dstechsmart.com/...`).
+  2. Memperbaiki secret key `MASTER_SECRET` pada sinkronisasi livestream agar selaras dengan `LICENSE_MASTER_KEY` SmartPro.
+  3. Memodifikasi `wa-gateway-server/public/virtual-host.html`:
+     - Menambahkan deklarasi variabel `isLockedOnProduct` dan inisialisasi `window.greetedUsers`.
+     - Menambahkan fallback cerdas ke `/api/catalog-public` saat diakses oleh penonton/pengunjung umum tanpa secret key.
+     - Menambahkan fungsi `resolveProductImg()` yang otomatis mendeteksi URL relatif lokal dan mengubahnya menjadi URL absolut `https://dstechsmart.com/...`.
+     - Menambahkan atribut `onerror="this.onerror=null;this.src='https://dstechsmart.com/service-cctv.png'"` sehingga tidak ada thumbnail atau slide yang blank.
+  4. Mengupdate seluruh 45 baris produk di tabel `wa_catalog` database MySQL `smartpro` di VPS sehingga memiliki URL gambar absolut tajam sesuai kategori (CCTV, Barrier Gate, Smart Access, Masjid, POS).
+  5. Mengunggah `virtual-host.html` terbaru langsung ke server VPS `smartpro.dstechsmart.com/public/virtual-host.html`.
+  6. Menguji build Next.js lokal (70/70 halaman sukses) dan mendeply kode ke server live VPS (PM2 `dstech-main` PID 1719810 online).
+  7. Verifikasi visual langsung via browser subagent pada `https://smartpro.dstechsmart.com/virtual-host.html`:
+     - Screenshot `catalog_thumbnails_loaded_1793087897957.png` membuktikan seluruh gambar thumbnail produk di panel katalog sebelah kiri (No. 1 s.d. 8 dst) muncul sempurna, jernih, dan tidak ada yang pecah/kosong.
+  8. Membersihkan folder cadangan sementara `_backup_product_images_fix/`.
 - **2026-10-27**: [ANTREAN BERIKUTNYA] Pengembangan Fitur Meeting Langsung / Video Conference Interaktif pada Aplikasi Smartphone (/meeting/[roomCode], /employee, & /admin/meetings) [Tugas 236].
   *Permintaan User*: "tolong catat juga untuk fitur kedepan saya ingin kamu membuatkan fitur meeting langsung pada aplikasi smartphone" & "ok, lanjutkan".
   *Langkah-langkah yang akan dilakukan*:
