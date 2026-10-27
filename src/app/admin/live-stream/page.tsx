@@ -472,13 +472,16 @@ export default function AdminLiveStreamPage() {
 
               {data?.currentProduct ? (
                 <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
-                  <div className="w-full h-40 bg-slate-900 rounded-xl overflow-hidden relative">
+                  <div className="w-full h-44 bg-slate-900/90 rounded-xl overflow-hidden relative flex items-center justify-center p-2 border border-slate-800">
                     <img
-                      src={data.currentProduct.image || "/kop_surat_dstech.jpg"}
+                      src={data.currentProduct.image || "/service-cctv.png"}
                       alt={data.currentProduct.name}
-                      className="w-full h-full object-contain p-2"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "/service-cctv.png";
+                      }}
+                      className="max-h-full max-w-full object-contain mx-auto"
                     />
-                    <div className="absolute top-2 left-2 bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                    <div className="absolute top-2 left-2 bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow">
                       PINNED
                     </div>
                   </div>

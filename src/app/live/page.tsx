@@ -352,11 +352,14 @@ Mohon informasi ketersediaan stok & jadwal instalasi teknisi. Terima kasih!`;
               </div>
 
               <div className="flex gap-3">
-                <div className="w-24 h-24 bg-slate-900 rounded-2xl overflow-hidden shrink-0 relative border border-slate-800">
+                <div className="w-24 h-24 bg-slate-900/90 rounded-2xl overflow-hidden shrink-0 relative border border-slate-800 flex items-center justify-center p-1.5">
                   <img
-                    src={currentDisplayProduct.image || "/kop_surat_dstech.jpg"}
+                    src={currentDisplayProduct.image || "/service-cctv.png"}
                     alt={currentDisplayProduct.name}
-                    className="w-full h-full object-contain p-2"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = "/service-cctv.png";
+                    }}
+                    className="max-h-full max-w-full object-contain mx-auto"
                   />
                 </div>
                 <div className="flex-1 min-w-0">
