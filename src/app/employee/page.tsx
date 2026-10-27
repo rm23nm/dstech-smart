@@ -45,6 +45,8 @@ import {
   Loader2,
   Lock,
   HeartPulse,
+  Video,
+  Share2,
 } from "lucide-react";
 
 interface DamagedItem {
@@ -282,7 +284,7 @@ export default function EmployeeDashboard() {
   const [currentUser, setCurrentUser] = useState<EmployeeUserSession | null>(null);
 
   // Navigation state
-  const [activeTab, setActiveTab] = useState<"tasks" | "inventory" | "attendance">("tasks");
+  const [activeTab, setActiveTab] = useState<"tasks" | "inventory" | "attendance" | "meetings">("tasks");
   const [currentTime, setCurrentTime] = useState<string>("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -293,7 +295,7 @@ export default function EmployeeDashboard() {
     radius: number;
     name: string;
     allowFlexible: boolean;
-    projectLocations?: any[];
+    projectLocations: any[];
   }>({
     lat: -6.031846,
     lng: 106.037198,
@@ -313,6 +315,7 @@ export default function EmployeeDashboard() {
   const [kmsList, setKmsList] = useState<KmsGuideItem[]>([]);
   const [dailyReports, setDailyReports] = useState<DailyReportItem[]>([]);
   const [projectsList, setProjectsList] = useState<any[]>([]);
+  const [meetingsList, setMeetingsList] = useState<any[]>([]);
   const [monthlyStats, setMonthlyStats] = useState({
     totalHours: 168,
     overtimeHours: 14,
@@ -934,6 +937,11 @@ export default function EmployeeDashboard() {
     attachmentUrl: "" as string | null,
   });
 
+  // State Rapat & Notula (Tugas 233 / 110)
+  const [meetingFilter, setMeetingFilter] = useState<"ALL" | "ACTIVE" | "UPCOMING" | "ENDED">("ALL");
+  const [meetingSearch, setMeetingSearch] = useState<string>("");
+  const [selectedMeetingDetail, setSelectedMeetingDetail] = useState<any | null>(null);
+
   const fetchLeaveData = async (empName?: string) => {
     try {
       const targetName = empName || currentUser?.name;
@@ -1105,7 +1113,7 @@ export default function EmployeeDashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [resTasks, resInv, resAtt, resAnn, resKms, resFin, resReports] = await Promise.all([
+        const [resTasks, resInv, resAtt, resAnn, resKms, resFin, resReports, resMeetings] = await Promise.all([
           fetch("/api/employee/tasks"),
           fetch("/api/employee/inventory"),
           fetch(`/api/employee/attendance?t=${Date.now()}`, {
@@ -1116,6 +1124,7 @@ export default function EmployeeDashboard() {
           fetch("/api/kms"),
           fetch("/api/finance"),
           fetch("/api/employee/daily-reports"),
+          fetch(`/api/meetings?t=${Date.now()}`, { cache: "no-store" }),
         ]);
 
         if (resTasks.ok) {
@@ -1162,6 +1171,12 @@ export default function EmployeeDashboard() {
         if (resReports && resReports.ok) {
           const d = await resReports.json();
           if (d.data && Array.isArray(d.data)) setDailyReports(d.data);
+        }
+        if (resMeetings && resMeetings.ok) {
+          const mData = await resMeetings.json();
+          if (mData?.data && Array.isArray(mData.data)) {
+            setMeetingsList(mData.data);
+          }
         }
       } catch (err) {
         console.warn("Using offline fallback data for employee portal:", err);
@@ -2450,6 +2465,30 @@ export default function EmployeeDashboard() {
               {todayAttendance?.checkIn ? "Hadir" : "Belum Absen"}
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("meetings")}
+            className={`w-full flex items-center justify-between p-4 rounded-2xl font-bold text-sm transition-all cursor-pointer ${
+              activeTab === "meetings"
+                ? "bg-dstech-red text-white shadow-lg shadow-red-500/25"
+                : "text-slate-600 hover:bg-slate-50 hover:text-dstech-red"
+            }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <Video className="w-5 h-5" />
+              <span>Rapat & Notula</span>
+            </div>
+            {meetingsList.filter((m) => m.status === "ACTIVE").length > 0 ? (
+              <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-dstech-red">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping"></span>
+                {meetingsList.filter((m) => m.status === "ACTIVE").length} Live
+              </span>
+            ) : (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                {meetingsList.length}
+              </span>
+            )}
+          </button>
         </nav>
 
         {/* Profile Card & Logout */}
@@ -2527,6 +2566,18 @@ export default function EmployeeDashboard() {
             }`}
           >
             Presensi & Lembur
+          </button>
+          <button
+            onClick={() => setActiveTab("meetings")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1 ${
+              activeTab === "meetings" ? "bg-dstech-red text-white" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            <Video className="w-3.5 h-3.5" />
+            <span>Rapat & Notula</span>
+            {meetingsList.filter((m) => m.status === "ACTIVE").length > 0 && (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            )}
           </button>
         </div>
 
@@ -3831,6 +3882,368 @@ export default function EmployeeDashboard() {
                   </div>
                 </div>
               )}
+
+              {/* TAB 4: JADWAL RAPAT & NOTULA PERUSAHAAN (Tugas 233 / 110) */}
+              {activeTab === "meetings" && (
+                <div className="space-y-6">
+                  {/* Header Card */}
+                  <div className="p-6 sm:p-8 rounded-[36px] bg-white border border-slate-200/80 shadow-sm space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2.5 py-0.5 rounded-md bg-red-100 text-dstech-red text-[10px] font-black uppercase tracking-wider">
+                            Video Conference & Notula
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold">
+                            Total {meetingsList.length} Rapat
+                          </span>
+                        </div>
+                        <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                          Jadwal Rapat & Notula Perusahaan
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                          Akses ruang video koordinasi online, briefing harian teknisi, dan dokumentasi hasil keputusan rapat.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(`/api/meetings?t=${Date.now()}`, { cache: "no-store" });
+                              if (res.ok) {
+                                const d = await res.json();
+                                if (d?.data) setMeetingsList(d.data);
+                              }
+                            } catch (e) {
+                              console.error(e);
+                            }
+                          }}
+                          className="px-4 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                          title="Segarkan Jadwal Rapat"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Segarkan</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Search & Filter Bar */}
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                      <div className="relative flex-1 max-w-md">
+                        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={meetingSearch}
+                          onChange={(e) => setMeetingSearch(e.target.value)}
+                          placeholder="Cari topik, agenda, atau penyelenggara..."
+                          className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-dstech-red/20 focus:border-dstech-red transition-all"
+                        />
+                        {meetingSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setMeetingSearch("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Filter Pills */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide py-1">
+                        <button
+                          type="button"
+                          onClick={() => setMeetingFilter("ALL")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                            meetingFilter === "ALL"
+                              ? "bg-slate-900 text-white shadow-sm"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                        >
+                          Semua ({meetingsList.length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMeetingFilter("ACTIVE")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+                            meetingFilter === "ACTIVE"
+                              ? "bg-red-600 text-white shadow-sm"
+                              : "bg-red-50 text-red-600 hover:bg-red-100"
+                          }`}
+                        >
+                          <span className="w-2 h-2 rounded-full bg-current animate-ping"></span>
+                          Sedang Live ({meetingsList.filter((m) => m.status === "ACTIVE").length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMeetingFilter("UPCOMING")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                            meetingFilter === "UPCOMING"
+                              ? "bg-blue-600 text-white shadow-sm"
+                              : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+                          }`}
+                        >
+                          Terjadwal ({meetingsList.filter((m) => m.status === "UPCOMING").length})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMeetingFilter("ENDED")}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                            meetingFilter === "ENDED"
+                              ? "bg-slate-700 text-white shadow-sm"
+                              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          }`}
+                        >
+                          Selesai ({meetingsList.filter((m) => m.status === "ENDED").length})
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SPOTLIGHT BANNER: RAPAT LIVE / BERLANGSUNG */}
+                  {meetingsList.filter((m) => m.status === "ACTIVE").length > 0 && (
+                    <div className="p-6 sm:p-7 rounded-[32px] bg-gradient-to-br from-slate-950 via-slate-900 to-red-950 text-white border border-red-500/30 shadow-xl shadow-red-900/10 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 -mr-12 -mt-12 w-48 h-48 bg-red-600/20 rounded-full blur-3xl pointer-events-none" />
+                      
+                      {meetingsList
+                        .filter((m) => m.status === "ACTIVE")
+                        .slice(0, 1)
+                        .map((liveMeeting) => (
+                          <div key={liveMeeting.id} className="relative z-10 space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-600 text-white text-[11px] font-black uppercase tracking-wider animate-pulse shadow-md shadow-red-600/40">
+                                  <span className="w-2 h-2 rounded-full bg-white"></span>
+                                  Sedang Berlangsung Sekarang
+                                </span>
+                                <span className="px-2.5 py-1 rounded-full bg-white/10 text-slate-300 text-[10px] font-bold">
+                                  Room: #{liveMeeting.roomCode}
+                                </span>
+                              </div>
+                              <span className="text-xs text-slate-400 font-semibold flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5 text-red-400" />
+                                {liveMeeting.scheduledAt || "Sekarang"}
+                              </span>
+                            </div>
+
+                            <div>
+                              <h4 className="text-lg sm:text-2xl font-black text-white tracking-tight">
+                                {liveMeeting.title}
+                              </h4>
+                              <p className="text-xs sm:text-sm text-slate-300 mt-1 line-clamp-2">
+                                {liveMeeting.description}
+                              </p>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-white/10">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white font-black text-sm">
+                                  {liveMeeting.hostName ? liveMeeting.hostName.charAt(0).toUpperCase() : "D"}
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-white leading-tight">
+                                    {liveMeeting.hostName || "DSTech Management"}
+                                  </p>
+                                  <p className="text-[10px] font-medium text-slate-400">
+                                    Penyelenggara Rapat
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedMeetingDetail(liveMeeting)}
+                                  className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-red-400" />
+                                  <span>Lihat Notula</span>
+                                </button>
+                                <a
+                                  href={`/meeting/${liveMeeting.roomCode}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-red-600/40 flex items-center gap-2 transition-all cursor-pointer"
+                                >
+                                  <Video className="w-4 h-4" />
+                                  <span>Gabung Room Video</span>
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+
+                  {/* LIST DAFTAR RAPAT */}
+                  <div className="space-y-4">
+                    {meetingsList
+                      .filter((m) => {
+                        if (meetingFilter !== "ALL" && m.status !== meetingFilter) return false;
+                        if (meetingSearch.trim()) {
+                          const q = meetingSearch.toLowerCase();
+                          return (
+                            m.title.toLowerCase().includes(q) ||
+                            m.description.toLowerCase().includes(q) ||
+                            m.hostName?.toLowerCase().includes(q) ||
+                            m.roomCode?.toLowerCase().includes(q)
+                          );
+                        }
+                        return true;
+                      })
+                      .map((meeting) => {
+                        const isLive = meeting.status === "ACTIVE";
+                        const isUpcoming = meeting.status === "UPCOMING";
+                        const isEnded = meeting.status === "ENDED";
+
+                        const typeLabel =
+                          meeting.meetingType === "INTERNAL_STAF"
+                            ? "Koordinasi Internal"
+                            : meeting.meetingType === "KONSULTASI_KLIEN"
+                            ? "Konsultasi Klien"
+                            : "Survey & Bantuan Lapangan";
+
+                        const typeColor =
+                          meeting.meetingType === "INTERNAL_STAF"
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : meeting.meetingType === "KONSULTASI_KLIEN"
+                            ? "bg-purple-50 text-purple-700 border-purple-200"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200";
+
+                        return (
+                          <div
+                            key={meeting.id}
+                            className={`p-5 sm:p-6 rounded-[28px] bg-white border transition-all space-y-4 hover:shadow-md ${
+                              isLive
+                                ? "border-red-300 ring-2 ring-red-500/10 shadow-sm"
+                                : "border-slate-200/80"
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${typeColor}`}
+                                >
+                                  {typeLabel}
+                                </span>
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                    isLive
+                                      ? "bg-red-100 text-red-700"
+                                      : isUpcoming
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-slate-100 text-slate-700"
+                                  }`}
+                                >
+                                  {isLive ? "● Sedang Berlangsung" : isUpcoming ? "🕒 Terjadwal" : "✓ Selesai"}
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">
+                                  #{meeting.roomCode}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+                                <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                <span>{meeting.scheduledAt || "Sesuai Jadwal"}</span>
+                              </div>
+                            </div>
+
+                            <div>
+                              <h4 className="text-base sm:text-lg font-black text-slate-900">
+                                {meeting.title}
+                              </h4>
+                              <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
+                                {meeting.description}
+                              </p>
+                            </div>
+
+                            {/* Host and Participant Preview */}
+                            <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-slate-100">
+                              <div className="flex items-center gap-2.5 text-xs text-slate-600">
+                                <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-[11px]">
+                                  {meeting.hostName ? meeting.hostName.charAt(0).toUpperCase() : "U"}
+                                </div>
+                                <div>
+                                  <span className="font-bold text-slate-900 block leading-tight">
+                                    {meeting.hostName || "Manajemen DSTech"}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">
+                                    Host ({meeting.hostRole || "ADMIN"})
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedMeetingDetail(meeting)}
+                                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                                >
+                                  <FileText className="w-3.5 h-3.5 text-dstech-red" />
+                                  <span>Notula & Rincian</span>
+                                </button>
+
+                                <a
+                                  href={`/meeting/${meeting.roomCode}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
+                                    isLive
+                                      ? "bg-red-600 hover:bg-red-700 text-white shadow-red-500/20"
+                                      : "bg-slate-900 hover:bg-slate-800 text-white"
+                                  }`}
+                                >
+                                  <Video className="w-3.5 h-3.5" />
+                                  <span>{isLive ? "Gabung Live" : "Buka Room"}</span>
+                                  <ExternalLink className="w-3 h-3 opacity-70" />
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                    {meetingsList.filter((m) => {
+                      if (meetingFilter !== "ALL" && m.status !== meetingFilter) return false;
+                      if (meetingSearch.trim()) {
+                        const q = meetingSearch.toLowerCase();
+                        return (
+                          m.title.toLowerCase().includes(q) ||
+                          m.description.toLowerCase().includes(q) ||
+                          m.hostName?.toLowerCase().includes(q) ||
+                          m.roomCode?.toLowerCase().includes(q)
+                        );
+                      }
+                      return true;
+                    }).length === 0 && (
+                      <div className="p-12 text-center rounded-[32px] bg-slate-50 border border-dashed border-slate-200 space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                          <Video className="w-6 h-6" />
+                        </div>
+                        <h4 className="text-sm font-black text-slate-900">
+                          Tidak Ada Rapat yang Cocok
+                        </h4>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          Tidak ditemukan agenda rapat pada filter atau kata kunci pencarian yang dipilih.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMeetingFilter("ALL");
+                            setMeetingSearch("");
+                          }}
+                          className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-all cursor-pointer"
+                        >
+                          Reset Filter
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Right Column: Announcements Panel */}
@@ -3897,6 +4310,65 @@ export default function EmployeeDashboard() {
                   <BookOpen className="w-4 h-4 text-dstech-accent" />
                   <span>Buka Portal KMS</span>
                 </button>
+              </div>
+
+              {/* Widget Agenda Rapat Terdekat & Live */}
+              <div className="p-6 rounded-3xl bg-white border border-slate-200/80 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-red-100 text-dstech-red flex items-center justify-center">
+                      <Video className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-900 text-xs">Agenda Rapat</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Video & Notula</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab("meetings")}
+                    className="text-[11px] font-bold text-dstech-blue hover:text-blue-700 transition-colors"
+                  >
+                    Buka Tab
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {meetingsList.slice(0, 3).map((m) => (
+                    <div
+                      key={m.id}
+                      onClick={() => {
+                        setSelectedMeetingDetail(m);
+                        setActiveTab("meetings");
+                      }}
+                      className="p-3 rounded-2xl bg-slate-50 hover:bg-red-50/50 border border-slate-100 hover:border-red-200 transition-all cursor-pointer space-y-1 group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {m.scheduledAt || "Terjadwal"}
+                        </span>
+                        {m.status === "ACTIVE" ? (
+                          <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-bold text-[9px] animate-pulse">
+                            ● Live
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 font-bold text-[9px]">
+                            {m.status === "UPCOMING" ? "Terjadwal" : "Selesai"}
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-bold text-slate-900 text-xs line-clamp-1 group-hover:text-dstech-red transition-colors">
+                        {m.title}
+                      </p>
+                      <p className="text-[11px] text-slate-500 line-clamp-1">
+                        Host: {m.hostName || "Tim DSTech"}
+                      </p>
+                    </div>
+                  ))}
+                  {meetingsList.length === 0 && (
+                    <p className="text-xs text-slate-400 text-center py-2">Belum ada agenda rapat</p>
+                  )}
+                </div>
               </div>
 
               {/* Quick Info Card */}
@@ -7153,6 +7625,197 @@ export default function EmployeeDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DETAIL & NOTULA RAPAT (Tugas 233 / 110) */}
+      {selectedMeetingDetail && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedMeetingDetail(null)}
+        >
+          <div
+            className="bg-white rounded-[32px] max-w-2xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+              <div className="space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-dstech-red font-black text-[10px] uppercase tracking-wider">
+                    {selectedMeetingDetail.meetingType === "INTERNAL_STAF"
+                      ? "Koordinasi Internal"
+                      : selectedMeetingDetail.meetingType === "KONSULTASI_KLIEN"
+                      ? "Konsultasi Klien"
+                      : "Survey & Bantuan Lapangan"}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      selectedMeetingDetail.status === "ACTIVE"
+                        ? "bg-red-500 text-white animate-pulse"
+                        : selectedMeetingDetail.status === "UPCOMING"
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {selectedMeetingDetail.status === "ACTIVE"
+                      ? "Sedang Live"
+                      : selectedMeetingDetail.status === "UPCOMING"
+                      ? "Mendatang"
+                      : "Selesai"}
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                    Room: #{selectedMeetingDetail.roomCode}
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug">
+                  {selectedMeetingDetail.title}
+                </h3>
+                <p className="text-xs text-slate-500 flex items-center gap-2">
+                  <span>Host: <strong>{selectedMeetingDetail.hostName || "Tim DSTech"}</strong></span>
+                  <span>•</span>
+                  <span>Jadwal: <strong>{selectedMeetingDetail.scheduledAt || "Sesuai Agenda"}</strong></span>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedMeetingDetail(null)}
+                className="p-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Video Conference Banner */}
+            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-red-400 block mb-0.5">
+                  Ruang Virtual DSTech Meet
+                </span>
+                <p className="text-xs text-slate-300 font-mono break-all">
+                  dstechsmart.com/meeting/{selectedMeetingDetail.roomCode}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const url = `${window.location.origin}/meeting/${selectedMeetingDetail.roomCode}`;
+                    navigator.clipboard.writeText(url);
+                    alert("Tautan video room berhasil disalin!");
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all cursor-pointer"
+                  title="Salin Tautan Video"
+                >
+                  Salin Link
+                </button>
+                <a
+                  href={`/meeting/${selectedMeetingDetail.roomCode}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-red-600/30 transition-all cursor-pointer"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Buka Video Room</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Notula Content & Pembahasan */}
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-dstech-red" />
+                  Agenda & Ringkasan Pembahasan
+                </h4>
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
+                  {selectedMeetingDetail.description || "Tidak ada deskripsi agenda khusus."}
+                </div>
+              </div>
+
+              {/* Poin Keputusan & Notula Rapat */}
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Poin Hasil Keputusan & Catatan Notula
+                </h4>
+                <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100/80 space-y-2.5">
+                  <div className="flex items-start gap-2.5 text-xs text-slate-800">
+                    <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                      ✓
+                    </span>
+                    <span>
+                      Seluruh tim teknisi wajib mengonfirmasi ketersediaan alat pelindung diri (APD K3) dan material sebelum keberangkatan ke lokasi proyek.
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2.5 text-xs text-slate-800">
+                    <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                      ✓
+                    </span>
+                    <span>
+                      Pelaporan presensi kehadiran di lokasi wajib menggunakan fitur GPS Geofencing radius resmi proyek atau kantor DSTech Smart.
+                    </span>
+                  </div>
+                  <div className="flex items-start gap-2.5 text-xs text-slate-800">
+                    <span className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                      ✓
+                    </span>
+                    <span>
+                      Hasil berita acara serah terima (BAST) pekerjaan pemeliharaan wajib diunggah ke formulir penugasan maksimal 1x24 jam setelah selesai.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tindak Lanjut Teknisi Lapangan */}
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-1.5 flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4 text-blue-600" />
+                  Tindak Lanjut & Action Items Staf
+                </h4>
+                <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100/80 text-xs text-slate-700 space-y-1.5">
+                  <p>• <strong>PIC Lapangan:</strong> Menyerahkan rekapan inventaris alat uji jaringan & CCTV kepada koordinator operasional.</p>
+                  <p>• <strong>Tim Support:</strong> Melakukan sinkronisasi firmware terbaru pada gerbang tiket parkir dan access controller.</p>
+                  <p>• <strong>Admin Operasional:</strong> Mendokumentasikan rekaman rapat ke arsip internal KMS DSTech.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `*NOTULA RAPAT DSTECH SMART*\nTopik: ${selectedMeetingDetail.title}\nWaktu: ${selectedMeetingDetail.scheduledAt || "Sesuai Jadwal"}\nHost: ${selectedMeetingDetail.hostName || "Tim DSTech"}\nRoom Video: https://dstechsmart.com/meeting/${selectedMeetingDetail.roomCode}\n\n*Ringkasan:* ${selectedMeetingDetail.description || "-"}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <span>Bagikan ke WhatsApp Tim</span>
+              </a>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setSelectedMeetingDetail(null)}
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <a
+                  href={`/meeting/${selectedMeetingDetail.roomCode}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Video className="w-3.5 h-3.5" />
+                  <span>Buka Video Room</span>
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

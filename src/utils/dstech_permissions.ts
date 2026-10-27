@@ -56,6 +56,13 @@ export const DSTECH_SYSTEM_MENUS: MenuItemConfig[] = [
     desc: "Jadwal servis berkala, penugasan tiket teknisi & SPK lapangan",
   },
   {
+    id: "meetings",
+    name: "Video Meeting",
+    category: "Operasional",
+    path: "/admin/meetings",
+    desc: "Ruang rapat video conference interaktif smartphone, briefing staf & konsultasi survey klien",
+  },
+  {
     id: "attendance",
     name: "Rekap Absensi Staf",
     category: "Operasional",
@@ -237,6 +244,8 @@ export function getDefaultPermissionsByRole(role: string): UserPermissions {
     perms.maintenance = { view: true, create: true, edit: true, delete: false, print: true, send: true };
     // Absensi: view, create (check-in/out)
     perms.attendance = { view: true, create: true, edit: false, delete: false, print: true, send: false };
+    // Video Meeting: view, create room instan, send undangan
+    perms.meetings = { view: true, create: true, edit: false, delete: false, print: true, send: true };
     // Inventory: view, create (ajukan material)
     perms.inventory = { view: true, create: true, edit: false, delete: false, print: true, send: false };
     // KMS: view
