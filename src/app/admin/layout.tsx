@@ -31,6 +31,7 @@ import {
   ShoppingBag,
   Mail,
   Target,
+  Radio,
 } from "lucide-react";
 import { checkUserPermission } from "@/utils/dstech_permissions";
 
@@ -70,6 +71,7 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Kategori & Sub-Kategori", category: "Produk", url: "/admin/categories", desc: "Kelola klasifikasi kategori dan sub-kategori produk" },
   { title: "Portofolio Proyek", category: "Navigasi", url: "/admin/portfolios", desc: "Kelola dokumentasi proyek selesai, foto & video instalasi" },
   { title: "Materi Promosi & Katalog", category: "Navigasi", url: "/admin/promotions", desc: "Kelola e-katalog produk dan brosur unduhan mitra" },
+  { title: "Live Streaming Studio", category: "Produk", url: "/admin/live-stream", desc: "Studio siaran langsung E-Store, sinkronisasi SmartPro AI Virtual Host, dan pin produk promo" },
   { title: "KMS Teknisi (SOP & K3)", category: "Navigasi", url: "/admin/kms", desc: "Kelola SOP instalasi CCTV, standar K3, firmware NVR & kontak PIC" },
   { title: "SOP Pemasangan IP Camera", category: "Navigasi", url: "/admin/kms", desc: "Dokumen standar SOP teknisi lapangan" },
   { title: "Standar Keselamatan Kerja K3", category: "Navigasi", url: "/admin/kms", desc: "Pedoman APD dan keselamatan kerja ketinggian" },
@@ -303,6 +305,13 @@ export default function AdminLayout({
       href: "/admin/promotions",
       icon: FileDown,
       active: pathname.startsWith("/admin/promotions"),
+    },
+    {
+      id: "livestream",
+      label: "🔴 Live Streaming",
+      href: "/admin/live-stream",
+      icon: Radio,
+      active: pathname.startsWith("/admin/live-stream"),
     },
     {
       id: "kms",

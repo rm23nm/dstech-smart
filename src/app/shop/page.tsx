@@ -53,6 +53,7 @@ import {
   PackageX,
   ArrowLeft,
   Send,
+  Radio,
 } from "lucide-react";
 
 interface Product {
@@ -445,6 +446,11 @@ export default function ShopPage() {
   // Promosi aktif
   const [promotions, setPromotions] = useState<any[]>([]);
 
+  // Live Streaming State khusus E-Store (Tugas 235)
+  const [liveStreamData, setLiveStreamData] = useState<any | null>(null);
+  const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
+  const [liveLikes, setLiveLikes] = useState(2450);
+
   // Daftar Rekening Resmi Perusahaan Dinamis dari Pengaturan Sistem (Bukan Dummy)
   const paymentBanks: BankOption[] = useMemo(() => {
     if (siteSettings?.bankAccounts && Array.isArray(siteSettings.bankAccounts) && siteSettings.bankAccounts.length > 0) {
@@ -527,7 +533,23 @@ export default function ShopPage() {
     fetchPromotions();
     fetchSiteSettings();
     fetchUserOrders();
+    fetchLiveStream();
+    const liveInterval = setInterval(fetchLiveStream, 15000);
+    return () => clearInterval(liveInterval);
   }, []);
+
+  const fetchLiveStream = async () => {
+    try {
+      const res = await fetch("/api/livestream?t=" + Date.now());
+      const data = await res.json();
+      if (data && data.success && data.data) {
+        setLiveStreamData(data.data);
+        setLiveLikes(data.data.likesCount || 2450);
+      }
+    } catch (err) {
+      console.error("Gagal memuat status livestream E-Store:", err);
+    }
+  };
 
   const fetchSiteSettings = async () => {
     try {
@@ -1437,6 +1459,52 @@ export default function ShopPage() {
           </div>
         </div>
       </header>
+
+      {/* BANNER LIVE STREAMING E-STORE DSTECH SMART (Tugas 235) */}
+      {liveStreamData?.isLive && liveStreamData?.showInStore !== false && (
+        <div className="bg-gradient-to-r from-rose-600 via-pink-600 to-indigo-700 text-white shadow-xl relative overflow-hidden border-b border-rose-400/30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="relative flex h-3 w-3 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-90"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-black/40 border border-white/20 uppercase tracking-wider">
+                  🔴 LIVE SHOWCASE
+                </span>
+                <p className="text-xs sm:text-sm font-bold truncate max-w-md">
+                  {liveStreamData.title}
+                </p>
+                {liveStreamData.bannerNotice && (
+                  <span className="hidden md:inline text-[11px] font-semibold text-rose-100 bg-black/30 px-2 py-0.5 rounded-lg border border-white/10">
+                    {liveStreamData.bannerNotice}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsLiveModalOpen(true)}
+                className="px-4 py-1.5 rounded-xl bg-white text-rose-600 hover:bg-rose-50 font-black text-xs shadow-md flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+              >
+                <Radio className="w-3.5 h-3.5 text-rose-600 animate-pulse" />
+                Tonton Live Show
+              </button>
+              <Link
+                href="/live"
+                className="px-3 py-1.5 rounded-xl bg-black/30 hover:bg-black/50 text-white font-bold text-xs border border-white/20 flex items-center gap-1 transition-all"
+                title="Buka Layar Penuh di /live"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                Layar Penuh
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top Banner: Cakupan Wilayah Layanan Nasional (Tugas 198) */}
       <div className="bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 text-white text-[11px] sm:text-xs py-2 px-4 border-b border-blue-900/40">
@@ -4074,6 +4142,192 @@ export default function ShopPage() {
                       <span>Beli Sekarang</span>
                     </button>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING LIVE SHOPPING BADGE DI POJOK KANAN BAWAH E-STORE (Tugas 235) */}
+      {liveStreamData?.isLive && liveStreamData?.showInStore !== false && !isLiveModalOpen && (
+        <button
+          type="button"
+          onClick={() => setIsLiveModalOpen(true)}
+          className="fixed bottom-24 right-6 z-40 bg-gradient-to-r from-rose-600 to-pink-600 text-white p-3 sm:px-4 sm:py-3 rounded-full shadow-2xl shadow-rose-600/40 hover:scale-105 active:scale-95 transition-all flex items-center gap-2.5 border-2 border-white/30 cursor-pointer animate-bounce group"
+          title="Tonton Live Streaming E-Store"
+        >
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+          </span>
+          <Radio className="w-5 h-5 animate-pulse" />
+          <span className="font-black text-xs hidden sm:inline tracking-wider uppercase">
+            LIVE SHOWCASE
+          </span>
+        </button>
+      )}
+
+      {/* MODAL LIVE SHOPPING SHOWCASE INTERAKTIF (Tugas 235) */}
+      {isLiveModalOpen && liveStreamData && (
+        <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-slate-950 border border-slate-800 rounded-3xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden shadow-2xl relative">
+            {/* Header Modal Live */}
+            <div className="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                </span>
+                <span className="text-xs font-black text-rose-400 uppercase tracking-wider">
+                  🔴 DSTECH LIVE SHOWCASE
+                </span>
+                <span className="hidden sm:inline text-xs text-slate-400">•</span>
+                <h3 className="hidden sm:inline text-xs font-bold text-white truncate max-w-md">
+                  {liveStreamData.title}
+                </h3>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/live"
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all"
+                  title="Buka Layar Penuh"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Layar Penuh</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsLiveModalOpen(false)}
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white transition-all cursor-pointer"
+                  title="Tutup Player"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Theater Body */}
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden bg-black">
+              {/* Left: Video Player */}
+              <div className="lg:col-span-8 h-64 lg:h-full relative flex items-center justify-center bg-black border-b lg:border-b-0 lg:border-r border-slate-800">
+                {liveStreamData.streamType === "smartpro_ai" ? (
+                  <iframe
+                    src={liveStreamData.smartProUrl || "https://smartpro.dstechsmart.com/virtual-host.html"}
+                    className="w-full h-full border-0"
+                    allow="camera; microphone; autoplay; display-capture"
+                    title="SmartPro Virtual Host"
+                  />
+                ) : liveStreamData.streamType === "youtube" && liveStreamData.youtubeId ? (
+                  <iframe
+                    src={`https://www.youtube.com/embed/${liveStreamData.youtubeId}?autoplay=1&mute=0`}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title="YouTube Live"
+                  />
+                ) : (
+                  <div className="text-center p-6 text-slate-500">
+                    <Radio className="w-12 h-12 mx-auto mb-2 opacity-30" />
+                    <p className="text-xs">Live Stream Player</p>
+                  </div>
+                )}
+
+                {/* Like Button on Player */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setLiveLikes((p) => p + 1);
+                    try {
+                      await fetch("/api/livestream", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "like" }),
+                      });
+                    } catch {}
+                  }}
+                  className="absolute right-4 bottom-4 p-2.5 rounded-xl bg-slate-900/80 hover:bg-rose-600 text-rose-400 hover:text-white backdrop-blur-md border border-white/10 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer group"
+                >
+                  <Heart className="w-4 h-4 fill-current group-hover:scale-125 transition-transform" />
+                  <span>{liveLikes}</span>
+                </button>
+              </div>
+
+              {/* Right: Pinned Product & Fast Checkout */}
+              <div className="lg:col-span-4 h-full overflow-y-auto p-4 bg-slate-950 space-y-4 flex flex-col justify-between">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-[10px] font-black uppercase text-rose-400 bg-rose-500/10 border border-rose-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <Flame className="w-3 h-3 text-rose-500" />
+                      PROMO LIVE SEKARANG
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      {liveStreamData.viewerCount || 184} Penonton
+                    </span>
+                  </div>
+
+                  {liveStreamData.currentProduct && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-3">
+                      <div className="w-full h-36 bg-slate-950 rounded-xl overflow-hidden relative border border-slate-800/80">
+                        <img
+                          src={liveStreamData.currentProduct.image || "/kop_surat_dstech.jpg"}
+                          alt={liveStreamData.currentProduct.name}
+                          className="w-full h-full object-contain p-2"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">
+                          {liveStreamData.currentProduct.brand || "DSTech Smart"} • {liveStreamData.currentProduct.category}
+                        </span>
+                        <h4 className="text-xs font-bold text-white line-clamp-2 mt-0.5">
+                          {liveStreamData.currentProduct.name}
+                        </h4>
+                        <p className="text-base font-black text-emerald-400 mt-1">
+                          {typeof liveStreamData.currentProduct.price === "number"
+                            ? `Rp ${liveStreamData.currentProduct.price.toLocaleString("id-ID")}`
+                            : liveStreamData.currentProduct.price}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            addToCart(liveStreamData.currentProduct, 1);
+                            setIsLiveModalOpen(false);
+                            setIsCartOpen(true);
+                            showToast("✓ Produk live promo berhasil dimasukkan ke keranjang belanja!");
+                          }}
+                          className="w-full py-2.5 rounded-xl bg-dstech-blue hover:bg-blue-600 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer"
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          Beli Sekarang di E-Store
+                        </button>
+
+                        <a
+                          href={`https://wa.me/6282259494242?text=${encodeURIComponent(
+                            `Halo CS DSTech Smart, saya sedang menonton Siaran Live E-Store dan ingin memesan promo: ${liveStreamData.currentProduct.name} (${typeof liveStreamData.currentProduct.price === "number" ? `Rp ${liveStreamData.currentProduct.price.toLocaleString("id-ID")}` : liveStreamData.currentProduct.price})`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md transition-all text-center"
+                        >
+                          <Phone className="w-4 h-4" />
+                          Pesan Langsung via WhatsApp
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-3 border-t border-slate-900 text-center">
+                  <Link
+                    href="/live"
+                    className="text-xs text-rose-400 hover:text-rose-300 font-bold flex items-center justify-center gap-1"
+                  >
+                    Buka Halaman Live Streaming Interaktif ➔
+                  </Link>
                 </div>
               </div>
             </div>

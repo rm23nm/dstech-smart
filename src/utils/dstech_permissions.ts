@@ -112,6 +112,13 @@ export const DSTECH_SYSTEM_MENUS: MenuItemConfig[] = [
     desc: "E-katalog unduhan, brosur promosi & materi marketing mitra",
   },
   {
+    id: "livestream",
+    name: "Live Streaming Studio",
+    category: "Katalog & Produk",
+    path: "/admin/live-stream",
+    desc: "Studio siaran langsung E-Store, sinkronisasi SmartPro AI Virtual Host, dan pin produk promo",
+  },
+  {
     id: "kms",
     name: "KMS Teknisi (SOP & K3)",
     category: "Operasional",
