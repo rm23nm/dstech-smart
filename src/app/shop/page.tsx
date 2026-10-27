@@ -63,6 +63,10 @@ interface Product {
   subCategory?: string;
   brand?: string;
   price: number;
+  originalPrice?: number;
+  isPromo?: boolean;
+  discountPercent?: number;
+  promoTag?: string;
   installationFee?: number;
   hasInstallationService?: boolean;
   stock?: number;
@@ -96,6 +100,10 @@ const FALLBACK_PRODUCTS: Product[] = [
     name: "Smart Doorlock X-100 Luxury Series",
     category: "Smart Home",
     price: 1850000,
+    originalPrice: 2450000,
+    isPromo: true,
+    discountPercent: 24,
+    promoTag: "FLASH SALE",
     commission: "15%",
     image: "/portfolio-residential.png",
     desc: "Smart Doorlock dengan Fingerprint, RFID Card, Digital Passcode & Kontrol Aplikasi Bluetooth Smartphone.",
@@ -105,6 +113,10 @@ const FALLBACK_PRODUCTS: Product[] = [
     name: "CCTV Hikvision 4CH HD Ultra Clear",
     category: "Security",
     price: 3500000,
+    originalPrice: 4200000,
+    isPromo: true,
+    discountPercent: 17,
+    promoTag: "PROMO SPESIAL",
     commission: "10%",
     image: "/service-cctv.png",
     desc: "Paket CCTV 4 Channel Resolusi Full HD lengkap dengan DVR pintar, HDD 1TB, dan kabel coaxial 50m.",
@@ -324,6 +336,7 @@ export default function ShopPage() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [showOnlyWishlist, setShowOnlyWishlist] = useState(false);
+  const [showPromoOnly, setShowPromoOnly] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [shopActiveImage, setShopActiveImage] = useState<string>("");
   const [heroSlide, setHeroSlide] = useState(0);
@@ -772,6 +785,12 @@ export default function ShopPage() {
 
   // Perhitungan Biaya Keranjang
   const cartSubtotal = cart.reduce((acc, item) => acc + item.product.price * item.qty, 0);
+  const cartSavings = cart.reduce((acc, item) => {
+    const orig = item.product.originalPrice && item.product.originalPrice > item.product.price
+      ? item.product.originalPrice
+      : item.product.price;
+    return acc + (orig - item.product.price) * item.qty;
+  }, 0);
   const selectedCourier = SHIPPING_COURIERS.find((c) => c.id === selectedCourierId) || SHIPPING_COURIERS[0];
 
   // Kalkulasi Jasa Pemasangan & Setup Teknisi Proporsional per Kuantiti / Unit (Tugas 202)
@@ -1187,16 +1206,30 @@ export default function ShopPage() {
         // Filter Wishlist
         const matchWishlist = showOnlyWishlist ? wishlist.includes(prod.id) : true;
 
-        return matchCategory && matchSubCategory && matchBrand && matchSearch && matchWishlist;
+        // Filter Promo / Diskon
+        const isProdPromo = Boolean(prod.isPromo || (prod.originalPrice && prod.originalPrice > prod.price));
+        const matchPromo = showPromoOnly ? isProdPromo : true;
+
+        return matchCategory && matchSubCategory && matchBrand && matchSearch && matchWishlist && matchPromo;
       })
       .sort((a, b) => {
         if (sortBy === "price_low") return a.price - b.price;
         if (sortBy === "price_high") return b.price - a.price;
+        if (sortBy === "discount_high") {
+          const discA = a.originalPrice && a.originalPrice > a.price ? ((a.originalPrice - a.price) / a.originalPrice) : 0;
+          const discB = b.originalPrice && b.originalPrice > b.price ? ((b.originalPrice - b.price) / b.originalPrice) : 0;
+          return discB - discA;
+        }
         if (sortBy === "name_asc") return a.name.localeCompare(b.name);
         if (sortBy === "name_desc") return b.name.localeCompare(a.name);
         return 0;
       });
-  }, [products, activeCategory, activeSubCategory, activeBrand, searchQuery, showOnlyWishlist, wishlist, sortBy]);
+  }, [products, activeCategory, activeSubCategory, activeBrand, searchQuery, showOnlyWishlist, showPromoOnly, wishlist, sortBy]);
+
+  // Jumlah produk yang sedang dalam program diskon / promo
+  const promoCount = useMemo(() => {
+    return products.filter((p) => Boolean(p.isPromo || (p.originalPrice && p.originalPrice > p.price))).length;
+  }, [products]);
 
   // Handler Membuka Modal Pengajuan Retur
   const handleOpenReturnModal = (order: any) => {
@@ -1908,6 +1941,7 @@ export default function ShopPage() {
                   className="h-10 px-3.5 text-xs bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 cursor-pointer shadow-sm hover:bg-white transition-all"
                 >
                   <option value="default">Urutkan: Rekomendasi</option>
+                  <option value="discount_high">🔥 Diskon: Terbesar (%)</option>
                   <option value="price_low">Harga: Termurah</option>
                   <option value="price_high">Harga: Termahal</option>
                   <option value="name_asc">Nama: A → Z</option>
@@ -2211,24 +2245,49 @@ export default function ShopPage() {
               )}
             </div>
 
+            {/* 4. Tombol Cepat: Filter Promo Diskon */}
+            <button
+              type="button"
+              onClick={() => setShowPromoOnly(!showPromoOnly)}
+              className={`h-9 px-3.5 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 border transition-all cursor-pointer shadow-sm shrink-0 ${
+                showPromoOnly
+                  ? "bg-gradient-to-r from-red-600 to-rose-600 text-white border-red-600 shadow-red-500/20 font-black"
+                  : "bg-rose-50/80 hover:bg-rose-100 text-rose-700 border-rose-200"
+              }`}
+              title="Tampilkan hanya produk yang sedang promo diskon"
+            >
+              <Flame className={`w-3.5 h-3.5 ${showPromoOnly ? "text-amber-300 fill-amber-300" : "text-rose-600 fill-rose-600"}`} />
+              <span>Promo Diskon</span>
+              {promoCount > 0 && (
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    showPromoOnly ? "bg-white/25 text-white" : "bg-rose-200/80 text-rose-800"
+                  }`}
+                >
+                  {promoCount}
+                </span>
+              )}
+            </button>
+
             {/* Active Filter Badges & Reset All Button */}
-            {(activeCategory !== "Semua" || (activeSubCategory !== "Semua" && activeSubCategory !== "") || (activeBrand !== "Semua" && activeBrand !== "")) ? (
+            {(activeCategory !== "Semua" || (activeSubCategory !== "Semua" && activeSubCategory !== "") || (activeBrand !== "Semua" && activeBrand !== "") || showPromoOnly) ? (
               <button
                 type="button"
                 onClick={() => {
                   setActiveCategory("Semua");
                   setActiveSubCategory("Semua");
                   setActiveBrand("Semua");
+                  setShowPromoOnly(false);
                 }}
                 className="h-9 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ml-auto sm:ml-0"
-                title="Hapus semua filter kategori, subkategori, dan merek"
+                title="Hapus semua filter pencarian dan promo"
               >
                 <X className="w-3.5 h-3.5" />
                 <span>Reset Filter</span>
               </button>
             ) : (
               <span className="text-[11px] text-slate-400 font-medium hidden md:inline-block ml-2">
-                Pilih kategori, subkategori &amp; merek untuk memfilter
+                Pilih kategori, subkategori, merek, atau promo untuk memfilter
               </span>
             )}
           </div>

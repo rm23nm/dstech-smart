@@ -3,6 +3,27 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-27**: [SEDANG DIKERJAKAN] Fitur Harga Diskon Promo & Harga Normal Coret pada E-Store (/shop), Manajemen Produk Admin & Superadmin (/admin/products, /superadmin/products, & /api/products), serta Homepage Showcases [Tugas 239].
+  *Permintaan User*: "saya ingin kamu buat kan fitur harga diskon pada estor, misalnya harga normal dan harga promo diskon".
+  *Langkah-langkah yang akan dilakukan*:
+  1. Menyiapkan skema data produk terisolasi (`dstech_products.json`) dengan properti: `originalPrice` (harga normal/asli coret), `price` (harga promo diskon/jual), `isPromo` (status aktif diskon), `discountPercent` (persentase diskon otomatis), dan `promoTag` (label promo spesial).
+  2. Memperbarui API backend `/api/products` (GET, POST, PUT) agar mendukung pembacaan, validasi, dan penyimpanan properti diskon promo tanpa menghilangkan data biaya modal (costPrice).
+  3. Memperbarui antarmuka E-Store (`src/app/shop/page.tsx`):
+     - Badge diskon mencolok pada foto produk (contoh: "🔥 DISKON 25%" / "🏷️ FLASH SALE").
+     - Tampilan harga ganda: Harga Normal Coret (`line-through text-slate-400`) bersanding dengan Harga Promo Diskon (`text-rose-600 font-black`) serta badge hemat.
+     - Filter cepat: Filter pill "🔥 Sedang Promo / Diskon" dan pengurutan berdasarkan Diskon Terbesar.
+     - Modal Quick View: Rincian perbandingan harga normal vs promo serta total hemat pembeli.
+     - Keranjang Belanja: Notifikasi penghematan total belanja ("🎉 Anda Berhasil Menghemat Rp xxx.xxx").
+  4. Memperbarui Dashboard Admin Produk (`src/app/admin/products/page.tsx`):
+     - Form Tambah & Edit Produk dengan input Harga Normal, Harga Promo Diskon, kalkulasi otomatis persentase diskon, dan pilihan Label Promo.
+     - Tabel daftar produk dengan indikator visual harga promo coret dan badge diskon.
+     - Dukungan bulk export & import Excel untuk kolom harga normal dan status promo.
+  5. Memperbarui Dashboard Superadmin Produk (`src/app/superadmin/products/page.tsx`) dan Homepage (`src/components/ProductSection.tsx`) agar selaras menampilkan harga normal coret dan harga promo.
+  6. Menguji kompilasi TypeScript (`npx tsc --noEmit`) dan build produksi Next.js (`npm run build`).
+  7. Commit dan push ke GitHub repository `rm23nm/dstech-smart` branch `master`.
+  8. Deploy ke server VPS live (157.66.34.199:11587) dan restart PM2 `dstech-main`.
+  9. Verifikasi visual live dengan browser subagent pada `https://dstechsmart.com/shop`.
+  10. Membersihkan folder cadangan sementara dan memperbarui status laporan menjadi [SELESAI].
 - **2026-10-27**: [SELESAI] Penanganan Menyeluruh Error Console DevTools dan Layout Overlapping pada Live Stream Virtual Host & Admin Control Center (virtual-host.html, /admin/live-stream, & /live) [Tugas 238].
   *Permintaan User*: "banyak yang eror" (dilampirkan screenshot monitor dengan Chrome DevTools penuh pesan error merah, teks judul produk menimpa avatar, dan thumbnail produk berukuran abnormal).
   *Penyebab Masalah yang Ditemukan*:

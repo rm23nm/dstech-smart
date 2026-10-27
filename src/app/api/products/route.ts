@@ -10,6 +10,10 @@ const DEFAULT_PRODUCTS = [
     name: "Smart Doorlock X-100",
     category: "Smart Home",
     price: 1850000,
+    originalPrice: 2450000,
+    isPromo: true,
+    discountPercent: 24,
+    promoTag: "FLASH SALE",
     installationFee: 250000,
     hasInstallationService: true,
     stock: 24,
@@ -26,6 +30,10 @@ const DEFAULT_PRODUCTS = [
     name: "CCTV Hikvision 4CH HD",
     category: "Security",
     price: 3500000,
+    originalPrice: 4200000,
+    isPromo: true,
+    discountPercent: 17,
+    promoTag: "PROMO SPESIAL",
     installationFee: 350000,
     hasInstallationService: true,
     stock: 12,
@@ -42,6 +50,10 @@ const DEFAULT_PRODUCTS = [
     name: "Fingerprint ZKTeco Attendance",
     category: "Security",
     price: 1200000,
+    originalPrice: 1500000,
+    isPromo: true,
+    discountPercent: 20,
+    promoTag: "HEMAT 20%",
     installationFee: 150000,
     hasInstallationService: true,
     stock: 45,
@@ -74,6 +86,10 @@ const DEFAULT_PRODUCTS = [
     name: "Barrier Gate System Otomatis",
     category: "Parking",
     price: 8500000,
+    originalPrice: 9900000,
+    isPromo: true,
+    discountPercent: 14,
+    promoTag: "PROMO SPESIAL",
     installationFee: 1500000,
     hasInstallationService: true,
     stock: 5,
@@ -90,6 +106,10 @@ const DEFAULT_PRODUCTS = [
     name: "Paket Website Bisnis & E-Store",
     category: "Software",
     price: 2500000,
+    originalPrice: 3500000,
+    isPromo: true,
+    discountPercent: 28,
+    promoTag: "DISKON 28%",
     installationFee: 0,
     hasInstallationService: false,
     stock: 99,
@@ -129,14 +149,30 @@ function readProducts() {
     const parsed = JSON.parse(content);
     if (!Array.isArray(parsed)) return DEFAULT_PRODUCTS;
 
-    // Normalisasi field images (multi-image), brochureUrl, installationFee dan hasInstallationService
+    // Normalisasi field images (multi-image), brochureUrl, installationFee, hasInstallationService, dan Promo Diskon
     return parsed.map((p: any) => {
       const rawImages = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
       const primaryImg = p.image || (rawImages.length > 0 ? rawImages[0] : "");
       const finalImages = rawImages.length > 0 ? rawImages : (primaryImg ? [primaryImg] : []);
 
+      const curPrice = typeof p.price === "number" ? p.price : parseFloat(p.price) || 0;
+      const origPrice = typeof p.originalPrice === "number" && p.originalPrice > 0
+        ? p.originalPrice
+        : (p.originalPrice ? parseFloat(p.originalPrice) : undefined);
+      const isPromoActive = p.isPromo !== undefined
+        ? Boolean(p.isPromo)
+        : (origPrice !== undefined && origPrice > curPrice);
+      const discountPct = origPrice && origPrice > curPrice
+        ? Math.round(((origPrice - curPrice) / origPrice) * 100)
+        : (typeof p.discountPercent === "number" ? p.discountPercent : 0);
+
       return {
         ...p,
+        price: curPrice,
+        originalPrice: origPrice && origPrice > curPrice ? origPrice : (origPrice || undefined),
+        isPromo: isPromoActive,
+        discountPercent: discountPct,
+        promoTag: p.promoTag ? String(p.promoTag).trim() : (isPromoActive ? "PROMO SPESIAL" : ""),
         brand: p.brand || "",
         image: primaryImg,
         images: finalImages,
@@ -199,7 +235,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, category, subCategory, brand, price, costPrice, stock, commission, commissionType, desc, image, entityType } = body;
+    const { name, category, subCategory, brand, price, costPrice, originalPrice, isPromo, discountPercent, promoTag, stock, commission, commissionType, desc, image, entityType } = body;
 
     if (!name || name.trim() === "") {
       return NextResponse.json({ success: false, message: "Nama produk wajib diisi" }, { status: 400 });
@@ -210,6 +246,16 @@ export async function POST(req: Request) {
     const parsedCostPrice = costPrice !== undefined
       ? (typeof costPrice === "number" ? costPrice : parseFloat(costPrice) || 0)
       : 0;
+    const parsedOriginalPrice = originalPrice !== undefined && originalPrice !== "" && originalPrice !== null
+      ? (typeof originalPrice === "number" ? originalPrice : parseFloat(originalPrice) || 0)
+      : undefined;
+    const promoActive = isPromo !== undefined
+      ? Boolean(isPromo)
+      : (parsedOriginalPrice !== undefined && parsedOriginalPrice > parsedPrice);
+    const calculatedDiscount = parsedOriginalPrice && parsedOriginalPrice > parsedPrice
+      ? Math.round(((parsedOriginalPrice - parsedPrice) / parsedOriginalPrice) * 100)
+      : (typeof discountPercent === "number" ? discountPercent : 0);
+
     const parsedStock = typeof stock === "number" ? stock : parseInt(stock, 10) || 0;
     const commRate = typeof commission === "number" ? commission : parseInt(String(commission).replace(/[^0-9]/g, ""), 10) || 10;
     const parsedInstallationFee = body.installationFee !== undefined
@@ -233,6 +279,10 @@ export async function POST(req: Request) {
       brand: brand?.trim() || body.brand?.trim() || "",
       entityType: entityType === "NON_PT" ? "NON_PT" : "PT",
       price: parsedPrice,
+      originalPrice: parsedOriginalPrice && parsedOriginalPrice > parsedPrice ? parsedOriginalPrice : (parsedOriginalPrice || undefined),
+      isPromo: promoActive,
+      discountPercent: calculatedDiscount,
+      promoTag: promoTag ? String(promoTag).trim() : (promoActive ? "PROMO SPESIAL" : ""),
       costPrice: parsedCostPrice,
       installationFee: parsedInstallationFee,
       hasInstallationService: parsedHasInstallation,
@@ -269,7 +319,7 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, category, subCategory, brand, price, costPrice, stock, commission, commissionType, desc, image, unit, warehouseStock, entityType } = body;
+    const { id, name, category, subCategory, brand, price, costPrice, originalPrice, isPromo, discountPercent, promoTag, stock, commission, commissionType, desc, image, unit, warehouseStock, entityType } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, message: "ID produk wajib disertakan" }, { status: 400 });
@@ -286,6 +336,19 @@ export async function PUT(req: Request) {
     const parsedCostPrice = costPrice !== undefined
       ? (typeof costPrice === "number" ? costPrice : parseFloat(costPrice) || 0)
       : (products[index].costPrice ?? 0);
+
+    const parsedOriginalPrice = originalPrice !== undefined
+      ? (originalPrice !== "" && originalPrice !== null ? (typeof originalPrice === "number" ? originalPrice : parseFloat(originalPrice) || 0) : undefined)
+      : products[index].originalPrice;
+
+    const promoActive = isPromo !== undefined
+      ? Boolean(isPromo)
+      : (parsedOriginalPrice !== undefined && parsedOriginalPrice > parsedPrice);
+
+    const calculatedDiscount = parsedOriginalPrice && parsedOriginalPrice > parsedPrice
+      ? Math.round(((parsedOriginalPrice - parsedPrice) / parsedOriginalPrice) * 100)
+      : (discountPercent !== undefined ? (typeof discountPercent === "number" ? discountPercent : parseFloat(discountPercent) || 0) : (products[index].discountPercent || 0));
+
     const parsedStock = stock !== undefined ? (typeof stock === "number" ? stock : parseInt(stock, 10) || 0) : products[index].stock;
     const commRate = commission !== undefined ? (typeof commission === "number" ? commission : parseInt(String(commission).replace(/[^0-9]/g, ""), 10) || 10) : products[index].commissionRate;
 
@@ -308,6 +371,10 @@ export async function PUT(req: Request) {
       brand: brand !== undefined ? brand.trim() : (products[index].brand || ""),
       entityType: entityType === "NON_PT" || entityType === "PT" ? entityType : (products[index].entityType || "PT"),
       price: parsedPrice,
+      originalPrice: parsedOriginalPrice && parsedOriginalPrice > parsedPrice ? parsedOriginalPrice : (parsedOriginalPrice || undefined),
+      isPromo: promoActive,
+      discountPercent: calculatedDiscount,
+      promoTag: promoTag !== undefined ? String(promoTag).trim() : (products[index].promoTag || (promoActive ? "PROMO SPESIAL" : "")),
       costPrice: parsedCostPrice,
       installationFee: body.installationFee !== undefined
         ? (typeof body.installationFee === "number" ? body.installationFee : parseFloat(body.installationFee) || 0)
