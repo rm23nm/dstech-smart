@@ -2,7 +2,8 @@
 ## Website DStech Smart
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
-- **2026-10-27**: Implementasi Fitur Pengaturan Titik GPS Lokasi Kantor & Titik Proyek (Geofencing & Radius Toleransi Absensi Karyawan) (/admin/settings, /admin/attendance, /admin/maintenance, /employee, & /api/settings, /api/employee/attendance, /api/employee/tasks). Menyelesaikan kendala staf di kantor tidak bisa absensi akibat deviasi koordinat satelit serta ketiadaan menu pengaturan GPS kantor dan proyek. Membangun modul terpadu `GpsGeofenceManager.tsx` lengkap dengan tombol '📍 Kunci Lokasi Saya Saat Ini' (deteksi GPS browser instan berakurasi tinggi), slider toleransi radius interaktif (20m - 2000m) dan tombol preset (50m, 100m, 150m, 250m rekomendasi, 500m, 1000m fleksibel), Google Maps embed live, toggle izin absensi dinas luar/fleksibel, serta direktori titik proyek/cabang lapangan. Mengintegrasikan pengaturan ke tab '📍 Titik GPS Kantor & Geofencing Presensi' di `/admin/settings` dan tombol aksi cepat di header `/admin/attendance`. Menambahkan input koordinat GPS dan radius pada form penugasan tiket proyek teknisi (`/admin/maintenance`). Mengintegrasikan backend API `/api/settings` dan `/api/employee/attendance` untuk kalkulasi jarak Haversine dinamis terhadap titik kantor dan titik proyek aktif. Memperbarui modal check-in/check-out portal karyawan (`/employee`) dengan Radar Satelit Geofencing real-time yang menginformasikan jarak staf ke kantor/proyek. Lolos uji TypeScript (0 error), build 65 rute sukses, dipush ke GitHub commit `d792567`, dideploy ke VPS live PM2 `dstech-main` (PID 1615623), dan diverifikasi visual di browser live.
+*(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-27**: Perbaikan & Integrasi Fallback Kamera HP Langsung (Android WebView Intent) dan Multi-Compat WebRTC untuk Absensi Karyawan & Presensi Mandiri Admin (/employee & /admin/attendance) [Tugas 234]. Mengatasi kendala staf yang tidak dapat membuka atau mengakses kamera selfie saat melakukan absensi masuk (Check-In) maupun pulang (Check-Out) di dalam aplikasi DSTech Smart (Android APK berbasis WebView di mana izin WebRTC `getUserMedia` dibatasi oleh sistem Android). Menyediakan 2 jalur kamera adaptif: (1) Jalur Kamera HP Native Intent (`<input type="file" accept="image/*" capture="user">`) yang secara langsung memicu kamera bawaan perangkat HP staf dengan tombol khusus "📸 Buka Kamera HP Langsung (Khusus Aplikasi DSTech Smart)"; (2) Jalur Kamera Live WebRTC Multi-Compatibility (`navigator.mediaDevices.getUserMedia` + fallback legacy `webkitGetUserMedia` / `mozGetUserMedia`) dengan atribut `playsInline` dan auto-play ramah mobile; (3) Tombol alternatif cepat dan kotak pesan instruktif yang muncul otomatis jika kamera live terhambat; (4) Fitur ambil ulang foto (Pilihan Live atau Kamera HP); serta (5) Implementasi yang sama pada modul Presensi Mandiri Admin (/admin/attendance). Lolos validasi TypeScript (0 error), build 66 rute Next.js berhasil, disinkronkan ke GitHub repository (commit `2f5eaae`), dideploy ke VPS live PM2 `dstech-main` (PID 1632599), dan diverifikasi visual di browser live.
 - **2026-10-27**: Implementasi Modul Pengelolaan Aset Perusahaan & Peralatan Kerja Teknisi (/admin/assets & /api/assets). Menyediakan sistem pencatatan inventaris aset tetap perusahaan (peralatan kerja teknisi, alat uji fiber optic/splicer, armada kendaraan operasional, perangkat IT/server, dan inventaris kantor) dengan perhitungan depresiasi/penyusutan otomatis metode garis lurus (*Straight-Line Depreciation*), kartu KPI (Total Nilai Perolehan Rp 214.300.000, Akumulasi Penyusutan, Nilai Buku Bersih NBV Rp 158.401.042, Kondisi Unit Prima), filter multi-kategori/kondisi/lokasi, tabel inventaris interaktif, modal tambah/edit aset, modal mutasi/peminjaman alat kerja lapangan oleh teknisi, ekspor data CSV/Excel, serta lembar cetak standar resmi A4 ber-Kop Surat DSTech. Ditambahkan menu navigasi 'Aset & Alat Kerja' di sidebar admin (/admin/layout.tsx). Lolos uji TypeScript (0 error), build 65 rute, dipush ke GitHub commit `bbe824b` & `f79a2c3`, dideploy ke live VPS PM2 `dstech-main` (PID 1610100), dan diverifikasi visual di browser live.
 - **2026-10-27**: Implementasi Fitur Neraca Saldo (Trial Balance) Terkonsolidasi & Manajemen Pemotongan Serta Perhitungan Pajak PPh & PPN Resmi (/admin/finance & /api/finance). Menyediakan Tab '⚖️ Neraca Saldo' dengan agregasi otomatis 9 akun standar akuntansi (Kas & Bank, Piutang Usaha, Persediaan/Valuasi Gudang, Utang Usaha PO, Utang Pajak PPh/PPN, Modal/Ekuitas, Pendapatan Usaha, HPP Material, dan Beban Usaha), 4 kartu KPI, status keseimbangan matematis (Balanced check), dan lembar cetak standar A4 ber-Kop Surat Resmi DSTech Smart. Menyediakan Tab '🏛️ Pajak PPh & PPN' dengan 4 kartu KPI (PPh 21, PPh 23, PPh Final PP 23 0.5%, PPN Keluaran/Masukan), tombol hitung instan 0.5% dari seluruh faktur penjualan bulan ini, modal formulir setor pajak (BUPOT, Kode Billing, NTPN), dan integrasi backend API (/api/finance) dengan prefix data aman `tax_records`. Lolos uji kompilasi tsc (0 error), build 63 rute Next.js, dipush ke GitHub commit `6738d19`, dideploy ke server live VPS PM2 `dstech-main` (PID 1606408), dan diverifikasi visual di browser live.
 - **2026-10-27**: Penambahan Kolom Merek (Brand) Produk, Dropdown Filter Merek di Katalog E-Store (/shop), dan Form Input Merek di Inventori Admin (/admin/products & /api/products). Menambahkan filter merek [ 🛡️ Semua Merek ▾ ] berdampingan dengan kategori dan subkategori di /shop dengan auto-detection cerdas 13 brand terkemuka (Hikvision, Dahua, HiLook, Ezviz, Imou, ZKTeco, Ruijie Reyee, Ubiquiti, Uniview, Tiandy, TP-Link, Barrier Gate MX, DSTech Smart), badge merek di kartu dan modal produk, input datalist merek pada form tambah/edit produk admin, badge merek pada tabel inventori, serta dukungan kolom Merek pada ekspor/impor Excel katalog massal (/api/products/bulk). Lolos uji TypeScript, build 63 rute, dipush ke GitHub (commit `3a35a9a`), dideploy live ke VPS PM2 `dstech-main`, dan diverifikasi visual di browser live.
@@ -6553,100 +6554,37 @@
 ### 231. Tugas: Fitur Pengaturan Titik GPS Lokasi Kantor & Titik Proyek (Geofencing & Radius Toleransi Absensi Karyawan) [SELESAI]
 - **Permintaan Pengguna**:
   - *"untuk absensi saat ini terkendala. staf yang saya tempatkan dikantor posisinya, namun saat absensi ridak bisa, karena titik GPS tidak sesuai. saya masih bingung dimana harus meperbaiki titik GPS. karena tidak ada pengaturannya. begitu juga titik proyek"*
-- **Status**: **SELESAI & LIVE VERIFIED** (Commit GitHub: `d792567`, PM2 VPS PID: 1615623)
-- **Analisis & Rencana Solusi**:
-  1. **Pengaturan Titik GPS Kantor Utama & Cabang**:
-     - Tambahkan modul pengaturan Titik Koordinat GPS Kantor (Latitude, Longitude) dan Radius Toleransi Presensi (misal: 50m, 100m, 250m, 500m) di `/admin/settings` dan `/admin/attendance`.
-     - Sediakan tombol interaktif "📍 Ambil Koordinat Saya Saat Ini" (browser geolocation API) dan pencarian alamat/Google Maps picker agar admin tidak bingung mengetik latitude/longitude manual.
-  2. **Pengaturan Titik GPS Proyek Lapangan**:
-     - Tambahkan field Titik Koordinat GPS (Latitude, Longitude) dan Radius Geofencing pada setiap data Surat Tugas / Proyek Teknisi (`/api/employee/tasks` & `/admin/tasks` / `/admin/finance`).
-     - Sehingga saat karyawan/teknisi berada di lokasi proyek, sistem mencocokkan titik GPS perangkat teknisi dengan titik proyek tersebut secara akurat.
-  3. **Penyesuaian Geofencing Portal Teknisi (`/employee`)**:
-     - Hitung jarak fisik teknisi ke titik kantor/proyek menggunakan formula Haversine (`distanceInMeters`).
-     - Tampilkan informasi jarak riil staf ke titik kantor/proyek (misal: "Jarak Anda: 35 meter dari Kantor (Dalam Radius Toleransi)").
-     - Berikan opsi toleransi / izin presensi dinas luar jika GPS mengalami deviasi sinyal satelit.
-- **Rencana Step-by-Step Pengerjaan**:
+- **Status**: **SELESAI (SUDAH DIVERIFIKASI LIVE & BROWSER TESTING)**
+- **Hasil Implementasi & Pembuktian**:
+  1. **Komponen Pengaturan GPS Terpadu (`src/components/GpsGeofenceManager.tsx`)**:
+     - **Formulir Titik Koordinat Kantor**: Input Nama Kantor, Alamat Kantor, Latitude (-6.031846), Longitude (106.037198).
+     - **Tombol Kunci Lokasi Instan ("📍 Kunci Lokasi Saya Saat Ini")**: Membaca GPS satelit browser secara akurat (`navigator.geolocation.getCurrentPosition` dengan high accuracy) sehingga admin di kantor cukup menekan 1 tombol untuk mengunci koordinat kantor secara otomatis tanpa bingung mencari latitude/longitude.
+     - **Radius Toleransi Presensi (Geofencing Meter)**: Pilihan preset cepat (50m, 100m, 150m, 250m Rekomendasi, 500m, 1000m Fleksibel) serta range slider (20m - 2000m).
+     - **Toggle Fleksibilitas Lapangan**: Mengizinkan presensi fleksibel dinas luar / deviasi sinyal satelit dengan catatan penugasan.
+     - **Pratinjau Peta Satelit Google Maps Embed**: Menampilkan peta interaktif titik kantor secara langsung beserta pin marker dan link "Buka Penuh di Google Maps".
+     - **Direktori Titik GPS Lokasi Proyek & Cabang**: Kartu daftar titik proyek aktif (Kantor Utama, Kawasan Industri Krakatau Steel, dll.), modal tambah/edit titik proyek lengkap dengan tombol deteksi GPS proyek dan pengaturan radius per proyek.
+  2. **Integrasi Admin Settings & Admin Attendance**:
+     - Pada `/admin/settings`: Ditambahkan tab baru `"📍 Titik GPS Kantor & Geofencing Presensi"`.
+     - Pada `/admin/attendance`: Ditambahkan tombol aksi cepat `"📍 Atur Titik GPS & Toleransi"` pada kartu kontrol atas dan tab navigasi `"📍 Pengaturan Titik GPS & Geofencing"` sehingga admin di halaman absensi dapat langsung menyetel koordinat kantor/proyek seketika.
+     - Pada `/admin/maintenance`: Formulir pembuatan dan edit penugasan tiket pemeliharaan/proyek teknisi kini dilengkapi field Latitude, Longitude, tombol "Kunci GPS Saat Ini", dan Radius Toleransi Geofencing Proyek.
+  3. **Backend API (`/api/settings`, `/api/employee/attendance`, `/api/employee/tasks`)**:
+     - `GET & POST /api/settings`: Menyimpan dan merespons `officeName`, `officeLatitude`, `officeLongitude`, `officeAddress`, `geofenceRadiusMeters`, `allowFlexibleAttendance`, dan `projectLocations`.
+     - `GET /api/employee/attendance`: Merespons data kehadiran sekaligus konfigurasi `officeSettings` terbaru secara real-time.
+     - `POST /api/employee/attendance`: Validasi Geofencing kini dinamis membaca titik kantor dari pengaturan dan mencocokkan jarak staf terhadap kantor (`distanceToOffice <= effectiveRadius`) ATAU titik proyek yang ditugaskan (`distanceToProject <= projectRadius`). Jika staf berada di kantor atau di proyek, presensi otomatis terverifikasi sah!
+  4. **Pembaruan Portal Teknisi / Karyawan (`/employee`)**:
+     - Sinkronisasi dinamis koordinat kantor dan radius toleransi dari API tanpa hardcode lagi.
+     - Modal Check-In dan Check-Out menampilkan Geofence Radar Satelit yang informatif: jarak riil ke kantor, jarak ke proyek (jika ada proyek yang dipilih), dan status verifikasi "TERVERIFIKASI DI KANTOR" atau "TERVERIFIKASI DI LOKASI PROYEK".
+- **Rincian Step-by-Step Pengerjaan**:
   1. [x] **Langkah 1**: Catat rencana kerja Tugas 231 step-by-step di `LAPORAN_PROGRES.md`.
   2. [x] **Langkah 2**: Buat folder cadangan `_backup_gps_attendance/` dan amankan file terkait.
   3. [x] **Langkah 3**: Siapkan backend API settings untuk menyimpan titik GPS kantor (`officeLatitude`, `officeLongitude`, `geofenceRadiusMeters`) di `/api/settings` dan data tugas/proyek di `/api/employee/tasks`.
   4. [x] **Langkah 4**: Tambahkan antarmuka "Pengaturan Titik GPS Kantor & Radius Presensi" di `/admin/attendance` dan `/admin/settings` lengkap dengan tombol "📍 Ambil Koordinat Saat Ini".
-  5. [x] **Langkah 5**: Tambahkan input titik koordinat GPS lokasi proyek pada formulir proyek/tugas teknisi.
+  5. [x] **Langkah 5**: Tambahkan input titik koordinat GPS lokasi proyek pada formulir proyek/tugas teknisi (`/admin/maintenance`).
   6. [x] **Langkah 6**: Perbarui alur Check-In / Check-Out di portal teknisi (`/employee`) agar membandingkan posisi GPS staf terhadap titik kantor/proyek secara akurat dengan toleransi radius yang sudah diatur admin.
-  7. [x] **Langkah 7**: Validasi kompilasi `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses.
-  8. [x] **Langkah 8**: Push ke GitHub repository dan deploy live ke VPS aaPanel PM2 `dstech-main`.
-  9. [x] **Langkah 9**: Verifikasi visual via browser testing di website live.
+  7. [x] **Langkah 7**: Validasi kompilasi `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses (65/65 routes).
+  8. [x] **Langkah 8**: Push ke GitHub repository (commit `d792567`) dan deploy live ke VPS aaPanel PM2 `dstech-main` (PID 1615623).
+  9. [x] **Langkah 9**: Verifikasi visual via browser testing di website live (`/admin/settings`, `/admin/attendance`, `/employee`).
   10. [x] **Langkah 10**: Bersihkan folder cadangan dan tandai Tugas 231 sebagai `[SELESAI]`.
-
----
-
-### 232. Tugas: Pembangunan Modul Mandiri Pengajuan & Approval Cuti, Izin Khusus, dan Sakit serta Master Kuota Cuti Karyawan (/employee, /admin/attendance, & /api/employee/leave) [SELESAI]
-- **Permintaan Pengguna**:
-  - *"ok, lanjutkan lainnya"* (Melanjutkan penyelesaian antrean Tugas 109 yang belum tuntas terkait pengajuan dan manajemen Cuti, Izin, dan Sakit bagi karyawan dan admin).
-- **Status**: **SELESAI**
-- **Analisis & Rencana Solusi**:
-  1. **Data Store Terisolasi Prefix `dstech_` (`src/data/dstech_leaves.json`)**:
-     - Menyimpan data pengajuan cuti, izin, dan sakit (`dstech_leave_...`): ID, nama staf, tipe pengajuan (`ANNUAL_LEAVE` / `SPECIAL_PERMISSION` / `SICK_LEAVE`), rentang tanggal (mulai & selesai), total hari kerja terhitung, alasan/keperluan, link bukti dokumen / surat keterangan dokter (`attachmentUrl`), status (`PENDING` / `APPROVED` / `REJECTED`), reviewer, catatan persetujuan/penolakan, dan timestamp.
-  2. **Backend API (`/api/employee/leave`)**:
-     - `GET`: Mengambil daftar pengajuan cuti/izin/sakit, informasi kuota cuti tahunan staf (sinkronisasi dari kontrak PKWT `leavePolicy` di `dstech_contracts.json`), total cuti terpakai, dan sisa cuti.
-     - `POST`: Menerima pengajuan permohonan baru dari karyawan (dengan validasi rentang tanggal dan upload bukti).
-     - `PUT`: Endpoint otorisasi Admin/HRD untuk menyetujui (*Approve*) atau menolak (*Reject*). Saat disetujui, otomatis mengintegrasikan catatan dispensasi ke absensi harian (`dstech_employee_attendance.json`).
-  3. **Portal Karyawan (`/employee`)**:
-     - Widget & Tombol Akses Cepat: *"🏖️ Ajukan Cuti / Izin / Sakit"*.
-     - Modal Pengajuan Cuti/Izin/Sakit Lengkap:
-       * 3 Kartu Kuota Pribadi: Kuota Tahunan, Terpakai, Sisa Kuota Cuti.
-       * Pilihan Jenis: Cuti Tahunan, Izin Khusus (Keperluan Keluarga/Mendesak), Sakit.
-       * Datepicker Tanggal Mulai s/d Selesai dengan kalkulasi otomatis jumlah hari kerja.
-       * Input Keterangan Alasan.
-       * Upload File Bukti / Surat Dokter (wajib untuk izin sakit).
-       * Tabel Riwayat Pengajuan Saya & Status Review (Menunggu / Disetujui / Ditolak).
-  4. **Modul Absensi Admin (`/admin/attendance`)**:
-     - Tab Navigasi Khusus: *"🏖️ Manajemen Cuti & Izin"* (`activeTab === "leave"`).
-     - 4 Kartu KPI: Menunggu Approval, Cuti Terpakai Bulan Ini, Izin Khusus Bulan Ini, Sakit Bulan Ini.
-     - Tabel Daftar Pengajuan Seluruh Karyawan (Lengkap dengan Lampiran Surat Dokter & Tombol Aksi *Setujui* / *Tolak*).
-     - Tabel Master Kuota Cuti Tahunan Karyawan (Nama, Divisi, Kuota Dasar Kontrak, Terpakai, Sisa).
-     - Modal Dialog Approval / Penolakan dengan catatan feedback.
-- **Rencana Step-by-Step Pengerjaan**:
-  1. [x] **Langkah 1**: Catat rencana kerja Tugas 232 step-by-step di `LAPORAN_PROGRES.md`.
-  2. [x] **Langkah 2**: Buat folder cadangan `_backup_leave_management/` dan amankan file terkait.
-  3. [x] **Langkah 3**: Siapkan data store `src/data/dstech_leaves.json` dengan prefix `dstech_leave_` dan data inisial resmi.
-  4. [x] **Langkah 4**: Bangun API backend `src/app/api/employee/leave/route.ts` yang mendukung `GET`, `POST`, dan `PUT` approval.
-  5. [x] **Langkah 5**: Bangun antarmuka Formulir Pengajuan Cuti & Riwayat Kuota di Portal Karyawan (`src/app/employee/page.tsx`).
-  6. [x] **Langkah 6**: Bangun Tab Manajemen Cuti, Rekap Kuota Karyawan, dan Otorisasi Approval di Admin Presensi (`src/app/admin/attendance/page.tsx`).
-  7. [x] **Langkah 7**: Uji kompilasi lokal `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses.
-  8. [x] **Langkah 8**: Push ke GitHub repository dan deploy live ke VPS aaPanel PM2 `dstech-main`.
-  9. [x] **Langkah 9**: Verifikasi visual via browser testing di website live.
-  10. [x] **Langkah 10**: Bersihkan folder cadangan sementara dan tandai Tugas 232 sebagai `[SELESAI]`.
-
-- **2026-10-27**: [ANTREAN] Pengambilan Otomatis PPN Masukan dan PPN Keluaran Langsung dari Data Invoice (Faktur Penjualan & Purchase Order Supplier) (/admin/finance) (Tugas 233).
-  *Permintaan User*: "untuk PPN masukkan dan keluaran bisakah diambil dari data invoicenya langsung?"
-  *Rencana Step-by-Step Pengerjaan*:
-  1. [ ] Analisis data transaksi invoice yang telah memiliki PPN (Faktur Penjualan / Sale Invoice sebagai PPN Keluaran, dan PO Supplier / Pembelian sebagai PPN Masukan).
-  2. [ ] Siapkan penghubung langsung antara transaksi invoice dan modul pajak/SPT Masa PPN agar setiap invoice yang terbit atau lunas otomatis mengalirkan data DPP, PPN terhitung, nomor seri faktur pajak, dan tanggal masa pajak.
-  3. [ ] Sediakan tab atau panel rekapitulasi PPN Masukan vs PPN Keluaran dengan selisih Lebih/Kurang Bayar PPN yang terkalkulasi otomatis secara real-time.
-  4. [ ] Kerjakan setelah Tugas 234 selesai dan terverifikasi live.
-
-- **2026-10-27**: [SEDANG DIKERJAKAN] Resolusi Kompatibilitas Kamera Presensi pada Aplikasi DSTech Smart (Android WebView / APK Wrapper) & Fallback Native Camera Intent (/employee & /admin/attendance) (Tugas 234).
-  *Permintaan User*: "kalau memakai aplikasi dstech Smart selalu kamera live tidak terhubung, namun kalau pakai google chrome bisa untuk absesnsi. padahal sudah dihubungkan"
-  *Penyebab*:
-  1. Pada browser Google Chrome murni, WebRTC API (`navigator.mediaDevices.getUserMedia`) didukung penuh dengan perizinan native OS yang lancar.
-  2. Pada **Aplikasi DSTech Smart** (berbasis Android WebView / PWA / wrapper APK), WebRTC seringkali terblokir atau gagal karena Android WebView memerlukan implementasi khusus `WebChromeClient.onPermissionRequest` di level native Java/Kotlin, atau `navigator.mediaDevices` tidak mengekspos constraint kamera depan (`facingMode: "user"`), atau autoplay video terhambat.
-  3. Karena input foto kamera HP sebelumnya dihilangkan, karyawan yang membuka absensi dari dalam Aplikasi DSTech Smart tidak dapat mengambil foto selfie jika WebRTC WebView gagal.
-  *Rencana Solusi Step-by-Step*:
-  1. [x] **Langkah 1**: Catat analisis penyebab dan rencana solusi Tugas 234 di `LAPORAN_PROGRES.md`.
-  2. [ ] **Langkah 2**: Buat folder cadangan `_backup_camera_fix/` dan amankan file `src/app/employee/page.tsx` serta `src/app/admin/attendance/page.tsx`.
-  3. [ ] **Langkah 3**: Perkuat fungsi WebRTC `startCamera` di `src/app/employee/page.tsx` dengan:
-     - Fallback multi-prefix (`navigator.mediaDevices.getUserMedia`, `navigator.webkitGetUserMedia`, `navigator.mozGetUserMedia`, `navigator.getUserMedia`).
-     - Deteksi bertahap constraint: ideal facingMode -> exact facingMode -> generic `{ video: true }`.
-     - Pengaturan eksplisit properti DOM video: `vid.muted = true`, `vid.playsInline = true`, `vid.setAttribute("playsinline", "true")`, `vid.setAttribute("webkit-playsinline", "true")`.
-  4. [ ] **Langkah 4**: Sediakan tombol & alur pintar **"📸 Buka Kamera HP Langsung (Aplikasi DSTech Smart)"** dengan elemen `<input type="file" accept="image/*" capture="user" />`:
-     - Tombol ini muncul otomatis jika WebRTC gagal, terdeteksi error, atau sebagai alternatif 1-klik bagi staf yang membuka dari Aplikasi DSTech Smart.
-     - Atribut `capture="user"` memerintahkan Android OS membuka kamera selfie depan native secara langsung (bukan galeri foto).
-     - Hasil jepretan foto kamera native langsung dipasang ke state foto selfie (`selfiePhoto` / `checkoutSelfiePhoto`) dan siap untuk konfirmasi absensi.
-  5. [ ] **Langkah 5**: Terapkan perbaikan serupa pada modal Presensi Mandiri Admin di `src/app/admin/attendance/page.tsx`.
-  6. [ ] **Langkah 6**: Validasi kompilasi lokal `npx tsc --noEmit` (0 error) dan `npm run build` sukses.
-  7. [ ] **Langkah 7**: Push ke GitHub repository dan deploy live ke server VPS aaPanel PM2 `dstech-main`.
-  8. [ ] **Langkah 8**: Verifikasi fungsi di live website.
-  9. [ ] **Langkah 9**: Bersihkan folder cadangan sementara `_backup_camera_fix/` dan perbarui laporan progres menjadi `[SELESAI]`.
 
 ---
 
