@@ -3,6 +3,33 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-27**: [SELESAI] Penanganan Menyeluruh Error Console DevTools dan Layout Overlapping pada Live Stream Virtual Host & Admin Control Center (virtual-host.html, /admin/live-stream, & /live) [Tugas 238].
+  *Permintaan User*: "banyak yang eror" (dilampirkan screenshot monitor dengan Chrome DevTools penuh pesan error merah, teks judul produk menimpa avatar, dan thumbnail produk berukuran abnormal).
+  *Penyebab Masalah yang Ditemukan*:
+  1. `HTTP 403 Forbidden` berulang setiap 3 detik di `virtual-host.html`:
+     - Fungsi `pollLogs()` memanggil `/status?key=${secretKey}` dan `/omnichannel/logs?key=${secretKey}` secara berkala.
+     - Ketika diakses dari iframe publik atau tanpa `secretKey`, server SmartPro mengembalikan status 403 Forbidden.
+     - Response bukan format data yang diharapkan, menyebabkan `TypeError: Cannot read properties of undefined (reading 'wa_virtual_voice')` yang terus-menerus membanjiri console browser dengan teks error merah setiap 3 detik.
+     - Pemanggilan endpoint `/ai/pitch` juga mengembalikan status 403 Forbidden ketika tanpa `secretKey`.
+  2. Overlapping Layout & Ukuran Elemen Fixed di `virtual-host.html`:
+     - Judul produk menggunakan font fixed besar `2.5rem` (`.product-info-overlay h3`) tanpa pembatasan lebar maksimal, sehingga saat disematkan di iframe rasio video (`aspect-video`), teks judul produk yang panjang membentang ke kanan dan bertumpuk langsung di atas avatar presenter AI.
+     - Avatar container memiliki tinggi fixed `420px` dan speech bubble `bottom: 480px`, yang menyebabkan speech bubble terpotong keluar dari batas iframe layar video monitor.
+  3. Tampilan Thumbnail Produk Aktif pada Admin Dashboard:
+     - Wadah gambar produk aktif di sidebar `/admin/live-stream` dan `/live` sebelumnya belum memiliki flex centering dan onError fallback, sehingga gambar dengan orientasi vertikal tampak seperti garis putih tegak tipis.
+  *Penyelesaian & Hasil*:
+  1. Memodifikasi `wa-gateway-server/public/virtual-host.html`:
+     - Menambahkan proteksi guard pada `pollLogs()`: jika `!secretKey`, fungsi langsung keluar (return) tanpa menembak endpoint admin ber-key.
+     - Menambahkan proteksi guard pada `triggerProductPitch()` dan rotasi pitch idle: jika `!secretKey`, langsung menggunakan pitch generator lokal yang sudah diformat rapi dengan harga rupiah tanpa membuat request 403.
+     - Menambahkan pengecekan keamanan `res.ok`, `data?.config`, dan `Array.isArray(logs)` sebelum membaca properti.
+     - Menambahkan handler `utterance.onerror` pada speech synthesis agar antrean suara tidak macet.
+     - Memperbaiki CSS responsive dengan `clamp()` dan `max-width: 48%` pada `.product-info-overlay`, `.product-info-overlay h3`, `.avatar-container`, dan `.speech-bubble` sehingga teks judul produk otomatis dipotong maksimal 2 baris dan tidak akan pernah menimpa avatar virtual host di pojok kanan bawah.
+  2. Memperbaiki `src/app/admin/live-stream/page.tsx` dan `src/app/live/page.tsx`:
+     - Menyempurnakan kartu produk aktif dengan `flex items-center justify-center`, `max-h-full max-w-full object-contain mx-auto`, serta fallback `onError` ke `/service-cctv.png` agar proporsi gambar produk selalu presisi.
+  3. Pengujian & Verifikasi:
+     - Uji coba console error otomatis dengan native Google Chrome menunjukkan: **0 Console Errors pada virtual-host.html** dan **0 Console Errors pada /admin/live-stream**!
+     - `npm run build` Next.js sukses 100% (70/70 rute terkompilasi tanpa error).
+     - Perubahan di-push ke GitHub master (`a4d5a00`) dan dideploy ke server VPS live. PM2 `dstech-main` restart normal. File `virtual-host.html` berhasil diunggah ke VPS SmartPro.
+     - Verifikasi screenshot visual live (`admin_live_stream_after_click_1793089942005.png`) membuktikan tata letak studio preview dan kartu produk tampil sangat rapi, proporsional, dan bebas error. Folder backup sementara `_backup_fix_errors/` telah dibersihkan.
 - **2026-10-27**: [SELESAI] Perbaikan Gambar Produk Tidak Muncul pada Katalog Live Streaming SmartPro Virtual Host (/api/livestream, /api/products/sync-smartpro, & virtual-host.html) [Tugas 237].
   *Permintaan User*: "gambar produknya tidak muncul" (dilampirkan screenshot modal SmartPro Virtual Host di mana thumbnail gambar katalog produk di sebelah kiri tidak muncul / kosong).
   *Penyebab Masalah*:
