@@ -2,7 +2,7 @@
 ## Website DStech Smart
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
-*(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-27**: Implementasi Fitur Pengaturan Titik GPS Lokasi Kantor & Titik Proyek (Geofencing & Radius Toleransi Absensi Karyawan) (/admin/settings, /admin/attendance, /admin/maintenance, /employee, & /api/settings, /api/employee/attendance, /api/employee/tasks). Menyelesaikan kendala staf di kantor tidak bisa absensi akibat deviasi koordinat satelit serta ketiadaan menu pengaturan GPS kantor dan proyek. Membangun modul terpadu `GpsGeofenceManager.tsx` lengkap dengan tombol '📍 Kunci Lokasi Saya Saat Ini' (deteksi GPS browser instan berakurasi tinggi), slider toleransi radius interaktif (20m - 2000m) dan tombol preset (50m, 100m, 150m, 250m rekomendasi, 500m, 1000m fleksibel), Google Maps embed live, toggle izin absensi dinas luar/fleksibel, serta direktori titik proyek/cabang lapangan. Mengintegrasikan pengaturan ke tab '📍 Titik GPS Kantor & Geofencing Presensi' di `/admin/settings` dan tombol aksi cepat di header `/admin/attendance`. Menambahkan input koordinat GPS dan radius pada form penugasan tiket proyek teknisi (`/admin/maintenance`). Mengintegrasikan backend API `/api/settings` dan `/api/employee/attendance` untuk kalkulasi jarak Haversine dinamis terhadap titik kantor dan titik proyek aktif. Memperbarui modal check-in/check-out portal karyawan (`/employee`) dengan Radar Satelit Geofencing real-time yang menginformasikan jarak staf ke kantor/proyek. Lolos uji TypeScript (0 error), build 65 rute sukses, dipush ke GitHub commit `d792567`, dideploy ke VPS live PM2 `dstech-main` (PID 1615623), dan diverifikasi visual di browser live.
 - **2026-10-27**: Implementasi Modul Pengelolaan Aset Perusahaan & Peralatan Kerja Teknisi (/admin/assets & /api/assets). Menyediakan sistem pencatatan inventaris aset tetap perusahaan (peralatan kerja teknisi, alat uji fiber optic/splicer, armada kendaraan operasional, perangkat IT/server, dan inventaris kantor) dengan perhitungan depresiasi/penyusutan otomatis metode garis lurus (*Straight-Line Depreciation*), kartu KPI (Total Nilai Perolehan Rp 214.300.000, Akumulasi Penyusutan, Nilai Buku Bersih NBV Rp 158.401.042, Kondisi Unit Prima), filter multi-kategori/kondisi/lokasi, tabel inventaris interaktif, modal tambah/edit aset, modal mutasi/peminjaman alat kerja lapangan oleh teknisi, ekspor data CSV/Excel, serta lembar cetak standar resmi A4 ber-Kop Surat DSTech. Ditambahkan menu navigasi 'Aset & Alat Kerja' di sidebar admin (/admin/layout.tsx). Lolos uji TypeScript (0 error), build 65 rute, dipush ke GitHub commit `bbe824b` & `f79a2c3`, dideploy ke live VPS PM2 `dstech-main` (PID 1610100), dan diverifikasi visual di browser live.
 - **2026-10-27**: Implementasi Fitur Neraca Saldo (Trial Balance) Terkonsolidasi & Manajemen Pemotongan Serta Perhitungan Pajak PPh & PPN Resmi (/admin/finance & /api/finance). Menyediakan Tab '⚖️ Neraca Saldo' dengan agregasi otomatis 9 akun standar akuntansi (Kas & Bank, Piutang Usaha, Persediaan/Valuasi Gudang, Utang Usaha PO, Utang Pajak PPh/PPN, Modal/Ekuitas, Pendapatan Usaha, HPP Material, dan Beban Usaha), 4 kartu KPI, status keseimbangan matematis (Balanced check), dan lembar cetak standar A4 ber-Kop Surat Resmi DSTech Smart. Menyediakan Tab '🏛️ Pajak PPh & PPN' dengan 4 kartu KPI (PPh 21, PPh 23, PPh Final PP 23 0.5%, PPN Keluaran/Masukan), tombol hitung instan 0.5% dari seluruh faktur penjualan bulan ini, modal formulir setor pajak (BUPOT, Kode Billing, NTPN), dan integrasi backend API (/api/finance) dengan prefix data aman `tax_records`. Lolos uji kompilasi tsc (0 error), build 63 rute Next.js, dipush ke GitHub commit `6738d19`, dideploy ke server live VPS PM2 `dstech-main` (PID 1606408), dan diverifikasi visual di browser live.
 - **2026-10-27**: Penambahan Kolom Merek (Brand) Produk, Dropdown Filter Merek di Katalog E-Store (/shop), dan Form Input Merek di Inventori Admin (/admin/products & /api/products). Menambahkan filter merek [ 🛡️ Semua Merek ▾ ] berdampingan dengan kategori dan subkategori di /shop dengan auto-detection cerdas 13 brand terkemuka (Hikvision, Dahua, HiLook, Ezviz, Imou, ZKTeco, Ruijie Reyee, Ubiquiti, Uniview, Tiandy, TP-Link, Barrier Gate MX, DSTech Smart), badge merek di kartu dan modal produk, input datalist merek pada form tambah/edit produk admin, badge merek pada tabel inventori, serta dukungan kolom Merek pada ekspor/impor Excel katalog massal (/api/products/bulk). Lolos uji TypeScript, build 63 rute, dipush ke GitHub (commit `3a35a9a`), dideploy live ke VPS PM2 `dstech-main`, dan diverifikasi visual di browser live.
@@ -6550,10 +6550,10 @@
 
 ---
 
-### 231. Tugas: Fitur Pengaturan Titik GPS Lokasi Kantor & Titik Proyek (Geofencing & Radius Toleransi Absensi Karyawan) [SEDANG DIKERJAKAN]
+### 231. Tugas: Fitur Pengaturan Titik GPS Lokasi Kantor & Titik Proyek (Geofencing & Radius Toleransi Absensi Karyawan) [SELESAI]
 - **Permintaan Pengguna**:
   - *"untuk absensi saat ini terkendala. staf yang saya tempatkan dikantor posisinya, namun saat absensi ridak bisa, karena titik GPS tidak sesuai. saya masih bingung dimana harus meperbaiki titik GPS. karena tidak ada pengaturannya. begitu juga titik proyek"*
-- **Status**: **SEDANG DIKERJAKAN**
+- **Status**: **SELESAI & LIVE VERIFIED** (Commit GitHub: `d792567`, PM2 VPS PID: 1615623)
 - **Analisis & Rencana Solusi**:
   1. **Pengaturan Titik GPS Kantor Utama & Cabang**:
      - Tambahkan modul pengaturan Titik Koordinat GPS Kantor (Latitude, Longitude) dan Radius Toleransi Presensi (misal: 50m, 100m, 250m, 500m) di `/admin/settings` dan `/admin/attendance`.
@@ -6567,15 +6567,63 @@
      - Berikan opsi toleransi / izin presensi dinas luar jika GPS mengalami deviasi sinyal satelit.
 - **Rencana Step-by-Step Pengerjaan**:
   1. [x] **Langkah 1**: Catat rencana kerja Tugas 231 step-by-step di `LAPORAN_PROGRES.md`.
-  2. [ ] **Langkah 2**: Buat folder cadangan `_backup_gps_attendance/` dan amankan file terkait.
-  3. [ ] **Langkah 3**: Siapkan backend API settings untuk menyimpan titik GPS kantor (`officeLatitude`, `officeLongitude`, `geofenceRadiusMeters`) di `/api/settings` dan data tugas/proyek di `/api/employee/tasks`.
-  4. [ ] **Langkah 4**: Tambahkan antarmuka "Pengaturan Titik GPS Kantor & Radius Presensi" di `/admin/attendance` dan `/admin/settings` lengkap dengan tombol "📍 Ambil Koordinat Saat Ini".
-  5. [ ] **Langkah 5**: Tambahkan input titik koordinat GPS lokasi proyek pada formulir proyek/tugas teknisi.
-  6. [ ] **Langkah 6**: Perbarui alur Check-In / Check-Out di portal teknisi (`/employee`) agar membandingkan posisi GPS staf terhadap titik kantor/proyek secara akurat dengan toleransi radius yang sudah diatur admin.
-  7. [ ] **Langkah 7**: Validasi kompilasi `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses.
+  2. [x] **Langkah 2**: Buat folder cadangan `_backup_gps_attendance/` dan amankan file terkait.
+  3. [x] **Langkah 3**: Siapkan backend API settings untuk menyimpan titik GPS kantor (`officeLatitude`, `officeLongitude`, `geofenceRadiusMeters`) di `/api/settings` dan data tugas/proyek di `/api/employee/tasks`.
+  4. [x] **Langkah 4**: Tambahkan antarmuka "Pengaturan Titik GPS Kantor & Radius Presensi" di `/admin/attendance` dan `/admin/settings` lengkap dengan tombol "📍 Ambil Koordinat Saat Ini".
+  5. [x] **Langkah 5**: Tambahkan input titik koordinat GPS lokasi proyek pada formulir proyek/tugas teknisi.
+  6. [x] **Langkah 6**: Perbarui alur Check-In / Check-Out di portal teknisi (`/employee`) agar membandingkan posisi GPS staf terhadap titik kantor/proyek secara akurat dengan toleransi radius yang sudah diatur admin.
+  7. [x] **Langkah 7**: Validasi kompilasi `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses.
+  8. [x] **Langkah 8**: Push ke GitHub repository dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  9. [x] **Langkah 9**: Verifikasi visual via browser testing di website live.
+  10. [x] **Langkah 10**: Bersihkan folder cadangan dan tandai Tugas 231 sebagai `[SELESAI]`.
+
+---
+
+### 232. Tugas: Pembangunan Modul Mandiri Pengajuan & Approval Cuti, Izin Khusus, dan Sakit serta Master Kuota Cuti Karyawan (/employee, /admin/attendance, & /api/employee/leave) [SEDANG DIKERJAKAN]
+- **Permintaan Pengguna**:
+  - *"ok, lanjutkan lainnya"* (Melanjutkan penyelesaian antrean Tugas 109 yang belum tuntas terkait pengajuan dan manajemen Cuti, Izin, dan Sakit bagi karyawan dan admin).
+- **Status**: **SEDANG DIKERJAKAN**
+- **Analisis & Rencana Solusi**:
+  1. **Data Store Terisolasi Prefix `dstech_` (`src/data/dstech_leaves.json`)**:
+     - Menyimpan data pengajuan cuti, izin, dan sakit (`dstech_leave_...`): ID, nama staf, tipe pengajuan (`ANNUAL_LEAVE` / `SPECIAL_PERMISSION` / `SICK_LEAVE`), rentang tanggal (mulai & selesai), total hari kerja terhitung, alasan/keperluan, link bukti dokumen / surat keterangan dokter (`attachmentUrl`), status (`PENDING` / `APPROVED` / `REJECTED`), reviewer, catatan persetujuan/penolakan, dan timestamp.
+  2. **Backend API (`/api/employee/leave`)**:
+     - `GET`: Mengambil daftar pengajuan cuti/izin/sakit, informasi kuota cuti tahunan staf (sinkronisasi dari kontrak PKWT `leavePolicy` di `dstech_contracts.json`), total cuti terpakai, dan sisa cuti.
+     - `POST`: Menerima pengajuan permohonan baru dari karyawan (dengan validasi rentang tanggal dan upload bukti).
+     - `PUT`: Endpoint otorisasi Admin/HRD untuk menyetujui (*Approve*) atau menolak (*Reject*). Saat disetujui, otomatis mengintegrasikan catatan dispensasi ke absensi harian (`dstech_employee_attendance.json`).
+  3. **Portal Karyawan (`/employee`)**:
+     - Widget & Tombol Akses Cepat: *"🏖️ Ajukan Cuti / Izin / Sakit"*.
+     - Modal Pengajuan Cuti/Izin/Sakit Lengkap:
+       * 3 Kartu Kuota Pribadi: Kuota Tahunan, Terpakai, Sisa Kuota Cuti.
+       * Pilihan Jenis: Cuti Tahunan, Izin Khusus (Keperluan Keluarga/Mendesak), Sakit.
+       * Datepicker Tanggal Mulai s/d Selesai dengan kalkulasi otomatis jumlah hari kerja.
+       * Input Keterangan Alasan.
+       * Upload File Bukti / Surat Dokter (wajib untuk izin sakit).
+       * Tabel Riwayat Pengajuan Saya & Status Review (Menunggu / Disetujui / Ditolak).
+  4. **Modul Absensi Admin (`/admin/attendance`)**:
+     - Tab Navigasi Khusus: *"🏖️ Manajemen Cuti & Izin"* (`activeTab === "leave"`).
+     - 4 Kartu KPI: Menunggu Approval, Cuti Terpakai Bulan Ini, Izin Khusus Bulan Ini, Sakit Bulan Ini.
+     - Tabel Daftar Pengajuan Seluruh Karyawan (Lengkap dengan Lampiran Surat Dokter & Tombol Aksi *Setujui* / *Tolak*).
+     - Tabel Master Kuota Cuti Tahunan Karyawan (Nama, Divisi, Kuota Dasar Kontrak, Terpakai, Sisa).
+     - Modal Dialog Approval / Penolakan dengan catatan feedback.
+- **Rencana Step-by-Step Pengerjaan**:
+  1. [x] **Langkah 1**: Catat rencana kerja Tugas 232 step-by-step di `LAPORAN_PROGRES.md`.
+  2. [x] **Langkah 2**: Buat folder cadangan `_backup_leave_management/` dan amankan file terkait.
+  3. [x] **Langkah 3**: Siapkan data store `src/data/dstech_leaves.json` dengan prefix `dstech_leave_` dan data inisial resmi.
+  4. [x] **Langkah 4**: Bangun API backend `src/app/api/employee/leave/route.ts` yang mendukung `GET`, `POST`, dan `PUT` approval.
+  5. [x] **Langkah 5**: Bangun antarmuka Formulir Pengajuan Cuti & Riwayat Kuota di Portal Karyawan (`src/app/employee/page.tsx`).
+  6. [x] **Langkah 6**: Bangun Tab Manajemen Cuti, Rekap Kuota Karyawan, dan Otorisasi Approval di Admin Presensi (`src/app/admin/attendance/page.tsx`).
+  7. [x] **Langkah 7**: Uji kompilasi lokal `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses.
   8. [ ] **Langkah 8**: Push ke GitHub repository dan deploy live ke VPS aaPanel PM2 `dstech-main`.
   9. [ ] **Langkah 9**: Verifikasi visual via browser testing di website live.
-  10. [ ] **Langkah 10**: Bersihkan folder cadangan dan tandai Tugas 231 sebagai `[SELESAI]`.
+  10. [ ] **Langkah 10**: Bersihkan folder cadangan sementara dan tandai Tugas 232 sebagai `[SELESAI]`.
+
+- **2026-10-27**: [ANTREAN / AKAN DIKERJAKAN SETELAH TUGAS 232] Pengambilan Otomatis PPN Masukan dan PPN Keluaran Langsung dari Data Invoice (Faktur Penjualan & Purchase Order Supplier) (/admin/finance) (Tugas 233).
+  *Permintaan User*: "untuk PPN masukkan dan keluaran bisakah diambil dari data invoicenya langsung?"
+  *Rencana Step-by-Step Pengerjaan*:
+  1. [ ] Analisis data transaksi invoice yang telah memiliki PPN (Faktur Penjualan / Sale Invoice sebagai PPN Keluaran, dan PO Supplier / Pembelian sebagai PPN Masukan).
+  2. [ ] Siapkan penghubung langsung antara transaksi invoice dan modul pajak/SPT Masa PPN agar setiap invoice yang terbit atau lunas otomatis mengalirkan data DPP, PPN terhitung, nomor seri faktur pajak, dan tanggal masa pajak.
+  3. [ ] Sediakan tab atau panel rekapitulasi PPN Masukan vs PPN Keluaran dengan selisih Lebih/Kurang Bayar PPN yang terkalkulasi otomatis secara real-time.
+  4. [ ] Kerjakan segera setelah Tugas 232 selesai 100% dan terverifikasi live.
 
 ---
 

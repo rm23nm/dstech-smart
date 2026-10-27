@@ -50,6 +50,7 @@ import {
   Download,
   Check,
   Compass,
+  HeartPulse,
 } from "lucide-react";
 
 interface AttendanceRecord {
@@ -225,6 +226,24 @@ export default function AdminAttendancePage() {
     endDate: new Date().toISOString().split("T")[0],
     notes: "",
     hasDoctorNote: false,
+  });
+
+  // Data State Manajemen Cuti & Izin (Tugas 232 / 109)
+  const [leaveRequestsList, setLeaveRequestsList] = useState<any[]>([]);
+  const [employeeLeaveQuotas, setEmployeeLeaveQuotas] = useState<any[]>([]);
+  const [leaveActionLoading, setLeaveActionLoading] = useState<string | null>(null);
+  const [rejectModal, setRejectModal] = useState<{
+    isOpen: boolean;
+    leaveId: string;
+    employeeName: string;
+    typeLabel: string;
+    reason: string;
+  }>({
+    isOpen: false,
+    leaveId: "",
+    employeeName: "",
+    typeLabel: "",
+    reason: "",
   });
 
   // Current logged in Superadmin info
@@ -426,7 +445,7 @@ export default function AdminAttendancePage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [resAtt, resUsers, resPayroll, resContracts, resFinance] = await Promise.all([
+      const [resAtt, resUsers, resPayroll, resContracts, resFinance, resLeaves] = await Promise.all([
         fetch(`/api/employee/attendance?t=${Date.now()}`, {
           cache: "no-store",
           headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
@@ -435,6 +454,7 @@ export default function AdminAttendancePage() {
         fetch("/api/payroll"),
         fetch("/api/contracts"),
         fetch("/api/finance"),
+        fetch(`/api/employee/leave?t=${Date.now()}`),
       ]);
 
       if (resAtt.ok) {
@@ -465,6 +485,12 @@ export default function AdminAttendancePage() {
           setProjectsList(finData.data.projects);
         }
       }
+
+      if (resLeaves && resLeaves.ok) {
+        const lvData = await resLeaves.json();
+        if (Array.isArray(lvData.leaves)) setLeaveRequestsList(lvData.leaves);
+        if (Array.isArray(lvData.employeeQuotas)) setEmployeeLeaveQuotas(lvData.employeeQuotas);
+      }
     } catch (err) {
       console.error("Gagal memuat data presensi & payroll:", err);
       setToastMsg({ type: "error", text: "Gagal terhubung ke server data" });
@@ -472,6 +498,78 @@ export default function AdminAttendancePage() {
       setLoading(false);
     }
   };
+
+  // Handler Approval & Penolakan Cuti (Tugas 232 / 109)
+  const handleApproveLeave = async (id: string, empName: string, typeLabel: string) => {
+    setLeaveActionLoading(id);
+    try {
+      const res = await fetch("/api/employee/leave", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          action: "approve",
+          reviewerName: currentUser.name || "RAMADHANI, ST",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMsg({ type: "success", text: `Pengajuan ${typeLabel} (${empName}) berhasil disetujui & otomatis dicatat ke presensi!` });
+        fetchData();
+      } else {
+        setToastMsg({ type: "error", text: data.message || "Gagal menyetujui pengajuan" });
+      }
+    } catch (err) {
+      setToastMsg({ type: "error", text: "Terjadi kesalahan koneksi" });
+    } finally {
+      setLeaveActionLoading(null);
+    }
+  };
+
+  const handleConfirmRejectLeave = async () => {
+    if (!rejectModal.leaveId) return;
+    setLeaveActionLoading(rejectModal.leaveId);
+    try {
+      const res = await fetch("/api/employee/leave", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: rejectModal.leaveId,
+          action: "reject",
+          reviewerName: currentUser.name || "RAMADHANI, ST",
+          rejectionReason: rejectModal.reason.trim() || "Pengajuan belum dapat disetujui",
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMsg({ type: "success", text: `Pengajuan ${rejectModal.typeLabel} (${rejectModal.employeeName}) telah ditolak.` });
+        setRejectModal({ isOpen: false, leaveId: "", employeeName: "", typeLabel: "", reason: "" });
+        fetchData();
+      } else {
+        setToastMsg({ type: "error", text: data.message || "Gagal menolak pengajuan" });
+      }
+    } catch (err) {
+      setToastMsg({ type: "error", text: "Terjadi kesalahan koneksi" });
+    } finally {
+      setLeaveActionLoading(null);
+    }
+  };
+
+  const pendingLeaveCount = useMemo(() => {
+    return leaveRequestsList.filter((l) => l.status === "PENDING").length;
+  }, [leaveRequestsList]);
+
+  const approvedAnnualLeaveThisMonth = useMemo(() => {
+    return leaveRequestsList.filter((l) => l.status === "APPROVED" && l.type === "ANNUAL_LEAVE").length;
+  }, [leaveRequestsList]);
+
+  const approvedSpecialPermissionThisMonth = useMemo(() => {
+    return leaveRequestsList.filter((l) => l.status === "APPROVED" && l.type === "SPECIAL_PERMISSION").length;
+  }, [leaveRequestsList]);
+
+  const approvedSickLeaveThisMonth = useMemo(() => {
+    return leaveRequestsList.filter((l) => l.status === "APPROVED" && l.type === "SICK_LEAVE").length;
+  }, [leaveRequestsList]);
 
   useEffect(() => {
     fetchData();
@@ -1397,6 +1495,27 @@ export default function AdminAttendancePage() {
           <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-100 text-emerald-800 font-black">
             Laporan
           </span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("leave")}
+          className={`pb-4 text-sm font-bold flex items-center gap-2.5 transition-all whitespace-nowrap relative ${
+            activeTab === "leave"
+              ? "text-teal-600 border-b-2 border-teal-600"
+              : "text-slate-500 hover:text-slate-900"
+          }`}
+        >
+          <HeartPulse className="w-4 h-4 text-teal-600" />
+          <span>🏖️ Manajemen Cuti &amp; Izin</span>
+          {pendingLeaveCount > 0 ? (
+            <span className="px-2 py-0.5 rounded-full text-xs bg-teal-100 text-teal-800 font-black animate-pulse">
+              {pendingLeaveCount} Baru
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-600 font-black">
+              {leaveRequestsList.length}
+            </span>
+          )}
         </button>
 
         <button
@@ -2517,6 +2636,338 @@ export default function AdminAttendancePage() {
         </div>
       )}
 
+      {/* TAB 6: MANAJEMEN CUTI, IZIN KHUSUS & SAKIT KARYAWAN (Tugas 232 / 109) */}
+      {activeTab === "leave" && (
+        <div className="space-y-6 animate-in fade-in-50 duration-200">
+          {/* Header Card */}
+          <div className="bg-gradient-to-r from-teal-900 via-slate-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white relative overflow-hidden shadow-xl border border-teal-800/40">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-bold mb-3">
+                  <HeartPulse className="w-3.5 h-3.5" />
+                  <span>Modul HR &amp; Manajemen Personalia</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+                  Manajemen Cuti, Izin &amp; Sakit Karyawan
+                </h2>
+                <p className="text-sm text-slate-300 mt-1.5 max-w-2xl leading-relaxed">
+                  Otorisasi persetujuan dispensasi kehadiran resmi staf, verifikasi surat sakit dokter, serta pemantauan otomatis sisa kuota cuti tahunan sesuai kontrak kerja PKWT.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLeaveRecordModal({
+                      isOpen: true,
+                      employeeName: employeeOptions[0] || "",
+                      type: "Cuti",
+                      startDate: todayStr,
+                      endDate: todayStr,
+                      notes: "",
+                      hasDoctorNote: false,
+                    })
+                  }
+                  className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-teal-500 hover:bg-teal-600 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg shadow-teal-500/20 cursor-pointer active:scale-95"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Catat Cuti / Izin Manual (Admin)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* 4 Kartu KPI Ringkasan Cuti & Izin */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Menunggu Review</p>
+                <h3 className="text-2xl font-black text-amber-600 mt-1">
+                  {pendingLeaveCount} <span className="text-xs font-bold text-slate-400">Pengajuan</span>
+                </h3>
+                <p className="text-[11px] text-amber-600 mt-0.5 font-medium">Perlu Otorisasi Pimpinan</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                <Clock className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Cuti Tahunan Disetujui</p>
+                <h3 className="text-2xl font-black text-teal-600 mt-1">
+                  {approvedAnnualLeaveThisMonth} <span className="text-xs font-bold text-slate-400">Pengajuan</span>
+                </h3>
+                <p className="text-[11px] text-teal-600 mt-0.5 font-medium">Potong Kuota Tahunan</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Izin Khusus Disetujui</p>
+                <h3 className="text-2xl font-black text-blue-600 mt-1">
+                  {approvedSpecialPermissionThisMonth} <span className="text-xs font-bold text-slate-400">Pengajuan</span>
+                </h3>
+                <p className="text-[11px] text-blue-600 mt-0.5 font-medium">Keperluan Mendesak Resmi</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600">
+                <FileText className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Izin Sakit Terverifikasi</p>
+                <h3 className="text-2xl font-black text-rose-600 mt-1">
+                  {approvedSickLeaveThisMonth} <span className="text-xs font-bold text-slate-400">Pengajuan</span>
+                </h3>
+                <p className="text-[11px] text-rose-600 mt-0.5 font-medium">Surat Dokter Valid</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
+                <HeartPulse className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          {/* TABEL 1: DAFTAR PERMOHONAN CUTI / IZIN / SAKIT SELURUH KARYAWAN */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  Daftar Permohonan Cuti, Izin &amp; Sakit Karyawan
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  Tinjau dan berikan persetujuan dispensasi presensi staf. Persetujuan otomatis memperbarui absensi harian.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700">
+                  Total: {leaveRequestsList.length} Pengajuan
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                  <tr>
+                    <th className="py-3.5 px-6">Tanggal Masuk</th>
+                    <th className="py-3.5 px-6">Nama Karyawan</th>
+                    <th className="py-3.5 px-6">Jenis Dispensasi</th>
+                    <th className="py-3.5 px-6">Rentang Tanggal</th>
+                    <th className="py-3.5 px-6">Durasi</th>
+                    <th className="py-3.5 px-6">Alasan Keperluan</th>
+                    <th className="py-3.5 px-6">Lampiran Bukti</th>
+                    <th className="py-3.5 px-6">Status &amp; Peninjau</th>
+                    <th className="py-3.5 px-6 text-right">Otorisasi / Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {leaveRequestsList.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center text-slate-400 italic">
+                        Belum ada permohonan cuti, izin, atau sakit yang diajukan oleh karyawan.
+                      </td>
+                    </tr>
+                  ) : (
+                    leaveRequestsList.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-4 px-6 font-medium text-slate-500 whitespace-nowrap">
+                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}
+                        </td>
+                        <td className="py-4 px-6">
+                          <p className="font-bold text-slate-900">{item.employeeName}</p>
+                          <p className="text-[11px] text-slate-400">{item.department || "Operasional"}</p>
+                        </td>
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-black ${
+                              item.type === "ANNUAL_LEAVE"
+                                ? "bg-teal-100 text-teal-800"
+                                : item.type === "SICK_LEAVE"
+                                ? "bg-rose-100 text-rose-800"
+                                : "bg-blue-100 text-blue-800"
+                            }`}
+                          >
+                            {item.typeLabel}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 font-bold text-slate-800 whitespace-nowrap">
+                          {item.startDate === item.endDate ? item.startDate : `${item.startDate} s.d. ${item.endDate}`}
+                        </td>
+                        <td className="py-4 px-6 font-black text-slate-700 whitespace-nowrap">
+                          {item.totalDays} Hari
+                        </td>
+                        <td className="py-4 px-6 text-slate-600 max-w-xs leading-relaxed">
+                          {item.reason}
+                        </td>
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          {item.attachmentUrl ? (
+                            <a
+                              href={item.attachmentUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-[11px] border border-blue-200 transition-colors"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              <span>Lihat Bukti</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 italic">Tanpa Lampiran</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6 whitespace-nowrap">
+                          <div>
+                            <span
+                              className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${
+                                item.status === "APPROVED"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : item.status === "REJECTED"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : "bg-amber-100 text-amber-800 animate-pulse"
+                              }`}
+                            >
+                              {item.status === "APPROVED"
+                                ? "Disetujui"
+                                : item.status === "REJECTED"
+                                ? "Ditolak"
+                                : "Menunggu Review"}
+                            </span>
+                            {item.approvedBy && (
+                              <p className="text-[10px] text-slate-400 mt-1">
+                                Oleh: {item.approvedBy}
+                              </p>
+                            )}
+                            {item.rejectionReason && (
+                              <p className="text-[10px] text-rose-500 mt-1 italic max-w-[150px] truncate" title={item.rejectionReason}>
+                                Alasan: {item.rejectionReason}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-6 text-right whitespace-nowrap">
+                          {item.status === "PENDING" ? (
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                disabled={leaveActionLoading === item.id}
+                                onClick={() => handleApproveLeave(item.id, item.employeeName, item.typeLabel)}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Setujui</span>
+                              </button>
+                              <button
+                                type="button"
+                                disabled={leaveActionLoading === item.id}
+                                onClick={() =>
+                                  setRejectModal({
+                                    isOpen: true,
+                                    leaveId: item.id,
+                                    employeeName: item.employeeName,
+                                    typeLabel: item.typeLabel,
+                                    reason: "",
+                                  })
+                                }
+                                className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Tolak</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs italic">Selesai Ditinjau</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* TABEL 2: REKAPITULASI MASTER KUOTA CUTI TAHUNAN KARYAWAN */}
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  Master Kuota Cuti Tahunan Karyawan (Tahun 2026)
+                </h3>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  Perhitungan sisa hak cuti tahunan berdasar Perjanjian Kerja Waktu Tertentu (PKWT) resmi.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                  Hak Standar: 12 Hari / Tahun
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                  <tr>
+                    <th className="py-3.5 px-6">Nama Karyawan</th>
+                    <th className="py-3.5 px-6">Departemen / Divisi</th>
+                    <th className="py-3.5 px-6">Hak Cuti Tahunan</th>
+                    <th className="py-3.5 px-6">Cuti Terpakai</th>
+                    <th className="py-3.5 px-6">Sisa Kuota Cuti</th>
+                    <th className="py-3.5 px-6">Status Kuota</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {employeeLeaveQuotas.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-6 text-center text-slate-400 italic">
+                        Belum ada data kuota karyawan.
+                      </td>
+                    </tr>
+                  ) : (
+                    employeeLeaveQuotas.map((emp, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-3.5 px-6 font-bold text-slate-900">{emp.employeeName}</td>
+                        <td className="py-3.5 px-6 text-slate-500">{emp.department || "Operasional"}</td>
+                        <td className="py-3.5 px-6 font-medium text-slate-700">{emp.annualQuota} Hari</td>
+                        <td className="py-3.5 px-6 font-bold text-amber-600">{emp.usedDays} Hari</td>
+                        <td className="py-3.5 px-6">
+                          <span className="px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 font-black border border-teal-200">
+                            {emp.remainingDays} Hari
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-6">
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              emp.remainingDays > 5
+                                ? "bg-emerald-100 text-emerald-800"
+                                : emp.remainingDays > 0
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-rose-100 text-rose-800"
+                            }`}
+                          >
+                            {emp.remainingDays > 5
+                              ? "🟢 Tersedia"
+                              : emp.remainingDays > 0
+                              ? "🟡 Menipis"
+                              : "🔴 Habis"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* TAB 5: PENGATURAN TITIK GPS & GEOFENCING */}
       {activeTab === "geofence" && (
         <GpsGeofenceManager standaloneTitle={true} />
@@ -3588,6 +4039,62 @@ export default function AdminAttendancePage() {
                     <span>Konfirmasi Presensi</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PENOLAKAN PENGAJUAN CUTI (Tugas 232 / 109) */}
+      {rejectModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setRejectModal((prev) => ({ ...prev, isOpen: false }))}
+          />
+          <div className="relative bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 z-10 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2 text-rose-600">
+                <AlertTriangle className="w-5 h-5" />
+                <h3 className="text-base font-black text-slate-900">Tolak Permohonan Dispensasi</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRejectModal((prev) => ({ ...prev, isOpen: false }))}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 mb-3">
+              Anda akan menolak pengajuan <strong>{rejectModal.typeLabel}</strong> milik <strong>{rejectModal.employeeName}</strong>. Mohon berikan alasan penolakan agar transparan bagi staf:
+            </p>
+
+            <textarea
+              required
+              rows={3}
+              value={rejectModal.reason}
+              onChange={(e) => setRejectModal((prev) => ({ ...prev, reason: e.target.value }))}
+              placeholder="Contoh: Beban proyek pada tanggal tersebut sedang padat / surat dokter tidak jelas..."
+              className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-rose-500 mb-4"
+            />
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRejectModal((prev) => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 text-xs font-bold"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={leaveActionLoading === rejectModal.leaveId}
+                onClick={handleConfirmRejectLeave}
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md cursor-pointer disabled:opacity-50"
+              >
+                {leaveActionLoading === rejectModal.leaveId ? "Menolak..." : "Konfirmasi Tolak"}
               </button>
             </div>
           </div>

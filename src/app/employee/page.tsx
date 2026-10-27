@@ -44,6 +44,7 @@ import {
   FileSignature,
   Loader2,
   Lock,
+  HeartPulse,
 } from "lucide-react";
 
 interface DamagedItem {
@@ -857,6 +858,134 @@ export default function EmployeeDashboard() {
 
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState<boolean>(false);
 
+  // State Pengajuan Cuti, Izin, dan Sakit (Tugas 232 / 109)
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [leaveQuota, setLeaveQuota] = useState<{
+    annualQuota: number;
+    paidPermissionQuota: number;
+    usedDays: number;
+    remainingDays: number;
+  }>({ annualQuota: 12, paidPermissionQuota: 3, usedDays: 0, remainingDays: 12 });
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState<boolean>(false);
+  const [isSubmittingLeave, setIsSubmittingLeave] = useState<boolean>(false);
+  const [isUploadingDoctorNote, setIsUploadingDoctorNote] = useState<boolean>(false);
+  const [leaveForm, setLeaveForm] = useState({
+    type: "ANNUAL_LEAVE" as "ANNUAL_LEAVE" | "SPECIAL_PERMISSION" | "SICK_LEAVE",
+    startDate: new Date().toISOString().split("T")[0],
+    endDate: new Date().toISOString().split("T")[0],
+    totalDays: 1,
+    reason: "",
+    attachmentUrl: "" as string | null,
+  });
+
+  const fetchLeaveData = async (empName?: string) => {
+    try {
+      const targetName = empName || currentUser?.name;
+      if (!targetName) return;
+      const res = await fetch(`/api/employee/leave?employeeName=${encodeURIComponent(targetName)}&t=${Date.now()}`);
+      if (res.ok) {
+        const d = await res.json();
+        if (d.success) {
+          if (Array.isArray(d.leaves)) setLeaveRequests(d.leaves);
+          if (d.quota) setLeaveQuota(d.quota);
+        }
+      }
+    } catch (e) {
+      console.error("Gagal memuat data cuti:", e);
+    }
+  };
+
+  const handleLeaveDateChange = (startStr: string, endStr: string) => {
+    const start = new Date(startStr);
+    const end = new Date(endStr);
+    let days = 1;
+    if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+    }
+    setLeaveForm((prev) => ({
+      ...prev,
+      startDate: startStr,
+      endDate: endStr,
+      totalDays: days,
+    }));
+  };
+
+  const handleUploadDoctorNote = async (file: File) => {
+    try {
+      setIsUploadingDoctorNote(true);
+      showToast("Mengunggah surat dokter / bukti...");
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("docType", "doctor_note");
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (json.success && json.url) {
+        setLeaveForm((prev) => ({ ...prev, attachmentUrl: json.url }));
+        showToast("Surat keterangan dokter berhasil diunggah.");
+      } else {
+        showToast(json.message || "Gagal mengunggah file.");
+      }
+    } catch (err) {
+      showToast("Gagal mengunggah berkas.");
+    } finally {
+      setIsUploadingDoctorNote(false);
+    }
+  };
+
+  const handleSubmitLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!leaveForm.reason.trim()) {
+      showToast("Mohon tuliskan alasan permohonan.");
+      return;
+    }
+    if (leaveForm.type === "SICK_LEAVE" && !leaveForm.attachmentUrl) {
+      showToast("Wajib melampirkan Surat Keterangan Dokter untuk izin sakit.");
+      return;
+    }
+    setIsSubmittingLeave(true);
+    try {
+      const res = await fetch("/api/employee/leave", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          employeeName: currentUser?.name || "Karyawan",
+          employeeEmail: currentUser?.email || "",
+          department: currentUser?.role || "Operasional",
+          type: leaveForm.type,
+          startDate: leaveForm.startDate,
+          endDate: leaveForm.endDate,
+          totalDays: leaveForm.totalDays,
+          reason: leaveForm.reason,
+          attachmentUrl: leaveForm.attachmentUrl,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || "Pengajuan berhasil dikirim.");
+        setIsLeaveModalOpen(false);
+        setLeaveForm({
+          type: "ANNUAL_LEAVE",
+          startDate: new Date().toISOString().split("T")[0],
+          endDate: new Date().toISOString().split("T")[0],
+          totalDays: 1,
+          reason: "",
+          attachmentUrl: null,
+        });
+        fetchLeaveData(currentUser?.name);
+      } else {
+        showToast(data.message || "Gagal mengirim pengajuan.");
+      }
+    } catch (err) {
+      showToast("Terjadi kesalahan saat mengirim pengajuan.");
+    } finally {
+      setIsSubmittingLeave(false);
+    }
+  };
+
   // Helper Toast
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -907,6 +1036,7 @@ export default function EmployeeDashboard() {
                 }
               })
               .catch(() => {});
+            fetchLeaveData(parsed.name);
           }
         }
       } catch (err) {
@@ -3376,6 +3506,134 @@ export default function EmployeeDashboard() {
                     </div>
                   </div>
 
+                  {/* Leave & Permission (Cuti, Izin, Sakit) Section - Tugas 232 / 109 */}
+                  <div className="p-6 sm:p-8 rounded-[36px] bg-white border border-slate-200/80 shadow-sm space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="p-1.5 rounded-xl bg-teal-50 text-teal-600 border border-teal-100">
+                            <HeartPulse className="w-5 h-5" />
+                          </span>
+                          <h3 className="text-lg font-black text-slate-900">Permohonan Cuti, Izin &amp; Sakit</h3>
+                        </div>
+                        <p className="text-xs text-slate-400 font-medium mt-1">
+                          Pengajuan dispensasi kehadiran, cuti tahunan, dan izin sakit resmi
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setIsLeaveModalOpen(true)}
+                        className="px-4 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Ajukan Cuti / Izin / Sakit</span>
+                      </button>
+                    </div>
+
+                    {/* 3 Kartu Kuota Pribadi */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/70">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hak Cuti Tahunan</p>
+                        <p className="text-xl font-black text-slate-800 mt-0.5">{leaveQuota.annualQuota} Hari</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Sesuai Perjanjian Kerja PKWT</p>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/70">
+                        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Cuti Terpakai</p>
+                        <p className="text-xl font-black text-amber-900 mt-0.5">{leaveQuota.usedDays} Hari</p>
+                        <p className="text-[10px] text-amber-600 mt-1">Tahun Berjalan 2026</p>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200/70">
+                        <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">Sisa Kuota Cuti</p>
+                        <p className="text-xl font-black text-emerald-900 mt-0.5">{leaveQuota.remainingDays} Hari</p>
+                        <p className="text-[10px] text-emerald-600 mt-1">Dapat diajukan kapan saja</p>
+                      </div>
+                    </div>
+
+                    {/* Tabel Riwayat Pengajuan Cuti / Izin / Sakit */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                          <tr>
+                            <th className="p-3">Tanggal Pengajuan</th>
+                            <th className="p-3">Jenis Dispensasi</th>
+                            <th className="p-3">Rentang Tanggal</th>
+                            <th className="p-3">Durasi</th>
+                            <th className="p-3">Alasan / Keterangan</th>
+                            <th className="p-3">Lampiran Bukti</th>
+                            <th className="p-3">Status Persetujuan</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {leaveRequests.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="p-4 text-center text-slate-400 italic">
+                                Belum ada riwayat permohonan cuti atau izin.
+                              </td>
+                            </tr>
+                          ) : (
+                            leaveRequests.map((lv) => (
+                              <tr key={lv.id} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="p-3 font-medium text-slate-500">
+                                  {lv.createdAt ? new Date(lv.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "-"}
+                                </td>
+                                <td className="p-3">
+                                  <span
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                      lv.type === "ANNUAL_LEAVE"
+                                        ? "bg-teal-100 text-teal-800"
+                                        : lv.type === "SICK_LEAVE"
+                                        ? "bg-rose-100 text-rose-800"
+                                        : "bg-blue-100 text-blue-800"
+                                    }`}
+                                  >
+                                    {lv.typeLabel}
+                                  </span>
+                                </td>
+                                <td className="p-3 font-bold text-slate-800">
+                                  {lv.startDate === lv.endDate ? lv.startDate : `${lv.startDate} s.d. ${lv.endDate}`}
+                                </td>
+                                <td className="p-3 font-black text-slate-700">{lv.totalDays} Hari</td>
+                                <td className="p-3 text-slate-600 max-w-xs">{lv.reason}</td>
+                                <td className="p-3">
+                                  {lv.attachmentUrl ? (
+                                    <a
+                                      href={lv.attachmentUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline font-bold"
+                                    >
+                                      <FileText className="w-3.5 h-3.5" />
+                                      <span>Lihat Surat</span>
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-400">-</span>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  <span
+                                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold ${
+                                      lv.status === "APPROVED"
+                                        ? "bg-green-100 text-green-700"
+                                        : lv.status === "REJECTED"
+                                        ? "bg-rose-100 text-rose-700"
+                                        : "bg-amber-100 text-amber-700 animate-pulse"
+                                    }`}
+                                  >
+                                    {lv.status === "APPROVED"
+                                      ? "Disetujui"
+                                      : lv.status === "REJECTED"
+                                      ? "Ditolak"
+                                      : "Menunggu Review"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
                   {/* Attendance History Table */}
                   <div className="p-6 sm:p-8 rounded-[36px] bg-white border border-slate-200/80 shadow-sm space-y-4">
                     <h3 className="text-lg font-black text-slate-900">Riwayat Presensi Terbaru</h3>
@@ -5463,6 +5721,214 @@ export default function EmployeeDashboard() {
                   className="px-5 py-2.5 rounded-xl bg-dstech-blue text-white font-bold hover:bg-blue-700 shadow-md"
                 >
                   Ajukan ke HR
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PENGAJUAN CUTI / IZIN / SAKIT (Tugas 232 / 109) */}
+      {isLeaveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+            onClick={() => setIsLeaveModalOpen(false)}
+          />
+          <div className="relative bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 z-10 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-teal-50 text-teal-600">
+                  <HeartPulse className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Formulir Permohonan Cuti &amp; Izin</h3>
+                  <p className="text-xs text-slate-400">Ajukan permohonan dispensasi kehadiran resmi</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsLeaveModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitLeave} className="space-y-4">
+              {/* Pilihan Tipe Dispensasi */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Jenis Pengajuan
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLeaveForm((prev) => ({ ...prev, type: "ANNUAL_LEAVE" }))}
+                    className={`p-3 rounded-2xl border text-center transition-all ${
+                      leaveForm.type === "ANNUAL_LEAVE"
+                        ? "border-teal-500 bg-teal-50 text-teal-900 font-black shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold"
+                    }`}
+                  >
+                    <p className="text-xs">🏖️ Cuti Tahunan</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Sisa: {leaveQuota.remainingDays} Hari</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLeaveForm((prev) => ({ ...prev, type: "SPECIAL_PERMISSION" }))}
+                    className={`p-3 rounded-2xl border text-center transition-all ${
+                      leaveForm.type === "SPECIAL_PERMISSION"
+                        ? "border-blue-500 bg-blue-50 text-blue-900 font-black shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold"
+                    }`}
+                  >
+                    <p className="text-xs">📋 Izin Khusus</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Mendesak/Keluarga</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setLeaveForm((prev) => ({ ...prev, type: "SICK_LEAVE" }))}
+                    className={`p-3 rounded-2xl border text-center transition-all ${
+                      leaveForm.type === "SICK_LEAVE"
+                        ? "border-rose-500 bg-rose-50 text-rose-900 font-black shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50 font-bold"
+                    }`}
+                  >
+                    <p className="text-xs">🏥 Izin Sakit</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Surat Dokter</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Rentang Tanggal */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Tanggal Mulai
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveForm.startDate}
+                    onChange={(e) => handleLeaveDateChange(e.target.value, leaveForm.endDate)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Tanggal Selesai
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={leaveForm.endDate}
+                    onChange={(e) => handleLeaveDateChange(leaveForm.startDate, e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              {/* Info Total Hari */}
+              <div className="p-3 rounded-2xl bg-teal-50/60 border border-teal-100 flex items-center justify-between">
+                <span className="text-xs font-bold text-teal-900">Total Durasi Pengajuan:</span>
+                <span className="text-sm font-black text-teal-700 bg-white px-3 py-1 rounded-xl shadow-xs border border-teal-100">
+                  {leaveForm.totalDays} Hari Kerja
+                </span>
+              </div>
+
+              {/* Alasan */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Alasan &amp; Keterangan Keperluan
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={leaveForm.reason}
+                  onChange={(e) => setLeaveForm((prev) => ({ ...prev, reason: e.target.value }))}
+                  placeholder="Contoh: Keperluan acara keluarga di luar kota / Sakit demam tinggi..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
+              {/* Upload Surat Dokter (Wajib jika Sakit) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Lampiran Berkas / Surat Dokter {leaveForm.type === "SICK_LEAVE" && <span className="text-rose-500 font-bold">*Wajib</span>}
+                </label>
+                {leaveForm.attachmentUrl ? (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-bold text-emerald-800">Berkas Berhasil Terlampir</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setLeaveForm((prev) => ({ ...prev, attachmentUrl: null }))}
+                      className="text-xs font-bold text-rose-600 hover:underline"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      id="doctorNoteInput"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleUploadDoctorNote(file);
+                      }}
+                    />
+                    <label
+                      htmlFor="doctorNoteInput"
+                      className={`flex-1 py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-teal-500 bg-slate-50 hover:bg-teal-50/30 text-slate-600 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                        isUploadingDoctorNote ? "opacity-50 pointer-events-none" : ""
+                      }`}
+                    >
+                      {isUploadingDoctorNote ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
+                          <span>Mengunggah...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 text-slate-400" />
+                          <span>Unggah Foto Surat Dokter / Bukti Pendukung</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsLeaveModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-600 hover:bg-slate-100 font-bold text-xs"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingLeave}
+                  className="px-5 py-2.5 rounded-xl bg-teal-600 text-white font-bold text-xs hover:bg-teal-700 shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingLeave ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Mengirim...</span>
+                    </>
+                  ) : (
+                    <span>Kirim Pengajuan</span>
+                  )}
                 </button>
               </div>
             </form>
