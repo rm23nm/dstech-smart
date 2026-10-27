@@ -143,14 +143,13 @@ function readAssets(): CorporateAsset[] {
     }
     const raw = fs.readFileSync(ASSETS_FILE, "utf-8");
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      writeAssets(DEFAULT_ASSETS);
-      return DEFAULT_ASSETS;
+    if (!Array.isArray(parsed)) {
+      return [];
     }
     return parsed as CorporateAsset[];
   } catch (err) {
     console.error("Error reading dstech_assets.json:", err);
-    return DEFAULT_ASSETS;
+    return [];
   }
 }
 

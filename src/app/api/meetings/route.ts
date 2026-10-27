@@ -174,6 +174,7 @@ export async function POST(req: Request) {
 
     // Pastikan jitsiRoomName aman
     const jitsiRoomName = `dstechsmart_${slug.replace(/-/g, "_")}`;
+    const roomPassword = (body.password || "").trim();
 
     const newMeeting: Meeting = {
       id: "meet_dstech_" + Date.now(),
@@ -187,7 +188,8 @@ export async function POST(req: Request) {
       hostRole: hostRole || "STAFF",
       maxParticipants: 50,
       allowGuests: true,
-      requiresPassword: false,
+      requiresPassword: !!roomPassword,
+      password: roomPassword,
       jitsiRoomName,
       createdAt: new Date().toISOString(),
       participants: [],
@@ -209,11 +211,11 @@ export async function POST(req: Request) {
   }
 }
 
-// PATCH: Update status meeting ("ACTIVE" | "ENDED" | "UPCOMING")
+// PATCH: Update status meeting ("ACTIVE" | "ENDED" | "UPCOMING") atau password
 export async function PATCH(req: Request) {
   try {
     const body = await req.json();
-    const { id, roomCode, status, title, description } = body;
+    const { id, roomCode, status, title, description, password } = body;
 
     const data = readMeetingsData();
     const idx = data.meetings.findIndex((m) => m.id === id || m.roomCode === roomCode);
@@ -225,6 +227,11 @@ export async function PATCH(req: Request) {
     if (status) data.meetings[idx].status = status;
     if (title) data.meetings[idx].title = title.trim();
     if (description !== undefined) data.meetings[idx].description = description.trim();
+    if (password !== undefined) {
+      const cleanPass = password.trim();
+      data.meetings[idx].password = cleanPass;
+      data.meetings[idx].requiresPassword = !!cleanPass;
+    }
 
     writeMeetingsData(data);
 

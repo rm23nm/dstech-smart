@@ -30,6 +30,7 @@ import {
   AlertTriangle,
   Send,
   Radio,
+  Lock,
 } from "lucide-react";
 
 interface Participant {
@@ -52,6 +53,7 @@ interface Meeting {
   maxParticipants?: number;
   allowGuests?: boolean;
   requiresPassword?: boolean;
+  password?: string;
   jitsiRoomName: string;
   createdAt: string;
   participants?: Participant[];
@@ -83,6 +85,7 @@ export default function AdminMeetingsPage() {
     hostRole: "ADMIN",
     customRoomCode: "",
     status: "ACTIVE" as "ACTIVE" | "UPCOMING" | "ENDED",
+    password: "",
   });
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
@@ -120,6 +123,7 @@ export default function AdminMeetingsPage() {
       hostRole: "SUPERADMIN",
       customRoomCode: "",
       status: "ACTIVE",
+      password: "",
     });
     setIsModalOpen(true);
   };
@@ -135,6 +139,7 @@ export default function AdminMeetingsPage() {
       hostRole: m.hostRole,
       customRoomCode: m.roomCode,
       status: m.status,
+      password: m.password || "",
     });
     setIsModalOpen(true);
   };
@@ -158,6 +163,7 @@ export default function AdminMeetingsPage() {
             title: formData.title,
             description: formData.description,
             status: formData.status,
+            password: formData.password?.trim() || "",
           }),
         });
         const resData = await res.json();
@@ -181,6 +187,7 @@ export default function AdminMeetingsPage() {
             hostName: formData.hostName,
             hostRole: formData.hostRole,
             customRoomCode: formData.customRoomCode,
+            password: formData.password?.trim() || "",
           }),
         });
         const resData = await res.json();
@@ -713,6 +720,22 @@ _Bisa langsung dibuka di smartphone Android / browser Chrome tanpa perlu install
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                 ></textarea>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <Lock className="w-3.5 h-3.5 text-amber-400" /> PIN / Password Akses Ruangan (Opsional)
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-normal">Kosongkan jika bebas tanpa password</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 123456 atau DSTech2026"
+                  value={formData.password || ""}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono tracking-wider"
+                />
               </div>
 
               {editingMeeting && (

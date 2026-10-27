@@ -23,8 +23,12 @@ import {
   ScreenShare,
   X,
   Radio,
-  Settings,
   Wifi,
+  AlertTriangle,
+  Loader2,
+  Lock,
+  Unlock,
+  Key,
 } from "lucide-react";
 
 interface MeetingInfo {
@@ -37,6 +41,8 @@ interface MeetingInfo {
   meetingType: "INTERNAL_STAF" | "KONSULTASI_KLIEN" | "MAINTENANCE_SURVEY";
   hostName: string;
   hostRole: string;
+  requiresPassword?: boolean;
+  password?: string;
 }
 
 interface PeerState {
@@ -78,11 +84,25 @@ export default function NativeWebRTCMeetingRoomPage() {
   const [participantRole, setParticipantRole] = useState("GUEST");
   const [isCopied, setIsCopied] = useState(false);
 
+  // Password / PIN Ruangan
+  const [roomPasswordInput, setRoomPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [showSetPasswordModal, setShowSetPasswordModal] = useState(false);
+  const [newPasswordValue, setNewPasswordValue] = useState("");
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [showPasswordText, setShowPasswordText] = useState(false);
+
   // Kontrol Media
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [isCameraStarting, setIsCameraStarting] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  // Dialog Konfirmasi Keluar Modal
+  const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
 
   // Chat Drawer
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -97,6 +117,58 @@ export default function NativeWebRTCMeetingRoomPage() {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const [remotePeers, setRemotePeers] = useState<Map<string, PeerState>>(new Map());
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Navigasi Kembali Aman ke Asal Pengguna
+  const handleSafeExitNavigation = useCallback(() => {
+    let target = "/";
+    try {
+      const emp = localStorage.getItem("dstech_employee_auth");
+      const adm = localStorage.getItem("dstech_admin_auth");
+      if (emp || participantRole.includes("TEKNISI") || participantRole.includes("STAF")) {
+        target = "/employee";
+      } else if (adm || participantRole.includes("ADMIN") || participantRole.includes("HOST")) {
+        target = "/admin/meetings";
+      }
+    } catch {}
+    window.location.href = target;
+  }, [participantRole]);
+
+  // Helper untuk Memasang Stream ke Elemen Video Secara Aman
+  const attachStreamToVideo = useCallback((videoEl: HTMLVideoElement | null, stream: MediaStream | null) => {
+    if (!videoEl || !stream) return;
+    try {
+      if (videoEl.srcObject !== stream) {
+        videoEl.srcObject = stream;
+      }
+      videoEl.play().catch((err) => {
+        console.warn("Autoplay note:", err);
+      });
+    } catch (e) {
+      console.warn("Error attachStreamToVideo:", e);
+    }
+  }, []);
+
+  // Callback Ref untuk Video Preview (Pre-Join)
+  const setPreviewVideoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      previewVideoRef.current = el;
+      if (el && localStreamRef.current) {
+        attachStreamToVideo(el, localStreamRef.current);
+      }
+    },
+    [attachStreamToVideo]
+  );
+
+  // Callback Ref untuk Video Lokal (In-Meeting)
+  const setLocalVideoRef = useCallback(
+    (el: HTMLVideoElement | null) => {
+      localVideoRef.current = el;
+      if (el && localStreamRef.current) {
+        attachStreamToVideo(el, localStreamRef.current);
+      }
+    },
+    [attachStreamToVideo]
+  );
 
   // Mengambil Profil Pengguna yang Tersimpan (Employee Portal atau Admin)
   useEffect(() => {
@@ -128,6 +200,9 @@ export default function NativeWebRTCMeetingRoomPage() {
       const data = await res.json();
       if (data.success && data.data) {
         setMeeting(data.data);
+        if (data.data.password) {
+          setNewPasswordValue(data.data.password);
+        }
       } else {
         setMeeting({
           id: "meet_native_" + roomCode,
@@ -148,52 +223,112 @@ export default function NativeWebRTCMeetingRoomPage() {
     }
   };
 
-  // Setup Kamera Lokal (Pre-Join Preview)
-  useEffect(() => {
-    let active = true;
+  // Fungsi Inisialisasi Media dengan Multi-Stage Fallback
+  const requestMediaStream = useCallback(
+    async (mode: "user" | "environment", isOff: boolean) => {
+      setIsCameraStarting(true);
+      setCameraError(null);
 
-    async function initCameraPreview() {
-      try {
-        if (localStreamRef.current) {
-          localStreamRef.current.getTracks().forEach((t) => t.stop());
+      if (isOff) {
+        try {
+          const audioOnly = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          setIsCameraStarting(false);
+          return audioOnly;
+        } catch (e) {
+          setIsCameraStarting(false);
+          return null;
         }
+      }
 
+      // 1. Coba HD + facingMode + audio
+      try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: isVideoOff ? false : { facingMode: facingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: true,
         });
+        setIsCameraStarting(false);
+        return stream;
+      } catch (err1) {
+        console.warn("Fallback 1: Mencoba video sederhana + audio...", err1);
+      }
 
-        if (!active) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-
-        localStreamRef.current = stream;
-
-        // Terapkan mute awal
-        stream.getAudioTracks().forEach((t) => {
-          t.enabled = !isMuted;
+      // 2. Coba video dasar + audio
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
         });
+        setIsCameraStarting(false);
+        return stream;
+      } catch (err2) {
+        console.warn("Fallback 2: Mencoba video saja (tanpa mic)...", err2);
+      }
 
-        if (previewVideoRef.current && !hasJoined) {
-          previewVideoRef.current.srcObject = stream;
+      // 3. Coba video saja (berguna jika PC tidak memiliki mikrofon)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+        setIsCameraStarting(false);
+        return stream;
+      } catch (err3: any) {
+        console.error("Semua fallback kamera gagal:", err3);
+        setIsCameraStarting(false);
+        if (err3?.name === "NotAllowedError" || err3?.name === "PermissionDeniedError") {
+          setCameraError("Izin kamera/mikrofon ditolak di browser. Klik ikon gembok di sebelah URL untuk mengizinkan.");
+        } else if (err3?.name === "NotFoundError" || err3?.name === "DevicesNotFoundError") {
+          setCameraError("Perangkat kamera tidak ditemukan. Pastikan webcam terhubung.");
+        } else {
+          setCameraError("Tidak dapat mengakses kamera: " + (err3?.message || "Kesalahan perizinan"));
         }
-        if (localVideoRef.current && hasJoined) {
-          localVideoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.warn("Gagal membuka kamera / mikrofon:", err);
+        return null;
+      }
+    },
+    []
+  );
+
+  // Inisialisasi Kamera Awal
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function initCamera() {
+      const stream = await requestMediaStream(facingMode, isVideoOff);
+      if (isCancelled || !stream) return;
+
+      if (localStreamRef.current && localStreamRef.current !== stream) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+      }
+
+      localStreamRef.current = stream;
+
+      stream.getAudioTracks().forEach((t) => {
+        t.enabled = !isMuted;
+      });
+
+      if (previewVideoRef.current && !hasJoined) {
+        attachStreamToVideo(previewVideoRef.current, stream);
+      }
+      if (localVideoRef.current && hasJoined) {
+        attachStreamToVideo(localVideoRef.current, stream);
       }
     }
 
-    if (!hasJoined) {
-      initCameraPreview();
-    }
+    initCamera();
 
     return () => {
-      active = false;
+      isCancelled = true;
     };
-  }, [facingMode, hasJoined]);
+  }, [facingMode, requestMediaStream, attachStreamToVideo]);
+
+  // Pasang ulang stream saat hasJoined berubah ke true
+  useEffect(() => {
+    if (hasJoined) {
+      if (localVideoRef.current && localStreamRef.current) {
+        attachStreamToVideo(localVideoRef.current, localStreamRef.current);
+      }
+    }
+  }, [hasJoined, attachStreamToVideo]);
 
   // Update enable/disable audio dan video track saat toggle berubah
   useEffect(() => {
@@ -206,7 +341,6 @@ export default function NativeWebRTCMeetingRoomPage() {
       });
     }
 
-    // Beritahu peer lain via signaling
     if (hasJoined) {
       fetch("/api/meetings/signal", {
         method: "POST",
@@ -231,14 +365,12 @@ export default function NativeWebRTCMeetingRoomPage() {
       const pc = new RTCPeerConnection(RTC_CONFIG);
       peerConnectionsRef.current.set(targetPeerId, pc);
 
-      // Tambahkan track lokal ke peer connection
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => {
           pc.addTrack(track, localStreamRef.current!);
         });
       }
 
-      // Kirim ICE candidate ke signaling server saat ditemukan
       pc.onicecandidate = (event) => {
         if (event.candidate) {
           fetch("/api/meetings/signal", {
@@ -258,7 +390,6 @@ export default function NativeWebRTCMeetingRoomPage() {
         }
       };
 
-      // Terima media stream dari remote peer
       pc.ontrack = (event) => {
         const [remoteStream] = event.streams;
         setRemotePeers((prev) => {
@@ -333,12 +464,10 @@ export default function NativeWebRTCMeetingRoomPage() {
         if (json.success && isPolling) {
           const { peers, signals, chats } = json.data;
 
-          // Update data chat
           if (Array.isArray(chats)) {
             setChatMessages(chats);
           }
 
-          // Cek peer lain yang ada di room
           if (Array.isArray(peers)) {
             peers.forEach((p: any) => {
               if (p.id !== myPeerId) {
@@ -358,13 +487,11 @@ export default function NativeWebRTCMeetingRoomPage() {
             });
           }
 
-          // Proses sinyal masuk
           if (Array.isArray(signals)) {
             for (const sig of signals) {
               const { fromPeerId, fromPeerName, fromPeerRole, type, data } = sig;
 
               if (type === "status" && data?.action === "peer_joined") {
-                // Peer baru masuk: jika peer ID kita lebih kecil secara leksikografis, kita jadi caller
                 if (myPeerId < fromPeerId) {
                   initiateCall(fromPeerId, fromPeerName || "Peserta", fromPeerRole || "GUEST");
                 }
@@ -400,9 +527,7 @@ export default function NativeWebRTCMeetingRoomPage() {
                 if (pc) {
                   try {
                     await pc.addIceCandidate(new RTCIceCandidate(data));
-                  } catch (e) {
-                    // Candidate out-of-order bisa diabaikan
-                  }
+                  } catch (e) {}
                 }
               } else if (type === "chat") {
                 if (!isChatOpen) {
@@ -424,7 +549,6 @@ export default function NativeWebRTCMeetingRoomPage() {
           }
         }
       } catch (e) {
-        // Abaikan error network transient
       } finally {
         if (isPolling) {
           setTimeout(pollSignals, 1000);
@@ -439,12 +563,20 @@ export default function NativeWebRTCMeetingRoomPage() {
     };
   }, [hasJoined, myPeerId, roomCode, createPeerConnection, initiateCall, isChatOpen]);
 
-  // Bergabung ke Room
+  // Bergabung ke Room (Dengan Validasi Password Ruangan)
   const handleJoinMeeting = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!participantName.trim()) {
       alert("Silakan masukkan nama Anda sebelum bergabung ke meeting.");
       return;
+    }
+
+    // Validasi Password jika room diproteksi
+    if (meeting?.requiresPassword && meeting?.password) {
+      if (roomPasswordInput.trim() !== meeting.password.trim()) {
+        setPasswordError("PIN / Password Ruangan salah! Silakan periksa kembali atau hubungi Host.");
+        return;
+      }
     }
 
     try {
@@ -481,13 +613,6 @@ export default function NativeWebRTCMeetingRoomPage() {
     }
 
     setHasJoined(true);
-
-    // Tempelkan video lokal ke elemen player
-    setTimeout(() => {
-      if (localVideoRef.current && localStreamRef.current) {
-        localVideoRef.current.srcObject = localStreamRef.current;
-      }
-    }, 200);
   };
 
   // Balik Kamera (Flip Camera Depan / Belakang untuk Teknisi Smartphone)
@@ -496,10 +621,9 @@ export default function NativeWebRTCMeetingRoomPage() {
     setFacingMode(nextMode);
 
     try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: nextMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: true,
-      });
+      setIsCameraStarting(true);
+      const newStream = await requestMediaStream(nextMode, isVideoOff);
+      if (!newStream) return;
 
       const newVideoTrack = newStream.getVideoTracks()[0];
       if (newVideoTrack && localStreamRef.current) {
@@ -510,7 +634,6 @@ export default function NativeWebRTCMeetingRoomPage() {
         }
         localStreamRef.current.addTrack(newVideoTrack);
 
-        // Ganti track di semua peer connection
         peerConnectionsRef.current.forEach((pc) => {
           const senders = pc.getSenders();
           const sender = senders.find((s) => s.track && s.track.kind === "video");
@@ -520,18 +643,38 @@ export default function NativeWebRTCMeetingRoomPage() {
         });
 
         if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStreamRef.current;
+          attachStreamToVideo(localVideoRef.current, localStreamRef.current);
         }
       }
     } catch (err) {
       alert("Kamera perangkat tidak mendukung peralihan kamera (flip camera).");
+    } finally {
+      setIsCameraStarting(false);
+    }
+  };
+
+  // Toggle Video Camera Nyala / Mati
+  const handleToggleVideoCamera = async () => {
+    if (isVideoOff) {
+      setIsVideoOff(false);
+      const hasActiveVideo = localStreamRef.current?.getVideoTracks().some((t) => t.readyState === "live");
+      if (!hasActiveVideo) {
+        const stream = await requestMediaStream(facingMode, false);
+        if (stream) {
+          localStreamRef.current = stream;
+          if (localVideoRef.current) {
+            attachStreamToVideo(localVideoRef.current, stream);
+          }
+        }
+      }
+    } else {
+      setIsVideoOff(true);
     }
   };
 
   // Berbagi Layar (Screen Share)
   const handleToggleScreenShare = async () => {
     if (isScreenSharing) {
-      // Kembali ke kamera
       handleFlipCamera();
       setIsScreenSharing(false);
       return;
@@ -561,7 +704,7 @@ export default function NativeWebRTCMeetingRoomPage() {
         });
 
         if (localVideoRef.current) {
-          localVideoRef.current.srcObject = localStreamRef.current;
+          attachStreamToVideo(localVideoRef.current, localStreamRef.current);
         }
 
         setIsScreenSharing(true);
@@ -608,31 +751,81 @@ export default function NativeWebRTCMeetingRoomPage() {
     }, 100);
   };
 
-  // Keluar dari Ruang Meeting
-  const handleLeaveMeeting = async () => {
-    if (confirm("Apakah Anda ingin keluar dari video meeting?")) {
-      try {
-        await fetch("/api/meetings/signal", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            roomCode,
-            peerId: myPeerId,
-            action: "leave",
-          }),
-        });
-      } catch {}
-
-      // Hentikan semua track
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach((t) => t.stop());
+  // Update / Kunci Password Ruang Rapat
+  const handleSaveRoomPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdatingPassword(true);
+    try {
+      const res = await fetch("/api/meetings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomCode,
+          password: newPasswordValue.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMeeting((prev) =>
+          prev
+            ? {
+                ...prev,
+                requiresPassword: !!newPasswordValue.trim(),
+                password: newPasswordValue.trim(),
+              }
+            : null
+        );
+        setShowSetPasswordModal(false);
+        alert(
+          newPasswordValue.trim()
+            ? `PIN Ruangan berhasil diatur: ${newPasswordValue.trim()}`
+            : "PIN Ruangan berhasil dihapus (ruangan kini terbuka)."
+        );
+      } else {
+        alert("Gagal menyimpan password: " + data.error);
       }
-      peerConnectionsRef.current.forEach((pc) => pc.close());
-      peerConnectionsRef.current.clear();
-
-      setHasJoined(false);
-      router.back();
+    } catch (err) {
+      alert("Terjadi kesalahan saat menyimpan password");
+    } finally {
+      setIsUpdatingPassword(false);
     }
+  };
+
+  // EKSEKUSI KELUAR RUANG RAPAT
+  const executeLeaveMeeting = async () => {
+    setIsLeaving(true);
+    try {
+      await fetch("/api/meetings/signal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomCode,
+          peerId: myPeerId,
+          action: "leave",
+        }),
+      });
+    } catch (e) {
+      console.warn("Signal leave error:", e);
+    }
+
+    try {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => {
+          track.stop();
+        });
+        localStreamRef.current = null;
+      }
+      peerConnectionsRef.current.forEach((pc) => {
+        try {
+          pc.close();
+        } catch {}
+      });
+      peerConnectionsRef.current.clear();
+    } catch (e) {
+      console.warn("Media teardown error:", e);
+    }
+
+    handleSafeExitNavigation();
   };
 
   const handleCopyLink = () => {
@@ -644,10 +837,11 @@ export default function NativeWebRTCMeetingRoomPage() {
 
   const handleShareWhatsApp = () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
+    const passInfo = meeting?.password ? `\n🔐 *PIN Akses*: ${meeting.password}` : "";
     const msg = `Halo, mari bergabung ke Ruang Video Meeting Native PT. DSTech Smart Perkasa:
 📌 *Agenda*: ${meeting?.title || "Meeting Koordinasi"}
 👤 *Host*: ${meeting?.hostName || "DSTech Smart"}
-🔗 *Tautan Langsung*: ${url}
+🔗 *Tautan Langsung*: ${url}${passInfo}
 
 Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplikasi pihak ketiga.`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
@@ -673,12 +867,13 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
           <button
             onClick={() => {
               if (hasJoined) {
-                handleLeaveMeeting();
+                setShowLeaveConfirmModal(true);
               } else {
-                router.back();
+                handleSafeExitNavigation();
               }
             }}
-            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all flex items-center gap-1.5 text-xs font-bold shrink-0"
+            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all flex items-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer active:scale-95"
+            title="Kembali ke Portal"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Kembali</span>
@@ -692,9 +887,11 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
               </span>
               <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 truncate flex items-center gap-1">
                 <span>DSTECH NATIVE WEBRTC MEET</span>
-                <span className="hidden md:inline px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 text-[9px]">
-                  P2P IN-HOUSE
-                </span>
+                {meeting?.password && (
+                  <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[9px] flex items-center gap-0.5 font-bold">
+                    <Lock className="w-2.5 h-2.5" /> PIN AKTIF
+                  </span>
+                )}
               </span>
             </div>
             <h1 className="text-xs sm:text-sm font-bold text-white truncate max-w-[180px] sm:max-w-md">
@@ -705,6 +902,20 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
 
         {/* Quick Action Share & Info */}
         <div className="flex items-center gap-1.5 shrink-0">
+          {/* Tombol Atur Password Room */}
+          <button
+            onClick={() => setShowSetPasswordModal(true)}
+            className={`p-2 sm:px-2.5 sm:py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              meeting?.password
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20"
+                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+            }`}
+            title="Pengaturan Password / PIN Keamanan Ruangan"
+          >
+            {meeting?.password ? <Lock className="w-3.5 h-3.5 text-amber-400" /> : <Unlock className="w-3.5 h-3.5" />}
+            <span className="hidden md:inline">{meeting?.password ? "PIN: " + meeting.password : "Set PIN"}</span>
+          </button>
+
           <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
             <Users className="w-3.5 h-3.5 text-indigo-400" />
             <span className="font-bold">{totalPeersCount} Peserta</span>
@@ -712,7 +923,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
 
           <button
             onClick={handleCopyLink}
-            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all"
+            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
             title="Salin Tautan Ruang Rapat"
           >
             {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -721,7 +932,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
 
           <button
             onClick={handleShareWhatsApp}
-            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all"
+            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
             title="Bagikan Undangan via WhatsApp"
           >
             <Share2 className="w-3.5 h-3.5" />
@@ -739,12 +950,20 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
               {/* Camera Preview Box */}
               <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden border border-slate-800 shadow-inner group">
                 <video
-                  ref={previewVideoRef}
+                  ref={setPreviewVideoRef}
                   autoPlay
                   playsInline
                   muted
                   className={`w-full h-full object-cover ${facingMode === "user" ? "scale-x-[-1]" : ""}`}
                 />
+
+                {/* Loading indicator saat kamera mulai */}
+                {isCameraStarting && (
+                  <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-slate-300 gap-2">
+                    <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                    <span className="text-xs font-bold">Mengaktifkan Kamera...</span>
+                  </div>
+                )}
 
                 {isVideoOff && (
                   <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center text-slate-500 gap-2">
@@ -753,12 +972,20 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                   </div>
                 )}
 
+                {/* Banner Error Izin Kamera jika ada */}
+                {cameraError && (
+                  <div className="absolute inset-x-2 top-2 p-2 rounded-xl bg-rose-950/90 border border-rose-600/50 text-[11px] text-rose-200 flex items-center gap-1.5 shadow-lg">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span className="line-clamp-2">{cameraError}</span>
+                  </div>
+                )}
+
                 {/* Floating Preview Controls */}
                 <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsMuted(!isMuted)}
-                    className={`p-2 rounded-xl transition-all ${
+                    className={`p-2 rounded-xl transition-all cursor-pointer ${
                       isMuted ? "bg-rose-500 text-white" : "bg-slate-800 text-emerald-400 hover:bg-slate-700"
                     }`}
                     title={isMuted ? "Buka Mic" : "Matikan Mic"}
@@ -768,8 +995,8 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
 
                   <button
                     type="button"
-                    onClick={() => setIsVideoOff(!isVideoOff)}
-                    className={`p-2 rounded-xl transition-all ${
+                    onClick={handleToggleVideoCamera}
+                    className={`p-2 rounded-xl transition-all cursor-pointer ${
                       isVideoOff ? "bg-rose-500 text-white" : "bg-slate-800 text-indigo-400 hover:bg-slate-700"
                     }`}
                     title={isVideoOff ? "Nyalakan Kamera" : "Matikan Kamera"}
@@ -780,7 +1007,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                   <button
                     type="button"
                     onClick={handleFlipCamera}
-                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all"
+                    className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer"
                     title="Balik Kamera (Depan / Belakang)"
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -822,7 +1049,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                   <select
                     value={participantRole}
                     onChange={(e) => setParticipantRole(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500"
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500 cursor-pointer"
                   >
                     <option value="TEKNISI / STAF">Teknisi / Staf Lapangan</option>
                     <option value="ADMIN / HOST">Admin / Pimpinan Rapat</option>
@@ -831,6 +1058,47 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                     <option value="GUEST">Tamu Undangan</option>
                   </select>
                 </div>
+
+                {/* Input Password / PIN Jika Ruang Terproteksi */}
+                {meeting?.requiresPassword && meeting?.password && (
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-1.5">
+                    <label className="block text-xs font-bold text-amber-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>PIN / Password Ruangan</span>
+                      </span>
+                      <span className="text-[10px] text-amber-400 font-semibold uppercase tracking-wider">
+                        Proteksi Aktif
+                      </span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPasswordText ? "text" : "password"}
+                        required
+                        placeholder="Masukkan PIN / Password Ruangan..."
+                        value={roomPasswordInput}
+                        onChange={(e) => {
+                          setRoomPasswordInput(e.target.value);
+                          setPasswordError(null);
+                        }}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-amber-500/40 text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono tracking-wider"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPasswordText(!showPasswordText)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-amber-300 hover:text-white"
+                      >
+                        {showPasswordText ? "Sembunyikan" : "Lihat"}
+                      </button>
+                    </div>
+                    {passwordError && (
+                      <p className="text-[11px] text-rose-400 font-bold flex items-center gap-1 pt-0.5">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>{passwordError}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <button
                   type="submit"
@@ -844,7 +1112,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
               {/* Info Native */}
               <div className="text-[11px] text-slate-400 flex items-center gap-2 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>100% Native WebRTC In-House PT. DSTech Smart Perkasa. Aman &amp; langsung tanpa aplikasi luar.</span>
+                <span>100% Native WebRTC In-House PT. DSTech Smart Perkasa. Langsung terbuka tanpa aplikasi lain.</span>
               </div>
             </div>
           </div>
@@ -867,7 +1135,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                 {/* 1. Video Tile Lokal (Anda Sendiri) */}
                 <div className="relative bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-lg group">
                   <video
-                    ref={localVideoRef}
+                    ref={setLocalVideoRef}
                     autoPlay
                     playsInline
                     muted
@@ -875,6 +1143,14 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                       facingMode === "user" && !isScreenSharing ? "scale-x-[-1]" : ""
                     }`}
                   />
+
+                  {/* Loading indicator saat kamera mulai */}
+                  {isCameraStarting && (
+                    <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm flex flex-col items-center justify-center text-slate-300 gap-2">
+                      <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
+                      <span className="text-xs font-bold">Mengaktifkan Kamera...</span>
+                    </div>
+                  )}
 
                   {isVideoOff && (
                     <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center gap-2">
@@ -929,7 +1205,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                   {/* Mute Mic Toggle */}
                   <button
                     onClick={() => setIsMuted(!isMuted)}
-                    className={`p-3 rounded-2xl transition-all shadow-md ${
+                    className={`p-3 rounded-2xl transition-all shadow-md cursor-pointer ${
                       isMuted
                         ? "bg-rose-600 text-white shadow-rose-600/30"
                         : "bg-slate-800 text-emerald-400 hover:bg-slate-700"
@@ -941,8 +1217,8 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
 
                   {/* Video Camera Toggle */}
                   <button
-                    onClick={() => setIsVideoOff(!isVideoOff)}
-                    className={`p-3 rounded-2xl transition-all shadow-md ${
+                    onClick={handleToggleVideoCamera}
+                    className={`p-3 rounded-2xl transition-all shadow-md cursor-pointer ${
                       isVideoOff
                         ? "bg-rose-600 text-white shadow-rose-600/30"
                         : "bg-slate-800 text-indigo-400 hover:bg-slate-700"
@@ -955,7 +1231,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                   {/* Flip Camera (Kamera Belakang Lapangan untuk Teknisi CCTV) */}
                   <button
                     onClick={handleFlipCamera}
-                    className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all shadow-md"
+                    className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all shadow-md cursor-pointer"
                     title="Balik Kamera (Depan / Belakang)"
                   >
                     <RotateCcw className="w-5 h-5" />
@@ -964,7 +1240,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                   {/* Screen Share (Bagi Layar) */}
                   <button
                     onClick={handleToggleScreenShare}
-                    className={`p-3 rounded-2xl transition-all shadow-md ${
+                    className={`p-3 rounded-2xl transition-all shadow-md cursor-pointer ${
                       isScreenSharing
                         ? "bg-amber-600 text-white shadow-amber-600/30"
                         : "bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -980,7 +1256,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                       setIsChatOpen(!isChatOpen);
                       setUnreadChatCount(0);
                     }}
-                    className={`relative p-3 rounded-2xl transition-all shadow-md ${
+                    className={`relative p-3 rounded-2xl transition-all shadow-md cursor-pointer ${
                       isChatOpen
                         ? "bg-indigo-600 text-white shadow-indigo-600/30"
                         : "bg-slate-800 text-slate-300 hover:bg-slate-700"
@@ -995,14 +1271,14 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                     )}
                   </button>
 
-                  {/* End Call / Leave Meeting Button */}
+                  {/* TOMBOL KELUAR / TINGGALKAN RAPAT */}
                   <button
-                    onClick={handleLeaveMeeting}
-                    className="px-4 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-rose-600/40 transition-all cursor-pointer"
+                    onClick={() => setShowLeaveConfirmModal(true)}
+                    className="px-4 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-rose-600/40 transition-all cursor-pointer active:scale-95"
                     title="Tinggalkan Ruang Rapat"
                   >
                     <PhoneOff className="w-5 h-5" />
-                    <span className="hidden sm:inline">Keluar</span>
+                    <span>Keluar</span>
                   </button>
                 </div>
 
@@ -1010,7 +1286,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                 <div className="hidden sm:flex items-center gap-1.5">
                   <button
                     onClick={handleShareWhatsApp}
-                    className="px-3 py-2 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all text-xs font-bold flex items-center gap-1.5"
+                    className="px-3 py-2 rounded-xl bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all text-xs font-bold flex items-center gap-1.5 cursor-pointer"
                     title="Undang Rekan via WhatsApp"
                   >
                     <Share2 className="w-3.5 h-3.5" />
@@ -1030,7 +1306,7 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
                   </div>
                   <button
                     onClick={() => setIsChatOpen(false)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1086,6 +1362,109 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
         )}
       </main>
 
+      {/* MODAL DIALOG KONFIRMASI TINGGALKAN RAPAT */}
+      {showLeaveConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center justify-center mx-auto">
+              <PhoneOff className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-base font-black text-white">Tinggalkan Ruang Rapat?</h3>
+              <p className="text-xs text-slate-400">
+                Koneksi video dan audio Anda akan diputus dan Anda akan dialihkan kembali ke portal.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowLeaveConfirmModal(false)}
+                disabled={isLeaving}
+                className="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+
+              <button
+                type="button"
+                onClick={executeLeaveMeeting}
+                disabled={isLeaving}
+                className="py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition-all shadow-lg shadow-rose-600/30 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                {isLeaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Keluar...</span>
+                  </>
+                ) : (
+                  <span>Ya, Keluar</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DIALOG ATUR / GANTI PASSWORD RUANGAN */}
+      {showSetPasswordModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400">
+                  <Key className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-bold text-white">Kunci PIN Ruang Rapat</h3>
+              </div>
+              <button
+                onClick={() => setShowSetPasswordModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveRoomPassword} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">
+                  PIN / Password Ruangan
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 123456 (Kosongkan untuk lepas kunci)"
+                  value={newPasswordValue}
+                  onChange={(e) => setNewPasswordValue(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Hanya peserta yang memiliki PIN ini yang dapat masuk ke ruang rapat.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSetPasswordModal(false)}
+                  className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingPassword}
+                  className="py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-md shadow-amber-600/30"
+                >
+                  {isUpdatingPassword ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Lock className="w-3.5 h-3.5" />}
+                  <span>Simpan PIN</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Footer Info */}
       <footer className="py-2 px-4 text-center border-t border-slate-900 text-[10px] text-slate-500">
         PT. DSTech Smart Perkasa • Native WebRTC Video Conference Suite (In-House Application)
@@ -1101,6 +1480,7 @@ function RemotePeerTile({ peer }: { peer: PeerState }) {
   useEffect(() => {
     if (videoRef.current && peer.stream) {
       videoRef.current.srcObject = peer.stream;
+      videoRef.current.play().catch(() => {});
     }
   }, [peer.stream]);
 
