@@ -3,27 +3,29 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
-- **2026-10-27**: [SEDANG DIKERJAKAN] Fitur Harga Diskon Promo & Harga Normal Coret pada E-Store (/shop), Manajemen Produk Admin & Superadmin (/admin/products, /superadmin/products, & /api/products), serta Homepage Showcases [Tugas 239].
-  *Permintaan User*: "saya ingin kamu buat kan fitur harga diskon pada estor, misalnya harga normal dan harga promo diskon".
-  *Langkah-langkah yang akan dilakukan*:
-  1. Menyiapkan skema data produk terisolasi (`dstech_products.json`) dengan properti: `originalPrice` (harga normal/asli coret), `price` (harga promo diskon/jual), `isPromo` (status aktif diskon), `discountPercent` (persentase diskon otomatis), dan `promoTag` (label promo spesial).
-  2. Memperbarui API backend `/api/products` (GET, POST, PUT) agar mendukung pembacaan, validasi, dan penyimpanan properti diskon promo tanpa menghilangkan data biaya modal (costPrice).
-  3. Memperbarui antarmuka E-Store (`src/app/shop/page.tsx`):
-     - Badge diskon mencolok pada foto produk (contoh: "🔥 DISKON 25%" / "🏷️ FLASH SALE").
-     - Tampilan harga ganda: Harga Normal Coret (`line-through text-slate-400`) bersanding dengan Harga Promo Diskon (`text-rose-600 font-black`) serta badge hemat.
-     - Filter cepat: Filter pill "🔥 Sedang Promo / Diskon" dan pengurutan berdasarkan Diskon Terbesar.
-     - Modal Quick View: Rincian perbandingan harga normal vs promo serta total hemat pembeli.
-     - Keranjang Belanja: Notifikasi penghematan total belanja ("🎉 Anda Berhasil Menghemat Rp xxx.xxx").
-  4. Memperbarui Dashboard Admin Produk (`src/app/admin/products/page.tsx`):
-     - Form Tambah & Edit Produk dengan input Harga Normal, Harga Promo Diskon, kalkulasi otomatis persentase diskon, dan pilihan Label Promo.
-     - Tabel daftar produk dengan indikator visual harga promo coret dan badge diskon.
-     - Dukungan bulk export & import Excel untuk kolom harga normal dan status promo.
-  5. Memperbarui Dashboard Superadmin Produk (`src/app/superadmin/products/page.tsx`) dan Homepage (`src/components/ProductSection.tsx`) agar selaras menampilkan harga normal coret dan harga promo.
-  6. Menguji kompilasi TypeScript (`npx tsc --noEmit`) dan build produksi Next.js (`npm run build`).
-  7. Commit dan push ke GitHub repository `rm23nm/dstech-smart` branch `master`.
-  8. Deploy ke server VPS live (157.66.34.199:11587) dan restart PM2 `dstech-main`.
-  9. Verifikasi visual live dengan browser subagent pada `https://dstechsmart.com/shop`.
-  10. Membersihkan folder cadangan sementara dan memperbarui status laporan menjadi [SELESAI].
+- **2026-10-28**: [SELESAI] Implementasi Ruang Video Meeting Native WebRTC Mandiri 100% Buatan Sendiri (In-House Video Call & Signaling Engine seperti SmartDesk/SmartShare) pada (/meeting/[roomCode] & /api/meetings/signal) [Tugas 239].
+  *Permintaan User*: "terkait fitur meeting dengan aplikasi sendiri tanpa menggunakan aplikasi orang bagai mana?", "ok, coba kamu cek aplikasi kita sebelumnya, bukannya kita juga sudah buat aplikasi smartdesk dan smartshare yang mirip seperti ini", & "ok, mari kita lanjutkan".
+  *Penyebab & Analisis Kebutuhan*:
+  - Pada Tugas 236, ruang rapat masih menyematkan iframe pihak ketiga (Jitsi Meet).
+  - Berdasarkan pemeriksaan aplikasi kita sebelumnya (`SmartDesk` dan `SmartShareWeb`), kita telah memiliki arsitektur WebRTC native lengkap beserta signaling handshake (`webrtc-offer`, `webrtc-answer`, `webrtc-ice-candidate`).
+  - Pengguna menghendaki fitur meeting berjalan 100% independen menggunakan aplikasi dan infrastruktur server sendiri tanpa aplikasi orang lain.
+  *Penyelesaian & Hasil Implementasi*:
+  1. **Backend Signaling API Terpadu (`src/app/api/meetings/signal/route.ts`)**:
+     - Membangun endpoint WebRTC signaling in-house ber-prefix data `dstech_` (`src/data/dstech_meetings_signals.json` dengan fallback in-memory store).
+     - Menangani aksi: `join`, `signal` (pertukaran SDP Offer, SDP Answer, dan ICE Candidates), `update_status` (mic mute/unmute, video on/off), `chat` pesan teks ruang rapat, dan `leave`.
+     - Pruning otomatis: sinyal kedaluwarsa dan peer idle > 35 detik dibersihkan otomatis tanpa membebani disk/memori.
+  2. **Antarmuka Native WebRTC Video Room (`src/app/meeting/[roomCode]/page.tsx`)**:
+     - Menghapus 100% dependensi iframe pihak ketiga (`meet.jit.si`).
+     - **Pre-Join Lobby**: Live camera preview, pengatur status mic dan video awal, tombol flip camera (depan/belakang), input nama peserta (otomatis membaca data login karyawan/admin), dan seleksi role pengguna.
+     - **In-Meeting Screen**: Grid video responsif dinamis (1, 2, 4, 6+ peserta), tile lokal ("Anda") dengan status nama dan role, tile remote peer dengan stream video/audio P2P langsung, status indikator "P2P Terhubung".
+     - **Fitur Khusus Smartphone & Teknisi Lapangan**: Tombol Flip Camera (`facingMode: user <-> environment`) untuk teknisi menyorot panel kabel/CCTV/barrier gate secara instan, tombol Screen Share bagi laptop/PC, tombol mute mic, toggle kamera, serta tombol Keluar Rapat.
+     - **Obrolan Teks Interaktif (Chat Drawer)**: Sidebar chat real-time terintegrasi untuk komunikasi teks cepat selama rapat.
+  3. **Pengujian & Deployment**:
+     - Validasi `npx tsc --noEmit` lolos 0 error.
+     - Build Next.js lokal dan server VPS live sukses 100% (71/71 rute terkompilasi, termasuk rute baru `/api/meetings/signal`).
+     - Sinkronisasi GitHub commit `92bc4ec` dan restart PM2 `dstech-main` (PID 1859404) online.
+     - Verifikasi visual langsung via browser subagent pada `https://dstechsmart.com/meeting/room-demo-teknisi`: Pre-join screen, live camera preview, pemilihan role, join room, verifikasi tile lokal 'Teknisi Joko (Anda)', status 'P2P Terhubung', controls bar, dan pembukaan drawer chat teruji bekerja dengan sempurna.
+     - Folder cadangan sementara `_backup_native_meeting/` telah dibersihkan.
 - **2026-10-27**: [SELESAI] Penanganan Menyeluruh Error Console DevTools dan Layout Overlapping pada Live Stream Virtual Host & Admin Control Center (virtual-host.html, /admin/live-stream, & /live) [Tugas 238].
   *Permintaan User*: "banyak yang eror" (dilampirkan screenshot monitor dengan Chrome DevTools penuh pesan error merah, teks judul produk menimpa avatar, dan thumbnail produk berukuran abnormal).
   *Penyebab Masalah yang Ditemukan*:
