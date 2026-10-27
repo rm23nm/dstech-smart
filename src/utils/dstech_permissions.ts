@@ -56,6 +56,13 @@ export const DSTECH_SYSTEM_MENUS: MenuItemConfig[] = [
     desc: "Jadwal servis berkala, penugasan tiket teknisi & SPK lapangan",
   },
   {
+    id: "chat",
+    name: "Pesan Tim (Chat)",
+    category: "Operasional",
+    path: "/admin/chat",
+    desc: "Pesan instan tim ala WhatsApp, panggilan video/audio WebRTC & berbagi invoice/SPK",
+  },
+  {
     id: "meetings",
     name: "Video Meeting",
     category: "Operasional",
@@ -246,6 +253,8 @@ export function getDefaultPermissionsByRole(role: string): UserPermissions {
     perms.attendance = { view: true, create: true, edit: false, delete: false, print: true, send: false };
     // Video Meeting: view, create room instan, send undangan
     perms.meetings = { view: true, create: true, edit: false, delete: false, print: true, send: true };
+    // Chat & Call: view, create (kirim pesan & bukti kerja), send, print
+    perms.chat = { view: true, create: true, edit: true, delete: false, print: true, send: true };
     // Inventory: view, create (ajukan material)
     perms.inventory = { view: true, create: true, edit: false, delete: false, print: true, send: false };
     // KMS: view

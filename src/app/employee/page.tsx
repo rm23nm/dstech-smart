@@ -47,7 +47,9 @@ import {
   HeartPulse,
   Video,
   Share2,
+  MessageSquare,
 } from "lucide-react";
+import TeamChatMessenger from "@/components/TeamChatMessenger";
 
 interface DamagedItem {
   id: string;
@@ -284,7 +286,7 @@ export default function EmployeeDashboard() {
   const [currentUser, setCurrentUser] = useState<EmployeeUserSession | null>(null);
 
   // Navigation state
-  const [activeTab, setActiveTab] = useState<"tasks" | "inventory" | "attendance" | "meetings">("tasks");
+  const [activeTab, setActiveTab] = useState<"tasks" | "inventory" | "attendance" | "meetings" | "chat">("tasks");
   const [currentTime, setCurrentTime] = useState<string>("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -2489,6 +2491,23 @@ export default function EmployeeDashboard() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab("chat")}
+            className={`w-full flex items-center justify-between p-4 rounded-2xl font-bold text-sm transition-all cursor-pointer ${
+              activeTab === "chat"
+                ? "bg-dstech-red text-white shadow-lg shadow-red-500/25"
+                : "text-slate-600 hover:bg-slate-50 hover:text-dstech-red"
+            }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <MessageSquare className="w-5 h-5 text-emerald-500" />
+              <span>Chat & Panggilan</span>
+            </div>
+            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Connect
+            </span>
+          </button>
         </nav>
 
         {/* Profile Card & Logout */}
@@ -2578,6 +2597,15 @@ export default function EmployeeDashboard() {
             {meetingsList.filter((m) => m.status === "ACTIVE").length > 0 && (
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab("chat")}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === "chat" ? "bg-dstech-red text-white" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-500" />
+            <span>Chat Tim</span>
           </button>
         </div>
 
@@ -4242,6 +4270,31 @@ export default function EmployeeDashboard() {
                       </div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {/* TAB 5: DSTECH CONNECT - CHAT & PANGGILAN TIM ALA WHATSAPP (Tugas 242) */}
+              {activeTab === "chat" && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="p-4 sm:p-6 rounded-[32px] bg-white border border-slate-200/80 shadow-sm flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                        💬 DStech Connect <span className="text-emerald-600 font-extrabold text-sm sm:text-base">Messenger & Panggilan Lapangan</span>
+                      </h3>
+                      <p className="text-xs text-slate-500 font-medium mt-1">
+                        Komunikasi langsung antar tim proyek, kirim foto bukti penyelesaian tugas lapangan, surat perintah kerja (SPK), dan panggilan suara/video jernih.
+                      </p>
+                    </div>
+                  </div>
+                  <TeamChatMessenger
+                    currentUser={{
+                      id: currentUser?.id || "dstech_usr_1792549625191",
+                      name: currentUser?.name || "Staf Lapangan",
+                      role: currentUser?.role || "EMPLOYEE",
+                      phone: currentUser?.phone || "",
+                    }}
+                    embeddedMode={true}
+                  />
                 </div>
               )}
             </div>

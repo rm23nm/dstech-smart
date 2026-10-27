@@ -33,6 +33,7 @@ import {
   Target,
   Radio,
   Video,
+  MessageSquare,
 } from "lucide-react";
 import { checkUserPermission } from "@/utils/dstech_permissions";
 
@@ -49,6 +50,7 @@ const SEARCH_CATALOG: SearchResult[] = [
   { title: "Kontrak Kerja & Rekrutmen", category: "Operasional", url: "/admin/contracts", desc: "Kelola kontrak kerja staf bulanan/tahunan dan teknisi harian (Tipe 1 & 2), cetak PKWT resmi A4" },
   { title: "Rekap Absensi Karyawan & Teknisi", category: "Operasional", url: "/admin/attendance", desc: "Pantau presensi masuk/pulang, titik GPS Google Maps, dan riwayat kehadiran" },
   { title: "Download Laporan Absensi (Excel & PDF)", category: "Operasional", url: "/admin/attendance", desc: "Unduh file CSV/Excel dan cetak lembar rekapitulasi kehadiran A4 resmi" },
+  { title: "Pesan Tim & Chat Mandiri (DStech Connect)", category: "Operasional", url: "/admin/chat", desc: "Pesan instan tim ala WhatsApp, panggilan audio/video WebRTC, berbagi invoice & SPK penugasan" },
   { title: "Video Meeting & Ruang Rapat Online", category: "Operasional", url: "/admin/meetings", desc: "Ruang rapat video conference interaktif smartphone staf, survey online & briefing teknisi" },
   { title: "Briefing Pagi Teknisi (Meeting)", category: "Operasional", url: "/meeting/briefing-pagi-teknisi", desc: "Ruang video meeting koordinasi pagi teknisi lapangan" },
   { title: "Penggajian & Rekap Gaji (Payroll)", category: "Keuangan", url: "/admin/payroll", desc: "Rekapitulasi gaji bulanan staf & teknisi, setting auto payday, cetak slip & rekap A4 resmi" },
@@ -238,6 +240,13 @@ export default function AdminLayout({
       href: "/admin/attendance",
       icon: CalendarCheck,
       active: pathname.startsWith("/admin/attendance"),
+    },
+    {
+      id: "chat",
+      label: "💬 Pesan Tim (Chat)",
+      href: "/admin/chat",
+      icon: MessageSquare,
+      active: pathname.startsWith("/admin/chat") || pathname.startsWith("/chat"),
     },
     {
       id: "meetings",
