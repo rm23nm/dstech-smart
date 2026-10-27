@@ -32,6 +32,7 @@ import {
   AlertCircle,
   Sparkles,
   Maximize2,
+  MessageSquare,
 } from "lucide-react";
 
 interface TeamChatMessengerProps {
@@ -53,6 +54,47 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [usersList, setUsersList] = useState<any[]>([]);
+  const [leftTab, setLeftTab] = useState<"chats" | "contacts">("chats");
+
+  // Fungsi memulai chat langsung dengan rekan tim
+  const handleStartChatWithUser = async (targetUser: any) => {
+    // Jika mengklik diri sendiri, abaikan
+    if (targetUser.id === currentUser.id) return;
+
+    // Cari apakah chat sudah ada di list
+    const existing = chats.find(
+      (c) =>
+        !c.isGroup &&
+        c.participants?.includes(targetUser.id) &&
+        (c.participants?.includes(currentUser.id) || c.participants?.length === 2)
+    );
+    if (existing) {
+      setActiveChat(existing);
+      setLeftTab("chats");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/team-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create_chat",
+          name: targetUser.name,
+          isGroup: false,
+          participants: [currentUser.id, targetUser.id],
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.chat) {
+        setChats((prev) => [data.chat, ...prev]);
+        setActiveChat(data.chat);
+        setLeftTab("chats");
+      }
+    } catch (err) {
+      console.error("Gagal membuat obrolan:", err);
+    }
+  };
 
   // State Lampiran Menu
   const [showAttachMenu, setShowAttachMenu] = useState(false);
@@ -580,7 +622,33 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
             </button>
           </div>
 
-          {/* Search Bar Kontak */}
+          {/* Tab Filter: Obrolan vs Direktori Kontak Tim */}
+          <div className="p-2 border-b border-slate-800 flex items-center gap-1 bg-slate-950/90">
+            <button
+              onClick={() => setLeftTab("chats")}
+              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                leftTab === "chats"
+                  ? "bg-slate-800 text-white shadow-sm border border-slate-700"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900"
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Obrolan ({chats.length})</span>
+            </button>
+            <button
+              onClick={() => setLeftTab("contacts")}
+              className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                leftTab === "contacts"
+                  ? "bg-slate-800 text-white shadow-sm border border-slate-700"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Kontak Tim ({usersList.length})</span>
+            </button>
+          </div>
+
+          {/* Search Bar Kontak / Obrolan */}
           <div className="p-3 border-b border-slate-800/80">
             <div className="relative">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -588,52 +656,132 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari obrolan tim atau rekan..."
+                placeholder={leftTab === "chats" ? "Cari percakapan..." : "Cari nama atau divisi rekan tim..."}
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
 
-          {/* List Percakapan */}
+          {/* List Percakapan ATAU List Kontak Tim */}
           <div className="flex-1 overflow-y-auto divide-y divide-slate-850">
-            {filteredChats.map((chat) => {
-              const isSelected = activeChat?.id === chat.id;
-              return (
-                <div
-                  key={chat.id}
-                  onClick={() => setActiveChat(chat)}
-                  className={`p-3.5 flex items-start gap-3 cursor-pointer transition select-none ${
-                    isSelected
-                      ? "bg-slate-850 border-l-4 border-emerald-500"
-                      : "hover:bg-slate-900/60"
-                  }`}
-                >
-                  <div className="relative flex-shrink-0">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-slate-300 font-bold overflow-hidden shadow">
-                      {chat.isGroup ? (
-                        <Users className="w-6 h-6 text-emerald-400" />
-                      ) : (
-                        <User className="w-6 h-6 text-cyan-400" />
+            {leftTab === "chats" ? (
+              filteredChats.length > 0 ? (
+                filteredChats.map((chat) => {
+                  const isSelected = activeChat?.id === chat.id;
+                  return (
+                    <div
+                      key={chat.id}
+                      onClick={() => setActiveChat(chat)}
+                      className={`p-3.5 flex items-start gap-3 cursor-pointer transition select-none ${
+                        isSelected
+                          ? "bg-slate-850 border-l-4 border-emerald-500"
+                          : "hover:bg-slate-900/60"
+                      }`}
+                    >
+                      <div className="relative flex-shrink-0">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-slate-300 font-bold overflow-hidden shadow">
+                          {chat.isGroup ? (
+                            <Users className="w-6 h-6 text-emerald-400" />
+                          ) : (
+                            <User className="w-6 h-6 text-cyan-400" />
+                          )}
+                        </div>
+                        {!chat.isGroup && (
+                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="text-xs font-bold text-white truncate">{chat.name}</h4>
+                          <span className="text-[10px] text-slate-500">
+                            {formatTime(chat.lastMessageTime)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 truncate leading-relaxed">
+                          {chat.lastMessage || "Mulai obrolan baru"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-6 text-center text-slate-500 space-y-3">
+                  <p className="text-xs">Belum ada obrolan yang sesuai.</p>
+                  <button
+                    onClick={() => setLeftTab("contacts")}
+                    className="px-4 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-semibold hover:bg-emerald-600/30 transition cursor-pointer"
+                  >
+                    Buka Direktori Rekan Tim ({usersList.length})
+                  </button>
+                </div>
+              )
+            ) : (
+              /* TAB DIREKTORI KONTAK TIM */
+              usersList
+                .filter(
+                  (u) =>
+                    u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    (u.role && u.role.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                    (u.phone && u.phone.includes(searchQuery))
+                )
+                .map((u) => {
+                  const isCurrent = u.id === currentUser.id;
+                  const roleBadgeColor =
+                    u.role === "SUPERADMIN"
+                      ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                      : u.role === "ADMIN"
+                      ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                      : "bg-cyan-500/10 text-cyan-400 border-cyan-500/20";
+
+                  return (
+                    <div
+                      key={u.id}
+                      onClick={() => handleStartChatWithUser(u)}
+                      className={`p-3.5 flex items-center justify-between gap-3 cursor-pointer transition ${
+                        isCurrent ? "opacity-60 bg-slate-950/40" : "hover:bg-slate-900"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative flex-shrink-0">
+                          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-white font-bold text-xs shadow">
+                            {u.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-950 rounded-full" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                            {u.name}
+                            {isCurrent && <span className="text-[10px] text-slate-500">(Anda)</span>}
+                          </h4>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[9px] px-1.5 py-0.2 rounded-md font-bold border ${roleBadgeColor}`}>
+                              {u.role}
+                            </span>
+                            {u.phone && (
+                              <span className="text-[10px] text-slate-500 truncate">{u.phone}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {!isCurrent && (
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartChatWithUser(u);
+                            }}
+                            className="p-2 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded-xl transition cursor-pointer"
+                            title="Buka Chat"
+                          >
+                            <Send className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
-                    {!chat.isGroup && (
-                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <h4 className="text-xs font-bold text-white truncate">{chat.name}</h4>
-                      <span className="text-[10px] text-slate-500">
-                        {formatTime(chat.lastMessageTime)}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400 truncate leading-relaxed">
-                      {chat.lastMessage || "Mulai obrolan baru"}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })
+            )}
           </div>
         </div>
 

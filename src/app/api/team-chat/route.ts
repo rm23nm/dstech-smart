@@ -40,8 +40,64 @@ export async function GET(request: Request) {
 
   // 1. Ambil daftar thread percakapan
   if (action === "chats") {
-    const chats = readJsonSafe(CHATS_FILE, []);
-    const users = readJsonSafe(USERS_FILE, []);
+    let chats = readJsonSafe(CHATS_FILE, []);
+    let users = readJsonSafe(USERS_FILE, []);
+
+    // Fallback jika dstech_users.json kosong
+    if (!Array.isArray(users) || users.length === 0) {
+      users = [
+        { id: "dstech_usr_1", name: "Super Admin DStech", role: "SUPERADMIN", phone: "08225949424", status: "ACTIVE" },
+        { id: "dstech_usr_2", name: "Admin Operasional", role: "ADMIN", phone: "081299887711", status: "ACTIVE" },
+        { id: "dstech_usr_1792549625191", name: "RAMADHANI ST", role: "EMPLOYEE", phone: "082259494242", status: "ACTIVE" },
+        { id: "dstech_usr_1792545916165", name: "Marshanda Salwa Agustina", role: "ADMIN", phone: "089630855206", status: "ACTIVE" },
+      ];
+    }
+
+    // Auto-inisialisasi thread chat jika chats kosong
+    if (!Array.isArray(chats) || chats.length === 0) {
+      const allUserIds = users.map((u: any) => u.id);
+      chats = [
+        {
+          id: "dstech_chat_group_ops",
+          name: "Koordinasi Operasional & Proyek",
+          isGroup: true,
+          groupAvatar: "/services-access.png",
+          participants: allUserIds,
+          description: "Grup koordinasi lapangan, surat tugas SPK, dan laporan progres teknisi",
+          lastMessage: "Selamat datang di DStech Connect Messenger. Koordinasi tim proyek lapangan aktif.",
+          lastMessageTime: new Date().toISOString(),
+          unreadCount: 0,
+        },
+        {
+          id: "dstech_chat_group_finance",
+          name: "Finance & Invoice Billing",
+          isGroup: true,
+          groupAvatar: "/service-software.png",
+          participants: allUserIds.filter((id: string) => id !== "dstech_usr_1792549625191"),
+          description: "Koordinasi penagihan invoice, approval termin DP, dan klaim reimburse",
+          lastMessage: "Ruang koordinasi keuangan dan faktur penagihan aktif.",
+          lastMessageTime: new Date().toISOString(),
+          unreadCount: 0,
+        },
+      ];
+
+      // Tambahkan direct chat untuk setiap rekan tim
+      for (const u of users) {
+        chats.push({
+          id: `dstech_chat_dm_${u.id}`,
+          name: u.name,
+          isGroup: false,
+          participants: ["dstech_usr_1", u.id],
+          userRole: u.role,
+          userPhone: u.phone,
+          lastMessage: `Kontak rekan tim: ${u.role}`,
+          lastMessageTime: new Date().toISOString(),
+          unreadCount: 0,
+        });
+      }
+
+      writeJsonSafe(CHATS_FILE, chats);
+    }
 
     // Filter chat yang relevan untuk user (jika userId diberikan), atau kembalikan semua chat jika tidak difilter
     const userChats = chats.map((c: any) => {
