@@ -3,9 +3,37 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
-- **2026-10-27**: [ANTREAN TUGAS BERIKUTNYA] Pengembangan Fitur Meeting Langsung / Video Conference Interaktif pada Aplikasi Smartphone [Tugas 236].
-  *Permintaan User*: "tolong catat juga untuk fitur kedepan saya ingin kamu membuatkan fitur meeting langsung pada aplikasi smartphone".
-  *Status*: Tercatat rapi dalam antrean pekerjaan ke depan, akan langsung dikerjakan segera setelah Tugas 235 (Live Streaming E-Store) selesai.
+- **2026-10-27**: [SEDANG BERJALAN] Perbaikan Gambar Produk Tidak Muncul pada Katalog Live Streaming SmartPro Virtual Host (/api/livestream, /api/products/sync-smartpro, & virtual-host.html) [Tugas 237].
+  *Permintaan User*: "gambar produknya tidak muncul" (dilampirkan screenshot modal SmartPro Virtual Host di mana thumbnail gambar katalog produk di sebelah kiri tidak muncul / kosong).
+  *Penyebab Masalah*:
+  - Saat sinkronisasi katalog produk dari DSTech Smart ke SmartPro WA Gateway, path gambar produk dikirimkan dalam format URL lokal relatif (seperti `/service-cctv.png`, `/about-image.png`, atau `/portfolio-industrial.png`).
+  - Ketika `virtual-host.html` dibuka di domain SmartPro (`https://smartpro.dstechsmart.com/virtual-host.html`), browser mencoba mengambil gambar dari `https://smartpro.dstechsmart.com/service-cctv.png` yang tidak ada di server SmartPro (menghasilkan status HTTP 404). Gambar sebenarnya berada di server DSTech Smart (`https://dstechsmart.com/service-cctv.png`).
+  - Pada `virtual-host.html`, elemen `<img>` pada panel katalog dan presentasi slide tidak memiliki konversi URL absolut otomatis dan fallback `onerror`.
+  *Langkah-langkah yang akan dilakukan*:
+  1. Memodifikasi `src/app/api/livestream/route.ts` dan `src/app/api/products/sync-smartpro/route.ts` agar saat menyinkronkan data katalog ke SmartPro, seluruh path gambar otomatis dikonversi menjadi URL absolut penuh (`https://dstechsmart.com${p.image}`).
+  2. Memperbarui `src/data/dstech_livestream.json` dengan URL gambar absolut resmi yang terverifikasi.
+  3. Memodifikasi `wa-gateway-server/public/virtual-host.html` dengan fungsi konversi URL cerdas `formatProductImageUrl()` dan fallback error `onerror="this.onerror=null;this.src='https://dstechsmart.com/kop_surat_dstech.jpg'"` sehingga thumbnail katalog produk dan slide presentasi 100% selalu muncul sempurna.
+  4. Menguji kompilasi dan build Next.js lokal, push ke GitHub, deploy ke server VPS live, mengunggah pembaruan `virtual-host.html` ke SmartPro di VPS, dan mentrigger re-sync katalog.
+  5. Verifikasi visual di browser live dan memperbarui status laporan menjadi SELESAI.
+- **2026-10-27**: [ANTREAN BERIKUTNYA] Pengembangan Fitur Meeting Langsung / Video Conference Interaktif pada Aplikasi Smartphone (/meeting/[roomCode], /employee, & /admin/meetings) [Tugas 236].
+  *Permintaan User*: "tolong catat juga untuk fitur kedepan saya ingin kamu membuatkan fitur meeting langsung pada aplikasi smartphone" & "ok, lanjutkan".
+  *Langkah-langkah yang akan dilakukan*:
+  1. Menyiapkan data store terisolasi prefix `dstech_` (`src/data/dstech_meetings.json`) untuk penyimpanan ruang rapat, agenda, kode room, status meeting ("ACTIVE" | "UPCOMING" | "ENDED"), tipe meeting ("INTERNAL_STAF" | "KONSULTASI_KLIEN" | "MAINTENANCE_SURVEY"), daftar peserta, dan log meeting.
+  2. Membangun API Endpoint `/api/meetings` (GET, POST, PATCH, DELETE) untuk membuat room, verifikasi kode room, update status, dan integrasi log kehadiran meeting staf/teknisi.
+  3. Membangun halaman antarmuka video conference mobile-first `/meeting/[roomCode]/page.tsx` khusus smartphone:
+     - Dukungan WebRTC video/audio call responsif layar HP (portrait & landscape) dan kompatibel penuh dengan Android WebView APK.
+     - Kontrol smartphone: Mic Mute/Unmute, Kamera Flip (Depan/Belakang untuk teknisi memperlihatkan panel CCTV/kabel lapangan), Chat Room, Bagikan Link WA, dan Angkat Tangan.
+  4. Mengintegrasikan kartu & tombol "📹 Ruang Meeting Langsung" di portal smartphone karyawan (`src/app/employee/page.tsx`):
+     - Jadwal meeting aktif hari ini (Briefing Pagi, Koordinasi Lapangan).
+     - Tombol "🚀 Masuk Meeting Sekarang" (auto-fill nama & role staf).
+     - Tombol "➕ Buat Meeting Instan Lapangan" untuk konsultasi darurat teknisi dengan SPV/kantor.
+  5. Membangun modul manajemen meeting di admin (`src/app/admin/meetings/page.tsx`):
+     - Pembuatan jadwal rapat resmi, kirim undangan otomatis via WhatsApp, dan pantauan room aktif.
+  6. Menambahkan menu navigasi "📹 Video Meeting" di sidebar admin (`src/app/admin/layout.tsx`), katalog pencarian, dan hak akses permissions pengguna (`src/utils/dstech_permissions.ts`).
+  7. Menguji kompilasi TypeScript (`npx tsc --noEmit`) dan build Next.js lokal.
+  8. Commit & push ke GitHub branch master.
+  9. Deploy ke server VPS live (157.66.34.199:11587) dan restart PM2 `dstech-main`.
+  10. Verifikasi visual di browser live, membersihkan folder cadangan sementara, dan memperbarui status laporan menjadi SELESAI.
 - **2026-10-27**: [SELESAI] Integrasi Fitur Live Streaming Penjualan Terhubung ke SmartPro WA Gateway pada E-Store (/shop), Halaman Nonton Live (/live), dan Studio Kontrol Admin (/admin/live-stream) [Tugas 235].
   *Permintaan User*: "selanjutnya saya ingin menambahkan fitur live streaming. sebelumnya kita sudah menghubungkan ke smartpro.dstechsmart.com. fitur itu ada disana, saya ingin agar fitur itu bisa sinkron ke website utama juga" & "nanti tampilnya di estor bukan halaman utama aplikasi".
   *Penyelesaian*:

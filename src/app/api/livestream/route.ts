@@ -63,6 +63,13 @@ function writeLiveStreamData(data: LiveStreamData) {
   }
 }
 
+function toAbsoluteImageUrl(img: string | undefined): string {
+  if (!img) return "https://dstechsmart.com/service-cctv.png";
+  if (img.startsWith("http://") || img.startsWith("https://")) return img;
+  if (img.startsWith("/")) return `https://dstechsmart.com${img}`;
+  return `https://dstechsmart.com/${img}`;
+}
+
 function readProducts(): any[] {
   try {
     if (!fs.existsSync(PRODUCTS_FILE)) return [];
@@ -80,13 +87,29 @@ export async function GET() {
     const liveData = readLiveStreamData();
     const products = readProducts();
 
-    // Attach detail current product
-    const currentProduct = products.find((p) => p.id === liveData.currentProductId) || products[0] || null;
+    // Attach detail current product dengan gambar absolut
+    const rawCurrent = products.find((p) => p.id === liveData.currentProductId) || products[0] || null;
+    const currentProduct = rawCurrent
+      ? {
+          ...rawCurrent,
+          image: toAbsoluteImageUrl(rawCurrent.image),
+          images: (Array.isArray(rawCurrent.images) && rawCurrent.images.length > 0)
+            ? rawCurrent.images.map(toAbsoluteImageUrl)
+            : [toAbsoluteImageUrl(rawCurrent.image)],
+        }
+      : null;
 
     // Attach featured products
     const featuredProducts = (liveData.featuredProductIds || [])
       .map((id) => products.find((p) => p.id === id))
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((p) => ({
+        ...p,
+        image: toAbsoluteImageUrl(p.image),
+        images: (Array.isArray(p.images) && p.images.length > 0)
+          ? p.images.map(toAbsoluteImageUrl)
+          : [toAbsoluteImageUrl(p.image)],
+      }));
 
     // Dynamic viewers fluctuation simulation (+/- 3)
     const randomizedViewers = Math.max(12, liveData.viewerCount + Math.floor(Math.random() * 7) - 3);
@@ -97,14 +120,23 @@ export async function GET() {
         ...liveData,
         viewerCount: randomizedViewers,
         currentProduct,
-        featuredProducts: featuredProducts.length > 0 ? featuredProducts : products.slice(0, 6),
+        featuredProducts: featuredProducts.length > 0 ? featuredProducts : products.slice(0, 6).map((p) => ({
+          ...p,
+          image: toAbsoluteImageUrl(p.image),
+          images: (Array.isArray(p.images) && p.images.length > 0)
+            ? p.images.map(toAbsoluteImageUrl)
+            : [toAbsoluteImageUrl(p.image)],
+        })),
         allProducts: products.map((p) => ({
           id: p.id,
           name: p.name,
           price: p.price,
           category: p.category,
           brand: p.brand || "DSTech Smart",
-          image: p.image || "/kop_surat_dstech.jpg",
+          image: toAbsoluteImageUrl(p.image),
+          images: (Array.isArray(p.images) && p.images.length > 0)
+            ? p.images.map(toAbsoluteImageUrl)
+            : [toAbsoluteImageUrl(p.image)],
           stock: p.stock ?? 10,
         })),
       },
@@ -144,18 +176,23 @@ export async function POST(req: Request) {
       try {
         const payload = {
           secret: MASTER_SECRET,
-          products: products.map((p, idx) => ({
-            id: p.id,
-            name: p.name,
-            price: typeof p.price === "number" ? `Rp ${p.price.toLocaleString("id-ID")}` : p.price,
-            numericPrice: typeof p.price === "number" ? p.price : 0,
-            category: p.category || "CCTV & Security",
-            brand: p.brand || "DSTech Smart",
-            description: p.description || p.name,
-            images: [p.image || "assets/package.png"],
-            stock: p.stock ?? 10,
-            index: idx + 1,
-          })),
+          products: products.map((p, idx) => {
+            const absImages = (Array.isArray(p.images) && p.images.length > 0)
+              ? p.images.map(toAbsoluteImageUrl)
+              : [toAbsoluteImageUrl(p.image)];
+            return {
+              id: p.id,
+              name: p.name,
+              price: typeof p.price === "number" ? `Rp ${p.price.toLocaleString("id-ID")}` : p.price,
+              numericPrice: typeof p.price === "number" ? p.price : 0,
+              category: p.category || "CCTV & Security",
+              brand: p.brand || "DSTech Smart",
+              description: p.description || p.name,
+              images: absImages,
+              stock: p.stock ?? 10,
+              index: idx + 1,
+            };
+          }),
         };
 
         const resSmartPro = await fetch(`${SMARTPRO_URL}/api/external/sync-products`, {

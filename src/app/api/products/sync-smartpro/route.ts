@@ -35,21 +35,32 @@ export async function POST() {
       return NextResponse.json({ success: false, error: "Tidak ada produk untuk disinkronkan" }, { status: 400 });
     }
 
+    function toAbsoluteImageUrl(img: string | undefined): string {
+      if (!img) return "https://dstechsmart.com/service-cctv.png";
+      if (img.startsWith("http://") || img.startsWith("https://")) return img;
+      if (img.startsWith("/")) return `https://dstechsmart.com${img}`;
+      return `https://dstechsmart.com/${img}`;
+    }
+
     // Format katalog untuk SmartPro (akun admin wa_catalog)
     const payload = {
       secret: MASTER_SECRET,
-      products: products.map((p: any) => ({
-        id: `PROD-${p.id}`,
-        name: p.name,
-        description: `${p.description || ""}\n\nGaransi: ${p.warranty || "Resmi PT. DSTech Smart Perkasa"}\nSpesifikasi: ${(p.features || []).join(", ")}`,
-        price: `Rp ${(Number(p.price) || 0).toLocaleString("id-ID")}`,
-        numericPrice: Number(p.price) || 0,
-        category: p.category || "Teknologi & Keamanan",
-        stock: p.stock > 0 ? "Ready Stock" : "Pre-Order",
-        images: Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image || "/service-cctv.png"],
-        features: Array.isArray(p.features) ? p.features : [],
-        is_active: 1,
-      })),
+      products: products.map((p: any) => {
+        const rawImages = Array.isArray(p.images) && p.images.length > 0 ? p.images : [p.image || "/service-cctv.png"];
+        const absImages = rawImages.map(toAbsoluteImageUrl);
+        return {
+          id: `PROD-${p.id}`,
+          name: p.name,
+          description: `${p.description || ""}\n\nGaransi: ${p.warranty || "Resmi PT. DSTech Smart Perkasa"}\nSpesifikasi: ${(p.features || []).join(", ")}`,
+          price: `Rp ${(Number(p.price) || 0).toLocaleString("id-ID")}`,
+          numericPrice: Number(p.price) || 0,
+          category: p.category || "Teknologi & Keamanan",
+          stock: p.stock > 0 ? "Ready Stock" : "Pre-Order",
+          images: absImages,
+          features: Array.isArray(p.features) ? p.features : [],
+          is_active: 1,
+        };
+      }),
     };
 
     const res = await fetch(`${SMARTPRO_URL}/api/external/sync-products`, {
