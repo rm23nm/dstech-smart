@@ -570,7 +570,7 @@ export default function EmployeeDashboard() {
   const [isDetectingCheckOutGps, setIsDetectingCheckOutGps] = useState<boolean>(false);
   const [gpsErrorCheckOut, setGpsErrorCheckOut] = useState<string | null>(null);
 
-  // Wajib Foto Selfie Kamera States & Refs (Kamera Langsung WebRTC Anti-Manipulasi)
+  // Wajib Foto Selfie Kamera States & Refs (Kamera Langsung WebRTC Anti-Manipulasi & Native Camera Intent Fallback)
   const [selfieCheckInPhoto, setSelfieCheckInPhoto] = useState<string | null>(null);
   const [selfieCheckOutPhoto, setSelfieCheckOutPhoto] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
@@ -581,19 +581,48 @@ export default function EmployeeDashboard() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  const nativeCheckInInputRef = useRef<HTMLInputElement | null>(null);
+  const nativeCheckOutInputRef = useRef<HTMLInputElement | null>(null);
 
   // Pasang stream secara reaktif setiap kali elemen video terpasang di DOM
   useEffect(() => {
     if (isCameraActive && cameraStream && videoRef.current) {
       const vid = videoRef.current;
       vid.srcObject = cameraStream;
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.setAttribute("playsinline", "true");
+      vid.setAttribute("webkit-playsinline", "true");
       vid.onloadedmetadata = () => {
         vid.play().catch((e) => console.log("Auto-play live camera error:", e));
       };
     }
   }, [isCameraActive, cameraStream]);
 
-  // Mulai Kamera Langsung Perangkat (Dengan Multi-Fallback untuk HP Android, iPhone & Desktop)
+  // Handler Native Camera Capture (Khusus Aplikasi DSTech Smart / Android WebView)
+  const handleNativeCameraCapture = (e: React.ChangeEvent<HTMLInputElement>, mode: "checkin" | "checkout") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        if (mode === "checkin") {
+          setSelfieCheckInPhoto(dataUrl);
+        } else {
+          setSelfieCheckOutPhoto(dataUrl);
+        }
+        stopCamera();
+        showToast("📸 Foto selfie berhasil diambil langsung dari kamera HP!");
+      }
+    };
+    reader.readAsDataURL(file);
+    // Reset input agar dapat mengambil foto kembali jika diinginkan
+    e.target.value = "";
+  };
+
+  // Mulai Kamera Langsung Perangkat (Dengan Multi-Fallback untuk HP Android, iPhone, Aplikasi WebView & Desktop)
   const startCamera = async (mode: "checkin" | "checkout", facing: "user" | "environment" = cameraFacing) => {
     try {
       setCameraError(null);
@@ -608,33 +637,55 @@ export default function EmployeeDashboard() {
         setCameraStream(null);
       }
 
-      if (typeof window === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Browser atau koneksi tidak mendukung akses kamera WebRTC. Pastikan situs dibuka melalui protokol aman HTTPS.");
-      }
+      // Helper MediaStream dengan multi-prefix support untuk Android WebView / Legacy Browser
+      const requestMediaStream = async (constraints: MediaStreamConstraints): Promise<MediaStream> => {
+        if (typeof window !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          return await navigator.mediaDevices.getUserMedia(constraints);
+        }
+        const legacyGUM =
+          (navigator as any).webkitGetUserMedia ||
+          (navigator as any).mozGetUserMedia ||
+          (navigator as any).getUserMedia;
+        if (legacyGUM) {
+          return new Promise((resolve, reject) => {
+            legacyGUM.call(navigator, constraints, resolve, reject);
+          });
+        }
+        throw new Error("WebRTC tidak didukung di dalam aplikasi/browser ini. Silakan gunakan tombol '📸 Buka Kamera HP Langsung' di bawah.");
+      };
 
       let stream: MediaStream | null = null;
 
-      // Percobaan 1: Coba dengan facingMode yang diminta (default kamera depan 'user')
+      // Percobaan 1: Ideal facingMode dengan resolusi mobile standar
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing },
+        stream = await requestMediaStream({
+          video: {
+            facingMode: { ideal: facing },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
           audio: false,
         });
       } catch (err1: any) {
-        console.warn("Coba 1 facingMode gagal, mencoba ideal constraint...", err1);
+        console.warn("Percobaan 1 gagal, mencoba facingMode langsung...", err1);
         try {
-          // Percobaan 2: Coba dengan ideal facingMode
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: facing } },
+          // Percobaan 2: Coba dengan exact facingMode string
+          stream = await requestMediaStream({
+            video: { facingMode: facing },
             audio: false,
           });
         } catch (err2: any) {
-          console.warn("Coba 2 ideal facingMode gagal, mencoba generic video: true...", err2);
-          // Percobaan 3: Fallback ke kamera manapun yang tersedia di perangkat
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          });
+          console.warn("Percobaan 2 gagal, mencoba generic video: true...", err2);
+          try {
+            // Percobaan 3: Generic fallback video true
+            stream = await requestMediaStream({
+              video: true,
+              audio: false,
+            });
+          } catch (err3: any) {
+            console.warn("Percobaan 3 gagal...", err3);
+            throw err3;
+          }
         }
       }
 
@@ -642,23 +693,28 @@ export default function EmployeeDashboard() {
         cameraStreamRef.current = stream;
         setCameraStream(stream);
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.play().catch(() => {});
+          const vid = videoRef.current;
+          vid.srcObject = stream;
+          vid.muted = true;
+          vid.playsInline = true;
+          vid.setAttribute("playsinline", "true");
+          vid.setAttribute("webkit-playsinline", "true");
+          vid.play().catch(() => {});
         }
       }
     } catch (err: any) {
-      console.error("Gagal membuka kamera HP/perangkat:", err);
+      console.error("Gagal membuka kamera HP/perangkat via WebRTC:", err);
       setIsCameraActive(false);
       setCameraMode(null);
-      let userFriendlyMsg = "Kamera tidak dapat diakses.";
+      let userFriendlyMsg = "Kamera live WebRTC tidak terhubung.";
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        userFriendlyMsg = "Izin kamera ditolak. Silakan berikan izin akses kamera di setelan browser atau ikon gembok URL HP Anda.";
+        userFriendlyMsg = "Izin kamera live dibatasi pada aplikasi ini. Silakan klik tombol '📸 Buka Kamera HP Langsung' di bawah untuk mengambil selfie.";
       } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
-        userFriendlyMsg = "Tidak ditemukan sensor kamera pada perangkat ini.";
+        userFriendlyMsg = "Tidak ditemukan sensor kamera WebRTC. Silakan gunakan tombol kamera HP di bawah.";
       } else if (err.name === "NotReadableError" || err.name === "TrackStartError") {
-        userFriendlyMsg = "Kamera sedang digunakan aplikasi lain (misal WhatsApp/Instagram). Tutup aplikasi tersebut dan coba lagi.";
+        userFriendlyMsg = "Kamera sedang digunakan aplikasi lain. Atau gunakan tombol kamera HP langsung.";
       } else if (err.name === "OverconstrainedError") {
-        userFriendlyMsg = "Kamera HP Anda tidak mendukung resolusi yang diminta. Coba gunakan browser Chrome terbaru.";
+        userFriendlyMsg = "Kamera tidak mendukung resolusi WebRTC. Gunakan tombol kamera HP langsung di bawah.";
       } else if (err.message) {
         userFriendlyMsg = err.message;
       }
@@ -4789,6 +4845,16 @@ export default function EmployeeDashboard() {
                   )}
                 </div>
 
+                {/* Input Native Camera Intent (Khusus Aplikasi DSTech Smart / Android WebView Fallback) */}
+                <input
+                  ref={nativeCheckInInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  className="hidden"
+                  onChange={(e) => handleNativeCameraCapture(e, "checkin")}
+                />
+
                 {selfieCheckInPhoto ? (
                   <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black group max-h-52 flex items-center justify-center">
                     <img
@@ -4796,16 +4862,25 @@ export default function EmployeeDashboard() {
                       alt="Selfie Check-In"
                       className="w-full h-48 object-cover rounded-xl"
                     />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-2 p-2">
                       <button
                         type="button"
                         onClick={() => {
                           setSelfieCheckInPhoto(null);
                           startCamera("checkin");
                         }}
-                        className="px-3.5 py-1.5 rounded-xl bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 shadow cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 shadow cursor-pointer flex items-center gap-1.5"
                       >
-                        Ambil Ulang Foto
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Ambil Ulang (Live)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => nativeCheckInInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Kamera HP Native</span>
                       </button>
                     </div>
                   </div>
@@ -4823,6 +4898,10 @@ export default function EmployeeDashboard() {
                             videoRef.current = el;
                             if (el && cameraStream && el.srcObject !== cameraStream) {
                               el.srcObject = cameraStream;
+                              el.muted = true;
+                              el.playsInline = true;
+                              el.setAttribute("playsinline", "true");
+                              el.setAttribute("webkit-playsinline", "true");
                               el.play().catch(() => {});
                             }
                           }}
@@ -4847,9 +4926,19 @@ export default function EmployeeDashboard() {
                     </div>
 
                     {cameraError && (
-                      <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-                        <span>{cameraError}</span>
+                      <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium space-y-2">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                          <span>{cameraError}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => nativeCheckInInputRef.current?.click()}
+                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer transition-all active:scale-95"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>📸 Buka Kamera HP Langsung Sekarang</span>
+                        </button>
                       </div>
                     )}
 
@@ -4871,6 +4960,16 @@ export default function EmployeeDashboard() {
                         Tutup
                       </button>
                     </div>
+
+                    {/* Tombol Alternatif Cepat Kamera Native Android */}
+                    <button
+                      type="button"
+                      onClick={() => nativeCheckInInputRef.current?.click()}
+                      className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Kamera live bermasalah? Klik di sini untuk buka Kamera HP langsung</span>
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-2 pt-1">
@@ -4880,10 +4979,20 @@ export default function EmployeeDashboard() {
                       className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                     >
                       <Camera className="w-4 h-4" />
-                      <span>Buka Kamera Langsung (Selfie Wajah)</span>
+                      <span>Buka Live Kamera (Google Chrome / Desktop)</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => nativeCheckInInputRef.current?.click()}
+                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>📸 Buka Kamera HP Langsung (Khusus Aplikasi DSTech Smart)</span>
+                    </button>
+
                     <p className="text-[10px] text-slate-400 text-center italic">
-                      * Sistem anti-manipulasi: Wajib menggunakan kamera langsung HP tanpa unggah file galeri.
+                      * Sistem anti-manipulasi: Wajib jepretan kamera langsung HP tanpa unggah file galeri.
                     </p>
                   </div>
                 )}
@@ -5225,6 +5334,16 @@ export default function EmployeeDashboard() {
                   )}
                 </div>
 
+                {/* Input Native Camera Intent (Khusus Aplikasi DSTech Smart / Android WebView Fallback) */}
+                <input
+                  ref={nativeCheckOutInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  className="hidden"
+                  onChange={(e) => handleNativeCameraCapture(e, "checkout")}
+                />
+
                 {selfieCheckOutPhoto ? (
                   <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-black group max-h-52 flex items-center justify-center">
                     <img
@@ -5232,16 +5351,25 @@ export default function EmployeeDashboard() {
                       alt="Selfie Check-Out"
                       className="w-full h-48 object-cover rounded-xl"
                     />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-2 p-2">
                       <button
                         type="button"
                         onClick={() => {
                           setSelfieCheckOutPhoto(null);
                           startCamera("checkout");
                         }}
-                        className="px-3.5 py-1.5 rounded-xl bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 shadow cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-white text-slate-900 font-bold text-xs hover:bg-slate-100 shadow cursor-pointer flex items-center gap-1.5"
                       >
-                        Ambil Ulang Foto
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Ambil Ulang (Live)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => nativeCheckOutInputRef.current?.click()}
+                        className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Kamera HP Native</span>
                       </button>
                     </div>
                   </div>
@@ -5259,6 +5387,10 @@ export default function EmployeeDashboard() {
                             videoRef.current = el;
                             if (el && cameraStream && el.srcObject !== cameraStream) {
                               el.srcObject = cameraStream;
+                              el.muted = true;
+                              el.playsInline = true;
+                              el.setAttribute("playsinline", "true");
+                              el.setAttribute("webkit-playsinline", "true");
                               el.play().catch(() => {});
                             }
                           }}
@@ -5283,9 +5415,19 @@ export default function EmployeeDashboard() {
                     </div>
 
                     {cameraError && (
-                      <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-medium flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-                        <span>{cameraError}</span>
+                      <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium space-y-2">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                          <span>{cameraError}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => nativeCheckOutInputRef.current?.click()}
+                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer transition-all active:scale-95"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>📸 Buka Kamera HP Langsung Sekarang</span>
+                        </button>
                       </div>
                     )}
 
@@ -5307,6 +5449,16 @@ export default function EmployeeDashboard() {
                         Tutup
                       </button>
                     </div>
+
+                    {/* Tombol Alternatif Cepat Kamera Native Android */}
+                    <button
+                      type="button"
+                      onClick={() => nativeCheckOutInputRef.current?.click()}
+                      className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Kamera live bermasalah? Klik di sini untuk buka Kamera HP langsung</span>
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-2 pt-1">
@@ -5316,10 +5468,20 @@ export default function EmployeeDashboard() {
                       className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
                     >
                       <Camera className="w-4 h-4" />
-                      <span>Buka Kamera Langsung (Selfie Wajah)</span>
+                      <span>Buka Live Kamera (Google Chrome / Desktop)</span>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => nativeCheckOutInputRef.current?.click()}
+                      className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer active:scale-95"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>📸 Buka Kamera HP Langsung (Khusus Aplikasi DSTech Smart)</span>
+                    </button>
+
                     <p className="text-[10px] text-slate-400 text-center italic">
-                      * Sistem anti-manipulasi: Wajib menggunakan kamera langsung HP tanpa unggah file galeri.
+                      * Sistem anti-manipulasi: Wajib jepretan kamera langsung HP tanpa unggah file galeri.
                     </p>
                   </div>
                 )}

@@ -6579,10 +6579,10 @@
 
 ---
 
-### 232. Tugas: Pembangunan Modul Mandiri Pengajuan & Approval Cuti, Izin Khusus, dan Sakit serta Master Kuota Cuti Karyawan (/employee, /admin/attendance, & /api/employee/leave) [SEDANG DIKERJAKAN]
+### 232. Tugas: Pembangunan Modul Mandiri Pengajuan & Approval Cuti, Izin Khusus, dan Sakit serta Master Kuota Cuti Karyawan (/employee, /admin/attendance, & /api/employee/leave) [SELESAI]
 - **Permintaan Pengguna**:
   - *"ok, lanjutkan lainnya"* (Melanjutkan penyelesaian antrean Tugas 109 yang belum tuntas terkait pengajuan dan manajemen Cuti, Izin, dan Sakit bagi karyawan dan admin).
-- **Status**: **SEDANG DIKERJAKAN**
+- **Status**: **SELESAI**
 - **Analisis & Rencana Solusi**:
   1. **Data Store Terisolasi Prefix `dstech_` (`src/data/dstech_leaves.json`)**:
      - Menyimpan data pengajuan cuti, izin, dan sakit (`dstech_leave_...`): ID, nama staf, tipe pengajuan (`ANNUAL_LEAVE` / `SPECIAL_PERMISSION` / `SICK_LEAVE`), rentang tanggal (mulai & selesai), total hari kerja terhitung, alasan/keperluan, link bukti dokumen / surat keterangan dokter (`attachmentUrl`), status (`PENDING` / `APPROVED` / `REJECTED`), reviewer, catatan persetujuan/penolakan, dan timestamp.
@@ -6613,17 +6613,40 @@
   5. [x] **Langkah 5**: Bangun antarmuka Formulir Pengajuan Cuti & Riwayat Kuota di Portal Karyawan (`src/app/employee/page.tsx`).
   6. [x] **Langkah 6**: Bangun Tab Manajemen Cuti, Rekap Kuota Karyawan, dan Otorisasi Approval di Admin Presensi (`src/app/admin/attendance/page.tsx`).
   7. [x] **Langkah 7**: Uji kompilasi lokal `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses.
-  8. [ ] **Langkah 8**: Push ke GitHub repository dan deploy live ke VPS aaPanel PM2 `dstech-main`.
-  9. [ ] **Langkah 9**: Verifikasi visual via browser testing di website live.
-  10. [ ] **Langkah 10**: Bersihkan folder cadangan sementara dan tandai Tugas 232 sebagai `[SELESAI]`.
+  8. [x] **Langkah 8**: Push ke GitHub repository dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  9. [x] **Langkah 9**: Verifikasi visual via browser testing di website live.
+  10. [x] **Langkah 10**: Bersihkan folder cadangan sementara dan tandai Tugas 232 sebagai `[SELESAI]`.
 
-- **2026-10-27**: [ANTREAN / AKAN DIKERJAKAN SETELAH TUGAS 232] Pengambilan Otomatis PPN Masukan dan PPN Keluaran Langsung dari Data Invoice (Faktur Penjualan & Purchase Order Supplier) (/admin/finance) (Tugas 233).
+- **2026-10-27**: [ANTREAN] Pengambilan Otomatis PPN Masukan dan PPN Keluaran Langsung dari Data Invoice (Faktur Penjualan & Purchase Order Supplier) (/admin/finance) (Tugas 233).
   *Permintaan User*: "untuk PPN masukkan dan keluaran bisakah diambil dari data invoicenya langsung?"
   *Rencana Step-by-Step Pengerjaan*:
   1. [ ] Analisis data transaksi invoice yang telah memiliki PPN (Faktur Penjualan / Sale Invoice sebagai PPN Keluaran, dan PO Supplier / Pembelian sebagai PPN Masukan).
   2. [ ] Siapkan penghubung langsung antara transaksi invoice dan modul pajak/SPT Masa PPN agar setiap invoice yang terbit atau lunas otomatis mengalirkan data DPP, PPN terhitung, nomor seri faktur pajak, dan tanggal masa pajak.
   3. [ ] Sediakan tab atau panel rekapitulasi PPN Masukan vs PPN Keluaran dengan selisih Lebih/Kurang Bayar PPN yang terkalkulasi otomatis secara real-time.
-  4. [ ] Kerjakan segera setelah Tugas 232 selesai 100% dan terverifikasi live.
+  4. [ ] Kerjakan setelah Tugas 234 selesai dan terverifikasi live.
+
+- **2026-10-27**: [SEDANG DIKERJAKAN] Resolusi Kompatibilitas Kamera Presensi pada Aplikasi DSTech Smart (Android WebView / APK Wrapper) & Fallback Native Camera Intent (/employee & /admin/attendance) (Tugas 234).
+  *Permintaan User*: "kalau memakai aplikasi dstech Smart selalu kamera live tidak terhubung, namun kalau pakai google chrome bisa untuk absesnsi. padahal sudah dihubungkan"
+  *Penyebab*:
+  1. Pada browser Google Chrome murni, WebRTC API (`navigator.mediaDevices.getUserMedia`) didukung penuh dengan perizinan native OS yang lancar.
+  2. Pada **Aplikasi DSTech Smart** (berbasis Android WebView / PWA / wrapper APK), WebRTC seringkali terblokir atau gagal karena Android WebView memerlukan implementasi khusus `WebChromeClient.onPermissionRequest` di level native Java/Kotlin, atau `navigator.mediaDevices` tidak mengekspos constraint kamera depan (`facingMode: "user"`), atau autoplay video terhambat.
+  3. Karena input foto kamera HP sebelumnya dihilangkan, karyawan yang membuka absensi dari dalam Aplikasi DSTech Smart tidak dapat mengambil foto selfie jika WebRTC WebView gagal.
+  *Rencana Solusi Step-by-Step*:
+  1. [x] **Langkah 1**: Catat analisis penyebab dan rencana solusi Tugas 234 di `LAPORAN_PROGRES.md`.
+  2. [ ] **Langkah 2**: Buat folder cadangan `_backup_camera_fix/` dan amankan file `src/app/employee/page.tsx` serta `src/app/admin/attendance/page.tsx`.
+  3. [ ] **Langkah 3**: Perkuat fungsi WebRTC `startCamera` di `src/app/employee/page.tsx` dengan:
+     - Fallback multi-prefix (`navigator.mediaDevices.getUserMedia`, `navigator.webkitGetUserMedia`, `navigator.mozGetUserMedia`, `navigator.getUserMedia`).
+     - Deteksi bertahap constraint: ideal facingMode -> exact facingMode -> generic `{ video: true }`.
+     - Pengaturan eksplisit properti DOM video: `vid.muted = true`, `vid.playsInline = true`, `vid.setAttribute("playsinline", "true")`, `vid.setAttribute("webkit-playsinline", "true")`.
+  4. [ ] **Langkah 4**: Sediakan tombol & alur pintar **"📸 Buka Kamera HP Langsung (Aplikasi DSTech Smart)"** dengan elemen `<input type="file" accept="image/*" capture="user" />`:
+     - Tombol ini muncul otomatis jika WebRTC gagal, terdeteksi error, atau sebagai alternatif 1-klik bagi staf yang membuka dari Aplikasi DSTech Smart.
+     - Atribut `capture="user"` memerintahkan Android OS membuka kamera selfie depan native secara langsung (bukan galeri foto).
+     - Hasil jepretan foto kamera native langsung dipasang ke state foto selfie (`selfiePhoto` / `checkoutSelfiePhoto`) dan siap untuk konfirmasi absensi.
+  5. [ ] **Langkah 5**: Terapkan perbaikan serupa pada modal Presensi Mandiri Admin di `src/app/admin/attendance/page.tsx`.
+  6. [ ] **Langkah 6**: Validasi kompilasi lokal `npx tsc --noEmit` (0 error) dan `npm run build` sukses.
+  7. [ ] **Langkah 7**: Push ke GitHub repository dan deploy live ke server VPS aaPanel PM2 `dstech-main`.
+  8. [ ] **Langkah 8**: Verifikasi fungsi di live website.
+  9. [ ] **Langkah 9**: Bersihkan folder cadangan sementara `_backup_camera_fix/` dan perbarui laporan progres menjadi `[SELESAI]`.
 
 ---
 

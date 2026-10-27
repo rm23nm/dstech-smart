@@ -263,6 +263,7 @@ export default function AdminAttendancePage() {
   const [selfSelfiePhoto, setSelfSelfiePhoto] = useState<string | null>(null);
   const selfVideoRef = useRef<HTMLVideoElement | null>(null);
   const selfCameraStreamRef = useRef<MediaStream | null>(null);
+  const adminNativeSelfCameraRef = useRef<HTMLInputElement | null>(null);
   const [selfGpsCoords, setSelfGpsCoords] = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
   const [selfGpsLocation, setSelfGpsLocation] = useState<string>("Mendeteksi lokasi satelit...");
   const [isSelfDetectingGps, setIsSelfDetectingGps] = useState(false);
@@ -273,11 +274,31 @@ export default function AdminAttendancePage() {
     if (isSelfCameraModalOpen && selfCameraStream && selfVideoRef.current) {
       const vid = selfVideoRef.current;
       vid.srcObject = selfCameraStream;
+      vid.muted = true;
+      vid.playsInline = true;
+      vid.setAttribute("playsinline", "true");
+      vid.setAttribute("webkit-playsinline", "true");
       vid.onloadedmetadata = () => {
         vid.play().catch((e) => console.log("Auto-play error:", e));
       };
     }
   }, [isSelfCameraModalOpen, selfCameraStream]);
+
+  // Handler Native Camera Capture Admin
+  const handleAdminNativeCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      if (dataUrl) {
+        setSelfSelfiePhoto(dataUrl);
+        stopSelfCamera();
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
 
   // Modal States
   const [gpsModal, setGpsModal] = useState<{
@@ -677,27 +698,48 @@ export default function AdminAttendancePage() {
         setSelfCameraStream(null);
       }
 
-      if (typeof window === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Browser tidak mendukung WebRTC kamera atau belum menggunakan HTTPS.");
-      }
+      // Helper MediaStream dengan multi-prefix support untuk Android WebView / Legacy Browser
+      const requestMediaStream = async (constraints: MediaStreamConstraints): Promise<MediaStream> => {
+        if (typeof window !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          return await navigator.mediaDevices.getUserMedia(constraints);
+        }
+        const legacyGUM =
+          (navigator as any).webkitGetUserMedia ||
+          (navigator as any).mozGetUserMedia ||
+          (navigator as any).getUserMedia;
+        if (legacyGUM) {
+          return new Promise((resolve, reject) => {
+            legacyGUM.call(navigator, constraints, resolve, reject);
+          });
+        }
+        throw new Error("WebRTC tidak didukung di dalam aplikasi/browser ini. Silakan gunakan tombol '📸 Buka Kamera HP Langsung' di bawah.");
+      };
 
       let stream: MediaStream | null = null;
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing },
+        stream = await requestMediaStream({
+          video: {
+            facingMode: { ideal: facing },
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+          },
           audio: false,
         });
       } catch (e1) {
         try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: facing } },
+          stream = await requestMediaStream({
+            video: { facingMode: facing },
             audio: false,
           });
         } catch (e2) {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false,
-          });
+          try {
+            stream = await requestMediaStream({
+              video: true,
+              audio: false,
+            });
+          } catch (e3) {
+            throw e3;
+          }
         }
       }
 
@@ -705,17 +747,22 @@ export default function AdminAttendancePage() {
         selfCameraStreamRef.current = stream;
         setSelfCameraStream(stream);
         if (selfVideoRef.current) {
-          selfVideoRef.current.srcObject = stream;
-          selfVideoRef.current.play().catch(() => {});
+          const vid = selfVideoRef.current;
+          vid.srcObject = stream;
+          vid.muted = true;
+          vid.playsInline = true;
+          vid.setAttribute("playsinline", "true");
+          vid.setAttribute("webkit-playsinline", "true");
+          vid.play().catch(() => {});
         }
       }
     } catch (err: any) {
       console.error("Camera error admin attendance:", err);
-      let msg = "Kamera tidak dapat diakses.";
+      let msg = "Kamera live WebRTC tidak terhubung.";
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        msg = "Izin kamera ditolak. Silakan izinkan akses kamera di pengaturan browser Anda.";
+        msg = "Izin kamera live dibatasi pada aplikasi ini. Silakan gunakan tombol '📸 Buka Kamera HP Langsung' di bawah.";
       } else if (err.name === "NotFoundError") {
-        msg = "Sensor kamera tidak ditemukan pada perangkat Anda.";
+        msg = "Sensor kamera tidak ditemukan pada perangkat Anda. Silakan gunakan tombol kamera HP di bawah.";
       } else if (err.message) {
         msg = err.message;
       }
@@ -3913,19 +3960,38 @@ export default function AdminAttendancePage() {
                   )}
                 </div>
 
+                {/* Input Native Camera Intent (Khusus Aplikasi DSTech Smart / Android WebView Fallback) */}
+                <input
+                  ref={adminNativeSelfCameraRef}
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  className="hidden"
+                  onChange={handleAdminNativeCameraCapture}
+                />
+
                 {selfSelfiePhoto ? (
                   <div className="relative rounded-2xl overflow-hidden border border-slate-200 shadow-inner bg-black h-60 flex items-center justify-center">
                     <img src={selfSelfiePhoto} alt="Selfie Preview" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-2 p-2">
                       <button
                         type="button"
                         onClick={() => {
                           setSelfSelfiePhoto(null);
                           startSelfCamera("user");
                         }}
-                        className="px-4 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-md cursor-pointer hover:bg-slate-100"
+                        className="px-3.5 py-2 rounded-xl bg-white text-slate-900 font-bold text-xs shadow-md cursor-pointer hover:bg-slate-100 flex items-center gap-1.5"
                       >
-                        Ambil Ulang Foto
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Ambil Ulang (Live)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => adminNativeSelfCameraRef.current?.click()}
+                        className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Kamera HP Native</span>
                       </button>
                     </div>
                   </div>
@@ -3943,6 +4009,10 @@ export default function AdminAttendancePage() {
                             selfVideoRef.current = el;
                             if (el && selfCameraStream && el.srcObject !== selfCameraStream) {
                               el.srcObject = selfCameraStream;
+                              el.muted = true;
+                              el.playsInline = true;
+                              el.setAttribute("playsinline", "true");
+                              el.setAttribute("webkit-playsinline", "true");
                               el.play().catch(() => {});
                             }
                           }}
@@ -3969,9 +4039,19 @@ export default function AdminAttendancePage() {
                     </div>
 
                     {selfCameraError && (
-                      <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-start gap-2">
-                        <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-                        <span>{selfCameraError}</span>
+                      <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-medium space-y-2">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+                          <span>{selfCameraError}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => adminNativeSelfCameraRef.current?.click()}
+                          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer transition-all active:scale-95"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>📸 Buka Kamera HP Langsung Sekarang</span>
+                        </button>
                       </div>
                     )}
 
@@ -3983,6 +4063,15 @@ export default function AdminAttendancePage() {
                     >
                       <Camera className="w-4 h-4" />
                       <span>Jepret Foto Selfie Sekarang</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => adminNativeSelfCameraRef.current?.click()}
+                      className="w-full py-2 px-3 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-bold text-[11px] flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>Kamera live bermasalah? Buka Kamera HP Langsung</span>
                     </button>
                   </div>
                 )}
