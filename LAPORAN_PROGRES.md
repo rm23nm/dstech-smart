@@ -3,6 +3,113 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-28**: [SELESAI] Perbaikan Audio Speaker WebRTC, Nada Dering Telepon (Ringtone), Notifikasi Panggilan Masuk Global Lintas Halaman, dan Pengaktifan Kamera Belakang Android (/components/GlobalCallListener.tsx, /meeting/[roomCode]/page.tsx, /admin/layout.tsx, /employee, & TeamChatMessenger.tsx) [Tugas 245].
+  *Permintaan User*: "saya uji coba melakukan panggilan gak ada keluar suara speaker, kemudian untuk notif suara masuk dan panggilan vidio harus buka pesan dulu baru muncul. tidak muncul langsung saat luar. dan tidak ada suara panggilan juga", dan "kemudian pada saat melakukan panggilan vidio, hanya bisa memakai kamera depan, kamera belakang tidak bisa di aktifkan atau diganti".
+  *Penyebab Masalah yang Ditemukan*:
+  1. Suara Speaker Panggilan: Modal panggilan aktif (`isCallingModalOpen`) belum mengarahkan stream audio/video WebRTC ke elemen audio/video native yang terhubung langsung ke audio output/speaker perangkat. Di `RemotePeerTile`, elemen `<video>` berpotensi di-mute browser tanpa elemen `<audio autoPlay playsInline />` khusus.
+  2. Notifikasi Panggilan Masuk Hanya Ada di Halaman Chat: Pengecekan panggilan masuk sebelumnya hanya berada di dalam `TeamChatMessenger.tsx` yang hanya aktif saat tab pesan dibuka. Ketika berada di dashboard lain, panggilan tidak terpantau.
+  3. Ketiadaan Nada Dering (Ringtone/Dialtone): Belum ada audio synthesizer untuk nada dering masuk dan nada sambung keluar.
+  4. Kamera Belakang Gagal Diaktifkan: Pada `requestMediaStream`, fallback constraint kamera sebelumnya menghapus parameter `facingMode` menjadi `video: true` (sehingga browser Android kembali ke kamera default/depan). Selain itu, belum memanfaatkan `enumerateDevices()` untuk mencari ID sensor kamera belakang (*rear/back camera*), dan terjadi race condition antara `useEffect([facingMode])` dan fungsi flipping.
+  *Penyelesaian & Hasil*:
+  1. **Komponen Notifikasi Panggilan Masuk Global Lintas Halaman (`GlobalCallListener.tsx`)**:
+     - Membangun background listener dengan polling interval 3 detik yang dipasang pada root layout Admin (`/admin/layout.tsx`) dan Portal Karyawan (`/employee/page.tsx`).
+     - Menyajikan pop-up overlay panggilan masuk dengan animasi ringing berkedip, avatar pemanggil, indikator Audio Call / Video Call, tombol Terima (Hijau), dan Tolak (Merah) di mana pun user berada di dalam aplikasi.
+  2. **Synthesizer Nada Dering Telepon Web Audio API (`dstech_call_audio.ts`)**:
+     - Membuat generator nada dering Web Audio API in-house (dual-tone 440Hz + 480Hz standar telekomunikasi) untuk panggilan masuk dan dialtone (425Hz) untuk panggilan keluar tanpa membutuhkan file audio eksternal.
+     - Suara dering langsung berdering keras dan otomatis berhenti seketika saat panggilan diterima, ditolak, atau dibatalkan.
+  3. **Penyambungan Audio Speaker WebRTC**:
+     - Menambahkan dedicated element `<audio ref={audioRef} autoPlay playsInline />` di dalam `RemotePeerTile` pada `/meeting/[roomCode]/page.tsx` sehingga browser tidak lagi memblokir audio track saat video di-minimize atau dalam mode panggilan suara.
+     - Menggabungkan penanganan `pc.ontrack` untuk menyatukan stream audio dan video remote peer ke speaker perangkat secara otomatis.
+  4. **Perbaikan Handal Kamera Belakang Android (Flip Camera)**:
+     - Mengimplementasikan `findCameraDeviceId()` dengan deteksi cerdas `navigator.mediaDevices.enumerateDevices()` yang secara spesifik mencari sensor kamera belakang (*back/rear/environment*).
+     - Menambahkan multi-stage fallback dengan `facingMode: { ideal: mode }` dan resolusi fleksibel sehingga tidak lagi memicu `OverconstrainedError` pada sensor kamera smartphone teknisi.
+     - Menambahkan ref `isFlippingRef` untuk mencegah tabrakan/race condition antara `useEffect` inisialisasi dan fungsi switch camera.
+     - Memperbarui tampilan video lokal secara instan baik pada layar pra-bergabung (pre-join preview) maupun di dalam ruang rapat (in-meeting).
+  5. **Pengujian & Deployment**:
+     - Validasi `npx tsc --noEmit` lolos 0 error.
+     - Build lokal Next.js sukses 100% (75/75 halaman terkompilasi).
+     - Sinkronisasi GitHub commit `1ce6f5f` dan live deploy ke VPS Ubuntu dengan PM2 `dstech-main` (PID 1923911) berjalan normal.
+
+- **2026-10-28**: [SELESAI] Desain Antarmuka Tab Pesan Mobile Khusus Smartphone Android (Mobile-First Chat UX) pada Aplikasi DStech Smart (TeamChatMessenger.tsx & /employee) [Tugas 244].
+  *Permintaan User*: "pada aplikasi android saya ingin tab khusus yang meunculkan pesan, bukan seperti WA web, tapi fitur pesan mobile khusus".
+  *Penyelesaian & Hasil*:
+  1. **Layout Mobile-First Single-Stack ala WhatsApp Android**:
+     - Mengubah container chat di layar smartphone agar tidak lagi menggunakan 2 kolom terbelah (split-view ala WA Web).
+     - Di layar mobile (`< md`), saat membuka tab pesan, pengguna disajikan daftar obrolan & direktori kontak tim layar penuh yang nyaman disentuh.
+  2. **Navigasi Percakapan Mobile (Transisi Halus & Tombol Kembali)**:
+     - Ketika pengguna mengklik kontak rekan tim atau obrolan, layar secara instan beralih ke ruang pesan layar penuh (*full-screen mobile chat*).
+     - Header ruang obrolan dilengkapi tombol panah **< Kembali** di pojok kiri atas untuk kembali ke daftar obrolan kapan saja tanpa membingungkan navigasi browser/aplikasi.
+     - Kolom ketik pesan, tombol lampiran data perusahaan, dan kontrol panggilan video/audio teroptimasi penuh untuk genggaman satu tangan di HP Android teknisi.
+  3. **Pengujian & Deployment**:
+     - `npx tsc --noEmit` lolos 0 error.
+     - Live deploy sukses ke VPS server dan PM2 `dstech-main` online.
+
+- **2026-10-28**: [SELESAI] Perbaikan Tampilan Direktori Kontak Pengguna & Inisialisasi Otomatis Rekan Tim pada DStech Connect Messenger (/api/team-chat & TeamChatMessenger.tsx) [Tugas 243].
+  *Permintaan User*: "untuk user-usernya dimana? kenapa gak muncul?" (dilampirkan screenshot monitor halaman Admin Chat di mana panel kiri obrolan kosong karena belum ada inisialisasi thread chat).
+  *Penyebab Masalah yang Ditemukan*:
+  1. `src/data/` dikecualikan (`.gitignore`) dari Git commit sehingga file `dstech_team_chats.json` belum tercipta di server live VPS saat deploy.
+  2. Logika backend API `/api/team-chat` sebelumnya hanya membaca file `dstech_team_chats.json` tanpa auto-generate thread chat dari master pengguna (`dstech_users.json`) jika data chat kosong.
+  3. UI Panel Kiri belum memiliki tab navigasi cepat untuk melihat seluruh direktori anggota tim / kontak rekan kerja (Admin, Teknisi, Finance, dll).
+  *Penyelesaian & Hasil*:
+  1. Menambahkan Auto-initialization thread chat tim di backend (`/api/team-chat/route.ts`): jika data chat kosong, sistem secara otomatis membaca master user dari `dstech_users.json` dan membuatkan thread chat grup koordinasi serta kontak 1-on-1 untuk setiap anggota tim.
+  2. Menambahkan Tab Filter pada Panel Kiri: `[💬 Obrolan]` dan `[👥 Kontak Tim]`.
+  3. Menampilkan seluruh anggota tim terdaftar (Super Admin, Admin Operasional, RAMADHANI ST, Marshanda Salwa Agustina, dll.) lengkap dengan badge role, nomor telepon, status online, dan tombol cepat chat/panggilan.
+  4. Kompilasi `npx tsc --noEmit` lolos 0 error dan pembaruan live aktif di VPS server.
+
+- **2026-10-28**: [SELESAI] Implementasi Fitur Pesan Mandiri ala WhatsApp (DStech Connect / Team Chat) Terintegrasi Data Perusahaan (Invoice, SPK Penugasan, Bukti Kerja) & Panggilan Video/Suara WebRTC Native (/chat, /admin/chat, /employee, /api/team-chat) [Tugas 242].
+  *Permintaan User*: "saya ingin kamu membuatkan fitur pesan sendiri seperti WA pada aplikasi, bisa melakukan panggilan vidio, kirim pesan teks atau vidio, panggilan biasa. dan nantinya saya juga bisa berkomunikasi dengan team terhubung dengan data perusahaan, seperti invoice, surat penugasan, kirim bukti pekerjaan dan lain-lain".
+  *Penyelesaian & Hasil*:
+  1. **Struktur Data Ber-Prefix `dstech_` Sesuai Aturan Global**:
+     - `src/data/dstech_team_chats.json`: Menyimpan thread percakapan 1-on-1 dan grup koordinasi tim internal.
+     - `src/data/dstech_team_messages.json`: Menyimpan riwayat pesan multi-tipe (teks, invoice, SPK penugasan, bukti kerja harian, dan call log).
+     - `src/data/dstech_team_calls.json`: Tracking status pensinyalan panggilan suara/video 1-on-1 real-time.
+  2. **Backend API Terpadu (`/api/team-chat` & `/api/team-chat/call`)**:
+     - GET/POST percakapan dan pesan dengan dukungan auto-preview.
+     - Integrasi data ERP Keuangan: Mengambil faktur penagihan resmi dari `dstech_finance_erp.json` untuk dikirim langsung ke obrolan sebagai kartu invoice interaktif.
+     - Integrasi Penugasan Teknisi: Mengambil tiket tugas lapangan dari `dstech_employee_tasks.json` untuk dikirim ke chat sebagai kartu SPK resmi.
+     - Form Pengiriman Bukti Kerja: Teknisi dapat langsung melampirkan laporan pekerjaan (deskripsi, foto bukti kerja, dan progres %) langsung dari percakapan.
+     - Pensinyalan Panggilan WebRTC: End-point pensinyalan panggilan masuk (`calling`), terima (`connected`), tolak (`declined`), dan selesai (`ended`) lengkap dengan pencatatan otomatis riwayat panggilan ke pesan chat.
+  3. **Antarmuka Lengkap ala WhatsApp Web (`TeamChatMessenger.tsx`)**:
+     - Panel kiri: Daftar Kontak/Thread percakapan tim dengan avatar, status online, badge role, pencarian kontak, dan preview pesan terakhir.
+     - Panel kanan: Header lawan bicara dengan status terenkripsi + tombol 📞 Panggilan Suara & 📹 Video Call.
+     - Bubble pesan dengan tampilan kartu interaktif Invoice, SPK Penugasan, dan Bukti Kerja Lapangan.
+     - Modal Notifikasi Panggilan Masuk real-time (bunyi/animasi dengan tombol terima hijau dan tolak merah).
+     - Ruang panggilan WebRTC in-house mandiri dengan visualizer gelombang audio HD dan video call room.
+  4. **Penyebaran Antarmuka**:
+     - Menu baru "💬 Pesan Tim (Chat)" di Sidebar Admin (`/admin/layout.tsx` & `/admin/chat`).
+     - Tab baru "💬 Chat Tim" di Portal Karyawan (`/employee`) baik mode desktop maupun smartphone.
+     - Halaman mandiri `/chat` responsif untuk akses cepat via tautan langsung.
+  5. **Pengujian & Deployment**:
+     - `npx tsc --noEmit` lolos 0 error.
+     - Production build Next.js lokal sukses 100% (75/75 rute terkompilasi).
+
+- **2026-10-28**: [SELESAI] Perbaikan Aset Selalu Muncul Kembali Setelah Dihapus pada Manajemen Aset Perusahaan (/admin/assets & /api/assets/route.ts) [Tugas 241].
+  *Permintaan User*: "aset setelah habis dihapus kenapa selalu muncul kembali" (dilampirkan screenshot halaman Pengelolaan Aset Perusahaan di mana aset bawaan kembali muncul setelah dihapus).
+  *Penyebab Masalah yang Ditemukan*:
+  - Pada `src/app/api/assets/route.ts`, fungsi `readAssets()` sebelumnya memiliki logika validasi: `if (!Array.isArray(parsed) || parsed.length === 0) { writeAssets(DEFAULT_ASSETS); return DEFAULT_ASSETS; }`.
+  - Akibatnya, setiap kali pengguna menghapus seluruh aset hingga data menjadi kosong (`[]`), sistem salah menganggap data aset belum pernah diinisialisasi dan otomatis menulis ulang seluruh `DEFAULT_ASSETS` ke file `dstech_assets.json`.
+  *Penyelesaian & Hasil*:
+  1. Memperbaiki logika `readAssets()` pada `src/app/api/assets/route.ts`:
+     - Default data hanya dibuat sekali jika file `dstech_assets.json` benar-benar belum ada di disk (`!fs.existsSync(ASSETS_FILE)`).
+     - Menghapus pengecekan `parsed.length === 0`. Jika pengguna telah menghapus seluruh aset sehingga array bernilai `[]`, sistem menghormati tindakan tersebut dan mengembalikan data kosong tanpa me-reseed ulang data lama.
+  2. Menguji validasi penghapusan aset: data aset yang dihapus kini tersimpan permanen dan tidak akan pernah bangkit kembali secara otomatis.
+
+- **2026-10-28**: [SELESAI] Perbaikan Tombol Keluar & Kembali Ruang Rapat Serta Integrasi Fitur PIN / Password Ruangan Meeting (/meeting/[roomCode], /api/meetings, & /admin/meetings) [Tugas 240].
+  *Permintaan User*: "diklik kembali juga belum berfungsi", "kita klik tinggalkan ruang rapat/keluar tidak fungsi", & "kalau mau kasih pasword ruangan meeting bagai mana?".
+  *Penyebab Masalah yang Ditemukan*:
+  1. Tombol 'Kembali' dan 'Keluar' sebelumnya memanggil `router.back()`. Ketika tautan meeting dibuka langsung di tab baru (direct link), riwayat browser kosong (`history.length = 1`) sehingga browser tidak bergerak ke mana pun dan tombol tampak macet.
+  2. Dialog native `window.confirm()` berpotensi dicekal oleh sistem popup browser modern, terutama dalam mode interaktif video.
+  3. Ketiadaan fitur pengamanan PIN/Password untuk membatasi akses ruang rapat khusus/rahasia.
+  *Penyelesaian & Hasil*:
+  1. Mengganti seluruh navigasi 'Kembali' dan 'Keluar' dengan fungsi `handleSafeExitNavigation()` berbasis `window.location.href`:
+     - Jika staf/teknisi: otomatis dialihkan kembali ke Portal Karyawan (`/employee`).
+     - Jika admin/host: otomatis dialihkan kembali ke Dashboard Rapat Admin (`/admin/meetings`).
+     - Jika tamu: otomatis dialihkan ke Beranda (`/`).
+  2. Membangun Modal Dialog Konfirmasi Keluar In-App ("Tinggalkan Ruang Rapat?") yang elegan tanpa dependensi `confirm()` browser. Saat pengguna mengonfirmasi keluar, seluruh media track kamera dan mikrofon dimatikan bersih (`track.stop()`) agar lampu hardware kamera langsung padam.
+  3. Menambahkan Fitur Keamanan PIN / Password Ruangan Meeting:
+     - Backend API (`/api/meetings/route.ts`): Menyimpan dan memvalidasi `password` dan `requiresPassword`.
+     - Admin Meeting Manager (`/admin/meetings/page.tsx`): Menambahkan input "PIN / Password Akses Ruangan (Opsional)" pada formulir pembuatan dan edit rapat.
+     - Ruang Rapat Native (`/meeting/[roomCode]/page.tsx`): Jika ruangan diproteksi PIN, layar pra-bergabung mewajibkan input PIN dengan validasi instan sebelum diizinkan masuk. Dilengkapi juga modal "Kunci PIN" bagi Host/Admin untuk mengatur atau mengubah password ruangan secara fleksibel.
 - **2026-10-28**: [SELESAI] Implementasi Ruang Video Meeting Native WebRTC Mandiri 100% Buatan Sendiri (In-House Video Call & Signaling Engine seperti SmartDesk/SmartShare) pada (/meeting/[roomCode] & /api/meetings/signal) [Tugas 239].
   *Permintaan User*: "terkait fitur meeting dengan aplikasi sendiri tanpa menggunakan aplikasi orang bagai mana?", "ok, coba kamu cek aplikasi kita sebelumnya, bukannya kita juga sudah buat aplikasi smartdesk dan smartshare yang mirip seperti ini", & "ok, mari kita lanjutkan".
   *Penyebab & Analisis Kebutuhan*:
