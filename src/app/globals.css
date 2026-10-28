@@ -237,3 +237,14 @@ body {
   }
 }
 
+/* =========================================================================
+   MODE APLIKASI ANDROID NATIVE
+   Sembunyikan tombol floating chat dan elemen web browser yang mengganggu
+   ========================================================================= */
+.dstech-android-app .ai-chat-widget-container,
+.dstech-android-app [class*="AIChatWidget"],
+body[data-dstech-app="android"] .ai-chat-widget-container {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

@@ -45,9 +45,14 @@ interface TeamChatMessengerProps {
     phone?: string;
   };
   embeddedMode?: boolean; // Jika dipasang di dalam tab employee atau admin
+  standaloneMobileApp?: boolean; // Mode murni mobile app (100% full-screen WhatsApp style)
 }
 
-export default function TeamChatMessenger({ currentUser, embeddedMode = false }: TeamChatMessengerProps) {
+export default function TeamChatMessenger({
+  currentUser,
+  embeddedMode = false,
+  standaloneMobileApp = false,
+}: TeamChatMessengerProps) {
   // State Percakapan
   const [chats, setChats] = useState<any[]>([]);
   const [activeChat, setActiveChat] = useState<any | null>(null);
@@ -521,7 +526,15 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
   );
 
   return (
-    <div className={`flex flex-col bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative ${embeddedMode ? "h-[750px]" : "h-[calc(100vh-140px)]"}`}>
+    <div
+      className={`flex flex-col bg-slate-950 relative overflow-hidden ${
+        standaloneMobileApp
+          ? "h-full w-full rounded-none border-0 shadow-none"
+          : embeddedMode
+          ? "h-[750px] border border-slate-800 rounded-2xl shadow-2xl"
+          : "h-[calc(100vh-140px)] border border-slate-800 rounded-2xl shadow-2xl"
+      }`}
+    >
       {/* ================= INCOMING CALL NOTIFICATION BANNER / MODAL ================= */}
       {incomingCall && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border-2 border-emerald-500/80 rounded-2xl p-4 shadow-2xl flex items-center gap-4 text-white animate-bounce backdrop-blur-md max-w-md w-full mx-4">

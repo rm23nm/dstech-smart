@@ -276,6 +276,25 @@ export async function POST(request: Request) {
       const { location, notes, latitude, longitude, accuracy, mapsUrl, projectId, projectName, projectRole } = body;
       const selfieCheckIn = body.selfieCheckIn || body.selfiePhoto || null;
 
+      // 0. Validasi Penguncian: Karyawan hanya boleh absen masuk 1 KALI per hari!
+      const existingCheckInRecord = data.attendance.find((a: any) => {
+        const matchDate = a.date === dateStr;
+        if (!matchDate) return false;
+        const matchName = targetEmpName && a.employeeName && a.employeeName.trim().toLowerCase() === targetEmpName;
+        const matchEmail = targetEmpEmail && a.employeeEmail && a.employeeEmail.trim().toLowerCase() === targetEmpEmail;
+        return Boolean(matchName || matchEmail);
+      });
+
+      if (existingCheckInRecord && existingCheckInRecord.checkIn && existingCheckInRecord.checkIn !== "-" && !body.isSuperAdminBypass) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Presensi Masuk Terkunci: Anda sudah melakukan absen masuk hari ini pada pukul ${existingCheckInRecord.checkIn}. Anda hanya tinggal melakukan Absen Pulang (Check-Out)!`,
+          },
+          { status: 400 }
+        );
+      }
+
       // 1. Validasi Wajib Koordinat GPS (Input manual dilarang!)
       if (latitude === undefined || latitude === null || longitude === undefined || longitude === null || latitude === "" || longitude === "") {
         return NextResponse.json(

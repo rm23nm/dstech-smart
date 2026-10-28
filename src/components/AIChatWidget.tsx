@@ -177,8 +177,31 @@ export default function AIChatWidget() {
   const [visitorGeo, setVisitorGeo] = useState<any>(null);
   const [hasUnread, setHasUnread] = useState(true);
   const [showTeaser, setShowTeaser] = useState(false);
+  const [isAndroidApp, setIsAndroidApp] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Deteksi lingkungan aplikasi Android / WebView native
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const ua = navigator.userAgent || "";
+      const isNative =
+        ua.includes("DSTechSmartApp") ||
+        !!(window as any).DStechNative ||
+        document.documentElement.classList.contains("dstech-android-app") ||
+        window.location.search.includes("is_app=true") ||
+        window.location.search.includes("mode=app") ||
+        sessionStorage.getItem("dstech_is_android_app") === "true";
+
+      if (isNative) {
+        setIsAndroidApp(true);
+        try {
+          sessionStorage.setItem("dstech_is_android_app", "true");
+          document.documentElement.classList.add("dstech-android-app");
+        } catch (e) {}
+      }
+    }
+  }, []);
 
   // Ambil user login aktif dari berbagai sesi
   useEffect(() => {
@@ -256,12 +279,18 @@ export default function AIChatWidget() {
     }
   }, [messages, isOpen]);
 
-  // Teaser bubble timeout
+  // Event listener global untuk membuka AI Copilot jika dipicu via menu bantuan
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!isOpen) setShowTeaser(true);
-    }, 4500);
-    return () => clearTimeout(timer);
+    const handleOpenCopilot = () => {
+      setIsOpen(true);
+    };
+    window.addEventListener("dstech_open_copilot", handleOpenCopilot);
+    return () => window.removeEventListener("dstech_open_copilot", handleOpenCopilot);
+  }, []);
+
+  // Teaser bubble dinonaktifkan agar tidak muncul tiba-tiba dan mengganggu operasional
+  useEffect(() => {
+    setShowTeaser(false);
   }, [isOpen]);
 
   // Muat riwayat chat dari localStorage
@@ -399,8 +428,24 @@ export default function AIChatWidget() {
     }
   };
 
+  if (isAndroidApp) {
+    return null;
+  }
+
+  // Pada portal internal (Admin, Superadmin, Employee, Mobile Chat), sembunyikan tombol mengambang di pojok layar
+  // Hanya buka jendela jika pengguna secara eksplisit mengklik menu/tautan bantuan AI Copilot
+  const isInternalPortal =
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/superadmin") ||
+    pathname.startsWith("/employee") ||
+    pathname.startsWith("/mobile-chat");
+
+  if (isInternalPortal && !isOpen) {
+    return null;
+  }
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 print:hidden font-sans">
+    <div className="ai-chat-widget-container fixed bottom-6 right-6 z-50 print:hidden font-sans">
       {/* Floating Teaser Pop-up Bubble (sebelum chat dibuka) */}
       {!isOpen && showTeaser && (
         <div className="absolute bottom-20 right-0 w-80 bg-white p-4 rounded-3xl shadow-2xl border border-slate-100 animate-in fade-in slide-in-from-bottom-3 duration-300">

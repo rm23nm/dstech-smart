@@ -882,6 +882,10 @@ export default function EmployeeDashboard() {
   };
 
   const openCheckInModal = () => {
+    if (todayAttendance?.checkIn && todayAttendance.checkIn !== "-") {
+      showToast(`Presensi Masuk Terkunci: Anda sudah melakukan absen masuk hari ini pukul ${todayAttendance.checkIn}. Silakan lakukan Check-Out saat jam pulang.`);
+      return;
+    }
     setCheckInCoords({ lat: 0, lng: 0, accuracy: null, source: "unlocked" });
     setSelfieCheckInPhoto(null);
     setIsCheckInModalOpen(true);
@@ -3477,23 +3481,43 @@ export default function EmployeeDashboard() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <button
-                          id="btn-checkin"
-                          onClick={openCheckInModal}
-                          className="px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-2"
-                        >
-                          <MapPin className="w-4 h-4" />
-                          Check-In (Masuk)
-                        </button>
-                        <button
-                          id="btn-checkout"
-                          onClick={openCheckOutModal}
-                          className="px-5 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-2"
-                        >
-                          <Clock className="w-4 h-4" />
-                          Check-Out (Pulang)
-                        </button>
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {todayAttendance?.checkIn && todayAttendance.checkIn !== "-" ? (
+                          <div className="px-4 py-2.5 rounded-2xl bg-emerald-50 text-emerald-800 border border-emerald-300 font-black text-xs flex items-center gap-2 shadow-2xs">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                            <span>✓ Masuk: {todayAttendance.checkIn} (Terkunci)</span>
+                          </div>
+                        ) : (
+                          <button
+                            id="btn-checkin"
+                            onClick={openCheckInModal}
+                            className="px-5 py-3 rounded-2xl bg-green-600 hover:bg-green-700 text-white font-black text-xs uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-2"
+                          >
+                            <MapPin className="w-4 h-4" />
+                            Check-In (Masuk)
+                          </button>
+                        )}
+
+                        {todayAttendance?.checkOut && todayAttendance.checkOut !== "-" ? (
+                          <div className="px-4 py-2.5 rounded-2xl bg-slate-100 text-slate-800 border border-slate-300 font-black text-xs flex items-center gap-2 shadow-2xs">
+                            <Clock className="w-4 h-4 text-slate-600" />
+                            <span>✓ Pulang: {todayAttendance.checkOut} (Terkunci)</span>
+                          </div>
+                        ) : (
+                          <button
+                            id="btn-checkout"
+                            onClick={openCheckOutModal}
+                            disabled={!todayAttendance?.checkIn || todayAttendance.checkIn === "-"}
+                            className={`px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all shadow-md flex items-center gap-2 ${
+                              todayAttendance?.checkIn && todayAttendance.checkIn !== "-"
+                                ? "bg-slate-900 hover:bg-slate-800 text-white cursor-pointer"
+                                : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                            }`}
+                          >
+                            <Clock className="w-4 h-4" />
+                            Check-Out (Pulang)
+                          </button>
+                        )}
                       </div>
                     </div>
 

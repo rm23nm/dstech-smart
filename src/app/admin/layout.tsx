@@ -34,6 +34,7 @@ import {
   Radio,
   Video,
   MessageSquare,
+  Sparkles,
 } from "lucide-react";
 import { checkUserPermission } from "@/utils/dstech_permissions";
 import GlobalCallListener from "@/components/GlobalCallListener";
@@ -428,11 +429,25 @@ export default function AdminLayout({
           })}
         </nav>
 
-        <div className="p-6 border-t border-slate-100">
+        <div className="p-6 border-t border-slate-100 space-y-2">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent("dstech_open_copilot"))}
+            className="flex items-center justify-between p-3.5 w-full rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-dstech-blue hover:from-blue-100 hover:to-indigo-100 font-bold text-xs transition-all shadow-xs cursor-pointer group"
+          >
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="w-4 h-4 text-dstech-blue animate-pulse" />
+              <span>Bantuan AI Copilot</span>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white text-blue-700 font-bold border border-blue-100 shadow-2xs">
+              Tanya Panduan
+            </span>
+          </button>
+
           <button
             onClick={() => setIsLogoutModalOpen(true)}
             id="admin-logout-btn"
-            className="flex items-center gap-3.5 p-4 w-full rounded-2xl text-red-600 hover:bg-red-50 font-bold text-sm transition-all group cursor-pointer"
+            className="flex items-center gap-3.5 p-3.5 w-full rounded-2xl text-red-600 hover:bg-red-50 font-bold text-sm transition-all group cursor-pointer"
           >
             <LogOut className="w-5 h-5 group-hover:-translate-x-0.5 transition-transform" />
             <span>Keluar (Log Out)</span>
@@ -495,7 +510,24 @@ export default function AdminLayout({
               })}
             </nav>
 
-            <div className="p-5 border-t border-slate-100">
+            <div className="p-5 border-t border-slate-100 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  window.dispatchEvent(new CustomEvent("dstech_open_copilot"));
+                }}
+                className="flex items-center justify-between p-3.5 w-full rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-dstech-blue font-bold text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-dstech-blue" />
+                  <span>Bantuan AI Copilot</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-white text-blue-700 font-bold border border-blue-100">
+                  Tanya Panduan
+                </span>
+              </button>
+
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
@@ -606,6 +638,17 @@ export default function AdminLayout({
                 </div>
               )}
             </div>
+
+            {/* Tombol Akses Bantuan AI Copilot (Hanya saat admin membutuhkan bantuan fitur) */}
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent("dstech_open_copilot"))}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-dstech-blue border border-blue-200 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              title="Buka panduan modul & tanya Copilot Operasional"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-dstech-blue" />
+              <span>Bantuan AI</span>
+            </button>
 
             {/* Profile Pill */}
             <div className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-slate-100">
