@@ -4,22 +4,38 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 ### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Status Sedang Dikerjakan (Tugas 268 & 269)**:
-  *Permintaan User*: "paggilan masuknya tidak bisa diangkat, kemudian suara notifikasinya double, kemudian panggilannya putus nyambung"
-  *Langkah-langkah yang Sedang Dikerjakan (Step-by-Step Execution Plan)*:
-  1. **Langkah 1 (Izin WebRTC Hardware Kamera & Mic di Android WebView - Tugas 268)**:
-     - Di `MainActivity.kt`: Tambahkan implementasi `onPermissionRequest(request: PermissionRequest?)` pada `WebChromeClient`. Berikan izin otomatis `request.grant(request.resources)` untuk resource audio capture dan video capture (`RESOURCE_AUDIO_CAPTURE`, `RESOURCE_VIDEO_CAPTURE`). Hal ini menjamin panggilan masuk di Android WebView dapat langsung mengangkat stream media WebRTC tanpa terblokir / tanpa Permission Denied.
-  2. **Langkah 2 (Eliminasi Penyebab Panggilan Putus-Nyambung - Tugas 268)**:
-     - Di `/direct-call/[roomCode]/page.tsx`:
-       - Lepaskan `callDuration` dari dependensi `useCallback` fungsi `terminateMediaAndExit` (gunakan ref `callDurationRef` atau functional update), dan hapus `terminateMediaAndExit` serta `myName` dari dependency array `useEffect(setupDirectCall)`. Ini menghilangkan bug siklus loop di mana koneksi WebRTC diputus (`pcRef.current.close()`) dan di-restart setiap detik akibat detik durasi bertambah!
-       - Hapus auto-terminate instan saat respon peers kosong dalam 1 interval 1.5 detik. Ganti dengan batas toleransi diskoneksi WebRTC murni (`pc.iceConnectionState === "disconnected" || "failed"`) atau grace period 15 detik, sehingga koneksi panggilan tetap kokoh dan stabil tanpa putus-nyambung.
-  3. **Langkah 3 (Eliminasi Duplikasi Suara Notifikasi Panggilan Double - Tugas 269)**:
-     - Di `GlobalCallListener.tsx`: Tambahkan deteksi apakah aplikasi berjalan di lingkungan Android App. Jika berjalan di aplikasi Android (`window.DStechNative` atau userAgent `DSTechSmartApp`), matikan pemutaran Web Audio synthesizer ringtone `dstechCallAudio.startIncomingRingtone()` agar tidak bertabrakan dengan nada dering Android native.
-     - Di `DStechNotificationService.kt`: Selaraskan pemutaran nada dering antara Notification Channel dan MediaPlayer/RingtoneManager agar hanya ada 1 sumber suara dering telepon yang aktif.
-  4. **Langkah 4 (Pengujian & Validasi)**:
-     - Jalankan `npx tsc --noEmit` untuk memastikan 0 error.
-     - Recompile APK Android Debug `build_android.bat assembleDebug` dan perbarui berkas di `public/dstech-smart-app.apk`.
-     - Push ke GitHub dan deploy ke server live VPS DSTech Smart.
+- **Status**: Tidak ada pekerjaan aktif saat ini. Semua tugas terakhir telah selesai.
+
+- **2026-10-28**: [SELESAI] Perbaikan Loop Putus-Nyambung WebRTC, Panggilan Tidak Bisa Diangkat, Suara Notifikasi Double & Tidak Bisa Scroll ke Atas di Aplikasi Mobile (Tugas 268, 269 & 270) (`direct-call/[roomCode]/page.tsx`, `GlobalCallListener.tsx`, `DStechNotificationService.kt`, `MainActivity.kt`).
+  *Permintaan User*:
+  1. \"paggilan masuknya tidak bisa diangkat\"
+  2. \"suara notifikasinya double\"
+  3. \"panggilannya putus nyambung\"
+  4. \"pada aplikasi mobil, jika sudah dikursor kebawah, untuk kembali lagi ke kursor atas sudah tidak bisa\"
+  *Penyebab Masalah yang Ditemukan*:
+  1. **Loop putus-nyambung setiap 1 detik**: Di `direct-call/[roomCode]/page.tsx`, `callDuration` bertambah tiap detik dan masuk ke dependency array `useCallback(terminateMediaAndExit)`. Karena `terminateMediaAndExit` juga masuk dependency array `useEffect(setupDirectCall)`, setiap detik useEffect cleanup dijalankan — `pcRef.current.close()` dipanggil, lalu WebRTC restart dari awal. Ini menyebabkan koneksi putus-nyambung setiap 1 detik.
+  2. **Panggilan tidak bisa diangkat**: Saat penerima menekan "Terima", `getUserMedia` dengan constraints `{ audio: true, video: true }` gagal karena kamera sedang dipakai atau tidak tersedia. Kode langsung jump ke `catch` dan memanggil `setCallStatus("ended")` sehingga layar panggilan langsung menutup sendiri.
+  3. **Suara notifikasi double**: `DStechNotificationService.kt` mendefinisikan Notification Channel dengan `setSound(RingtoneManager.TYPE_RINGTONE)` DAN sekaligus memanggil `playRingtone()`. Kedua suara ini berjalan bersamaan menyebabkan suara double. Di Web juga ada `dstechCallAudio.startIncomingRingtone()` yang menambah sumber suara ketiga saat di Android.
+  4. **Tidak bisa scroll ke atas di aplikasi mobile**: `SwipeRefreshLayout` membungkus WebView. Saat konten sudah digulir ke bawah, gesture swipe ke atas dicegat SwipeRefreshLayout sebagai "pull to refresh" bukan scroll WebView ke atas, sehingga scroll ke atas tidak berfungsi.
+  *Penyelesaian & Hasil*:
+  1. **Eliminasi Loop WebRTC Putus-Nyambung (`direct-call/[roomCode]/page.tsx`)**:
+     - Dihapus `terminateMediaAndExit` dan `myName` dari dependency array `useEffect(setupDirectCall)`. useEffect kini hanya dijalankan sekali saat komponen mount.
+     - Di dalam polling interval, panggilan ke `terminateMediaAndExit` diganti dengan `terminateMediaAndExitRef.current(...)` agar selalu membaca fungsi terbaru tanpa memicu re-render.
+     - Ditambahkan grace period 10 ticks (15 detik) via `missingPeerTicksRef` sebelum memutus koneksi jika peer hilang dari polling — menghindari false-positive disconnect akibat polling kosong sementara.
+     - Ditambahkan `pc.oniceconnectionstatechange` untuk ICE restart otomatis jika state `failed`.
+  2. **Fix Panggilan Tidak Bisa Diangkat — Audio Fallback getUserMedia (`direct-call/[roomCode]/page.tsx`)**:
+     - Ditambahkan try/catch berlapis: jika `getUserMedia(video+audio)` gagal, fallback otomatis ke `getUserMedia({ audio: true, video: false })` sehingga panggilan suara tetap bisa berjalan meski kamera tidak tersedia.
+  3. **Eliminasi Suara Notifikasi Double**:
+     - Di `DStechNotificationService.kt`: Notification Channel panggilan diubah dari `setSound(RingtoneManager.TYPE_RINGTONE, ...)` menjadi `setSound(null, null)`. Suara dering kini hanya berasal dari `playRingtone()` manual — 1 sumber saja.
+     - Di `GlobalCallListener.tsx`: Ditambahkan deteksi Android app (`window.DStechNative`, `DSTechSmartApp` user-agent, atau class `dstech-android-app`). Jika di Android, `dstechCallAudio.startIncomingRingtone()` tidak dipanggil agar tidak tumpang tindih dengan dering native Android.
+  4. **Fix Scroll ke Atas di Aplikasi Mobile (`MainActivity.kt`)**:
+     - Ditambahkan `webView.setOnScrollChangeListener { _, _, scrollY, _, _ -> swipeRefreshLayout.isEnabled = scrollY == 0 }` di `setupSwipeRefresh()`. SwipeRefreshLayout hanya aktif saat WebView berada di posisi paling atas (scrollY == 0). Saat sudah digulir ke bawah, SwipeRefreshLayout dinonaktifkan sehingga swipe ke atas berfungsi normal untuk scroll WebView.
+  5. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: **0 error**.
+     - Build APK Android: **BUILD SUCCESSFUL** (5.98 MB).
+     - Git push: commit `ce3bb12` ke GitHub.
+     - Deploy VPS: `dstech-main` **online** di PM2, build Next.js sukses.
+
 
 - **2026-10-28**: [SELESAI] Perbaikan Isolasi Sesi Admin & Pencegahan Degradasi Dashboard ke Teknisi (Tugas 266) serta Normalisasi Penerimaan Panggilan WebRTC & Eliminasi Nada Dering Terus-Menerus (Tugas 267) (login/page.tsx, admin/layout.tsx, MainActivity.kt, DStechNotificationService.kt, GlobalCallListener.tsx, /direct-call/[roomCode], /api/meetings/signal, & /api/team-chat/call).
   *Permintaan User*:
