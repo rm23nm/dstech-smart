@@ -50,7 +50,7 @@ export default function DirectCallPage() {
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
 
-  // Refs WebRTC
+  // Refs WebRTC & Kontrol Kestabilan Panggilan
   const localStreamRef = useRef<MediaStream | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -59,6 +59,9 @@ export default function DirectCallPage() {
   const signalingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isEndingRef = useRef(false);
+  const callDurationRef = useRef(0);
+  const missingPeerTicksRef = useRef(0);
+  const terminateMediaAndExitRef = useRef<(reason?: string) => void>(() => {});
 
   // Ambil profil login lokal
   useEffect(() => {
@@ -78,7 +81,11 @@ export default function DirectCallPage() {
   useEffect(() => {
     if (callStatus === "connected") {
       durationIntervalRef.current = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
+        setCallDuration((prev) => {
+          const next = prev + 1;
+          callDurationRef.current = next;
+          return next;
+        });
       }, 1000);
     } else {
       if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
@@ -153,7 +160,7 @@ export default function DirectCallPage() {
             body: JSON.stringify({
               action: "end",
               callId,
-              duration: callDuration,
+              duration: callDurationRef.current,
             }),
           }).catch(() => {});
         }
@@ -177,8 +184,10 @@ export default function DirectCallPage() {
         }
       }, 1000);
     },
-    [roomCode, myPeerId, callId, callDuration]
+    [roomCode, myPeerId, callId]
   );
+
+  terminateMediaAndExitRef.current = terminateMediaAndExit;
 
   // Inisialisasi Media & WebRTC
   useEffect(() => {
@@ -199,20 +208,39 @@ export default function DirectCallPage() {
               : false,
         };
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        } catch (mediaErr) {
+          console.warn("Gagal getUserMedia dengan video, fallback ke audio only:", mediaErr);
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        }
+
         if (!active) {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
 
         localStreamRef.current = stream;
-        if (localVideoRef.current && callType === "video") {
+        if (localVideoRef.current && callType === "video" && stream.getVideoTracks().length > 0) {
           attachStream(localVideoRef.current, stream);
         }
 
         // Buat RTCPeerConnection
         const pc = new RTCPeerConnection(RTC_CONFIG);
         pcRef.current = pc;
+
+        // Tangani pemulihan koneksi ICE otomatis
+        pc.oniceconnectionstatechange = () => {
+          if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+            setCallStatus("connected");
+          } else if (pc.iceConnectionState === "failed") {
+            console.warn("ICE connection failed, attempting restart...");
+            try {
+              pc.restartIce?.();
+            } catch {}
+          }
+        };
 
         // Tambahkan local tracks ke RTCPeerConnection
         stream.getTracks().forEach((track) => {
@@ -374,7 +402,7 @@ export default function DirectCallPage() {
               }
             }
 
-            // Periksa jika panggilan diakhiri lawan bicara di meetings/signal
+            // Periksa jika lawan bicara keluar dari signaling room dengan grace period
             const rawPeers = Array.isArray(data.peers)
               ? data.peers
               : Array.isArray(data.data?.peers)
@@ -385,9 +413,13 @@ export default function DirectCallPage() {
               const otherPeers = rawPeers.filter((p: any) => (p.peerId || p.id) !== myPeerId);
               if (otherPeers.length > 0) {
                 setPeerName(otherPeers[0].name || initialPeerName);
+                missingPeerTicksRef.current = 0;
               } else if (callStatus === "connected") {
-                // Lawan bicara sudah keluar
-                terminateMediaAndExit("ended");
+                // Beri grace period 10 ticks (15 detik) sebelum memutuskan jika lawan bicara hilang dari polling
+                missingPeerTicksRef.current += 1;
+                if (missingPeerTicksRef.current >= 10) {
+                  terminateMediaAndExitRef.current("ended");
+                }
               }
             }
 
@@ -397,7 +429,7 @@ export default function DirectCallPage() {
               const callCheck = await callCheckRes.json();
               if (callCheck.success && callCheck.call) {
                 if (callCheck.call.status === "declined" || callCheck.call.status === "ended") {
-                  terminateMediaAndExit("declined");
+                  terminateMediaAndExitRef.current("declined");
                 } else if (callCheck.call.status === "connected" && callStatus === "ringing") {
                   setCallStatus("connecting");
                 }
@@ -425,7 +457,7 @@ export default function DirectCallPage() {
         clearInterval(signalingIntervalRef.current);
       }
     };
-  }, [roomCode, myPeerId, callType, facingMode, isAutoAccept, attachStream, initialPeerName, myName, terminateMediaAndExit]);
+  }, [roomCode, myPeerId, callType, facingMode, isAutoAccept, attachStream, initialPeerName]);
 
   // Toggle Mute Mikrofon
   const toggleMute = () => {

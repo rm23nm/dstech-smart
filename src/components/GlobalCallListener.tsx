@@ -46,8 +46,15 @@ export default function GlobalCallListener() {
         if (data.success && isSubscribed) {
           if (data.incomingCall && data.incomingCall.status === "calling") {
             setIncomingCall(data.incomingCall);
-            // Bunyikan nada dering jika ada panggilan masuk
-            dstechCallAudio.startIncomingRingtone();
+            // Hanya bunyikan ringtone Web Audio jika BUKAN di aplikasi native Android (agar tidak bersuara double)
+            const isAndroidApp = typeof window !== "undefined" && (
+              Boolean((window as any).DStechNative) ||
+              navigator.userAgent.includes("DSTechSmartApp") ||
+              document.documentElement.classList.contains("dstech-android-app")
+            );
+            if (!isAndroidApp) {
+              dstechCallAudio.startIncomingRingtone();
+            }
           } else {
             if (incomingCall) {
               // Jika sebelumnya ada panggilan lalu dijawab atau ditutup oleh penelepon
