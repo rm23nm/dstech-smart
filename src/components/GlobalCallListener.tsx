@@ -9,9 +9,12 @@ export default function GlobalCallListener() {
   const [incomingCall, setIncomingCall] = useState<any | null>(null);
 
   useEffect(() => {
-    // Ambil data user aktif dari localStorage
+    // Ambil data user aktif dari localStorage secara komprehensif
     try {
-      const stored = localStorage.getItem("dstech_auth_user");
+      const stored =
+        localStorage.getItem("dstech_admin_auth") ||
+        localStorage.getItem("dstech_employee_auth") ||
+        localStorage.getItem("dstech_auth_user");
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed.id) {
@@ -30,17 +33,24 @@ export default function GlobalCallListener() {
     let isSubscribed = true;
 
     const checkIncoming = async () => {
+      // Jika user sudah berada di layar panggilan, jangan bunyikan ringtone banner global
+      if (typeof window !== "undefined" && window.location.pathname.startsWith("/direct-call")) {
+        dstechCallAudio.stopCallAudio();
+        if (incomingCall) setIncomingCall(null);
+        return;
+      }
+
       try {
-        const res = await fetch(`/api/team-chat/call?userId=${currentUser.id}`);
+        const res = await fetch(`/api/team-chat/call?userId=${encodeURIComponent(currentUser.id)}&t=${Date.now()}`);
         const data = await res.json();
         if (data.success && isSubscribed) {
-          if (data.incomingCall) {
+          if (data.incomingCall && data.incomingCall.status === "calling") {
             setIncomingCall(data.incomingCall);
             // Bunyikan nada dering jika ada panggilan masuk
             dstechCallAudio.startIncomingRingtone();
           } else {
             if (incomingCall) {
-              // Jika sebelumnya ada panggilan lalu ditutup oleh penelepon
+              // Jika sebelumnya ada panggilan lalu dijawab atau ditutup oleh penelepon
               dstechCallAudio.stopCallAudio();
               setIncomingCall(null);
             }

@@ -119,8 +119,9 @@ export async function POST(request: Request) {
 
     // 2. Menerima Panggilan (Accept)
     if (action === "accept") {
-      const { callId } = body;
-      const callIndex = calls.findIndex((c: any) => c.id === callId);
+      const callId = body.callId || body.id;
+      const roomCode = body.roomCode;
+      const callIndex = calls.findIndex((c: any) => (callId && c.id === callId) || (roomCode && c.roomCode === roomCode));
 
       if (callIndex !== -1) {
         calls[callIndex].status = "connected";
@@ -134,8 +135,9 @@ export async function POST(request: Request) {
 
     // 3. Menolak Panggilan (Decline / Reject)
     if (action === "decline" || action === "reject") {
-      const { callId } = body;
-      const callIndex = calls.findIndex((c: any) => c.id === callId);
+      const callId = body.callId || body.id;
+      const roomCode = body.roomCode;
+      const callIndex = calls.findIndex((c: any) => (callId && c.id === callId) || (roomCode && c.roomCode === roomCode));
 
       if (callIndex !== -1) {
         calls[callIndex].status = "declined";
@@ -155,8 +157,10 @@ export async function POST(request: Request) {
 
     // 4. Mengakhiri Panggilan (End)
     if (action === "end") {
-      const { callId, duration } = body;
-      const callIndex = calls.findIndex((c: any) => c.id === callId);
+      const callId = body.callId || body.id;
+      const roomCode = body.roomCode;
+      const duration = body.duration;
+      const callIndex = calls.findIndex((c: any) => (callId && c.id === callId) || (roomCode && c.roomCode === roomCode));
 
       if (callIndex !== -1) {
         calls[callIndex].status = "ended";

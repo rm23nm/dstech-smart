@@ -172,6 +172,9 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
+      signals: incomingSignals,
+      peers: Object.values(room.peers),
+      chats: room.chats || [],
       data: {
         peers: Object.values(room.peers),
         signals: incomingSignals,
@@ -187,7 +190,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { roomCode, peerId, action, payload } = body;
+    const roomCode = body.roomCode;
+    const peerId = body.peerId || body.fromPeerId;
+    const action = body.action;
+    const rawPayload = body.payload || body.signalData || {};
+    const payload = rawPayload;
 
     if (!roomCode || !peerId || !action) {
       return NextResponse.json(
@@ -196,8 +203,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const cleanRoom = roomCode.trim();
-    const cleanPeer = peerId.trim();
+    const cleanRoom = String(roomCode).trim();
+    const cleanPeer = String(peerId).trim();
     const now = Date.now();
 
     const store = loadStore();
@@ -212,12 +219,15 @@ export async function POST(req: Request) {
 
     if (action === "join") {
       // Registrasi peer ke room
+      const peerName = rawPayload?.name || body.name || "Peserta Direct Call";
+      const peerRole = rawPayload?.role || body.role || "DIRECT_CALLER";
+
       room.peers[cleanPeer] = {
         id: cleanPeer,
-        name: payload?.name || "Peserta Meeting",
-        role: payload?.role || "GUEST",
-        isMuted: !!payload?.isMuted,
-        isVideoOff: !!payload?.isVideoOff,
+        name: peerName,
+        role: peerRole,
+        isMuted: !!(rawPayload?.isMuted || body.isMuted),
+        isVideoOff: !!(rawPayload?.isVideoOff || body.isVideoOff),
         lastSeen: now,
       };
 
@@ -226,8 +236,8 @@ export async function POST(req: Request) {
         id: `sig_join_${cleanPeer}_${now}`,
         roomCode: cleanRoom,
         fromPeerId: cleanPeer,
-        fromPeerName: payload?.name,
-        fromPeerRole: payload?.role,
+        fromPeerName: peerName,
+        fromPeerRole: peerRole,
         type: "status",
         data: { action: "peer_joined", peer: room.peers[cleanPeer] },
         timestamp: now,
@@ -247,19 +257,22 @@ export async function POST(req: Request) {
 
     if (action === "signal") {
       // Mengirim WebRTC handshake: offer, answer, atau candidate
-      const { toPeerId, type, data } = payload;
-      if (!type || !data) {
-        return NextResponse.json({ success: false, error: "Format sinyal tidak lengkap" }, { status: 400 });
+      const toPeerId = rawPayload?.toPeerId || body.targetPeerId || (body.toPeerId !== "broadcast" ? body.toPeerId : undefined);
+      const type = rawPayload?.type || body.type || (body.signalData?.type);
+      const data = rawPayload?.data || body.signalData || rawPayload;
+
+      if (!type) {
+        return NextResponse.json({ success: false, error: "Format tipe sinyal tidak lengkap" }, { status: 400 });
       }
 
       room.signals.push({
         id: `sig_${type}_${cleanPeer}_${now}_${Math.random().toString(36).substring(2, 6)}`,
         roomCode: cleanRoom,
         fromPeerId: cleanPeer,
-        fromPeerName: room.peers[cleanPeer]?.name || payload?.fromPeerName,
-        fromPeerRole: room.peers[cleanPeer]?.role || payload?.fromPeerRole,
-        toPeerId: toPeerId || undefined,
-        type,
+        fromPeerName: room.peers[cleanPeer]?.name || rawPayload?.fromPeerName || body.fromPeerName,
+        fromPeerRole: room.peers[cleanPeer]?.role || rawPayload?.fromPeerRole || body.fromPeerRole,
+        toPeerId: toPeerId === "broadcast" ? undefined : toPeerId,
+        type: type.replace("webrtc-", "") as any,
         data,
         timestamp: now,
       });

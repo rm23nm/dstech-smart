@@ -64,23 +64,48 @@ function LoginForm() {
           name: userData.name,
           email: userData.email,
           phone: userData.phone,
+          permissions: userData.permissions || null,
           loginTime: new Date().toISOString(),
         };
 
+        const sessionPayloadStr = JSON.stringify(sessionPayload);
+        localStorage.setItem("dstech_auth_user", sessionPayloadStr);
+
         if (role === "PARTNER" || userData.role === "AFFILIATE") {
+          localStorage.removeItem("dstech_admin_auth");
+          localStorage.removeItem("dstech_employee_auth");
           localStorage.setItem("dstech_partner_auth", JSON.stringify({
             ...sessionPayload,
             refCode: `DST-${userData.id.slice(-4)}`,
           }));
           localStorage.setItem("dstech_auth_token", userData.token);
+          if ((window as any).DStechNative?.syncAuthWithData) {
+            try {
+              (window as any).DStechNative.syncAuthWithData(userData.id, userData.name, userData.role || "AFFILIATE", sessionPayloadStr);
+            } catch (e) {}
+          }
           router.push("/affiliate");
         } else if (role === "ADMIN" || userData.role === "ADMIN" || userData.role === "SUPERADMIN") {
-          localStorage.setItem("dstech_admin_auth", JSON.stringify(sessionPayload));
+          localStorage.removeItem("dstech_employee_auth");
+          localStorage.removeItem("dstech_partner_auth");
+          localStorage.setItem("dstech_admin_auth", sessionPayloadStr);
           localStorage.setItem("dstech_auth_token", userData.token);
+          if ((window as any).DStechNative?.syncAuthWithData) {
+            try {
+              (window as any).DStechNative.syncAuthWithData(userData.id, userData.name, userData.role || "ADMIN", sessionPayloadStr);
+            } catch (e) {}
+          }
           router.push("/admin");
         } else {
-          localStorage.setItem("dstech_employee_auth", JSON.stringify(sessionPayload));
+          localStorage.removeItem("dstech_admin_auth");
+          localStorage.removeItem("dstech_partner_auth");
+          localStorage.setItem("dstech_employee_auth", sessionPayloadStr);
           localStorage.setItem("dstech_auth_token", userData.token);
+          if ((window as any).DStechNative?.syncAuthWithData) {
+            try {
+              (window as any).DStechNative.syncAuthWithData(userData.id, userData.name, userData.role || "EMPLOYEE", sessionPayloadStr);
+            } catch (e) {}
+          }
           router.push("/employee");
         }
       }

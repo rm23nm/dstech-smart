@@ -267,6 +267,18 @@ export default function DirectCallPage() {
           }),
         });
 
+        // Jika penerima masuk via autoAccept, konfirmasi penerimaan ke API call
+        if (isAutoAccept && callId) {
+          fetch("/api/team-chat/call", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "accept",
+              callId,
+            }),
+          }).catch(() => {});
+        }
+
         if (!isAutoAccept) {
           // Penelepon: Buat WebRTC Offer
           const offer = await pc.createOffer();
@@ -279,7 +291,13 @@ export default function DirectCallPage() {
               action: "signal",
               roomCode: signalingRoom,
               fromPeerId: myPeerId,
+              peerId: myPeerId,
               targetPeerId: "broadcast",
+              type: "offer",
+              payload: {
+                type: "offer",
+                sdp: offer,
+              },
               signalData: {
                 type: "webrtc-offer",
                 sdp: offer,
@@ -302,13 +320,20 @@ export default function DirectCallPage() {
             );
             const data = await res.json();
 
-            if (data.success && Array.isArray(data.signals)) {
-              for (const sig of data.signals) {
-                const payload = sig.signalData;
-                if (!payload) continue;
+            const rawSignals = Array.isArray(data.signals)
+              ? data.signals
+              : Array.isArray(data.data?.signals)
+              ? data.data.signals
+              : [];
 
-                if (payload.type === "webrtc-offer" && pc.signalingState !== "closed") {
-                  await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+            if (data.success && rawSignals.length > 0) {
+              for (const sig of rawSignals) {
+                const payload = sig.data || sig.signalData || sig;
+                const type = (sig.type || payload.type || "").replace("webrtc-", "");
+                const sdp = payload.sdp || payload.data?.sdp || (payload.type ? payload : null);
+
+                if (type === "offer" && sdp && pc.signalingState !== "closed") {
+                  await pc.setRemoteDescription(new RTCSessionDescription(sdp));
                   const answer = await pc.createAnswer();
                   await pc.setLocalDescription(answer);
 
@@ -319,7 +344,13 @@ export default function DirectCallPage() {
                       action: "signal",
                       roomCode: signalingRoom,
                       fromPeerId: myPeerId,
+                      peerId: myPeerId,
                       targetPeerId: sig.fromPeerId,
+                      type: "answer",
+                      payload: {
+                        type: "answer",
+                        sdp: answer,
+                      },
                       signalData: {
                         type: "webrtc-answer",
                         sdp: answer,
@@ -327,27 +358,49 @@ export default function DirectCallPage() {
                     }),
                   });
                   setCallStatus("connected");
-                } else if (payload.type === "webrtc-answer" && pc.signalingState !== "closed") {
+                } else if (type === "answer" && sdp && pc.signalingState !== "closed") {
                   if (pc.signalingState === "have-local-offer") {
-                    await pc.setRemoteDescription(new RTCSessionDescription(payload.sdp));
+                    await pc.setRemoteDescription(new RTCSessionDescription(sdp));
                     setCallStatus("connected");
                   }
-                } else if (payload.type === "webrtc-ice-candidate" && pc.remoteDescription) {
-                  try {
-                    await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-                  } catch {}
+                } else if ((type === "candidate" || type === "ice-candidate") && pc.remoteDescription) {
+                  const candidate = payload.candidate || payload.data?.candidate;
+                  if (candidate) {
+                    try {
+                      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    } catch {}
+                  }
                 }
               }
             }
 
-            // Periksa jika panggilan diakhiri lawan bicara
-            if (data.success && data.peers) {
-              const otherPeers = data.peers.filter((p: any) => p.peerId !== myPeerId);
+            // Periksa jika panggilan diakhiri lawan bicara di meetings/signal
+            const rawPeers = Array.isArray(data.peers)
+              ? data.peers
+              : Array.isArray(data.data?.peers)
+              ? data.data.peers
+              : [];
+
+            if (data.success && rawPeers.length > 0) {
+              const otherPeers = rawPeers.filter((p: any) => (p.peerId || p.id) !== myPeerId);
               if (otherPeers.length > 0) {
                 setPeerName(otherPeers[0].name || initialPeerName);
               } else if (callStatus === "connected") {
                 // Lawan bicara sudah keluar
                 terminateMediaAndExit("ended");
+              }
+            }
+
+            // Pengecekan status panggilan di API team-chat/call
+            if (callId) {
+              const callCheckRes = await fetch(`/api/team-chat/call?callId=${encodeURIComponent(callId)}&t=${Date.now()}`);
+              const callCheck = await callCheckRes.json();
+              if (callCheck.success && callCheck.call) {
+                if (callCheck.call.status === "declined" || callCheck.call.status === "ended") {
+                  terminateMediaAndExit("declined");
+                } else if (callCheck.call.status === "connected" && callStatus === "ringing") {
+                  setCallStatus("connecting");
+                }
               }
             }
           } catch {}

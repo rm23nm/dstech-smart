@@ -5,7 +5,34 @@
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 ### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
 - **Status Sedang Dikerjakan**:
-  - Semua antrian permintaan pengguna saat ini telah selesai dikerjakan 100% dan teruji lolos kompilasi 0 error. Sistem dalam status siaga menunggu arahan selanjutnya dari pengguna.
+  - Semua antrian perbaikan (Tugas 266 & Tugas 267) telah selesai 100% dan teruji lolos kompilasi 0 error (`npx tsc --noEmit` & `build_android.bat assembleDebug`). Sistem dalam status siaga menunggu arahan selanjutnya dari pengguna.
+
+- **2026-10-28**: [SELESAI] Perbaikan Isolasi Sesi Admin & Pencegahan Degradasi Dashboard ke Teknisi (Tugas 266) serta Normalisasi Penerimaan Panggilan WebRTC & Eliminasi Nada Dering Terus-Menerus (Tugas 267) (login/page.tsx, admin/layout.tsx, MainActivity.kt, DStechNotificationService.kt, GlobalCallListener.tsx, /direct-call/[roomCode], /api/meetings/signal, & /api/team-chat/call).
+  *Permintaan User*:
+  1. "ketika saya masuk ke akun admin, awalnya semua menu muncul, selanjutnya dasbordnya berubah akun teknisi"
+  2. "kemudian untuk paggilan masuk vidio dan panggilan masuk suara, ketika diangkat tidak bisa diangkat, terus-terusan memanggil"
+  *Penyebab Masalah yang Ditemukan*:
+  1. **Degradasi Sesi Admin ke Teknisi**:
+     - Di `MainActivity.kt` Android, fungsi `onPageFinished` membaca `localStorage.getItem('dstech_employee_auth')` sebelum `dstech_admin_auth`. Jika perangkat sebelumnya pernah login teknisi, sesi lama teknisi otomatis tersinkron ke SharedPreferences Android native dan menimpa role admin menjadi `EMPLOYEE`.
+     - Skrip auto-login di halaman `/login` sebelumnya menimpa kunci `dstech_admin_auth` dengan JSON akun karyawan.
+     - Di portal web (`src/app/login/page.tsx`), login admin tidak menghapus kunci `dstech_employee_auth` yang tersisa, sehingga kedua sesi bertabrakan dan hak akses `permissions` tidak tersimpan di `sessionPayload`.
+  2. **Panggilan Tidak Bisa Diangkat & Dering Terus-Menerus**:
+     - Protokol signaling WebRTC di `/direct-call/[roomCode]/page.tsx` mengirimkan properti `fromPeerId`, `signalData`, dan `roomCode: direct_[code]`, sedangkan backend `/api/meetings/signal/route.ts` mewajibkan properti `peerId` dan `payload`. Ketidaksesuaian ini menyebabkan backend merespon `400 Bad Request` pada setiap penawaran koneksi WebRTC (Offer/Answer/Candidate).
+     - Format respon GET `/api/meetings/signal` mengembalikan data bersarang `{ data: { signals: [...] } }`, sedangkan client mencari `data.signals`, sehingga Offer tidak pernah diproses oleh penerima dan status panggilan macet di "calling" / "connecting".
+     - Pada `DStechNotificationService.kt` dan `GlobalCallListener.tsx`, saat tombol "Terima" ditekan, pembaruan status ke `/api/team-chat/call` (`action: accept`) tidak terpanggil atau status tidak ter-update di database panggilan, sehingga polling latar belakang mendeteksi panggilan masih aktif (`calling`) dan membunyikan nada dering kembali secara berulang tanpa henti.
+  *Penyelesaian & Hasil*:
+  1. **Isolasi Penuh Sesi Admin & Proteksi Role (`login/page.tsx`, `admin/layout.tsx`, & `MainActivity.kt`)**:
+     - Pada `src/app/login/page.tsx`, saat login Admin berhasil, sistem langsung menghapus `dstech_employee_auth` & `dstech_partner_auth`, menyimpan `sessionPayload` lengkap dengan `permissions`, dan memanggil `window.DStechNative?.syncAuthWithData` secara instan.
+     - Pada `MainActivity.kt`, `onPageFinished` kini membaca sesi secara cerdas sesuai rute aktif (pada `/admin` selalu memprioritaskan `dstech_admin_auth`), dan skrip auto-restore di `/login` hanya memulihkan kunci auth yang sesuai dengan role tersimpan.
+     - Pada `src/app/admin/layout.tsx`, ditambahkan fallback role `ADMIN` agar menu dashboard admin tidak pernah menyusut atau hilang akibat tabrakan role lama.
+  2. **Sinkronisasi Protokol WebRTC & Normalisasi Panggilan Langsung (`/direct-call`, `/api/meetings/signal`, & `/api/team-chat/call`)**:
+     - Backend `/api/meetings/signal/route.ts` diperbarui agar mendukung alias `fromPeerId` / `peerId`, menerima `signalData` / `payload`, serta mengembalikan array `signals` baik di root maupun di dalam `data.signals` untuk kompatibilitas WebRTC 100%.
+     - Halaman `/direct-call/[roomCode]/page.tsx` kini menangani WebRTC Offer, Answer, dan ICE Candidate secara tangguh, serta langsung mengirimkan konfirmasi penerimaan (`action: accept`) ke `/api/team-chat/call` saat `autoAccept=true`.
+     - Di `GlobalCallListener.tsx`, jika pengguna sudah berada di halaman `/direct-call`, nada dering dan banner otomatis dimatikan (`stopCallAudio()`) dan tidak akan berdering ulang.
+     - Di `DStechNotificationService.kt`, ditambahkan fungsi native `acceptCallOnServer()` yang langsung menghentikan dering di server saat pengguna mengetuk "Terima" dari notifikasi heads-up Android.
+  3. **Pengujian & Validasi**:
+     - Kompilasi TypeScript `npx tsc --noEmit` lolos **0 error**.
+     - Build APK Android Debug (`build_android.bat assembleDebug`) sukses 100% dan file `dstech-smart-app.apk` (6.27 MB) telah diperbarui di folder public.
 
 - **2026-10-28**: [SELESAI] Filter Ketat SPK Khusus Proyek Grup, Fitur Bagikan Informasi Proyek ke Obrolan, Restriksi Tagihan Invoice (Hanya DM User & Filter Ketat Klien), Pembatasan Lampiran Karyawan (Hanya SPK & Laporan), serta Pengisian Otomatis Nama Klien & SPK pada Bukti Pekerjaan (api/team-chat/route.ts & TeamChatMessenger.tsx) [Tugas 264 & Tugas 265].
   *Permintaan User*:

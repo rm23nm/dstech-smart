@@ -127,8 +127,14 @@ export default function AdminLayout({
       const raw = localStorage.getItem("dstech_admin_auth");
       if (raw) {
         try {
-          setCurrentUser(JSON.parse(raw));
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.role !== "SUPERADMIN" && parsed.role !== "ADMIN") {
+            parsed.role = "ADMIN";
+          }
+          setCurrentUser(parsed);
         } catch {}
+      } else {
+        setCurrentUser({ name: "Administrator", role: "ADMIN" });
       }
     }
 
