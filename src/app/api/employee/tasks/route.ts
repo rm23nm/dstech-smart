@@ -167,11 +167,19 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({
-      success: true,
-      total: tasks.length,
-      data: tasks,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        total: tasks.length,
+        data: tasks,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          "Pragma": "no-cache",
+        },
+      }
+    );
   } catch (err: any) {
     console.error("Error in GET /api/employee/tasks:", err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -276,39 +284,60 @@ export async function PUT(request: Request) {
       );
     }
 
+    // Cek apakah tugas terkait Proyek di dstech_finance_erp.json
+    let matchedProject: any = null;
+    const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
+    try {
+      if (fs.existsSync(FINANCE_FILE)) {
+        const rawFinance = fs.readFileSync(FINANCE_FILE, "utf-8");
+        const financeData = JSON.parse(rawFinance);
+        matchedProject = (financeData.projects || []).find(
+          (p: any) =>
+            p.id === id ||
+            p.id === body.projectId ||
+            (body.ticketNumber && p.projectCode && p.projectCode.toLowerCase() === body.ticketNumber.toLowerCase())
+        );
+      }
+    } catch (e) {
+      console.warn("Could not check project finance for task update:", e);
+    }
+
+    const isProjectTask = !!(body.isProject || matchedProject);
+    const projectId = body.projectId || matchedProject?.id || "";
+
     let savedTask: any;
 
     if (index === -1) {
       // Buatkan data penugasan baru jika belum tercatat di database JSON
       const newTask = {
         id: id || `dstech_task_${Date.now()}`,
-        ticketNumber: body.ticketNumber || `MTC-${new Date().toISOString().slice(0, 7).replace("-", "")}-001`,
-        entityType: body.entityType || "PT",
-        type: body.type || (body.isProject ? "Proyek Lapangan" : "Penugasan Maintenance Lapangan"),
-        isProject: !!body.isProject,
-        projectId: body.projectId || "",
-        title: body.title || "Penugasan Maintenance Lapangan",
-        client: body.client || "Klien Umum",
-        clientPhone: body.clientPhone || "",
-        clientPic: body.clientPic || "",
-        location: body.location || "-",
-        date: body.date || new Date().toISOString().split("T")[0],
-        deadline: body.deadline || new Date().toISOString().split("T")[0],
-        status: body.status || "In Progress",
-        priority: body.priority || "Medium",
-        technician: body.technician || "Teknisi Lapangan",
-        technicianPhone: body.technicianPhone || "",
-        scope: Array.isArray(body.scope) ? body.scope : [],
+        ticketNumber: body.ticketNumber || matchedProject?.projectCode || `MTC-${new Date().toISOString().slice(0, 7).replace("-", "")}-001`,
+        entityType: body.entityType || matchedProject?.businessEntity || "PT",
+        type: body.type || (isProjectTask ? "Proyek Lapangan" : "Penugasan Maintenance Lapangan"),
+        isProject: isProjectTask,
+        projectId: projectId,
+        title: body.title || matchedProject?.projectName || "Penugasan Lapangan",
+        client: body.client || matchedProject?.clientName || "Klien DSTech",
+        clientPhone: body.clientPhone || matchedProject?.clientPhone || "",
+        clientPic: body.clientPic || matchedProject?.clientPic || matchedProject?.picProject || "",
+        location: body.location || matchedProject?.clientAddress || "-",
+        date: body.date || matchedProject?.startDate || new Date().toISOString().split("T")[0],
+        deadline: body.deadline || matchedProject?.targetEndDate || new Date().toISOString().split("T")[0],
+        status: body.status || (matchedProject?.status === "Completed" ? "Completed" : "In Progress"),
+        priority: body.priority || "High",
+        technician: body.technician || matchedProject?.picProject || "Teknisi Lapangan",
+        technicianPhone: body.technicianPhone || "+6282259494242",
+        scope: Array.isArray(body.scope) && body.scope.length > 0 ? body.scope : (matchedProject ? [`Pelaksanaan pengadaan & instalasi proyek ${matchedProject.projectName}`] : []),
         equipment: Array.isArray(body.equipment) ? body.equipment : [],
-        report: body.report || "",
-        notes: body.notes || "",
+        report: body.report !== undefined ? body.report : (matchedProject?.report || matchedProject?.description || ""),
+        notes: body.notes || (isProjectTask ? "Wajib mengisi Laporan Harian (Daily Report) dan dokumentasi foto progres setiap hari kerja." : ""),
         recommendation: body.recommendation || "",
-        photos: Array.isArray(body.photos) ? body.photos : [],
+        photos: Array.isArray(body.photos) ? body.photos : (Array.isArray(matchedProject?.photos) ? matchedProject.photos : []),
         damagedItems: Array.isArray(body.damagedItems) ? body.damagedItems : [],
         latitude: body.latitude || null,
         longitude: body.longitude || null,
         googleMapsUrl: body.googleMapsUrl || (body.latitude && body.longitude ? `https://www.google.com/maps?q=${body.latitude},${body.longitude}` : ""),
-        completionDate: body.status === "Completed" ? new Date().toISOString().split("T")[0] : undefined,
+        completionDate: body.status === "Completed" ? (body.completionDate || new Date().toISOString().split("T")[0]) : undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -320,6 +349,8 @@ export async function PUT(request: Request) {
       const updatedTask = {
         ...tasks[index],
         ...body,
+        isProject: isProjectTask || tasks[index].isProject,
+        projectId: projectId || tasks[index].projectId,
         updatedAt: new Date().toISOString(),
       };
 
@@ -340,11 +371,10 @@ export async function PUT(request: Request) {
 
     // Sinkronkan juga ke dstech_finance_erp.json jika ini adalah proyek
     try {
-      const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
       if (fs.existsSync(FINANCE_FILE)) {
         const rawFinance = fs.readFileSync(FINANCE_FILE, "utf-8");
         const financeData = JSON.parse(rawFinance);
-        const prjIdToFind = body.projectId || body.id || savedTask.projectId || savedTask.id;
+        const prjIdToFind = projectId || body.projectId || body.id || savedTask.projectId || savedTask.id;
         const ticketToFind = body.ticketNumber || savedTask.ticketNumber;
 
         const prjIdx = (financeData.projects || []).findIndex(
@@ -375,11 +405,19 @@ export async function PUT(request: Request) {
       console.error("Error syncing task update to dstech_finance_erp.json:", finErr);
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Laporan pekerjaan & foto dokumentasi berhasil disimpan secara permanen",
-      data: savedTask,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Laporan pekerjaan & foto dokumentasi berhasil disimpan secara permanen",
+        data: savedTask,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          "Pragma": "no-cache",
+        },
+      }
+    );
   } catch (err: any) {
     console.error("Error updating task:", err);
     return NextResponse.json({ success: false, error: err.message || "Gagal memperbarui tugas" }, { status: 500 });

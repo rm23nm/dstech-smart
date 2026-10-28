@@ -1126,7 +1126,10 @@ export default function EmployeeDashboard() {
     async function loadData() {
       try {
         const [resTasks, resInv, resAtt, resAnn, resKms, resFin, resReports, resMeetings] = await Promise.all([
-          fetch("/api/employee/tasks"),
+          fetch(`/api/employee/tasks?t=${Date.now()}`, {
+            cache: "no-store",
+            headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+          }),
           fetch("/api/employee/inventory"),
           fetch(`/api/employee/attendance?t=${Date.now()}`, {
             cache: "no-store",
@@ -1134,8 +1137,14 @@ export default function EmployeeDashboard() {
           }),
           fetch("/api/employee/announcements"),
           fetch("/api/kms"),
-          fetch("/api/finance"),
-          fetch("/api/employee/daily-reports"),
+          fetch(`/api/finance?t=${Date.now()}`, {
+            cache: "no-store",
+            headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+          }),
+          fetch(`/api/employee/daily-reports?t=${Date.now()}`, {
+            cache: "no-store",
+            headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+          }),
           fetch(`/api/meetings?t=${Date.now()}`, { cache: "no-store" }),
         ]);
 
@@ -1538,6 +1547,8 @@ export default function EmployeeDashboard() {
     try {
       const payload = {
         id: selectedTask.id,
+        projectId: (selectedTask as any).projectId || selectedTask.id,
+        isProject: !!(selectedTask as any).isProject,
         ticketNumber: (selectedTask as any).ticketNumber || "",
         title: selectedTask.title,
         client: selectedTask.client,
@@ -1592,8 +1603,11 @@ export default function EmployeeDashboard() {
         showToast("Status penugasan, koordinat GPS & rincian barang berhasil disimpan!");
         setIsStatusModalOpen(false);
 
-        // Re-fetch data segar dari server
-        fetch("/api/employee/tasks")
+        // Re-fetch data segar dari server dengan cache-busting
+        fetch(`/api/employee/tasks?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Pragma": "no-cache", "Cache-Control": "no-cache" },
+        })
           .then((r) => r.json())
           .then((d) => {
             if (d.success && Array.isArray(d.data)) setTasks(d.data);

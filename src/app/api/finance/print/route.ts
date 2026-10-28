@@ -2408,14 +2408,14 @@ export async function GET(req: Request) {
             ${photos.map((photo: any, idx: number) => `
               <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/80 shadow-2xs">
                 <div class="h-44 bg-slate-200 flex items-center justify-center overflow-hidden">
-                  <img src="${photo.url || photo.photoUrl}" alt="${photo.title || 'Foto Pekerjaan'}" class="w-full h-full object-cover" />
+                  <img src="${photo.url || photo.photoUrl}" alt="${photo.caption || photo.title || 'Foto Pekerjaan'}" class="w-full h-full object-cover" />
                 </div>
                 <div class="p-2.5 space-y-0.5">
                   <span class="text-[9px] font-bold px-2 py-0.5 rounded-full ${photo.category === 'part_replacement' ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'}">
                     ${photo.category === 'part_replacement' ? '⚙️ Pergantian Part' : '📸 Dokumentasi Lapangan'}
                   </span>
-                  <p class="font-bold text-slate-900 mt-1">${photo.title || `Foto Dokumentasi ${idx + 1}`}</p>
-                  <p class="text-[10px] text-slate-500">${photo.description || photo.notes || '-'}</p>
+                  <p class="font-bold text-slate-900 mt-1">${photo.caption || photo.title || `Foto Dokumentasi ${idx + 1}`}</p>
+                  <p class="text-[10px] text-slate-500">${photo.description || photo.notes || (photo.caption !== photo.title ? (photo.description || '') : '') || '-'}</p>
                 </div>
               </div>
             `).join("")}
