@@ -4,16 +4,28 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 ### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Status**: SIAP DIKERJAKAN / AKTIF (Active Queue)
-- **Tugas 273**: Perbaikan Notifikasi Panggilan Latar Belakang / Saat Aplikasi Tertutup di HP (`DStechNotificationService.kt`, WakeLock, Foreground Service, & Polling Interval Background).
+- **Status**: SEMUA ANTRIAN SELESAI (Idle / Menunggu Permintaan Baru)
+- Tidak ada tugas aktif yang tertunda.
+
+- **2026-10-28**: [SELESAI] Perbaikan Panggilan Masuk Tidak Muncul / Tidak Berdering Saat Aplikasi HP Tertutup (Tugas 273) (`DStechNotificationService.kt`, `GlobalCallListener.tsx`, `api/team-chat/call/route.ts`, & Android APK).
   *Permintaan User*: "sekarang aplikasinya malah jika memanggil tidak masuk kalau posisi tertutup, namun posisi aplikasi terbuka di HP baru masuk panggilan dan suara notifnya."
-  *Penyebab Masalah yang Diteliti*:
-  - Saat aplikasi tertutup / di-swipe kill, sistem Android menghentikan Service jika bukan sticky foreground service atau notification channel service dihancurkan.
-  - Di `DStechNotificationService.kt`, saat user membuka aplikasi (foreground), webview aktif dan panggilan dideteksi oleh polling web. Namun ketika tertutup, polling background service mungkin terlelap (Doze mode) atau interval terlalu lambat, atau service mati saat aplikasi di-kill.
-  *Langkah-langkah Pengerjaan*:
-  - Step 1: Periksa lifecycle `DStechNotificationService.kt`, pastikan `START_STICKY`, implementasi WakeLock saat deteksi panggilan, dan foreground notification channel yang persisten.
-  - Step 2: Pastikan polling interval di background service berjalan konsisten (misal tiap 2-3 detik) dan tidak terputus saat activity finish.
-  - Step 3: Kompilasi APK Android Debug & perbarui file download APK di web.
+  *Penyebab Masalah yang Ditemukan*:
+  1. Sinkronisasi Auth ke Native Android: `(window as any).DStechNative?.syncAuthWithData(...)` sebelumnya hanya dipanggil pada halaman login. Jika teknisi membuka aplikasi dalam keadaan sudah login (tersimpan di localStorage) atau membuka halaman selain login, Service Android tidak menerima `userId` penerima sehingga `myUserId` di `dstech_app_prefs` kosong (`""`).
+  2. Saat aplikasi tertutup di latar belakang, background service Android memanggil `/api/team-chat/call` dengan `userId` kosong. Akibatnya backend hanya mengembalikan riwayat panggilan (`calls`), bukan `incomingCall`.
+  3. Saat HP dalam kondisi layar mati atau standby, sistem Android mengaktifkan Doze Mode (CPU sleep), sehingga interval `Handler.postDelayed()` tertunda atau dijeda jika tidak dilindungi oleh `WakeLock`.
+  *Penyelesaian & Hasil*:
+  1. **Sinkronisasi Native Auth Otomatis (`GlobalCallListener.tsx`)**:
+     - Ditambahkan pengecekan otomatis auth dari `localStorage` pada listener global. Setiap kali user terdeteksi login di frontend web/WebView, identitas `myUserId`, `myName`, dan `myRole` langsung disinkronkan ke native layer Android (`syncAuthWithData`).
+  2. **Pencarian Panggilan Cerdas & Fallback di Backend (`api/team-chat/call/route.ts`)**:
+     - Ditambahkan mekanisme pencarian panggilan masuk aktif berstatus `calling`/`RINGING` (< 45 detik) dengan pencocokan nama penerima (`receiverName`) atau fallback panggilan aktif terbaru jika `userId` pada perangkat Android belum terisi lengkap.
+  3. **Proteksi WakeLock & Percepatan Polling Android (`DStechNotificationService.kt`)**:
+     - Ditambahkan `PowerManager.PARTIAL_WAKE_LOCK` selama eksekusi `checkIncomingCallsAndMessages()` sehingga CPU HP Android tetap aktif memeriksa panggilan masuk meskipun layar HP dalam keadaan mati/standby.
+     - Interval polling background service dipercepat dari 3500ms menjadi 2500ms agar panggilan terdeteksi instan.
+     - Filter penerima diperluas untuk mencocokkan `targetUserId` maupun nama teknisi (`receiverName`), serta memastikan panggilan milik sendiri (`callerId == myUserId`) tidak memicu dering ke diri sendiri.
+  4. **Kompilasi APK Android & Rilis**:
+     - Build APK Android Debug (`build_android.bat assembleDebug`): **BUILD SUCCESSFUL** (5.98 MB).
+     - File APK baru disalin ke `dstech-smart/public/dstech-smart-app.apk`.
+     - Git push commit `1d8ddb6` dan deploy live ke VPS (`dstech-main`).
 
 - **2026-10-28**: [SELESAI] Perbaikan Fitur Update Laporan Pekerjaan & Bukti Foto Lampiran Tidak Tersimpan (Tugas 272) (`api/employee/tasks/route.ts`, `employee/page.tsx`, `api/employee/daily-reports/route.ts`, `TeamChatMessenger.tsx`, & `MainActivity.kt`).
   *Permintaan User*: "setiap saya update laporan, kenapa tidak bisa update, data gambar dan pekerjaan tidak tersimpan"
