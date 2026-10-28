@@ -35,6 +35,7 @@ import {
   MessageSquare,
   ArrowLeft,
 } from "lucide-react";
+import { dstechCallAudio } from "@/utils/dstech_call_audio";
 
 interface TeamChatMessengerProps {
   currentUser: {
@@ -200,8 +201,14 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
       const res = await fetch(`/api/team-chat/call?userId=${currentUser.id}`);
       const data = await res.json();
       if (data.success && data.incomingCall) {
+        if (!incomingCall) {
+          dstechCallAudio.startIncomingRingtone();
+        }
         setIncomingCall(data.incomingCall);
       } else {
+        if (incomingCall) {
+          dstechCallAudio.stopCallAudio();
+        }
         setIncomingCall(null);
       }
     } catch (err) {
@@ -398,9 +405,14 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
         }),
       });
       const data = await res.json();
-      if (data.success) {
+      if (data.success && data.call) {
         setActiveCall(data.call);
         setIsCallingModalOpen(true);
+        // Bunyikan nada panggil keluar (dial tone)
+        dstechCallAudio.startOutgoingDialtone();
+        // Buka langsung ruang WebRTC dua arah
+        const callUrl = `/meeting/${data.call.roomCode}?callType=${callType}&caller=${encodeURIComponent(currentUser.name)}&autoJoin=true`;
+        window.open(callUrl, "_blank");
       }
     } catch (err) {
       console.error("Gagal memulai panggilan:", err);
@@ -410,6 +422,10 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
   // Terima Panggilan Masuk
   const handleAcceptCall = async () => {
     if (!incomingCall) return;
+    dstechCallAudio.stopCallAudio();
+    const roomCode = incomingCall.roomCode;
+    const callType = incomingCall.callType;
+
     try {
       const res = await fetch("/api/team-chat/call", {
         method: "POST",
@@ -423,7 +439,10 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
       if (data.success) {
         setActiveCall(data.call);
         setIncomingCall(null);
-        setIsCallingModalOpen(true);
+        setIsCallingModalOpen(false);
+        // Buka langsung ruang WebRTC audio/video call
+        const callUrl = `/meeting/${roomCode}?callType=${callType}&caller=${encodeURIComponent(currentUser.name)}&autoJoin=true`;
+        window.open(callUrl, "_blank");
       }
     } catch (err) {
       console.error("Gagal menerima panggilan:", err);
@@ -433,6 +452,7 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
   // Tolak Panggilan Masuk
   const handleDeclineCall = async () => {
     if (!incomingCall) return;
+    dstechCallAudio.stopCallAudio();
     try {
       await fetch("/api/team-chat/call", {
         method: "POST",
@@ -450,6 +470,7 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
 
   // Akhiri Panggilan
   const handleEndCall = async () => {
+    dstechCallAudio.stopCallAudio();
     if (!activeCall) return;
     try {
       await fetch("/api/team-chat/call", {

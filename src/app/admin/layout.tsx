@@ -36,6 +36,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { checkUserPermission } from "@/utils/dstech_permissions";
+import GlobalCallListener from "@/components/GlobalCallListener";
 
 interface SearchResult {
   title: string;
@@ -721,6 +722,8 @@ export default function AdminLayout({
           </div>
         </div>
       )}
+      {/* Listener Panggilan Masuk Global Lintas Halaman */}
+      <GlobalCallListener />
     </div>
   );
 }

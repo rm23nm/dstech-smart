@@ -117,6 +117,7 @@ export default function NativeWebRTCMeetingRoomPage() {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const [remotePeers, setRemotePeers] = useState<Map<string, PeerState>>(new Map());
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const isFlippingRef = useRef(false);
 
   // Navigasi Kembali Aman ke Asal Pengguna
   const handleSafeExitNavigation = useCallback(() => {
@@ -223,7 +224,51 @@ export default function NativeWebRTCMeetingRoomPage() {
     }
   };
 
-  // Fungsi Inisialisasi Media dengan Multi-Stage Fallback
+  // Mencari ID Hardware Kamera Depan / Belakang dari enumerateDevices
+  const findCameraDeviceId = useCallback(async (targetMode: "user" | "environment"): Promise<string | null> => {
+    try {
+      if (typeof navigator === "undefined" || !navigator.mediaDevices?.enumerateDevices) return null;
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((d) => d.kind === "videoinput");
+      if (videoDevices.length <= 1) return null;
+
+      if (targetMode === "environment") {
+        // Cari kamera belakang dengan kata kunci label
+        const rear = videoDevices.find((d) => {
+          const lbl = (d.label || "").toLowerCase();
+          return (
+            lbl.includes("back") ||
+            lbl.includes("rear") ||
+            lbl.includes("belakang") ||
+            lbl.includes("environment") ||
+            lbl.includes("0, facing back") ||
+            lbl.includes("facing back")
+          );
+        });
+        if (rear && rear.deviceId) return rear.deviceId;
+        // Jika label belum terbaca, kamera belakang umumnya adalah kamera index terakhir
+        return videoDevices[videoDevices.length - 1]?.deviceId || null;
+      } else {
+        // Kamera depan
+        const front = videoDevices.find((d) => {
+          const lbl = (d.label || "").toLowerCase();
+          return (
+            lbl.includes("front") ||
+            lbl.includes("depan") ||
+            lbl.includes("user") ||
+            lbl.includes("facing front")
+          );
+        });
+        if (front && front.deviceId) return front.deviceId;
+        return videoDevices[0]?.deviceId || null;
+      }
+    } catch (e) {
+      console.warn("enumerateDevices warning:", e);
+      return null;
+    }
+  }, []);
+
+  // Fungsi Inisialisasi Media dengan Multi-Stage Fallback Cerdas untuk Kamera Belakang & Depan
   const requestMediaStream = useCallback(
     async (mode: "user" | "environment", isOff: boolean) => {
       setIsCameraStarting(true);
@@ -240,19 +285,63 @@ export default function NativeWebRTCMeetingRoomPage() {
         }
       }
 
-      // 1. Coba HD + facingMode + audio
+      // 1. Deteksi ID hardware kamera belakang/depan jika tersedia
+      const detectedDeviceId = await findCameraDeviceId(mode);
+
+      if (detectedDeviceId) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: { exact: detectedDeviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: true,
+          });
+          setIsCameraStarting(false);
+          return stream;
+        } catch (errDevId) {
+          console.warn("Fallback 1 (deviceId) gagal, lanjut ke facingMode ideal...", errDevId);
+        }
+      }
+
+      // 2. Coba HD + facingMode ideal + audio
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: { ideal: mode }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: true,
         });
         setIsCameraStarting(false);
         return stream;
       } catch (err1) {
-        console.warn("Fallback 1: Mencoba video sederhana + audio...", err1);
+        console.warn("Fallback 2: Mencoba facingMode ideal resolusi fleksibel...", err1);
       }
 
-      // 2. Coba video dasar + audio
+      // 3. Coba facingMode ideal tanpa batas resolusi (sangat ramah smartphone Android)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: mode } },
+          audio: true,
+        });
+        setIsCameraStarting(false);
+        return stream;
+      } catch (err2) {
+        console.warn("Fallback 3: Mencoba facingMode exact...", err2);
+      }
+
+      // 4. Coba facingMode exact
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: mode },
+          audio: true,
+        });
+        setIsCameraStarting(false);
+        return stream;
+      } catch (err3) {
+        console.warn("Fallback 4: Mencoba video dasar + audio...", err3);
+      }
+
+      // 5. Coba video dasar + audio
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -260,11 +349,11 @@ export default function NativeWebRTCMeetingRoomPage() {
         });
         setIsCameraStarting(false);
         return stream;
-      } catch (err2) {
-        console.warn("Fallback 2: Mencoba video saja (tanpa mic)...", err2);
+      } catch (err4) {
+        console.warn("Fallback 5: Mencoba video saja tanpa audio...", err4);
       }
 
-      // 3. Coba video saja (berguna jika PC tidak memiliki mikrofon)
+      // 6. Coba video saja (berguna jika perangkat tidak memiliki mikrofon)
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: true,
@@ -272,20 +361,20 @@ export default function NativeWebRTCMeetingRoomPage() {
         });
         setIsCameraStarting(false);
         return stream;
-      } catch (err3: any) {
-        console.error("Semua fallback kamera gagal:", err3);
+      } catch (errFinal: any) {
+        console.error("Semua tahapan inisialisasi kamera gagal:", errFinal);
         setIsCameraStarting(false);
-        if (err3?.name === "NotAllowedError" || err3?.name === "PermissionDeniedError") {
+        if (errFinal?.name === "NotAllowedError" || errFinal?.name === "PermissionDeniedError") {
           setCameraError("Izin kamera/mikrofon ditolak di browser. Klik ikon gembok di sebelah URL untuk mengizinkan.");
-        } else if (err3?.name === "NotFoundError" || err3?.name === "DevicesNotFoundError") {
+        } else if (errFinal?.name === "NotFoundError" || errFinal?.name === "DevicesNotFoundError") {
           setCameraError("Perangkat kamera tidak ditemukan. Pastikan webcam terhubung.");
         } else {
-          setCameraError("Tidak dapat mengakses kamera: " + (err3?.message || "Kesalahan perizinan"));
+          setCameraError("Tidak dapat mengakses kamera: " + (errFinal?.message || "Kesalahan perizinan"));
         }
         return null;
       }
     },
-    []
+    [findCameraDeviceId]
   );
 
   // Inisialisasi Kamera Awal
@@ -293,6 +382,8 @@ export default function NativeWebRTCMeetingRoomPage() {
     let isCancelled = false;
 
     async function initCamera() {
+      if (isFlippingRef.current) return;
+
       const stream = await requestMediaStream(facingMode, isVideoOff);
       if (isCancelled || !stream) return;
 
@@ -391,11 +482,15 @@ export default function NativeWebRTCMeetingRoomPage() {
       };
 
       pc.ontrack = (event) => {
-        const [remoteStream] = event.streams;
+        let stream = event.streams && event.streams[0];
         setRemotePeers((prev) => {
           const next = new Map(prev);
           const existing = next.get(targetPeerId) || { id: targetPeerId, name: targetName, role: targetRole };
-          next.set(targetPeerId, { ...existing, stream: remoteStream });
+          const finalStream = stream || existing.stream || new MediaStream();
+          if (!stream && event.track) {
+            finalStream.addTrack(event.track);
+          }
+          next.set(targetPeerId, { ...existing, stream: finalStream });
           return next;
         });
       };
@@ -617,39 +712,57 @@ export default function NativeWebRTCMeetingRoomPage() {
 
   // Balik Kamera (Flip Camera Depan / Belakang untuk Teknisi Smartphone)
   const handleFlipCamera = async () => {
+    if (isCameraStarting) return;
     const nextMode = facingMode === "user" ? "environment" : "user";
+    isFlippingRef.current = true;
     setFacingMode(nextMode);
 
     try {
       setIsCameraStarting(true);
+      // Hentikan video track lama terlebih dahulu agar hardware kamera dilepas oleh sistem operasi ponsel
+      const oldVideoTrack = localStreamRef.current?.getVideoTracks()[0];
+      if (oldVideoTrack) {
+        oldVideoTrack.stop();
+      }
+
       const newStream = await requestMediaStream(nextMode, isVideoOff);
-      if (!newStream) return;
+      if (!newStream) {
+        isFlippingRef.current = false;
+        return;
+      }
 
       const newVideoTrack = newStream.getVideoTracks()[0];
       if (newVideoTrack && localStreamRef.current) {
-        const oldVideoTrack = localStreamRef.current.getVideoTracks()[0];
         if (oldVideoTrack) {
-          oldVideoTrack.stop();
           localStreamRef.current.removeTrack(oldVideoTrack);
         }
         localStreamRef.current.addTrack(newVideoTrack);
 
+        // Ganti track video pada semua peer connection WebRTC aktif
         peerConnectionsRef.current.forEach((pc) => {
           const senders = pc.getSenders();
           const sender = senders.find((s) => s.track && s.track.kind === "video");
           if (sender) {
-            sender.replaceTrack(newVideoTrack);
+            sender.replaceTrack(newVideoTrack).catch((e) => console.warn("replaceTrack error:", e));
           }
         });
 
-        if (localVideoRef.current) {
+        // Pasang stream baru ke layar preview (pre-join) maupun in-meeting
+        if (previewVideoRef.current && !hasJoined) {
+          attachStreamToVideo(previewVideoRef.current, localStreamRef.current);
+        }
+        if (localVideoRef.current && hasJoined) {
           attachStreamToVideo(localVideoRef.current, localStreamRef.current);
         }
       }
     } catch (err) {
+      console.error("Gagal flip kamera:", err);
       alert("Kamera perangkat tidak mendukung peralihan kamera (flip camera).");
     } finally {
       setIsCameraStarting(false);
+      setTimeout(() => {
+        isFlippingRef.current = false;
+      }, 600);
     }
   };
 
@@ -1476,16 +1589,25 @@ Aplikasi Native WebRTC Mandiri DSTech Smart, langsung terbuka di HP tanpa aplika
 // Sub-komponen Video Tile Remote Peer
 function RemotePeerTile({ peer }: { peer: PeerState }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    if (videoRef.current && peer.stream) {
-      videoRef.current.srcObject = peer.stream;
-      videoRef.current.play().catch(() => {});
+    if (peer.stream) {
+      if (videoRef.current && videoRef.current.srcObject !== peer.stream) {
+        videoRef.current.srcObject = peer.stream;
+        videoRef.current.play().catch(() => {});
+      }
+      if (audioRef.current && audioRef.current.srcObject !== peer.stream) {
+        audioRef.current.srcObject = peer.stream;
+        audioRef.current.play().catch(() => {});
+      }
     }
   }, [peer.stream]);
 
   return (
     <div className="relative bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center shadow-lg group">
+      {/* Audio Element Dedicated untuk menjamin audio speaker WebRTC selalu aktif dan tidak di-mute */}
+      <audio ref={audioRef} autoPlay playsInline />
       <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
 
       {(!peer.stream || peer.isVideoOff) && (

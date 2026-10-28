@@ -50,6 +50,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import TeamChatMessenger from "@/components/TeamChatMessenger";
+import GlobalCallListener from "@/components/GlobalCallListener";
 
 interface DamagedItem {
   id: string;
@@ -7912,6 +7913,8 @@ export default function EmployeeDashboard() {
           </div>
         </div>
       )}
+      {/* Global Incoming Call Listener dengan Nada Dering Lintas Menu */}
+      <GlobalCallListener />
     </div>
   );
 }
