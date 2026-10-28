@@ -19,6 +19,17 @@ export default function GlobalCallListener() {
         const parsed = JSON.parse(stored);
         if (parsed.id) {
           setCurrentUser(parsed);
+          // Sinkronkan akun login aktif ke native Android background service secara instan
+          if (typeof window !== "undefined" && (window as any).DStechNative?.syncAuthWithData) {
+            try {
+              (window as any).DStechNative.syncAuthWithData(
+                parsed.id,
+                parsed.name || "Pengguna",
+                parsed.role || "EMPLOYEE",
+                JSON.stringify(parsed)
+              );
+            } catch (nativeErr) {}
+          }
         }
       }
     } catch (e) {

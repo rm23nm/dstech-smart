@@ -42,42 +42,49 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, call, data: call });
   }
 
-  // Jika mencari panggilan masuk untuk user tertentu
+  // Cek panggilan masuk aktif (< 45 detik dan status calling/RINGING)
+  const now = Date.now();
+  let incomingCall = null;
+
   if (userId) {
-    const now = Date.now();
-    // Panggilan masuk aktif jika status 'calling' dan belum lebih dari 45 detik
-    const incomingCall = calls.find(
+    incomingCall = calls.find(
       (c: any) =>
-        (c.receiverId === userId || !c.receiverId) &&
+        (c.receiverId === userId || !c.receiverId || (c.receiverName && c.receiverName.toLowerCase() === userId.toLowerCase())) &&
         (c.status === "calling" || c.status === "RINGING") &&
         now - new Date(c.startedAt).getTime() < 45000
     );
-
-    const formattedData = incomingCall
-      ? {
-          callId: incomingCall.id,
-          id: incomingCall.id,
-          callerId: incomingCall.callerId,
-          callerName: incomingCall.callerName,
-          receiverId: incomingCall.receiverId,
-          receiverName: incomingCall.receiverName,
-          targetUserId: incomingCall.receiverId,
-          callType: incomingCall.callType || "audio",
-          roomCode: incomingCall.roomCode,
-          chatId: incomingCall.chatId,
-          status: "RINGING",
-          startedAt: incomingCall.startedAt,
-        }
-      : null;
-
-    return NextResponse.json({
-      success: true,
-      incomingCall: incomingCall || null,
-      data: formattedData,
-    });
+  } else {
+    // Fallback: Jika userId belum tersinkron di perangkat, tetap deteksi panggilan aktif terbaru
+    incomingCall = calls.find(
+      (c: any) =>
+        (c.status === "calling" || c.status === "RINGING") &&
+        now - new Date(c.startedAt).getTime() < 45000
+    );
   }
 
-  return NextResponse.json({ success: true, calls: calls.slice(-20) });
+  const formattedData = incomingCall
+    ? {
+        callId: incomingCall.id,
+        id: incomingCall.id,
+        callerId: incomingCall.callerId,
+        callerName: incomingCall.callerName,
+        receiverId: incomingCall.receiverId,
+        receiverName: incomingCall.receiverName,
+        targetUserId: incomingCall.receiverId,
+        callType: incomingCall.callType || "audio",
+        roomCode: incomingCall.roomCode,
+        chatId: incomingCall.chatId,
+        status: "RINGING",
+        startedAt: incomingCall.startedAt,
+      }
+    : null;
+
+  return NextResponse.json({
+    success: true,
+    incomingCall: incomingCall || null,
+    data: formattedData,
+    calls: calls.slice(-20),
+  });
 }
 
 // POST: Inisiasi, jawab, tolak, atau akhiri panggilan

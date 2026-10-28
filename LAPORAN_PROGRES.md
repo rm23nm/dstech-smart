@@ -4,7 +4,44 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 ### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Status**: Tidak ada pekerjaan aktif saat ini. Semua tugas terakhir telah selesai.
+- **Status**: SIAP DIKERJAKAN / AKTIF (Active Queue)
+- **Tugas 273**: Perbaikan Notifikasi Panggilan Latar Belakang / Saat Aplikasi Tertutup di HP (`DStechNotificationService.kt`, WakeLock, Foreground Service, & Polling Interval Background).
+  *Permintaan User*: "sekarang aplikasinya malah jika memanggil tidak masuk kalau posisi tertutup, namun posisi aplikasi terbuka di HP baru masuk panggilan dan suara notifnya."
+  *Penyebab Masalah yang Diteliti*:
+  - Saat aplikasi tertutup / di-swipe kill, sistem Android menghentikan Service jika bukan sticky foreground service atau notification channel service dihancurkan.
+  - Di `DStechNotificationService.kt`, saat user membuka aplikasi (foreground), webview aktif dan panggilan dideteksi oleh polling web. Namun ketika tertutup, polling background service mungkin terlelap (Doze mode) atau interval terlalu lambat, atau service mati saat aplikasi di-kill.
+  *Langkah-langkah Pengerjaan*:
+  - Step 1: Periksa lifecycle `DStechNotificationService.kt`, pastikan `START_STICKY`, implementasi WakeLock saat deteksi panggilan, dan foreground notification channel yang persisten.
+  - Step 2: Pastikan polling interval di background service berjalan konsisten (misal tiap 2-3 detik) dan tidak terputus saat activity finish.
+  - Step 3: Kompilasi APK Android Debug & perbarui file download APK di web.
+
+- **2026-10-28**: [SELESAI] Perbaikan Fitur Update Laporan Pekerjaan & Bukti Foto Lampiran Tidak Tersimpan (Tugas 272) (`api/employee/tasks/route.ts`, `employee/page.tsx`, `api/employee/daily-reports/route.ts`, `TeamChatMessenger.tsx`, & `MainActivity.kt`).
+  *Permintaan User*: "setiap saya update laporan, kenapa tidak bisa update, data gambar dan pekerjaan tidak tersimpan"
+  *Penyebab Masalah*:
+  1. Pada `api/employee/tasks/route.ts`, saat `GET`, penugasan proyek lapangan di-map ulang dari `dstech_finance_erp.json` dengan hardcode `photos: []` dan `report: p.description || ""`. Ketika teknisi menyimpan laporan dan foto lewat `PUT`, lalu halaman memanggil re-fetch `GET /api/employee/tasks`, data foto proyek ter-reset menjadi kosong (`[]`) dan laporannya tertimpa kembali oleh deskripsi lama, serta terjadi duplikasi ID di array `allTasks`.
+  2. Saat `PUT /api/employee/tasks`, perubahan foto dan laporan proyek tidak disimpan ke `dstech_finance_erp.json` proyek terkait, sehingga data tidak persisten.
+  3. Pada Modal 11 Laporan Kegiatan Harian di `src/app/employee/page.tsx`, belum ada input/tombol unggah foto dokumentasi pekerjaan, padahal backend daily-reports sudah mewajibkan dan mendukung `photos`.
+  4. Di aplikasi Android `MainActivity.kt`, saat user mengambil foto dari kamera untuk upload laporan, `fileChooserLauncher` mengembalikan `Uri.fromFile(file)` yang berskema `file://`. Pada Android 10+ (Scoped Storage) dan WebView Sandbox, skema `file://` ditolak/diabaikan karena alasan keamanan, sehingga foto kamera tidak sampai ke elemen input file HTML.
+  5. Di `TeamChatMessenger.tsx`, form Laporan Bukti Pekerjaan Lapangan hanya tersimpan sebagai bubble chat, belum disinkronkan ke rekap riwayat laporan pekerjaan resmi.
+  *Penyelesaian & Hasil*:
+  1. **Deduplikasi & Preservasi Foto/Laporan Proyek (`api/employee/tasks/route.ts`)**:
+     - Pada `GET`, kode kini memeriksa apakah penugasan proyek sudah ada di `tasks.json`. Jika ada, `photos`, `report`, `status`, `damagedItems`, dan koordinat yang sudah diisi teknisi dipertahankan 100% dan tidak di-reset ke array kosong.
+     - Array `allTasks` dideduplikasi secara ketat sehingga tidak ada ID ganda yang menimpa data.
+     - Pada `PUT`, data pembaruan laporan (`report`), `photos`, `status`, dan `completionDate` disinkronkan dua arah langsung ke `dstech_finance_erp.json` (object project terkait) dan `dstech_employee_tasks.json` secara permanen.
+  2. **Fitur Unggah Foto Bukti Pekerjaan Harian di Modal 11 & Fallback Kompresi (`employee/page.tsx`)**:
+     - Ditambahkan section Lampiran Foto Bukti Pekerjaan Lapangan di Modal 11 (Laporan Kegiatan Harian) lengkap dengan input file kamera/galeri, pratinjau thumbnail foto, dan tombol hapus foto.
+     - Ditambahkan proteksi fallback pada `compressTechnicianPhoto`: jika canvas kompresi browser gagal atau terhambat, otomatis menggunakan file asli sehingga unggahan tidak pernah gagal.
+  3. **Sinkronisasi Foto Laporan Harian ke Galeri Proyek & Tugas (`api/employee/daily-reports/route.ts`)**:
+     - Foto yang diunggah pada laporan kegiatan harian otomatis ditambahkan ke `prj.photos` dan `task.photos` sehingga langsung masuk ke lampiran faktur dan dokumen laporan A4 resmi.
+  4. **Perbaikan File Chooser Android Native (`MainActivity.kt`)**:
+     - Pada `fileChooserLauncher`, `Uri.fromFile(file)` diganti dengan `FileProvider.getUriForFile(...)` berskema `content://`, sehingga WebView Android 10+ dapat membaca file foto kamera secara langsung tanpa penolakan security sandbox.
+  5. **Sinkronisasi Laporan Bukti Kerja dari Chat (`TeamChatMessenger.tsx`)**:
+     - Pengiriman Bukti Pekerjaan Lapangan dari obrolan kini otomatis mencatat laporan resmi ke endpoint `/api/employee/daily-reports`.
+  6. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: **0 error**.
+     - Build APK Android Debug (`build_android.bat assembleDebug`): **BUILD SUCCESSFUL**.
+     - File APK baru (5.98 MB) disalin ke `public/dstech-smart-app.apk`.
+     - Git push commit `e2977cd` dan deploy VPS sukses (`dstech-main` online).
 
 - **2026-10-28**: [SELESAI] Perbaikan Loop Putus-Nyambung WebRTC, Panggilan Tidak Bisa Diangkat, Suara Notifikasi Double & Tidak Bisa Scroll ke Atas di Aplikasi Mobile (Tugas 268, 269 & 270) (`direct-call/[roomCode]/page.tsx`, `GlobalCallListener.tsx`, `DStechNotificationService.kt`, `MainActivity.kt`).
   *Permintaan User*:
