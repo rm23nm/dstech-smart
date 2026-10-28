@@ -99,8 +99,87 @@ export async function GET(request: Request) {
       writeJsonSafe(CHATS_FILE, chats);
     }
 
-    // Filter chat yang relevan untuk user (jika userId diberikan), atau kembalikan semua chat jika tidak difilter
-    const userChats = chats.map((c: any) => {
+    // --- Otomatisasi Pembuatan Grup Koordinasi Tim Proyek ---
+    try {
+      const financeData = readJsonSafe(FINANCE_FILE, { projects: [] });
+      const projects = Array.isArray(financeData.projects) ? financeData.projects : [];
+      let updatedChats = false;
+
+      for (const prj of projects) {
+        const prjChatId = `dstech_chat_prj_${prj.id}`;
+        const existingChatIndex = chats.findIndex((c: any) => c.id === prjChatId || c.projectId === prj.id);
+        const isProjectDone =
+          prj.status === "Completed" ||
+          prj.status === "Selesai" ||
+          prj.status === "Closed";
+
+        // Pembubaran Otomatis: Jika proyek telah selesai, hapus grup dari chat aktif agar tidak menumpuk
+        if (isProjectDone) {
+          if (existingChatIndex !== -1) {
+            chats.splice(existingChatIndex, 1);
+            updatedChats = true;
+          }
+          continue;
+        }
+
+        // Cari teknisi terkait proyek dari penugasan lapangan
+        const tasksData = readJsonSafe(TASKS_FILE, []);
+        const relatedTasks = tasksData.filter((t: any) =>
+          (prj.clientName && t.client?.toLowerCase().includes(prj.clientName.toLowerCase())) ||
+          (prj.projectName && t.title?.toLowerCase().includes(prj.projectName.toLowerCase())) ||
+          t.projectId === prj.id
+        );
+
+        const assignedTechNames = relatedTasks.map((t: any) => (t.technician || "").toLowerCase());
+        const matchingTechUserIds = users
+          .filter((u: any) => assignedTechNames.some((name: string) => name && (u.name || "").toLowerCase().includes(name)))
+          .map((u: any) => u.id);
+
+        const adminIds = users.filter((u: any) => u.role === "ADMIN" || u.role === "SUPERADMIN").map((u: any) => u.id);
+        const projectParticipants = Array.from(new Set([...adminIds, ...matchingTechUserIds]));
+
+        if (existingChatIndex === -1) {
+          chats.unshift({
+            id: prjChatId,
+            projectId: prj.id,
+            name: `Koordinasi: ${prj.projectName}`,
+            isGroup: true,
+            isProjectCoordination: true,
+            groupAvatar: "/services-access.png",
+            participants: projectParticipants,
+            description: `Grup koordinasi proyek ${prj.projectName} (${prj.clientName || "Klien DSTech"}). Jalur resmi koordinasi teknisi dan PIC lapangan.`,
+            lastMessage: "Grup koordinasi proyek telah dibentuk otomatis. Anggota tim dan PIC resmi terdaftar.",
+            lastMessageTime: prj.createdAt || new Date().toISOString(),
+            unreadCount: 0,
+          });
+          updatedChats = true;
+        } else {
+          const current = chats[existingChatIndex];
+          const merged = Array.from(new Set([...(current.participants || []), ...projectParticipants]));
+          if (merged.length !== (current.participants || []).length) {
+            current.participants = merged;
+            updatedChats = true;
+          }
+        }
+      }
+
+      if (updatedChats) {
+        writeJsonSafe(CHATS_FILE, chats);
+      }
+    } catch (e) {
+      console.warn("Sync project chats notice:", e);
+    }
+
+    // Filter ketat hak akses: Jika bukan Admin/Superadmin, HANYA tampilkan obrolan di mana user menjadi peserta resmi
+    const requestUser = users.find((u: any) => u.id === userId);
+    const isAdmin = requestUser?.role === "ADMIN" || requestUser?.role === "SUPERADMIN";
+
+    let visibleChats = chats;
+    if (userId && !isAdmin) {
+      visibleChats = chats.filter((c: any) => Array.isArray(c.participants) && c.participants.includes(userId));
+    }
+
+    const userChats = visibleChats.map((c: any) => {
       // Jika DM (bukan grup), berikan nama lawan bicara
       if (!c.isGroup && userId) {
         const otherParticipantId = c.participants.find((p: string) => p !== userId) || c.participants[0];
@@ -145,12 +224,38 @@ export async function GET(request: Request) {
     });
   }
 
+  // 2b. Ambil pesan terbaru (Polling background service Android)
+  if (action === "recent_messages" || action === "all_messages") {
+    const allMessages = readJsonSafe(MESSAGES_FILE, []);
+    const allChats = readJsonSafe(CHATS_FILE, []);
+    const myChatIds = allChats
+      .filter((c: any) => !userId || (Array.isArray(c.participants) && c.participants.includes(userId)))
+      .map((c: any) => c.id);
+    const userMessages = allMessages.filter((m: any) => myChatIds.includes(m.chatId));
+
+    return NextResponse.json({
+      success: true,
+      data: userMessages.slice(-20),
+      totalCount: userMessages.length,
+    });
+  }
+
   // 3. Ambil data perusahaan untuk lampiran (Invoice, SPK Task, Laporan Bukti Kerja)
   if (action === "company_data") {
     const dataType = searchParams.get("type") || "invoices";
     const query = (searchParams.get("query") || "").toLowerCase();
+    const userRole = (searchParams.get("role") || "").toUpperCase();
+    const requesterName = (searchParams.get("userName") || "").toLowerCase();
 
+    // PERLINDUNGAN KERAHASIAAN PERUSAHAAN: Invoice hanya untuk Admin / Finance
     if (dataType === "invoices") {
+      if (userRole === "EMPLOYEE" || userRole === "CLIENT" || userRole === "PARTNER" || userRole.includes("TEKNISI")) {
+        return NextResponse.json({
+          success: false,
+          error: "Akses Ditolak: Data invoice & penagihan internal hanya dapat diakses oleh Manajemen & Admin Finance.",
+        }, { status: 403 });
+      }
+
       const financeData = readJsonSafe(FINANCE_FILE, { sales: [] });
       let invoices = (financeData.sales || []).map((inv: any) => ({
         id: inv.id,
@@ -184,6 +289,16 @@ export async function GET(request: Request) {
         technician: t.technician || "Teknisi",
         deadline: t.deadline || "-",
       }));
+
+      // Jika teknisi / karyawan: HANYA tampilkan tugas yang menugaskan dirinya
+      if (userRole === "EMPLOYEE" || userRole.includes("TEKNISI")) {
+        if (requesterName) {
+          tasks = tasks.filter((t: any) =>
+            t.technician?.toLowerCase().includes(requesterName)
+          );
+        }
+      }
+
       if (query) {
         tasks = tasks.filter(
           (t: any) =>

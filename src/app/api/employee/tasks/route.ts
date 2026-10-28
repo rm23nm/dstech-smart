@@ -37,32 +37,84 @@ export async function GET(request: Request) {
 
     let tasks = readTasks();
 
+    // Integrasi Penugasan Proyek Lapangan (Selain Maintenance)
+    const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
+    let projectTasks: any[] = [];
+    try {
+      if (fs.existsSync(FINANCE_FILE)) {
+        const finData = JSON.parse(fs.readFileSync(FINANCE_FILE, "utf-8"));
+        const rawProjects = Array.isArray(finData.projects) ? finData.projects : [];
+        projectTasks = rawProjects.map((p: any) => ({
+          id: p.id,
+          ticketNumber: p.projectCode || p.id,
+          entityType: p.businessEntity || "PT",
+          type: "Proyek Lapangan",
+          isProject: true,
+          projectId: p.id,
+          title: p.projectName,
+          client: p.clientName || "Klien DSTech",
+          clientPhone: p.clientPhone || "-",
+          clientPic: p.clientPic || p.picProject || "PIC Klien",
+          location: p.clientAddress || "Area Proyek Klien",
+          date: p.startDate || p.createdAt?.split("T")[0] || new Date().toISOString().split("T")[0],
+          deadline: p.targetEndDate || "-",
+          status: p.status === "Completed" ? "Completed" : p.status === "In Progress" ? "In Progress" : "Pending",
+          priority: "High",
+          technician: p.picProject || "RAMADHANI ST",
+          technicianPhone: "+6282259494242",
+          picProject: p.picProject || "RAMADHANI ST",
+          teamMembers: Array.isArray(p.teamMembers) && p.teamMembers.length > 0 ? p.teamMembers : [p.picProject || "RAMADHANI ST", "Ikhsan Maulidi"],
+          scope: [
+            `Pelaksanaan pengadaan & instalasi proyek ${p.projectName}`,
+            `Koordinasi berkala dengan PIC Klien (${p.clientName})`,
+            "Penyusunan laporan harian lapangan (Daily Report) dan Berita Acara Pekerjaan",
+          ],
+          equipment: ["Perangkat & Material Sesuai Kontrak Proyek"],
+          photos: [],
+          report: p.description || "",
+          notes: "Wajib mengisi Laporan Harian (Daily Report) dan dokumentasi foto progres setiap hari kerja.",
+        }));
+      }
+    } catch (e) {
+      console.error("Error reading projects for employee tasks:", e);
+    }
+
+    let allTasks = [...tasks, ...projectTasks];
+
     if (entity && entity !== "ALL") {
-      tasks = tasks.filter((t: any) => (t.entityType || "PT") === entity);
+      allTasks = allTasks.filter((t: any) => (t.entityType || "PT") === entity);
     }
 
     if (status && status !== "Semua") {
-      tasks = tasks.filter((t: any) => t.status?.toLowerCase() === status.toLowerCase());
+      allTasks = allTasks.filter((t: any) => t.status?.toLowerCase() === status.toLowerCase());
     }
 
     if (technician && technician !== "Semua") {
-      tasks = tasks.filter((t: any) => t.technician?.toLowerCase() === technician.toLowerCase());
+      const techLower = technician.toLowerCase();
+      allTasks = allTasks.filter((t: any) =>
+        t.technician?.toLowerCase() === techLower ||
+        (Array.isArray(t.teamMembers) && t.teamMembers.some((m: string) => m.toLowerCase().includes(techLower))) ||
+        (t.picProject && t.picProject.toLowerCase().includes(techLower))
+      );
     }
 
     if (type && type !== "Semua") {
-      tasks = tasks.filter((t: any) => (t.type || "Preventive Maintenance")?.toLowerCase() === type.toLowerCase());
+      allTasks = allTasks.filter((t: any) => (t.type || "Preventive Maintenance")?.toLowerCase() === type.toLowerCase());
     }
 
     if (query) {
-      tasks = tasks.filter(
+      allTasks = allTasks.filter(
         (t: any) =>
           t.title?.toLowerCase().includes(query) ||
           t.client?.toLowerCase().includes(query) ||
           t.location?.toLowerCase().includes(query) ||
           t.ticketNumber?.toLowerCase().includes(query) ||
-          t.technician?.toLowerCase().includes(query)
+          t.technician?.toLowerCase().includes(query) ||
+          (Array.isArray(t.teamMembers) && t.teamMembers.some((m: string) => m.toLowerCase().includes(query)))
       );
     }
+
+    tasks = allTasks;
 
     const INVENTORY_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_inventory.json");
     let inventoryRequests: any[] = [];

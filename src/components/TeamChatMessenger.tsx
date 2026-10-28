@@ -246,7 +246,11 @@ export default function TeamChatMessenger({
   // Load Data Perusahaan untuk Lampiran
   const loadCompanyData = async (type: "invoices" | "tasks" | "reports") => {
     try {
-      const res = await fetch(`/api/team-chat?action=company_data&type=${type}&query=${encodeURIComponent(dataSearch)}`);
+      const res = await fetch(
+        `/api/team-chat?action=company_data&type=${type}&query=${encodeURIComponent(dataSearch)}&role=${encodeURIComponent(
+          currentUser.role || "EMPLOYEE"
+        )}&userName=${encodeURIComponent(currentUser.name || "")}`
+      );
       const data = await res.json();
       if (data.success) {
         if (type === "invoices") setCompanyInvoices(data.data || []);
@@ -424,8 +428,10 @@ export default function TeamChatMessenger({
         setIsCallingModalOpen(true);
         // Bunyikan nada panggil keluar (dial tone)
         dstechCallAudio.startOutgoingDialtone();
-        // Buka langsung ruang WebRTC dua arah
-        const callUrl = `/meeting/${data.call.roomCode}?callType=${callType}&caller=${encodeURIComponent(currentUser.name)}&autoJoin=true`;
+        // Buka langsung ruang Panggilan Langsung 1-on-1 (bukan meeting conference)
+        const callUrl = `/direct-call/${data.call.roomCode}?callId=${data.call.id}&callType=${callType}&peerName=${encodeURIComponent(
+          activeChat.name
+        )}`;
         window.open(callUrl, "_blank");
       }
     } catch (err) {
@@ -433,12 +439,12 @@ export default function TeamChatMessenger({
     }
   };
 
-  // Terima Panggilan Masuk
+  // Terima Panggilan Masuk Langsung
   const handleAcceptCall = async () => {
     if (!incomingCall) return;
     dstechCallAudio.stopCallAudio();
     const roomCode = incomingCall.roomCode;
-    const callType = incomingCall.callType;
+    const callType = incomingCall.callType || "audio";
 
     try {
       const res = await fetch("/api/team-chat/call", {
@@ -454,8 +460,10 @@ export default function TeamChatMessenger({
         setActiveCall(data.call);
         setIncomingCall(null);
         setIsCallingModalOpen(false);
-        // Buka langsung ruang WebRTC audio/video call
-        const callUrl = `/meeting/${roomCode}?callType=${callType}&caller=${encodeURIComponent(currentUser.name)}&autoJoin=true`;
+        // Buka langsung ruang Panggilan Langsung 1-on-1
+        const callUrl = `/direct-call/${roomCode}?callId=${incomingCall.id}&callType=${callType}&peerName=${encodeURIComponent(
+          incomingCall.callerName
+        )}&autoAccept=true`;
         window.open(callUrl, "_blank");
       }
     } catch (err) {
@@ -945,16 +953,24 @@ export default function TeamChatMessenger({
                           </p>
                           <div className="flex items-center justify-between pt-1 text-xs">
                             <span className="text-[11px] text-slate-400">Total Tagihan:</span>
-                            <span className="font-extrabold text-emerald-400">
-                              Rp {Number(msg.invoiceData.grandTotal || 0).toLocaleString("id-ID")}
-                            </span>
+                            {currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN" ? (
+                              <span className="font-extrabold text-emerald-400">
+                                Rp {Number(msg.invoiceData.grandTotal || 0).toLocaleString("id-ID")}
+                              </span>
+                            ) : (
+                              <span className="font-bold text-slate-400 text-[11px] bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                                •••••••• (Internal Keuangan)
+                              </span>
+                            )}
                           </div>
-                          <Link
-                            href={`/admin/finance`}
-                            className="mt-2.5 w-full py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition"
-                          >
-                            <ExternalLink className="w-3 h-3" /> Buka Detail di Finance
-                          </Link>
+                          {(currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN") && (
+                            <Link
+                              href={`/admin/finance`}
+                              className="mt-2.5 w-full py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition"
+                            >
+                              <ExternalLink className="w-3 h-3" /> Buka Detail di Finance
+                            </Link>
+                          )}
                         </div>
                       )}
 
@@ -1047,21 +1063,23 @@ export default function TeamChatMessenger({
             {/* Menu Lampiran Data Perusahaan (Popup) */}
             {showAttachMenu && (
               <div className="absolute bottom-20 left-4 z-20 bg-slate-950 border border-slate-700/80 rounded-2xl p-2 shadow-2xl flex flex-col gap-1 w-64 animate-fadeIn backdrop-blur-lg">
-                <button
-                  onClick={() => {
-                    setAttachModalType("invoice");
-                    setShowAttachMenu(false);
-                  }}
-                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 hover:text-white text-xs transition cursor-pointer"
-                >
-                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div className="text-left">
-                    <div className="font-bold">Kirim Invoice / Tagihan</div>
-                    <div className="text-[10px] text-slate-400">Lampirkan faktur keuangan ERP</div>
-                  </div>
-                </button>
+                {(currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN") && (
+                  <button
+                    onClick={() => {
+                      setAttachModalType("invoice");
+                      setShowAttachMenu(false);
+                    }}
+                    className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 hover:text-white text-xs transition cursor-pointer"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="text-left">
+                      <div className="font-bold">Kirim Invoice / Tagihan</div>
+                      <div className="text-[10px] text-slate-400">Lampirkan faktur keuangan ERP</div>
+                    </div>
+                  </button>
+                )}
 
                 <button
                   onClick={() => {
@@ -1257,7 +1275,9 @@ export default function TeamChatMessenger({
                         </div>
                         <div className="text-right">
                           <span className="font-bold text-emerald-400 text-xs">
-                            Rp {Number(inv.grandTotal || 0).toLocaleString("id-ID")}
+                            {currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN"
+                              ? `Rp ${Number(inv.grandTotal || 0).toLocaleString("id-ID")}`
+                              : "••••••••"}
                           </span>
                           <span className="block text-[10px] text-slate-500">{inv.date}</span>
                         </div>

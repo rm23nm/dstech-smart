@@ -379,6 +379,9 @@ export default function EmployeeDashboard() {
       const tPhone = (t.technicianPhone || "").replace(/\D/g, "");
       if (uPhone && tPhone && (uPhone.endsWith(tPhone) || tPhone.endsWith(uPhone))) return true;
       if ((t as any).assignedTo && String((t as any).assignedTo).toLowerCase().includes(uName)) return true;
+      if ((t as any).picProject && String((t as any).picProject).toLowerCase().includes(uName)) return true;
+      const team = (t as any).teamMembers;
+      if (Array.isArray(team) && team.some((m: string) => String(m).toLowerCase().includes(uName) || (currentUser.id && String(m) === currentUser.id))) return true;
       return false;
     });
   }, [tasks, currentUser]);

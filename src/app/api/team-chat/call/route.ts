@@ -31,7 +31,7 @@ function writeJsonSafe(filePath: string, data: any) {
 // GET: Cek panggilan masuk atau status panggilan
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
+  const userId = searchParams.get("userId") || searchParams.get("targetUserId");
   const callId = searchParams.get("callId");
 
   const calls = readJsonSafe(CALLS_FILE, []);
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   // Jika mencari status call spesifik
   if (callId) {
     const call = calls.find((c: any) => c.id === callId);
-    return NextResponse.json({ success: true, call });
+    return NextResponse.json({ success: true, call, data: call });
   }
 
   // Jika mencari panggilan masuk untuk user tertentu
@@ -48,12 +48,33 @@ export async function GET(request: Request) {
     // Panggilan masuk aktif jika status 'calling' dan belum lebih dari 45 detik
     const incomingCall = calls.find(
       (c: any) =>
-        c.receiverId === userId &&
-        c.status === "calling" &&
+        (c.receiverId === userId || !c.receiverId) &&
+        (c.status === "calling" || c.status === "RINGING") &&
         now - new Date(c.startedAt).getTime() < 45000
     );
 
-    return NextResponse.json({ success: true, incomingCall: incomingCall || null });
+    const formattedData = incomingCall
+      ? {
+          callId: incomingCall.id,
+          id: incomingCall.id,
+          callerId: incomingCall.callerId,
+          callerName: incomingCall.callerName,
+          receiverId: incomingCall.receiverId,
+          receiverName: incomingCall.receiverName,
+          targetUserId: incomingCall.receiverId,
+          callType: incomingCall.callType || "audio",
+          roomCode: incomingCall.roomCode,
+          chatId: incomingCall.chatId,
+          status: "RINGING",
+          startedAt: incomingCall.startedAt,
+        }
+      : null;
+
+    return NextResponse.json({
+      success: true,
+      incomingCall: incomingCall || null,
+      data: formattedData,
+    });
   }
 
   return NextResponse.json({ success: true, calls: calls.slice(-20) });
@@ -111,8 +132,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Panggilan tidak ditemukan" }, { status: 404 });
     }
 
-    // 3. Menolak Panggilan (Decline)
-    if (action === "decline") {
+    // 3. Menolak Panggilan (Decline / Reject)
+    if (action === "decline" || action === "reject") {
       const { callId } = body;
       const callIndex = calls.findIndex((c: any) => c.id === callId);
 

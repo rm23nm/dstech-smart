@@ -77,9 +77,11 @@ export default function GlobalCallListener() {
         }),
       });
 
-      const roomUrl = `/meeting/${incomingCall.roomCode}`;
+      const roomUrl = `/direct-call/${incomingCall.roomCode}?callId=${incomingCall.id}&callType=${incomingCall.callType || "audio"}&peerName=${encodeURIComponent(
+        incomingCall.callerName
+      )}&autoAccept=true`;
       setIncomingCall(null);
-      // Buka ruang panggilan suara/video WebRTC secara langsung
+      // Buka langsung ruang Panggilan Langsung 1-on-1 (Direct Voice/Video Call)
       window.open(roomUrl, "_blank");
     } catch (err) {
       console.error("Gagal menerima panggilan:", err);
