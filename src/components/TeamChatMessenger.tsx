@@ -38,6 +38,9 @@ import {
   Unlock,
   CheckCircle2,
   ShieldAlert,
+  Upload,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import { dstechCallAudio } from "@/utils/dstech_call_audio";
 
@@ -133,8 +136,67 @@ export default function TeamChatMessenger({
     clientName: "",
     progressPercentage: 100,
     activityDescription: "",
-    photoUrl: "/portfolio-industrial.png",
+    photoUrl: "",
   });
+
+  // State Upload Foto Bukti Lapangan & Kamera
+  const [isUploadingReportPhoto, setIsUploadingReportPhoto] = useState(false);
+  const [spkPhotoUrl, setSpkPhotoUrl] = useState<string>("");
+  const [isUploadingSpkPhoto, setIsUploadingSpkPhoto] = useState(false);
+  const reportCameraInputRef = useRef<HTMLInputElement>(null);
+  const reportGalleryInputRef = useRef<HTMLInputElement>(null);
+  const spkCameraInputRef = useRef<HTMLInputElement>(null);
+  const spkGalleryInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadReportPhoto = async (file: File) => {
+    if (!file) return;
+    try {
+      setIsUploadingReportPhoto(true);
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("docType", "daily_report");
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        setReportForm((prev) => ({ ...prev, photoUrl: data.url }));
+      } else {
+        alert(data.message || "Gagal mengunggah foto.");
+      }
+    } catch (err) {
+      console.error("Gagal mengunggah foto:", err);
+      alert("Terjadi kesalahan saat mengunggah foto bukti.");
+    } finally {
+      setIsUploadingReportPhoto(false);
+    }
+  };
+
+  const handleUploadSpkPhoto = async (file: File) => {
+    if (!file) return;
+    try {
+      setIsUploadingSpkPhoto(true);
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("docType", "spk_proof");
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        setSpkPhotoUrl(data.url);
+      } else {
+        alert(data.message || "Gagal mengunggah foto.");
+      }
+    } catch (err) {
+      console.error("Gagal mengunggah foto:", err);
+      alert("Terjadi kesalahan saat mengunggah foto bukti.");
+    } finally {
+      setIsUploadingSpkPhoto(false);
+    }
+  };
 
   // State Buat Percakapan / Grup Baru
   const [showNewChatModal, setShowNewChatModal] = useState(false);
@@ -177,6 +239,7 @@ export default function TeamChatMessenger({
           status: spkStatus,
           progress: spkProgress,
           notes: spkNotes,
+          photoUrl: spkPhotoUrl || undefined,
           technician: currentUser.name,
         }),
       });
@@ -193,13 +256,14 @@ export default function TeamChatMessenger({
             senderName: currentUser.name,
             senderRole: currentUser.role,
             type: "text",
-            content: `📋 UPDATE SPK [${activeSpkModal.ticketNumber || activeSpkModal.title}]: Status diperbarui menjadi '${spkStatus}' (${spkProgress}%). Catatan: ${spkNotes || "Telah ditindaklanjuti langsung di lapangan."}`,
+            content: `📋 UPDATE SPK [${activeSpkModal.ticketNumber || activeSpkModal.title}]: Status diperbarui menjadi '${spkStatus}' (${spkProgress}%). ${spkPhotoUrl ? "📸 Foto bukti kerja dilampirkan." : ""} Catatan: ${spkNotes || "Telah ditindaklanjuti langsung di lapangan."}`,
           }),
         });
         loadChats();
         if (activeChat.id) loadMessages(activeChat.id);
       }
       setActiveSpkModal(null);
+      setSpkPhotoUrl("");
     } catch (err) {
       console.error("Gagal mengupdate SPK:", err);
     } finally {
@@ -1313,6 +1377,31 @@ export default function TeamChatMessenger({
             {/* Jika Modal Report: Form Input Bukti Pekerjaan */}
             {attachModalType === "report" ? (
               <form onSubmit={handleCustomReportSubmit} className="space-y-3.5 overflow-y-auto pr-1">
+                {/* Hidden File Inputs untuk Kamera dan Galeri */}
+                <input
+                  ref={reportCameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleUploadReportPhoto(e.target.files[0]);
+                    }
+                  }}
+                />
+                <input
+                  ref={reportGalleryInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      handleUploadReportPhoto(e.target.files[0]);
+                    }
+                  }}
+                />
+
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-300 mb-1">
                     Judul Pekerjaan / Tugas
@@ -1354,12 +1443,87 @@ export default function TeamChatMessenger({
                     />
                   </div>
                 </div>
+
+                {/* Upload Foto Bukti Lapangan */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+                    <span>Lampiran Foto Bukti Pekerjaan</span>
+                    {reportForm.photoUrl && (
+                      <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Foto Terpasang
+                      </span>
+                    )}
+                  </label>
+
+                  {reportForm.photoUrl ? (
+                    <div className="relative w-full h-40 rounded-2xl overflow-hidden border border-teal-500/50 group bg-slate-950">
+                      <Image
+                        src={reportForm.photoUrl}
+                        alt="Bukti Pekerjaan"
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => reportCameraInputRef.current?.click()}
+                          className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-lg cursor-pointer"
+                        >
+                          <Camera className="w-3.5 h-3.5" /> Ganti Foto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReportForm((prev) => ({ ...prev, photoUrl: "" }))}
+                          className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-lg cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Hapus
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3.5 border-2 border-dashed border-slate-800 hover:border-teal-500/60 rounded-2xl bg-slate-950/60 text-center transition">
+                      {isUploadingReportPhoto ? (
+                        <div className="py-3 flex flex-col items-center justify-center text-teal-400 gap-2">
+                          <Loader2 className="w-6 h-6 animate-spin" />
+                          <span className="text-xs font-semibold">Mengunggah foto bukti ke server...</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <div className="w-9 h-9 rounded-full bg-teal-500/10 text-teal-400 flex items-center justify-center">
+                            <Camera className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-white mb-0.5">Ambil atau Pilih Foto Bukti</p>
+                            <p className="text-[10px] text-slate-400">Jepret foto langsung di lapangan atau unggah dari galeri</p>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => reportCameraInputRef.current?.click()}
+                              className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow transition cursor-pointer"
+                            >
+                              <Camera className="w-3.5 h-3.5" /> Ambil Kamera
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => reportGalleryInputRef.current?.click()}
+                              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition cursor-pointer"
+                            >
+                              <Upload className="w-3.5 h-3.5" /> Dari Galeri
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-300 mb-1">
                     Deskripsi Aktivitas & Bukti Lapangan
                   </label>
                   <textarea
-                    rows={3}
+                    rows={2}
                     required
                     value={reportForm.activityDescription}
                     onChange={(e) => setReportForm({ ...reportForm, activityDescription: e.target.value })}
@@ -1369,9 +1533,10 @@ export default function TeamChatMessenger({
                 </div>
                 <button
                   type="submit"
-                  className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-xs shadow-lg transition mt-2 cursor-pointer"
+                  disabled={isUploadingReportPhoto}
+                  className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-lg transition mt-2 cursor-pointer"
                 >
-                  Kirim Bukti Pekerjaan ke Chat
+                  {isUploadingReportPhoto ? "Sedang Mengunggah Foto..." : "Kirim Bukti Pekerjaan ke Chat"}
                 </button>
               </form>
             ) : (
@@ -1536,12 +1701,106 @@ export default function TeamChatMessenger({
                 <div>
                   <label className="block text-slate-300 font-bold mb-1.5">Catatan Teknisi / Kondisi Lapangan</label>
                   <textarea
-                    rows={3}
+                    rows={2}
                     placeholder="Contoh: Perangkat sudah terpasang dan berfungsi normal, siap uji coba serah terima..."
                     value={spkNotes}
                     onChange={(e) => setSpkNotes(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:border-cyan-500 outline-none resize-none"
                   />
+                </div>
+
+                {/* Upload Foto Bukti Pekerjaan Lapangan untuk SPK */}
+                <div>
+                  <input
+                    ref={spkCameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleUploadSpkPhoto(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <input
+                    ref={spkGalleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleUploadSpkPhoto(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  <label className="block text-slate-300 font-bold mb-1.5 flex items-center justify-between">
+                    <span>Foto Bukti Fisik / Dokumentasi Pekerjaan</span>
+                    {spkPhotoUrl && (
+                      <span className="text-[10px] text-cyan-400 font-bold flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Foto Terlampir
+                      </span>
+                    )}
+                  </label>
+
+                  {spkPhotoUrl ? (
+                    <div className="relative w-full h-32 rounded-xl overflow-hidden border border-cyan-500/50 group bg-slate-950">
+                      <Image
+                        src={spkPhotoUrl}
+                        alt="Bukti Pekerjaan"
+                        fill
+                        className="object-cover"
+                      />
+                      <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => spkCameraInputRef.current?.click()}
+                          className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow cursor-pointer"
+                        >
+                          <Camera className="w-3 h-3" /> Ganti
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSpkPhotoUrl("")}
+                          className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" /> Hapus
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-3 border border-dashed border-slate-800 hover:border-cyan-500/50 rounded-xl bg-slate-950/60 flex items-center justify-between transition">
+                      {isUploadingSpkPhoto ? (
+                        <div className="w-full py-2 flex items-center justify-center text-cyan-400 gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="text-xs">Mengunggah foto bukti...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <Camera className="w-4 h-4 text-cyan-400" />
+                            <span className="text-[11px] text-slate-400">Lampirkan foto hasil pemasangan/servis</span>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => spkCameraInputRef.current?.click()}
+                              className="px-2.5 py-1 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Camera className="w-3 h-3" /> Kamera
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => spkGalleryInputRef.current?.click()}
+                              className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                            >
+                              <Upload className="w-3 h-3" /> Galeri
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
