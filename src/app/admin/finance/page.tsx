@@ -1172,6 +1172,24 @@ export default function AdminFinanceERPPage() {
     return def ? `Transfer ${def.bankName} (${def.accountNumber} - ${def.accountHolder})` : "Transfer Bank Resmi DSTech";
   };
 
+  const resolveProjectEntity = (p?: Partial<ProjectItem> | any | null): "PT" | "NON_PT" => {
+    if (!p) return "PT";
+    if (p.businessEntity === "NON_PT") return "NON_PT";
+    if (p.businessEntity === "PT") return "PT";
+    const code = (p.projectCode || "").toUpperCase();
+    const name = (p.projectName || "").toUpperCase();
+    if (
+      code.includes("NON-PT") ||
+      code.includes("NON_PT") ||
+      code.includes("DTS") ||
+      name.includes("NON-PT") ||
+      name.includes("NON_PT")
+    ) {
+      return "NON_PT";
+    }
+    return "PT";
+  };
+
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings>({
     letterheadUrl: "/kop_surat_dstech.jpg",
     letterheadEnabled: true,
@@ -13734,77 +13752,79 @@ export default function AdminFinanceERPPage() {
             </div>
 
             <form onSubmit={handleCreateSaleSubmit} className="space-y-4 text-xs">
-              {/* Profil Entitas & Badan Usaha (PT vs DSTech Smart Non-PT) */}
-              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                <label className="text-[11px] font-black text-slate-800 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <Building2 className="w-3.5 h-3.5 text-dstech-blue" />
-                    Pilih Badan Usaha / Profil Faktur:
-                  </span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                    saleForm.businessEntity === "NON_PT" 
-                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
-                      : "bg-blue-100 text-blue-800 border border-blue-200"
-                  }`}>
-                    {saleForm.businessEntity === "NON_PT" ? "Non-PKP / 0% PPN (Bebas PPN)" : "PKP / PPN 12% Resmi PT"}
-                  </span>
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <label
-                    onClick={() => {
-                      setSaleForm((prev) => ({
-                        ...prev,
-                        businessEntity: "PT",
-                        taxRate: prev.taxRate === 0 ? 12 : prev.taxRate,
-                      }));
-                    }}
-                    className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
-                      saleForm.businessEntity !== "NON_PT"
-                        ? "bg-blue-50/80 border-blue-300 ring-2 ring-blue-500/20"
-                        : "bg-white border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="sale-entity"
-                      checked={saleForm.businessEntity !== "NON_PT"}
-                      onChange={() => {}}
-                      className="mt-0.5 text-dstech-blue"
-                    />
-                    <div>
-                      <p className="font-black text-xs text-slate-900">PT. DSTech Smart Perkasa</p>
-                      <p className="text-[10px] text-slate-500">Kop resmi PT, NIB & NPWP, PPN 11%, Rekening Bank PT</p>
-                    </div>
+              {/* Profil Entitas & Badan Usaha (PT vs DSTech Smart Non-PT) - Otomatis tersembunyi jika membuat faktur proyek */}
+              {!saleForm.projectId ? (
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <label className="text-[11px] font-black text-slate-800 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-dstech-blue" />
+                      Pilih Badan Usaha / Profil Faktur:
+                    </span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      saleForm.businessEntity === "NON_PT" 
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-200" 
+                        : "bg-blue-100 text-blue-800 border border-blue-200"
+                    }`}>
+                      {saleForm.businessEntity === "NON_PT" ? "Non-PKP / 0% PPN (Bebas PPN)" : "PKP / PPN 12% Resmi PT"}
+                    </span>
                   </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label
+                      onClick={() => {
+                        setSaleForm((prev) => ({
+                          ...prev,
+                          businessEntity: "PT",
+                          taxRate: prev.taxRate === 0 ? 12 : prev.taxRate,
+                        }));
+                      }}
+                      className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                        saleForm.businessEntity !== "NON_PT"
+                          ? "bg-blue-50/80 border-blue-300 ring-2 ring-blue-500/20"
+                          : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="sale-entity"
+                        checked={saleForm.businessEntity !== "NON_PT"}
+                        onChange={() => {}}
+                        className="mt-0.5 text-dstech-blue"
+                      />
+                      <div>
+                        <p className="font-black text-xs text-slate-900">PT. DSTech Smart Perkasa</p>
+                        <p className="text-[10px] text-slate-500">Kop resmi PT, NIB & NPWP, PPN 11%, Rekening Bank PT</p>
+                      </div>
+                    </label>
 
-                  <label
-                    onClick={() => {
-                      setSaleForm((prev) => ({
-                        ...prev,
-                        businessEntity: "NON_PT",
-                        taxRate: 0,
-                      }));
-                    }}
-                    className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
-                      saleForm.businessEntity === "NON_PT"
-                        ? "bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20"
-                        : "bg-white border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="sale-entity"
-                      checked={saleForm.businessEntity === "NON_PT"}
-                      onChange={() => {}}
-                      className="mt-0.5 text-emerald-600"
-                    />
-                    <div>
-                      <p className="font-black text-xs text-slate-900">DSTech Smart (Usaha Mandiri)</p>
-                      <p className="text-[10px] text-slate-500">Kop DSTech Smart, Bebas PPN (0%), Rekening Pribadi</p>
-                    </div>
-                  </label>
+                    <label
+                      onClick={() => {
+                        setSaleForm((prev) => ({
+                          ...prev,
+                          businessEntity: "NON_PT",
+                          taxRate: 0,
+                        }));
+                      }}
+                      className={`p-2.5 rounded-xl border flex items-start gap-2.5 cursor-pointer transition-all ${
+                        saleForm.businessEntity === "NON_PT"
+                          ? "bg-emerald-50/80 border-emerald-300 ring-2 ring-emerald-500/20"
+                          : "bg-white border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="sale-entity"
+                        checked={saleForm.businessEntity === "NON_PT"}
+                        onChange={() => {}}
+                        className="mt-0.5 text-emerald-600"
+                      />
+                      <div>
+                        <p className="font-black text-xs text-slate-900">DSTech Smart (Usaha Mandiri)</p>
+                        <p className="text-[10px] text-slate-500">Kop DSTech Smart, Bebas PPN (0%), Rekening Pribadi</p>
+                      </div>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               {/* Quick Select Client from Master Data */}
               <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200/80 space-y-1.5">
@@ -13841,208 +13861,260 @@ export default function AdminFinanceERPPage() {
                 </select>
               </div>
 
-              {/* Selector Proyek Terkait (Opsional) */}
-              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-purple-600" />
-                    <span>Alokasikan Pendapatan ke Proyek (Opsional):</span>
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenAddProject()}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] shadow-xs transition-colors cursor-pointer"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>+ Tambah Proyek Baru</span>
-                    </button>
-                    <span className="text-[10px] text-purple-600 font-medium hidden sm:inline">
-                      {saleForm.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
-                    </span>
-                  </div>
-                </div>
-                {/* Searchable Project Selector */}
-                <div className="space-y-2">
-                  {/* Selected Project Card Preview */}
-                  {(() => {
-                    const currentPrj = projects.find((p) => p.id === saleForm.projectId);
-                    if (!currentPrj) return null;
-                    return (
-                      <div className="p-3 bg-purple-50/90 rounded-xl border border-purple-200 flex items-start justify-between gap-3 shadow-xs">
-                        <div className="flex-1 min-w-0">
+              {/* Selector / Kartu Proyek Terkait pada Faktur Penjualan */}
+              {saleForm.projectId ? (
+                (() => {
+                  const lockedPrj = projects.find((p) => p.id === saleForm.projectId) || selectedProjectForDetail;
+                  const isNonPt = (saleForm.businessEntity || resolveProjectEntity(lockedPrj)) === "NON_PT";
+                  return (
+                    <div className="p-3 bg-gradient-to-r from-emerald-50 via-purple-50/40 to-emerald-50 rounded-2xl border border-purple-200 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-black text-purple-950 flex items-center gap-1.5">
+                          <Briefcase className="w-3.5 h-3.5 text-purple-700" />
+                          <span>Alokasi Faktur Penjualan Proyek (Terkunci Otomatis):</span>
+                        </label>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-200 text-purple-900 border border-purple-300 shadow-2xs">
+                          🔒 Terkunci Pada Proyek Ini
+                        </span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-purple-100 flex items-start justify-between gap-2 shadow-xs">
+                        <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="px-2 py-0.5 rounded-md bg-purple-700 text-white font-mono font-black text-[11px] shadow-xs">
-                              {currentPrj.projectCode}
+                              {lockedPrj?.projectCode || "PROYEK"}
                             </span>
-                            <span className="text-xs font-black text-slate-800">
-                              {currentPrj.projectName}
+                            <span className="font-black text-xs text-slate-900">
+                              {lockedPrj?.projectName || saleForm.projectName}
                             </span>
                             <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-white text-purple-700 border border-purple-200">
-                              {currentPrj.status}
+                              {lockedPrj?.status}
                             </span>
                           </div>
-                          <div className="text-[11px] text-slate-600 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
-                            <span>Klien: <strong className="text-slate-800">{currentPrj.clientName}</strong></span>
-                            {currentPrj.clientPhone && <span>Telp: {currentPrj.clientPhone}</span>}
-                            {currentPrj.contractValue ? (
-                              <span>Nilai Kontrak: <strong className="text-purple-700">{formatRupiah(currentPrj.contractValue)}</strong></span>
+                          <div className="text-[11px] text-slate-600 flex items-center gap-2 flex-wrap">
+                            <span>👤 Klien: <strong className="text-slate-800">{lockedPrj?.clientName || saleForm.customerName || "-"}</strong></span>
+                            {lockedPrj?.contractValue ? (
+                              <span>• Nilai Kontrak: <strong className="text-purple-700">{formatRupiah(lockedPrj.contractValue)}</strong></span>
                             ) : null}
+                            <span>•</span>
+                            <span className={`font-black px-2 py-0.5 rounded-md text-[10px] ${
+                              isNonPt
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                : "bg-indigo-100 text-indigo-800 border border-indigo-300"
+                            }`}>
+                              {isNonPt ? "🏬 Entitas: Non-PT (Bebas PPN 0%)" : "🏢 Entitas: PT. DSTech Smart Perkasa (PPN 12%)"}
+                            </span>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSaleForm((prev) => ({
-                              ...prev,
-                              projectId: "",
-                              projectName: "",
-                            }));
-                          }}
-                          className="px-2 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-[10px] transition-colors cursor-pointer shrink-0 inline-flex items-center gap-1 shadow-2xs"
-                          title="Lepas keterhubungan proyek dari faktur ini"
-                        >
-                          <X className="w-3 h-3" />
-                          <span>Lepas Proyek</span>
-                        </button>
                       </div>
-                    );
-                  })()}
-
-                  {/* Search Input for Project */}
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-purple-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      placeholder="Cari nomor proyek (PRJ-...), nama proyek, atau nama klien..."
-                      value={saleProjectSearchQuery}
-                      onChange={(e) => setSaleProjectSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-8 py-2 rounded-xl bg-white border border-purple-200 text-xs font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-purple-600 focus:outline-none transition-all shadow-2xs"
-                    />
-                    {saleProjectSearchQuery && (
+                      <p className="text-[10px] text-purple-700 font-medium">
+                        ✓ Entitas penerbitan faktur dan tarif PPN otomatis terkunci mengikuti proyek ({isNonPt ? "DSTech Non-PT (0% Bebas PPN)" : "PT. DSTech Smart (12% PPN)"}).
+                      </p>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Alokasikan Pendapatan ke Proyek (Opsional):</span>
+                    </label>
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setSaleProjectSearchQuery("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        title="Hapus pencarian"
+                        onClick={() => handleOpenAddProject()}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] shadow-xs transition-colors cursor-pointer"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <Plus className="w-3 h-3" />
+                        <span>+ Tambah Proyek Baru</span>
                       </button>
-                    )}
+                      <span className="text-[10px] text-purple-600 font-medium hidden sm:inline">
+                        {saleForm.projectId ? "✓ Terhubung ke Proyek" : "Opsional"}
+                      </span>
+                    </div>
                   </div>
-
-                  {/* Filtered Project Results List */}
-                  {(() => {
-                    const entityProjects = projects.filter(
-                      (p) => (saleForm.businessEntity || "PT") === (p.businessEntity || "PT")
-                    );
-                    const q = saleProjectSearchQuery.trim().toLowerCase();
-                    const filteredList = q
-                      ? entityProjects.filter((p) =>
-                          (p.projectCode && p.projectCode.toLowerCase().includes(q)) ||
-                          (p.projectName && p.projectName.toLowerCase().includes(q)) ||
-                          (p.clientName && p.clientName.toLowerCase().includes(q)) ||
-                          (p.picProject && p.picProject.toLowerCase().includes(q))
-                        )
-                      : entityProjects;
-
-                    return (
-                      <div className="border border-purple-200/80 rounded-xl bg-white overflow-hidden shadow-xs">
-                        <div className="max-h-48 overflow-y-auto divide-y divide-purple-100 text-xs">
-                          {/* Opsi Bukan Penjualan Proyek */}
-                          <div
+                  {/* Searchable Project Selector */}
+                  <div className="space-y-2">
+                    {/* Selected Project Card Preview */}
+                    {(() => {
+                      const currentPrj = projects.find((p) => p.id === saleForm.projectId);
+                      if (!currentPrj) return null;
+                      return (
+                        <div className="p-3 bg-purple-50/90 rounded-xl border border-purple-200 flex items-start justify-between gap-3 shadow-xs">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2 py-0.5 rounded-md bg-purple-700 text-white font-mono font-black text-[11px] shadow-xs">
+                                {currentPrj.projectCode}
+                              </span>
+                              <span className="text-xs font-black text-slate-800">
+                                {currentPrj.projectName}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-white text-purple-700 border border-purple-200">
+                                {currentPrj.status}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-600 mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
+                              <span>Klien: <strong className="text-slate-800">{currentPrj.clientName}</strong></span>
+                              {currentPrj.clientPhone && <span>Telp: {currentPrj.clientPhone}</span>}
+                              {currentPrj.contractValue ? (
+                                <span>Nilai Kontrak: <strong className="text-purple-700">{formatRupiah(currentPrj.contractValue)}</strong></span>
+                              ) : null}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
                             onClick={() => {
                               setSaleForm((prev) => ({
                                 ...prev,
                                 projectId: "",
                                 projectName: "",
                               }));
-                              setSaleProjectSearchQuery("");
                             }}
-                            className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
-                              !saleForm.projectId
-                                ? "bg-purple-100/70 text-purple-900 font-black"
-                                : "hover:bg-purple-50/50 text-slate-600"
-                            }`}
+                            className="px-2 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-[10px] transition-colors cursor-pointer shrink-0 inline-flex items-center gap-1 shadow-2xs"
+                            title="Lepas keterhubungan proyek dari faktur ini"
                           >
-                            <span className="italic flex items-center gap-1.5">
-                              <Ban className="w-3.5 h-3.5 text-slate-400" />
-                              -- Bukan Penjualan Proyek Khusus (Umum / Ritel) --
-                            </span>
-                            {!saleForm.projectId && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-200 text-purple-800 font-bold">
-                                Terpilih
+                            <X className="w-3 h-3" />
+                            <span>Lepas Proyek</span>
+                          </button>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Search Input for Project */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-purple-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Cari nomor proyek (PRJ-...), nama proyek, atau nama klien..."
+                        value={saleProjectSearchQuery}
+                        onChange={(e) => setSaleProjectSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-8 py-2 rounded-xl bg-white border border-purple-200 text-xs font-medium text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-purple-600 focus:outline-none transition-all shadow-2xs"
+                      />
+                      {saleProjectSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSaleProjectSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 cursor-pointer"
+                          title="Hapus pencarian"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filtered Project Results List */}
+                    {(() => {
+                      const entityProjects = projects.filter(
+                        (p) => (saleForm.businessEntity || "PT") === (p.businessEntity || "PT")
+                      );
+                      const q = saleProjectSearchQuery.trim().toLowerCase();
+                      const filteredList = q
+                        ? entityProjects.filter((p) =>
+                            (p.projectCode && p.projectCode.toLowerCase().includes(q)) ||
+                            (p.projectName && p.projectName.toLowerCase().includes(q)) ||
+                            (p.clientName && p.clientName.toLowerCase().includes(q)) ||
+                            (p.picProject && p.picProject.toLowerCase().includes(q))
+                          )
+                        : entityProjects;
+
+                      return (
+                        <div className="border border-purple-200/80 rounded-xl bg-white overflow-hidden shadow-xs">
+                          <div className="max-h-48 overflow-y-auto divide-y divide-purple-100 text-xs">
+                            {/* Opsi Bukan Penjualan Proyek */}
+                            <div
+                              onClick={() => {
+                                setSaleForm((prev) => ({
+                                  ...prev,
+                                  projectId: "",
+                                  projectName: "",
+                                }));
+                                setSaleProjectSearchQuery("");
+                              }}
+                              className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors ${
+                                !saleForm.projectId
+                                  ? "bg-purple-100/70 text-purple-900 font-black"
+                                  : "hover:bg-purple-50/50 text-slate-600"
+                              }`}
+                            >
+                              <span className="italic flex items-center gap-1.5">
+                                <Ban className="w-3.5 h-3.5 text-slate-400" />
+                                -- Bukan Penjualan Proyek Khusus (Umum / Ritel) --
                               </span>
+                              {!saleForm.projectId && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-200 text-purple-800 font-bold">
+                                  Terpilih
+                                </span>
+                              )}
+                            </div>
+
+                            {/* List Proyek Tersedia */}
+                            {filteredList.map((p) => {
+                              const isSelected = saleForm.projectId === p.id;
+                              return (
+                                <div
+                                  key={p.id}
+                                  onClick={() => {
+                                    setSaleForm((prev) => ({
+                                      ...prev,
+                                      projectId: p.id,
+                                      projectName: p.projectName,
+                                      customerName: !prev.customerName && p.clientName ? p.clientName : prev.customerName,
+                                      customerPhone: !prev.customerPhone && p.clientPhone ? p.clientPhone : prev.customerPhone,
+                                      customerAddress: !prev.customerAddress && p.clientAddress ? p.clientAddress : prev.customerAddress,
+                                    }));
+                                    setSaleProjectSearchQuery("");
+                                  }}
+                                  className={`p-2.5 cursor-pointer transition-colors flex items-center justify-between gap-2 ${
+                                    isSelected
+                                      ? "bg-purple-100 text-purple-900 font-bold"
+                                      : "hover:bg-purple-50/70 text-slate-700"
+                                  }`}
+                                >
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="px-1.5 py-0.5 rounded bg-purple-200/90 text-purple-900 font-mono font-black text-[10px]">
+                                        {p.projectCode}
+                                      </span>
+                                      <span className="font-bold text-slate-900 truncate">
+                                        {p.projectName}
+                                      </span>
+                                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                        {p.status}
+                                      </span>
+                                    </div>
+                                    <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
+                                      <span>Klien: <strong>{p.clientName}</strong></span>
+                                      {p.contractValue ? (
+                                        <span>• Kontrak: {formatRupiah(p.contractValue)}</span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                  {isSelected ? (
+                                    <Check className="w-4 h-4 text-purple-700 shrink-0" />
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white font-bold text-[10px] transition-colors shrink-0"
+                                    >
+                                      Pilih
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {filteredList.length === 0 && (
+                              <div className="p-4 text-center text-slate-400 italic text-xs">
+                                Tidak ada proyek yang sesuai dengan pencarian &quot;{saleProjectSearchQuery}&quot;.
+                              </div>
                             )}
                           </div>
-
-                          {/* List Proyek Tersedia */}
-                          {filteredList.map((p) => {
-                            const isSelected = saleForm.projectId === p.id;
-                            return (
-                              <div
-                                key={p.id}
-                                onClick={() => {
-                                  setSaleForm((prev) => ({
-                                    ...prev,
-                                    projectId: p.id,
-                                    projectName: p.projectName,
-                                    customerName: !prev.customerName && p.clientName ? p.clientName : prev.customerName,
-                                    customerPhone: !prev.customerPhone && p.clientPhone ? p.clientPhone : prev.customerPhone,
-                                    customerAddress: !prev.customerAddress && p.clientAddress ? p.clientAddress : prev.customerAddress,
-                                  }));
-                                  setSaleProjectSearchQuery("");
-                                }}
-                                className={`p-2.5 cursor-pointer transition-colors flex items-center justify-between gap-2 ${
-                                  isSelected
-                                    ? "bg-purple-100 text-purple-900 font-bold"
-                                    : "hover:bg-purple-50/70 text-slate-700"
-                                }`}
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="px-1.5 py-0.5 rounded bg-purple-200/90 text-purple-900 font-mono font-black text-[10px]">
-                                      {p.projectCode}
-                                    </span>
-                                    <span className="font-bold text-slate-900 truncate">
-                                      {p.projectName}
-                                    </span>
-                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                                      {p.status}
-                                    </span>
-                                  </div>
-                                  <div className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-2">
-                                    <span>Klien: <strong>{p.clientName}</strong></span>
-                                    {p.contractValue ? (
-                                      <span>• Kontrak: {formatRupiah(p.contractValue)}</span>
-                                    ) : null}
-                                  </div>
-                                </div>
-                                {isSelected ? (
-                                  <Check className="w-4 h-4 text-purple-700 shrink-0" />
-                                ) : (
-                                  <button
-                                    type="button"
-                                    className="px-2 py-1 rounded-md bg-purple-50 hover:bg-purple-600 text-purple-700 hover:text-white font-bold text-[10px] transition-colors shrink-0"
-                                  >
-                                    Pilih
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-
-                          {filteredList.length === 0 && (
-                            <div className="p-4 text-center text-slate-400 italic text-xs">
-                              Tidak ada proyek yang sesuai dengan pencarian &quot;{saleProjectSearchQuery}&quot;.
-                            </div>
-                          )}
                         </div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Branch & Warehouse Selection for Sale Invoice */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-blue-50/50 rounded-2xl border border-blue-200/80">
@@ -15257,9 +15329,13 @@ export default function AdminFinanceERPPage() {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-purple-600">
-                  Buku Kas & Bank
+                  {cashForm.projectId ? "Beban Lapangan Proyek" : "Buku Kas & Bank"}
                 </span>
-                <h3 className="text-base font-black text-slate-900 mt-0.5">Catat Transaksi Arus Kas</h3>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">
+                  {cashForm.projectId
+                    ? `Catat Kas Proyek [${projects.find((p) => p.id === cashForm.projectId)?.projectCode || "Dossier"}]`
+                    : "Catat Transaksi Arus Kas"}
+                </h3>
               </div>
               <button
                 onClick={() => setIsNewCashModalOpen(false)}
@@ -15270,57 +15346,59 @@ export default function AdminFinanceERPPage() {
             </div>
 
             <form onSubmit={handleCreateCashSubmit} className="space-y-3 text-xs">
-              {/* Selector Entitas Pembukuan */}
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">
-                  Entitas Usaha / Pembukuan: <span className="text-rose-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCashForm({
-                        ...cashForm,
-                        businessEntity: "PT",
-                        account: getDefaultBankAccLabel("PT"),
-                      });
-                    }}
-                    className={`p-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
-                      (cashForm.businessEntity || "PT") === "PT"
-                        ? "bg-indigo-50 border-indigo-400 text-indigo-900 shadow-xs ring-1 ring-indigo-400"
-                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span className="text-base">🏢</span>
-                    <div>
-                      <div className="font-black text-[11px]">PT. DSTech Smart</div>
-                      <div className="text-[9px] text-slate-500 font-normal">Badan Hukum Resmi</div>
-                    </div>
-                  </button>
+              {/* Selector Entitas Pembukuan - Otomatis tersembunyi jika mencatat dari proyek */}
+              {!cashForm.projectId ? (
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    Entitas Usaha / Pembukuan: <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCashForm({
+                          ...cashForm,
+                          businessEntity: "PT",
+                          account: getDefaultBankAccLabel("PT"),
+                        });
+                      }}
+                      className={`p-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                        (cashForm.businessEntity || "PT") === "PT"
+                          ? "bg-indigo-50 border-indigo-400 text-indigo-900 shadow-xs ring-1 ring-indigo-400"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span className="text-base">🏢</span>
+                      <div>
+                        <div className="font-black text-[11px]">PT. DSTech Smart</div>
+                        <div className="text-[9px] text-slate-500 font-normal">Badan Hukum Resmi</div>
+                      </div>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCashForm({
-                        ...cashForm,
-                        businessEntity: "NON_PT",
-                        account: getDefaultBankAccLabel("NON_PT"),
-                      });
-                    }}
-                    className={`p-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
-                      cashForm.businessEntity === "NON_PT"
-                        ? "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs ring-1 ring-emerald-400"
-                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span className="text-base">🏬</span>
-                    <div>
-                      <div className="font-black text-[11px]">DSTech Non-PT</div>
-                      <div className="text-[9px] text-slate-500 font-normal">Usaha Mandiri/Pribadi</div>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCashForm({
+                          ...cashForm,
+                          businessEntity: "NON_PT",
+                          account: getDefaultBankAccLabel("NON_PT"),
+                        });
+                      }}
+                      className={`p-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                        cashForm.businessEntity === "NON_PT"
+                          ? "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs ring-1 ring-emerald-400"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span className="text-base">🏬</span>
+                      <div>
+                        <div className="font-black text-[11px]">DSTech Non-PT</div>
+                        <div className="text-[9px] text-slate-500 font-normal">Usaha Mandiri/Pribadi</div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               {/* Tanggal Transaksi Kas */}
               <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
@@ -15404,40 +15482,87 @@ export default function AdminFinanceERPPage() {
                 </select>
               </div>
 
-              {/* Selector Proyek Terkait pada Arus Kas */}
-              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-purple-600" />
-                    <span>Alokasi Biaya / Pemasukan Proyek:</span>
-                  </label>
-                  <span className="text-[10px] text-purple-600 font-medium">
-                    {cashForm.projectId ? "✓ Beban Proyek" : "Opsional"}
-                  </span>
+              {/* Selector / Kartu Proyek Terkait pada Arus Kas */}
+              {cashForm.projectId ? (
+                (() => {
+                  const lockedPrj = projects.find((p) => p.id === cashForm.projectId) || selectedProjectForDetail;
+                  const isNonPt = (cashForm.businessEntity || resolveProjectEntity(lockedPrj)) === "NON_PT";
+                  return (
+                    <div className="p-3 bg-gradient-to-r from-purple-50 via-indigo-50/40 to-purple-50 rounded-2xl border border-purple-200 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-black text-purple-950 flex items-center gap-1.5">
+                          <Briefcase className="w-3.5 h-3.5 text-purple-700" />
+                          <span>Alokasi Biaya Proyek (Terkunci Otomatis):</span>
+                        </label>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-200 text-purple-900 border border-purple-300 shadow-2xs">
+                          🔒 Terkunci Pada Proyek Ini
+                        </span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-purple-100 flex items-start justify-between gap-2 shadow-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-900 text-white font-mono font-black text-[11px]">
+                              {lockedPrj?.projectCode || "PROYEK"}
+                            </span>
+                            <span className="font-black text-xs text-slate-900">
+                              {lockedPrj?.projectName || cashForm.projectName}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-600 flex items-center gap-2 flex-wrap">
+                            <span>👤 Klien: <strong className="text-slate-800">{lockedPrj?.clientName || "-"}</strong></span>
+                            <span>•</span>
+                            <span className={`font-black px-2 py-0.5 rounded-md text-[10px] ${
+                              isNonPt
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                : "bg-indigo-100 text-indigo-800 border border-indigo-300"
+                            }`}>
+                              {isNonPt ? "🏬 Entitas: Non-PT (Usaha Mandiri)" : "🏢 Entitas: PT. DSTech Smart Perkasa"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-purple-700 font-medium">
+                        ✓ Entitas usaha dan rekening kas/bank otomatis terkunci mengikuti proyek ({isNonPt ? "DSTech Non-PT" : "PT. DSTech Smart"}).
+                      </p>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Alokasi Biaya / Pemasukan Proyek:</span>
+                    </label>
+                    <span className="text-[10px] text-purple-600 font-medium">Opsional</span>
+                  </div>
+                  <select
+                    value={cashForm.projectId || ""}
+                    onChange={(e) => {
+                      const prjId = e.target.value;
+                      const foundPrj = projects.find((p) => p.id === prjId);
+                      const ent = foundPrj ? resolveProjectEntity(foundPrj) : cashForm.businessEntity;
+                      setCashForm((prev) => ({
+                        ...prev,
+                        projectId: prjId,
+                        projectName: foundPrj ? foundPrj.projectName : "",
+                        businessEntity: ent,
+                        account: getDefaultBankAccLabel(ent),
+                      }));
+                    }}
+                    className="w-full p-2 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">-- Bukan Transaksi Proyek Spesifik (Umum / Kantor) --</option>
+                    {projects
+                      .filter((p) => (cashForm.businessEntity || "PT") === (p.businessEntity || "PT"))
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
+                        </option>
+                      ))}
+                  </select>
                 </div>
-                <select
-                  value={cashForm.projectId || ""}
-                  onChange={(e) => {
-                    const prjId = e.target.value;
-                    const prj = projects.find((p) => p.id === prjId);
-                    setCashForm((prev) => ({
-                      ...prev,
-                      projectId: prjId,
-                      projectName: prj ? prj.projectName : "",
-                    }));
-                  }}
-                  className="w-full p-2 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
-                >
-                  <option value="">-- Bukan Transaksi Proyek Spesifik (Umum / Kantor) --</option>
-                  {projects
-                    .filter((p) => (cashForm.businessEntity || "PT") === (p.businessEntity || "PT"))
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
-                      </option>
-                    ))}
-                </select>
-              </div>
+              )}
 
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -20155,11 +20280,13 @@ export default function AdminFinanceERPPage() {
                       <button
                         type="button"
                         onClick={() => {
+                          const prjEnt = resolveProjectEntity(prj);
                           setSaleForm((prev) => ({
                             ...prev,
                             projectId: prj.id,
                             projectName: prj.projectName,
-                            businessEntity: prj.businessEntity || "PT",
+                            businessEntity: prjEnt,
+                            taxRate: prjEnt === "NON_PT" ? 0 : (prev.taxRate || 12),
                             customerName: prj.clientName || prev.customerName,
                           }));
                           setIsNewSaleModalOpen(true);
@@ -20289,11 +20416,13 @@ export default function AdminFinanceERPPage() {
                       <button
                         type="button"
                         onClick={() => {
+                          const prjEnt = resolveProjectEntity(prj);
                           setPoForm((prev) => ({
                             ...prev,
                             projectId: prj.id,
                             projectName: prj.projectName,
-                            businessEntity: prj.businessEntity || "PT",
+                            businessEntity: prjEnt,
+                            taxRate: prjEnt === "NON_PT" ? 0 : 12,
                             notes: `Belanja Material Proyek: [${prj.projectCode}] ${prj.projectName}`,
                           }));
                           setIsNewPoModalOpen(true);
@@ -20404,15 +20533,26 @@ export default function AdminFinanceERPPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setCashForm((prev) => ({
-                            ...prev,
-                            projectId: prj.id,
-                            projectName: prj.projectName,
-                            businessEntity: prj.businessEntity || "PT",
+                          const prjEnt = resolveProjectEntity(prj);
+                          setCashForm({
+                            date: new Date().toISOString().split("T")[0],
                             type: "OUT",
                             category: "Transport, BBM & Tol",
+                            amount: 0,
+                            account: getDefaultBankAccLabel(prjEnt),
+                            reference: "",
                             description: `Biaya Lapangan Proyek [${prj.projectCode}]: `,
-                          }));
+                            recordAsExpense: true,
+                            recipient: "",
+                            receiptUrl: "",
+                            receiptName: "",
+                            receiptSize: 0,
+                            receiptCompressedSize: 0,
+                            businessEntity: prjEnt,
+                            projectId: prj.id,
+                            projectName: prj.projectName,
+                          });
+                          setReceiptCompressionRatio("");
                           setIsNewCashModalOpen(true);
                         }}
                         className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer"
@@ -21591,45 +21731,47 @@ export default function AdminFinanceERPPage() {
             </div>
 
             <form onSubmit={handleCreatePoSubmit} className="space-y-4 text-xs">
-              {/* Selector Entitas Bisnis PO */}
-              <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-1.5">
-                <label className="font-black text-slate-800 block text-xs">
-                  Entitas Pemesan / Pengadaan: <span className="text-rose-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPoForm((prev) => ({ ...prev, businessEntity: "PT" }))}
-                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
-                      (poForm.businessEntity || "PT") === "PT"
-                        ? "bg-indigo-50 border-indigo-400 text-indigo-900 shadow-xs ring-1 ring-indigo-400"
-                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span className="text-base">🏢</span>
-                    <div>
-                      <div className="font-black text-[11px]">PT. DSTech Smart Perkasa</div>
-                      <div className="text-[9px] text-slate-500 font-normal">PO Badan Hukum Resmi</div>
-                    </div>
-                  </button>
+              {/* Selector Entitas Bisnis PO - Otomatis tersembunyi jika membuat PO proyek */}
+              {!poForm.projectId ? (
+                <div className="p-3 bg-white rounded-2xl border border-slate-200 space-y-1.5">
+                  <label className="font-black text-slate-800 block text-xs">
+                    Entitas Pemesan / Pengadaan: <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPoForm((prev) => ({ ...prev, businessEntity: "PT" }))}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                        (poForm.businessEntity || "PT") === "PT"
+                          ? "bg-indigo-50 border-indigo-400 text-indigo-900 shadow-xs ring-1 ring-indigo-400"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span className="text-base">🏢</span>
+                      <div>
+                        <div className="font-black text-[11px]">PT. DSTech Smart Perkasa</div>
+                        <div className="text-[9px] text-slate-500 font-normal">PO Badan Hukum Resmi</div>
+                      </div>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setPoForm((prev) => ({ ...prev, businessEntity: "NON_PT" }))}
-                    className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
-                      poForm.businessEntity === "NON_PT"
-                        ? "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs ring-1 ring-emerald-400"
-                        : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                    }`}
-                  >
-                    <span className="text-base">🏬</span>
-                    <div>
-                      <div className="font-black text-[11px]">DSTech Smart (Non-PT)</div>
-                      <div className="text-[9px] text-slate-500 font-normal">Pengadaan Usaha Mandiri</div>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setPoForm((prev) => ({ ...prev, businessEntity: "NON_PT" }))}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-2 ${
+                        poForm.businessEntity === "NON_PT"
+                          ? "bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs ring-1 ring-emerald-400"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      <span className="text-base">🏬</span>
+                      <div>
+                        <div className="font-black text-[11px]">DSTech Smart (Non-PT)</div>
+                        <div className="text-[9px] text-slate-500 font-normal">Pengadaan Usaha Mandiri</div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
 
               {/* Quick Select Supplier from Master Data */}
               <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200/80 space-y-1.5">
@@ -21678,40 +21820,86 @@ export default function AdminFinanceERPPage() {
                 </select>
               </div>
 
-              {/* Selector Proyek Terkait pada PO (Beban Material Proyek) */}
-              <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
-                    <Briefcase className="w-3.5 h-3.5 text-purple-600" />
-                    <span>Beban Biaya Material Proyek (Opsional):</span>
-                  </label>
-                  <span className="text-[10px] text-purple-600 font-medium">
-                    {poForm.projectId ? "✓ Beban Proyek" : "Opsional"}
-                  </span>
+              {/* Selector / Kartu Proyek Terkait pada PO (Beban Material Proyek) */}
+              {poForm.projectId ? (
+                (() => {
+                  const lockedPrj = projects.find((p) => p.id === poForm.projectId) || selectedProjectForDetail;
+                  const isNonPt = (poForm.businessEntity || resolveProjectEntity(lockedPrj)) === "NON_PT";
+                  return (
+                    <div className="p-3 bg-gradient-to-r from-amber-50 via-purple-50/40 to-amber-50 rounded-2xl border border-amber-200 space-y-2 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-black text-amber-950 flex items-center gap-1.5">
+                          <Briefcase className="w-3.5 h-3.5 text-purple-700" />
+                          <span>Beban Pengadaan Proyek (Terkunci Otomatis):</span>
+                        </label>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-200 text-amber-900 border border-amber-300 shadow-2xs">
+                          🔒 Terkunci Pada Proyek Ini
+                        </span>
+                      </div>
+                      <div className="bg-white p-2.5 rounded-xl border border-amber-100 flex items-start justify-between gap-2 shadow-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="px-2 py-0.5 rounded-md bg-slate-900 text-white font-mono font-black text-[11px]">
+                              {lockedPrj?.projectCode || "PROYEK"}
+                            </span>
+                            <span className="font-black text-xs text-slate-900">
+                              {lockedPrj?.projectName || poForm.projectName}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-600 flex items-center gap-2 flex-wrap">
+                            <span>👤 Klien: <strong className="text-slate-800">{lockedPrj?.clientName || "-"}</strong></span>
+                            <span>•</span>
+                            <span className={`font-black px-2 py-0.5 rounded-md text-[10px] ${
+                              isNonPt
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                : "bg-indigo-100 text-indigo-800 border border-indigo-300"
+                            }`}>
+                              {isNonPt ? "🏬 Entitas: Non-PT (Usaha Mandiri)" : "🏢 Entitas: PT. DSTech Smart Perkasa"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-amber-700 font-medium">
+                        ✓ Entitas pengadaan PO otomatis terkunci mengikuti proyek ({isNonPt ? "DSTech Non-PT" : "PT. DSTech Smart"}).
+                      </p>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="p-3 bg-purple-50/70 rounded-2xl border border-purple-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-black text-purple-900 flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Beban Biaya Material Proyek (Opsional):</span>
+                    </label>
+                    <span className="text-[10px] text-purple-600 font-medium">Opsional</span>
+                  </div>
+                  <select
+                    value={poForm.projectId || ""}
+                    onChange={(e) => {
+                      const prjId = e.target.value;
+                      const foundPrj = projects.find((p) => p.id === prjId);
+                      const ent = foundPrj ? resolveProjectEntity(foundPrj) : poForm.businessEntity;
+                      setPoForm((prev) => ({
+                        ...prev,
+                        projectId: prjId,
+                        projectName: foundPrj ? foundPrj.projectName : "",
+                        businessEntity: ent,
+                      }));
+                    }}
+                    className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
+                  >
+                    <option value="">-- Bukan Belanja Proyek Spesifik (Stok Rutin / Operasional Gudang) --</option>
+                    {projects
+                      .filter((p) => (poForm.businessEntity || "PT") === (p.businessEntity || "PT"))
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
+                        </option>
+                      ))}
+                  </select>
                 </div>
-                <select
-                  value={poForm.projectId || ""}
-                  onChange={(e) => {
-                    const prjId = e.target.value;
-                    const prj = projects.find((p) => p.id === prjId);
-                    setPoForm((prev) => ({
-                      ...prev,
-                      projectId: prjId,
-                      projectName: prj ? prj.projectName : "",
-                    }));
-                  }}
-                  className="w-full p-2.5 rounded-xl bg-white border border-purple-200 text-xs font-bold text-slate-800 focus:ring-2 focus:ring-purple-600 focus:outline-none cursor-pointer"
-                >
-                  <option value="">-- Bukan Belanja Proyek Spesifik (Stok Rutin / Operasional Gudang) --</option>
-                  {projects
-                    .filter((p) => (poForm.businessEntity || "PT") === (p.businessEntity || "PT"))
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        [{p.projectCode}] {p.projectName} — Klien: {p.clientName} ({p.status})
-                      </option>
-                    ))}
-                </select>
-              </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
