@@ -233,11 +233,22 @@ export async function GET(request: Request) {
       .map((c: any) => c.id);
     const userMessages = allMessages.filter((m: any) => myChatIds.includes(m.chatId));
 
-    return NextResponse.json({
-      success: true,
-      data: userMessages.slice(-20),
-      totalCount: userMessages.length,
-    });
+    const latestMsg = userMessages[userMessages.length - 1];
+    return NextResponse.json(
+      {
+        success: true,
+        data: userMessages.slice(-20),
+        totalCount: userMessages.length,
+        latestMessageId: latestMsg?.id || null,
+        latestMessageTime: latestMsg?.createdAt || null,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          Pragma: "no-cache",
+        },
+      }
+    );
   }
 
     // 3. Ambil data perusahaan untuk lampiran (Invoice, SPK Task, Laporan Bukti Kerja)
