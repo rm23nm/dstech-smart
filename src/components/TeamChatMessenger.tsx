@@ -123,12 +123,6 @@ export default function TeamChatMessenger({
   const [companyReports, setCompanyReports] = useState<any[]>([]);
   const [dataSearch, setDataSearch] = useState("");
 
-  // State Panggilan Audio / Video WebRTC
-  const [activeCall, setActiveCall] = useState<any | null>(null);
-  const [incomingCall, setIncomingCall] = useState<any | null>(null);
-  const [isCallingModalOpen, setIsCallingModalOpen] = useState(false);
-  const [callTimer, setCallTimer] = useState(0);
-
   // State Form Bukti Pekerjaan Lapangan Cepat
   const [reportForm, setReportForm] = useState({
     ticketNumber: "",
@@ -324,14 +318,13 @@ export default function TeamChatMessenger({
     }
   };
 
-  // Polling Chat Messages dan Incoming Calls
+  // Polling Chat Messages
   useEffect(() => {
     loadChats();
     const interval = setInterval(() => {
       if (activeChat?.id) {
         loadMessages(activeChat.id);
       }
-      checkIncomingCall();
     }, 3500);
     return () => clearInterval(interval);
   }, [activeChat?.id, currentUser.id]);
@@ -341,40 +334,6 @@ export default function TeamChatMessenger({
       loadMessages(activeChat.id);
     }
   }, [activeChat?.id]);
-
-  // Cek Panggilan Masuk (Incoming Call)
-  const checkIncomingCall = async () => {
-    try {
-      const res = await fetch(`/api/team-chat/call?userId=${currentUser.id}`);
-      const data = await res.json();
-      if (data.success && data.incomingCall) {
-        if (!incomingCall) {
-          dstechCallAudio.startIncomingRingtone();
-        }
-        setIncomingCall(data.incomingCall);
-      } else {
-        if (incomingCall) {
-          dstechCallAudio.stopCallAudio();
-        }
-        setIncomingCall(null);
-      }
-    } catch (err) {
-      // silent
-    }
-  };
-
-  // Timer panggilan aktif
-  useEffect(() => {
-    let timer: any = null;
-    if (activeCall && activeCall.status === "connected") {
-      timer = setInterval(() => {
-        setCallTimer((prev) => prev + 1);
-      }, 1000);
-    } else {
-      setCallTimer(0);
-    }
-    return () => clearInterval(timer);
-  }, [activeCall?.status]);
 
   // Load Data Perusahaan untuk Lampiran
   const loadCompanyData = async (type: "invoices" | "tasks" | "reports") => {
@@ -534,7 +493,7 @@ export default function TeamChatMessenger({
     });
   };
 
-  // Mulai Panggilan (Audio atau Video)
+  // Mulai Panggilan Langsung (Audio atau Video)
   const handleStartCall = async (callType: "audio" | "video") => {
     if (!activeChat) return;
     const receiverId = activeChat.isGroup
@@ -557,92 +516,14 @@ export default function TeamChatMessenger({
       });
       const data = await res.json();
       if (data.success && data.call) {
-        setActiveCall(data.call);
-        setIsCallingModalOpen(true);
-        // Bunyikan nada panggil keluar (dial tone)
-        dstechCallAudio.startOutgoingDialtone();
-        // Buka langsung ruang Panggilan Langsung 1-on-1 (bukan meeting conference)
+        // Langsung arahkan ke layar Panggilan Langsung 1-on-1 (Direct Voice/Video Call)
         const callUrl = `/direct-call/${data.call.roomCode}?callId=${data.call.id}&callType=${callType}&peerName=${encodeURIComponent(
           activeChat.name
         )}`;
-        window.open(callUrl, "_blank");
+        window.location.href = callUrl;
       }
     } catch (err) {
       console.error("Gagal memulai panggilan:", err);
-    }
-  };
-
-  // Terima Panggilan Masuk Langsung
-  const handleAcceptCall = async () => {
-    if (!incomingCall) return;
-    dstechCallAudio.stopCallAudio();
-    const roomCode = incomingCall.roomCode;
-    const callType = incomingCall.callType || "audio";
-
-    try {
-      const res = await fetch("/api/team-chat/call", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "accept",
-          callId: incomingCall.id,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setActiveCall(data.call);
-        setIncomingCall(null);
-        setIsCallingModalOpen(false);
-        // Buka langsung ruang Panggilan Langsung 1-on-1
-        const callUrl = `/direct-call/${roomCode}?callId=${incomingCall.id}&callType=${callType}&peerName=${encodeURIComponent(
-          incomingCall.callerName
-        )}&autoAccept=true`;
-        window.open(callUrl, "_blank");
-      }
-    } catch (err) {
-      console.error("Gagal menerima panggilan:", err);
-    }
-  };
-
-  // Tolak Panggilan Masuk
-  const handleDeclineCall = async () => {
-    if (!incomingCall) return;
-    dstechCallAudio.stopCallAudio();
-    try {
-      await fetch("/api/team-chat/call", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "decline",
-          callId: incomingCall.id,
-        }),
-      });
-      setIncomingCall(null);
-    } catch (err) {
-      console.error("Gagal menolak panggilan:", err);
-    }
-  };
-
-  // Akhiri Panggilan
-  const handleEndCall = async () => {
-    dstechCallAudio.stopCallAudio();
-    if (!activeCall) return;
-    try {
-      await fetch("/api/team-chat/call", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "end",
-          callId: activeCall.id,
-          duration: callTimer,
-        }),
-      });
-      setActiveCall(null);
-      setIsCallingModalOpen(false);
-      setCallTimer(0);
-      if (activeChat?.id) loadMessages(activeChat.id);
-    } catch (err) {
-      console.error("Gagal mengakhiri panggilan:", err);
     }
   };
 
@@ -676,113 +557,6 @@ export default function TeamChatMessenger({
           : "h-[calc(100vh-140px)] border border-slate-800 rounded-2xl shadow-2xl"
       }`}
     >
-      {/* ================= INCOMING CALL NOTIFICATION BANNER / MODAL ================= */}
-      {incomingCall && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 border-2 border-emerald-500/80 rounded-2xl p-4 shadow-2xl flex items-center gap-4 text-white animate-bounce backdrop-blur-md max-w-md w-full mx-4">
-          <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-pulse">
-            {incomingCall.callType === "video" ? <Video className="w-6 h-6" /> : <PhoneIncoming className="w-6 h-6" />}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
-              {incomingCall.callType === "video" ? "Panggilan Video Masuk..." : "Panggilan Suara Masuk..."}
-            </p>
-            <h4 className="font-bold text-white text-base truncate">{incomingCall.callerName}</h4>
-            <p className="text-xs text-slate-400">Menghubungi Anda melalui DStech Connect</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleAcceptCall}
-              className="p-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full transition shadow-lg flex items-center justify-center cursor-pointer"
-              title="Terima Panggilan"
-            >
-              <PhoneCall className="w-5 h-5" />
-            </button>
-            <button
-              onClick={handleDeclineCall}
-              className="p-3 bg-rose-600 hover:bg-rose-500 text-white rounded-full transition shadow-lg flex items-center justify-center cursor-pointer"
-              title="Tolak Panggilan"
-            >
-              <PhoneOff className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ================= ACTIVE CALL MODAL (WEBRTC AUDIO / VIDEO IN-APP) ================= */}
-      {isCallingModalOpen && activeCall && (
-        <div className="absolute inset-0 z-40 bg-slate-950/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-white animate-fadeIn">
-          <div className="w-full max-w-2xl bg-slate-900/90 border border-slate-700/80 rounded-3xl p-8 shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
-            {/* Background glowing aura */}
-            <div className="absolute -top-24 -left-24 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -right-24 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 p-1 mb-4 shadow-xl shadow-emerald-500/20">
-              <div className="w-full h-full bg-slate-950 rounded-full flex items-center justify-center text-emerald-400">
-                {activeCall.callType === "video" ? <Video className="w-10 h-10" /> : <Phone className="w-10 h-10" />}
-              </div>
-            </div>
-
-            <h3 className="text-2xl font-bold text-white mb-1">
-              {activeCall.callerId === currentUser.id ? activeCall.receiverName : activeCall.callerName}
-            </h3>
-            <p className="text-sm text-emerald-400 font-medium mb-4 flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-              {activeCall.status === "connected"
-                ? `Terhubung (${Math.floor(callTimer / 60)}:${(callTimer % 60).toString().padStart(2, "0")})`
-                : "Memanggil..."}
-            </p>
-
-            {/* Video Preview or Audio Wave */}
-            <div className="w-full bg-slate-950/80 rounded-2xl border border-slate-800 p-6 mb-6 flex flex-col items-center justify-center min-h-[220px]">
-              {activeCall.callType === "video" ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="flex items-center gap-2 text-cyan-400 text-sm">
-                    <Video className="w-5 h-5 animate-pulse" />
-                    <span>Ruang Panggilan Video In-House Aktif</span>
-                  </div>
-                  <p className="text-xs text-slate-400 max-w-md">
-                    Panggilan video WebRTC terhubung dengan enkripsi end-to-end lokal internal server DStech.
-                  </p>
-                  <Link
-                    href={`/meeting/${activeCall.roomCode}`}
-                    target="_blank"
-                    className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white rounded-xl text-sm font-semibold shadow-lg transition"
-                  >
-                    <Maximize2 className="w-4 h-4" /> Buka Layar Penuh Video Call
-                  </Link>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-2">
-                  <div className="flex items-center gap-1.5 py-4">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((bar) => (
-                      <div
-                        key={bar}
-                        className="w-1.5 bg-emerald-500 rounded-full animate-pulse"
-                        style={{
-                          height: `${Math.sin(bar * 0.8) * 20 + 26}px`,
-                          animationDelay: `${bar * 120}ms`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-xs text-slate-400">Mikrofon HD Aktif (Suara Jernih Terenkripsi)</span>
-                </div>
-              )}
-            </div>
-
-            {/* Tombol Kontrol Panggilan */}
-            <div className="flex items-center gap-4">
-              <button
-                onClick={handleEndCall}
-                className="px-6 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-full font-bold shadow-lg shadow-rose-600/30 flex items-center gap-2 cursor-pointer transition transform hover:scale-105"
-              >
-                <PhoneOff className="w-5 h-5" /> Akhiri Panggilan
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ================= MAIN CHAT INTERFACE (WHATSAPP WEB STYLE) ================= */}
       <div className="flex-1 flex overflow-hidden">
         {/* PANEL KIRI: DAFTAR KONTAK & THREAD CHAT */}

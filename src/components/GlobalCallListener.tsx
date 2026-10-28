@@ -81,8 +81,8 @@ export default function GlobalCallListener() {
         incomingCall.callerName
       )}&autoAccept=true`;
       setIncomingCall(null);
-      // Buka langsung ruang Panggilan Langsung 1-on-1 (Direct Voice/Video Call)
-      window.open(roomUrl, "_blank");
+      // Langsung buka layar panggilan suara / video murni di layar utama layaknya mengangkat telepon biasa
+      window.location.href = roomUrl;
     } catch (err) {
       console.error("Gagal menerima panggilan:", err);
     }
