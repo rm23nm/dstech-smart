@@ -3,6 +3,102 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-28**: [SELESAI] Penguncian Sesi Login Permanen (Persistent Session & Auto-Restore) pada Aplikasi Android agar Tidak Logout Berulang dan Panggilan/Pesan Selalu Masuk (MainActivity.kt & DStechNotificationService.kt) [Tugas 252].
+  *Permintaan User*: "kemudian saya melihat, sering keluar masuk untuk login dari aplikasi. tolong agar buat bisa dikunci, agar jika ada pesan masuk dan juga panggilan bisa masuk."
+  *Penyebab Masalah yang Ditemukan*:
+  1. Pada `MainActivity.kt`, fungsi `onDestroy()` sebelumnya mengeksekusi `webView.clearCache(true)` dan `webView.clearHistory()`. Akibatnya, setiap kali aplikasi ditutup atau Android me-recycle memori aktivitas, cache dan sesi otentikasi terhapus sehingga pengguna terlempar kembali ke layar login (`/login`).
+  2. Saat pengguna terlempar ke layar login, data akun aktif di `localStorage` menjadi kosong sehingga background notification service tidak dapat mengidentifikasi user target dan dering panggilan/pesan gagal masuk.
+  *Penyelesaian & Hasil*:
+  1. **Penghapusan Penghapusan Cache Otomatis di `onDestroy()`**:
+     - Menghapus pemanggilan `webView.clearCache(true)` dari `onDestroy()`.
+     - Menggantinya dengan `CookieManager.getInstance().flush()` agar cookies otentikasi tersimpan permanen ke disk perangkat.
+  2. **Penguncian & Auto-Restore Sesi di `onPageFinished` (`MainActivity.kt`)**:
+     - Menyimpan seluruh profil login pengguna (ID, Nama, Role, dan JSON sesi lengkap) ke Android SharedPreferences native melalui `syncAuthWithData`.
+     - Jika pengguna terlempar ke halaman `/login`, WebView secara otomatis mendeteksi akun tersimpan di SharedPreferences dan langsung menginjeksi kredensial ke `localStorage` serta me-redirect seketika ke dashboard (`/employee` atau `/admin`) tanpa perlu login manual lagi.
+  3. **Penyelarasan Background Notification Service (`DStechNotificationService.kt`)**:
+     - Service kini selalu memiliki akses ke `current_user_id` permanen dari SharedPreferences, menjamin notifikasi panggilan video/suara dan pesan obrolan selalu berdering keras meskipun aplikasi sedang ditutup atau diminimalkan.
+  4. Kompilasi build APK berhasil dan file `dstech-smart-app.apk` terbaru telah diunggah ke server live VPS.
+
+- **2026-10-28**: [SELESAI] Penguncian Presensi Masuk (Check-In) Maksimal 1 Kali per Hari & Pembatasan Hanya Tinggal Absen Pulang (Check-Out) (/api/employee/attendance & /employee) [Tugas 251].
+  *Permintaan User*: "pada abesensi, karyawan hanya boleh absen 1 kali, jangan muncul untuk chekin berkali-kali. jika sudah melakaukan absen, maka langsung terkunci, tinggal absen pulang".
+  *Penyebab Masalah yang Ditemukan*:
+  1. Pada backend API (`src/app/api/employee/attendance/route.ts`), endpoint check-in sebelumnya mengizinkan update record meskipun karyawan telah memiliki jam masuk (`checkIn`) pada hari yang sama.
+  2. Pada antarmuka pengguna (`src/app/employee/page.tsx`), tombol `Check-In (Masuk)` tetap aktif dan dapat diklik berulang kali sepanjang hari.
+  *Penyelesaian & Hasil*:
+  1. **Validasi Penguncian di Backend API (`/api/employee/attendance/route.ts`)**:
+     - Menambahkan validasi guard: jika data presensi hari ini untuk karyawan terkait sudah memiliki nilai `checkIn` yang valid, request ditolak dengan status HTTP 400 dan pesan: *"Presensi Masuk Terkunci: Anda sudah melakukan absen masuk hari ini pada pukul [jam]. Anda hanya tinggal melakukan Absen Pulang (Check-Out)!"*.
+  2. **Penguncian Antarmuka di Frontend Portal Karyawan (`/employee`)**:
+     - Jika karyawan sudah melakukan absen masuk: tombol `Check-In` otomatis digantikan dengan Badge Hijau Terkunci: `✓ Masuk: [Jam] (Terkunci)` dengan ikon centang.
+     - Tombol `Check-Out (Pulang)` menjadi satu-satunya tombol aksi aktif yang dapat digunakan karyawan saat jam pulang.
+     - Fungsi `openCheckInModal` otomatis memblokir modal jika karyawan sudah absen masuk, mencegah form terbuka.
+  3. Pengujian TypeScript lolos 0 error dan pembaruan dideploy langsung ke live VPS.
+
+- **2026-10-28**: [SELESAI] Desain Antarmuka Khusus Mobile Penuh (Mobile-First Standalone UI Tanpa Nuansa Web Browser Desktop) untuk Fitur Pesan WhatsApp (/mobile-chat & MainActivity.kt) [Tugas 250].
+  *Permintaan User*: "kemudian pada aplikasi android. selain dari tampilan web brouser, bisakah kita buat khusus aplikasi yang memang benar-benar terpisah dari web browser, karena saat ini sangat buruk kualitasnya di mobile untuk tampilannya, sangat acak dan ngawur", "untuk fitur pesan, jangan ada seperti brouser, harus full tampilan pesan", & "saya ingin pada aplikasi android memang murni aplikasi dengan 3 menu, Home yang bisa tersedia semua menu. kemudian pesan yang memang menu khusus pesan seperti aplikasi WA, kemudian meeting. yang tampilan sekarang sudah ok sama saya."
+  *Penyelesaian & Hasil*:
+  1. **Halaman Khusus Mobile Chat Penuh (`/mobile-chat/page.tsx`)**:
+     - Membuat rute mandiri mobile murni `w-screen h-[100dvh] bg-slate-950 overflow-hidden` tanpa header web browser, tanpa link navigasi luar, dan tanpa margin.
+     - Menyematkan `TeamChatMessenger` dengan properti `standaloneMobileApp={true}`: tampilan pesan otomatis mengisi 100% layar HP dari atas hingga pas di atas Bottom Navigation Bar native Android.
+     - Menampilkan tampilan single-stack ala WhatsApp: daftar obrolan tim dengan tab `[💬 Chat Tim]` dan `[👥 Kontak Rekan]`. Saat obrolan diklik, langsung beralih ke ruang obrolan penuh dengan tombol kembali `< Kembali`, panggilan video/suara, bubble pesan WhatsApp dark mode, dan input pesan bawah.
+  2. **Navigasi Tab Pesan Android Native (`MainActivity.kt`)**:
+     - Mengubah handler `navigateToChatTab()` pada bilah navigasi bawah native Android agar langsung memuat `https://dstechsmart.com/mobile-chat`.
+  3. Kompilasi APK Android dan deployment server live VPS berhasil 100%.
+
+- **2026-10-28**: [SELESAI] Penghilangan Tombol Chat Mengambang (Floating Chat Widget) & Penonaktifan Auto-Popup Teaser Copilot Operasional Admin (AIChatWidget.tsx & admin/layout.tsx) [Tugas 249].
+  *Permintaan User*: "fitur chat mengambang pada aplikasi sangat mengganggu, saya ingin menghilangkan fitur ini pada aplikasi android, karena setiap kali membuka menu lain selalu kesentuh dia." & "untuk copilot Oprasional admin sebaiknya disembunyikan, jangan selalu muncul, karena sangat mengganggu, sebaiknya jika ada kendala baru bisa diakses oleh user. misalnya dengan klik menu link yang mengarahkan ke fitur chat".
+  *Penyebab Masalah yang Ditemukan*:
+  1. `AIChatWidget` memiliki timer otomatis `setTimeout(() => setShowTeaser(true), 4500)` yang memunculkan gelembung teaser mengambang di pojok kanan bawah setiap kali admin membuka halaman (seperti terlihat pada screenshot).
+  2. Tombol bulat mengambang (`fixed bottom-6 right-6 z-50`) menutupi tombol navigasi dan form input di layar HP teknisi dan monitor admin.
+  *Penyelesaian & Hasil*:
+  1. **Penghilangan Floating Widget pada Android**:
+     - `AIChatWidget` otomatis mendeteksi lingkungan Android (`isAndroidApp`) dan mengembalikan `null` (widget lenyap 100% tanpa sisa).
+     - Menambahkan aturan CSS `.dstech-android-app .ai-chat-widget-container { display: none !important; }` di `globals.css`.
+  2. **Penyembunyian Floating Button di Seluruh Portal Internal (Admin, Superadmin, Employee)**:
+     - Tombol mengambang di pojok kanan bawah otomatis disembunyikan (`if (isInternalPortal && !isOpen) return null;`).
+     - Timer auto-popup teaser dinonaktifkan permanen sehingga tidak ada lagi pop-up mengambang yang mengganggu aktivitas admin.
+  3. **Akses Bantuan AI Berbasis Permintaan (On-Demand)**:
+     - Menambahkan tombol menu "💡 Bantuan AI Copilot" di Sidebar Admin, Mobile Drawer, dan Header Bar Admin.
+     - Jendela konsultasi AI hanya akan terbuka jika admin secara sadar mengklik tombol bantuan tersebut saat mengalami kendala.
+  4. Pengujian TypeScript lolos 0 error dan deployment sukses di VPS server.
+
+- **2026-10-28**: [SELESAI] Penguncian Otomatis Proyek & Entitas Usaha (Non-PT / PT) pada Pencatatan Keuangan / Arus Kas Proyek dari Dossier Proyek (src/app/admin/finance/page.tsx) [Tugas 248].
+  *Permintaan User*: "ketika saya mencatat keuangan pada proyek, maka catatan pengeluaran proyek tidak terkunci pada proyek yang kita maksud, malah didalamnya muncul banyak pilihan proyek. seharusnya penginputan terkunci diproyek yang ingin kita catat tanpa harus setting kembali. kemudian untuk entintasnya yang PT muncul, padahal ini pekerjaanya non PT. seharusnya tab itu tidak harus ada, jadi proyek dan mengikuti entintas yang sudah diatur".
+  *Penyebab Masalah yang Ditemukan*:
+  1. Tombol `+ Catat Kas Lapangan` pada tab Arus Kas di Dossier Proyek (`page.tsx`) telah mengirimkan data proyek `projectId`, `projectName`, dan `businessEntity` ke dalam state `cashForm`.
+  2. Namun pada modal pencatatan kas (`isNewCashModalOpen`):
+     - Selector Entitas Usaha (PT vs Non-PT) masih selalu muncul sebagai toggle buttons yang dapat diubah dan secara visual menampilkan opsi PT padahal proyek bertipe Non-PT.
+     - Bagian Alokasi Proyek (`cashForm.projectId`) masih berupa `<select>` dropdown penuh yang menampilkan seluruh daftar proyek lain.
+     - Rekening kas sumber (`account`) belum otomatis menyesuaikan ke rekening default entitas proyek terkait.
+  3. Hal yang sama juga terdapat pada modal Faktur Penjualan (`isNewSaleModalOpen`) dan PO Proyek (`isNewPoModalOpen`).
+  *Penyelesaian & Hasil*:
+  1. **Penguncian Bersih pada Modal Arus Kas (`isNewCashModalOpen`)**:
+     - Jika `cashForm.projectId` terisi: selector entitas PT vs Non-PT otomatis disembunyikan.
+     - Dropdown pilihan banyak proyek digantikan dengan Kartu Proyek Terkunci (Kode Proyek, Nama Proyek, Klien, dan Badge Entitas Usaha Proyek) yang read-only dengan status 🔒 Terkunci Pada Proyek Ini.
+     - Opsi rekening bank/kas otomatis terfilter dan default akun kas otomatis terpasang sesuai entitas proyek (`getDefaultBankAccLabel(prjEnt)`).
+  2. **Penguncian Bersih pada Modal Purchase Order (`isNewPoModalOpen`)**:
+     - Selector entitas pemesan disembunyikan jika `poForm.projectId` terisi.
+     - Dropdown proyek diganti dengan Kartu Proyek Terkunci (read-only) dengan tarif pajak dan entitas terkunci otomatis.
+  3. **Penguncian Bersih pada Modal Faktur Penjualan (`isNewSaleModalOpen`)**:
+     - Radio selector profil faktur (PT vs Non-PT) disembunyikan jika `saleForm.projectId` terisi.
+     - Searchable project selector diganti dengan Kartu Proyek Terkunci (read-only) lengkap dengan informasi nilai kontrak, klien, dan aturan PPN yang sesuai entitas proyek.
+  4. **Pengujian & Deployment**:
+     - `npx tsc --noEmit` lolos 0 error.
+     - Deploy live VPS berhasil (Next.js build 75/75 halaman lolos dan PM2 `dstech-main` online PID 1936406).
+     - Folder backup sementara `_backup_project_expense_lock` telah dibersihkan.
+
+- **2026-10-28**: [SELESAI] Upload dan Distribusi File APK Android Terbaru (3 Tab Menu & Background Call Service) ke Server Live VPS (/public/dstech-smart-app.apk & dstechsmart.com) [Tugas 247].
+  *Permintaan User*: "file apknya langsung upload ke live".
+  *Analisis & Rencana Kerja Step-by-Step*:
+  1. Menyalin file `dstech-smart-app.apk` hasil build terbaru (~6.24 MB) ke direktori web Next.js lokal: `dstech-smart/public/dstech-smart-app.apk`.
+  2. Melakukan sinkronisasi upload file APK via SFTP SSH langsung ke server live VPS:
+     - `/www/wwwroot/dstechsmart.com/public/dstech-smart-app.apk`
+     - `/www/wwwroot/dstechsmart.com/dstech-smart-app.apk`
+  3. Menguji akses URL unduhan live: `https://dstechsmart.com/dstech-smart-app.apk`.
+  4. Memperbarui status di LAPORAN_PROGRES.md menjadi [SELESAI].
+  *Penyelesaian & Hasil*:
+  - File APK Android terbaru (ukuran 6.0MB di Linux / 6,242,450 bytes) telah berhasil diunggah via SFTP SSH2 ke server live VPS di `/www/wwwroot/dstechsmart.com/public/dstech-smart-app.apk` dan root `/www/wwwroot/dstechsmart.com/dstech-smart-app.apk`.
+  - File live dapat diakses dan diunduh langsung secara publik di `https://dstechsmart.com/dstech-smart-app.apk`.
+
 - **2026-10-28**: [SELESAI] Implementasi 3 Tab Menu Native Bawah (Home, Pesan, Meeting) & Background Notification Service Dering Panggilan/Pesan Saat Aplikasi Tertutup pada Aplikasi Android (dstech-smart-android, MainActivity.kt, & DStechNotificationService.kt) [Tugas 246].
   *Permintaan User*: "saya ingin agar aplikasi android mempunya tab khusus menu tersendiri, jangan digabung kedalam web browser, agar lebih cepat dalam membukanya, ibarat 2 menu ada di bagian bawah aplikasi android, menu home dan pesan, meeting. saya rasa ini akan membuat aplikasi lebih menarik. kemudian setiap ada pesan masuk atau panggilan HP harus bisa berbunyi walaupun tanpa ada membuka aplikasi. aplikasi sedang tertutup dari layar." & "maksud saya ada 3 menu".
   *Penyelesaian & Hasil*:
