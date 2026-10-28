@@ -79,12 +79,20 @@ export async function GET(request: Request) {
       }
     : null;
 
-  return NextResponse.json({
-    success: true,
-    incomingCall: incomingCall || null,
-    data: formattedData,
-    calls: calls.slice(-20),
-  });
+  return NextResponse.json(
+    {
+      success: true,
+      incomingCall: incomingCall || null,
+      data: formattedData,
+      calls: calls.slice(-20),
+    },
+    {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        "Pragma": "no-cache",
+      },
+    }
+  );
 }
 
 // POST: Inisiasi, jawab, tolak, atau akhiri panggilan
