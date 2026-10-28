@@ -34,6 +34,10 @@ import {
   Maximize2,
   MessageSquare,
   ArrowLeft,
+  Lock,
+  Unlock,
+  CheckCircle2,
+  ShieldAlert,
 } from "lucide-react";
 import { dstechCallAudio } from "@/utils/dstech_call_audio";
 
@@ -137,6 +141,71 @@ export default function TeamChatMessenger({
   const [isNewGroup, setIsNewGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+
+  // State Proteksi PIN Keamanan Dokumen Invoice Klien
+  const [unlockedInvoices, setUnlockedInvoices] = useState<Record<string, boolean>>({});
+  const [invoicePinInput, setInvoicePinInput] = useState<Record<string, string>>({});
+  const [invoicePinError, setInvoicePinError] = useState<Record<string, string>>({});
+
+  // State Modal Interaktif Tindak Lanjut & Buka SPK Langsung dari Chat
+  const [activeSpkModal, setActiveSpkModal] = useState<any | null>(null);
+  const [spkStatus, setSpkStatus] = useState<string>("In Progress");
+  const [spkProgress, setSpkProgress] = useState<number>(50);
+  const [spkNotes, setSpkNotes] = useState<string>("");
+  const [isUpdatingSpk, setIsUpdatingSpk] = useState<boolean>(false);
+
+  const handleUnlockInvoice = (msgId: string) => {
+    const pin = (invoicePinInput[msgId] || "").trim();
+    if (pin === "1234" || pin === "8899" || pin === "2026") {
+      setUnlockedInvoices((prev) => ({ ...prev, [msgId]: true }));
+      setInvoicePinError((prev) => ({ ...prev, [msgId]: "" }));
+    } else {
+      setInvoicePinError((prev) => ({ ...prev, [msgId]: "PIN salah! Masukkan PIN otorisasi (Contoh: 1234)" }));
+    }
+  };
+
+  const handleSaveSpkUpdate = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!activeSpkModal) return;
+    setIsUpdatingSpk(true);
+    try {
+      await fetch("/api/employee/tasks", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: activeSpkModal.id,
+          status: spkStatus,
+          progress: spkProgress,
+          notes: spkNotes,
+          technician: currentUser.name,
+        }),
+      });
+
+      // Kirim pesan konfirmasi update ke chat koordinasi
+      if (activeChat) {
+        await fetch("/api/team-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "send_message",
+            chatId: activeChat.id,
+            senderId: currentUser.id,
+            senderName: currentUser.name,
+            senderRole: currentUser.role,
+            type: "text",
+            content: `📋 UPDATE SPK [${activeSpkModal.ticketNumber || activeSpkModal.title}]: Status diperbarui menjadi '${spkStatus}' (${spkProgress}%). Catatan: ${spkNotes || "Telah ditindaklanjuti langsung di lapangan."}`,
+          }),
+        });
+        loadChats();
+        if (activeChat.id) loadMessages(activeChat.id);
+      }
+      setActiveSpkModal(null);
+    } catch (err) {
+      console.error("Gagal mengupdate SPK:", err);
+    } finally {
+      setIsUpdatingSpk(false);
+    }
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -921,55 +990,95 @@ export default function TeamChatMessenger({
                     )}
 
                     <div
-                      className={`max-w-[85%] sm:max-w-[70%] rounded-2xl p-3.5 shadow-lg relative ${
+                      className={`max-w-[85%] sm:max-w-[70%] rounded-2xl p-3.5 shadow-lg relative dstech-chat-bubble select-none ${
                         isMe
                           ? "bg-emerald-950/80 border border-emerald-600/40 text-emerald-50 rounded-tr-none"
                           : "bg-slate-800/90 border border-slate-700 text-slate-100 rounded-tl-none"
                       }`}
+                      onContextMenu={(e) => e.preventDefault()}
                     >
                       {/* 1. Teks Biasa */}
                       {msg.content && (
-                        <p className="text-xs leading-relaxed whitespace-pre-wrap mb-1">
+                        <p className="text-xs leading-relaxed whitespace-pre-wrap mb-1 dstech-protected-message select-none">
                           {msg.content}
                         </p>
                       )}
 
-                      {/* 2. Kartu Lampiran INVOICE */}
+                      {/* 2. Kartu Lampiran INVOICE (Dengan Proteksi PIN Klien) */}
                       {msg.type === "invoice" && msg.invoiceData && (
                         <div className="mt-2 p-3 bg-slate-900/90 border border-emerald-500/40 rounded-xl text-left">
                           <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
                             <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                              <FileText className="w-3.5 h-3.5" /> DOKUMEN INVOICE
+                              <FileText className="w-3.5 h-3.5" /> DOKUMEN INVOICE KLIEN
                             </span>
                             <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded font-bold">
                               {msg.invoiceData.paymentStatus}
                             </span>
                           </div>
-                          <h5 className="font-bold text-white text-xs mb-0.5">
-                            {msg.invoiceData.invoiceNumber}
-                          </h5>
-                          <p className="text-[11px] text-slate-400 mb-2 truncate">
-                            Klien: {msg.invoiceData.customerName}
-                          </p>
-                          <div className="flex items-center justify-between pt-1 text-xs">
-                            <span className="text-[11px] text-slate-400">Total Tagihan:</span>
-                            {currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN" ? (
-                              <span className="font-extrabold text-emerald-400">
-                                Rp {Number(msg.invoiceData.grandTotal || 0).toLocaleString("id-ID")}
-                              </span>
-                            ) : (
-                              <span className="font-bold text-slate-400 text-[11px] bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                                •••••••• (Internal Keuangan)
-                              </span>
-                            )}
-                          </div>
-                          {(currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN") && (
-                            <Link
-                              href={`/admin/finance`}
-                              className="mt-2.5 w-full py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition"
-                            >
-                              <ExternalLink className="w-3 h-3" /> Buka Detail di Finance
-                            </Link>
+
+                          {!unlockedInvoices[msg.id] && currentUser.role !== "SUPERADMIN" && currentUser.role !== "ADMIN" ? (
+                            /* TAMPILAN TERKUNCI PIN */
+                            <div className="py-2.5 px-3 bg-slate-950/80 border border-amber-500/30 rounded-lg text-center">
+                              <div className="flex items-center justify-center gap-1.5 text-amber-400 font-bold text-xs mb-1">
+                                <Lock className="w-3.5 h-3.5" /> Dokumen Tagihan Terproteksi
+                              </div>
+                              <p className="text-[10px] text-slate-400 mb-2">
+                                Masukkan PIN otorisasi untuk membuka rincian faktur ini:
+                              </p>
+                              <div className="flex items-center justify-center gap-2">
+                                <input
+                                  type="password"
+                                  maxLength={6}
+                                  placeholder="PIN (1234)"
+                                  value={invoicePinInput[msg.id] || ""}
+                                  onChange={(e) =>
+                                    setInvoicePinInput({ ...invoicePinInput, [msg.id]: e.target.value })
+                                  }
+                                  className="w-28 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-center text-xs text-white tracking-widest focus:border-amber-400 outline-none"
+                                />
+                                <button
+                                  onClick={() => handleUnlockInvoice(msg.id)}
+                                  className="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition cursor-pointer"
+                                >
+                                  Buka Kunci
+                                </button>
+                              </div>
+                              {invoicePinError[msg.id] && (
+                                <p className="text-[10px] text-rose-400 mt-1 font-medium">
+                                  {invoicePinError[msg.id]}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            /* TAMPILAN TERBUKA */
+                            <div>
+                              <h5 className="font-bold text-white text-xs mb-0.5">
+                                {msg.invoiceData.invoiceNumber}
+                              </h5>
+                              <p className="text-[11px] text-slate-400 mb-2 truncate">
+                                Klien: {msg.invoiceData.customerName}
+                              </p>
+                              <div className="flex items-center justify-between pt-1 text-xs">
+                                <span className="text-[11px] text-slate-400">Total Tagihan:</span>
+                                {currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN" || currentUser.role === "CLIENT" ? (
+                                  <span className="font-extrabold text-emerald-400">
+                                    Rp {Number(msg.invoiceData.grandTotal || 0).toLocaleString("id-ID")}
+                                  </span>
+                                ) : (
+                                  <span className="font-bold text-slate-400 text-[11px] bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                                    •••••••• (Internal Keuangan)
+                                  </span>
+                                )}
+                              </div>
+                              {(currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN") && (
+                                <Link
+                                  href={`/admin/finance`}
+                                  className="mt-2.5 w-full py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition"
+                                >
+                                  <ExternalLink className="w-3 h-3" /> Buka Detail di Finance
+                                </Link>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
@@ -998,6 +1107,18 @@ export default function TeamChatMessenger({
                             <span className="text-slate-400">Teknisi: {msg.taskData.technician}</span>
                             <span className="text-cyan-400 font-semibold">{msg.taskData.status}</span>
                           </div>
+                          {/* Tombol Interaktif Buka & Tindak Lanjuti SPK Langsung dari Chat */}
+                          <button
+                            onClick={() => {
+                              setActiveSpkModal(msg.taskData);
+                              setSpkStatus(msg.taskData.status || "In Progress");
+                              setSpkProgress(msg.taskData.progress || 50);
+                              setSpkNotes("");
+                            }}
+                            className="mt-2.5 w-full py-1.5 bg-cyan-600/20 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/30 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                          >
+                            <ExternalLink className="w-3 h-3" /> Buka & Tindak Lanjuti SPK
+                          </button>
                         </div>
                       )}
 
@@ -1063,7 +1184,14 @@ export default function TeamChatMessenger({
             {/* Menu Lampiran Data Perusahaan (Popup) */}
             {showAttachMenu && (
               <div className="absolute bottom-20 left-4 z-20 bg-slate-950 border border-slate-700/80 rounded-2xl p-2 shadow-2xl flex flex-col gap-1 w-64 animate-fadeIn backdrop-blur-lg">
-                {(currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN") && (
+                {(currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN") &&
+                  activeChat &&
+                  (activeChat.isProjectCoordination ||
+                    activeChat.name?.toLowerCase().includes("klien") ||
+                    activeChat.name?.toLowerCase().includes("pt ") ||
+                    activeChat.name?.toLowerCase().includes("cv ") ||
+                    activeChat.name?.toLowerCase().includes("client") ||
+                    activeChat.name?.toLowerCase().includes("koordinasi")) && (
                   <button
                     onClick={() => {
                       setAttachModalType("invoice");
@@ -1075,8 +1203,8 @@ export default function TeamChatMessenger({
                       <FileText className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                      <div className="font-bold">Kirim Invoice / Tagihan</div>
-                      <div className="text-[10px] text-slate-400">Lampirkan faktur keuangan ERP</div>
+                      <div className="font-bold">Kirim Invoice / Tagihan (Klien)</div>
+                      <div className="text-[10px] text-slate-400">Lampirkan faktur keuangan ke klien</div>
                     </div>
                   </button>
                 )}
@@ -1307,6 +1435,134 @@ export default function TeamChatMessenger({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL INTERAKTIF TINDAK LANJUT & UPDATE SPK ================= */}
+      {activeSpkModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl max-w-lg w-full p-6 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <ClipboardList className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Lembar Kerja & Update SPK</h3>
+                  <p className="text-[11px] text-slate-400">Tanggapi dan perbarui status pekerjaan lapangan</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveSpkModal(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
+              {/* Ringkasan SPK */}
+              <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-cyan-500/20 text-cyan-300">
+                    {activeSpkModal.ticketNumber || "SPK-DST"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    Prioritas: {activeSpkModal.priority || "Normal"}
+                  </span>
+                </div>
+                <h4 className="font-bold text-white text-sm">{activeSpkModal.title}</h4>
+                <p className="text-slate-400 flex items-center gap-1.5">
+                  <Building className="w-3.5 h-3.5 text-slate-500" /> Klien: {activeSpkModal.client}
+                </p>
+                <p className="text-slate-400 flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 text-slate-500" /> Lokasi: {activeSpkModal.location}
+                </p>
+                {activeSpkModal.scope && Array.isArray(activeSpkModal.scope) && (
+                  <div className="pt-2 border-t border-slate-800">
+                    <span className="text-[10px] font-bold text-slate-400 block mb-1">Rincian Pekerjaan:</span>
+                    <ul className="list-disc pl-4 space-y-0.5 text-slate-300 text-[11px]">
+                      {activeSpkModal.scope.map((s: string, idx: number) => (
+                        <li key={idx}>{s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Form Update Langsung */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">Status Penanganan Pekerjaan</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {["Pending", "In Progress", "Completed"].map((st) => (
+                      <button
+                        key={st}
+                        type="button"
+                        onClick={() => setSpkStatus(st)}
+                        className={`py-2 px-3 rounded-xl font-bold text-xs border transition ${
+                          spkStatus === st
+                            ? st === "Completed"
+                              ? "bg-emerald-600/30 border-emerald-500 text-emerald-300"
+                              : st === "In Progress"
+                              ? "bg-cyan-600/30 border-cyan-500 text-cyan-300"
+                              : "bg-amber-600/30 border-amber-500 text-amber-300"
+                            : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                        }`}
+                      >
+                        {st === "Pending" ? "⏳ Menunggu" : st === "In Progress" ? "⚡ Dikerjakan" : "✓ Selesai"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-slate-300 font-bold">Progres Penyelesaian</label>
+                    <span className="text-cyan-400 font-extrabold">{spkProgress}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={spkProgress}
+                    onChange={(e) => setSpkProgress(Number(e.target.value))}
+                    className="w-full accent-cyan-500 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">Catatan Teknisi / Kondisi Lapangan</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Contoh: Perangkat sudah terpasang dan berfungsi normal, siap uji coba serah terima..."
+                    value={spkNotes}
+                    onChange={(e) => setSpkNotes(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white placeholder-slate-600 focus:border-cyan-500 outline-none resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 flex items-center justify-end gap-2.5 mt-2">
+              <button
+                type="button"
+                onClick={() => setActiveSpkModal(null)}
+                className="px-4 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 text-xs font-semibold transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={isUpdatingSpk}
+                onClick={handleSaveSpkUpdate}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/30 flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+              >
+                {isUpdatingSpk ? "Menyimpan..." : "Simpan & Kirim Laporan ke Chat"}
+              </button>
+            </div>
           </div>
         </div>
       )}
