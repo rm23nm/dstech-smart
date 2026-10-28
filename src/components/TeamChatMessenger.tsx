@@ -153,6 +153,15 @@ export default function TeamChatMessenger({ currentUser, embeddedMode = false }:
       if (data.success) {
         setChats(data.chats || []);
         setUsersList(data.users || []);
+
+        // Sinkronisasi badge angka belum dibaca ke Navigasi Bawah Aplikasi Android
+        try {
+          const totalUnread = (data.chats || []).reduce((acc: number, c: any) => acc + (c.unread || 0), 0);
+          if (typeof window !== "undefined" && (window as any).DStechNative?.updateUnreadMessages) {
+            (window as any).DStechNative.updateUnreadMessages(totalUnread);
+          }
+        } catch (e) {}
+
         if (!activeChat && data.chats.length > 0) {
           setActiveChat(data.chats[0]);
         }
