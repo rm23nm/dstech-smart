@@ -42,6 +42,9 @@ import {
   Trash2,
   Loader2,
   Share2,
+  ShoppingBag,
+  Package,
+  Tag,
 } from "lucide-react";
 import { dstechCallAudio } from "@/utils/dstech_call_audio";
 
@@ -116,12 +119,13 @@ export default function TeamChatMessenger({
 
   // State Lampiran Menu
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [attachModalType, setAttachModalType] = useState<"invoice" | "task" | "report" | "media" | null>(null);
+  const [attachModalType, setAttachModalType] = useState<"invoice" | "task" | "report" | "product" | "media" | null>(null);
 
-  // State Data Perusahaan untuk Lampiran
+  // State Data Perusahaan & Produk untuk Lampiran
   const [companyInvoices, setCompanyInvoices] = useState<any[]>([]);
   const [companyTasks, setCompanyTasks] = useState<any[]>([]);
   const [companyReports, setCompanyReports] = useState<any[]>([]);
+  const [companyProducts, setCompanyProducts] = useState<any[]>([]);
   const [dataSearch, setDataSearch] = useState("");
 
   // State Form Bukti Pekerjaan Lapangan Cepat
@@ -339,7 +343,7 @@ export default function TeamChatMessenger({
   }, [activeChat?.id]);
 
   // Load Data Perusahaan untuk Lampiran
-  const loadCompanyData = async (type: "invoices" | "tasks" | "reports") => {
+  const loadCompanyData = async (type: "invoices" | "tasks" | "reports" | "products") => {
     try {
       const targetUserName = (!activeChat?.isGroup && activeChat?.name) ? activeChat.name : "";
       const chatIdParam = activeChat?.id || "";
@@ -376,6 +380,9 @@ export default function TeamChatMessenger({
             setActiveProjectInfo(data.projectInfo);
           }
         }
+        if (type === "products") {
+          setCompanyProducts(data.data || []);
+        }
       }
     } catch (err) {
       console.error(`Gagal load data ${type}:`, err);
@@ -385,6 +392,7 @@ export default function TeamChatMessenger({
   useEffect(() => {
     if (attachModalType === "invoice") loadCompanyData("invoices");
     if (attachModalType === "task") loadCompanyData("tasks");
+    if (attachModalType === "product") loadCompanyData("products");
     if (attachModalType === "report") {
       loadCompanyData("tasks"); // Pastikan data SPK aktif proyek terambil untuk dropdown
       loadCompanyData("reports");
@@ -498,6 +506,35 @@ export default function TeamChatMessenger({
       }
     } catch (err) {
       console.error("Gagal kirim invoice:", err);
+    }
+  };
+
+  // Kirim Lampiran Produk Katalog
+  const handleSendProduct = async (product: any) => {
+    if (!activeChat || !product) return;
+    try {
+      const res = await fetch("/api/team-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_message",
+          chatId: activeChat.id,
+          senderId: currentUser.id,
+          senderName: currentUser.name,
+          senderRole: currentUser.role,
+          type: "product",
+          content: `📦 [Katalog Produk] ${product.name}`,
+          productData: product,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages((prev) => [...prev, data.message]);
+        setAttachModalType(null);
+        loadChats();
+      }
+    } catch (err) {
+      console.error("Gagal kirim produk:", err);
     }
   };
 
@@ -759,21 +796,32 @@ export default function TeamChatMessenger({
                       }`}
                     >
                       <div className="relative flex-shrink-0">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-slate-300 font-bold overflow-hidden shadow">
-                          {chat.isGroup ? (
+                        <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center font-bold overflow-hidden shadow ${
+                          chat.isClientChat
+                            ? "bg-gradient-to-tr from-emerald-950 via-slate-900 to-teal-950 border-emerald-500/50 text-emerald-400"
+                            : "bg-gradient-to-tr from-slate-800 to-slate-700 border-slate-700 text-slate-300"
+                        }`}>
+                          {chat.isClientChat ? (
+                            <MessageSquare className="w-6 h-6 text-emerald-400" />
+                          ) : chat.isGroup ? (
                             <Users className="w-6 h-6 text-emerald-400" />
                           ) : (
                             <User className="w-6 h-6 text-cyan-400" />
                           )}
                         </div>
-                        {!chat.isGroup && (
-                          <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full" />
-                        )}
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
-                          <h4 className="text-xs font-bold text-white truncate">{chat.name}</h4>
-                          <span className="text-[10px] text-slate-500">
+                          <h4 className="text-xs font-bold text-white truncate flex items-center gap-1.5">
+                            {chat.name}
+                            {chat.isClientChat && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
+                                Klien Web
+                              </span>
+                            )}
+                          </h4>
+                          <span className="text-[10px] text-slate-500 shrink-0">
                             {formatTime(chat.lastMessageTime)}
                           </span>
                         </div>
@@ -881,8 +929,14 @@ export default function TeamChatMessenger({
                   <ArrowLeft className="w-5 h-5 text-emerald-400" />
                 </button>
 
-                <div className="w-9 h-9 md:w-10 md:h-10 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold flex-shrink-0">
-                  {activeChat.isGroup ? (
+                <div className={`w-9 h-9 md:w-10 md:h-10 rounded-2xl border flex items-center justify-center font-bold flex-shrink-0 ${
+                  activeChat.isClientChat
+                    ? "bg-gradient-to-tr from-emerald-950 to-teal-950 border-emerald-500/50 text-emerald-400"
+                    : "bg-slate-800 border-slate-700 text-slate-300"
+                }`}>
+                  {activeChat.isClientChat ? (
+                    <MessageSquare className="w-5 h-5 text-emerald-400" />
+                  ) : activeChat.isGroup ? (
                     <Users className="w-5 h-5 text-emerald-400" />
                   ) : (
                     <User className="w-5 h-5 text-cyan-400" />
@@ -891,14 +945,21 @@ export default function TeamChatMessenger({
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
                     {activeChat.name}
-                    {activeChat.isGroup && (
+                    {activeChat.isClientChat ? (
+                      <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        Klien Web • Terkunci Admin & CS
+                      </span>
+                    ) : activeChat.isGroup ? (
                       <span className="text-[10px] px-2 py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full font-semibold">
                         Grup Tim
                       </span>
-                    )}
+                    ) : null}
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    {activeChat.isGroup
+                    {activeChat.isClientChat
+                      ? `Klien: ${activeChat.clientName || "Pengunjung"} • No: ${activeChat.clientPhone || "-"} • Live Handover AI Dani`
+                      : activeChat.isGroup
                       ? `${activeChat.participants?.length || 4} anggota koordinasi proyek`
                       : "Online | DStech Encrypted"}
                   </p>
@@ -1146,6 +1207,71 @@ export default function TeamChatMessenger({
                         </div>
                       )}
 
+                      {/* Kartu LAMPIRAN PRODUK KATALOG DSTECH SMART */}
+                      {msg.type === "product" && msg.productData && (
+                        <div className="mt-2 p-3 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-amber-500/40 rounded-2xl text-left shadow-lg max-w-sm">
+                          <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+                            <span className="text-[10px] font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
+                              <ShoppingBag className="w-3.5 h-3.5" /> Katalog Produk DSTech
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded font-bold">
+                              {msg.productData.category || "Produk"}
+                            </span>
+                          </div>
+
+                          <div className="flex items-start gap-3 mb-2.5">
+                            {msg.productData.image && (
+                              <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700">
+                                <Image
+                                  src={msg.productData.image}
+                                  alt={msg.productData.name}
+                                  fill
+                                  className="object-cover"
+                                />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <h5 className="font-extrabold text-white text-xs leading-snug line-clamp-2">
+                                {msg.productData.name}
+                              </h5>
+                              <div className="mt-1 flex items-baseline gap-2">
+                                <span className="text-sm font-extrabold text-amber-400 font-mono">
+                                  {typeof msg.productData.price === "number"
+                                    ? `Rp ${msg.productData.price.toLocaleString("id-ID")}`
+                                    : msg.productData.price}
+                                </span>
+                                {msg.productData.originalPrice && (
+                                  <span className="text-[10px] text-slate-500 line-through font-mono">
+                                    Rp {Number(msg.productData.originalPrice).toLocaleString("id-ID")}
+                                  </span>
+                                )}
+                              </div>
+                              {msg.productData.stock !== undefined && (
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  Stok: <strong className="text-emerald-400">{msg.productData.stock} {msg.productData.unit || "Unit"}</strong>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {msg.productData.desc && (
+                            <p className="text-[11px] text-slate-400 leading-relaxed bg-slate-950/70 p-2 rounded-xl border border-slate-800/80 line-clamp-2 mb-2">
+                              {msg.productData.desc}
+                            </p>
+                          )}
+
+                          <a
+                            href={`/shop?search=${encodeURIComponent(msg.productData.name)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow transition cursor-pointer"
+                          >
+                            <span>Lihat Detail / Beli Produk</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </div>
+                      )}
+
                       {/* 5. Kartu RIWAYAT PANGGILAN */}
                       {msg.type === "call_log" && msg.callData && (
                         <div className="flex items-center gap-2 py-1 text-xs">
@@ -1198,6 +1324,22 @@ export default function TeamChatMessenger({
                     </div>
                   </button>
                 )}
+
+                <button
+                  onClick={() => {
+                    setAttachModalType("product");
+                    setShowAttachMenu(false);
+                  }}
+                  className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-800 text-slate-200 hover:text-white text-xs transition cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                    <ShoppingBag className="w-4 h-4" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-bold">Lampirkan Produk</div>
+                    <div className="text-[10px] text-slate-400">Katalog Smart Home, CCTV & Security</div>
+                  </div>
+                </button>
 
                 <button
                   onClick={() => {
@@ -1288,9 +1430,11 @@ export default function TeamChatMessenger({
                 {attachModalType === "invoice" && <FileText className="w-5 h-5 text-emerald-400" />}
                 {attachModalType === "task" && <ClipboardList className="w-5 h-5 text-cyan-400" />}
                 {attachModalType === "report" && <Camera className="w-5 h-5 text-teal-400" />}
+                {attachModalType === "product" && <ShoppingBag className="w-5 h-5 text-amber-400" />}
                 {attachModalType === "invoice" && "Pilih Faktur Invoice Perusahaan"}
                 {attachModalType === "task" && "Pilih Surat Penugasan (SPK) Lapangan"}
                 {attachModalType === "report" && "Kirim Bukti Pekerjaan Lapangan"}
+                {attachModalType === "product" && "Pilih Produk Katalog DStech Smart"}
               </h3>
               <button
                 onClick={() => setAttachModalType(null)}
@@ -1535,6 +1679,8 @@ export default function TeamChatMessenger({
                     placeholder={
                       attachModalType === "invoice"
                         ? "Cari invoice tagihan user ini..."
+                        : attachModalType === "product"
+                        ? "Cari nama produk, kategori, spesifikasi..."
                         : "Cari SPK penugasan proyek..."
                     }
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
@@ -1542,6 +1688,67 @@ export default function TeamChatMessenger({
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                  {attachModalType === "product" && (
+                    <>
+                      {companyProducts.length === 0 ? (
+                        <div className="py-8 text-center text-slate-400">
+                          <ShoppingBag className="w-10 h-10 mx-auto mb-2 text-slate-600" />
+                          <p className="text-xs font-bold text-slate-300">Produk Tidak Ditemukan</p>
+                          <p className="text-[11px] text-slate-500 max-w-xs mx-auto mt-1">
+                            Coba kata kunci lain atau periksa data master produk DStech Smart.
+                          </p>
+                        </div>
+                      ) : (
+                        companyProducts.map((prod) => (
+                          <div
+                            key={prod.id}
+                            onClick={() => handleSendProduct(prod)}
+                            className="p-3 bg-slate-950 border border-slate-800 hover:border-amber-500 rounded-xl cursor-pointer transition flex items-center justify-between gap-3 group"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              {prod.image && (
+                                <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-slate-900 border border-slate-800 shrink-0">
+                                  <Image
+                                    src={prod.image}
+                                    alt={prod.name}
+                                    fill
+                                    className="object-cover"
+                                  />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <h5 className="font-bold text-white text-xs truncate group-hover:text-amber-400 transition">
+                                  {prod.name}
+                                </h5>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-semibold">
+                                    {prod.category}
+                                  </span>
+                                  {prod.promoTag && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-red-500/20 text-red-300 font-bold border border-red-500/30">
+                                      {prod.promoTag}
+                                    </span>
+                                  )}
+                                  <span className="text-[10px] text-slate-400">
+                                    Stok: {prod.stock} {prod.unit}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="font-mono font-bold text-amber-400 text-xs block">
+                                Rp {Number(prod.price || 0).toLocaleString("id-ID")}
+                              </span>
+                              <span className="text-[10px] text-slate-500 group-hover:text-amber-300 transition">
+                                Klik Lampirkan →
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  )}
+
                   {attachModalType === "invoice" && (
                     <>
                       {companyInvoices.length === 0 ? (

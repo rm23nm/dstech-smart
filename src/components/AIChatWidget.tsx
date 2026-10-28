@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { 
   MessageSquare, 
   X, 
@@ -17,6 +18,13 @@ import {
   ShoppingBag, 
   Headphones, 
   PhoneCall,
+  Phone,
+  Video,
+  PhoneOff,
+  UserCheck,
+  ShieldCheck,
+  ArrowLeft,
+  Loader2,
   ArrowRight
 } from "lucide-react";
 
@@ -179,7 +187,28 @@ export default function AIChatWidget() {
   const [showTeaser, setShowTeaser] = useState(false);
   const [isAndroidApp, setIsAndroidApp] = useState(false);
 
+  // State Live Chat Klien Langsung dengan Tim Admin & CS
+  const [isLiveMode, setIsLiveMode] = useState(false);
+  const [clientChatId, setClientChatId] = useState("");
+  const [clientId, setClientId] = useState("");
+  const [liveMessages, setLiveMessages] = useState<any[]>([]);
+  const [liveInputMessage, setLiveInputMessage] = useState("");
+  const [sendingLiveMsg, setSendingLiveMsg] = useState(false);
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
+  const [pendingHandoverSummary, setPendingHandoverSummary] = useState("");
+  const [pendingMatchedProducts, setPendingMatchedProducts] = useState<any[]>([]);
+
+  // State Panggilan Suara & Video Klien
+  const [activeCall, setActiveCall] = useState<{
+    callId: string;
+    callType: "audio" | "video";
+    status: "calling" | "connected" | "ended" | "declined";
+    roomCode?: string;
+  } | null>(null);
+  const [callTimer, setCallTimer] = useState<number>(0);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const liveMessagesEndRef = useRef<HTMLDivElement>(null);
 
   // Deteksi lingkungan aplikasi Android / WebView native
   useEffect(() => {
@@ -293,9 +322,21 @@ export default function AIChatWidget() {
     setShowTeaser(false);
   }, [isOpen]);
 
-  // Muat riwayat chat dari localStorage
+  // Muat riwayat chat & identitas klien dari localStorage
   useEffect(() => {
     try {
+      let savedClientId = localStorage.getItem("dstech_client_chat_id");
+      if (!savedClientId) {
+        savedClientId = `client_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+        localStorage.setItem("dstech_client_chat_id", savedClientId);
+      }
+      setClientId(savedClientId);
+
+      const savedChatId = localStorage.getItem("dstech_active_client_chat_id");
+      if (savedChatId) {
+        setClientChatId(savedChatId);
+      }
+
       const saved = localStorage.getItem("dstech_ai_chat_history");
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -309,6 +350,199 @@ export default function AIChatWidget() {
       if (savedPhone) setVisitorPhone(savedPhone);
     } catch (e) {}
   }, []);
+
+  // Polling Pesan Live Chat Klien dari Tim Admin & CS
+  useEffect(() => {
+    if (!isLiveMode || !clientChatId) return;
+
+    const fetchLiveMessages = async () => {
+      try {
+        const res = await fetch(`/api/team-chat?action=client_messages&chatId=${clientChatId}&clientId=${clientId}`);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.messages)) {
+          setLiveMessages(data.messages);
+        }
+      } catch (err) {}
+    };
+
+    fetchLiveMessages();
+    const interval = setInterval(fetchLiveMessages, 2500);
+    return () => clearInterval(interval);
+  }, [isLiveMode, clientChatId, clientId]);
+
+  // Auto-scroll pesan live ke paling bawah
+  useEffect(() => {
+    if (isLiveMode) {
+      liveMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [liveMessages, isLiveMode]);
+
+  // Polling Status Panggilan Klien (Audio / Video)
+  useEffect(() => {
+    if (!activeCall || activeCall.status === "ended" || activeCall.status === "declined") return;
+
+    const checkCallStatus = async () => {
+      try {
+        const res = await fetch(`/api/team-chat/call?callId=${activeCall.callId}`);
+        const data = await res.json();
+        if (data.success && data.call) {
+          if (data.call.status === "connected" && activeCall.status !== "connected") {
+            setActiveCall((prev) => (prev ? { ...prev, status: "connected" } : null));
+          } else if (data.call.status === "declined" || data.call.status === "ended") {
+            setActiveCall(null);
+          }
+        }
+      } catch (err) {}
+    };
+
+    const interval = setInterval(checkCallStatus, 1500);
+    return () => clearInterval(interval);
+  }, [activeCall]);
+
+  // Timer Durasi Panggilan Klien
+  useEffect(() => {
+    let timer: any;
+    if (activeCall && activeCall.status === "connected") {
+      timer = setInterval(() => {
+        setCallTimer((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setCallTimer(0);
+    }
+    return () => clearInterval(timer);
+  }, [activeCall?.status]);
+
+  // Fungsi Mulai Handover ke Tim Admin & CS
+  const startLiveChatHandover = async (name: string, phone: string, summary?: string, matchedProducts?: any[]) => {
+    try {
+      setLoading(true);
+      const res = await fetch("/api/team-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "client_handover",
+          clientId,
+          clientName: name,
+          clientPhone: phone,
+          summary: summary || pendingHandoverSummary || "Konsultasi produk & sistem DSTech Smart",
+          initialMessage: `Halo! Saya ${name} (${phone}), ingin terhubung langsung dengan tim Admin & CS DSTech.`,
+          matchedProducts: matchedProducts || pendingMatchedProducts || [],
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.chatId) {
+        setClientChatId(data.chatId);
+        localStorage.setItem("dstech_active_client_chat_id", data.chatId);
+        setIsLiveMode(true);
+        setShowHandoverModal(false);
+      }
+    } catch (err) {
+      console.error("Gagal memulai handover:", err);
+      alert("Terjadi kendala saat menghubungkan ke Admin. Silakan coba kembali.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTriggerHandover = (summary?: string, matchedProducts?: any[]) => {
+    setPendingHandoverSummary(summary || "");
+    setPendingMatchedProducts(matchedProducts || []);
+    if (!visitorName || !visitorPhone) {
+      setShowHandoverModal(true);
+    } else {
+      startLiveChatHandover(visitorName, visitorPhone, summary, matchedProducts);
+    }
+  };
+
+  // Fungsi Kirim Pesan Live ke Admin / CS
+  const handleSendLiveMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const content = liveInputMessage.trim();
+    if (!content || !clientChatId || sendingLiveMsg) return;
+
+    setLiveInputMessage("");
+    setSendingLiveMsg(true);
+
+    try {
+      const res = await fetch("/api/team-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "client_send_message",
+          chatId: clientChatId,
+          clientId,
+          clientName: visitorName || "Klien Web",
+          content,
+          type: "text",
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.message) {
+        setLiveMessages((prev) => [...prev, data.message]);
+      }
+    } catch (err) {
+      console.error("Gagal mengirim pesan live:", err);
+    } finally {
+      setSendingLiveMsg(false);
+    }
+  };
+
+  // Fungsi Melakukan Panggilan Suara / Video dari Klien
+  const handleInitiateClientCall = async (type: "audio" | "video") => {
+    if (!clientChatId) {
+      if (!visitorName || !visitorPhone) {
+        setShowHandoverModal(true);
+        return;
+      }
+      await startLiveChatHandover(visitorName, visitorPhone, "Panggilan langsung dari website", []);
+    }
+
+    try {
+      const res = await fetch("/api/team-chat/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "initiate",
+          callerId: clientId,
+          callerName: visitorName || "Klien Website",
+          receiverId: "all_admins",
+          receiverName: "Admin & CS DSTech",
+          callType: type,
+          chatId: clientChatId || undefined,
+          isClientCall: true,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.call) {
+        setActiveCall({
+          callId: data.call.id,
+          callType: type,
+          status: "calling",
+          roomCode: data.call.roomCode,
+        });
+      }
+    } catch (err) {
+      console.error("Gagal memulai panggilan:", err);
+      alert("Gagal melakukan panggilan ke Admin/CS.");
+    }
+  };
+
+  // Fungsi Mengakhiri Panggilan
+  const handleEndClientCall = async () => {
+    if (!activeCall) return;
+    try {
+      await fetch("/api/team-chat/call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "end",
+          callId: activeCall.callId,
+          duration: callTimer,
+        }),
+      });
+    } catch (err) {}
+    setActiveCall(null);
+  };
 
   // Simpan riwayat chat ke localStorage per portal
   const saveChatHistory = (newMsgs: ChatMessage[]) => {
@@ -507,60 +741,135 @@ export default function AIChatWidget() {
       {/* Main Chat Modal Box */}
       {isOpen && (
         <div className="relative w-[92vw] sm:w-[420px] h-[610px] max-h-[85vh] bg-white rounded-3xl shadow-2xl border border-slate-100 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-          {/* Header Widget */}
-          <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-5 py-4 flex items-center justify-between border-b border-white/10 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${portalConfig.avatarBg} flex items-center justify-center text-white shadow-md shadow-blue-500/20`}>
-                  <Bot className="w-6 h-6" />
+          {/* Header Widget: Mode Live Chat Admin/CS vs Mode AI Dani */}
+          {isLiveMode ? (
+            <div className="bg-gradient-to-r from-slate-950 via-emerald-950 to-slate-900 text-white px-4 py-3.5 flex items-center justify-between border-b border-emerald-500/30 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setIsLiveMode(false)}
+                  className="p-1.5 -ml-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer shrink-0"
+                  title="Kembali ke Asisten AI Dani"
+                >
+                  <ArrowLeft className="w-4 h-4 text-emerald-400" />
+                </button>
+                <div className="relative shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+                    <Headphones className="w-5 h-5" />
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 border-2 border-slate-900 rounded-full animate-pulse"></span>
                 </div>
-                <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-black text-sm text-white tracking-wide">{portalConfig.title}</h3>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${portalConfig.badgeColor}`}>
-                    {portalConfig.badge}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 flex items-center gap-1.5 flex-wrap">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span>{currentUser?.name ? `User: ${currentUser.name}` : "Online 24/7"} • DSTech</span>
-                  {visitorGeo?.city && (
-                    <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-md border border-emerald-400/30">
-                      📍 {visitorGeo.city}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="font-extrabold text-xs text-white truncate">Admin & CS DSTech</h3>
+                    <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 shrink-0">
+                      LIVE
                     </span>
-                  )}
-                </p>
+                  </div>
+                  <p className="text-[10px] text-slate-300 truncate">
+                    <span>{visitorName ? `Klien: ${visitorName}` : "Terhubung Langsung"}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Tombol Panggilan Suara & Panggilan Video ke Admin */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleInitiateClientCall("audio")}
+                  className="px-2.5 py-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 rounded-xl transition cursor-pointer flex items-center gap-1 text-[11px] font-bold shadow-sm"
+                  title="Mulai Panggilan Suara ke Admin/CS"
+                >
+                  <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Panggilan</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleInitiateClientCall("video")}
+                  className="px-2.5 py-1.5 bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 border border-cyan-500/40 rounded-xl transition cursor-pointer flex items-center gap-1 text-[11px] font-bold shadow-sm"
+                  title="Mulai Panggilan Video HD ke Admin/CS"
+                >
+                  <Video className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="hidden sm:inline">Video</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  title="Tutup Chat"
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition cursor-pointer"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </button>
               </div>
             </div>
+          ) : (
+            <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white px-5 py-4 flex items-center justify-between border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${portalConfig.avatarBg} flex items-center justify-center text-white shadow-md shadow-blue-500/20`}>
+                    <Bot className="w-6 h-6" />
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-sm text-white tracking-wide">{portalConfig.title}</h3>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${portalConfig.badgeColor}`}>
+                      {portalConfig.badge}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 flex items-center gap-1.5 flex-wrap">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span>{currentUser?.name ? `User: ${currentUser.name}` : "Online 24/7"} • DSTech</span>
+                    {visitorGeo?.city && (
+                      <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded-md border border-emerald-400/30">
+                        📍 {visitorGeo.city}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
 
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleResetChat}
-                title="Reset Percakapan"
-                className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsOpen(false)}
-                title="Tutup Chat"
-                className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer"
-              >
-                <ChevronDown className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                {clientChatId && (
+                  <button
+                    type="button"
+                    onClick={() => setIsLiveMode(true)}
+                    title="Beralih ke Live Chat Admin & CS"
+                    className="px-2 py-1 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <Headphones className="w-3 h-3" />
+                    <span>Live Admin</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleResetChat}
+                  title="Reset Percakapan"
+                  className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  title="Tutup Chat"
+                  className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer"
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Subheader Context Info */}
           <div className="bg-slate-100/90 border-b border-slate-200/60 px-4 py-2 flex items-center justify-between text-[11px] text-slate-700 shrink-0">
             <span className="flex items-center gap-1.5 font-medium">
               <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
               <span>
-                {portalConfig.portalType === "SUPERADMIN" || portalConfig.portalType === "ADMIN"
+                {isLiveMode
+                  ? "💬 Terhubung Langsung ke Tim Admin & Customer Service DSTech Smart Perkasa"
+                  : portalConfig.portalType === "SUPERADMIN" || portalConfig.portalType === "ADMIN"
                   ? "⚡ Copilot Aktif: Panduan pengoperasian modul ERP & tata cara input data"
                   : portalConfig.portalType === "EMPLOYEE"
                   ? "🛠️ Mode Lapangan: Panduan presensi GPS, ambil material & SOP teknisi"
@@ -571,10 +880,126 @@ export default function AIChatWidget() {
             </span>
           </div>
 
-          {/* Messages Body */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-            {messages.map((m) => {
-              const isAi = m.sender === "ai";
+          {/* Messages Body: Live Mode vs AI Mode */}
+          {isLiveMode ? (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+              {liveMessages.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 space-y-2">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-2 shadow-sm">
+                    <Headphones className="w-6 h-6" />
+                  </div>
+                  <h4 className="font-extrabold text-sm text-slate-900">Ruang Obrolan Terbuka</h4>
+                  <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                    Pesan Anda terhubung langsung ke Tim Admin & CS DSTech. Tuliskan pesan Anda di bawah atau gunakan tombol Panggilan Suara / Video di atas.
+                  </p>
+                </div>
+              ) : (
+                liveMessages.map((msg: any) => {
+                  const isClient = msg.senderRole === "CLIENT" || msg.senderId === clientId;
+                  return (
+                    <div key={msg.id} className={`flex flex-col ${isClient ? "items-end" : "items-start"}`}>
+                      <div className={`flex items-start gap-2 max-w-[88%] ${isClient ? "flex-row-reverse" : "flex-row"}`}>
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-bold ${
+                          isClient ? "bg-emerald-600 text-white shadow-sm" : "bg-slate-900 text-white"
+                        }`}>
+                          {isClient ? <User className="w-4 h-4" /> : <Headphones className="w-4 h-4 text-emerald-400" />}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {!isClient && (
+                            <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1 ml-1">
+                              <span>{msg.senderName || "Admin & CS DSTech"}</span>
+                              <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 font-mono font-bold">TIM RESMI</span>
+                            </span>
+                          )}
+
+                          <div className={`p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-sm whitespace-pre-line ${
+                            isClient 
+                              ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-tr-xs font-medium" 
+                              : "bg-white text-slate-800 border border-slate-200 rounded-tl-xs"
+                          }`}>
+                            {msg.content}
+                          </div>
+
+                          {/* Render Kartu Produk jika Admin melampirkan Produk */}
+                          {msg.type === "product" && msg.productData && (
+                            <div className="p-3 bg-white border border-amber-400/50 rounded-2xl shadow-sm text-left max-w-xs space-y-2">
+                              <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                                <span className="text-[10px] font-bold text-amber-700 flex items-center gap-1 uppercase">
+                                  <ShoppingBag className="w-3.5 h-3.5" /> Produk Rekomendasi
+                                </span>
+                                <span className="text-[9px] px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded font-bold">
+                                  {msg.productData.category}
+                                </span>
+                              </div>
+                              <div className="flex items-start gap-2.5">
+                                {msg.productData.image && (
+                                  <div className="relative w-14 h-14 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0">
+                                    <Image
+                                      src={msg.productData.image}
+                                      alt={msg.productData.name}
+                                      fill
+                                      className="object-cover"
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <h5 className="font-bold text-slate-900 text-xs line-clamp-2">
+                                    {msg.productData.name}
+                                  </h5>
+                                  <p className="text-xs font-mono font-extrabold text-dstech-blue mt-0.5">
+                                    {typeof msg.productData.price === "number"
+                                      ? `Rp ${msg.productData.price.toLocaleString("id-ID")}`
+                                      : msg.productData.price}
+                                  </p>
+                                </div>
+                              </div>
+                              <a
+                                href={`/shop?search=${encodeURIComponent(msg.productData.name)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs rounded-xl flex items-center justify-center gap-1 shadow-xs transition cursor-pointer"
+                              >
+                                <span>Lihat Detail / Beli</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+
+                          {/* Render Log Panggilan jika ada */}
+                          {msg.type === "call_log" && msg.callData && (
+                            <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 text-xs flex items-center gap-2">
+                              {msg.callData.callType === "video" ? (
+                                <Video className="w-4 h-4 text-cyan-600" />
+                              ) : (
+                                <Phone className="w-4 h-4 text-emerald-600" />
+                              )}
+                              <span className="font-bold">
+                                {msg.callData.callType === "video" ? "Panggilan Video" : "Panggilan Suara"} ({msg.callData.status === "completed" ? "Selesai" : "Tak Terjawab"})
+                              </span>
+                              {msg.callData.duration ? (
+                                <span className="text-[10px] text-slate-500">
+                                  {Math.floor(msg.callData.duration / 60)}m {msg.callData.duration % 60}s
+                                </span>
+                              ) : null}
+                            </div>
+                          )}
+
+                          <span className="block text-[10px] text-slate-400">
+                            {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+              <div ref={liveMessagesEndRef} />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
+              {messages.map((m) => {
+                const isAi = m.sender === "ai";
               return (
                 <div key={m.id} className={`flex flex-col ${isAi ? "items-start" : "items-end"}`}>
                   <div className={`flex items-start gap-2 max-w-[88%] ${isAi ? "flex-row" : "flex-row-reverse"}`}>
@@ -649,15 +1074,48 @@ export default function AIChatWidget() {
                             </p>
                           </div>
 
-                          <a
-                            href={m.whatsappUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 active:scale-98 transition-all cursor-pointer"
-                          >
-                            <PhoneCall className="w-4 h-4" />
-                            <span>Lanjutkan ke WhatsApp {m.department === "TECHNICAL" ? "Tim Teknisi" : m.department === "COMPLAINT" ? "Tim Komplain" : "Tim Sales"}</span>
-                          </a>
+                          {/* Tombol Utama: Live Chat Terkoneksi ke Aplikasi Pesan Admin & CS */}
+                          <div className="space-y-1.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleTriggerHandover(m.handoverSummary, m.matchedProducts)}
+                              className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-700 hover:to-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-600/30 active:scale-98 transition-all cursor-pointer"
+                            >
+                              <MessageSquare className="w-4 h-4 text-emerald-300" />
+                              <span>Hubungkan ke Tim Admin / CS Langsung</span>
+                            </button>
+
+                            {/* Tombol Panggilan Cepat: Suara & Video */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleInitiateClientCall("audio")}
+                                className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-emerald-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-98 transition cursor-pointer"
+                              >
+                                <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>Panggilan Suara</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleInitiateClientCall("video")}
+                                className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-400 border border-cyan-500/30 text-[11px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-98 transition cursor-pointer"
+                              >
+                                <Video className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>Panggilan Video</span>
+                              </button>
+                            </div>
+
+                            {/* Opsi Cadangan WhatsApp Eksternal */}
+                            <a
+                              href={m.whatsappUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full py-1.5 px-3 rounded-lg text-slate-500 hover:text-emerald-700 text-[10px] font-semibold flex items-center justify-center gap-1 transition"
+                            >
+                              <PhoneCall className="w-3 h-3 text-emerald-600" />
+                              <span>Atau hubungi via WhatsApp eksternal ↗</span>
+                            </a>
+                          </div>
                         </div>
                       )}
 
@@ -703,47 +1161,206 @@ export default function AIChatWidget() {
 
             <div ref={messagesEndRef} />
           </div>
+          )}
 
-          {/* Quick Department / Portal Shortcuts Bar */}
-          <div className="px-3 py-2 bg-slate-100/90 border-t border-slate-200/60 flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Pilihan Cepat:</span>
-            {portalConfig.quickReplies.map((qr, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleSendMessage(qr)}
-                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:text-dstech-blue text-slate-700 font-bold shrink-0 transition-all cursor-pointer whitespace-nowrap"
-              >
-                {qr}
-              </button>
-            ))}
-          </div>
+          {/* Quick Department / Portal Shortcuts Bar (Hanya pada mode AI) */}
+          {!isLiveMode && (
+            <div className="px-3 py-2 bg-slate-100/90 border-t border-slate-200/60 flex items-center gap-1.5 overflow-x-auto text-[11px] shrink-0">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Pilihan Cepat:</span>
+              {portalConfig.quickReplies.map((qr, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleSendMessage(qr)}
+                  className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:bg-blue-50 hover:text-dstech-blue text-slate-700 font-bold shrink-0 transition-all cursor-pointer whitespace-nowrap"
+                >
+                  {qr}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Chat Input Bar */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendMessage();
-            }}
-            className="p-3 bg-white border-t border-slate-100 flex items-center gap-2 shrink-0"
-          >
-            <input
-              type="text"
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              placeholder={portalConfig.placeholder}
-              disabled={loading}
-              className="flex-1 px-4 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:border-dstech-blue text-slate-900 disabled:opacity-50"
-            />
-            <button
-              type="submit"
-              disabled={!inputMessage.trim() || loading}
-              className="p-2.5 rounded-2xl bg-dstech-blue hover:bg-blue-700 active:scale-95 text-white disabled:opacity-40 disabled:pointer-events-none transition-all shadow-md shadow-blue-600/20 cursor-pointer"
-              aria-label="Kirim Pesan"
+          {isLiveMode ? (
+            <form
+              onSubmit={handleSendLiveMessage}
+              className="p-3 bg-white border-t border-slate-100 flex items-center gap-2 shrink-0"
             >
-              <Send className="w-4 h-4" />
-            </button>
-          </form>
+              <input
+                type="text"
+                value={liveInputMessage}
+                onChange={(e) => setLiveInputMessage(e.target.value)}
+                placeholder="Ketik pesan Anda ke Admin / CS..."
+                disabled={sendingLiveMsg}
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-slate-900 disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={!liveInputMessage.trim() || sendingLiveMsg}
+                className="p-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white disabled:opacity-40 disabled:pointer-events-none transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
+                aria-label="Kirim Pesan Live"
+              >
+                {sendingLiveMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              </button>
+            </form>
+          ) : (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendMessage();
+              }}
+              className="p-3 bg-white border-t border-slate-100 flex items-center gap-2 shrink-0"
+            >
+              <input
+                type="text"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                placeholder={portalConfig.placeholder}
+                disabled={loading}
+                className="flex-1 px-4 py-2.5 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-dstech-blue/30 focus:border-dstech-blue text-slate-900 disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={!inputMessage.trim() || loading}
+                className="p-2.5 rounded-2xl bg-dstech-blue hover:bg-blue-700 active:scale-95 text-white disabled:opacity-40 disabled:pointer-events-none transition-all shadow-md shadow-blue-600/20 cursor-pointer"
+                aria-label="Kirim Pesan"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </form>
+          )}
+
+          {/* OVERLAY LAYAR PANGGILAN AUDIO / VIDEO AKTIF */}
+          {activeCall && (
+            <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-between p-6 animate-in fade-in zoom-in-95 duration-200">
+              <div className="w-full flex justify-end">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                  {activeCall.status === "connected" ? "TERHUBUNG" : "MEMANGGIL..."}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-2xl border-4 border-white/20">
+                    {activeCall.callType === "video" ? (
+                      <Video className="w-10 h-10 text-white" />
+                    ) : (
+                      <Phone className="w-10 h-10 text-white" />
+                    )}
+                  </div>
+                  {activeCall.status === "calling" && (
+                    <span className="absolute -inset-2 rounded-full bg-emerald-500/30 animate-ping"></span>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="text-base font-extrabold text-white">Admin & Customer Service DSTech</h4>
+                  <p className="text-xs text-slate-400 mt-1">
+                    {activeCall.callType === "video" ? "Panggilan Video HD" : "Panggilan Suara Langsung"}
+                  </p>
+                  <p className="text-sm font-mono font-bold text-emerald-400 mt-2">
+                    {activeCall.status === "connected"
+                      ? `${Math.floor(callTimer / 60)}:${callTimer % 60 < 10 ? "0" : ""}${callTimer % 60}`
+                      : "HP Admin & CS Berdering..."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={handleEndClientCall}
+                  className="px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-full shadow-lg shadow-rose-600/40 flex items-center gap-2 active:scale-95 transition cursor-pointer"
+                >
+                  <PhoneOff className="w-4 h-4" />
+                  <span>Akhiri Panggilan</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL HANDOVER DATA KLIEN (Nama & No. WhatsApp) */}
+          {showHandoverModal && (
+            <div className="absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+              <div className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-2xl space-y-4 border border-slate-100">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                      <Headphones className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-xs text-slate-900">Hubungkan ke Admin / CS</h4>
+                      <p className="text-[10px] text-slate-500">Lengkapi kontak untuk mulai obrolan</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowHandoverModal(false)}
+                    className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (visitorName.trim() && visitorPhone.trim()) {
+                      localStorage.setItem("dstech_ai_client_name", visitorName);
+                      localStorage.setItem("dstech_ai_client_phone", visitorPhone);
+                      startLiveChatHandover(visitorName, visitorPhone);
+                    }
+                  }}
+                  className="space-y-3 text-xs"
+                >
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Nama Lengkap Anda
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={visitorName}
+                      onChange={(e) => setVisitorName(e.target.value)}
+                      placeholder="Contoh: Bpk. Hendra Wijaya"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      No. WhatsApp / Telepon
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={visitorPhone}
+                      onChange={(e) => setVisitorPhone(e.target.value)}
+                      placeholder="Contoh: 08123456789"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="pt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowHandoverModal(false)}
+                      className="flex-1 py-2 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading || !visitorName.trim() || !visitorPhone.trim()}
+                      className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition flex items-center justify-center gap-1 shadow-md shadow-emerald-600/20"
+                    >
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Mulai Obrolan</span>}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -8,6 +8,7 @@ const USERS_FILE = path.join(process.cwd(), "src", "data", "dstech_users.json");
 const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
 const TASKS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_tasks.json");
 const REPORTS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_daily_reports.json");
+const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
 
 function readJsonSafe(filePath: string, fallback: any) {
   try {
@@ -170,16 +171,29 @@ export async function GET(request: Request) {
       console.warn("Sync project chats notice:", e);
     }
 
-    // Filter ketat hak akses: Jika bukan Admin/Superadmin, HANYA tampilkan obrolan di mana user menjadi peserta resmi
+    // Filter ketat hak akses: Jika bukan Admin/Superadmin/CS, HANYA tampilkan obrolan di mana user menjadi peserta resmi
     const requestUser = users.find((u: any) => u.id === userId);
-    const isAdmin = requestUser?.role === "ADMIN" || requestUser?.role === "SUPERADMIN";
+    const isAdminOrCS = requestUser?.role === "ADMIN" || requestUser?.role === "SUPERADMIN" || requestUser?.role === "CS";
 
     let visibleChats = chats;
-    if (userId && !isAdmin) {
-      visibleChats = chats.filter((c: any) => Array.isArray(c.participants) && c.participants.includes(userId));
+    if (userId && !isAdminOrCS) {
+      // User non-Admin/CS HANYA bisa melihat obrolan di mana dia peserta DAN BUKAN chat klien!
+      visibleChats = chats.filter((c: any) => !c.isClientChat && Array.isArray(c.participants) && c.participants.includes(userId));
+    } else if (!isAdminOrCS) {
+      // Jika request tanpa userId dan bukan Admin/CS, sembunyikan semua obrolan klien
+      visibleChats = chats.filter((c: any) => !c.isClientChat);
     }
 
     const userChats = visibleChats.map((c: any) => {
+      // Jika chat klien website
+      if (c.isClientChat) {
+        return {
+          ...c,
+          isOnline: true,
+          badgeLabel: "Klien Web",
+        };
+      }
+
       // Jika DM (bukan grup), berikan nama lawan bicara
       if (!c.isGroup && userId) {
         const otherParticipantId = c.participants.find((p: string) => p !== userId) || c.participants[0];
@@ -215,21 +229,71 @@ export async function GET(request: Request) {
     if (!chatId) {
       return NextResponse.json({ success: false, error: "chatId wajib disertakan" }, { status: 400 });
     }
+    const chats = readJsonSafe(CHATS_FILE, []);
+    const users = readJsonSafe(USERS_FILE, []);
+    const targetChat = chats.find((c: any) => c.id === chatId);
+    const requestUser = users.find((u: any) => u.id === userId);
+    const isAdminOrCS = requestUser?.role === "ADMIN" || requestUser?.role === "SUPERADMIN" || requestUser?.role === "CS";
+
+    // KERAHASIAAN KETAT: Percakapan dengan klien TERKUNCI khusus Admin & CS
+    if (targetChat?.isClientChat && !isAdminOrCS) {
+      return NextResponse.json({
+        success: false,
+        error: "Akses Ditolak: Percakapan dengan klien terkunci dan hanya dapat diakses oleh Admin & Customer Service.",
+      }, { status: 403 });
+    }
+
     const messages = readJsonSafe(MESSAGES_FILE, []);
     const chatMessages = messages.filter((m: any) => m.chatId === chatId);
 
     return NextResponse.json({
       success: true,
       messages: chatMessages,
+      chat: targetChat || null,
     });
   }
 
-  // 2b. Ambil pesan terbaru (Polling background service Android)
+  // 2b. Ambil pesan chat klien (Publik dari widget website tanpa login internal)
+  if (action === "client_messages") {
+    if (!chatId) {
+      return NextResponse.json({ success: false, error: "chatId wajib disertakan" }, { status: 400 });
+    }
+    const messages = readJsonSafe(MESSAGES_FILE, []);
+    const chats = readJsonSafe(CHATS_FILE, []);
+    const chatMessages = messages.filter((m: any) => m.chatId === chatId);
+    const activeChat = chats.find((c: any) => c.id === chatId);
+
+    return NextResponse.json(
+      {
+        success: true,
+        messages: chatMessages,
+        chat: activeChat || null,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          Pragma: "no-cache",
+        },
+      }
+    );
+  }
+
+  // 2c. Ambil pesan terbaru (Polling background service Android)
   if (action === "recent_messages" || action === "all_messages") {
     const allMessages = readJsonSafe(MESSAGES_FILE, []);
     const allChats = readJsonSafe(CHATS_FILE, []);
+    const users = readJsonSafe(USERS_FILE, []);
+    const requestUser = users.find((u: any) => u.id === userId);
+    const isAdminOrCS = requestUser?.role === "ADMIN" || requestUser?.role === "SUPERADMIN" || requestUser?.role === "CS";
+
     const myChatIds = allChats
-      .filter((c: any) => !userId || (Array.isArray(c.participants) && c.participants.includes(userId)))
+      .filter((c: any) => {
+        // Obrolan klien HANYA memicu notifikasi ke Admin & CS
+        if (c.isClientChat) {
+          return isAdminOrCS;
+        }
+        return !userId || (Array.isArray(c.participants) && c.participants.includes(userId));
+      })
       .map((c: any) => c.id);
     const userMessages = allMessages.filter((m: any) => myChatIds.includes(m.chatId));
 
@@ -240,7 +304,7 @@ export async function GET(request: Request) {
         data: userMessages.slice(-20),
         totalCount: userMessages.length,
         latestMessageId: latestMsg?.id || null,
-        latestMessageTime: latestMsg?.createdAt || null,
+        latestMessageTime: latestMsg?.createdAt || latestMsg?.timestamp || null,
       },
       {
         headers: {
@@ -408,6 +472,34 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: reports.slice(0, 50), projectInfo });
     }
 
+    // 4. Lampirkan Produk Master DStech Smart
+    if (dataType === "products") {
+      const productsData = readJsonSafe(PRODUCTS_FILE, []);
+      let products = productsData.map((p: any) => ({
+        id: p.id,
+        name: p.name || "Produk DSTech",
+        category: p.category || "General",
+        price: p.price || 0,
+        originalPrice: p.originalPrice || 0,
+        isPromo: !!p.isPromo,
+        promoTag: p.promoTag || "",
+        stock: p.stock ?? 0,
+        unit: p.unit || "Unit",
+        image: p.image || "/service-software.png",
+        desc: p.desc || "",
+      }));
+
+      if (query) {
+        products = products.filter(
+          (p: any) =>
+            p.name.toLowerCase().includes(query) ||
+            p.category.toLowerCase().includes(query) ||
+            p.desc.toLowerCase().includes(query)
+        );
+      }
+      return NextResponse.json({ success: true, data: products.slice(0, 50), projectInfo });
+    }
+
     return NextResponse.json({ success: false, error: "Tipe data perusahaan tidak valid" }, { status: 400 });
   }
 
@@ -420,7 +512,135 @@ export async function POST(request: Request) {
     const body = await request.json();
     const action = body.action || "send_message";
 
-    // 1. Kirim Pesan
+    // 0. Handover dari AI Dani Chat Asisten ke Tim Admin / CS
+    if (action === "client_handover") {
+      const { clientId, clientName, clientPhone, summary, initialMessage, matchedProducts } = body;
+      const chats = readJsonSafe(CHATS_FILE, []);
+      const messages = readJsonSafe(MESSAGES_FILE, []);
+      const users = readJsonSafe(USERS_FILE, []);
+
+      // Admin & CS yang akan menerima percakapan
+      let adminIds = users
+        .filter((u: any) => u.role === "ADMIN" || u.role === "SUPERADMIN" || u.role === "CS")
+        .map((u: any) => u.id);
+      if (adminIds.length === 0) adminIds = ["dstech_usr_1", "dstech_usr_2"];
+
+      const resolvedClientId = clientId || `client_${Date.now()}`;
+      const resolvedChatId = `dstech_chat_client_${resolvedClientId}`;
+      let existingChatIndex = chats.findIndex((c: any) => c.id === resolvedChatId || (c.isClientChat && c.clientId === resolvedClientId));
+
+      const chatTitle = clientName ? `Klien: ${clientName}` : "Klien Web Pengunjung";
+
+      let chatObj: any;
+      if (existingChatIndex === -1) {
+        chatObj = {
+          id: resolvedChatId,
+          clientId: resolvedClientId,
+          name: chatTitle,
+          isGroup: false,
+          isClientChat: true,
+          clientName: clientName || "Pengunjung Website",
+          clientPhone: clientPhone || "-",
+          participants: [...adminIds, resolvedClientId],
+          allowedRoles: ["ADMIN", "SUPERADMIN", "CS"],
+          description: `Jalur obrolan klien website resmi. Kebutuhan: ${summary || "Konsultasi produk & layanan DSTech Smart"}`,
+          lastMessage: initialMessage || `Klien ${clientName || ""} meminta terhubung ke tim Admin/CS.`,
+          lastMessageTime: new Date().toISOString(),
+          unreadCount: 1,
+        };
+        chats.unshift(chatObj);
+      } else {
+        chatObj = chats[existingChatIndex];
+        chatObj.name = chatTitle;
+        if (clientName) chatObj.clientName = clientName;
+        if (clientPhone) chatObj.clientPhone = clientPhone;
+        chatObj.lastMessageTime = new Date().toISOString();
+      }
+      writeJsonSafe(CHATS_FILE, chats);
+
+      // Buat pesan ringkasan awal jika pesan masih kosong
+      const existingMsgs = messages.filter((m: any) => m.chatId === chatObj.id);
+      if (existingMsgs.length === 0) {
+        const summaryContent = `🔔 **Permintaan Handover Klien ke Admin & CS**\n\n👤 **Klien**: ${clientName || "Pengunjung Web"}\n📞 **No. WhatsApp**: ${clientPhone || "Belum diisi"}\n📝 **Kebutuhan**: ${summary || initialMessage || "Konsultasi produk & solusi sistem"}`;
+        
+        const introMsg = {
+          id: `dstech_msg_${Date.now()}_intro`,
+          chatId: chatObj.id,
+          senderId: resolvedClientId,
+          senderName: clientName || "Klien Web",
+          senderRole: "CLIENT",
+          type: "text",
+          content: summaryContent,
+          timestamp: new Date().toISOString(),
+          readBy: [resolvedClientId],
+        };
+        messages.push(introMsg);
+
+        // Jika ada produk yang direkomendasikan AI Dani, lampirkan kartu produk otomatis
+        if (Array.isArray(matchedProducts) && matchedProducts.length > 0) {
+          for (const prod of matchedProducts.slice(0, 3)) {
+            messages.push({
+              id: `dstech_msg_${Date.now()}_prod_${prod.id || Math.random()}`,
+              chatId: chatObj.id,
+              senderId: resolvedClientId,
+              senderName: "Asisten AI Dani",
+              senderRole: "AI",
+              type: "product",
+              content: `📦 [Produk Diminati] ${prod.name} (${typeof prod.price === "number" ? `Rp ${prod.price.toLocaleString("id-ID")}` : prod.price})`,
+              productData: prod,
+              timestamp: new Date().toISOString(),
+              readBy: [resolvedClientId],
+            });
+          }
+        }
+
+        writeJsonSafe(MESSAGES_FILE, messages);
+      }
+
+      return NextResponse.json({
+        success: true,
+        chat: chatObj,
+        chatId: chatObj.id,
+        clientId: resolvedClientId,
+      });
+    }
+
+    // 0b. Klien publik mengirim pesan langsung ke Admin/CS dari widget website
+    if (action === "client_send_message") {
+      const { chatId, clientId, clientName, content, type = "text" } = body;
+      if (!chatId || !content) {
+        return NextResponse.json({ success: false, error: "Parameter tidak lengkap" }, { status: 400 });
+      }
+
+      const messages = readJsonSafe(MESSAGES_FILE, []);
+      const chats = readJsonSafe(CHATS_FILE, []);
+
+      const newMsg = {
+        id: `dstech_msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        chatId,
+        senderId: clientId || "client_web",
+        senderName: clientName || "Klien Web",
+        senderRole: "CLIENT",
+        type,
+        content,
+        timestamp: new Date().toISOString(),
+        readBy: [clientId || "client_web"],
+      };
+
+      messages.push(newMsg);
+      writeJsonSafe(MESSAGES_FILE, messages);
+
+      const chatIndex = chats.findIndex((c: any) => c.id === chatId);
+      if (chatIndex !== -1) {
+        chats[chatIndex].lastMessage = content;
+        chats[chatIndex].lastMessageTime = newMsg.timestamp;
+        writeJsonSafe(CHATS_FILE, chats);
+      }
+
+      return NextResponse.json({ success: true, message: newMsg });
+    }
+
+    // 1. Kirim Pesan Internal
     if (action === "send_message") {
       const {
         chatId,
@@ -434,10 +654,11 @@ export async function POST(request: Request) {
         taskData,
         reportData,
         projectData,
+        productData,
         callData,
       } = body;
 
-      if (!chatId || !senderId || (!content && !mediaUrl && !invoiceData && !taskData && !reportData && !projectData && !callData)) {
+      if (!chatId || !senderId || (!content && !mediaUrl && !invoiceData && !taskData && !reportData && !projectData && !productData && !callData)) {
         return NextResponse.json({ success: false, error: "Parameter pesan tidak lengkap" }, { status: 400 });
       }
 
@@ -458,6 +679,7 @@ export async function POST(request: Request) {
         taskData: taskData || undefined,
         reportData: reportData || undefined,
         projectData: projectData || undefined,
+        productData: productData || undefined,
         callData: callData || undefined,
         timestamp: new Date().toISOString(),
         readBy: [senderId],
@@ -472,6 +694,7 @@ export async function POST(request: Request) {
       else if (type === "task") lastPreview = `📋 [SPK Penugasan] ${taskData?.title || ""}`;
       else if (type === "project_info") lastPreview = `📁 [Info Proyek] ${projectData?.projectName || ""}`;
       else if (type === "daily_report") lastPreview = `📸 [Bukti Pekerjaan] ${reportData?.taskTitle || ""}`;
+      else if (type === "product") lastPreview = `📦 [Produk] ${productData?.name || "Katalog Produk"}`;
       else if (type === "image") lastPreview = "📷 [Foto]";
       else if (type === "video") lastPreview = "📹 [Video]";
       else if (type === "call_log") lastPreview = `📞 [${callData?.callType === "video" ? "Panggilan Video" : "Panggilan Suara"}]`;

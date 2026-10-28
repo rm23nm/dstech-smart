@@ -49,7 +49,12 @@ export async function GET(request: Request) {
   if (userId) {
     incomingCall = calls.find(
       (c: any) =>
-        (c.receiverId === userId || !c.receiverId || (c.receiverName && c.receiverName.toLowerCase() === userId.toLowerCase())) &&
+        (c.receiverId === userId || 
+         !c.receiverId || 
+         c.receiverId === "all_admins" || 
+         c.receiverId === "admin_cs" || 
+         c.isClientCall ||
+         (c.receiverName && c.receiverName.toLowerCase() === userId.toLowerCase())) &&
         (c.status === "calling" || c.status === "RINGING") &&
         now - new Date(c.startedAt).getTime() < 45000
     );
@@ -122,6 +127,7 @@ export async function POST(request: Request) {
         callType: callType === "video" ? "video" : "audio",
         roomCode,
         chatId: chatId || null,
+        isClientCall: !!body.isClientCall,
         status: "calling",
         startedAt: new Date().toISOString(),
       };
