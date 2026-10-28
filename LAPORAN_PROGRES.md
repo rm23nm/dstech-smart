@@ -7,6 +7,34 @@
 - **Status**: SEMUA ANTRIAN SELESAI (Idle / Menunggu Permintaan Baru)
 - Tidak ada tugas aktif yang tertunda.
 
+- **2026-10-28**: [SELESAI] Perbaikan Scroll Kembali ke Atas Macet di Android WebView & Penyimpanan Data Laporan Dokumentasi (Tugas 274) (`MainActivity.kt`, `src/app/api/finance/print/route.ts`, `src/app/employee/page.tsx`, `src/app/api/employee/tasks/route.ts`, & Android APK).
+  *Permintaan User*: "terkait perbaikan sebelumnya jika sudah dikursor kebawah kembali lagi ketas masih belum bisa. kemudian saat saya update data laporan dokumentasi saya save, namun tidak tersimpan."
+  *Penyebab Masalah yang Ditemukan*:
+  1. **Scroll Ke Atas Macet di Mobile**: `SwipeRefreshLayout` di `MainActivity.kt` mencegat touch event drag down (arah bawah) saat user berada di bawah dan ingin scroll kembali ke atas. Karena halaman web modern menggunakan kontainer internal (`overflow-y: auto`), `scrollY` native WebView bernilai 0 sehingga `SwipeRefreshLayout` selalu menduga user ada di puncak dan membajak gesture sentuhan scroll ke atas.
+  2. **Data Laporan Dokumentasi Tidak Muncul / Tidak Tersimpan**:
+     - Pada `src/app/api/finance/print/route.ts` (Laporan Foto Dokumentasi), kode menampilkan `${photo.title}` dan `${photo.description}`, padahal form finance dan employee menyimpan foto dengan properti `photo.caption`. Akibatnya keterangan dokumentasi yang di-save selalu hilang di tampilan cetak resmi A4 dan ter-reset ke label default.
+     - Pada `src/app/employee/page.tsx`, re-fetch `fetch("/api/employee/tasks")` setelah simpan tidak memiliki `cache: "no-store"` atau query time-stamp `?t=${Date.now()}`, sehingga WebView Android membaca cache HTTP statis lama yang membuat data tampak tidak tersimpan.
+     - Pada `src/app/api/employee/tasks/route.ts`, route `GET` belum menyertakan header proteksi `Cache-Control: no-store, no-cache`, dan saat `PUT` untuk tugas proyek, `isProject` dan `projectId` belum secara otomatis dideteksi dari database proyek.
+  *Penyelesaian & Hasil*:
+  1. **Bebaskan Sentuhan Scroll WebView 100% (`MainActivity.kt`)**:
+     - Di `setupSwipeRefresh()`, `swipeRefreshLayout.isEnabled = false` dinonaktifkan pull gesture-nya dan dipasang `setOnChildScrollUpCallback { _, _ -> true }`.
+     - WebView native Android kini memiliki kendali 100% atas semua gesture scroll sentuhan (naik, turun, di dalam modal formulir, maupun di dokumen panjang) tanpa ada pembajakan gesture oleh SwipeRefreshLayout.
+  2. **Perbaikan Render Keterangan Foto Dokumentasi A4 (`src/app/api/finance/print/route.ts`)**:
+     - Kode render foto kini membaca `photo.caption || photo.title || 'Foto Dokumentasi ' + (idx + 1)` dan `photo.description || photo.notes || photo.caption || '-'`.
+     - Keterangan dan nama foto dokumentasi yang disimpan teknisi atau admin langsung muncul secara tepat di lembar cetak A4 resmi lampiran faktur dan berita acara.
+  3. **Auto-Detect Project & Persistensi Dua Arah (`src/app/api/employee/tasks/route.ts`)**:
+     - Endpoint `PUT` kini otomatis memeriksa apakah penugasan yang di-update cocok dengan proyek di `dstech_finance_erp.json` (berdasarkan `id`, `projectId`, atau `projectCode`). Jika ya, otomatis melengkapi `isProject: true` dan `projectId`, serta menyinkronkan pembaruan `photos`, `report`, `status`, dan `completionDate` langsung ke `dstech_finance_erp.json` DAN ke `dstech_employee_tasks.json`.
+     - Endpoint `GET` dan `PUT` kini mengirim header `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0` sehingga browser mobile tidak pernah me-render data kadaluarsa.
+  4. **Pembaruan Payload & Cache-Busting di Portal Karyawan (`src/app/employee/page.tsx`)**:
+     - Form `handleUpdateTaskStatus` kini menyertakan `projectId` dan `isProject` secara eksplisit pada payload.
+     - Seluruh pemanggilan `fetch("/api/employee/tasks")` kini menggunakan query time-stamp `?t=${Date.now()}` dan header `{ "Cache-Control": "no-cache", cache: "no-store" }` sehingga data laporan dan foto yang baru disimpan langsung tampil secara instan.
+  5. **Pengujian & Kompilasi APK**:
+     - `npx tsc --noEmit`: **0 error**.
+     - Build APK Android Debug (`build_android.bat assembleDebug`): **BUILD SUCCESSFUL in 35s** (ukuran 5.98 MB).
+     - File APK baru disalin ke `dstech-smart/public/dstech-smart-app.apk`.
+     - Git push commit `fedfd6c` dan deploy live ke VPS sukses (`dstech-main` online PID 2094490).
+
+
 - **2026-10-28**: [SELESAI] Perbaikan Panggilan Masuk Tidak Muncul / Tidak Berdering Saat Aplikasi HP Tertutup (Tugas 273) (`DStechNotificationService.kt`, `GlobalCallListener.tsx`, `api/team-chat/call/route.ts`, & Android APK).
   *Permintaan User*: "sekarang aplikasinya malah jika memanggil tidak masuk kalau posisi tertutup, namun posisi aplikasi terbuka di HP baru masuk panggilan dan suara notifnya."
   *Penyebab Masalah yang Ditemukan*:
