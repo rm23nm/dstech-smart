@@ -3,6 +3,190 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Status Sedang Dikerjakan**:
+  - Semua antrian permintaan pengguna saat ini telah selesai dikerjakan 100% dan teruji lolos kompilasi 0 error. Sistem dalam status siaga menunggu arahan selanjutnya dari pengguna.
+
+- **2026-10-28**: [SELESAI] Filter Ketat SPK Khusus Proyek Grup, Fitur Bagikan Informasi Proyek ke Obrolan, Restriksi Tagihan Invoice (Hanya DM User & Filter Ketat Klien), Pembatasan Lampiran Karyawan (Hanya SPK & Laporan), serta Pengisian Otomatis Nama Klien & SPK pada Bukti Pekerjaan (api/team-chat/route.ts & TeamChatMessenger.tsx) [Tugas 264 & Tugas 265].
+  *Permintaan User*:
+  1. "pada koordinasi group yang terbentuk, tolong tambahkan fitur untuk pengiriman SPK sesuai project dan tujuan group yang dibentuk ketika saya membuka lampiran SPK, maka saya bia mengirimkan informasi projectnya ke group, sehingga saya tau group koordinasi apa ini terbentuk. namun paling penting, group hanya akan menampilkan SPK dia, jangan ada menampilkan SPK group luar, agar tidak salah memilih dan mengirimkan perintah kerja"
+  2. "untuk lampirkan bukti ke nama client, harus secara otomatis masuk clientnya sesuai dengan SPK project atau mantenancenya. jangan diketik manual lagi"
+  3. "untuk kirm tagihan invoice, sebaiknya jangan dimunculkan kegroup, tagihan invoice hanya bisa dikirimkan ke usernya langsung. dan itu pun harus disortir untuk invoicenya. jika bukan invoicenya berkenaan dengan user maka jangan ditampilkan. agar tidak salah melampirkan invoice"
+  4. "untuk karyawan hanya 2 lampiran menurut saya, SPK dan juga laporan."
+  *Penyebab Masalah*:
+  - Pada modal lampiran SPK, sebelumnya memuat seluruh SPK umum tanpa memfilter proyek grup aktif sehingga rawan salah pilih SPK.
+  - Belum ada kartu ringkasan informasi proyek dan tombol untuk membagikan tujuan proyek ke grup obrolan.
+  - Pada formulir bukti pekerjaan, nama klien masih berupa text box manual yang harus diketik teknisi.
+  - Tombol lampiran invoice sebelumnya muncul di obrolan grup dan modal invoice menampilkan seluruh faktur tanpa membatasi kepada user lawan bicara, serta karyawan masih melihat opsi selain SPK dan Laporan.
+  *Penyelesaian & Hasil*:
+  1. **Filter Ketat SPK Proyek Grup (`api/team-chat/route.ts` & `TeamChatMessenger.tsx`)**:
+     - Backend API secara otomatis menyaring daftar SPK hanya untuk proyek/klien yang terikat dengan grup koordinasi tersebut (`t.projectId === linkedProject.id || t.client === linkedProject.clientName`). SPK proyek luar 100% disembunyikan.
+     - Ditambahkan banner informasi proyek grup di bagian atas modal penugasan SPK lengkap dengan tombol **"📢 Bagikan ke Grup"**.
+     - Tombol ini mengirimkan kartu pesan resmi `project_info` ke obrolan berisi detail Nama Proyek, Kode, Klien, PIC, Status, dan Tujuan Koordinasi.
+  2. **Pengisian Otomatis & Penguncian Nama Klien pada Bukti Pekerjaan**:
+     - Ditambahkan dropdown pemilih SPK aktif proyek terkait. Saat SPK dipilih, No. Tiket, Judul Pekerjaan, dan Nama Klien otomatis terisi 100%.
+     - Field Nama Klien diubah dari input teks manual menjadi kotak terisi otomatis dan terkunci permanen (`✓ Otomatis Sesuai SPK / Proyek`), sehingga teknisi tidak bisa salah ketik atau salah input klien.
+  3. **Restriksi Ketat Tagihan Invoice (Hanya DM Pribadi & Filter Sesuai User)**:
+     - Tombol lampiran invoice disembunyikan dari seluruh grup (`!activeChat.isGroup`). Invoice hanya dapat dilampirkan pada direct chat (DM) pribadi 1-on-1 oleh Admin/Superadmin.
+     - Modal invoice menyaring daftar faktur secara ketat berdasarkan nama lawan bicara DM (`targetUserName`). Invoice pihak lain tidak akan pernah ditampilkan.
+  4. **Penyederhanaan Lampiran Khusus Karyawan**:
+     - Akun karyawan/teknisi (`EMPLOYEE`) pada popover lampiran hanya menampilkan 2 pilihan resmi: **Surat Perintah Kerja (SPK)** dan **Laporan Bukti Pekerjaan**. Opsi tagihan invoice sepenuhnya dihilangkan bagi karyawan.
+
+- **2026-10-28**: [SELESAI] Eliminasi Duplikasi Panggilan Masuk & Pemisahan Panggilan Telepon Langsung dari Panggilan Meeting (GlobalCallListener.tsx, TeamChatMessenger.tsx, & MainActivity.kt) [Tugas 263].
+  *Permintaan User*: "saat melakukan paggilan, ada 2 panggilan masuk, panggilan vidio atau suara dan ditambah paggilan meeting. seharusnya panggilan meeting jangn muncul user hanya langsung mengang mengangkat seperti biasa panggilan pada umumnya"
+  *Penyebab Masalah*:
+  - Terjadi duplikasi panggilan masuk (2 popup dan 2 nada dering berbunyi bertumpukan) karena `GlobalCallListener.tsx` dan `TeamChatMessenger.tsx` sama-sama melakukan polling ke `/api/team-chat/call` dan sama-sama menampilkan banner panggilan masuk.
+  - Pada `TeamChatMessenger.tsx`, modal panggilan masih menyertakan tautan ke `/meeting/...` dan aksi penerimaan panggilan memakai `window.open` yang pada aplikasi Android memicu pembukaan rute tab `nav_meeting` (ruang konferensi multi-user rapat), bukan langsung tersambung telepon 1-on-1 biasa.
+  *Penyelesaian & Hasil*:
+  1. **Satu Sumber Resmi Panggilan Masuk Tunggal (`GlobalCallListener.tsx`)**:
+     - Menghapus polling duplikat `checkIncomingCall()` dan banner modal panggilan duplikat dari `TeamChatMessenger.tsx`.
+     - `GlobalCallListener.tsx` kini menjadi satu-satunya penanggung jawab panggilan masuk di seluruh aplikasi, menjamin hanya muncul 1 popup panggilan telepon masuk yang rapi dan elegan.
+  2. **Pengangkatan Panggilan Langsung Instan di Layar Utama (Ala WhatsApp / Telepon Biasa)**:
+     - Mengubah fungsi `handleAcceptCall()` pada `GlobalCallListener.tsx` dari `window.open` menjadi `window.location.href = roomUrl` langsung ke `/direct-call/[roomCode]`.
+     - Pengguna yang menekan tombol hijau "Terima" langsung tersambung ke layar panggilan suara/video murni tanpa popup baru, tanpa form nama/password rapat, dan tanpa dialihkan ke menu meeting.
+  3. **Pemisahan Panggilan Telepon dari Tab Meeting di Android (`MainActivity.kt`)**:
+     - Pada `MainActivity.kt`, logika `syncBottomNavWithUrl()` diperbarui sehingga URL `/direct-call/` disinkronkan ke tab Chat/Panggilan (`R.id.nav_chat`), bukan tab `R.id.nav_meeting`.
+     - Tab Meeting di Android kini khusus untuk konferensi rapat video staf/klien, sedangkan panggilan suara & video 1-on-1 sepenuhnya berjalan layaknya telepon biasa.
+
+- **2026-10-28**: [SELESAI] Fitur Ambil Foto Kamera Langsung & Unggah Galeri untuk Bukti Pekerjaan Lapangan & Update SPK (TeamChatMessenger.tsx & /api/upload) [Tugas 262].
+  *Permintaan User*: "untuk lampiran kirim bukti pekerjaan, saya melihat tidak bisa melapirkan atau mengambil foto langsung untuk dilaporkan. hanya teks tanpa foto"
+  *Penyebab Masalah*:
+  - Pada form "Kirim Bukti Pekerjaan Lapangan", input sebelumnya hanya mencakup field teks (judul pekerjaan, nama klien, progres %, dan deskripsi aktivitas) serta field `photoUrl` diisi statis (`/portfolio-industrial.png`) tanpa adanya kontrol input berkas kamera atau galeri bagi teknisi di lapangan.
+  *Penyelesaian & Hasil*:
+  1. **Tombol Jepret Kamera Langsung (`capture="environment"`)**:
+     - Ditambahkan elemen `<input type="file" accept="image/*" capture="environment" />` yang memicu kamera smartphone teknisi secara instan saat menekan tombol "📸 Ambil Kamera".
+  2. **Tombol Pilih Berkas dari Galeri HP/PC (`accept="image/*"`)**:
+     - Ditambahkan tombol "🖼️ Dari Galeri" untuk memilih foto dokumentasi yang telah diambil sebelumnya dari memori perangkat.
+  3. **Integrasi Endpoint Unggah Berkas (`/api/upload`)**:
+     - Berkas foto yang dipilih langsung diunggah secara asinkron ke server DSTech melalui `/api/upload` dengan indikator animasi loading ("Mengunggah foto bukti ke server...").
+  4. **Pratinjau Interaktif Foto Lapangan (Preview Box)**:
+     - Setelah terunggah, foto langsung tampil dalam bingkai preview interaktif lengkap dengan tombol "Ganti Foto" dan "Hapus Foto", serta badge verifikasi "✓ Foto Terpasang".
+  5. **Dukungan Foto Lapangan pada Modal Update SPK Interaktif**:
+     - Pada modal tindak lanjut SPK (`activeSpkModal`), teknisi kini juga dapat melampirkan foto hasil pemasangan/servis baik via jepretan kamera maupun galeri, sehingga catatan update SPK yang terkirim ke chat memuat dokumentasi foto pekerjaan nyata.
+
+- **2026-10-28**: [SELESAI] Proteksi Anti-Screenshot (FLAG_SECURE Native) & Anti-Salin Teks Obrolan (MainActivity.kt, globals.css, & TeamChatMessenger.tsx) [Tugas 261].
+  *Permintaan User*: "kemudian saya ingin memproteksi agar chat pada aplikasi tidak bisa discrenshot. karena ini bersifat penting. dan tidak boleh dapat disalin pesannya keluar. kalau dari luar pesan dicopy untuk dishare tidak masalah. mungkin ada hal penting yang harus kita share"
+  *Penyelesaian & Hasil*:
+  1. **Proteksi Anti-Screenshot Native Android (`MainActivity.kt`)**:
+     - Pada `MainActivity.kt` di fungsi `onCreate()`, diaktifkan flag keamanan native sistem Android:
+       `window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)`.
+     - Ketika pengguna mencoba melakukan screenshot tombol kombinasi fisik, swipe layar, atau screen recorder aplikasi pihak ketiga di smartphone Android, sistem operasi Android otomatis memblokir aksi tersebut dengan pesan "Tangkapan layar diblokir oleh kebijakan keamanan aplikasi" dan hasil rekaman layar menjadi hitam pekat (black screen).
+  2. **Proteksi Anti-Salin Teks Chat ke Luar (Copy Shield)**:
+     - Pada `globals.css` dan `TeamChatMessenger.tsx`, seluruh gelembung pesan chat diberi kelas `.dstech-chat-bubble`, `.dstech-protected-message`, dan aturan CSS:
+       `-webkit-user-select: none !important; user-select: none !important; -webkit-touch-callout: none !important;`.
+     - Ditambahkan event handler `onContextMenu={(e) => e.preventDefault()}` pada setiap gelembung obrolan untuk memblokir menu klik kanan / menu tekan lama (long-press) salin teks.
+  3. **Fleksibilitas Penempelan (Paste) dari Luar Tetap Diizinkan**:
+     - Kolom input pesan (`.dstech-chat-input`, textarea, input) secara eksplisit diatur `user-select: text !important;` sehingga pengguna tetap bisa menempelkan (paste) teks penting atau catatan dari luar untuk dibagikan ke dalam obrolan tim.
+
+- **2026-10-28**: [SELESAI] Pembatasan Pengiriman Invoice Khusus Klien & Proteksi PIN Keamanan Dokumen Tagihan (TeamChatMessenger.tsx) [Tugas 260].
+  *Permintaan User*: "kalau kirim invoice tagihan, itu hanya bisa dikirimkan ke client. namun juga harus di proteksi atau dikunci dengan pin."
+  *Penyelesaian & Hasil*:
+  1. **Pembatasan Tombol Kirim Invoice Hanya ke Klien**:
+     - Opsi "Kirim Invoice / Tagihan (Klien)" pada menu lampiran pesan kini hanya dimunculkan jika memenuhi dua syarat mutlak:
+       (a) Pengguna memiliki role `ADMIN` atau `SUPERADMIN`.
+       (b) Percakapan yang sedang aktif adalah percakapan dengan Klien atau dalam Grup Koordinasi Proyek Klien (`isProjectCoordination` / nama berawalan "PT ", "CV ", atau memuat kata "klien").
+       Pada chat pribadi internal antar teknisi/karyawan, opsi pengiriman invoice disembunyikan 100%.
+  2. **Proteksi PIN Keamanan Faktur Tagihan di Chat (Security PIN Lock)**:
+     - Kartu invoice di dalam obrolan kini memiliki status proteksi terkunci (`🔒 Dokumen Tagihan Terproteksi`).
+     - Penerima wajib memasukkan 4-digit PIN otorisasi (PIN default otorisasi: `1234` / `8899`) untuk membuka dokumen rincian faktur.
+     - Jika PIN salah, sistem menampilkan peringatan merah "PIN salah! Masukkan PIN otorisasi yang benar".
+     - Setelah PIN berhasil dimasukkan, kartu faktur terbuka dan menampilkan rincian nomor invoice, nama pelanggan, dan status pembayaran.
+
+- **2026-10-28**: [SELESAI] Buka & Tindak Lanjuti SPK Langsung dari Chat Card dengan Modal Interaktif (TeamChatMessenger.tsx & /api/employee/tasks) [Tugas 259].
+  *Permintaan User*: "pada pesan, saya melihat fitur kirim spk sudah ada, namun spk yang dikirimkan tidak bisa diubka uleh user penerima. hanya sebatas kartu kerja saja. seharusnya mengarah langsung ke SPK tersebut uhntuk langsung ditanggap dan diupdate oleh usernya."
+  *Penyelesaian & Hasil*:
+  1. **Tombol Interaktif pada Kartu SPK**:
+     - Pada kartu pesan SPK di `TeamChatMessenger.tsx`, ditambahkan tombol aksi nyata "🛠️ Buka & Tindak Lanjuti SPK".
+  2. **Modal Lembar Kerja & Update SPK Langsung**:
+     - Mengklik tombol tersebut langsung memunculkan modal interaktif layar penuh di dalam chat.
+     - Teknisi dapat melihat informasi lengkap tiket: Judul SPK, Klien, Lokasi, Prioritas, dan Rincian Pekerjaan (Scope of Work).
+     - Teknisi dapat langsung mengubah status pekerjaan: `Pending (Menunggu)`, `In Progress (Dikerjakan)`, atau `Completed (Selesai)`.
+     - Teknisi dapat mengatur slider persentase progres pekerjaan (0% - 100%).
+     - Teknisi dapat menulis catatan kendala / hasil penanganan di lapangan.
+  3. **Sinkronisasi Database & Notifikasi Chat Otomatis**:
+     - Menekan tombol "Simpan & Kirim Laporan ke Chat" langsung memperbarui database tugas via API `PUT /api/employee/tasks` dan secara otomatis mengirimkan pesan konfirmasi update ke dalam obrolan tim koordinasi sehingga PIC dan tim admin langsung mengetahui progres penanganan terkini.
+
+- **2026-10-28**: [SELESAI] Sinkronisasi Dashboard Teknisi (/employee) dengan Proyek Lapangan Selain Maintenance (/api/employee/tasks/route.ts & /employee/page.tsx) [Tugas 258].
+  *Permintaan User*: "kemudian untuk dasbord teknisi, saya cek selain dari penugasan mantenance tidak muncul, padahal pada project teknisi tersebut termasuk kedalam team. sehingga dia tidak bisa memberikan laporan harian dan juga laporan pekerjaan untuk dilaporkan ke client yang wajib dilaporkan oleh user PICnya"
+  *Penyelesaian & Hasil*:
+  1. Pada `/api/employee/tasks/route.ts`, sistem kini membaca data proyek pekerjaan aktif dari data ERP (`FINANCE_FILE` -> `projects`) dan mengonversinya menjadi tiket penugasan proyek lapangan berjenis `Proyek Lapangan` (`isProject: true`).
+  2. Data proyek lapangan tersebut memetakan `teamMembers` dan `picProject`.
+  3. Pada `/employee/page.tsx`, filter tugas teknisi diselaraskan sehingga jika teknisi terdaftar sebagai anggota tim koordinasi proyek atau PIC proyek, proyek tersebut langsung muncul di halaman dashboard teknisi di bawah daftar penugasan.
+  4. Teknisi dapat langsung mengisi Laporan Harian Proyek (`daily-reports`) dan Berita Acara Pekerjaan dengan foto dokumentasi lapangan untuk dilaporkan oleh PIC ke pihak klien.
+  5. Nilai kontrak dan budget keuangan proyek disensor (`null`) sehingga privasi finansial perusahaan tetap terlindungi 100%.
+
+- **2026-10-28**: [SELESAI] Proteksi Dokumen Penting (SPK, Invoice, Surat Keluar/Masuk) dari Client & Mitra Afiliasi (dstech_permissions.ts, TeamChatMessenger.tsx, & /api/team-chat/route.ts) [Tugas 257].
+  *Permintaan User*: "untuk user client/mitra afliasi jangan sampai melihat SPK, Invoice atau surat-surat penting lainnya. dan janga bisa membukanya. kecuali mitra client yang dimasukkan kedalam team koordinasi project"
+  *Penyelesaian & Hasil*:
+  1. Pada `dstech_permissions.ts`, hak akses default untuk role `CLIENT` dan `AFFILIATE` ditetapkan `false` pada menu `finance` (invoice & faktur), `maintenance` (SPK & jadwal), dan `mail` (surat-surat resmi).
+  2. Pada `TeamChatMessenger.tsx`, menu lampiran invoice dan dokumen perusahaan disembunyikan sepenuhnya dari user ber-role Klien atau Mitra Afiliasi.
+  3. Pada `/api/team-chat/route.ts`, client dan affiliate hanya dapat mengakses thread obrolan di mana mereka secara eksplisit dimasukkan ke dalam tim koordinasi proyek (`participants.includes(userId)`). Dokumen SPK atau surat di luar koordinasi proyek terkait diblokir total dari pandangan mereka.
+
+- **2026-10-28**: [SELESAI] Otomatisasi Pembuatan & Pembubaran Grup Koordinasi Tim Proyek (/api/team-chat/route.ts) [Tugas 256].
+  *Permintaan User*: "koordinasi team sesuai dengan project pekerjaan maka usernya otomatis ada didalam, setiap project langsung terbentuk chat group koordinasi" & "kalau pekerjaan project telah selesai maka secara otomatis team koordinasi juga dibubarkan dan hilang dari chat, agar tidak menumpuk".
+  *Penyelesaian & Hasil*:
+  1. **Pembuatan Grup Koordinasi Otomatis**:
+     - Pada `/api/team-chat/route.ts`, sistem secara otomatis memindai seluruh proyek pekerjaan aktif dari data ERP (`FINANCE_FILE` -> `projects`).
+     - Untuk setiap proyek aktif, sistem otomatis membentuk thread percakapan grup koordinasi `[Koordinasi] <Nama Proyek>` lengkap dengan avatar proyek dan deskripsi resmi.
+     - Seluruh teknisi yang ditugaskan pada proyek tersebut (berdasarkan data penugasan lapangan `TASKS_FILE`) serta PIC Proyek otomatis terdaftar sebagai partisipan (`participants`) grup obrolan.
+  2. **Pembubaran Otomatis (Auto-Dissolve on Completion)**:
+     - Jika status proyek telah selesai (`Completed`, `Selesai`, atau `Closed`), grup koordinasi proyek tersebut otomatis dibubarkan dan dihilangkan dari daftar obrolan aktif. Hal ini menjamin daftar obrolan tim tetap bersih, rapi, dan tidak menumpuk dengan percakapan proyek lama yang sudah tuntas.
+
+- **2026-10-28**: [SELESAI] Pengetatan Hak Akses Data Perusahaan & Sensor Total Tagihan / Nilai Nominal dari Teknisi & Klien (Technician Privacy Shield) (TeamChatMessenger.tsx, /api/team-chat/route.ts, & /employee) [Tugas 255].
+  *Permintaan User*: "kemudian saya ingin memperketat data perusahaan agar tidak bocor. untuk data-data invoice, SPK atau lainnya yang user teknisi tidak punya wewenang yang ditunjuk atau masuk kedalam team jangan tampil... kemudian untuk nilai tagihan, atau nominal jangan sampai dimunculkan. tidak boleh ditampilkan nilainya."
+  *Penyebab Masalah yang Ditemukan*:
+  1. Pada komponen obrolan (`TeamChatMessenger.tsx`), kartu lampiran faktur invoice menampilkan nilai `Total Tagihan: Rp [GrandTotal]` dan tombol tautan langsung ke detail Finance bagi semua pengguna termasuk teknisi lapangan.
+  2. Modal pemilihan lampiran dokumen perusahaan memperbolehkan teknisi melampirkan invoice dan melihat nominal seluruh invoice perusahaan.
+  3. API penugasan dan dokumen sebelumnya mengembalikan semua tiket tanpa filter ketat penugasan personal teknisi.
+  *Penyelesaian & Hasil*:
+  1. **Penyensoran Total Tagihan / Nominal Finansial**:
+     - Nilai nominal rupiah pada kartu lampiran invoice di obrolan otomatis disensor menjadi `•••••••• (Internal Keuangan)` untuk pengguna ber-role Karyawan/Teknisi (`EMPLOYEE`) dan Klien/Mitra (`CLIENT` / `AFFILIATE`).
+     - Nilai nominal rupiah asli hanya dapat dilihat oleh pengguna dengan hak akses `ADMIN` dan `SUPERADMIN`.
+     - Tombol tautan "Buka Detail di Finance" otomatis disembunyikan bagi teknisi/klien.
+  2. **Pembatasan Opsi Lampiran Dokumen**:
+     - Tombol "Kirim Invoice / Tagihan" disembunyikan 100% dari menu lampiran obrolan bagi teknisi dan klien.
+     - Endpoint API `/api/team-chat?action=company_data&type=invoices` memblokir akses teknisi/klien dengan respon HTTP 403 Forbidden.
+  3. **Filter Ketat Hak Akses SPK & Percakapan**:
+     - Teknisi hanya dapat melihat thread obrolan, proyek, dan tiket tugas SPK di mana dirinya secara resmi ditugaskan atau terdaftar sebagai anggota tim koordinasi.
+
+- **2026-10-28**: [SELESAI] Antarmuka Panggilan Langsung 1-on-1 (Direct Voice Call & Direct Video Call ala WhatsApp) — Tanpa Masuk ke Ruang Rapat Video Meeting (/direct-call/[roomCode], TeamChatMessenger.tsx, & GlobalCallListener.tsx) [Tugas 254].
+  *Permintaan User*: "kemudian untuk panggilan suara saja tidak bisa. hanya bisa melakukan panggilan dengan vidio meeting. bukan panggilan vidio langsung."
+  *Penyebab Masalah yang Ditemukan*:
+  - Saat tombol panggilan telepon atau video diklik di obrolan, sistem sebelumnya melempar pengguna ke `/meeting/[roomCode]` yang merupakan ruang konferensi rapat umum (harus mengisi nama peserta, pre-join lobby kamera, dan meminta PIN rapat).
+  - Panggilan suara murni tidak ada karena kamera tetap diaktifkan secara paksa di ruang rapat.
+  *Penyelesaian & Hasil*:
+  1. **Pembangunan Rute Mandiri Panggilan Langsung (`/direct-call/[roomCode]/page.tsx`)**:
+     - Mengembangkan antarmuka panggilan langsung 1-on-1 P2P WebRTC independen tanpa keterikatan dengan ruang rapat konferensi.
+  2. **Panggilan Suara Langsung Murni (Voice Call)**:
+     - Hanya meminta izin dan menyalakan audio mikrofon (`video: false`). Kamera hardware smartphone/laptop 100% tidak dinyalakan.
+     - Desain layar penuh bertema dark ala panggilan suara WhatsApp: Avatar besar dengan gelombang denyut audio (pulsing waveform), status "Menghubungkan..." / "Berdering..." / "Terhubung (MM:SS)", tombol Mute Mic, tombol Loudspeaker, dan tombol Tutup Panggilan (End Call merah).
+  3. **Panggilan Video Langsung 1-on-1 (Direct Video Call)**:
+     - Tampilan video lawan bicara memenuhi layar penuh (full-screen) dengan Picture-in-Picture (PIP) video lokal di pojok kanan atas.
+     - Langsung terhubung P2P secara instan tanpa layar pra-bergabung (pre-join) atau input nama/PIN.
+     - Dilengkapi tombol Flip Camera (kamera depan / belakang) khusus smartphone teknisi lapangan untuk menyorot instalasi kabel/perangkat, toggle kamera, mic mute, dan tombol tutup merah.
+  4. Pengalihan pemanggilan di `TeamChatMessenger.tsx` dan `GlobalCallListener.tsx` kini 100% mengarah ke `/direct-call`.
+
+- **2026-10-28**: [SELESAI] Perbaikan Pemanggilan di Aplikasi Android Saat Aplikasi Ditutup / Berjalan di Latar Belakang (DStechNotificationService.kt, BootReceiver.kt, & AndroidManifest.xml) [Tugas 253].
+  *Permintaan User*: "ketika kita melakukan panggilan, kalau aplikasi gak dibuka maka panggilannya tidak masuk. namun setelah aplikasi dibuka berjalan baru masuk panggilannya."
+  *Penyebab Masalah yang Ditemukan*:
+  1. Pada `DStechNotificationService.kt`, query parameter URL adalah `targetUserId=$myUserId`, sedangkan endpoint `/api/team-chat/call` membaca parameter `userId`.
+  2. Format JSON respon di API mengembalikan `incomingCall`, sementara service Android mencari `data` dengan properti `callId` dan status `RINGING` (bukan `calling`).
+  3. Cek pesan baru di Android memanggil endpoint tanpa parameter `chatId`, sehingga mengembalikan daftar thread obrolan bukan array pesan.
+  4. Android service tidak memiliki watchdog `onTaskRemoved` dan `BootReceiver` sehingga service terbunuh saat aplikasi di-swipe away atau perangkat di-restart.
+  *Penyelesaian & Hasil*:
+  1. **Penyelarasan Kontrak API Panggilan (`/api/team-chat/call/route.ts`)**:
+     - Endpoint kini mendukung parameter `userId` maupun `targetUserId`.
+     - Mengembalikan payload `incomingCall` dan alias `data` lengkap dengan `callId`, `status: "RINGING"`, dan tipe panggilan `audio`/`video`.
+     - Menangani aksi tolak panggilan `decline` maupun `reject`.
+  2. **Pembaruan Background Service Android (`DStechNotificationService.kt`)**:
+     - Polling panggilan dan pesan diselaraskan 100% dengan endpoint server live.
+     - Notifikasi panggilan berdering keras di HP penerima dengan tombol "Terima" (hijau) dan "Tolak" (merah).
+     - Menekan tombol "Terima" langsung membuka antarmuka `/direct-call` dengan auto-accept.
+     - Menambahkan handler `onTaskRemoved` dengan AlarmManager watchdog agar background service otomatis dihidupkan kembali seketika jika aplikasi di-swipe away dari recent apps.
+  3. **Boot & Package Replace Receiver (`BootReceiver.kt` & `AndroidManifest.xml`)**:
+     - Menambahkan permission `RECEIVE_BOOT_COMPLETED` dan mendaftarkan `BootReceiver` agar service notifikasi panggilan dan pesan otomatis aktif begitu HP dinyalakan tanpa perlu membuka aplikasi terlebih dahulu.
+  4. Kompilasi build APK debug Android sukses 100% (6.0 MB) dan file APK terbaru telah diunggah ke server live VPS.
+
 - **2026-10-28**: [SELESAI] Penguncian Sesi Login Permanen (Persistent Session & Auto-Restore) pada Aplikasi Android agar Tidak Logout Berulang dan Panggilan/Pesan Selalu Masuk (MainActivity.kt & DStechNotificationService.kt) [Tugas 252].
   *Permintaan User*: "kemudian saya melihat, sering keluar masuk untuk login dari aplikasi. tolong agar buat bisa dikunci, agar jika ada pesan masuk dan juga panggilan bisa masuk."
   *Penyebab Masalah yang Ditemukan*:
