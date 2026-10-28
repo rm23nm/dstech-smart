@@ -3,6 +3,28 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
+- **2026-10-28**: [SELESAI] Implementasi 3 Tab Menu Native Bawah (Home, Pesan, Meeting) & Background Notification Service Dering Panggilan/Pesan Saat Aplikasi Tertutup pada Aplikasi Android (dstech-smart-android, MainActivity.kt, & DStechNotificationService.kt) [Tugas 246].
+  *Permintaan User*: "saya ingin agar aplikasi android mempunya tab khusus menu tersendiri, jangan digabung kedalam web browser, agar lebih cepat dalam membukanya, ibarat 2 menu ada di bagian bawah aplikasi android, menu home dan pesan, meeting. saya rasa ini akan membuat aplikasi lebih menarik. kemudian setiap ada pesan masuk atau panggilan HP harus bisa berbunyi walaupun tanpa ada membuka aplikasi. aplikasi sedang tertutup dari layar." & "maksud saya ada 3 menu".
+  *Penyelesaian & Hasil*:
+  1. **Bottom Navigation Bar Native 3 Menu di Aplikasi Android (`activity_main.xml` & `MainActivity.kt`)**:
+     - Menambahkan bar navigasi bawah native permanen yang elegan dengan tema gelap DSTech (`#0b1120`) dan 3 menu utama:
+       - 🏠 **Home**: Membuka dashboard utama (Portal Karyawan `/employee` atau Admin `/admin`).
+       - 💬 **Pesan**: Membuka langsung antarmuka obrolan tim mobile (`/employee?tab=chat` atau `/admin/chat`) tanpa harus browsing menu web. Dilengkapi badge angka merah notifikasi pesan belum dibaca secara real-time.
+       - 📹 **Meeting**: Membuka langsung ruang video conference WebRTC in-house mandiri (`/meeting/ruang-staf-dstech`).
+     - Navigasi instan terpadu dengan sinkronisasi otomatis status URL halaman aktif.
+  2. **Background Notification & Ringing Service Saat Aplikasi Tertutup / Layar Mati (`DStechNotificationService.kt`)**:
+     - Membangun `DStechNotificationService` (Foreground & Background Service berprioritas tinggi) yang terus siaga memantau sinyal panggilan masuk (`/api/team-chat/call`) dan pesan baru (`/api/team-chat`) meskipun aplikasi sedang diminimalkan, ditutup, atau layar HP dalam keadaan mati/terkunci.
+     - **Panggilan Masuk Telepon & Video**:
+       - Membunyikan nada dering bawaan HP (`RingtoneManager.TYPE_RINGTONE`) keras dan getar berulang.
+       - Membangunkan layar HP (*WakeLock & showWhenLocked/turnScreenOn*).
+       - Menampilkan notifikasi heads-up prioritas maksimal (`PRIORITY_MAX`, `CATEGORY_CALL`) dengan tombol **Terima (Hijau)** dan **Tolak (Merah)**. Menekan tombol "Terima" otomatis membuka aplikasi dan langsung meluncurkan ruang video/suara WebRTC.
+     - **Pesan Masuk Baru**:
+       - Membunyikan suara notifikasi pesan + getar, serta notifikasi push lokal yang langsung mengarahkan ke tab obrolan tim.
+  3. **Kompilasi & Build APK Android Siap Pasang**:
+     - Kompilasi Gradle Android `build_android.bat assembleDebug` berhasil 100%.
+     - File APK baru siap pasang langsung diperbarui di root workspace: `dstech-smart-app.apk` (~6.24 MB).
+     - Sinkronisasi badge belum dibaca pada web `TeamChatMessenger.tsx` berhasil diuji dan dideploy ke server live VPS (PM2 `dstech-main` online).
+
 - **2026-10-28**: [SELESAI] Perbaikan Audio Speaker WebRTC, Nada Dering Telepon (Ringtone), Notifikasi Panggilan Masuk Global Lintas Halaman, dan Pengaktifan Kamera Belakang Android (/components/GlobalCallListener.tsx, /meeting/[roomCode]/page.tsx, /admin/layout.tsx, /employee, & TeamChatMessenger.tsx) [Tugas 245].
   *Permintaan User*: "saya uji coba melakukan panggilan gak ada keluar suara speaker, kemudian untuk notif suara masuk dan panggilan vidio harus buka pesan dulu baru muncul. tidak muncul langsung saat luar. dan tidak ada suara panggilan juga", dan "kemudian pada saat melakukan panggilan vidio, hanya bisa memakai kamera depan, kamera belakang tidak bisa di aktifkan atau diganti".
   *Penyebab Masalah yang Ditemukan*:
