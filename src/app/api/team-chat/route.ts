@@ -240,12 +240,49 @@ export async function GET(request: Request) {
     });
   }
 
-  // 3. Ambil data perusahaan untuk lampiran (Invoice, SPK Task, Laporan Bukti Kerja)
+    // 3. Ambil data perusahaan untuk lampiran (Invoice, SPK Task, Laporan Bukti Kerja)
   if (action === "company_data") {
     const dataType = searchParams.get("type") || "invoices";
     const query = (searchParams.get("query") || "").toLowerCase();
     const userRole = (searchParams.get("role") || "").toUpperCase();
     const requesterName = (searchParams.get("userName") || "").toLowerCase();
+    const chatId = searchParams.get("chatId") || "";
+    const projectIdParam = searchParams.get("projectId") || "";
+    const chatNameParam = searchParams.get("chatName") || "";
+
+    const financeData = readJsonSafe(FINANCE_FILE, { sales: [], projects: [] });
+    const allProjects = Array.isArray(financeData.projects) ? financeData.projects : [];
+    const chats = readJsonSafe(CHATS_FILE, []);
+    const activeChat = chats.find((c: any) => c.id === chatId);
+    const resolvedProjectId = projectIdParam || activeChat?.projectId || "";
+
+    let linkedProject: any = allProjects.find((p: any) => p.id === resolvedProjectId);
+    if (!linkedProject && (chatNameParam || activeChat?.name)) {
+      const searchName = (chatNameParam || activeChat?.name || "").toLowerCase();
+      linkedProject = allProjects.find((p: any) => {
+        const pName = (p.projectName || "").toLowerCase();
+        const cName = (p.clientName || "").toLowerCase();
+        return (
+          (pName && searchName.includes(pName)) ||
+          (cName && searchName.includes(cName)) ||
+          (pName && pName.includes(searchName.replace(/koordinasi:?/i, "").trim()))
+        );
+      });
+    }
+
+    const projectInfo = linkedProject
+      ? {
+          id: linkedProject.id,
+          projectCode: linkedProject.projectCode || "PRJ-DSTECH",
+          projectName: linkedProject.projectName || activeChat?.name || "Proyek DStech",
+          clientName: linkedProject.clientName || "Klien DStech",
+          status: linkedProject.status || "In Progress",
+          picProject: linkedProject.picProject || "Project Manager",
+          contractValue: linkedProject.contractValue || 0,
+          description: linkedProject.description || "Koordinasi proyek dan penugasan teknisi",
+          startDate: linkedProject.startDate || "",
+        }
+      : null;
 
     // PERLINDUNGAN KERAHASIAAN PERUSAHAAN: Invoice hanya untuk Admin / Finance
     if (dataType === "invoices") {
@@ -256,7 +293,7 @@ export async function GET(request: Request) {
         }, { status: 403 });
       }
 
-      const financeData = readJsonSafe(FINANCE_FILE, { sales: [] });
+      const targetUserName = (searchParams.get("targetUserName") || "").toLowerCase();
       let invoices = (financeData.sales || []).map((inv: any) => ({
         id: inv.id,
         invoiceNumber: inv.invoiceNumber || "INV-UNKNOWN",
@@ -266,6 +303,16 @@ export async function GET(request: Request) {
         date: inv.date || new Date().toISOString().split("T")[0],
         invoiceType: inv.invoiceType || "Standard",
       }));
+
+      // Filter ketat: jika sedang berada di percakapan pribadi / DM dengan user tertentu,
+      // HANYA tampilkan invoice milik user tersebut agar tidak salah mengirimkan invoice pihak lain!
+      if (targetUserName) {
+        invoices = invoices.filter((inv: any) => {
+          const cName = (inv.customerName || "").toLowerCase();
+          return cName.includes(targetUserName) || targetUserName.includes(cName);
+        });
+      }
+
       if (query) {
         invoices = invoices.filter(
           (inv: any) =>
@@ -273,7 +320,7 @@ export async function GET(request: Request) {
             inv.customerName.toLowerCase().includes(query)
         );
       }
-      return NextResponse.json({ success: true, data: invoices.slice(0, 20) });
+      return NextResponse.json({ success: true, data: invoices.slice(0, 50), projectInfo });
     }
 
     if (dataType === "tasks") {
@@ -288,10 +335,27 @@ export async function GET(request: Request) {
         priority: t.priority || "Normal",
         technician: t.technician || "Teknisi",
         deadline: t.deadline || "-",
+        projectId: t.projectId || "",
+        scope: t.scope || [],
       }));
 
-      // Jika teknisi / karyawan: HANYA tampilkan tugas yang menugaskan dirinya
-      if (userRole === "EMPLOYEE" || userRole.includes("TEKNISI")) {
+      // Filter ketat berdasarkan Proyek Grup:
+      // Jika grup ini adalah grup koordinasi proyek, HANYA tampilkan SPK yang terikat dengan proyek/klien ini!
+      if (linkedProject) {
+        const prjName = (linkedProject.projectName || "").toLowerCase();
+        const clientName = (linkedProject.clientName || "").toLowerCase();
+        tasks = tasks.filter((t: any) => {
+          const tClient = (t.client || "").toLowerCase();
+          const tTitle = (t.title || "").toLowerCase();
+          const matchPrjId = t.projectId && t.projectId === linkedProject.id;
+          const matchClient = clientName && (tClient.includes(clientName) || clientName.includes(tClient));
+          const matchName = prjName && (tTitle.includes(prjName) || prjName.includes(tTitle));
+          return matchPrjId || matchClient || matchName;
+        });
+      }
+
+      // Jika teknisi / karyawan: HANYA tampilkan tugas yang menugaskan dirinya jika di luar grup proyek
+      if ((userRole === "EMPLOYEE" || userRole.includes("TEKNISI")) && !linkedProject) {
         if (requesterName) {
           tasks = tasks.filter((t: any) =>
             t.technician?.toLowerCase().includes(requesterName)
@@ -307,7 +371,7 @@ export async function GET(request: Request) {
             t.client.toLowerCase().includes(query)
         );
       }
-      return NextResponse.json({ success: true, data: tasks.slice(0, 20) });
+      return NextResponse.json({ success: true, data: tasks.slice(0, 50), projectInfo });
     }
 
     if (dataType === "reports") {
@@ -330,7 +394,7 @@ export async function GET(request: Request) {
             r.ticketNumber.toLowerCase().includes(query)
         );
       }
-      return NextResponse.json({ success: true, data: reports.slice(0, 20) });
+      return NextResponse.json({ success: true, data: reports.slice(0, 50), projectInfo });
     }
 
     return NextResponse.json({ success: false, error: "Tipe data perusahaan tidak valid" }, { status: 400 });
@@ -358,10 +422,11 @@ export async function POST(request: Request) {
         invoiceData,
         taskData,
         reportData,
+        projectData,
         callData,
       } = body;
 
-      if (!chatId || !senderId || (!content && !mediaUrl && !invoiceData && !taskData && !reportData && !callData)) {
+      if (!chatId || !senderId || (!content && !mediaUrl && !invoiceData && !taskData && !reportData && !projectData && !callData)) {
         return NextResponse.json({ success: false, error: "Parameter pesan tidak lengkap" }, { status: 400 });
       }
 
@@ -381,6 +446,7 @@ export async function POST(request: Request) {
         invoiceData: invoiceData || undefined,
         taskData: taskData || undefined,
         reportData: reportData || undefined,
+        projectData: projectData || undefined,
         callData: callData || undefined,
         timestamp: new Date().toISOString(),
         readBy: [senderId],
@@ -393,6 +459,7 @@ export async function POST(request: Request) {
       let lastPreview = content || "";
       if (type === "invoice") lastPreview = `📑 [Invoice] ${invoiceData?.invoiceNumber || ""}`;
       else if (type === "task") lastPreview = `📋 [SPK Penugasan] ${taskData?.title || ""}`;
+      else if (type === "project_info") lastPreview = `📁 [Info Proyek] ${projectData?.projectName || ""}`;
       else if (type === "daily_report") lastPreview = `📸 [Bukti Pekerjaan] ${reportData?.taskTitle || ""}`;
       else if (type === "image") lastPreview = "📷 [Foto]";
       else if (type === "video") lastPreview = "📹 [Video]";

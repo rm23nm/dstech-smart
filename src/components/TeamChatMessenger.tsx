@@ -41,6 +41,7 @@ import {
   Upload,
   Trash2,
   Loader2,
+  Share2,
 } from "lucide-react";
 import { dstechCallAudio } from "@/utils/dstech_call_audio";
 
@@ -132,6 +133,8 @@ export default function TeamChatMessenger({
     activityDescription: "",
     photoUrl: "",
   });
+  const [selectedSpkId, setSelectedSpkId] = useState<string>("");
+  const [activeProjectInfo, setActiveProjectInfo] = useState<any>(null);
 
   // State Upload Foto Bukti Lapangan & Kamera
   const [isUploadingReportPhoto, setIsUploadingReportPhoto] = useState(false);
@@ -338,16 +341,41 @@ export default function TeamChatMessenger({
   // Load Data Perusahaan untuk Lampiran
   const loadCompanyData = async (type: "invoices" | "tasks" | "reports") => {
     try {
+      const targetUserName = (!activeChat?.isGroup && activeChat?.name) ? activeChat.name : "";
+      const chatIdParam = activeChat?.id || "";
+      const projectIdParam = activeChat?.projectId || "";
+      const chatNameParam = activeChat?.name || "";
+
       const res = await fetch(
-        `/api/team-chat?action=company_data&type=${type}&query=${encodeURIComponent(dataSearch)}&role=${encodeURIComponent(
+        `/api/team-chat?action=company_data&type=${type}&query=${encodeURIComponent(
+          dataSearch
+        )}&role=${encodeURIComponent(
           currentUser.role || "EMPLOYEE"
-        )}&userName=${encodeURIComponent(currentUser.name || "")}`
+        )}&userName=${encodeURIComponent(
+          currentUser.name || ""
+        )}&chatId=${encodeURIComponent(
+          chatIdParam
+        )}&projectId=${encodeURIComponent(
+          projectIdParam
+        )}&chatName=${encodeURIComponent(
+          chatNameParam
+        )}&targetUserName=${encodeURIComponent(targetUserName)}`
       );
       const data = await res.json();
       if (data.success) {
         if (type === "invoices") setCompanyInvoices(data.data || []);
-        if (type === "tasks") setCompanyTasks(data.data || []);
-        if (type === "reports") setCompanyReports(data.data || []);
+        if (type === "tasks") {
+          setCompanyTasks(data.data || []);
+          if (data.projectInfo) {
+            setActiveProjectInfo(data.projectInfo);
+          }
+        }
+        if (type === "reports") {
+          setCompanyReports(data.data || []);
+          if (data.projectInfo) {
+            setActiveProjectInfo(data.projectInfo);
+          }
+        }
       }
     } catch (err) {
       console.error(`Gagal load data ${type}:`, err);
@@ -357,8 +385,60 @@ export default function TeamChatMessenger({
   useEffect(() => {
     if (attachModalType === "invoice") loadCompanyData("invoices");
     if (attachModalType === "task") loadCompanyData("tasks");
-    if (attachModalType === "report") loadCompanyData("reports");
-  }, [attachModalType, dataSearch]);
+    if (attachModalType === "report") {
+      loadCompanyData("tasks"); // Pastikan data SPK aktif proyek terambil untuk dropdown
+      loadCompanyData("reports");
+      if (activeProjectInfo?.clientName) {
+        setReportForm((prev) => ({
+          ...prev,
+          clientName: prev.clientName || activeProjectInfo.clientName,
+        }));
+      }
+    }
+  }, [attachModalType, dataSearch, activeChat?.id]);
+
+  // Handler Pilih SPK untuk Laporan Bukti Pekerjaan (Otomatis isi No. Tiket, Judul & Klien)
+  const handleSelectSpkForReport = (spkId: string) => {
+    setSelectedSpkId(spkId);
+    const found = companyTasks.find((t) => t.id === spkId);
+    if (found) {
+      setReportForm((prev) => ({
+        ...prev,
+        ticketNumber: found.ticketNumber || found.id,
+        taskTitle: found.title,
+        clientName: found.client,
+      }));
+    }
+  };
+
+  // Kirim Kartu Ringkasan Informasi Proyek Resmi ke Chat
+  const handleSendProjectInfo = async (project: any) => {
+    if (!activeChat || !project) return;
+    try {
+      const res = await fetch("/api/team-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send_message",
+          chatId: activeChat.id,
+          senderId: currentUser.id,
+          senderName: currentUser.name,
+          senderRole: currentUser.role,
+          type: "project_info",
+          content: `Informasi Resmi Proyek Koordinasi: ${project.projectName}`,
+          projectData: project,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setMessages((prev) => [...prev, data.message]);
+        setAttachModalType(null);
+        loadChats();
+      }
+    } catch (err) {
+      console.error("Gagal kirim informasi proyek:", err);
+    }
+  };
 
   // Kirim Pesan Teks Standar
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -479,14 +559,18 @@ export default function TeamChatMessenger({
     }
   };
 
-  // Handle Form Submit Bukti Pekerjaan Baru
+  // Handle Form Submit Bukti Pekerjaan Baru (Klien Otomatis Masuk Sesuai SPK / Proyek)
   const handleCustomReportSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const resolvedClient =
+      reportForm.clientName ||
+      activeProjectInfo?.clientName ||
+      (activeChat?.isGroup ? activeChat.name.replace(/koordinasi:?/i, "").trim() : "Klien DStech");
     handleSendReport({
       id: `dstech_rep_${Date.now()}`,
       ticketNumber: reportForm.ticketNumber || `MTC-${new Date().getFullYear()}`,
       taskTitle: reportForm.taskTitle || "Pekerjaan Lapangan",
-      clientName: reportForm.clientName || "Klien DStech",
+      clientName: resolvedClient,
       progressPercentage: reportForm.progressPercentage,
       activityDescription: reportForm.activityDescription,
       photoUrl: reportForm.photoUrl,
@@ -990,6 +1074,47 @@ export default function TeamChatMessenger({
                         </div>
                       )}
 
+                      {/* Kartu INFORMASI RESMI PROYEK KOORDINASI (PROJECT INFO) */}
+                      {msg.type === "project_info" && msg.projectData && (
+                        <div className="mt-2 p-3.5 bg-gradient-to-br from-slate-900 to-slate-950 border border-blue-500/50 rounded-2xl text-left shadow-lg">
+                          <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-800">
+                            <span className="text-[10px] font-bold text-blue-400 flex items-center gap-1.5 uppercase tracking-wider">
+                              <Building className="w-3.5 h-3.5" /> Informasi Resmi Proyek
+                            </span>
+                            <span className="text-[10px] px-2 py-0.5 bg-blue-500/20 text-blue-300 rounded font-bold">
+                              {msg.projectData.status || "Aktif"}
+                            </span>
+                          </div>
+                          <div className="space-y-1.5 mb-2.5">
+                            <h5 className="font-extrabold text-white text-sm">
+                              {msg.projectData.projectName}
+                            </h5>
+                            <div className="text-[11px] text-slate-300 flex items-center gap-2">
+                              <span className="px-1.5 py-0.5 bg-slate-800 rounded text-[10px] font-mono text-cyan-300">
+                                {msg.projectData.projectCode || "PRJ-DSTECH"}
+                              </span>
+                              <span>🏢 Klien: <strong className="text-white">{msg.projectData.clientName}</strong></span>
+                            </div>
+                            {msg.projectData.picProject && (
+                              <p className="text-[11px] text-slate-400">
+                                👤 PIC Proyek: <span className="text-slate-200 font-medium">{msg.projectData.picProject}</span>
+                              </p>
+                            )}
+                            {msg.projectData.description && msg.projectData.description !== "-" && (
+                              <p className="text-[11px] text-slate-400 bg-slate-950/80 p-2 rounded-xl border border-slate-800/80 leading-relaxed italic">
+                                &quot;{msg.projectData.description}&quot;
+                              </p>
+                            )}
+                          </div>
+                          <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+                            <span>Tujuan Grup: Koordinasi Teknis & Lapangan</span>
+                            <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Resmi Terdaftar
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       {/* 5. Kartu RIWAYAT PANGGILAN */}
                       {msg.type === "call_log" && msg.callData && (
                         <div className="flex items-center gap-2 py-1 text-xs">
@@ -1022,14 +1147,10 @@ export default function TeamChatMessenger({
             {/* Menu Lampiran Data Perusahaan (Popup) */}
             {showAttachMenu && (
               <div className="absolute bottom-20 left-4 z-20 bg-slate-950 border border-slate-700/80 rounded-2xl p-2 shadow-2xl flex flex-col gap-1 w-64 animate-fadeIn backdrop-blur-lg">
+                {/* 1. Opsi Kirim Invoice: HANYA untuk Admin/Superadmin & HANYA pada Direct Chat (1-on-1), JANGAN PERNAH MUNCUL DI GRUP! */}
                 {(currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN") &&
                   activeChat &&
-                  (activeChat.isProjectCoordination ||
-                    activeChat.name?.toLowerCase().includes("klien") ||
-                    activeChat.name?.toLowerCase().includes("pt ") ||
-                    activeChat.name?.toLowerCase().includes("cv ") ||
-                    activeChat.name?.toLowerCase().includes("client") ||
-                    activeChat.name?.toLowerCase().includes("koordinasi")) && (
+                  !activeChat.isGroup && (
                   <button
                     onClick={() => {
                       setAttachModalType("invoice");
@@ -1041,8 +1162,8 @@ export default function TeamChatMessenger({
                       <FileText className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                      <div className="font-bold">Kirim Invoice / Tagihan (Klien)</div>
-                      <div className="text-[10px] text-slate-400">Lampirkan faktur keuangan ke klien</div>
+                      <div className="font-bold">Kirim Tagihan Invoice</div>
+                      <div className="text-[10px] text-slate-400">Lampirkan faktur tagihan ke {activeChat.name}</div>
                     </div>
                   </button>
                 )}
@@ -1177,6 +1298,25 @@ export default function TeamChatMessenger({
                 />
 
                 <div>
+                  <label className="block text-[11px] font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                    <span>Pilih Referensi SPK / Surat Tugas</span>
+                    <span className="text-[10px] text-cyan-400 font-bold">Otomatisasi Nama Klien & Tugas</span>
+                  </label>
+                  <select
+                    value={selectedSpkId}
+                    onChange={(e) => handleSelectSpkForReport(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-teal-500 focus:outline-none"
+                  >
+                    <option value="">-- Pilih SPK Lapangan Terkait --</option>
+                    {companyTasks.map((tsk) => (
+                      <option key={tsk.id} value={tsk.id}>
+                        [{tsk.ticketNumber}] {tsk.title} — {tsk.client}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
                   <label className="block text-[11px] font-semibold text-slate-300 mb-1">
                     Judul Pekerjaan / Tugas
                   </label>
@@ -1185,23 +1325,22 @@ export default function TeamChatMessenger({
                     required
                     value={reportForm.taskTitle}
                     onChange={(e) => setReportForm({ ...reportForm, taskTitle: e.target.value })}
-                    placeholder="Contoh: Instalasi CCTV Titik 01 Krakatau Posco"
+                    placeholder="Contoh: Instalasi CCTV Titik 01"
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                      Nama Klien
+                    <label className="block text-[11px] font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                      <span>Nama Klien</span>
+                      <span className="text-[9px] text-emerald-400 font-bold flex items-center gap-0.5">
+                        <Check className="w-2.5 h-2.5" /> Otomatis Sesuai SPK
+                      </span>
                     </label>
-                    <input
-                      type="text"
-                      required
-                      value={reportForm.clientName}
-                      onChange={(e) => setReportForm({ ...reportForm, clientName: e.target.value })}
-                      placeholder="PT. Krakatau Posco Energy"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white"
-                    />
+                    <div className="w-full bg-slate-900 border border-emerald-500/30 rounded-xl px-3 py-2 text-xs text-emerald-300 font-bold truncate flex items-center justify-between">
+                      <span className="truncate">{reportForm.clientName || activeProjectInfo?.clientName || "Otomatis dari SPK..."}</span>
+                      <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1 py-0.5 rounded font-mono ml-1 shrink-0">TERKUNCI</span>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-300 mb-1">
@@ -1316,61 +1455,131 @@ export default function TeamChatMessenger({
             ) : (
               /* Modal Search & List Dokumen */
               <div className="flex-1 flex flex-col overflow-hidden">
+                {/* Banner Informasi & Tujuan Proyek Grup (Jika dalam Grup Koordinasi Proyek) */}
+                {attachModalType === "task" && (activeProjectInfo || activeChat?.isGroup) && (
+                  <div className="p-3 bg-gradient-to-r from-blue-950/60 to-cyan-950/60 border border-blue-500/40 rounded-2xl mb-3 flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold shrink-0">
+                          <Building className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[9px] uppercase font-bold text-blue-400 tracking-wider">
+                            Informasi & Tujuan Proyek Grup
+                          </span>
+                          <h4 className="text-xs font-extrabold text-white truncate leading-tight">
+                            {activeProjectInfo?.projectName || activeChat?.name}
+                          </h4>
+                          <p className="text-[10px] text-slate-300 truncate">
+                            Klien: <strong className="text-cyan-300">{activeProjectInfo?.clientName || "Klien DStech"}</strong> | PIC: {activeProjectInfo?.picProject || "DSTech Management"}
+                          </p>
+                        </div>
+                      </div>
+                      {activeProjectInfo && (
+                        <button
+                          type="button"
+                          onClick={() => handleSendProjectInfo(activeProjectInfo)}
+                          className="px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[10px] font-bold flex items-center gap-1 shadow-md transition cursor-pointer whitespace-nowrap shrink-0"
+                          title="Kirim Kartu Informasi Proyek ini ke Obrolan Grup"
+                        >
+                          <Share2 className="w-3 h-3" /> Bagikan ke Grup
+                        </button>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-300 bg-slate-950/80 px-2.5 py-1 rounded-lg border border-slate-800 flex items-center justify-between">
+                      <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Hanya menampilkan SPK proyek ini
+                      </span>
+                      <span className="text-cyan-400 font-mono font-bold">{companyTasks.length} SPK Tersedia</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="relative mb-3">
                   <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={dataSearch}
                     onChange={(e) => setDataSearch(e.target.value)}
-                    placeholder="Cari berdasarkan nomor atau nama klien..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500"
+                    placeholder={
+                      attachModalType === "invoice"
+                        ? "Cari invoice tagihan user ini..."
+                        : "Cari SPK penugasan proyek..."
+                    }
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
                   />
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                  {attachModalType === "invoice" &&
-                    companyInvoices.map((inv) => (
-                      <div
-                        key={inv.id}
-                        onClick={() => handleSendInvoice(inv)}
-                        className="p-3 bg-slate-950 border border-slate-800 hover:border-emerald-500 rounded-xl cursor-pointer transition flex items-center justify-between"
-                      >
-                        <div>
-                          <h5 className="font-bold text-white text-xs">{inv.invoiceNumber}</h5>
-                          <p className="text-[11px] text-slate-400">{inv.customerName}</p>
-                          <span className="text-[10px] text-emerald-400 font-semibold">{inv.paymentStatus}</span>
+                  {attachModalType === "invoice" && (
+                    <>
+                      {companyInvoices.length === 0 ? (
+                        <div className="py-8 text-center text-slate-400">
+                          <FileText className="w-10 h-10 mx-auto mb-2 text-slate-600" />
+                          <p className="text-xs font-bold text-slate-300">Tidak Ada Tagihan Khusus {activeChat?.name}</p>
+                          <p className="text-[11px] text-slate-500 max-w-xs mx-auto mt-1">
+                            Hanya menampilkan invoice yang berkenaan dengan user ini untuk mencegah salah melampirkan invoice tagihan pihak lain.
+                          </p>
                         </div>
-                        <div className="text-right">
-                          <span className="font-bold text-emerald-400 text-xs">
-                            {currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN"
-                              ? `Rp ${Number(inv.grandTotal || 0).toLocaleString("id-ID")}`
-                              : "••••••••"}
-                          </span>
-                          <span className="block text-[10px] text-slate-500">{inv.date}</span>
-                        </div>
-                      </div>
-                    ))}
+                      ) : (
+                        companyInvoices.map((inv) => (
+                          <div
+                            key={inv.id}
+                            onClick={() => handleSendInvoice(inv)}
+                            className="p-3 bg-slate-950 border border-slate-800 hover:border-emerald-500 rounded-xl cursor-pointer transition flex items-center justify-between"
+                          >
+                            <div>
+                              <h5 className="font-bold text-white text-xs">{inv.invoiceNumber}</h5>
+                              <p className="text-[11px] text-slate-400">{inv.customerName}</p>
+                              <span className="text-[10px] text-emerald-400 font-semibold">{inv.paymentStatus}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-bold text-emerald-400 text-xs">
+                                {currentUser.role === "ADMIN" || currentUser.role === "SUPERADMIN"
+                                  ? `Rp ${Number(inv.grandTotal || 0).toLocaleString("id-ID")}`
+                                  : "••••••••"}
+                              </span>
+                              <span className="block text-[10px] text-slate-500">{inv.date}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  )}
 
-                  {attachModalType === "task" &&
-                    companyTasks.map((tsk) => (
-                      <div
-                        key={tsk.id}
-                        onClick={() => handleSendTask(tsk)}
-                        className="p-3 bg-slate-950 border border-slate-800 hover:border-cyan-500 rounded-xl cursor-pointer transition flex items-center justify-between"
-                      >
-                        <div>
-                          <h5 className="font-bold text-white text-xs">{tsk.title}</h5>
-                          <p className="text-[11px] text-slate-400">Klien: {tsk.client}</p>
-                          <span className="text-[10px] text-cyan-400 font-semibold">{tsk.status}</span>
+                  {attachModalType === "task" && (
+                    <>
+                      {companyTasks.length === 0 ? (
+                        <div className="py-8 text-center text-slate-400">
+                          <ClipboardList className="w-10 h-10 mx-auto mb-2 text-slate-600" />
+                          <p className="text-xs font-bold text-slate-300">Belum Ada SPK Khusus Proyek Ini</p>
+                          <p className="text-[11px] text-slate-500 max-w-xs mx-auto mt-1">
+                            SPK proyek lain sengaja disembunyikan agar tidak salah penugasan perintah kerja. Anda dapat membuat SPK baru di modul Manajemen Tugas.
+                          </p>
                         </div>
-                        <div className="text-right">
-                          <span className="text-[10px] px-2 py-0.5 bg-cyan-500/20 text-cyan-300 rounded font-bold">
-                            {tsk.priority}
-                          </span>
-                          <span className="block text-[10px] text-slate-500 mt-1">{tsk.technician}</span>
-                        </div>
-                      </div>
-                    ))}
+                      ) : (
+                        companyTasks.map((tsk) => (
+                          <div
+                            key={tsk.id}
+                            onClick={() => handleSendTask(tsk)}
+                            className="p-3 bg-slate-950 border border-slate-800 hover:border-cyan-500 rounded-xl cursor-pointer transition flex items-center justify-between"
+                          >
+                            <div>
+                              <h5 className="font-bold text-white text-xs">{tsk.title}</h5>
+                              <p className="text-[11px] text-slate-400">Klien: {tsk.client}</p>
+                              <span className="text-[10px] text-cyan-400 font-semibold">{tsk.status}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] px-2 py-0.5 bg-cyan-500/20 text-cyan-300 rounded font-bold">
+                                {tsk.priority}
+                              </span>
+                              <span className="block text-[10px] text-slate-500 mt-1">{tsk.technician}</span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
             )}
