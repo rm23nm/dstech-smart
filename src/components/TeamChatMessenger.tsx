@@ -553,6 +553,37 @@ export default function TeamChatMessenger({
         setMessages((prev) => [...prev, data.message]);
         setAttachModalType(null);
         loadChats();
+
+        // Sinkronkan juga laporan bukti pekerjaan ini ke sistem Laporan Harian resmi & Tiket
+        try {
+          fetch("/api/employee/daily-reports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              activityDescription: report.activityDescription || "Pekerjaan Lapangan",
+              progressPercentage: report.progressPercentage || 100,
+              ticketNumber: report.ticketNumber || "",
+              taskTitle: report.taskTitle || "Pekerjaan Lapangan",
+              clientName: report.clientName || "Klien DSTech",
+              employeeId: currentUser.id,
+              employeeName: currentUser.name,
+              employeeEmail: (currentUser as any).email || "",
+              photos: report.photoUrl
+                ? [
+                    {
+                      id: `dstech_photo_${Date.now()}`,
+                      url: report.photoUrl,
+                      caption: report.taskTitle || "Bukti Pekerjaan Lapangan",
+                      category: "documentation",
+                      createdAt: new Date().toISOString(),
+                    },
+                  ]
+                : [],
+            }),
+          }).catch(() => {});
+        } catch (syncErr) {
+          console.error("Gagal sinkron laporan ke database harian:", syncErr);
+        }
       }
     } catch (err) {
       console.error("Gagal kirim laporan:", err);

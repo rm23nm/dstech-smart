@@ -513,6 +513,8 @@ export default function EmployeeDashboard() {
   // Modal State Pelaporan Kerja Harian Teknisi (Tugas 137 & 138)
   const [isDailyReportModalOpen, setIsDailyReportModalOpen] = useState<boolean>(false);
   const [isSubmittingDailyReport, setIsSubmittingDailyReport] = useState<boolean>(false);
+  const [isUploadingDailyReportPhoto, setIsUploadingDailyReportPhoto] = useState<boolean>(false);
+  const [dailyReportPhotoCaption, setDailyReportPhotoCaption] = useState<string>("");
   const [dailyReportForm, setDailyReportForm] = useState({
     date: getTodayWibDate(),
     reportTime: "",
@@ -1793,7 +1795,7 @@ export default function EmployeeDashboard() {
     });
   };
 
-  // Upload photo handler for technicians
+  // Upload photo handler for technicians (Modal Task Status)
   const handleUploadTaskPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1801,7 +1803,12 @@ export default function EmployeeDashboard() {
     try {
       setIsUploadingTaskPhoto(true);
       showToast("Mengompresi foto ke ~40 KB...");
-      const fileToUpload = await compressTechnicianPhoto(file, 40);
+      let fileToUpload = file;
+      try {
+        fileToUpload = await compressTechnicianPhoto(file, 40);
+      } catch (cErr) {
+        console.warn("Kompresi gagal, menggunakan file asli:", cErr);
+      }
 
       const fd = new FormData();
       fd.append("file", fileToUpload);
@@ -1829,7 +1836,7 @@ export default function EmployeeDashboard() {
           photos: [...(prev.photos || []), newPhoto],
         }));
         setTaskPhotoCaption("");
-        showToast("Foto berhasil diunggah!");
+        showToast("✓ Foto berhasil diunggah!");
       } else {
         showToast("Gagal unggah foto: " + (json.message || "Error"));
       }
@@ -1844,6 +1851,63 @@ export default function EmployeeDashboard() {
   // Remove photo from taskStatusForm
   const handleRemoveTaskPhoto = (photoId: string) => {
     setTaskStatusForm((prev) => ({
+      ...prev,
+      photos: (prev.photos || []).filter((p) => p.id !== photoId),
+    }));
+  };
+
+  // Upload photo handler for Daily Report (Modal 11)
+  const handleUploadDailyReportPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploadingDailyReportPhoto(true);
+      showToast("Mengompresi foto bukti pekerjaan...");
+      let fileToUpload = file;
+      try {
+        fileToUpload = await compressTechnicianPhoto(file, 40);
+      } catch (cErr) {
+        console.warn("Kompresi gagal, menggunakan file asli:", cErr);
+      }
+
+      const fd = new FormData();
+      fd.append("file", fileToUpload);
+      fd.append("docType", "technician_photo");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const json = await res.json();
+      if (json.success && json.url) {
+        const newPhoto: TaskPhoto = {
+          id: `dstech_daily_photo_${Date.now()}`,
+          url: json.url,
+          caption: dailyReportPhotoCaption.trim() || "Dokumentasi Bukti Pekerjaan Harian",
+          category: "documentation",
+          createdAt: new Date().toISOString(),
+        };
+        setDailyReportForm((prev) => ({
+          ...prev,
+          photos: [...(prev.photos || []), newPhoto],
+        }));
+        setDailyReportPhotoCaption("");
+        showToast("✓ Foto bukti pekerjaan berhasil dilampirkan!");
+      } else {
+        showToast("Gagal unggah foto: " + (json.message || "Error"));
+      }
+    } catch (err: any) {
+      showToast("Error upload: " + err.message);
+    } finally {
+      setIsUploadingDailyReportPhoto(false);
+      e.target.value = "";
+    }
+  };
+
+  // Remove photo from dailyReportForm
+  const handleRemoveDailyReportPhoto = (photoId: string) => {
+    setDailyReportForm((prev) => ({
       ...prev,
       photos: (prev.photos || []).filter((p) => p.id !== photoId),
     }));
@@ -7641,6 +7705,71 @@ export default function EmployeeDashboard() {
                   className="w-full p-3 rounded-2xl border border-slate-200 bg-slate-50 text-xs font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 leading-relaxed"
                   required
                 />
+              </div>
+
+              {/* LAMPIRAN FOTO BUKTI PEKERJAAN HARIAN */}
+              <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Camera className="w-4 h-4 text-emerald-700" />
+                    <span className="font-black text-slate-900 text-xs">
+                      Foto Bukti Pekerjaan Lapangan ({dailyReportForm.photos?.length || 0} Terlampir)
+                    </span>
+                  </div>
+                  {dailyReportForm.photos && dailyReportForm.photos.length > 0 && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                      ✓ Siap Dikirim
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Keterangan foto (misal: Penarikan kabel outdoor / Pemasangan sensor)..."
+                    value={dailyReportPhotoCaption}
+                    onChange={(e) => setDailyReportPhotoCaption(e.target.value)}
+                    className="flex-1 p-2.5 rounded-xl border border-slate-200 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <label className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shrink-0">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>{isUploadingDailyReportPhoto ? "Mengunggah..." : "Pilih / Kamera"}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleUploadDailyReportPhoto}
+                      disabled={isUploadingDailyReportPhoto}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Previews Foto Daily Report */}
+                {dailyReportForm.photos && dailyReportForm.photos.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                    {dailyReportForm.photos.map((p) => (
+                      <div key={p.id} className="relative rounded-xl overflow-hidden border border-emerald-200 bg-white group shadow-2xs">
+                        <img src={p.url} alt={p.caption} className="w-full h-20 object-cover" />
+                        <div className="p-1.5 text-[9px]">
+                          <p className="font-semibold text-slate-700 truncate">{p.caption}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveDailyReportPhoto(p.id)}
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-600 text-white rounded-full flex items-center justify-center opacity-85 hover:opacity-100 cursor-pointer shadow-xs"
+                          title="Hapus foto ini"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-400 italic text-center py-1">
+                    Opsional: Lampirkan foto bukti pekerjaan agar laporan harian langsung tervalidasi oleh sistem dan manajemen.
+                  </p>
+                )}
               </div>
 
               {/* Kendala & Rencana Besok */}

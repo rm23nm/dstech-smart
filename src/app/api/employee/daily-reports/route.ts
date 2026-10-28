@@ -155,6 +155,15 @@ export async function POST(request: Request) {
               photos: newReport.photos,
               createdAt: newReport.createdAt,
             });
+            if (Array.isArray(newReport.photos) && newReport.photos.length > 0) {
+              prj.photos = [...(prj.photos || []), ...newReport.photos];
+            }
+            if (newReport.activityDescription) {
+              prj.report = `${prj.report ? prj.report + "\n\n" : ""}[${newReport.date} - ${newReport.employeeName}] (${newReport.progressPercentage}%): ${newReport.activityDescription}`;
+            }
+            if (body.statusAfter) {
+              prj.status = body.statusAfter;
+            }
             fs.writeFileSync(FINANCE_FILE, JSON.stringify(financeData, null, 2), "utf-8");
           }
         }
@@ -178,6 +187,9 @@ export async function POST(request: Request) {
             task.report = `${task.report ? task.report + "\n\n" : ""}[${newReport.date} - ${newReport.employeeName}] (${newReport.progressPercentage}%): ${newReport.activityDescription}`;
             if (body.statusAfter) {
               task.status = body.statusAfter;
+            }
+            if (Array.isArray(newReport.photos) && newReport.photos.length > 0) {
+              task.photos = [...(task.photos || []), ...newReport.photos];
             }
             if (!Array.isArray(task.dailyLogs)) {
               task.dailyLogs = [];
