@@ -131,6 +131,8 @@ export default function TeamChatMessenger({
   const [companyOrders, setCompanyOrders] = useState<any[]>([]);
   const [clientActiveOrder, setClientActiveOrder] = useState<any | null>(null);
   const [dataSearch, setDataSearch] = useState("");
+  const [showAllCompanyData, setShowAllCompanyData] = useState(false);
+  const [isDataFilteredByTarget, setIsDataFilteredByTarget] = useState(false);
 
   // State Form Bukti Pekerjaan Lapangan Cepat
   const [reportForm, setReportForm] = useState({
@@ -349,13 +351,23 @@ export default function TeamChatMessenger({
   // Load Data Perusahaan untuk Lampiran
   const loadCompanyData = async (type: "invoices" | "tasks" | "reports" | "products" | "orders") => {
     try {
-      const targetUserName = (!activeChat?.isGroup && activeChat?.name) ? activeChat.name : "";
+      const targetUserName = activeChat?.isClientChat
+        ? (activeChat.clientName || (activeChat.name ? activeChat.name.replace(/^klien:\s*/i, "") : ""))
+        : (!activeChat?.isGroup && activeChat?.name ? activeChat.name : "");
+      const targetPhone = activeChat?.isClientChat
+        ? (activeChat.clientPhone || "")
+        : (activeChat?.userPhone || "");
+      const targetClientId = activeChat?.clientId || "";
+      const targetUserId = (!activeChat?.isGroup && Array.isArray(activeChat?.participants))
+        ? (activeChat.participants.find((p: string) => p !== currentUser.id) || "")
+        : "";
       const chatIdParam = activeChat?.id || "";
       const projectIdParam = activeChat?.projectId || "";
       const chatNameParam = activeChat?.name || "";
+      const modeParam = showAllCompanyData ? "all" : "target";
 
       const res = await fetch(
-        `/api/team-chat?action=company_data&type=${type}&query=${encodeURIComponent(
+        `/api/team-chat?action=company_data&type=${type}&dataType=${type}&query=${encodeURIComponent(
           dataSearch
         )}&role=${encodeURIComponent(
           currentUser.role || "EMPLOYEE"
@@ -367,10 +379,17 @@ export default function TeamChatMessenger({
           projectIdParam
         )}&chatName=${encodeURIComponent(
           chatNameParam
-        )}&targetUserName=${encodeURIComponent(targetUserName)}`
+        )}&targetUserName=${encodeURIComponent(targetUserName)}&targetPhone=${encodeURIComponent(
+          targetPhone
+        )}&targetClientId=${encodeURIComponent(
+          targetClientId
+        )}&targetUserId=${encodeURIComponent(
+          targetUserId
+        )}&mode=${modeParam}`
       );
       const data = await res.json();
       if (data.success) {
+        setIsDataFilteredByTarget(!!data.isFilteredByTarget);
         if (type === "invoices") setCompanyInvoices(data.data || []);
         if (type === "tasks") {
           setCompanyTasks(data.data || []);
@@ -411,14 +430,22 @@ export default function TeamChatMessenger({
         }));
       }
     }
-  }, [attachModalType, dataSearch, activeChat?.id]);
+  }, [attachModalType, dataSearch, activeChat?.id, showAllCompanyData]);
 
   // Otomatis deteksi pesanan klien web saat Admin/CS membuka chat klien
   useEffect(() => {
     if (activeChat?.isClientChat) {
       const q = (activeChat.clientPhone || activeChat.clientName || "").trim();
       if (q) {
-        fetch(`/api/team-chat?action=company_data&dataType=orders&query=${encodeURIComponent(q)}`)
+        fetch(
+          `/api/team-chat?action=company_data&type=orders&dataType=orders&query=${encodeURIComponent(
+            q
+          )}&targetPhone=${encodeURIComponent(
+            activeChat.clientPhone || ""
+          )}&targetUserName=${encodeURIComponent(
+            activeChat.clientName || ""
+          )}&targetClientId=${encodeURIComponent(activeChat.clientId || "")}`
+        )
           .then((res) => res.json())
           .then((res) => {
             if (res.success && Array.isArray(res.data) && res.data.length > 0) {
@@ -1484,6 +1511,8 @@ export default function TeamChatMessenger({
                   !activeChat.isGroup && (
                   <button
                     onClick={() => {
+                      setShowAllCompanyData(false);
+                      setDataSearch("");
                       setAttachModalType("invoice");
                       setShowAttachMenu(false);
                     }}
@@ -1501,6 +1530,7 @@ export default function TeamChatMessenger({
 
                 <button
                   onClick={() => {
+                    setDataSearch("");
                     setAttachModalType("product");
                     setShowAttachMenu(false);
                   }}
@@ -1517,6 +1547,8 @@ export default function TeamChatMessenger({
 
                 <button
                   onClick={() => {
+                    setShowAllCompanyData(false);
+                    setDataSearch("");
                     setAttachModalType("order");
                     setShowAttachMenu(false);
                   }}
@@ -1862,6 +1894,44 @@ export default function TeamChatMessenger({
                   </div>
                 )}
 
+                {/* Banner Status Filter Khusus Lawan Bicara (Invoice & Pesanan) */}
+                {(attachModalType === "invoice" || attachModalType === "order") && !activeChat?.isGroup && (
+                  <div className="mb-3 p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${!showAllCompanyData ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+                      <div className="min-w-0">
+                        <span className="text-[11px] text-slate-300 block truncate">
+                          {!showAllCompanyData ? (
+                            <>
+                              <strong className="text-emerald-400">🔒 Terkunci Khusus:</strong> <span className="text-white font-bold">{activeChat?.name}</span> {activeChat?.userPhone || activeChat?.clientPhone ? `(${activeChat.userPhone || activeChat.clientPhone})` : ""}
+                            </>
+                          ) : (
+                            <span className="text-amber-300 font-bold">⚠️ Mode Pencarian Seluruh Database</span>
+                          )}
+                        </span>
+                        <span className="text-[10px] text-slate-500 block truncate">
+                          {!showAllCompanyData
+                            ? "Dokumen & data pihak lain otomatis disembunyikan demi menjaga kerahasiaan."
+                            : "Menampilkan semua data transaksi tanpa batasan kontak aktif."}
+                        </span>
+                      </div>
+                    </div>
+                    {(currentUser.role === "SUPERADMIN" || currentUser.role === "ADMIN") && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllCompanyData(!showAllCompanyData)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer shrink-0 ${
+                          showAllCompanyData
+                            ? "bg-emerald-600/30 text-emerald-300 border border-emerald-500"
+                            : "bg-slate-800 text-slate-300 hover:text-white border border-slate-700"
+                        }`}
+                      >
+                        {showAllCompanyData ? "Kembali ke Filter Khusus" : "Cari Semua"}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className="relative mb-3">
                   <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
@@ -1870,7 +1940,13 @@ export default function TeamChatMessenger({
                     onChange={(e) => setDataSearch(e.target.value)}
                     placeholder={
                       attachModalType === "invoice"
-                        ? "Cari invoice tagihan user ini..."
+                        ? !showAllCompanyData
+                          ? `Cari tagihan milik ${activeChat?.name || "user ini"}...`
+                          : "Cari semua nomor invoice, nama pelanggan..."
+                        : attachModalType === "order"
+                        ? !showAllCompanyData
+                          ? `Cari pesanan / resi milik ${activeChat?.name || "klien ini"}...`
+                          : "Cari semua nomor pesanan (ORD/DST/...), no resi, nama pembeli..."
                         : attachModalType === "product"
                         ? "Cari nama produk, kategori, spesifikasi..."
                         : "Cari SPK penugasan proyek..."
@@ -1946,9 +2022,13 @@ export default function TeamChatMessenger({
                       {companyOrders.length === 0 ? (
                         <div className="py-8 text-center text-slate-400">
                           <Truck className="w-10 h-10 mx-auto mb-2 text-slate-600" />
-                          <p className="text-xs font-bold text-slate-300">Data Pesanan Tidak Ditemukan</p>
+                          <p className="text-xs font-bold text-slate-300">
+                            Tidak Ada Pesanan Khusus {!showAllCompanyData && activeChat?.name ? activeChat.name : "Klien Ini"}
+                          </p>
                           <p className="text-[11px] text-slate-500 max-w-xs mx-auto mt-1">
-                            Gunakan pencarian di atas untuk mencari berdasarkan Nomor Pesanan (ORD/DST/...), No. Resi, atau Nama/No. HP Pembeli.
+                            {!showAllCompanyData
+                              ? "Pesanan dan nomor resi pihak lain otomatis disembunyikan demi perlindungan privasi data pelanggan."
+                              : "Data pesanan tidak ditemukan dengan kata kunci pencarian tersebut."}
                           </p>
                         </div>
                       ) : (
@@ -2004,9 +2084,13 @@ export default function TeamChatMessenger({
                       {companyInvoices.length === 0 ? (
                         <div className="py-8 text-center text-slate-400">
                           <FileText className="w-10 h-10 mx-auto mb-2 text-slate-600" />
-                          <p className="text-xs font-bold text-slate-300">Tidak Ada Tagihan Khusus {activeChat?.name}</p>
+                          <p className="text-xs font-bold text-slate-300">
+                            Tidak Ada Tagihan Khusus {!showAllCompanyData && activeChat?.name ? activeChat.name : "User Ini"}
+                          </p>
                           <p className="text-[11px] text-slate-500 max-w-xs mx-auto mt-1">
-                            Hanya menampilkan invoice yang berkenaan dengan user ini untuk mencegah salah melampirkan invoice tagihan pihak lain.
+                            {!showAllCompanyData
+                              ? "Hanya menampilkan faktur tagihan yang berkenaan dengan user ini untuk mencegah salah melampirkan invoice tagihan pihak lain."
+                              : "Tidak ada invoice tagihan yang cocok dengan kriteria pencarian."}
                           </p>
                         </div>
                       ) : (
@@ -2017,8 +2101,15 @@ export default function TeamChatMessenger({
                             className="p-3 bg-slate-950 border border-slate-800 hover:border-emerald-500 rounded-xl cursor-pointer transition flex items-center justify-between"
                           >
                             <div>
-                              <h5 className="font-bold text-white text-xs">{inv.invoiceNumber}</h5>
-                              <p className="text-[11px] text-slate-400">{inv.customerName}</p>
+                              <div className="flex items-center gap-2">
+                                <h5 className="font-bold text-white text-xs">{inv.invoiceNumber}</h5>
+                                {inv.source === "ESTORE" && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">
+                                    E-Store
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-400">{inv.customerName} {inv.customerPhone ? `(${inv.customerPhone})` : ""}</p>
                               <span className="text-[10px] text-emerald-400 font-semibold">{inv.paymentStatus}</span>
                             </div>
                             <div className="text-right">

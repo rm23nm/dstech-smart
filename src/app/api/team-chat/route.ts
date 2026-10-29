@@ -318,13 +318,78 @@ export async function GET(request: Request) {
 
     // 3. Ambil data perusahaan untuk lampiran (Invoice, SPK Task, Laporan Bukti Kerja)
   if (action === "company_data") {
-    const dataType = searchParams.get("type") || "invoices";
-    const query = (searchParams.get("query") || "").toLowerCase();
+    const dataType = searchParams.get("type") || searchParams.get("dataType") || "invoices";
+    const query = (searchParams.get("query") || "").toLowerCase().trim();
     const userRole = (searchParams.get("role") || "").toUpperCase();
     const requesterName = (searchParams.get("userName") || "").toLowerCase();
     const chatId = searchParams.get("chatId") || "";
     const projectIdParam = searchParams.get("projectId") || "";
     const chatNameParam = searchParams.get("chatName") || "";
+    const targetUserName = (searchParams.get("targetUserName") || "").trim();
+    const targetPhone = (searchParams.get("targetPhone") || "").trim();
+    const targetClientId = (searchParams.get("targetClientId") || "").trim();
+    const targetUserId = (searchParams.get("targetUserId") || "").trim();
+    const mode = (searchParams.get("mode") || "").toLowerCase();
+
+    // Helper untuk normalisasi digit telepon (ambil 8-10 digit terakhir untuk pencocokan akurat)
+    const normalizePhoneDigits = (ph: string) => {
+      const d = (ph || "").replace(/\D/g, "");
+      return d.length > 8 ? d.slice(-9) : d;
+    };
+
+    // Helper untuk membersihkan nama dari gelar / prefix umum
+    const cleanPersonName = (rawName: string) => {
+      return (rawName || "")
+        .toLowerCase()
+        .replace(/^klien:\s*/i, "")
+        .replace(/\b(bapak|ibu|bpk|pak|pt|cv|st|se|sh|sk|ir|drs|dra|kom|m\.kom|s\.kom)\b/gi, "")
+        .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+
+    // Helper pencocokan identitas lawan bicara
+    const isMatchedTarget = (
+      recName: string,
+      recPhone: string,
+      recClientId?: string,
+      recUserId?: string
+    ) => {
+      // 1. Cek Client ID / User ID
+      if (targetClientId && recClientId && (recClientId === targetClientId || recClientId.includes(targetClientId) || targetClientId.includes(recClientId))) return true;
+      if (targetUserId && recUserId && (recUserId === targetUserId || recUserId.includes(targetUserId) || targetUserId.includes(recUserId))) return true;
+
+      // 2. Cek Nomor Telepon / WhatsApp (akurasi tertinggi)
+      if (targetPhone && recPhone) {
+        const normTarget = normalizePhoneDigits(targetPhone);
+        const normRec = normalizePhoneDigits(recPhone);
+        if (normTarget.length >= 6 && normRec.length >= 6) {
+          if (normTarget.includes(normRec) || normRec.includes(normTarget)) {
+            return true;
+          }
+        }
+      }
+
+      // 3. Cek Nama Lawan Bicara
+      if (targetUserName && recName) {
+        const cTarget = cleanPersonName(targetUserName);
+        const cRec = cleanPersonName(recName);
+        if (cTarget && cRec) {
+          if (cTarget.includes(cRec) || cRec.includes(cTarget)) {
+            return true;
+          }
+          // Periksa kesamaan kata nama unik (minimal 3 karakter)
+          const targetWords = cTarget.split(" ").filter((w) => w.length >= 3);
+          const recWords = cRec.split(" ").filter((w) => w.length >= 3);
+          const hasCommonWord = targetWords.some((tw) =>
+            recWords.some((rw) => rw === tw || rw.includes(tw) || tw.includes(rw))
+          );
+          if (hasCommonWord) return true;
+        }
+      }
+
+      return false;
+    };
 
     const financeData = readJsonSafe(FINANCE_FILE, { sales: [], projects: [] });
     const allProjects = Array.isArray(financeData.projects) ? financeData.projects : [];
@@ -369,34 +434,99 @@ export async function GET(request: Request) {
         }, { status: 403 });
       }
 
-      const targetUserName = (searchParams.get("targetUserName") || "").toLowerCase();
-      let invoices = (financeData.sales || []).map((inv: any) => ({
+      const hasTargetContext = Boolean(targetUserName || targetPhone || targetClientId || targetUserId);
+      const isSearchAll = mode === "all";
+
+      // 1. Data Faktur Penjualan dari modul Finance ERP
+      const erpSales = (financeData.sales || []).map((inv: any) => ({
         id: inv.id,
         invoiceNumber: inv.invoiceNumber || "INV-UNKNOWN",
+        orderNumber: inv.orderNumber || "",
         customerName: inv.customerName || "Klien Umum",
+        customerPhone: inv.customerPhone || "",
         grandTotal: inv.grandTotal || 0,
         paymentStatus: inv.paymentStatus || "Belum Bayar",
         date: inv.date || new Date().toISOString().split("T")[0],
         invoiceType: inv.invoiceType || "Standard",
+        projectId: inv.projectId || "",
+        source: "ERP",
       }));
 
-      // Filter ketat: jika sedang berada di percakapan pribadi / DM dengan user tertentu,
-      // HANYA tampilkan invoice milik user tersebut agar tidak salah mengirimkan invoice pihak lain!
-      if (targetUserName) {
+      // 2. Data Faktur dari Pesanan Toko Online E-Store (dstech_orders.json)
+      const ordersData = readJsonSafe(ORDERS_FILE, { orders: [] });
+      const rawOrders = Array.isArray(ordersData) ? ordersData : (Array.isArray(ordersData.orders) ? ordersData.orders : []);
+      const estoreInvoices = rawOrders.map((o: any) => {
+        const totalVal = o.total || o.grandTotal || 0;
+        const statusMap: Record<string, string> = {
+          PENDING: "Menunggu Pembayaran",
+          BELUM_BAYAR: "Menunggu Pembayaran",
+          PAID: "Lunas / Terverifikasi",
+          MENUNGGU_KONFIRMASI: "Menunggu Konfirmasi Gudang",
+          PROCESSING: "Sedang Diproses Gudang",
+          DIPROSES: "Sedang Diproses",
+          SHIPPED: "Sedang Dikirim",
+          DIKIRIM: "Sedang Dikirim",
+          DELIVERED: "Lunas & Selesai",
+          SELESAI: "Lunas & Selesai",
+          CANCELLED: "Dibatalkan",
+          DIBATALKAN: "Dibatalkan",
+        };
+        return {
+          id: o.id,
+          invoiceNumber: o.invoiceNumber || `INV-${(o.orderNumber || o.id).replace(/[^a-zA-Z0-9]/g, "")}`,
+          orderNumber: o.orderNumber || o.id,
+          customerName: o.customerName || o.shippingAddress?.recipientName || "Pelanggan E-Store",
+          customerPhone: o.customerPhone || o.shippingAddress?.phone || "",
+          grandTotal: totalVal,
+          paymentStatus: statusMap[(o.status || "").toUpperCase()] || o.status || "Menunggu Pembayaran",
+          date: o.createdAt ? o.createdAt.split("T")[0] : new Date().toISOString().split("T")[0],
+          invoiceType: "Faktur E-Store",
+          projectId: "",
+          source: "ESTORE",
+          userId: o.userId || "",
+        };
+      });
+
+      let invoices = [...erpSales, ...estoreInvoices];
+
+      // FILTER KETAT PRIVASI:
+      // A. Jika di dalam grup proyek koordinasi:
+      if (linkedProject && !isSearchAll) {
+        const prjClient = cleanPersonName(linkedProject.clientName || "");
+        const prjId = linkedProject.id;
         invoices = invoices.filter((inv: any) => {
-          const cName = (inv.customerName || "").toLowerCase();
-          return cName.includes(targetUserName) || targetUserName.includes(cName);
+          const cName = cleanPersonName(inv.customerName || "");
+          return (prjClient && (cName.includes(prjClient) || prjClient.includes(cName))) ||
+                 (inv.projectId && inv.projectId === prjId);
         });
+      }
+      // B. Jika di dalam chat DM atau chat klien dengan lawan bicara tertentu:
+      else if (hasTargetContext && !isSearchAll) {
+        invoices = invoices.filter((inv: any) =>
+          isMatchedTarget(
+            inv.customerName,
+            inv.customerPhone,
+            inv.userId,
+            inv.userId
+          )
+        );
       }
 
       if (query) {
         invoices = invoices.filter(
           (inv: any) =>
             inv.invoiceNumber.toLowerCase().includes(query) ||
-            inv.customerName.toLowerCase().includes(query)
+            inv.customerName.toLowerCase().includes(query) ||
+            (inv.orderNumber && inv.orderNumber.toLowerCase().includes(query)) ||
+            (inv.customerPhone && inv.customerPhone.includes(query))
         );
       }
-      return NextResponse.json({ success: true, data: invoices.slice(0, 50), projectInfo });
+      return NextResponse.json({
+        success: true,
+        data: invoices.slice(0, 50),
+        projectInfo,
+        isFilteredByTarget: hasTargetContext && !isSearchAll,
+      });
     }
 
     if (dataType === "tasks") {
@@ -519,7 +649,7 @@ export async function GET(request: Request) {
           DELIVERED: "Pesanan Diterima",
           SELESAI: "Selesai",
           CANCELLED: "Dibatalkan",
-          DIBATALKAN: "Dibatalkan"
+          DIBATALKAN: "Dibatalkan",
         };
         const totalVal = o.total || o.grandTotal || 0;
         return {
@@ -535,14 +665,30 @@ export async function GET(request: Request) {
           trackingNumber: o.trackingNumber || "",
           total: totalVal,
           totalFormatted: new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(totalVal),
+          userId: o.userId || "",
           items: (o.items || []).map((it: any) => ({
             name: it.productName || it.name,
             qty: it.qty || 1,
             price: it.price || 0,
-            image: it.image || "/service-software.png"
-          }))
+            image: it.image || "/service-software.png",
+          })),
         };
       });
+
+      // FILTER KETAT PRIVASI LAWAN BICARA:
+      const hasTargetContext = Boolean(targetUserName || targetPhone || targetClientId || targetUserId);
+      const isSearchAll = mode === "all";
+
+      if (hasTargetContext && !isSearchAll) {
+        orders = orders.filter((o: any) =>
+          isMatchedTarget(
+            o.customerName,
+            o.customerPhone,
+            o.userId,
+            o.userId
+          )
+        );
+      }
 
       if (query) {
         const qClean = query.toLowerCase();
@@ -555,7 +701,12 @@ export async function GET(request: Request) {
           (digits.length >= 4 && o.customerPhone.replace(/\D/g, "").includes(digits))
         );
       }
-      return NextResponse.json({ success: true, data: orders.slice(0, 50), projectInfo });
+      return NextResponse.json({
+        success: true,
+        data: orders.slice(0, 50),
+        projectInfo,
+        isFilteredByTarget: hasTargetContext && !isSearchAll,
+      });
     }
 
     return NextResponse.json({ success: false, error: "Tipe data perusahaan tidak valid" }, { status: 400 });

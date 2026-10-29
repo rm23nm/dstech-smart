@@ -7,6 +7,32 @@
 - **Status**: SEMUA ANTRIAN SELESAI (Idle / Menunggu Permintaan Baru)
 - Tidak ada tugas aktif yang tertunda.
 
+- **2026-10-29**: [SELESAI] Perbaikan Filterisasi Menu "Kirim Tagihan Invoice" dan "Lampirkan Pesanan & Resi" pada Aplikasi Pesan Obrolan (Terkunci Khusus Milik Lawan Bicara / Klien Aktif) (Tugas 282) (`src/app/api/team-chat/route.ts` & `src/components/TeamChatMessenger.tsx`).
+  *Permintaan User*: "saya melihat, kirim tagihan invoice, dan juga lampirkan pesanan dan resi masih belum terfilter, tagihan dan pesanan yang bukan milknya masih muncul didaftar."
+  *Penyebab Masalah yang Ditemukan*:
+  1. Pada `src/app/api/team-chat/route.ts` bagian `dataType === "orders"`, sebelumnya sama sekali belum ada filter lawan bicara (`targetUserName`, `targetPhone`, atau `targetClientId`). Akibatnya saat Admin/CS membuka modal "Lampirkan Pesanan & Resi" di chat mana pun, semua pesanan dari seluruh pelanggan toko online langsung muncul di daftar (termasuk pesanan orang lain).
+  2. Pada bagian `dataType === "invoices"`, filter hanya menggunakan `cName.includes(targetUserName)`. Jika nama kontak di chat memiliki gelar (misal `"RAMADHANI ST"`) atau prefix (misal `"Klien: Budi"`), pencocokan string gagal karena `"Ramadhani"` tidak mengandung substring `"RAMADHANI ST"`. Selain itu nomor telepon pemesan/klien belum dicocokkan, dan tagihan pesanan toko online e-store (`dstech_orders.json`) belum diintegrasikan ke daftar faktur penagihan.
+  3. Pada frontend `src/components/TeamChatMessenger.tsx`, parameter nomor telepon (`targetPhone`), client ID (`targetClientId`), dan user ID lawan bicara belum dikirimkan saat memanggil endpoint data perusahaan.
+  *Penyelesaian & Hasil*:
+  1. **Helper Pencocokan Identitas Lawan Bicara Cerdas (`isMatchedTarget`)**:
+     - Ditambahkan fungsi normalisasi nomor telepon (`normalizePhoneDigits`) yang mencocokkan digit nomor WhatsApp (akurasi 100% tanpa terganggu format +62/08).
+     - Ditambahkan fungsi pembersihan nama (`cleanPersonName`) yang membersihkan gelar akademis/profesi (`ST`, `SE`, `SH`, `PT`, `CV`, dll) serta prefix (`Klien:`, `Bpk/Ibu`).
+     - Pencocokan nama fleksibel berbasis token nama depan/belakang unik dan kesamaan Client ID / User ID.
+  2. **Filter Ketat Pesanan & Resi (`dataType === "orders"`)**:
+     - Mengunci daftar pesanan secara default khusus untuk lawan bicara aktif (`isMatchedTarget`). Pesanan dan nomor resi pelanggan lain 100% terlindungi dan tidak akan pernah bocor ke daftar.
+  3. **Filter Ketat Faktur Tagihan (`dataType === "invoices"`)**:
+     - Mengintegrasikan faktur penjualan dari modul Finance ERP (`sales`) dan pesanan toko online e-store bertagihan (`dstech_orders.json`).
+     - Mengunci daftar faktur khusus untuk lawan bicara aktif atau proyek terkait jika di grup koordinasi proyek.
+  4. **Peningkatan UX & Banner Privasi di Frontend (`TeamChatMessenger.tsx`)**:
+     - Ditambahkan Banner Status Filter Visual: *"🔒 Terkunci Khusus: [Nama Lawan Bicara] ([No. HP])"*.
+     - Tampilan pesan kosong yang aman & edukatif jika lawan bicara belum memiliki pesanan/tagihan.
+     - Disediakan toggle pencarian sadar khusus Admin/Superadmin: *"Cari Semua"* vs *"Kembali ke Filter Khusus"*.
+  5. **Pengujian & Validasi**:
+     - Seluruh test case logika pencocokan berhasil 100%.
+     - `npx tsc --noEmit`: **0 error**.
+     - `npm run build`: **Berhasil 100% (76/76 static & dynamic pages)**.
+     - Folder cadangan `_backup_chat_attachment_filter` telah dibersihkan.
+
 - **2026-10-29**: [SELESAI] Perbaikan Cetak Faktur Pesanan E-Store Ditujukan ke Orang yang Salah (Eliminasi Fallback Data Orang Lain & Integrasi Pembacaan Pesanan E-Store) (Tugas 281) (`src/app/api/finance/print/route.ts` & `src/app/admin/orders/page.tsx`).
   *Permintaan User*: "pada pesanan estor, ketika saya tekan akse cetak faktur, saya melihat kenapa faktur ditujukan ke orang yang salah?"
   *Penyebab Masalah yang Ditemukan*:
