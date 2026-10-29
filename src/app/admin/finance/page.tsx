@@ -2139,6 +2139,7 @@ export default function AdminFinanceERPPage() {
     notes?: string;
     taxInvoiceNumber?: string;
     taxInvoiceUrl?: string;
+    businessEntity?: "PT" | "NON_PT" | string;
   }>({
     isOpen: false,
     docType: "SPH",
@@ -2165,6 +2166,7 @@ export default function AdminFinanceERPPage() {
     notes: "",
     taxInvoiceNumber: "",
     taxInvoiceUrl: "",
+    businessEntity: "PT",
   });
   const [sendTab, setSendTab] = useState<"whatsapp" | "email">("whatsapp");
   const [customPhoneInput, setCustomPhoneInput] = useState<string>("");
@@ -2243,6 +2245,7 @@ export default function AdminFinanceERPPage() {
     notes?: string;
     taxInvoiceNumber?: string;
     taxInvoiceUrl?: string;
+    businessEntity?: "PT" | "NON_PT" | string;
     initialTab?: "whatsapp" | "email";
   }) => {
     // 1. Auto-lookup email & phone dari master clients / suppliers jika belum terisi
@@ -2307,6 +2310,7 @@ export default function AdminFinanceERPPage() {
       notes: params.notes || "",
       taxInvoiceNumber: (params as any).taxInvoiceNumber || "",
       taxInvoiceUrl: (params as any).taxInvoiceUrl || "",
+      businessEntity: (params as any).businessEntity || "PT",
     };
 
     setSendDocModal(newModalState);
@@ -2373,7 +2377,8 @@ export default function AdminFinanceERPPage() {
   };
 
   const generateDocShareContent = (doc: typeof sendDocModal) => {
-    const companyName = "PT. DSTech Smart Perkasa";
+    const isNonPt = (doc as any).businessEntity === "NON_PT";
+    const companyName = isNonPt ? "DSTech Smart" : "PT. DSTech Smart Perkasa";
     const portalUrl = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
 
     // Format WA Text dengan PIC yang lebih personal jika terisi
@@ -2450,10 +2455,15 @@ export default function AdminFinanceERPPage() {
       waText += `🚚 *3. Surat Jalan Material (Delivery Order):*\n${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n\n`;
       waText += `📸 *4. Laporan Foto Dokumentasi & Part:*\n${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n\n`;
       waText += `🧾 *5. Kuitansi Pembayaran Sah:*\n${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n\n`;
-      if ((doc as any).taxInvoiceUrl) {
-        waText += `🏛️ *6. Faktur Pajak Elektronik (e-Faktur DJP / KPP):*\n${(doc as any).taxInvoiceUrl}\n${(doc as any).taxInvoiceNumber ? `(No. Seri Faktur Pajak: ${(doc as any).taxInvoiceNumber})\n\n` : '\n'}`;
-      } else if ((doc as any).taxInvoiceNumber) {
-        waText += `🏛️ *6. Faktur Pajak Elektronik (e-Faktur DJP):*\nNo. Seri Faktur Pajak (NSFP): ${(doc as any).taxInvoiceNumber}\n\n`;
+      // Khusus entitas PT: lampirkan Faktur Pajak Elektronik (Non-PT Non-PKP bebas PPN)
+      if (!isNonPt) {
+        if ((doc as any).taxInvoiceUrl) {
+          const rawTaxUrl = String((doc as any).taxInvoiceUrl);
+          const fullTaxUrl = rawTaxUrl.startsWith("http") ? rawTaxUrl : `${portalUrl}${rawTaxUrl.startsWith("/") ? "" : "/"}${rawTaxUrl}`;
+          waText += `🏛️ *6. Faktur Pajak Elektronik (e-Faktur DJP / KPP):*\n${fullTaxUrl}\n${(doc as any).taxInvoiceNumber ? `(No. Seri Faktur Pajak: ${(doc as any).taxInvoiceNumber})\n\n` : '\n'}`;
+        } else if ((doc as any).taxInvoiceNumber) {
+          waText += `🏛️ *6. Faktur Pajak Elektronik (e-Faktur DJP):*\nNo. Seri Faktur Pajak (NSFP): ${(doc as any).taxInvoiceNumber}\n\n`;
+        }
       }
 
       waText += `\n💳 *Rekening Resmi Pembayaran Transfer:*\n`;
@@ -2500,17 +2510,15 @@ export default function AdminFinanceERPPage() {
       emailBody += `• Berita Acara Serah Terima (BAST): ${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n`;
       emailBody += `• Surat Jalan Material (Delivery Order): ${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n`;
       emailBody += `• Laporan Foto Dokumentasi: ${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n`;
-      emailBody += `• Kuitansi Pembayaran: ${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n`;
-      if ((doc as any).taxInvoiceUrl) {
-        emailBody += `• Faktur Pajak Elektronik (e-Faktur DJP): ${(doc as any).taxInvoiceUrl}${(doc as any).taxInvoiceNumber ? ` (NSFP: ${(doc as any).taxInvoiceNumber})` : ''}\n`;
-      } else if ((doc as any).taxInvoiceNumber) {
-        emailBody += `• No. Seri Faktur Pajak (NSFP DJP): ${(doc as any).taxInvoiceNumber}\n`;
-      }
-      emailBody += `• Berita Acara (BAST): ${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n`;
-      emailBody += `• Surat Jalan: ${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n`;
-      emailBody += `• Foto Dokumentasi: ${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n`;
-      if ((doc.paidAmount && doc.paidAmount > 0) || doc.paymentStatus === "Lunas" || doc.paymentStatus === "Sebagian") {
-        emailBody += `• Kuitansi Pembayaran Sah: ${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n`;
+      emailBody += `• Kuitansi Pembayaran Sah: ${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n`;
+      if (!isNonPt) {
+        if ((doc as any).taxInvoiceUrl) {
+          const rawTaxUrl = String((doc as any).taxInvoiceUrl);
+          const fullTaxUrl = rawTaxUrl.startsWith("http") ? rawTaxUrl : `${portalUrl}${rawTaxUrl.startsWith("/") ? "" : "/"}${rawTaxUrl}`;
+          emailBody += `• Faktur Pajak Elektronik (e-Faktur DJP): ${fullTaxUrl}${(doc as any).taxInvoiceNumber ? ` (NSFP: ${(doc as any).taxInvoiceNumber})` : ''}\n`;
+        } else if ((doc as any).taxInvoiceNumber) {
+          emailBody += `• No. Seri Faktur Pajak (NSFP DJP): ${(doc as any).taxInvoiceNumber}\n`;
+        }
       }
       emailBody += `\nInstruksi Pembayaran Transfer Rekening Perusahaan:\n`;
       const docEntity = (doc as any).businessEntity === "NON_PT" ? "NON_PT" : "PT";
@@ -9940,6 +9948,31 @@ export default function AdminFinanceERPPage() {
                                 <span>Approval Faktur</span>
                               </button>
                             )}
+
+                            {/* Badge Status Lampiran e-Faktur Pajak Khusus Entitas PT */}
+                            {sale.businessEntity !== "NON_PT" && (
+                              sale.taxInvoiceUrl || sale.taxInvoiceNumber ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenTaxInvoiceModal(sale)}
+                                  title={`Faktur Pajak Elektronik (e-Faktur DJP) sudah dilampirkan (${sale.taxInvoiceNumber ? 'NSFP: ' + sale.taxInvoiceNumber : 'Berkas PDF Tersedia'}). Klik untuk meninjau / mengganti.`}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 transition-all cursor-pointer"
+                                >
+                                  <Landmark className="w-3 h-3 text-emerald-600" />
+                                  <span>e-Faktur Dilampirkan</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenTaxInvoiceModal(sale)}
+                                  title="Faktur Pajak belum dilampirkan. Klik di sini untuk melampirkan berkas PDF e-Faktur DJP & Nomor Seri Faktur Pajak."
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 transition-all cursor-pointer"
+                                >
+                                  <Landmark className="w-3 h-3 text-slate-500" />
+                                  <span>+ Lampirkan Pajak</span>
+                                </button>
+                              )
+                            )}
                           </div>
                         </td>
                         <td className="p-3 text-right whitespace-nowrap">
@@ -10064,6 +10097,29 @@ export default function AdminFinanceERPPage() {
                                   </span>
                                 )}
                               </button>
+
+                              {/* Tombol Kelola / Lampirkan e-Faktur Pajak Elektronik (DJP) */}
+                              {sale.businessEntity !== "NON_PT" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenTaxInvoiceModal(sale)}
+                                  title={
+                                    sale.taxInvoiceUrl || sale.taxInvoiceNumber
+                                      ? `Faktur Pajak Elektronik (e-Faktur DJP) Aktif: ${sale.taxInvoiceNumber || 'Berkas Terlampir'}. Klik untuk mengelola / mengunduh / mengganti.`
+                                      : "Kelola & Lampirkan Faktur Pajak Elektronik (e-Faktur DJP & NSFP)"
+                                  }
+                                  className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs hover:scale-105 shrink-0 relative ${
+                                    sale.taxInvoiceUrl || sale.taxInvoiceNumber
+                                      ? "bg-emerald-100 hover:bg-emerald-600 text-emerald-800 hover:text-white ring-1 ring-emerald-400"
+                                      : "bg-slate-100 hover:bg-slate-700 text-slate-700 hover:text-white border border-slate-300"
+                                  }`}
+                                >
+                                  <Landmark className="w-3.5 h-3.5" />
+                                  {(sale.taxInvoiceUrl || sale.taxInvoiceNumber) && (
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                                  )}
+                                </button>
+                              )}
                             </div>
 
                             {/* Baris 2 (Pasti 1 Baris): Komunikasi, Arsip & Manajemen Data */}
@@ -10092,6 +10148,7 @@ export default function AdminFinanceERPPage() {
                                     approvalStatus: sale.approvalStatus,
                                     taxInvoiceNumber: sale.taxInvoiceNumber,
                                     taxInvoiceUrl: sale.taxInvoiceUrl,
+                                    businessEntity: sale.businessEntity || "PT",
                                     initialTab: "whatsapp",
                                   })
                                 }
@@ -10125,6 +10182,7 @@ export default function AdminFinanceERPPage() {
                                     approvalStatus: sale.approvalStatus,
                                     taxInvoiceNumber: sale.taxInvoiceNumber,
                                     taxInvoiceUrl: sale.taxInvoiceUrl,
+                                    businessEntity: sale.businessEntity || "PT",
                                     initialTab: "email",
                                   })
                                 }
@@ -16370,6 +16428,29 @@ export default function AdminFinanceERPPage() {
                     </span>
                   )}
                 </button>
+
+                {/* Tombol Lampirkan / Kelola e-Faktur Pajak di Toolbar Cetak */}
+                {selectedInvoiceForPrint.businessEntity !== "NON_PT" && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenTaxInvoiceModal(selectedInvoiceForPrint)}
+                    title={
+                      selectedInvoiceForPrint.taxInvoiceUrl || selectedInvoiceForPrint.taxInvoiceNumber
+                        ? `e-Faktur DJP Aktif (${selectedInvoiceForPrint.taxInvoiceNumber || 'Berkas Terlampir'}). Klik untuk meninjau / mengelola.`
+                        : "Lampirkan berkas PDF e-Faktur DJP & NSFP untuk faktur ini"
+                    }
+                    className={`px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow cursor-pointer transition-all ${
+                      selectedInvoiceForPrint.taxInvoiceUrl || selectedInvoiceForPrint.taxInvoiceNumber
+                        ? "bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300"
+                    }`}
+                  >
+                    <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>
+                      {selectedInvoiceForPrint.taxInvoiceUrl || selectedInvoiceForPrint.taxInvoiceNumber ? "e-Faktur DJP" : "+ Lampirkan e-Faktur"}
+                    </span>
+                  </button>
+                )}
 
                 {/* Tombol Kirim Faktur & Berkas via WhatsApp */}
                 <button
@@ -30251,149 +30332,154 @@ export default function AdminFinanceERPPage() {
                   </span>
                   <span className="text-[10px] text-purple-700 font-bold">Siap Kirim / Akses Langsung</span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1">
-                  {/* Link 1: Faktur */}
-                  {(() => {
-                    const portal = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
-                    const enc = encodeURIComponent(sendDocModal.docNumber);
-                    const modalDocPin = getDocPin({
-                      id: sendDocModal.docNumber,
-                      quotationNumber: sendDocModal.docNumber,
-                      invoiceNumber: sendDocModal.docNumber,
-                      poNumber: sendDocModal.docNumber,
-                      orderNumber: sendDocModal.docNumber,
-                      date: sendDocModal.date,
-                      ...(sendDocModal as any),
-                    });
-                    const invUrl = `${portal}/api/finance/print?doc=invoice&no=${enc}`;
-                    const bastUrl = `${portal}/api/finance/print?doc=bast&no=${enc}`;
-                    const doUrl = `${portal}/api/finance/print?doc=delivery&no=${enc}`;
-                    const photoUrl = `${portal}/api/finance/print?doc=photos&no=${enc}`;
-                    const receiptUrl = `${portal}/api/finance/print?doc=receipt&no=${enc}`;
+                {(() => {
+                  const isModalNonPt = (sendDocModal as any).businessEntity === "NON_PT";
+                  const portal = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
+                  const enc = encodeURIComponent(sendDocModal.docNumber);
+                  const modalDocPin = getDocPin({
+                    id: sendDocModal.docNumber,
+                    quotationNumber: sendDocModal.docNumber,
+                    invoiceNumber: sendDocModal.docNumber,
+                    poNumber: sendDocModal.docNumber,
+                    orderNumber: sendDocModal.docNumber,
+                    date: sendDocModal.date,
+                    ...(sendDocModal as any),
+                  });
+                  const invUrl = `${portal}/api/finance/print?doc=invoice&no=${enc}`;
+                  const bastUrl = `${portal}/api/finance/print?doc=bast&no=${enc}`;
+                  const doUrl = `${portal}/api/finance/print?doc=delivery&no=${enc}`;
+                  const photoUrl = `${portal}/api/finance/print?doc=photos&no=${enc}`;
+                  const receiptUrl = `${portal}/api/finance/print?doc=receipt&no=${enc}`;
 
-                    return (
-                      <>
-                        <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
-                          <span className="text-[10px] font-black text-slate-800 block truncate">📄 Faktur</span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyContent(invUrl, "Link Faktur Penjualan")}
-                              className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
-                              title="Salin Link Faktur"
-                            >
-                              <Copy className="w-2.5 h-2.5" />
-                              <span>Salin</span>
-                            </button>
-                            <a
-                              href={`${invUrl}&pin=${modalDocPin}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
-                              title="Buka / Unduh Lembar Faktur"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          </div>
+                  return (
+                    <div className={`grid ${isModalNonPt ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"} gap-2 pt-1`}>
+                      {/* Link 1: Faktur */}
+                      <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                        <span className="text-[10px] font-black text-slate-800 block truncate">📄 Faktur</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyContent(invUrl, "Link Faktur Penjualan")}
+                            className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                            title="Salin Link Faktur"
+                          >
+                            <Copy className="w-2.5 h-2.5" />
+                            <span>Salin</span>
+                          </button>
+                          <a
+                            href={`${invUrl}&pin=${modalDocPin}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                            title="Buka / Unduh Lembar Faktur"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
                         </div>
+                      </div>
 
-                        <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
-                          <span className="text-[10px] font-black text-slate-800 block truncate">📝 BAST</span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyContent(bastUrl, "Link Berita Acara (BAST)")}
-                              className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
-                              title="Salin Link BAST"
-                            >
-                              <Copy className="w-2.5 h-2.5" />
-                              <span>Salin</span>
-                            </button>
-                            <a
-                              href={`${bastUrl}&pin=${modalDocPin}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
-                              title="Buka / Unduh Lembar BAST"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          </div>
+                      {/* Link 2: BAST */}
+                      <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                        <span className="text-[10px] font-black text-slate-800 block truncate">📝 BAST</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyContent(bastUrl, "Link Berita Acara (BAST)")}
+                            className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                            title="Salin Link BAST"
+                          >
+                            <Copy className="w-2.5 h-2.5" />
+                            <span>Salin</span>
+                          </button>
+                          <a
+                            href={`${bastUrl}&pin=${modalDocPin}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                            title="Buka / Unduh Lembar BAST"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
                         </div>
+                      </div>
 
-                        <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
-                          <span className="text-[10px] font-black text-slate-800 block truncate">🚚 Surat Jalan</span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyContent(doUrl, "Link Surat Jalan")}
-                              className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
-                              title="Salin Link Surat Jalan"
-                            >
-                              <Copy className="w-2.5 h-2.5" />
-                              <span>Salin</span>
-                            </button>
-                            <a
-                              href={`${doUrl}&pin=${modalDocPin}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
-                              title="Buka / Unduh Lembar Surat Jalan"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          </div>
+                      {/* Link 3: Surat Jalan */}
+                      <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                        <span className="text-[10px] font-black text-slate-800 block truncate">🚚 Surat Jalan</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyContent(doUrl, "Link Surat Jalan")}
+                            className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                            title="Salin Link Surat Jalan"
+                          >
+                            <Copy className="w-2.5 h-2.5" />
+                            <span>Salin</span>
+                          </button>
+                          <a
+                            href={`${doUrl}&pin=${modalDocPin}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                            title="Buka / Unduh Lembar Surat Jalan"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
                         </div>
+                      </div>
 
-                        <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
-                          <span className="text-[10px] font-black text-slate-800 block truncate">📸 Dokumentasi</span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyContent(photoUrl, "Link Laporan Dokumentasi Foto")}
-                              className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
-                              title="Salin Link Dokumentasi Foto"
-                            >
-                              <Copy className="w-2.5 h-2.5" />
-                              <span>Salin</span>
-                            </button>
-                            <a
-                              href={`${photoUrl}&pin=${modalDocPin}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
-                              title="Buka / Unduh Lembar Dokumentasi Foto"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          </div>
+                      {/* Link 4: Foto Dokumentasi */}
+                      <div className="p-2 bg-white rounded-xl border border-purple-200 shadow-2xs space-y-1">
+                        <span className="text-[10px] font-black text-slate-800 block truncate">📸 Foto Lapangan</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyContent(photoUrl, "Link Dokumentasi Foto")}
+                            className="flex-1 py-1 px-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                            title="Salin Link Dokumentasi Foto"
+                          >
+                            <Copy className="w-2.5 h-2.5" />
+                            <span>Salin</span>
+                          </button>
+                          <a
+                            href={`${photoUrl}&pin=${modalDocPin}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                            title="Buka / Unduh Lembar Foto Dokumentasi"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
                         </div>
-                        {/* Link 5: Kuitansi Pembayaran */}
-                        <div className="p-2 bg-white rounded-xl border border-emerald-300 shadow-2xs space-y-1">
-                          <span className="text-[10px] font-black text-emerald-950 block truncate">🧾 Kuitansi</span>
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleCopyContent(receiptUrl, "Link Kuitansi Resmi")}
-                              className="flex-1 py-1 px-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
-                              title="Salin Link Kuitansi"
-                            >
-                              <Copy className="w-2.5 h-2.5" />
-                              <span>Salin</span>
-                            </button>
-                            <a
-                              href={`${receiptUrl}&pin=${modalDocPin}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
-                              title="Buka / Unduh Lembar Kuitansi"
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          </div>
-                        </div>
+                      </div>
 
-                        {/* Link 6: Faktur Pajak DJP */}
+                      {/* Link 5: Kuitansi Pembayaran Sah */}
+                      <div className="p-2 bg-white rounded-xl border border-emerald-300 shadow-2xs space-y-1">
+                        <span className="text-[10px] font-black text-emerald-900 block truncate">🧾 Kuitansi Sah</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyContent(receiptUrl, "Link Kuitansi Pembayaran Sah")}
+                            className="flex-1 py-1 px-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                            title="Salin Link Kuitansi Sah"
+                          >
+                            <Copy className="w-2.5 h-2.5" />
+                            <span>Salin</span>
+                          </button>
+                          <a
+                            href={`${receiptUrl}&pin=${modalDocPin}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                            title="Buka / Unduh Lembar Kuitansi"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Link 6: Faktur Pajak DJP (Khusus Entitas PT) */}
+                      {!isModalNonPt && (
                         <div className="p-2 bg-white rounded-xl border border-blue-300 shadow-2xs space-y-1">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] font-black text-blue-950 block truncate">🏛️ e-Faktur DJP</span>
@@ -30440,10 +30526,10 @@ export default function AdminFinanceERPPage() {
                             )}
                           </div>
                         </div>
-                      </>
-                    );
-                  })()}
-                </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

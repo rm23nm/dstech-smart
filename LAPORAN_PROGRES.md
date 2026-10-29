@@ -4,6 +4,92 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 293 (SEDANG BERJALAN)**: Penempatan Tombol Aksi e-Faktur Pajak di Kolom Aksi Tabel Penjualan, Badge Status Pajak, Toolbar Cetak Faktur, dan Sinkronisasi Deployment Langsung ke Server Live VPS (`src/app/admin/finance/page.tsx`).
+  *Permintaan User*: 
+  1. "pada tombol akse saya tidak menemukan tombol faktur pajak" (disertai foto layar browser pada tabel penjualan).
+  2. "setelah selesai perbaikan, uanggah langsung ke server laive jika sudah tidak ada eror saat dilakukan ujicoba."
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  Pada pembaruan sebelumnya (Tugas 292), handler `handleOpenTaxInvoiceModal` baru tersambung di modal kirim pesan `sendDocModal`, namun belum dipasang secara visual di baris tombol kolom Aksi (Baris 1) tabel penjualan (`sales`) dan kolom Status Dokumen. Akibatnya pengguna yang membuka menu Penjualan & Faktur tidak melihat tombol atau badge khusus e-Faktur Pajak di tabel daftar faktur.
+  *Rencana Langkah Pengerjaan (Step-by-Step)*:
+  1. **Pencadangan Berkas (Backup)**: Membuat folder cadangan `dstech-smart/_backup_tax_invoice_table_action/` yang berisi `src/app/admin/finance/page.tsx`.
+  2. **Penambahan Tombol & Badge e-Faktur di Tabel Penjualan (`src/app/admin/finance/page.tsx`)**:
+     - **Di Kolom Aksi (Baris 1)**: Memasang tombol aksi khusus `🏛️ e-Faktur Pajak` (ikon `Landmark`) bersebelahan dengan dokumen resmi lainnya (Cetak Faktur, Kuitansi, BAST, Surat Jalan, Foto) khusus untuk faktur entitas PT (`sale.businessEntity !== "NON_PT"`).
+       * Status aktif (sudah ada berkas / NSFP): Latar hijau emerald dengan tooltip NSFP & titik indikator.
+       * Status belum diisi: Latar slate dengan border dan tooltip siap unggah.
+     - **Di Kolom Status Dokumen**: Memasang badge tombol e-Faktur di bawah status Approval (`+ Lampirkan Pajak` / `e-Faktur Dilampirkan`) yang dapat diklik langsung untuk mempermudah identifikasi status pajak setiap faktur.
+     - **Di Toolbar Cetak Faktur (`selectedInvoiceForPrint`)**: Menambahkan tombol kelola e-Faktur agar admin dapat melampirkan berkas pajak langsung saat sedang meninjau dokumen faktur.
+  3. **Pengujian & Validasi Lokal**:
+     - Menjalankan `npx tsc --noEmit` untuk validasi tipe TypeScript.
+     - Menjalankan `npm run build` untuk memverifikasi kompilasi produksi 76/76 halaman.
+  4. **Deployment Langsung ke Server Live VPS**:
+     - Mengunggah berkas `src/app/admin/finance/page.tsx` ke server live VPS via SFTP SSH (`157.66.34.199:11587`).
+     - Menjalankan `npm run build` dan `pm2 restart dstech-main` di server live VPS.
+     - Memverifikasi status PM2 `dstech-main` adalah `online` dan halaman live bebas error.
+  5. **Pembersihan & Penyelesaian Laporan**:
+     - Menghapus folder cadangan sementara `_backup_tax_invoice_table_action`.
+     - Mengubah status Tugas 293 di `LAPORAN_PROGRES.md` menjadi `[SELESAI]`.
+
+
+- **2026-10-29**: [SELESAI] Penempatan Tombol Aksi e-Faktur Pajak di Kolom Aksi Tabel Penjualan dan Penyempurnaan Modal Pengiriman Pesan agar Langsung Melampirkan Link Download Siap Jadi (Tugas 292) (`src/app/admin/finance/page.tsx`).
+  *Permintaan User*: "pada aksi faktur pajaknya tidak saya temukan, hanya ada upload di pengiriman, seharusnya pada pengiriman pesan sudah siap jadi. hanya melampirkan link download saja"
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  1. Tombol untuk membuka modal lampiran e-Faktur Pajak (`handleOpenTaxInvoiceModal`) sebelumnya belum dipasang di kolom AKSI tabel penjualan (`sales`), sehingga admin kesulitan menemukan tempat untuk melampirkan/mengunggah e-Faktur sebelum pengiriman.
+  2. Di modal pengiriman pesan (`sendDocModal`), kartu e-Faktur menampilkan tombol `+ Upload e-Faktur` yang tidak semestinya ada di alur pengiriman pesan. Seharusnya di pengiriman pesan berkas e-Faktur sudah siap jadi dengan tautan unduh langsung, atau menampilkan informasi bahwa berkas belum dilampirkan.
+  3. Tautan e-Faktur pada generator pesan WhatsApp dan Email sebelumnya berpotensi relatif jika berkas diunggah secara lokal (`/uploads/...`), sehingga perlu dipastikan selalu berupa URL absolut lengkap (`https://dstechsmart.com/uploads/...`).
+  *Penyelesaian & Hasil*:
+  1. **Penambahan Tombol Aksi e-Faktur di Kolom Aksi Tabel Penjualan (`src/app/admin/finance/page.tsx`)**:
+     - Menambahkan tombol `🏛️ e-Faktur DJP` (ikon `Landmark`) di baris tombol dokumen resmi pada kolom Aksi tabel penjualan untuk setiap faktur dengan entitas PT (`sale.businessEntity !== "NON_PT"`).
+     - Jika e-Faktur sudah dilampirkan: Tombol berlatar emerald dengan tooltip *"e-Faktur Dilampirkan (NSFP: ...)"*.
+     - Jika e-Faktur belum dilampirkan: Tombol berlatar slate dengan tooltip *"Lampirkan e-Faktur DJP"*.
+     - Saat diklik langsung membuka modal `handleOpenTaxInvoiceModal(sale)` untuk input NSFP dan upload berkas PDF faktur pajak.
+  2. **Penyempurnaan Modal Pengiriman Pesan (`sendDocModal`)**:
+     - Mengubah kartu e-Faktur menjadi kartu unduh berkas siap pakai (terdapat tombol *"Buka e-Faktur"* dan *"Salin Tautan"*).
+     - Menghilangkan form/tombol upload di modal pengiriman pesan. Jika berkas belum dilampirkan, menampilkan pesan informatif *"Belum Dilampirkan di Tabel Aksi"* dengan tautan pembuka modal lampiran.
+     - Memastikan tautan e-Faktur di teks pesan WhatsApp (`waText`) dan Email (`emailBody`) selalu dikonversi menjadi URL absolut valid (`https://...`).
+  3. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: **0 error (Lolos validasi ketat)**.
+     - `npm run build`: **Berhasil 100% (76/76 static & dynamic pages terkompilasi optimal)**.
+     - Folder cadangan sementara `_backup_tax_invoice_action_and_modal` telah dibersihkan secara aman.
+
+- **2026-10-29**: [SELESAI] Pengecualian dan Penonaktifan Fitur Faktur Pajak Khusus Entitas Toko / Non-PT (Non-PKP Bebas Pajak) pada Pesan Pengiriman Klien (WhatsApp/Email) dan Modal Berkas Resmi Penagihan (Tugas 291) (`src/app/admin/finance/page.tsx`).
+  *Permintaan User*: "khusus entintas non PT, karena kita tidak memakai pajak, maka fitur pesan faktur pajak ini tidak perlu ada saat pengiriman ke client"
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  Pada pembaruan sebelumnya (Tugas 290), tautan e-Faktur Pajak dirancang untuk muncul jika berkas/nomor e-Faktur terisi atau ditampilkan pada modal share tanpa memeriksa atribut `businessEntity`. Padahal entitas Non-PT (Toko DSTech Smart) berstatus Non-PKP dan bebas PPN (0%), sehingga tidak memiliki Faktur Pajak DJP dan tidak boleh menampilkan rujukan atau tautan faktur pajak pada pesan penagihan ke konsumen toko.
+  *Penyelesaian & Hasil*:
+  1. **Deteksi Ketat Entitas Non-PT di Generator Pesan (`generateDocShareContent`)**:
+     - Memeriksa flag `const isNonPt = (doc as any).businessEntity === "NON_PT"`.
+     - Teks WhatsApp (`waText`) nomor urut 6 dan baris Email (`emailBody`) untuk e-Faktur Pajak DJP / NSFP **DILARANG MUNCUL / OTOMATIS DISARING KELUAR** jika entitas adalah Non-PT (`NON_PT`).
+     - Teks Faktur Pajak resmi hanya diizinkan untuk entitas resmi PT (`businessEntity !== "NON_PT"`).
+     - Nama pengirim dan tanda tangan penutup otomatis disesuaikan (*"DSTech Smart"* untuk Non-PT, dan *"PT. DSTech Smart Perkasa"* untuk PT).
+  2. **Penyembunyian Kartu e-Faktur di Modal Unduh Berkas (`sendDocModal`)**:
+     - Kartu ke-6 `🏛️ e-Faktur DJP` hanya di-render jika dokumen berasal dari entitas PT (`!isModalNonPt`).
+     - Jika dokumen Non-PT, kartu disembunyikan dan grid otomatis merata menjadi 5 dokumen resmi pekerjaan (Faktur, BAST, Surat Jalan, Foto, dan Kuitansi).
+  3. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: **0 error (Lolos validasi ketat)**.
+     - `npm run build`: **Berhasil 100% (76/76 static & dynamic pages terkompilasi optimal)**.
+     - Folder cadangan sementara `_backup_nonpt_tax_invoice_filter` telah dibersihkan secara aman.
+  *Rencana Langkah Pengerjaan (Step-by-Step)*:
+  1. **Pencadangan Berkas (Backup)**: Membuat folder cadangan `dstech-smart/_backup_nonpt_tax_invoice_filter` berisi `src/app/admin/finance/page.tsx`.
+  2. **Pengecualian Fitur Faktur Pajak Khusus Entitas Non-PT di Frontend (`src/app/admin/finance/page.tsx`)**:
+     - Di `handleOpenSendDocModal`: Meneruskan `businessEntity: (params as any).businessEntity || "PT"` ke state `sendDocModal`.
+     - Di `generateDocShareContent`:
+       * Menambahkan pengecekan: jika `businessEntity === "NON_PT"`, maka seluruh teks e-Faktur Pajak (nomor 6) **DILARANG DICANTUMKAN** baik di pesan WhatsApp (`waText`) maupun Email (`emailBody`).
+       * Teks e-Faktur Pajak hanya diizinkan untuk entitas resmi PT (`businessEntity !== "NON_PT"`).
+     - Di `sendDocModal` (Modal Tautan Unduh Berkas):
+       * Kartu ke-6 `🏛️ e-Faktur DJP` hanya di-render jika dokumen berasal dari entitas PT (`sendDocModal.businessEntity !== "NON_PT"`).
+       * Untuk dokumen Non-PT, kartu e-Faktur disembunyikan dan grid otomatis merata untuk 5 dokumen pekerjaan (Faktur, BAST, Surat Jalan, Foto, Kuitansi).
+     - Di Tabel Penjualan & Faktur (`sales`):
+       * Untuk baris invoice dengan entitas `businessEntity === "NON_PT"`, sembunyikan tombol `+ Pajak / e-Faktur` dan ganti dengan label `Non-PKP (Bebas PPN)`.
+  3. **Validasi & Pengujian**:
+     - Uji tipe data dengan `npx tsc --noEmit` (0 error).
+     - Uji kompilasi dengan `npm run build` (76/76 halaman sukses).
+  4. **Pembersihan Berkas Cadangan**:
+     - Hapus folder cadangan sementara `_backup_nonpt_tax_invoice_filter`.
+  5. **Deployment Live**:
+     - Push commit ke GitHub via `push_with_native_git.js`.
+     - Deploy ke server live VPS via `deploy_live.js` (PM2 `dstech-main` restart).
+     - Perbarui status Tugas 291 di `LAPORAN_PROGRES.md` menjadi `[SELESAI]`.
+
 - **Tugas 289**: Fitur Pengiriman Surat Resmi (SPH, Invoice/Faktur, BAST, Surat Jalan, Kuitansi, Laporan Foto) ke Beberapa Nomor Kontak WhatsApp Sekaligus (Multi-Recipient WhatsApp Dispatch) pada Modul Finance & Penagihan.
   *Permintaan User*: "ketika saya ingin mengirimkan SPH, Invoice, atau surat-suarat lainnya, tolong buatkan fiturnya agar bisa kirim ke beberapa nomor." (disertai instruksi: "ok, lanjutkan").
   *Akar Masalah yang Ditemukan (Root Cause)*:
