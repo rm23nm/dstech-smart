@@ -232,6 +232,14 @@ interface SaleInvoice {
   customerPic?: string;
   picName?: string;
   photos?: ProjectPhoto[];
+  isLocked?: boolean;
+  isLockedPermanently?: boolean;
+  frozenSignatureImage?: string;
+  frozenSignerName?: string;
+  frozenSignerTitle?: string;
+  frozenStampUrl?: string;
+  lastPrintedAt?: string;
+  firstPrintedAt?: string;
 }
 
 interface QuotationItem {
@@ -287,6 +295,14 @@ interface Quotation {
   businessEntity?: "PT" | "NON_PT";
   projectId?: string;
   projectName?: string;
+  isLocked?: boolean;
+  isLockedPermanently?: boolean;
+  frozenSignatureImage?: string;
+  frozenSignerName?: string;
+  frozenSignerTitle?: string;
+  frozenStampUrl?: string;
+  lastPrintedAt?: string;
+  firstPrintedAt?: string;
 }
 
 interface BankAccount {
@@ -373,6 +389,14 @@ interface PurchaseOrder {
   projectId?: string;
   projectName?: string;
   subject?: string;
+  isLocked?: boolean;
+  isLockedPermanently?: boolean;
+  frozenSignatureImage?: string;
+  frozenSignerName?: string;
+  frozenSignerTitle?: string;
+  frozenStampUrl?: string;
+  lastPrintedAt?: string;
+  firstPrintedAt?: string;
 }
 
 interface SalesReturn {
@@ -5337,9 +5361,9 @@ export default function AdminFinanceERPPage() {
   const handleOpenPayInvoice = (invoice: SaleInvoice, specificTerminId?: string) => {
     setSelectedInvoiceForPayment(invoice);
     let defaultAmount = invoice.remainingAmount;
-    let isDpPaymentPhase = false;
     let selectedTerminId = "";
-    let payNotes = `Penerimaan Pembayaran Faktur ${invoice.invoiceNumber}`;
+    const projectOrSubject = invoice.projectName || invoice.subject || (invoice.notes && invoice.notes.includes("(") ? invoice.notes.replace(/^.*?\((.*?)\).*$/, "$1") : "") || invoice.customerName || "Pengadaan & Layanan";
+    let payNotes = `Pembayaran Penuh (100%) atas Faktur ${invoice.invoiceNumber} - ${projectOrSubject}`;
 
     if (invoice.invoiceType === "Termin" && Array.isArray(invoice.termins) && invoice.termins.length > 0) {
       const targetT = specificTerminId
@@ -5353,14 +5377,14 @@ export default function AdminFinanceERPPage() {
         selectedTerminId = targetT.id;
         const remainingTermin = Math.max(0, targetT.amount - (Number(targetT.paidAmount) || 0));
         defaultAmount = remainingTermin > 0 ? remainingTermin : targetT.amount;
-        payNotes = `Penerimaan Pembayaran ${targetT.name} Faktur ${invoice.invoiceNumber}`;
+        payNotes = `Pembayaran ${targetT.name} (${targetT.percentage}%) - Syarat: ${targetT.condition || 'Progres Pekerjaan'} atas Faktur ${invoice.invoiceNumber} - ${projectOrSubject}`;
       }
     } else if (invoice.invoiceType === "DP" && (Number(invoice.dpPaidAmount) || 0) < (Number(invoice.dpAmount) || 0)) {
       defaultAmount = Math.max(0, (Number(invoice.dpAmount) || 0) - (Number(invoice.dpPaidAmount) || 0));
-      isDpPaymentPhase = true;
-      payNotes = `Penerimaan Uang Muka (DP ${invoice.dpPercentage || 50}%) Faktur ${invoice.invoiceNumber}`;
+      payNotes = `Pembayaran Uang Muka (DP ${invoice.dpPercentage || 50}%) atas Faktur ${invoice.invoiceNumber} - ${projectOrSubject}`;
     } else if (invoice.invoiceType === "DP") {
-      payNotes = `Penerimaan Pelunasan Sisa Kontrak Faktur ${invoice.invoiceNumber}`;
+      const remainingPct = 100 - (Number(invoice.dpPercentage) || 50);
+      payNotes = `Pelunasan Sisa Pembayaran Kontrak (${remainingPct}%) atas Faktur ${invoice.invoiceNumber} - ${projectOrSubject} setelah Berita Acara Serah Terima (BAST)`;
     }
 
     const defaultAcc = getDefaultBankAccLabel();
@@ -5421,10 +5445,22 @@ export default function AdminFinanceERPPage() {
 
   // Handler Edit Faktur
   const handleOpenEditSale = (sale: SaleInvoice) => {
+    const rawGrand = Number(sale.grandTotal) || 0;
+    const invType = sale.invoiceType || "Standar";
+    const dpPct = Number(sale.dpPercentage) || 50;
+    const dpAmt = sale.dpAmount || Math.round(rawGrand * (dpPct / 100));
+
     setEditingSale({
       ...sale,
       items: sale.items.map((it) => ({ ...it })),
       taxType: sale.taxType || "exclude",
+      invoiceType: invType,
+      dpPercentage: dpPct,
+      dpAmount: dpAmt,
+      dpNotes: sale.dpNotes || (invType === "DP" ? `Pengajuan Uang Muka (DP ${dpPct}%) Pelaksanaan Instalasi & Pengadaan` : ""),
+      termins: Array.isArray(sale.termins) && sale.termins.length > 0
+        ? sale.termins.map((t) => ({ ...t }))
+        : getDefaultTermins(rawGrand, sale.dueDate),
     });
     setIsEditSaleModalOpen(true);
   };
@@ -5460,6 +5496,13 @@ export default function AdminFinanceERPPage() {
       editingSale.invoiceType === "DP" ? Math.round(grandTotal * (dpPercentage / 100)) : 0;
     const remainingAmount = Math.max(0, grandTotal - (Number(editingSale.paidAmount) || 0));
 
+    const updatedTermins = Array.isArray(editingSale.termins)
+      ? editingSale.termins.map((t) => ({
+          ...t,
+          amount: Math.round(grandTotal * (Number(t.percentage || 0) / 100)),
+        }))
+      : [];
+
     setEditingSale({
       ...editingSale,
       items: updated,
@@ -5468,6 +5511,7 @@ export default function AdminFinanceERPPage() {
       grandTotal,
       dpAmount,
       remainingAmount,
+      termins: updatedTermins,
     });
   };
 
@@ -27661,6 +27705,7 @@ export default function AdminFinanceERPPage() {
                     value={paymentForm.terminId || ""}
                     onChange={(e) => {
                       const tId = e.target.value;
+                      const projectOrSub = selectedInvoiceForPayment.projectName || selectedInvoiceForPayment.subject || (selectedInvoiceForPayment.notes && selectedInvoiceForPayment.notes.includes("(") ? selectedInvoiceForPayment.notes.replace(/^.*?\((.*?)\).*$/, "$1") : "") || selectedInvoiceForPayment.customerName || "Pengadaan & Layanan";
                       const targetT = selectedInvoiceForPayment.termins?.find((t) => t.id === tId);
                       if (targetT) {
                         const remT = Math.max(0, targetT.amount - (Number(targetT.paidAmount) || 0));
@@ -27668,7 +27713,7 @@ export default function AdminFinanceERPPage() {
                           ...paymentForm,
                           terminId: tId,
                           amount: remT > 0 ? remT : targetT.amount,
-                          notes: `Penerimaan Pembayaran ${targetT.name} Faktur ${selectedInvoiceForPayment.invoiceNumber}`,
+                          notes: `Pembayaran ${targetT.name} (${targetT.percentage}%) - Syarat: ${targetT.condition || 'Progres Pekerjaan'} atas Faktur ${selectedInvoiceForPayment.invoiceNumber} - ${projectOrSub}`,
                         });
                       } else {
                         setPaymentForm({
@@ -27702,12 +27747,17 @@ export default function AdminFinanceERPPage() {
                         <button
                           type="button"
                           onClick={() => {
+                            const projectOrSub = selectedInvoiceForPayment.projectName || selectedInvoiceForPayment.subject || (selectedInvoiceForPayment.notes && selectedInvoiceForPayment.notes.includes("(") ? selectedInvoiceForPayment.notes.replace(/^.*?\((.*?)\).*$/, "$1") : "") || selectedInvoiceForPayment.customerName || "Pengadaan & Layanan";
                             const dpRem = Math.max(
                               0,
                               (Number(selectedInvoiceForPayment.dpAmount) || 0) -
                                 (Number(selectedInvoiceForPayment.dpPaidAmount) || 0)
                             );
-                            setPaymentForm({ ...paymentForm, amount: dpRem });
+                            setPaymentForm({
+                              ...paymentForm,
+                              amount: dpRem,
+                              notes: `Pembayaran Uang Muka (DP ${selectedInvoiceForPayment.dpPercentage || 50}%) atas Faktur ${selectedInvoiceForPayment.invoiceNumber} - ${projectOrSub}`,
+                            });
                           }}
                           className="text-[10px] text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded font-bold cursor-pointer"
                         >
@@ -27716,12 +27766,19 @@ export default function AdminFinanceERPPage() {
                       )}
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        const projectOrSub = selectedInvoiceForPayment.projectName || selectedInvoiceForPayment.subject || (selectedInvoiceForPayment.notes && selectedInvoiceForPayment.notes.includes("(") ? selectedInvoiceForPayment.notes.replace(/^.*?\((.*?)\).*$/, "$1") : "") || selectedInvoiceForPayment.customerName || "Pengadaan & Layanan";
+                        let lunasNote = `Pembayaran Penuh (100%) atas Faktur ${selectedInvoiceForPayment.invoiceNumber} - ${projectOrSub}`;
+                        if (selectedInvoiceForPayment.invoiceType === "DP") {
+                          const remPct = 100 - (Number(selectedInvoiceForPayment.dpPercentage) || 50);
+                          lunasNote = `Pelunasan Sisa Pembayaran Kontrak (${remPct}%) atas Faktur ${selectedInvoiceForPayment.invoiceNumber} - ${projectOrSub} setelah Berita Acara Serah Terima (BAST)`;
+                        }
                         setPaymentForm({
                           ...paymentForm,
                           amount: selectedInvoiceForPayment.remainingAmount,
-                        })
-                      }
+                          notes: lunasNote,
+                        });
+                      }}
                       className="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded font-bold cursor-pointer"
                     >
                       Bayar Lunas Semua

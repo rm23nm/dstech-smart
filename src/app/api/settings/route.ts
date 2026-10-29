@@ -327,6 +327,32 @@ export async function POST(request: Request) {
       );
     }
 
+    // Sinkronkan pengaturan penandatangan resmi ke dstech_finance_erp.json (Tugas 283)
+    if (updated.letterheadSettings && fs.existsSync(FINANCE_FILE)) {
+      try {
+        const rawFinance = fs.readFileSync(FINANCE_FILE, "utf-8");
+        const financeData = JSON.parse(rawFinance);
+        if (!financeData.settings) financeData.settings = {};
+        const lh = updated.letterheadSettings;
+        financeData.settings = {
+          ...financeData.settings,
+          signerName: lh.signerName || lh.signerName_PT || "RAMADHANI ST",
+          signerTitle: lh.signerTitle || lh.signerTitle_PT || "Direktur",
+          masterSignatureUrl: lh.masterSignatureUrl !== undefined ? lh.masterSignatureUrl : (financeData.settings.masterSignatureUrl || ""),
+          masterStampUrl: lh.masterStampUrl !== undefined ? lh.masterStampUrl : (financeData.settings.masterStampUrl || ""),
+          letterheadUrl: lh.letterheadUrl || financeData.settings.letterheadUrl || "/kop_surat_dstech.jpg",
+          letterheadEnabled: lh.letterheadEnabled !== undefined ? lh.letterheadEnabled : true,
+          watermarkOpacity: lh.watermarkOpacity !== undefined ? lh.watermarkOpacity : 0.15,
+          letterheadPaddingTop: lh.letterheadPaddingTop || 80,
+          letterheadPaddingBottom: lh.letterheadPaddingBottom || 75,
+          letterheadFitMode: lh.letterheadFitMode || "fill",
+        };
+        fs.writeFileSync(FINANCE_FILE, JSON.stringify(financeData, null, 2), "utf-8");
+      } catch (errSyncFin) {
+        console.error("Gagal sinkronkan pengaturan penandatangan ke finance ERP:", errSyncFin);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Pengaturan situs berhasil diperbarui.",

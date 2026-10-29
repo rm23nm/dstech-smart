@@ -74,7 +74,7 @@ function syncOrderCustomerToUsers(order: any): void {
   }
 }
 
-// Otomatisasi Penerbitan Faktur Penjualan, Surat Jalan (DO), & Kuitansi di ERP Keuangan (Tugas 200)
+// Otomatisasi Penerbitan Faktur Penjualan & Kuitansi di ERP Keuangan Khusus Pesanan yang Diterima Konsumen (Tugas 283)
 function syncOrderToFinanceErp(order: any, targetStatus?: string) {
   try {
     if (!fs.existsSync(FINANCE_FILE)) return;
@@ -83,21 +83,62 @@ function syncOrderToFinanceErp(order: any, targetStatus?: string) {
 
     if (!Array.isArray(financeData.sales)) financeData.sales = [];
     if (!Array.isArray(financeData.cash_flow)) financeData.cash_flow = [];
+    if (!Array.isArray(financeData.returns_sales)) financeData.returns_sales = [];
 
-    const status = targetStatus || order.status || "PAYMENT_PENDING";
+    const status = String(targetStatus || order.status || "").toUpperCase();
+    const cleanId = order.orderNumber ? order.orderNumber.replace(/[^a-zA-Z0-9]/g, "_") : String(Date.now());
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10);
     const yearMonth = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-    // Cek apakah rekaman invoice untuk pesanan ini sudah ada di sales
-    const cleanId = order.orderNumber ? order.orderNumber.replace(/[^a-zA-Z0-9]/g, "_") : String(Date.now());
+    // 1. ATURAN KETAT PESANAN BATAL (CANCELLED / DIBATALKAN):
+    // Jangan pernah membuat faktur penjualan!
+    // Jika faktur untuk pesanan ini pernah tersimpan di modul keuangan, bersihkan/batalkan agar tidak mengacak-acak pembukuan.
+    if (status === "CANCELLED" || status === "DIBATALKAN" || status === "BATAL") {
+      const prevSalesLen = financeData.sales.length;
+      financeData.sales = financeData.sales.filter(
+        (s: any) =>
+          s.orderNumber !== order.orderNumber &&
+          s.id !== `dstech_inv_${cleanId}` &&
+          s.orderId !== order.id &&
+          !(order.invoiceNumber && s.invoiceNumber === order.invoiceNumber)
+      );
+      // Bersihkan juga catatan arus kas masuk pesanan ini jika ada
+      financeData.cash_flow = financeData.cash_flow.filter(
+        (c: any) => c.reference !== order.orderNumber
+      );
+      if (financeData.sales.length !== prevSalesLen) {
+        fs.writeFileSync(FINANCE_FILE, JSON.stringify(financeData, null, 2), "utf-8");
+      }
+      return;
+    }
+
+    // 2. ATURAN KETAT PESANAN BELUM DITERIMA (PENDING, PAID, PROCESSING, SHIPPED):
+    // Faktur penjualan resmi ke modul keuangan (financeData.sales) HANYA TERBENTUK jika pesanan telah DITERIMA / SELESAI oleh client!
+    const isDelivered =
+      status === "DELIVERED" ||
+      status === "SELESAI" ||
+      status === "COMPLETED" ||
+      status === "DELIVERED_CONFIRMED";
+
+    if (!isDelivered) {
+      // Selama pesanan belum diterima oleh konsumen, pesanan tetap berada di e-store (dstech_orders.json)
+      // dan TIDAK dimasukkan ke faktur penjualan pembukuan keuangan resmi.
+      return;
+    }
+
+    // 3. PESANAN TELAH DITERIMA & SELESAI: BENTUK FAKTUR PENJUALAN RESMI DI KEUANGAN
     let existingSale = financeData.sales.find(
-      (s: any) => s.orderNumber === order.orderNumber || s.id === `dstech_inv_${cleanId}`
+      (s: any) =>
+        s.orderNumber === order.orderNumber ||
+        s.id === `dstech_inv_${cleanId}` ||
+        s.orderId === order.id ||
+        (order.invoiceNumber && s.invoiceNumber === order.invoiceNumber)
     );
 
-    let invoiceNo = existingSale?.invoiceNumber;
-    let doNo = existingSale?.deliveryOrderNumber;
-    let kwtNo = existingSale?.receiptNumber;
+    let invoiceNo = existingSale?.invoiceNumber || order.invoiceNumber;
+    let doNo = existingSale?.deliveryOrderNumber || order.deliveryOrderNumber;
+    let kwtNo = existingSale?.receiptNumber || order.receiptNumber;
 
     if (!invoiceNo) {
       const salesCount = financeData.sales.length + 1;
@@ -134,11 +175,6 @@ function syncOrderToFinanceErp(order: any, targetStatus?: string) {
       });
     }
 
-    const isPaidOrDelivered = status === "PAID" || status === "DELIVERED" || status === "PROCESSING" || status === "SHIPPED";
-    const paymentStatusStr = (status === "DELIVERED" || status === "PAID") ? "Lunas" : "Menunggu Pembayaran";
-    const paidAmount = (status === "DELIVERED" || status === "PAID") ? Number(order.grandTotal) : 0;
-    const remainingAmount = (status === "DELIVERED" || status === "PAID") ? 0 : Number(order.grandTotal);
-
     const saleRecord = {
       id: `dstech_inv_${cleanId}`,
       invoiceNumber: invoiceNo,
@@ -160,20 +196,21 @@ function syncOrderToFinanceErp(order: any, targetStatus?: string) {
       shippingCost: Number(order.shippingCost) || 0,
       grandTotal: Number(order.grandTotal),
       paymentMethod: order.paymentBank || "Transfer Bank BCA PT",
-      paymentStatus: paymentStatusStr,
-      paidAmount: paidAmount,
-      remainingAmount: remainingAmount,
+      paymentStatus: "Lunas",
+      paidAmount: Number(order.grandTotal),
+      remainingAmount: 0,
       warehouseId: "dstech_wh_1",
       branchId: "dstech_branch_1",
       salesPerson: "DSTech E-Store System",
       deliveryOrderNumber: doNo,
       receiptNumber: kwtNo,
-      notes: `Pesanan E-Store Toko Online #${order.orderNumber} - Pembeli: ${order.customerName} (${order.customerPhone})`,
+      notes: `Faktur Penjualan Resmi E-Store #${order.orderNumber} (Barang Diterima Konsumen) - Pembeli: ${order.customerName}`,
       approvalStatus: "Disetujui & Sah",
       approvedBy: "RAMADHANI ST",
       approvedTitle: "Direktur PT. DSTech Smart Perkasa",
       approvedAt: dateStr,
       verificationCode: `VER-DST-${Math.floor(Math.random() * 899999 + 100000)}`,
+      isLocked: true,
       photos: [],
     };
 
@@ -183,41 +220,39 @@ function syncOrderToFinanceErp(order: any, targetStatus?: string) {
       financeData.sales.unshift(saleRecord);
     }
 
-    // Catat ke Buku Kas (Cash Flow) otomatis jika status lunas / selesai
-    if (isPaidOrDelivered) {
-      const existingCash = financeData.cash_flow.find((c: any) => c.reference === order.orderNumber);
-      if (!existingCash) {
-        // Pos 1: Penjualan Produk
+    // Catat ke Buku Kas (Cash Flow) resmi penerimaan penjualan
+    const existingCash = financeData.cash_flow.find((c: any) => c.reference === order.orderNumber);
+    if (!existingCash) {
+      // Pos 1: Penjualan Produk
+      financeData.cash_flow.unshift({
+        id: `dstech_cash_${Date.now()}_prod`,
+        date: dateStr,
+        type: "IN",
+        category: "Penerimaan Penjualan Produk E-Store",
+        amount: Number(order.subtotal) || 0,
+        account: order.paymentBank || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+        reference: order.orderNumber,
+        description: `Penerimaan Pembayaran Pesanan #${order.orderNumber} - ${order.customerName} (Barang Diterima)`,
+        balanceAfter: 0,
+        receiptUrl: "",
+        attachments: [],
+      });
+
+      // Pos 2: Jasa Pasang Teknisi (jika ada)
+      if (order.includeInstallation && Number(order.installationFee) > 0) {
         financeData.cash_flow.unshift({
-          id: `dstech_cash_${Date.now()}_prod`,
+          id: `dstech_cash_${Date.now()}_srv`,
           date: dateStr,
           type: "IN",
-          category: "Penerimaan Penjualan Produk E-Store",
-          amount: Number(order.subtotal) || 0,
+          category: "Penerimaan Jasa Pemasangan & Setup Teknisi",
+          amount: Number(order.installationFee),
           account: order.paymentBank || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
           reference: order.orderNumber,
-          description: `Penerimaan Pembayaran Pesanan #${order.orderNumber} - ${order.customerName} (Barang/Perangkat)`,
+          description: `Penerimaan Jasa Instalasi Teknisi Pesanan #${order.orderNumber} - ${order.customerName}`,
           balanceAfter: 0,
           receiptUrl: "",
           attachments: [],
         });
-
-        // Pos 2: Jasa Pasang Teknisi (jika ada)
-        if (order.includeInstallation && Number(order.installationFee) > 0) {
-          financeData.cash_flow.unshift({
-            id: `dstech_cash_${Date.now()}_srv`,
-            date: dateStr,
-            type: "IN",
-            category: "Penerimaan Jasa Pemasangan & Setup Teknisi",
-            amount: Number(order.installationFee),
-            account: order.paymentBank || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
-            reference: order.orderNumber,
-            description: `Penerimaan Jasa Instalasi Teknisi Pesanan #${order.orderNumber} - ${order.customerName}`,
-            balanceAfter: 0,
-            receiptUrl: "",
-            attachments: [],
-          });
-        }
       }
     }
 
@@ -428,6 +463,13 @@ export async function PATCH(req: Request) {
       complaintSolution,
       complaintProof,
       complaintStatus,
+      refundAmount,
+      refundReason,
+      refundMethod,
+      refundAccount,
+      refundAccountName,
+      refundProcessedBy,
+      refundNotes,
     } = body;
 
     if (!id && !orderNumber) {
@@ -506,14 +548,120 @@ export async function PATCH(req: Request) {
         description: note || "Pesanan telah dibatalkan.",
         timestamp: nowIso,
       });
-    } else if (action === "return_order" || action === "refund_order") {
+    } else if (action === "return_order") {
       targetOrder.status = "RETURN";
       targetOrder.trackingTimeline.push({
         status: "RETURN",
         title: "Pengajuan Pengembalian / Retur Barang",
-        description: note || "Pengajuan pengembalian barang & dana telah diajukan dan sedang diproses tim QC & Keuangan DSTech Smart.",
+        description: note || "Pengajuan pengembalian barang telah diajukan dan sedang diproses tim QC & Keuangan DSTech Smart.",
         timestamp: nowIso,
       });
+    } else if (action === "process_refund" || action === "refund_order") {
+      // Proses Refund Resmi & Pengembalian Dana untuk Pesanan Selesai / Komplain (Tugas 283)
+      const nominal = Number(refundAmount) || Number(targetOrder.grandTotal) || 0;
+      const reason = refundReason || note || "Pengembalian barang / retur pesanan sesuai kesepakatan komplain";
+      const method = refundMethod || targetOrder.paymentBank || "Transfer Bank BCA PT";
+      const accNo = refundAccount || "-";
+      const accName = refundAccountName || targetOrder.customerName || "-";
+      const adminStaff = refundProcessedBy || "Tim Keuangan & After-Sales PT. DSTech Smart Perkasa";
+
+      targetOrder.status = "REFUNDED";
+      targetOrder.refundInfo = {
+        refundedAt: nowIso,
+        refundAmount: nominal,
+        refundReason: reason,
+        refundMethod: method,
+        refundAccount: accNo,
+        refundAccountName: accName,
+        refundProcessedBy: adminStaff,
+        refundNotes: refundNotes || note || "",
+      };
+
+      if (targetOrder.complaint) {
+        targetOrder.complaint.status = "RESOLVED";
+        targetOrder.complaint.resolvedAt = nowIso;
+        targetOrder.complaint.adminNotes = `Komplain diselesaikan via Refund Rp ${nominal.toLocaleString("id-ID")}. ${reason}`;
+      }
+
+      targetOrder.trackingTimeline.push({
+        status: "REFUNDED",
+        title: "Pengembalian Dana (Refund) Berhasil Diproses",
+        description: `Dana sebesar Rp ${nominal.toLocaleString("id-ID")} telah resmi dikembalikan via ${method} (Rek: ${accNo} a.n ${accName}). Alasan: ${reason}.`,
+        timestamp: nowIso,
+      });
+
+      // Integrasikan pencatatan Berita Acara Retur & Pengeluaran Kas Refund ke modul Keuangan ERP
+      try {
+        if (fs.existsSync(FINANCE_FILE)) {
+          const rawFinance = fs.readFileSync(FINANCE_FILE, "utf-8");
+          const financeData = JSON.parse(rawFinance);
+          if (!Array.isArray(financeData.returns_sales)) financeData.returns_sales = [];
+          if (!Array.isArray(financeData.cash_flow)) financeData.cash_flow = [];
+          if (!Array.isArray(financeData.sales)) financeData.sales = [];
+
+          const dateStr = nowIso.slice(0, 10);
+          const yearMonth = `${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+          const cleanId = targetOrder.orderNumber ? targetOrder.orderNumber.replace(/[^a-zA-Z0-9]/g, "_") : String(Date.now());
+          const seq = String(financeData.returns_sales.length + 1).padStart(3, "0");
+          const returnNo = `RET-ORD-${yearMonth}-${seq}`;
+
+          // 1. Catat ke Berita Acara Retur Penjualan resmi (returns_sales)
+          financeData.returns_sales.unshift({
+            id: `dstech_ret_ord_${cleanId}`,
+            returnNumber: returnNo,
+            invoiceNumber: targetOrder.invoiceNumber || `INV-ORD-${cleanId}`,
+            orderNumber: targetOrder.orderNumber,
+            date: dateStr,
+            customerName: targetOrder.customerName,
+            customerPhone: targetOrder.customerPhone,
+            items: targetOrder.items || [],
+            returnAmount: nominal,
+            refundAmount: nominal,
+            totalAmount: nominal,
+            reason: reason,
+            refundMethod: method,
+            refundAccount: accNo,
+            refundAccountName: accName,
+            approvalStatus: "Disetujui & Sah",
+            approvedBy: adminStaff,
+            approvedAt: `${dateStr} ${new Date().toTimeString().slice(0, 5)} WIB`,
+            verificationCode: `RET-APP-${yearMonth}-${Math.floor(1000 + Math.random() * 9000)}`,
+            isLocked: true,
+            notes: `Pengembalian dana resmi pesanan e-store #${targetOrder.orderNumber} - Pembeli: ${targetOrder.customerName}`,
+          });
+
+          // 2. Catat Arus Kas Keluar (Expense) di cash_flow
+          financeData.cash_flow.unshift({
+            id: `dstech_cash_${Date.now()}_ref`,
+            date: dateStr,
+            type: "OUT",
+            category: "Pengembalian Dana / Refund Penjualan E-Store",
+            amount: nominal,
+            account: method,
+            reference: targetOrder.orderNumber,
+            description: `Pengembalian Dana / Refund Pesanan #${targetOrder.orderNumber} - ${targetOrder.customerName} (${reason})`,
+            balanceAfter: 0,
+            receiptUrl: "",
+            attachments: [],
+          });
+
+          // 3. Perbarui status Faktur Penjualan terkait di modul sales jika ada
+          const saleIdx = financeData.sales.findIndex(
+            (s: any) =>
+              s.orderNumber === targetOrder.orderNumber ||
+              s.id === `dstech_inv_${cleanId}` ||
+              (targetOrder.invoiceNumber && s.invoiceNumber === targetOrder.invoiceNumber)
+          );
+          if (saleIdx !== -1) {
+            financeData.sales[saleIdx].paymentStatus = "Direfund / Dikembalikan";
+            financeData.sales[saleIdx].notes = `${financeData.sales[saleIdx].notes || ""} | [DIREFUND RESMI Rp ${nominal.toLocaleString("id-ID")}: ${reason}]`;
+          }
+
+          fs.writeFileSync(FINANCE_FILE, JSON.stringify(financeData, null, 2), "utf-8");
+        }
+      } catch (errFinance) {
+        console.error("Gagal mencatat retur/refund ke modul finance:", errFinance);
+      }
     } else if (action === "submit_complaint") {
       // Pembeli mengajukan komplain pesanan
       targetOrder.hasComplaint = true;

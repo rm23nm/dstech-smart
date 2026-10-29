@@ -650,13 +650,52 @@ export async function POST(request: Request) {
 
     if (actionType === "approve_document") {
       const { documentType = "sale", id, signatureImage, signerName, signerTitle, notes } = payload;
-      const signer = signerName || data.settings?.signerName || "H. Agus Supriyadi, S.T., M.Kom.";
-      const title = signerTitle || data.settings?.signerTitle || "Direktur Keuangan & Operasional";
+      const signer = signerName || "RAMADHANI ST";
+      const title = signerTitle || "Direktur";
       const now = new Date();
       const codeDate = now.toISOString().slice(0, 7).replace("-", "");
       const randomDigits = Math.floor(1000 + Math.random() * 9000);
       const verificationCode = `DST-APP-${codeDate}-${randomDigits}`;
       const approvedAt = `${now.toISOString().split("T")[0]} ${now.toTimeString().slice(0, 5)} WIB`;
+
+      // Validasi tanda tangan digital: Dokumen sah tidak boleh disahkan tanpa goresan tanda tangan
+      const finalSignature = signatureImage || data.settings?.masterSignatureUrl || "";
+      if (!finalSignature) {
+        return NextResponse.json({
+          success: false,
+          error: "Tanda tangan digital wajib digoreskan atau diatur terlebih dahulu sebelum dokumen dapat disahkan!",
+        }, { status: 400 });
+      }
+
+      // Helper untuk menyinkronkan pengesahan ke database e-store (dstech_orders.json) jika relevan
+      const syncApprovalToEStoreOrder = (targetId: string, docNum?: string) => {
+        try {
+          const ordersFile = path.join(process.cwd(), "src/data/dstech_orders.json");
+          if (fs.existsSync(ordersFile)) {
+            const rawOrders = fs.readFileSync(ordersFile, "utf-8");
+            const orders = JSON.parse(rawOrders);
+            const ordIdx = orders.findIndex((o: any) =>
+              o.id === targetId ||
+              o.orderNumber === targetId ||
+              o.invoiceNumber === targetId ||
+              (docNum && (o.invoiceNumber === docNum || o.orderNumber === docNum))
+            );
+            if (ordIdx !== -1) {
+              orders[ordIdx].approvalStatus = "Disetujui & Sah";
+              orders[ordIdx].approvedBy = signer;
+              orders[ordIdx].approvedTitle = title;
+              orders[ordIdx].approvedAt = approvedAt;
+              orders[ordIdx].verificationCode = verificationCode;
+              orders[ordIdx].signatureImage = finalSignature;
+              orders[ordIdx].isLocked = true;
+              if (notes) orders[ordIdx].approvalNotes = notes;
+              fs.writeFileSync(ordersFile, JSON.stringify(orders, null, 2), "utf-8");
+            }
+          }
+        } catch (syncErr) {
+          console.error("Gagal sinkronisasi approval ke pesanan e-store:", syncErr);
+        }
+      };
 
       if (documentType === "sale") {
         const sales = data.sales || [];
@@ -666,21 +705,22 @@ export async function POST(request: Request) {
         }
 
         sales[index].approvalStatus = "Disetujui & Sah";
+        sales[index].isLocked = true;
         sales[index].approvedBy = signer;
         sales[index].approvedTitle = title;
         sales[index].approvedAt = approvedAt;
         sales[index].verificationCode = verificationCode;
-        if (signatureImage) {
-          sales[index].signatureImage = signatureImage;
-        }
+        sales[index].signatureImage = finalSignature;
         if (notes) {
           sales[index].approvalNotes = notes;
         }
 
+        syncApprovalToEStoreOrder(id, sales[index].invoiceNumber);
+
         writeFinanceData(data);
         return NextResponse.json({
           success: true,
-          message: `Faktur ${sales[index].invoiceNumber} berhasil disetujui & disahkan secara resmi oleh ${signer}`,
+          message: `Faktur ${sales[index].invoiceNumber} berhasil disetujui, ditandatangani, & dikunci secara sah oleh ${signer}`,
           data: sales[index],
         });
       }
@@ -693,18 +733,17 @@ export async function POST(request: Request) {
         }
 
         purchases[index].approvalStatus = "Disetujui & Sah";
+        purchases[index].isLocked = true;
         purchases[index].approvedBy = signer;
         purchases[index].approvedTitle = title;
         purchases[index].approvedAt = approvedAt;
         purchases[index].verificationCode = verificationCode;
-        if (signatureImage) {
-          purchases[index].signatureImage = signatureImage;
-        }
+        purchases[index].signatureImage = finalSignature;
 
         writeFinanceData(data);
         return NextResponse.json({
           success: true,
-          message: `Purchase Order ${purchases[index].poNumber} berhasil disetujui & disahkan oleh ${signer}`,
+          message: `Purchase Order ${purchases[index].poNumber} berhasil disetujui, ditandatangani, & dikunci sah oleh ${signer}`,
           data: purchases[index],
         });
       }
@@ -717,13 +756,12 @@ export async function POST(request: Request) {
         }
 
         quotations[index].approvalStatus = "Disetujui & Sah";
+        quotations[index].isLocked = true;
         quotations[index].approvedBy = signer;
         quotations[index].approvedTitle = title;
         quotations[index].approvedAt = approvedAt;
         quotations[index].verificationCode = verificationCode;
-        if (signatureImage) {
-          quotations[index].signatureImage = signatureImage;
-        }
+        quotations[index].signatureImage = finalSignature;
         if (notes) {
           quotations[index].approvalNotes = notes;
         }
@@ -731,7 +769,7 @@ export async function POST(request: Request) {
         writeFinanceData(data);
         return NextResponse.json({
           success: true,
-          message: `Surat Penawaran ${quotations[index].quotationNumber} berhasil disetujui & disahkan secara resmi oleh ${signer}`,
+          message: `Surat Penawaran ${quotations[index].quotationNumber} berhasil disetujui, ditandatangani, & dikunci sah oleh ${signer}`,
           data: quotations[index],
         });
       }
@@ -744,13 +782,12 @@ export async function POST(request: Request) {
         }
 
         returnsSales[index].approvalStatus = "Disetujui & Sah";
+        returnsSales[index].isLocked = true;
         returnsSales[index].approvedBy = signer;
         returnsSales[index].approvedTitle = title;
         returnsSales[index].approvedAt = approvedAt;
         returnsSales[index].verificationCode = verificationCode;
-        if (signatureImage) {
-          returnsSales[index].signatureImage = signatureImage;
-        }
+        returnsSales[index].signatureImage = finalSignature;
         if (notes) {
           returnsSales[index].approvalNotes = notes;
         }
@@ -771,13 +808,12 @@ export async function POST(request: Request) {
         }
 
         returnsPurchase[index].approvalStatus = "Disetujui & Sah";
+        returnsPurchase[index].isLocked = true;
         returnsPurchase[index].approvedBy = signer;
         returnsPurchase[index].approvedTitle = title;
         returnsPurchase[index].approvedAt = approvedAt;
         returnsPurchase[index].verificationCode = verificationCode;
-        if (signatureImage) {
-          returnsPurchase[index].signatureImage = signatureImage;
-        }
+        returnsPurchase[index].signatureImage = finalSignature;
         if (notes) {
           returnsPurchase[index].approvalNotes = notes;
         }
@@ -898,57 +934,125 @@ export async function POST(request: Request) {
       } = payload;
 
       const sales = data.sales || [];
-      const index = sales.findIndex((s: any) => s.id === id || s.invoiceNumber === invoiceNumber || s.invoiceNumber?.toLowerCase() === invoiceNumber?.toLowerCase());
-
-      if (index === -1) {
-        return NextResponse.json({ success: false, error: "Faktur/Dokumen tidak ditemukan" }, { status: 404 });
-      }
+      const cleanTarget = (id || invoiceNumber || "").toLowerCase();
+      const index = sales.findIndex((s: any) =>
+        (s.id && s.id.toLowerCase() === cleanTarget) ||
+        (s.invoiceNumber && s.invoiceNumber.toLowerCase() === cleanTarget) ||
+        (s.orderNumber && s.orderNumber.toLowerCase() === cleanTarget)
+      );
 
       const now = new Date();
       const approvedAt = `${now.toISOString().split("T")[0]} ${now.toTimeString().slice(0, 5)} WIB`;
 
-      if (docType === "bast") {
-        sales[index].bastApproved = true;
-        sales[index].bastApprovedAt = approvedAt;
-        sales[index].bastSignerName = signerName || sales[index].customerName || "Pihak Kedua / Klien";
-        sales[index].bastSignerTitle = signerTitle || "Penanggung Jawab / PIC Klien";
-        sales[index].bastSignatureImage = signatureImage;
-        sales[index].bastNotes = notes || "";
-      } else if (docType === "delivery") {
-        sales[index].deliveryApproved = true;
-        sales[index].deliveryApprovedAt = approvedAt;
-        sales[index].deliverySignerName = signerName || sales[index].customerName || "Penerima Barang";
-        sales[index].deliverySignerTitle = signerTitle || "Penerima di Lapangan";
-        sales[index].deliverySignatureImage = signatureImage;
-        sales[index].deliveryNotes = notes || "";
-      } else if (docType === "photos") {
-        sales[index].photosApproved = true;
-        sales[index].photosApprovedAt = approvedAt;
-        sales[index].photosSignerName = signerName || sales[index].customerName || "Pemeriksa Pekerjaan";
-        sales[index].photosSignerTitle = signerTitle || "PIC Lapangan / Klien";
-        sales[index].photosSignatureImage = signatureImage;
-        sales[index].photosNotes = notes || "";
-      } else if (docType === "driver" || docType === "driver_delivery") {
-        sales[index].driverApproved = true;
-        sales[index].driverApprovedAt = approvedAt;
-        sales[index].driverSignerName = signerName || "Supir / Petugas Ekspedisi";
-        sales[index].driverSignerTitle = signerTitle || "Driver / Kurir Pengantar";
-        sales[index].driverSignatureImage = signatureImage;
-        sales[index].driverNotes = notes || "";
-      } else if (docType === "invoice" || docType === "faktur") {
-        sales[index].clientApproved = true;
-        sales[index].clientApprovedAt = approvedAt;
-        sales[index].clientSignerName = signerName || sales[index].customerName || "Penerima Faktur";
-        sales[index].clientSignerTitle = signerTitle || "Bagian Keuangan / PIC Penerima";
-        sales[index].clientSignatureImage = signatureImage;
-        sales[index].clientNotes = notes || "";
+      // Helper untuk menyimpan tanda tangan pihak kedua ke database pesanan e-store jika cocok
+      let updatedInOrder = false;
+      try {
+        const ordersFile = path.join(process.cwd(), "src/data/dstech_orders.json");
+        if (fs.existsSync(ordersFile)) {
+          const rawOrders = fs.readFileSync(ordersFile, "utf-8");
+          const orders = JSON.parse(rawOrders);
+          const ordIdx = orders.findIndex((o: any) =>
+            (o.id && o.id.toLowerCase() === cleanTarget) ||
+            (o.orderNumber && o.orderNumber.toLowerCase() === cleanTarget) ||
+            (o.invoiceNumber && o.invoiceNumber.toLowerCase() === cleanTarget) ||
+            (index !== -1 && sales[index]?.invoiceNumber && o.invoiceNumber?.toLowerCase() === sales[index].invoiceNumber.toLowerCase())
+          );
+          if (ordIdx !== -1) {
+            if (docType === "bast") {
+              orders[ordIdx].bastApproved = true;
+              orders[ordIdx].bastApprovedAt = approvedAt;
+              orders[ordIdx].bastSignerName = signerName || orders[ordIdx].customerName || "Pihak Kedua / Klien";
+              orders[ordIdx].bastSignerTitle = signerTitle || "Penanggung Jawab / PIC Klien";
+              orders[ordIdx].bastSignatureImage = signatureImage;
+              orders[ordIdx].bastNotes = notes || "";
+            } else if (docType === "delivery") {
+              orders[ordIdx].deliveryApproved = true;
+              orders[ordIdx].deliveryApprovedAt = approvedAt;
+              orders[ordIdx].deliverySignerName = signerName || orders[ordIdx].customerName || "Penerima Barang";
+              orders[ordIdx].deliverySignerTitle = signerTitle || "Penerima di Lapangan";
+              orders[ordIdx].deliverySignatureImage = signatureImage;
+              orders[ordIdx].deliveryNotes = notes || "";
+            } else if (docType === "photos") {
+              orders[ordIdx].photosApproved = true;
+              orders[ordIdx].photosApprovedAt = approvedAt;
+              orders[ordIdx].photosSignerName = signerName || orders[ordIdx].customerName || "Pemeriksa Pekerjaan";
+              orders[ordIdx].photosSignerTitle = signerTitle || "PIC Lapangan / Klien";
+              orders[ordIdx].photosSignatureImage = signatureImage;
+              orders[ordIdx].photosNotes = notes || "";
+            } else if (docType === "driver" || docType === "driver_delivery") {
+              orders[ordIdx].driverApproved = true;
+              orders[ordIdx].driverApprovedAt = approvedAt;
+              orders[ordIdx].driverSignerName = signerName || "Supir / Petugas Ekspedisi";
+              orders[ordIdx].driverSignerTitle = signerTitle || "Driver / Kurir Pengantar";
+              orders[ordIdx].driverSignatureImage = signatureImage;
+              orders[ordIdx].driverNotes = notes || "";
+            } else if (docType === "invoice" || docType === "faktur") {
+              orders[ordIdx].clientApproved = true;
+              orders[ordIdx].clientApprovedAt = approvedAt;
+              orders[ordIdx].clientSignerName = signerName || orders[ordIdx].customerName || "Penerima Faktur";
+              orders[ordIdx].clientSignerTitle = signerTitle || "Bagian Keuangan / PIC Penerima";
+              orders[ordIdx].clientSignatureImage = signatureImage;
+              orders[ordIdx].clientNotes = notes || "";
+            }
+            orders[ordIdx].isLocked = true;
+            fs.writeFileSync(ordersFile, JSON.stringify(orders, null, 2), "utf-8");
+            updatedInOrder = true;
+          }
+        }
+      } catch (eOrder) {
+        console.error("Gagal menyimpan client approval ke orders:", eOrder);
       }
 
-      writeFinanceData(data);
+      if (index === -1 && !updatedInOrder) {
+        return NextResponse.json({ success: false, error: "Faktur/Dokumen tidak ditemukan" }, { status: 404 });
+      }
+
+      if (index !== -1) {
+        if (docType === "bast") {
+          sales[index].bastApproved = true;
+          sales[index].bastApprovedAt = approvedAt;
+          sales[index].bastSignerName = signerName || sales[index].customerName || "Pihak Kedua / Klien";
+          sales[index].bastSignerTitle = signerTitle || "Penanggung Jawab / PIC Klien";
+          sales[index].bastSignatureImage = signatureImage;
+          sales[index].bastNotes = notes || "";
+        } else if (docType === "delivery") {
+          sales[index].deliveryApproved = true;
+          sales[index].deliveryApprovedAt = approvedAt;
+          sales[index].deliverySignerName = signerName || sales[index].customerName || "Penerima Barang";
+          sales[index].deliverySignerTitle = signerTitle || "Penerima di Lapangan";
+          sales[index].deliverySignatureImage = signatureImage;
+          sales[index].deliveryNotes = notes || "";
+        } else if (docType === "photos") {
+          sales[index].photosApproved = true;
+          sales[index].photosApprovedAt = approvedAt;
+          sales[index].photosSignerName = signerName || sales[index].customerName || "Pemeriksa Pekerjaan";
+          sales[index].photosSignerTitle = signerTitle || "PIC Lapangan / Klien";
+          sales[index].photosSignatureImage = signatureImage;
+          sales[index].photosNotes = notes || "";
+        } else if (docType === "driver" || docType === "driver_delivery") {
+          sales[index].driverApproved = true;
+          sales[index].driverApprovedAt = approvedAt;
+          sales[index].driverSignerName = signerName || "Supir / Petugas Ekspedisi";
+          sales[index].driverSignerTitle = signerTitle || "Driver / Kurir Pengantar";
+          sales[index].driverSignatureImage = signatureImage;
+          sales[index].driverNotes = notes || "";
+        } else if (docType === "invoice" || docType === "faktur") {
+          sales[index].clientApproved = true;
+          sales[index].clientApprovedAt = approvedAt;
+          sales[index].clientSignerName = signerName || sales[index].customerName || "Penerima Faktur";
+          sales[index].clientSignerTitle = signerTitle || "Bagian Keuangan / PIC Penerima";
+          sales[index].clientSignatureImage = signatureImage;
+          sales[index].clientNotes = notes || "";
+        }
+
+        sales[index].isLocked = true;
+        writeFinanceData(data);
+      }
+
       return NextResponse.json({
         success: true,
-        message: `Dokumen ${docType.toUpperCase()} berhasil disetujui & ditandatangani oleh ${signerName || "Klien"}!`,
-        data: sales[index],
+        message: `Dokumen ${docType.toUpperCase()} berhasil disetujui, ditandatangani, & dikunci secara sah oleh ${signerName || "Klien"}!`,
+        data: index !== -1 ? sales[index] : { id, docType, clientApproved: true },
       });
     }
 
@@ -1033,13 +1137,29 @@ export async function POST(request: Request) {
       const isDpPayment = invoice.invoiceType === "DP" && newPaidAmount <= (Number(invoice.dpAmount) || 0);
       const isTerminPayment = invoice.invoiceType === "Termin";
 
+      const projectOrSubject = invoice.projectName || invoice.subject || (invoice.notes && invoice.notes.includes("(") ? invoice.notes.replace(/^.*?\((.*?)\).*$/, "$1") : "") || invoice.customerName || "Pengadaan & Layanan";
+      let finalNotes = (notes || "").trim();
+      if (!finalNotes || finalNotes.toLowerCase().includes("angsuran / termin") || finalNotes.toLowerCase().includes("angsuran/termin") || finalNotes.toLowerCase().includes("pembayaran angsuran") || finalNotes.startsWith("Penerimaan Pembayaran Faktur")) {
+        if (isTerminPayment && targetTerminName) {
+          finalNotes = `Pembayaran ${targetTerminName} atas Faktur ${invoice.invoiceNumber} - ${projectOrSubject}`;
+        } else if (isDpPayment) {
+          finalNotes = `Pembayaran Uang Muka (DP ${invoice.dpPercentage || 50}%) atas Faktur ${invoice.invoiceNumber} - ${projectOrSubject}`;
+        } else if (invoice.invoiceType === "DP" && newRemaining === 0) {
+          finalNotes = `Pelunasan Sisa Pembayaran Kontrak (${100 - (Number(invoice.dpPercentage) || 50)}%) atas Faktur ${invoice.invoiceNumber} - ${projectOrSubject} setelah BAST`;
+        } else if (newRemaining === 0) {
+          finalNotes = `Pembayaran Penuh (100%) atas Faktur ${invoice.invoiceNumber} - ${projectOrSubject}`;
+        } else {
+          finalNotes = `Pembayaran Bertahap atas Faktur ${invoice.invoiceNumber} - ${projectOrSubject}`;
+        }
+      }
+
       const paymentRecord = {
         id: `dstech_pay_${Date.now()}`,
         receiptNumber,
         amount: amountToPay,
         paymentDate: paymentDate || new Date().toISOString().split("T")[0],
         paymentMethod: paymentMethod || invoice.paymentMethod,
-        notes: notes || `Penerimaan Pembayaran Faktur ${invoice.invoiceNumber}`,
+        notes: finalNotes,
         terminId: terminId || null,
         terminName: targetTerminName || null,
         paymentType: isTerminPayment ? targetTerminName || "Termin" : isDpPayment ? "Uang Muka (DP)" : "Pelunasan",
@@ -1526,7 +1646,11 @@ export async function POST(request: Request) {
         verificationCode: sph.verificationCode || "",
         businessEntity: (sph as any).businessEntity || "PT",
         projectId: (sph as any).projectId || payload.projectId || "",
-        projectName: (sph as any).projectName || payload.projectName || "",
+        projectName: (sph as any).projectName || payload.projectName || sph.subject || "",
+        quotationId: sph.id || sph.quotationNumber,
+        quotationNumber: sph.quotationNumber,
+        subject: sph.subject || "",
+        terms: sph.terms || "",
       };
 
       if (!data.sales) data.sales = [];
@@ -1750,15 +1874,87 @@ export async function PUT(request: Request) {
       });
     }
 
+    // Helper Penguncian Tanda Tangan & Pengesahan Dokumen (Anti-Hilang)
+    const applySignatureLockProtection = (existingDoc: any, incomingUpdates: any) => {
+      const isCurrentlyApproved = existingDoc.approvalStatus === "Disetujui & Sah" || Boolean(existingDoc.signatureImage);
+      if (!isCurrentlyApproved) {
+        return incomingUpdates;
+      }
+
+      // Jika admin secara sengaja meminta revisi surat (perbaikan dokumen)
+      if (incomingUpdates.isRevision === true) {
+        const revisionHistory = existingDoc.revisionHistory || [];
+        revisionHistory.push({
+          revision: existingDoc.revision || 0,
+          revisedAt: new Date().toISOString(),
+          revisedBy: incomingUpdates.revisedBy || "Admin",
+          reason: incomingUpdates.revisionReason || "Perbaikan / Revisi Rincian Dokumen",
+          previousSignatureImage: existingDoc.signatureImage,
+          previousApprovedBy: existingDoc.approvedBy,
+          previousApprovedAt: existingDoc.approvedAt,
+          previousGrandTotal: existingDoc.grandTotal,
+        });
+
+        return {
+          ...incomingUpdates,
+          revision: (existingDoc.revision || 0) + 1,
+          isRevision: true,
+          revisionHistory,
+          approvalStatus: "Menunggu Pengesahan Ulang (Pasca Revisi)",
+          signatureImage: "",
+          approvedAt: "",
+          approvedBy: "",
+          isLocked: false,
+        };
+      }
+
+      // Dokumen Terkunci Sah: Pertahankan tanda tangan & pengesahan 100% dari overwrite tidak sengaja
+      const protectedUpdates = { ...incomingUpdates };
+      protectedUpdates.isLocked = true;
+      if (existingDoc.isLockedPermanently) protectedUpdates.isLockedPermanently = true;
+      protectedUpdates.approvalStatus = existingDoc.approvalStatus || "Disetujui & Sah";
+      protectedUpdates.approvedBy = existingDoc.approvedBy;
+      protectedUpdates.approvedTitle = existingDoc.approvedTitle;
+      protectedUpdates.approvedAt = existingDoc.approvedAt;
+      protectedUpdates.verificationCode = existingDoc.verificationCode;
+      protectedUpdates.signatureImage = existingDoc.signatureImage;
+
+      // Pertahankan seluruh snapshot penguncian permanen (Tugas 284)
+      if (existingDoc.frozenSignatureImage) protectedUpdates.frozenSignatureImage = existingDoc.frozenSignatureImage;
+      if (existingDoc.frozenSignerName) protectedUpdates.frozenSignerName = existingDoc.frozenSignerName;
+      if (existingDoc.frozenSignerTitle) protectedUpdates.frozenSignerTitle = existingDoc.frozenSignerTitle;
+      if (existingDoc.frozenStampUrl) protectedUpdates.frozenStampUrl = existingDoc.frozenStampUrl;
+      if (existingDoc.lastPrintedAt) protectedUpdates.lastPrintedAt = existingDoc.lastPrintedAt;
+      if (existingDoc.firstPrintedAt) protectedUpdates.firstPrintedAt = existingDoc.firstPrintedAt;
+
+      // Pertahankan tanda tangan pihak kedua (klien, supir, vendor, BAST, surat jalan, foto)
+      if (existingDoc.bastSignatureImage && !protectedUpdates.bastSignatureImage) protectedUpdates.bastSignatureImage = existingDoc.bastSignatureImage;
+      if (existingDoc.bastApproved) protectedUpdates.bastApproved = existingDoc.bastApproved;
+      if (existingDoc.deliverySignatureImage && !protectedUpdates.deliverySignatureImage) protectedUpdates.deliverySignatureImage = existingDoc.deliverySignatureImage;
+      if (existingDoc.deliveryApproved) protectedUpdates.deliveryApproved = existingDoc.deliveryApproved;
+      if (existingDoc.driverSignatureImage && !protectedUpdates.driverSignatureImage) protectedUpdates.driverSignatureImage = existingDoc.driverSignatureImage;
+      if (existingDoc.driverApproved) protectedUpdates.driverApproved = existingDoc.driverApproved;
+      if (existingDoc.clientSignatureImage && !protectedUpdates.clientSignatureImage) protectedUpdates.clientSignatureImage = existingDoc.clientSignatureImage;
+      if (existingDoc.clientApproved) protectedUpdates.clientApproved = existingDoc.clientApproved;
+      if (existingDoc.supplierSignatureImage && !protectedUpdates.supplierSignatureImage) protectedUpdates.supplierSignatureImage = existingDoc.supplierSignatureImage;
+      if (existingDoc.supplierApproved) protectedUpdates.supplierApproved = existingDoc.supplierApproved;
+      if (existingDoc.photosSignatureImage && !protectedUpdates.photosSignatureImage) protectedUpdates.photosSignatureImage = existingDoc.photosSignatureImage;
+      if (existingDoc.photosApproved) protectedUpdates.photosApproved = existingDoc.photosApproved;
+
+      return protectedUpdates;
+    };
+
     if (actionType === "sale") {
       const index = (data.sales || []).findIndex((s: any) => s.id === id);
       if (index === -1) {
         return NextResponse.json({ success: false, error: "Faktur penjualan tidak ditemukan" }, { status: 404 });
       }
 
+      const safeUpdates = applySignatureLockProtection(data.sales[index], updates);
+
       data.sales[index] = {
         ...data.sales[index],
-        ...updates,
+        ...safeUpdates,
       };
 
       // Recalculate remaining amount and status
@@ -1808,9 +2004,11 @@ export async function PUT(request: Request) {
         return NextResponse.json({ success: false, error: "Purchase Order tidak ditemukan" }, { status: 404 });
       }
 
+      const safeUpdates = applySignatureLockProtection(data.purchases[index], updates);
+
       data.purchases[index] = {
         ...data.purchases[index],
-        ...updates,
+        ...safeUpdates,
       };
 
       if (updates.items || updates.taxRate !== undefined || updates.taxType !== undefined) {
@@ -1906,9 +2104,11 @@ export async function PUT(request: Request) {
         return NextResponse.json({ success: false, error: "Surat Penawaran tidak ditemukan" }, { status: 404 });
       }
 
+      const safeUpdates = applySignatureLockProtection(data.quotations[index], updates);
+
       data.quotations[index] = {
         ...data.quotations[index],
-        ...updates,
+        ...safeUpdates,
       };
 
       if (updates.items || updates.discount !== undefined || updates.taxRate !== undefined || updates.taxType !== undefined) {
@@ -1996,9 +2196,11 @@ export async function PUT(request: Request) {
         return NextResponse.json({ success: false, error: "Retur penjualan tidak ditemukan" }, { status: 404 });
       }
 
+      const safeUpdates = applySignatureLockProtection(data.returns_sales[index], updates);
+
       data.returns_sales[index] = {
         ...data.returns_sales[index],
-        ...updates,
+        ...safeUpdates,
       };
 
       writeFinanceData(data);
@@ -2015,9 +2217,11 @@ export async function PUT(request: Request) {
         return NextResponse.json({ success: false, error: "Retur pembelian tidak ditemukan" }, { status: 404 });
       }
 
+      const safeUpdates = applySignatureLockProtection(data.returns_purchase[index], updates);
+
       data.returns_purchase[index] = {
         ...data.returns_purchase[index],
-        ...updates,
+        ...safeUpdates,
       };
 
       writeFinanceData(data);

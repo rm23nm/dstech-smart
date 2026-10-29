@@ -4,8 +4,141 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Status**: SEMUA ANTRIAN SELESAI (Idle / Menunggu Permintaan Baru)
-- Tidak ada tugas aktif yang tertunda.
+- **Tugas 286**: Penyesuaian Mutlak Keterangan Tujuan Pembayaran Kuitansi Resmi Tanpa Teks Usang "Pembayaran Angsuran / Termin", Sanitasi Catatan Historis, dan Sinkronisasi Deployment ke Server Live VPS.
+  *Permintaan User*: "masih tertulis pembayaran angsuran/termin" (disertai tangkapan layar cetak Kuitansi Pembayaran di browser).
+  *Akar Masalah yang Ditemukan*:
+  1. Pada lembar cetak kuitansi (`src/app/api/finance/print/route.ts`), logika pengecekan `selectedPayment?.notes` hanya mengecualikan string yang diawali `"Penerimaan Pembayaran Faktur INV-"`. Jika pembayaran pada database telah tersimpan dengan teks bawaan lama `"Pembayaran Angsuran / Termin atas Faktur INV-..."`, sistem langsung mencetak teks lama tersebut tanpa melakukan sanitasi atau regenerasi otomatis.
+  2. Masih terdapat fallback baris lama yang menghasilkan teks `Pembayaran Angsuran atas Faktur...` di skema bertahap.
+  3. Server live VPS belum menerima sinkronisasi git push & deploy build terbaru dari perbaikan skema faktur sebelumnya.
+  *Rencana Langkah Pengerjaan (Step-by-Step)*:
+  1. **Pencadangan Berkas (Backup)**: Membuat folder `_backup_kwitansi_purpose_fix` dan menyalin:
+     - `src/app/api/finance/print/route.ts`
+     - `src/app/api/finance/route.ts`
+     - `src/app/admin/finance/page.tsx`
+  2. **Sanitasi Total & Regenerasi Cerdas Tujuan Pembayaran Kuitansi (`src/app/api/finance/print/route.ts`)**:
+     - Mendeteksi catatan historis generik/usang (`isLegacyOrGenericNote`: memuat "angsuran / termin", "angsuran/termin", "pembayaran angsuran", "pembayaran sebagian", atau awalan generik).
+     - Mengharuskan regenerasi dinamis 100% berdasarkan skema faktur:
+       * **Skema DP**:
+         - Pembayaran DP: `Pembayaran Uang Muka (DP {pct}%) atas Faktur {no} - {subject/project}`.
+         - Pelunasan DP: `Pelunasan Sisa Pembayaran Kontrak ({100-pct}%) atas Faktur {no} - {subject/project} setelah Berita Acara Serah Terima (BAST)`.
+         - Pembayaran Bertahap: `Pembayaran Bertahap Tahap {X} atas Faktur {no} - {subject/project}`.
+       * **Skema Multi-Termin Progresif**:
+         - Mengidentifikasi termin yang cocok berdasarkan `terminId`, `terminName`, atau urutan pembayaran `paymentIndex`.
+         - Format: `Pembayaran {terminName} ({pct}%) - Syarat: {condition} atas Faktur {no} - {subject/project}`.
+         - Pelunasan Akhir: `Pelunasan Pembayaran Termin Tahap Akhir ({terminName}) atas Faktur {no} - {subject/project} (BAST Selesai)`.
+       * **Skema Standar 100%**:
+         - Pelunasan: `Pembayaran Penuh (100%) atas Faktur {no} - {subject/project}`.
+         - Sebagian: `Pembayaran Sebagian (Tahap {X}) atas Faktur {no} - {subject/project}`.
+     - Memperbarui badge kuitansi agar mencantumkan nama termin spesifik secara dinamis.
+  3. **Penyempurnaan Backend Pencatatan Pembayaran (`src/app/api/finance/route.ts`)**:
+     - Menghilangkan segala bentukan default "Pembayaran Angsuran / Termin" pada saat `record_payment`.
+  4. **Validasi & Build Lokal**:
+     - Memeriksa kode via `npx tsc --noEmit`.
+     - Menguji kompilasi produksi via `npm run build`.
+  5. **Pembersihan Berkas Cadangan**:
+     - Menghapus folder cadangan `_backup_kwitansi_purpose_fix` setelah pengujian lokal sukses.
+  6. **Deployment ke Server Live VPS**:
+     - Melakukan sinkronisasi push ke GitHub dan trigger remote build & restart PM2 di server VPS.
+  7. **Pelaporan & Dokumentasi**:
+     - Memperbarui status Tugas 286 menjadi `[SELESAI]` pada `LAPORAN_PROGRES.md` di kedua lokasi.
+
+- **2026-10-29**: [SELESAI] Perbaikan Skema Penerbitan Faktur pada Modal Edit Faktur (Khususnya Faktur Konversi SPH) dan Otomatisasi Keterangan Pembayaran Kuitansi Sesuai Skema Pembayaran (Standar 100%, Uang Muka DP, Multi-Termin Progresif) (Tugas 285) (`src/app/admin/finance/page.tsx`, `src/app/api/finance/route.ts`, `src/app/api/finance/print/route.ts`).
+  *Permintaan User*: "pada saat edit faktur yang dikonvert dari SPH, kenapa tidak ada muncul skema penerbitan faktur. kemudian apada kuitansi yang terbentuk. keterangan pembayaran masih tidak sesuai dengan skema pembayaran yang dipilh."
+  *Penyebab Masalah yang Ditemukan*:
+  1. Pada modal Edit Faktur (`isEditSaleModalOpen`), kontrol tipe faktur sebelumnya hanya berupa 2 tombol sederhana tanpa kontrol skema "Multi-Termin Progresif" dan manajemen daftar termin.
+  2. Saat konversi SPH ke Faktur, metadata subjek pengadaan (`subject`) dan nama proyek (`projectName`) belum tersimpan di root atribut faktur penjualan sehingga referensi deskripsi pembayaran kuitansi tidak spesifik.
+  3. Keterangan pembayaran kuitansi sebelumnya bersifat statis atau generik ("Pelunasan Pembayaran Penuh" / "Pembayaran Angsuran") tanpa mendeteksi apakah pembayaran tersebut merupakan Uang Muka (DP), pelunasan sisa kontrak DP setelah BAST, atau termin progresif spesifik.
+  *Penyelesaian & Hasil*:
+  1. **Integrasi Skema Penerbitan Faktur Lengkap di Modal Edit Faktur (`src/app/admin/finance/page.tsx`)**:
+     - Menambahkan selektor 3 skema penagihan lengkap: Standar (Pelunasan 100%), Uang Muka (DP) Bertahap, dan Multi-Termin Progresif.
+     - Menyediakan antarmuka manajemen termin interaktif: nama termin, persentase bobot, kalkulasi nominal otomatis, tanggal jatuh tempo, syarat penagihan, serta tombol tambah/hapus termin dengan validasi bobot total 100%.
+     - Menghubungkan kalkulasi otomatis pada fungsi `handleOpenEditSale`, `handleEditSaleItemChange`, dan `calculateEditSaleDerivedTotals`.
+  2. **Penyempurnaan Konversi SPH ke Faktur di Backend (`src/app/api/finance/route.ts`)**:
+     - Memastikan atribut `subject`, `projectName`, `terms`, dan `quotationNumber` dari SPH tersimpan secara permanen ke faktur penjualan baru.
+  3. **Otomatisasi Keterangan Pembayaran Kuitansi Sesuai Skema di Formulir Pembayaran (`src/app/admin/finance/page.tsx`)**:
+     - Saat memilih termin atau menekan tombol Bayar DP / Bayar Lunas, catatan pembayaran otomatis diformat:
+       * DP: `Pembayaran Uang Muka (DP {pct}%) atas Faktur {no} - {subject/project}`.
+       * Pelunasan DP: `Pelunasan Sisa Pembayaran Kontrak ({100-pct}%) atas Faktur {no} - {subject/project} setelah Berita Acara Serah Terima (BAST)`.
+       * Termin: `Pembayaran {terminName} ({pct}%) - Syarat: {condition} atas Faktur {no} - {subject/project}`.
+       * Standar: `Pembayaran Penuh (100%) atas Faktur {no} - {subject/project}`.
+  4. **Penyempurnaan Tampilan & Data Kuitansi Pembayaran Resmi (`src/app/api/finance/print/route.ts`)**:
+     - Menampilkan baris status resmi **Skema Pembayaran** pada Kuitansi.
+     - `receiptPurpose` menampilkan deskripsi presisi pembayaran yang diterima.
+     - Menampilkan rincian audit finansial: Total Kontrak, Total Terbayar, Pembayaran Saat Ini, dan Sisa Piutang.
+  5. **Pengujian & Validasi**:
+     - `npx tsc --noEmit` lolos 100% tanpa error.
+     - `npm run build` sukses mengompilasi 76/76 static & dynamic pages.
+
+- **2026-10-29**: [SELESAI] Penguncian Permanen Snapshot Tanda Tangan & Metadata Dokumen yang Telah Ditandatangani / Dikirim ke Klien (Immutable Historical Lock & Waktu Terakhir Dicetak) (Tugas 284) (`src/app/api/finance/print/route.ts`, `src/app/api/finance/route.ts`, `src/app/api/orders/route.ts`, `src/app/admin/finance/page.tsx`).
+  *Permintaan User*: "untuk tandatangan yang sudah ditanda tangani dan telah lewat, apalagi sudah kita kirimkan ke client jangan pernah berubah. harus dikunci diwaktu terakhir dicetak."
+  *Penyebab Masalah yang Ditemukan*:
+  - Pada implementasi sebelumnya, lembar cetak dokumen (`/api/finance/print`) menggunakan fallback dinamis `signatureImage || settings.masterSignatureUrl`.
+  - Jika di masa depan admin mengubah atau mengupload tanda tangan baru di Site Settings, dokumen historis masa lalu yang telah dikirim ke klien dapat terpengaruh tampilan tanda tangannya.
+  *Penyelesaian & Hasil*:
+  1. **Immutable Frozen Signature Snapshot di API Cetak (`src/app/api/finance/print/route.ts`)**:
+     - Saat dokumen (Faktur Penjualan, SPH, PO, BAST, Kuitansi, atau Pesanan E-Store) diakses untuk dicetak atau dikirim ke klien:
+       * Sistem membekukan snapshot tanda tangan fisik ke dalam database JSON (`dstech_finance_erp.json` dan `dstech_orders.json`):
+         - `frozenSignatureImage`: Tanda tangan digital saat dicetak.
+         - `frozenSignerName`: Nama resmi penandatangan (`RAMADHANI ST`).
+         - `frozenSignerTitle`: Jabatan resmi penandatangan (`Direktur`).
+         - `frozenStampUrl`: Stempel resmi perusahaan saat dicetak.
+         - `lastPrintedAt`: Timestamp presisi waktu cetak terakhir (WIB, contoh: `29 Okt 2026, 10:05 WIB`).
+         - `firstPrintedAt`: Tanggal dokumen pertama kali dicetak/diterbitkan.
+         - `isLockedPermanently: true` & `isLocked: true`.
+     - Logika cetak diubah secara mutlak untuk memprioritaskan `doc.frozenSignatureImage || doc.signatureImage` dan **DILARANG KERAS** dioverwrite oleh perubahan `settings.masterSignatureUrl` baru di Site Settings.
+     - Ditambahkan catatan audit & cap validasi resmi di kaki dokumen cetak: *"🔒 Dokumen Sah & Terkunci Permanen: Dicetak pada [lastPrintedAt]. Tanda tangan & stempel historis dibekukan secara permanen."*
+  2. **Proteksi Backend Tambahan (`src/app/api/finance/route.ts` & `src/app/api/orders/route.ts`)**:
+     - Dokumen yang memiliki flag `isLockedPermanently: true` dilarang diubah tanda tangannya oleh form update biasa.
+  3. **Antarmuka Admin Finance (`src/app/admin/finance/page.tsx`)**:
+     - Menampilkan badge visual *"🔒 TERKUNCI & SAH (PERMANEN)"* pada invoice yang sudah dibekukan dan menampilkan informasi tanggal penguncian cetak (`lastPrintedAt`).
+     - Menyembunyikan tombol pembatalan tanda tangan jika dokumen telah dikunci permanen.
+  4. **Pengujian & Validasi**:
+     - `npx tsc --noEmit` lolos 100% tanpa error.
+     - `npm run build` sukses mengompilasi 76/76 static & dynamic pages.
+
+
+
+- **2026-10-29**: [SELESAI] Penguncian Tanda Tangan Digital & Pengesahan Dokumen Anti-Hilang, Pembatasan Faktur E-Store Khusus Pesanan Diterima, Alur Refund & Retur Keuangan, serta Pengaturan Penandatangan Seragam di Site Settings (Tugas 283) (`src/app/api/finance/route.ts`, `src/app/api/orders/route.ts`, `src/app/api/finance/print/route.ts`, `src/app/api/settings/route.ts`, `src/app/admin/settings/page.tsx`, `src/app/admin/orders/page.tsx`).
+  *Permintaan User*: 
+  1. "setiap saya selesai mengesahkan surat tanda tangan. selalu saja pengesahaannya hilang tanpa tertanda tangan. tolong dikunci. jika sudah melakukan tanda tangan 1x pada seluruh dokumen maka jangan pernah hilang dan diubah. kecuali ada melakukan perbaikan surat, maka butuh pengesahan kembali."
+  2. "kemudian saya melihat. jika ada order yang masuk dari estor client. maka faktur dan lainnya langsung terbentuk. padahal pesanan tersebut sudah berstatus batal. ordernya hanya berstatus baru order tanpa pembayaran terverivikasi dan pengirimannya belum diterima konsumen. tolong ubah sistemnya. agar seluruh faktur dari estor baru terbentuk setelah pesanan dinyatakan diterima oleh client. kalau pesanannya batal, maka jangan buatkan faktur penjualan. dikhawatirkan akan masuk ke keuangan dan mengacak-acak keuangannya.. jika pesanan sudah selesai dan diterima, namun client komplen dan mengembalikan pesanan. maka pesanan sebelumnya akan direfund dan pengembalian dana harus bisa diproses"
+  3. "untuk aproval selain dari surat jalan, setkan semuanya default ke penanda tangan PT. DSTECH SMART PRKASA yang menandatangani RAMADHANI ST dan Jabatannya Direktur"
+  4. "kalau bisa buatkan di pengaturan site setting untuk pengaturan penandatangan setiap surat, sehingga kedepannya secara otomatis dan seragam terbentuk"
+  *Penyebab Masalah yang Ditemukan*:
+  1. Setiap kali form invoice / dokumen di Admin Finance diedit dan disimpan via `PUT /api/finance`, handler backend melakukan spread operator `data.sales[index] = { ...data.sales[index], ...updates };` di mana payload dari form modal tidak menyertakan tanda tangan canvas yang sudah ada (tertimpa string kosong / null), sehingga status pengesahan dan tanda tangan digital hilang.
+  2. Handler `POST /api/orders` sebelumnya memicu sinkronisasi `syncOrderToFinanceErp` seketika saat pesanan dibuat (`PAYMENT_PENDING`), sehingga faktur penjualan resmi langsung tercatat ke modul keuangan dan buku kas. Saat pesanan dibatalkan atau belum lunas, invoice tetap menggantung di modul keuangan.
+  3. Belum ada mekanisme pemrosesan pengembalian dana (refund) untuk pesanan e-store yang diretur / komplain.
+  4. Pengaturan nama pejabat penandatangan, upload tanda tangan digital master (PNG), dan stempel perusahaan belum terintegrasi secara dua arah antara menu Site Settings (`dstech_settings.json`) dan modul Finance ERP (`dstech_finance_erp.json`).
+  *Penyelesaian & Hasil*:
+  1. **Penguncian Tanda Tangan & Pengesahan Dokumen (`applySignatureLockProtection`)**:
+     - Ditambahkan helper proteksi di `src/app/api/finance/route.ts`: Dokumen yang telah disahkan (`approvalStatus === "Disetujui & Sah"` atau telah bertanda tangan) otomatis dikunci (`isLocked: true`).
+     - Tanda tangan digital (`signatureImage`, `clientSignatureImage`, `bastSignatureImage`, `deliverySignatureImage`, `driverSignatureImage`), tanggal pengesahan, dan nama penandatangan 100% dipertahankan dan kebal dari overwrite form update biasa.
+     - Jika dokumen memerlukan perbaikan substansial (`isRevision: true`), sistem mencatat arsip riwayat versi ke `revisionHistory`, menaikkan nomor revisi (`revision + 1`), dan barulah membuka kunci untuk pengesahan ulang.
+  2. **Pembatasan Ketat Faktur E-Store & Pembersihan Pesanan Batal**:
+     - Di `src/app/api/orders/route.ts`: Faktur penjualan resmi ke pembukuan keuangan (`financeData.sales`) dan pencatatan kas masuk HANYA dibentuk jika pesanan telah berstatus `DELIVERED`, `SELESAI`, atau `COMPLETED` (barang diterima oleh konsumen).
+     - Untuk pesanan berstatus `CANCELLED` / `DIBATALKAN`: Sistem secara ketat menolak pembuatan faktur, dan otomatis membersihkan / menghapus faktur lama jika pernah tercatat di `financeData.sales` dan kas masuk agar keuangan bersih 100%.
+     - Di `src/app/api/finance/print/route.ts`: Untuk pesanan batal, sistem menampilkan layar penolakan resmi *"Faktur Tidak Diterbitkan untuk Pesanan Batal"*. Untuk pesanan yang masih dalam proses (`PAYMENT_PENDING`, `PAID`, `PROCESSING`, `SHIPPED`), dokumen dicetak sebagai *"Surat Pesanan / Bukti Belanja (Proforma)"*.
+  3. **Alur Pemrosesan Refund & Pengembalian Dana Terintegrasi**:
+     - Ditambahkan action `process_refund` pada `PATCH /api/orders`: Mengubah status pesanan menjadi `REFUNDED`, mencatat Berita Acara Retur ke `financeData.returns_sales`, mencatat pengeluaran kas refund ke `financeData.cash_flow` (`type: "OUT"`), dan memperbarui status faktur penjualan menjadi `Direfund / Dikembalikan`.
+     - Di `src/app/admin/orders/page.tsx`: Disediakan form interaktif pengembalian dana pada modal proses pesanan (nominal refund, metode pembayaran bank, nomor rekening tujuan, nama pemilik rekening, dan alasan retur).
+     - Tombol cetak faktur di tabel dan modal pesanan otomatis menyesuaikan badge dinamis: Batal (Tanpa Faktur), Selesai (Faktur Penjualan Sah), Refund (Berita Acara Refund), atau Dalam Proses (Surat Pesanan Proforma).
+  4. **Default Penandatangan Dokumen Resmi Seragam**:
+     - Default penandatangan seluruh dokumen resmi (selain Surat Jalan / Pengiriman) diseragamkan ke:
+       * Instansi: `PT. DSTECH SMART PERKASA`
+       * Pejabat Penandatangan: `RAMADHANI ST`
+       * Jabatan: `Direktur`
+  5. **Pengaturan Penandatangan Dokumen & Stempel di Site Settings**:
+     - Di `src/app/admin/settings/page.tsx` pada Tab Kop Surat Dokumen, ditambahkan form terpadu:
+       * Nama Pejabat Penandatangan Resmi & Jabatan Direktur Utama.
+       * Unggah Tanda Tangan Digital Master (PNG Transparan) dengan pratinjau langsung & tombol hapus.
+       * Unggah Stempel Resmi Perusahaan (PNG Transparan) dengan pratinjau langsung & tombol hapus.
+     - Di `src/app/api/settings/route.ts`: Sinkronisasi dua arah otomatis antara `dstech_settings.json` dan `financeData.settings` di `dstech_finance_erp.json` saat tombol simpan diklik.
+     - Di `src/app/api/finance/print/route.ts`: Dokumen cetak resmi (SPH Penawaran, Faktur Penjualan, BAST) otomatis memuat nama penandatangan, tanda tangan master, dan stempel resmi dari konfigurasi Site Settings.
+  6. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: **0 error (Lolos validasi ketat)**.
+     - `npm run build`: **Berhasil 100% (76/76 static & dynamic pages)**.
+     - Folder cadangan sementara `_backup_signature_lock_and_estore_refund` telah dibersihkan secara aman.
+
 
 - **2026-10-29**: [SELESAI] Perbaikan Filterisasi Menu "Kirim Tagihan Invoice" dan "Lampirkan Pesanan & Resi" pada Aplikasi Pesan Obrolan (Terkunci Khusus Milik Lawan Bicara / Klien Aktif) (Tugas 282) (`src/app/api/team-chat/route.ts` & `src/components/TeamChatMessenger.tsx`).
   *Permintaan User*: "saya melihat, kirim tagihan invoice, dan juga lampirkan pesanan dan resi masih belum terfilter, tagihan dan pesanan yang bukan milknya masih muncul didaftar."

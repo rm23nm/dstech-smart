@@ -246,6 +246,126 @@ function readOrders(): any[] {
   return [];
 }
 
+function writeFinanceData(data: any): boolean {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+    return true;
+  } catch (err) {
+    console.error("Error writing dstech_finance_erp.json:", err);
+    return false;
+  }
+}
+
+function writeOrders(orders: any[]): boolean {
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify({ orders }, null, 2), "utf-8");
+    return true;
+  } catch (err) {
+    console.error("Error writing dstech_orders.json:", err);
+    return false;
+  }
+}
+
+// Helper Pembekuan Snapshot Tanda Tangan & Metadata Dokumen (Tugas 284 - Immutable Historical Lock)
+function freezeDocumentSnapshot(
+  category: "quotations" | "purchases" | "sales" | "orders",
+  targetIdOrNo: string,
+  snapshot: {
+    signatureImage: string;
+    signerName: string;
+    signerTitle: string;
+    stampUrl?: string;
+  }
+) {
+  try {
+    const nowWIB = new Date().toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      dateStyle: "long",
+      timeStyle: "medium",
+    }) + " WIB";
+
+    if (category === "orders") {
+      const orders = readOrders();
+      const cleanTarget = (targetIdOrNo || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+      const idx = orders.findIndex((o: any) => {
+        const c1 = (o.orderNumber || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+        const c2 = (o.id || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+        const c3 = (o.invoiceNumber || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+        return c1 === cleanTarget || c2 === cleanTarget || c3 === cleanTarget;
+      });
+
+      if (idx !== -1) {
+        const order = orders[idx];
+        if (!order.frozenSignatureImage && snapshot.signatureImage) {
+          order.frozenSignatureImage = snapshot.signatureImage;
+          order.signatureImage = snapshot.signatureImage;
+        }
+        if (!order.frozenSignerName && snapshot.signerName) {
+          order.frozenSignerName = snapshot.signerName;
+          order.approvedBy = snapshot.signerName;
+        }
+        if (!order.frozenSignerTitle && snapshot.signerTitle) {
+          order.frozenSignerTitle = snapshot.signerTitle;
+          order.approvedTitle = snapshot.signerTitle;
+        }
+        if (!order.frozenStampUrl && snapshot.stampUrl) {
+          order.frozenStampUrl = snapshot.stampUrl;
+          order.stampUrl = snapshot.stampUrl;
+        }
+        if (!order.firstPrintedAt) {
+          order.firstPrintedAt = nowWIB;
+        }
+        order.lastPrintedAt = nowWIB;
+        order.isLockedPermanently = true;
+        order.isLocked = true;
+        writeOrders(orders);
+        return order;
+      }
+    } else {
+      const finData = readFinanceData();
+      const list = finData[category] || [];
+      const cleanTarget = (targetIdOrNo || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+
+      const idx = list.findIndex((item: any) => {
+        const no1 = (item.quotationNumber || item.poNumber || item.invoiceNumber || item.id || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+        const no2 = (item.id || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+        return no1 === cleanTarget || no2 === cleanTarget;
+      });
+
+      if (idx !== -1) {
+        const doc = list[idx];
+        if (!doc.frozenSignatureImage && snapshot.signatureImage) {
+          doc.frozenSignatureImage = snapshot.signatureImage;
+          doc.signatureImage = snapshot.signatureImage;
+        }
+        if (!doc.frozenSignerName && snapshot.signerName) {
+          doc.frozenSignerName = snapshot.signerName;
+          doc.approvedBy = snapshot.signerName;
+        }
+        if (!doc.frozenSignerTitle && snapshot.signerTitle) {
+          doc.frozenSignerTitle = snapshot.signerTitle;
+          doc.approvedTitle = snapshot.signerTitle;
+        }
+        if (!doc.frozenStampUrl && snapshot.stampUrl) {
+          doc.frozenStampUrl = snapshot.stampUrl;
+          doc.stampUrl = snapshot.stampUrl;
+        }
+        if (!doc.firstPrintedAt) {
+          doc.firstPrintedAt = nowWIB;
+        }
+        doc.lastPrintedAt = nowWIB;
+        doc.isLockedPermanently = true;
+        doc.isLocked = true;
+        writeFinanceData(finData);
+        return doc;
+      }
+    }
+  } catch (err) {
+    console.error("Gagal freezeDocumentSnapshot:", err);
+  }
+  return null;
+}
+
 // Helper pencarian dokumen penjualan resmi (mencakup modul Finance ERP dan Pesanan E-Store)
 function findSaleOrEStoreOrder(docNo: string, sales: any[]): any {
   if (!docNo) return null;
@@ -289,6 +409,11 @@ function findSaleOrEStoreOrder(docNo: string, sales: any[]): any {
   });
 
   if (matchedOrder) {
+    const generalSettings = readGeneralSettings();
+    const orderSettings = {
+      ...(generalSettings?.letterheadSettings || {}),
+      ...(generalSettings || {}),
+    };
     const customerName = matchedOrder.customerName || matchedOrder.shippingAddress?.recipientName || "Pelanggan E-Store";
     const customerPhone = matchedOrder.customerPhone || matchedOrder.shippingAddress?.phone || "";
     const customerAddress = matchedOrder.shippingAddress?.address
@@ -338,12 +463,22 @@ function findSaleOrEStoreOrder(docNo: string, sales: any[]): any {
     }
 
     const dateStr = matchedOrder.createdAt ? matchedOrder.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
-    const isPaid = matchedOrder.status === "PAID" || matchedOrder.status === "DELIVERED" || matchedOrder.status === "SHIPPED";
+    const orderStatusUpper = String(matchedOrder.status || "").toUpperCase();
+    const isCancelled = orderStatusUpper === "CANCELLED" || orderStatusUpper === "DIBATALKAN" || orderStatusUpper === "BATAL";
+    const isDelivered = orderStatusUpper === "DELIVERED" || orderStatusUpper === "SELESAI" || orderStatusUpper === "COMPLETED";
+    const isRefunded = orderStatusUpper === "REFUNDED" || orderStatusUpper === "RETURN";
+    const isPaid = matchedOrder.status === "PAID" || isDelivered;
 
     const convertedSale: any = {
       id: matchedOrder.id,
       orderId: matchedOrder.id,
       orderNumber: matchedOrder.orderNumber,
+      orderStatus: matchedOrder.status,
+      isCancelledOrder: isCancelled,
+      isDeliveredOrder: isDelivered,
+      isRefundedOrder: isRefunded,
+      isProformaOrder: !isDelivered && !isCancelled && !isRefunded,
+      refundInfo: matchedOrder.refundInfo || null,
       invoiceNumber: invoiceNo,
       deliveryOrderNumber: doNo,
       receiptNumber: kwtNo,
@@ -364,15 +499,42 @@ function findSaleOrEStoreOrder(docNo: string, sales: any[]): any {
       shippingCost: Number(matchedOrder.shippingCost) || 0,
       grandTotal: Number(matchedOrder.grandTotal),
       paymentMethod: matchedOrder.paymentBank || matchedOrder.paymentMethod || "Transfer Bank BCA",
-      paymentStatus: isPaid ? "Lunas" : "Menunggu Pembayaran",
+      paymentStatus: isRefunded ? "Direfund / Dikembalikan" : isPaid ? "Lunas" : "Menunggu Pembayaran",
       paidAmount: isPaid ? Number(matchedOrder.grandTotal) : 0,
       remainingAmount: isPaid ? 0 : Number(matchedOrder.grandTotal),
       salesPerson: "DSTech E-Store System",
-      notes: `Faktur Penjualan Resmi E-Store #${matchedOrder.orderNumber} - Pembeli: ${customerName}`,
-      approvedBy: "RAMADHANI ST",
-      approvedTitle: "Direktur PT. DSTech Smart Perkasa",
-      approvalStatus: "Disetujui & Sah",
-      approvedAt: dateStr,
+      notes: isDelivered
+        ? `Faktur Penjualan Resmi E-Store #${matchedOrder.orderNumber} (Barang Diterima Konsumen) - Pembeli: ${customerName}`
+        : isCancelled
+        ? `Pesanan E-Store #${matchedOrder.orderNumber} (BATAL) - Faktur Penjualan Dilarang Diterbitkan`
+        : `Surat Pesanan / Bukti Belanja E-Store #${matchedOrder.orderNumber} (Status: ${matchedOrder.status}) - Pembeli: ${customerName}`,
+      approvedBy: matchedOrder.approvedBy || orderSettings.signerName || "RAMADHANI ST",
+      approvedTitle: matchedOrder.approvedTitle || orderSettings.signerTitle || "Direktur",
+      approvalStatus: matchedOrder.approvalStatus || (isDelivered ? "Disetujui & Sah" : "Menunggu Serah Terima"),
+      approvedAt: matchedOrder.approvedAt || dateStr,
+      signatureImage: matchedOrder.signatureImage || (isDelivered ? orderSettings.masterSignatureUrl || "" : ""),
+      isLocked: matchedOrder.isLocked !== undefined ? matchedOrder.isLocked : isDelivered,
+      // Tanda tangan pihak kedua
+      bastApproved: matchedOrder.bastApproved || false,
+      bastApprovedAt: matchedOrder.bastApprovedAt || "",
+      bastSignerName: matchedOrder.bastSignerName || "",
+      bastSignerTitle: matchedOrder.bastSignerTitle || "",
+      bastSignatureImage: matchedOrder.bastSignatureImage || "",
+      deliveryApproved: matchedOrder.deliveryApproved || false,
+      deliveryApprovedAt: matchedOrder.deliveryApprovedAt || "",
+      deliverySignerName: matchedOrder.deliverySignerName || "",
+      deliverySignerTitle: matchedOrder.deliverySignerTitle || "",
+      deliverySignatureImage: matchedOrder.deliverySignatureImage || "",
+      driverApproved: matchedOrder.driverApproved || false,
+      driverApprovedAt: matchedOrder.driverApprovedAt || "",
+      driverSignerName: matchedOrder.driverSignerName || "",
+      driverSignerTitle: matchedOrder.driverSignerTitle || "",
+      driverSignatureImage: matchedOrder.driverSignatureImage || "",
+      clientApproved: matchedOrder.clientApproved || false,
+      clientApprovedAt: matchedOrder.clientApprovedAt || "",
+      clientSignerName: matchedOrder.clientSignerName || "",
+      clientSignerTitle: matchedOrder.clientSignerTitle || "",
+      clientSignatureImage: matchedOrder.clientSignatureImage || "",
       photos: [],
       // Sinkronkan PIN dengan getDocPin(matchedOrder)
       docPin: getDocPin(matchedOrder),
@@ -548,9 +710,30 @@ export async function GET(req: Request) {
       });
     }
 
-    const signerName = sph.approvedBy || settings.signerName || "RAMADHANI ST";
-    const signerTitle = sph.approvedTitle || settings.signerTitle || "Direktur";
-    const signatureImage = sph.signatureImage || settings.masterSignatureUrl || "";
+    // Snapshot Penguncian Permanen (Tugas 284: Dokumen sah yang dicetak/dikirim tidak boleh berubah)
+    const isSphLocked = sph.isLockedPermanently || sph.isLocked || Boolean(sph.frozenSignatureImage) || Boolean(sph.signatureImage);
+    const signatureImage = sph.frozenSignatureImage || sph.signatureImage || (isSphLocked ? "" : (settings.masterSignatureUrl || ""));
+    const signerName = sph.frozenSignerName || sph.approvedBy || (isSphLocked ? "RAMADHANI ST" : (settings.signerName || "RAMADHANI ST"));
+    const signerTitle = sph.frozenSignerTitle || sph.approvedTitle || (isSphLocked ? "Direktur" : (settings.signerTitle || "Direktur"));
+    const stampImage = sph.frozenStampUrl || sph.stampUrl || (isSphLocked ? "" : masterStampUrl);
+    const lastPrintedAt = sph.lastPrintedAt || (new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta", dateStyle: "long", timeStyle: "medium" }) + " WIB");
+
+    if (signatureImage && !sph.isLockedPermanently) {
+      freezeDocumentSnapshot("quotations", sph.quotationNumber || sph.id, {
+        signatureImage,
+        signerName,
+        signerTitle,
+        stampUrl: stampImage,
+      });
+      sph.isLockedPermanently = true;
+      sph.isLocked = true;
+      sph.frozenSignatureImage = signatureImage;
+      sph.frozenSignerName = signerName;
+      sph.frozenSignerTitle = signerTitle;
+      sph.frozenStampUrl = stampImage;
+      sph.lastPrintedAt = lastPrintedAt;
+    }
+
     const terbilangRupiah = angkaKeTerbilang(sph.grandTotal) + " Rupiah";
 
     // Lengkapi foto/gambar item produk dari katalog
@@ -961,6 +1144,7 @@ export async function GET(req: Request) {
                 <div class="pt-1 border-t border-slate-300">
                   <p class="font-black text-slate-900 text-[11px] underline">( ${signerName} )</p>
                   <p class="text-[8.5px] text-slate-500">${signerTitle}</p>
+                  ${lastPrintedAt ? `<p class="text-[7.5px] font-mono text-indigo-700 font-bold mt-0.5">🔒 Dokumen Terkunci Sah: ${lastPrintedAt}</p>` : ''}
                 </div>
               </div>
             </div>
@@ -969,6 +1153,7 @@ export async function GET(req: Request) {
             <div class="mt-2 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
               <p class="text-[7.5px] text-slate-500 leading-tight">
                 <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Dokumen ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+                ${lastPrintedAt ? `<br/><span class="font-mono text-indigo-700 font-bold">• Waktu Terakhir Dicetak &amp; Dikirim Sah: ${lastPrintedAt} • Tanda Tangan Snapshot Permanen Tidak Berubah</span>` : ''}
               </p>
             </div>
           </div>
@@ -1104,7 +1289,7 @@ export async function GET(req: Request) {
                     Paraf ${sph.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
                   </p>
                   <div class="h-7 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
-                    ${sph.approvedBy || signerName || "H. Agus Supriyadi, S.T."}
+                    ${sph.approvedBy || signerName}
                   </div>
                 </div>
               </div>
@@ -1129,7 +1314,7 @@ export async function GET(req: Request) {
                       Paraf ${sph.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
                     </p>
                     <div class="h-7 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
-                      ${sph.approvedBy || signerName || "H. Agus Supriyadi, S.T."}
+                      ${sph.approvedBy || signerName}
                     </div>
                   </div>
                 </div>
@@ -1490,10 +1675,31 @@ export async function GET(req: Request) {
       });
     }
 
-    const signerName = po.approvedBy || settings.signerName || "RAMADHANI ST";
-    const signerTitle = po.approvedTitle || settings.signerTitle || "Direktur";
-    const signatureImage = po.signatureImage || settings.masterSignatureUrl || "";
-    const isApproved = po.approvalStatus === "Disetujui & Sah" || po.approvalStatus === "Disetujui" || po.approvalStatus === "Approved";
+    // Snapshot Penguncian Permanen (Tugas 284: PO sah yang dicetak/dikirim tidak boleh berubah)
+    const isPoLocked = po.isLockedPermanently || po.isLocked || Boolean(po.frozenSignatureImage) || Boolean(po.signatureImage);
+    const signerName = po.frozenSignerName || po.approvedBy || (isPoLocked ? "RAMADHANI ST" : (settings.signerName || "RAMADHANI ST"));
+    const signerTitle = po.frozenSignerTitle || po.approvedTitle || (isPoLocked ? "Direktur" : (settings.signerTitle || "Direktur"));
+    const signatureImage = po.frozenSignatureImage || po.signatureImage || (isPoLocked ? "" : (settings.masterSignatureUrl || ""));
+    const stampImage = po.frozenStampUrl || po.stampUrl || (isPoLocked ? "" : masterStampUrl);
+    const isApproved = po.approvalStatus === "Disetujui & Sah" || po.approvalStatus === "Disetujui" || po.approvalStatus === "Approved" || isPoLocked;
+    const lastPrintedAt = po.lastPrintedAt || (new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta", dateStyle: "long", timeStyle: "medium" }) + " WIB");
+
+    if (signatureImage && !po.isLockedPermanently) {
+      freezeDocumentSnapshot("purchases", po.poNumber || po.id, {
+        signatureImage,
+        signerName,
+        signerTitle,
+        stampUrl: stampImage,
+      });
+      po.isLockedPermanently = true;
+      po.isLocked = true;
+      po.frozenSignatureImage = signatureImage;
+      po.frozenSignerName = signerName;
+      po.frozenSignerTitle = signerTitle;
+      po.frozenStampUrl = stampImage;
+      po.lastPrintedAt = lastPrintedAt;
+    }
+
     const documentTitle = `Purchase_Order_DSTECH_${po.poNumber || "PO"}_${(po.supplierName || "").replace(/[^a-zA-Z0-9]/g, "_")}`;
 
     const itemsHtml = (po.items || []).map((item: any, idx: number) => `
@@ -1785,6 +1991,7 @@ export async function GET(req: Request) {
                 <div class="pt-1 border-t border-slate-200">
                   <p class="font-bold text-slate-900 text-xs">( ${signerName} )</p>
                   <p class="text-[9px] text-slate-500">${signerTitle}</p>
+                  ${lastPrintedAt ? `<p class="text-[7.5px] font-mono text-indigo-700 font-bold mt-0.5">🔒 Dokumen Terkunci Sah: ${lastPrintedAt}</p>` : ''}
                 </div>
               </div>
             </div>
@@ -1793,6 +2000,7 @@ export async function GET(req: Request) {
             <div class="mt-2 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
               <p class="text-[7.5px] text-slate-500 leading-tight">
                 <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Dokumen Purchase Order ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+                ${lastPrintedAt ? `<br/><span class="font-mono text-indigo-700 font-bold">• Waktu Terakhir Dicetak &amp; Dikirim Sah: ${lastPrintedAt} • Tanda Tangan Snapshot Permanen Tidak Berubah</span>` : ''}
               </p>
             </div>
           </div> <!-- End po-content-wrapper -->
@@ -2103,14 +2311,82 @@ export async function GET(req: Request) {
     });
   }
 
-  const signerName = sale.approvedBy || settings.signerName || "RAMADHANI ST";
-  const signerTitle = sale.approvedTitle || settings.signerTitle || "Direktur";
-  const signatureImage = sale.signatureImage || settings.masterSignatureUrl || "";
+  // 1. Jika pesanan berstatus BATAL: Faktur Penjualan Dilarang & Tidak Diterbitkan (Tugas 283)
+  if (sale.isCancelledOrder && (docType === "invoice" || !docType)) {
+    const cancelHtml = `
+      <!DOCTYPE html>
+      <html lang="id">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Pesanan Dibatalkan - PT. DSTech Smart Perkasa</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+      </head>
+      <body class="bg-slate-950 text-white min-h-screen flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-slate-900 border border-rose-500/30 rounded-3xl p-8 text-center shadow-2xl relative overflow-hidden">
+          <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-3xl">
+            🚫
+          </div>
+          <h1 class="text-xl font-black text-rose-400 mb-2">Faktur Tidak Diterbitkan</h1>
+          <p class="text-xs text-slate-300 mb-6 leading-relaxed">
+            Pesanan E-Store <strong>#${sale.orderNumber || sale.id}</strong> berstatus <strong>DIBATALKAN</strong>. Sesuai kebijakan tata kelola keuangan PT. DSTech Smart Perkasa, seluruh faktur baru terbentuk setelah barang diterima oleh client. Pesanan yang batal tidak membentuk faktur penjualan resmi agar tidak mengacak-acak pembukuan keuangan.
+          </p>
+          <div class="p-4 bg-slate-950 rounded-2xl border border-slate-800 text-xs text-slate-400 text-left mb-6 space-y-1.5">
+            <p>• <strong>Nama Pemesan:</strong> ${sale.customerName || "-"}</p>
+            <p>• <strong>Nomor Pesanan:</strong> ${sale.orderNumber || "-"}</p>
+            <p>• <strong>Status Pesanan:</strong> <span class="text-rose-400 font-bold">BATAL / DIBATALKAN</span></p>
+            <p>• <strong>Pencatatan Keuangan:</strong> 0 (Nol / Bersih)</p>
+          </div>
+          <a href="/shop" class="inline-flex items-center justify-center w-full py-3 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-bold transition shadow-lg shadow-indigo-600/30">
+            Kembali ke Toko Online
+          </a>
+        </div>
+      </body>
+      </html>
+    `;
+    return new NextResponse(cancelHtml, {
+      status: 200,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  // Snapshot Penguncian Permanen (Tugas 284: Faktur/BAST yang dicetak/dikirim tidak boleh berubah)
+  const isSaleLocked = sale.isLockedPermanently || sale.isLocked || Boolean(sale.frozenSignatureImage) || Boolean(sale.signatureImage);
+  const signerName = sale.frozenSignerName || sale.approvedBy || (isSaleLocked ? "RAMADHANI ST" : (settings.signerName || "RAMADHANI ST"));
+  const signerTitle = sale.frozenSignerTitle || sale.approvedTitle || (isSaleLocked ? "Direktur" : (settings.signerTitle || "Direktur"));
+  const signatureImage = sale.frozenSignatureImage || sale.signatureImage || (isSaleLocked ? "" : (settings.masterSignatureUrl || ""));
+  const stampImage = sale.frozenStampUrl || sale.stampUrl || (isSaleLocked ? "" : masterStampUrl);
+  const lastPrintedAt = sale.lastPrintedAt || (new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta", dateStyle: "long", timeStyle: "medium" }) + " WIB");
+
+  if (signatureImage && !sale.isLockedPermanently) {
+    if (sale.orderId || sale.orderNumber) {
+      freezeDocumentSnapshot("orders", sale.orderNumber || sale.id, {
+        signatureImage,
+        signerName,
+        signerTitle,
+        stampUrl: stampImage,
+      });
+    }
+    freezeDocumentSnapshot("sales", sale.invoiceNumber || sale.id, {
+      signatureImage,
+      signerName,
+      signerTitle,
+      stampUrl: stampImage,
+    });
+    sale.isLockedPermanently = true;
+    sale.isLocked = true;
+    sale.frozenSignatureImage = signatureImage;
+    sale.frozenSignerName = signerName;
+    sale.frozenSignerTitle = signerTitle;
+    sale.frozenStampUrl = stampImage;
+    sale.lastPrintedAt = lastPrintedAt;
+  }
 
   // Navigasi Tab Dokumen Terkait
   const encNo = encodeURIComponent(sale.invoiceNumber);
+  const isEStoreProforma = sale.isProformaOrder;
   const tabs = [
-    { id: "invoice", label: "📄 Faktur Penjualan", active: docType === "invoice" },
+    { id: "invoice", label: isEStoreProforma ? "📄 Surat Pesanan (Proforma)" : "📄 Faktur Penjualan", active: docType === "invoice" },
     { id: "receipt", label: "🧾 Kuitansi Pembayaran", active: docType === "receipt" || docType === "kwitansi" },
     { id: "bast", label: "📝 Berita Acara (BAST)", active: docType === "bast" },
     { id: "delivery", label: "🚚 Surat Jalan", active: docType === "delivery" },
@@ -2119,7 +2395,9 @@ export async function GET(req: Request) {
 
   // Render Dokumen Sesuai Permintaan
   let documentContent = "";
-  let documentTitle = `Faktur Penjualan - ${sale.invoiceNumber}`;
+  let documentTitle = isEStoreProforma
+    ? `Surat Pesanan - ${sale.orderNumber || sale.invoiceNumber}`
+    : `Faktur Penjualan - ${sale.invoiceNumber}`;
 
   if (docType === "receipt" || docType === "kwitansi") {
     const payments: any[] = Array.isArray(sale.payments) ? sale.payments : [];
@@ -2140,15 +2418,94 @@ export async function GET(req: Request) {
     const receiptDateDisplay = selectedPayment?.paymentDate || sale.date || new Date().toISOString().split("T")[0];
     const receiptMethodDisplay = selectedPayment?.paymentMethod || sale.paymentMethod || defaultBank.bankName;
     const isFullPaid = sale.paymentStatus === "Lunas" || sale.remainingAmount === 0;
-    const isDpPhase = sale.invoiceType === "DP" && !isFullPaid;
+    const isTermin = sale.invoiceType === "Termin";
+    const isDp = sale.invoiceType === "DP";
+    const dpPct = Number(sale.dpPercentage) || 50;
+    const projectOrSubject = sale.projectName || sale.subject || (sale.notes && sale.notes.includes("(") ? sale.notes.replace(/^.*?\((.*?)\).*$/, "$1") : "") || "Pengadaan & Instalasi IT / Security System";
 
-    const receiptPurpose = selectedPayment?.notes || (
-      isDpPhase
-        ? `Pembayaran Uang Muka (DP ${sale.dpPercentage || 50}%) atas Faktur ${sale.invoiceNumber} - Pengadaan & Instalasi IT / Security System`
-        : isFullPaid
-        ? `Pelunasan Pembayaran Penuh atas Faktur ${sale.invoiceNumber} - Pengadaan & Instalasi IT / Security System`
-        : `Pembayaran Angsuran / Termin atas Faktur ${sale.invoiceNumber}`
-    );
+    // Hitung akumulasi pembayaran sampai kuitansi ini
+    const paymentIndex = payments.findIndex((p: any) => (p.receiptNumber && p.receiptNumber === receiptNumberDisplay) || (p.id && p.id === selectedPayment?.id));
+    let previousPaidSum = 0;
+    if (paymentIndex > 0) {
+      previousPaidSum = payments.slice(0, paymentIndex).reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
+    } else if (paymentIndex === -1 && payments.length > 0) {
+      previousPaidSum = Math.max(0, (Number(sale.paidAmount) || 0) - paidNominal);
+    }
+    const accumulatedPaid = previousPaidSum + paidNominal;
+    const remainingAfterThis = Math.max(0, Number(sale.grandTotal) - accumulatedPaid);
+
+    // Deteksi Catatan Lama / Generik yang Perlu Diregenerasi Otomatis
+    const rawNotes = (selectedPayment?.notes || "").trim();
+    const isLegacyOrGenericNote = !rawNotes ||
+      rawNotes.toLowerCase().includes("angsuran / termin") ||
+      rawNotes.toLowerCase().includes("angsuran/termin") ||
+      rawNotes.toLowerCase().includes("pembayaran angsuran") ||
+      rawNotes.toLowerCase().includes("pembayaran sebagian") ||
+      rawNotes.startsWith("Penerimaan Pembayaran Faktur") ||
+      rawNotes.startsWith("Pembayaran Faktur INV-");
+
+    // Identifikasi Termin yang Cocok jika Skema Termin
+    const terminsList: any[] = Array.isArray(sale.termins) ? sale.termins : [];
+    let matchedTermin: any = null;
+    if (isTermin) {
+      if (selectedPayment?.terminId) {
+        matchedTermin = terminsList.find((t: any) => t.id === selectedPayment.terminId);
+      }
+      if (!matchedTermin && selectedPayment?.terminName) {
+        matchedTermin = terminsList.find((t: any) => t.name && t.name.toLowerCase() === selectedPayment.terminName.toLowerCase());
+      }
+      if (!matchedTermin && paymentIndex >= 0 && paymentIndex < terminsList.length) {
+        matchedTermin = terminsList[paymentIndex];
+      }
+      if (!matchedTermin && terminsList.length > 0) {
+        matchedTermin = terminsList.find((t: any) => Math.abs((Number(t.amount) || 0) - paidNominal) < 100) || terminsList[0];
+      }
+    }
+
+    // Skema Pembayaran Display Label
+    const schemeLabelDisplay = isDp
+      ? `Skema Uang Muka (DP ${dpPct}%) & Pelunasan BAST`
+      : isTermin
+      ? `Skema Multi-Termin Progresif${matchedTermin ? ` (${matchedTermin.name} ${matchedTermin.percentage}%)` : (selectedPayment?.terminName ? ` (${selectedPayment.terminName})` : '')}`
+      : `Skema Standar (Pembayaran Penuh 100%)`;
+
+    // Penyusunan Keterangan Pembayaran (Untuk Pembayaran) yang Presisi Tanpa Pernah Teks "Angsuran / Termin"
+    let calculatedPurpose = "";
+    if (!isLegacyOrGenericNote) {
+      calculatedPurpose = rawNotes;
+    } else if (isTermin) {
+      if (matchedTermin) {
+        const cond = matchedTermin.condition ? ` - Syarat: ${matchedTermin.condition}` : '';
+        if (remainingAfterThis === 0) {
+          calculatedPurpose = `Pelunasan Pembayaran ${matchedTermin.name} (${matchedTermin.percentage}%)${cond} atas Faktur ${sale.invoiceNumber} - ${projectOrSubject} (BAST Selesai)`;
+        } else {
+          calculatedPurpose = `Pembayaran ${matchedTermin.name} (${matchedTermin.percentage}%)${cond} atas Faktur ${sale.invoiceNumber} - ${projectOrSubject}`;
+        }
+      } else if (remainingAfterThis === 0) {
+        calculatedPurpose = `Pelunasan Pembayaran Termin Tahap Akhir atas Faktur ${sale.invoiceNumber} - ${projectOrSubject} (BAST Selesai)`;
+      } else {
+        const stepNum = paymentIndex >= 0 ? paymentIndex + 1 : 1;
+        calculatedPurpose = `Pembayaran Termin Tahap ${stepNum} atas Faktur ${sale.invoiceNumber} - ${projectOrSubject}`;
+      }
+    } else if (isDp) {
+      const dpNominalThreshold = Number(sale.dpAmount) || Math.round(Number(sale.grandTotal) * (dpPct / 100));
+      if (accumulatedPaid <= dpNominalThreshold || paymentIndex === 0) {
+        calculatedPurpose = `Pembayaran Uang Muka (DP ${dpPct}%) atas Faktur ${sale.invoiceNumber} - ${projectOrSubject}`;
+      } else if (remainingAfterThis === 0) {
+        calculatedPurpose = `Pelunasan Sisa Pembayaran Kontrak (${100 - dpPct}%) atas Faktur ${sale.invoiceNumber} - ${projectOrSubject} setelah Berita Acara Serah Terima (BAST)`;
+      } else {
+        const stepNum = paymentIndex >= 0 ? paymentIndex + 1 : 2;
+        calculatedPurpose = `Pembayaran Bertahap Tahap ${stepNum} atas Faktur ${sale.invoiceNumber} - ${projectOrSubject}`;
+      }
+    } else {
+      if (remainingAfterThis === 0) {
+        calculatedPurpose = `Pembayaran Penuh (100%) atas Faktur ${sale.invoiceNumber} - ${projectOrSubject}`;
+      } else {
+        const stepNum = paymentIndex >= 0 ? paymentIndex + 1 : 1;
+        calculatedPurpose = `Pembayaran Bertahap Tahap ${stepNum} atas Faktur ${sale.invoiceNumber} - ${projectOrSubject}`;
+      }
+    }
+    const receiptPurpose = calculatedPurpose;
 
     const terbilangReceipt = angkaKeTerbilang(paidNominal) + " Rupiah";
     documentTitle = `Kuitansi_Pembayaran_${receiptNumberDisplay.replace(/[^a-zA-Z0-9_-]/g, "_")}_${(sale.customerName || "").replace(/[^a-zA-Z0-9]/g, "_")}`;
@@ -2180,11 +2537,20 @@ export async function GET(req: Request) {
                 <div class="flex items-center gap-2">
                   <h2 class="text-xs font-black text-slate-950 tracking-wider uppercase font-serif">KUITANSI PEMBAYARAN</h2>
                   <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
-                    isFullPaid
+                    isDp
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                      : isTermin
+                      ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                      : 'bg-blue-100 text-blue-900 border border-blue-300'
+                  }">
+                    ${isDp ? `DP ${dpPct}%` : isTermin ? (matchedTermin ? `${matchedTermin.name.toUpperCase()} (${matchedTermin.percentage}%)` : 'MULTI-TERMIN') : 'PENUH 100%'}
+                  </span>
+                  <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
+                    remainingAfterThis === 0
                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                       : 'bg-amber-100 text-amber-800 border border-amber-300'
                   }">
-                    ${isFullPaid ? '✓ LUNAS' : 'UANG MUKA / TERMIN'}
+                    ${remainingAfterThis === 0 ? '✓ LUNAS' : 'SEBAGIAN'}
                   </span>
                   <span class="text-[9.5px] font-mono font-bold text-indigo-700">NO: ${receiptNumberDisplay}</span>
                 </div>
@@ -2204,11 +2570,20 @@ export async function GET(req: Request) {
                 <div class="flex items-center justify-end gap-1.5">
                   <h2 class="text-xs font-black text-slate-950 tracking-wider uppercase font-serif">KUITANSI PEMBAYARAN</h2>
                   <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
-                    isFullPaid
+                    isDp
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                      : isTermin
+                      ? 'bg-purple-100 text-purple-900 border border-purple-300'
+                      : 'bg-blue-100 text-blue-900 border border-blue-300'
+                  }">
+                    ${isDp ? `DP ${dpPct}%` : isTermin ? (matchedTermin ? `${matchedTermin.name.toUpperCase()} (${matchedTermin.percentage}%)` : 'MULTI-TERMIN') : 'PENUH 100%'}
+                  </span>
+                  <span class="px-1.5 py-0.5 rounded-full text-[7.5px] font-black uppercase tracking-wider ${
+                    remainingAfterThis === 0
                       ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                       : 'bg-amber-100 text-amber-800 border border-amber-300'
                   }">
-                    ${isFullPaid ? '✓ LUNAS' : 'UANG MUKA / TERMIN'}
+                    ${remainingAfterThis === 0 ? '✓ LUNAS' : 'SEBAGIAN'}
                   </span>
                 </div>
                 <p class="text-[9.5px] font-mono font-bold text-indigo-700 mt-0.5 leading-none">NO: ${receiptNumberDisplay}</p>
@@ -2273,12 +2648,15 @@ export async function GET(req: Request) {
                   </div>
                   <div class="col-span-9">
                     <p class="font-bold text-slate-900 text-[9.5px] leading-tight line-clamp-2">${receiptPurpose}</p>
-                    <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[7.5px] text-slate-500 mt-0.5">
+                    <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[7.5px] text-slate-500 mt-1">
                       <span>Faktur: <strong class="text-indigo-900 font-mono">${sale.invoiceNumber}</strong></span>
-                      <span>Total Tagihan: <strong>${formatRupiah(sale.grandTotal)}</strong></span>
-                      ${sale.remainingAmount > 0 
-                        ? `<span>Sisa: <strong class="text-amber-700">${formatRupiah(sale.remainingAmount)}</strong></span>` 
-                        : `<span>Status: <strong class="text-emerald-700">LUNAS</strong></span>`}
+                      <span>Skema: <strong class="text-purple-900 font-bold">${schemeLabelDisplay}</strong></span>
+                      <span>Nilai Kontrak: <strong>${formatRupiah(sale.grandTotal)}</strong></span>
+                      ${previousPaidSum > 0 ? `<span>Telah Dibayar Lalu: <strong>${formatRupiah(previousPaidSum)}</strong></span>` : ''}
+                      <span>Pembayaran Ini: <strong class="text-emerald-700 font-mono">${formatRupiah(paidNominal)}</strong></span>
+                      ${remainingAfterThis > 0 
+                        ? `<span>Sisa Piutang: <strong class="text-amber-700 font-mono">${formatRupiah(remainingAfterThis)}</strong></span>` 
+                        : `<span>Status: <strong class="text-emerald-700 font-black">LUNAS (100%)</strong></span>`}
                     </div>
                   </div>
                 </div>
@@ -2775,6 +3153,7 @@ export async function GET(req: Request) {
           </div>
           <p class="font-black text-slate-900 text-xs mt-1 underline">( ${signerName} )</p>
           <p class="text-[10px] text-slate-500">${signerTitle}</p>
+          ${lastPrintedAt ? `<p class="text-[8px] font-mono text-indigo-700 font-bold mt-0.5">🔒 Dokumen Terkunci Sah: ${lastPrintedAt}</p>` : ''}
         </div>
       </div>
 
@@ -2782,6 +3161,7 @@ export async function GET(req: Request) {
       <div class="mt-3 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
         <p class="text-[7.5px] text-slate-500 leading-tight">
           <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Dokumen Faktur ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+          ${lastPrintedAt ? `<br/><span class="font-mono text-indigo-700 font-bold">• Waktu Terakhir Dicetak &amp; Dikirim Sah: ${lastPrintedAt} • Tanda Tangan Snapshot Permanen Tidak Berubah</span>` : ''}
         </p>
       </div>
     `;

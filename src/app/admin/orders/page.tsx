@@ -101,7 +101,7 @@ interface Order {
   invoiceNumber?: string;
   deliveryOrderNumber?: string;
   receiptNumber?: string;
-  status: "PAYMENT_PENDING" | "PAID" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "RETURN";
+  status: "PAYMENT_PENDING" | "PAID" | "PROCESSING" | "SHIPPED" | "DELIVERED" | "CANCELLED" | "RETURN" | "REFUNDED";
   hasComplaint?: boolean;
   complaint?: ComplaintData;
   trackingTimeline: TimelineItem[];
@@ -120,13 +120,20 @@ export default function AdminOrdersPage() {
   const [proofImageSrc, setProofImageSrc] = useState<string | null>(null);
 
   // Form Proses Pesanan
-  const [actionType, setActionType] = useState<"confirm_payment" | "process_packing" | "ship_order" | "deliver_order" | "cancel_order" | "return_order">("confirm_payment");
+  const [actionType, setActionType] = useState<"confirm_payment" | "process_packing" | "ship_order" | "deliver_order" | "cancel_order" | "return_order" | "process_refund">("confirm_payment");
   const [shipCourier, setShipCourier] = useState<string>("Armada Teknisi DSTech (Cilegon, Serang & Banten)");
   const [trackingNumber, setTrackingNumber] = useState<string>("");
   const [courierPhone, setCourierPhone] = useState<string>("");
   const [actionNote, setActionNote] = useState<string>("");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Form Proses Refund & Pengembalian Dana (Tugas 283)
+  const [refundAmount, setRefundAmount] = useState<number>(0);
+  const [refundReason, setRefundReason] = useState<string>("");
+  const [refundMethod, setRefundMethod] = useState<string>("Transfer Bank BCA PT");
+  const [refundAccount, setRefundAccount] = useState<string>("");
+  const [refundAccountName, setRefundAccountName] = useState<string>("");
 
   // Tanggapan Komplain
   const [complaintAdminNotes, setComplaintAdminNotes] = useState<string>("");
@@ -325,6 +332,8 @@ export default function AdminOrdersPage() {
         setActionType("ship_order");
       } else if (order.status === "SHIPPED") {
         setActionType("deliver_order");
+      } else if (order.status === "DELIVERED" && (order.hasComplaint || order.complaint)) {
+        setActionType("process_refund");
       } else {
         setActionType("confirm_payment");
       }
@@ -333,6 +342,14 @@ export default function AdminOrdersPage() {
     setTrackingNumber(order.trackingNumber || "");
     setCourierPhone(order.courierPhone || "");
     setActionNote("");
+
+    // Inisialisasi data refund (Tugas 283)
+    setRefundAmount(order.grandTotal || 0);
+    setRefundReason(order.complaint?.description || "Pengembalian barang dan dana pelanggan (retur)");
+    setRefundMethod(order.paymentBank || "Transfer Bank BCA PT");
+    setRefundAccount("");
+    setRefundAccountName(order.customerName || "");
+
     setIsProcessModalOpen(true);
   };
 
@@ -353,6 +370,16 @@ export default function AdminOrdersPage() {
         payload.shippingCourier = shipCourier;
         payload.trackingNumber = trackingNumber.trim() || `SJ-DSP-${Date.now().toString().slice(-6)}`;
         payload.courierPhone = courierPhone.trim();
+      }
+
+      if (actionType === "process_refund" || actionType === "return_order") {
+        payload.action = "process_refund";
+        payload.refundAmount = refundAmount || selectedOrder.grandTotal;
+        payload.refundReason = refundReason || actionNote || "Pengembalian dana & retur pesanan";
+        payload.refundMethod = refundMethod;
+        payload.refundAccount = refundAccount;
+        payload.refundAccountName = refundAccountName;
+        payload.refundProcessedBy = "Admin PT. DSTech Smart Perkasa";
       }
 
       const res = await fetch("/api/orders", {
@@ -771,15 +798,44 @@ export default function AdminOrdersPage() {
                           <ChevronRight className="w-3.5 h-3.5" />
                         </button>
 
-                        <a
-                          href={`/api/finance/print?doc=invoice&id=${order.invoiceNumber || order.orderNumber}&pin=${getDocPin(order)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 rounded-xl bg-blue-50 text-dstech-blue hover:bg-blue-100 border border-blue-200 transition-all cursor-pointer"
-                          title="Cetak Faktur Penjualan (A4)"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </a>
+                        {order.status === "CANCELLED" ? (
+                          <span
+                            className="p-1.5 rounded-xl bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed inline-flex items-center"
+                            title="Pesanan Batal: Faktur Penjualan Tidak Diterbitkan"
+                          >
+                            <FileText className="w-3.5 h-3.5 opacity-40 line-through" />
+                          </span>
+                        ) : order.status === "DELIVERED" ? (
+                          <a
+                            href={`/api/finance/print?doc=invoice&id=${order.invoiceNumber || order.orderNumber}&pin=${getDocPin(order)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-xl bg-blue-50 text-dstech-blue hover:bg-blue-100 border border-blue-200 transition-all cursor-pointer"
+                            title="Cetak Faktur Penjualan Sah (A4)"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </a>
+                        ) : order.status === "REFUNDED" ? (
+                          <a
+                            href={`/api/finance/print?doc=invoice&id=${order.invoiceNumber || order.orderNumber}&pin=${getDocPin(order)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-xl bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer"
+                            title="Cetak Berita Acara Retur & Refund (A4)"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </a>
+                        ) : (
+                          <a
+                            href={`/api/finance/print?doc=invoice&id=${order.invoiceNumber || order.orderNumber}&pin=${getDocPin(order)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-all cursor-pointer"
+                            title="Cetak Surat Pesanan / Proforma Order (A4)"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </a>
+                        )}
 
                         <button
                           onClick={() => handleContactWhatsApp(order)}
@@ -990,16 +1046,43 @@ export default function AdminOrdersPage() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {/* Cetak Faktur Penjualan */}
-                    <a
-                      href={`/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}&pin=${getDocPin(selectedOrder)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue hover:shadow-xs text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 transition group"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-dstech-blue group-hover:scale-110 transition-transform" />
-                      <span>Faktur Penjualan (A4)</span>
-                    </a>
+                    {/* Cetak Faktur Penjualan Sesuai Status (Tugas 283) */}
+                    {selectedOrder.status === "CANCELLED" ? (
+                      <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-400 flex items-center justify-center gap-1.5 cursor-not-allowed">
+                        <FileText className="w-3.5 h-3.5 opacity-40 line-through" />
+                        <span>Pesanan Batal (Tanpa Faktur)</span>
+                      </div>
+                    ) : selectedOrder.status === "DELIVERED" ? (
+                      <a
+                        href={`/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}&pin=${getDocPin(selectedOrder)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-xl bg-white border border-slate-200 hover:border-dstech-blue hover:shadow-xs text-xs font-bold text-slate-800 flex items-center justify-center gap-1.5 transition group"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-dstech-blue group-hover:scale-110 transition-transform" />
+                        <span>Faktur Penjualan Sah (A4)</span>
+                      </a>
+                    ) : selectedOrder.status === "REFUNDED" ? (
+                      <a
+                        href={`/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}&pin=${getDocPin(selectedOrder)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 hover:border-rose-400 hover:shadow-xs text-xs font-bold text-rose-800 flex items-center justify-center gap-1.5 transition group"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-rose-600 group-hover:scale-110 transition-transform" />
+                        <span>Berita Acara Refund (A4)</span>
+                      </a>
+                    ) : (
+                      <a
+                        href={`/api/finance/print?doc=invoice&id=${selectedOrder.invoiceNumber || selectedOrder.orderNumber}&pin=${getDocPin(selectedOrder)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 hover:border-amber-400 hover:shadow-xs text-xs font-bold text-amber-900 flex items-center justify-center gap-1.5 transition group"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-amber-600 group-hover:scale-110 transition-transform" />
+                        <span>Surat Pesanan Proforma (A4)</span>
+                      </a>
+                    )}
 
                     {/* Cetak Surat Jalan DO */}
                     <a
@@ -1145,7 +1228,7 @@ export default function AdminOrdersPage() {
 
                   <label
                     className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
-                      actionType === "return_order"
+                      actionType === "return_order" || actionType === "process_refund"
                         ? "border-amber-500 bg-amber-50/50 text-amber-900 shadow-sm"
                         : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
                     }`}
@@ -1153,15 +1236,15 @@ export default function AdminOrdersPage() {
                     <input
                       type="radio"
                       name="actionType"
-                      value="return_order"
-                      checked={actionType === "return_order"}
-                      onChange={() => setActionType("return_order")}
+                      value="process_refund"
+                      checked={actionType === "process_refund" || actionType === "return_order"}
+                      onChange={() => setActionType("process_refund")}
                       className="mt-1 text-amber-600 focus:ring-amber-500"
                     />
                     <div>
-                      <span className="font-black text-xs block">5. Proses Pengembalian / Retur</span>
+                      <span className="font-black text-xs block">5. Proses Pengembalian Dana &amp; Retur (Refund)</span>
                       <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
-                        Pengembalian barang atau refund garansi disetujui.
+                        Pengembalian barang atau refund garansi disetujui (membentuk Berita Acara Retur &amp; arus kas keluar).
                       </span>
                     </div>
                   </label>
@@ -1184,12 +1267,91 @@ export default function AdminOrdersPage() {
                     <div>
                       <span className="font-black text-xs block">6. Batalkan Pesanan</span>
                       <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
-                        Batalkan transaksi pesanan secara permanen.
+                        Batalkan transaksi pesanan secara permanen (tanpa membentuk faktur penjualan di keuangan).
                       </span>
                     </div>
                   </label>
                 </div>
               </div>
+
+              {/* Form Khusus Pengembalian Dana / Refund (Tugas 283) */}
+              {(actionType === "process_refund" || actionType === "return_order") && (
+                <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200 space-y-3.5 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2 text-xs font-black text-amber-900">
+                    <RotateCcw className="w-4 h-4 text-amber-600" />
+                    <span>Rincian Pengembalian Dana &amp; Berita Acara Retur</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Nominal Pengembalian Dana (Rp):
+                      </label>
+                      <input
+                        type="number"
+                        value={refundAmount}
+                        onChange={(e) => setRefundAmount(Number(e.target.value))}
+                        className="w-full p-2.5 rounded-xl bg-white border border-amber-300 font-mono font-bold text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Metode Pengembalian:
+                      </label>
+                      <select
+                        value={refundMethod}
+                        onChange={(e) => setRefundMethod(e.target.value)}
+                        className="w-full p-2.5 rounded-xl bg-white border border-amber-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      >
+                        <option value="Transfer Bank BCA PT">Transfer Bank BCA PT</option>
+                        <option value="Transfer Bank Mandiri">Transfer Bank Mandiri</option>
+                        <option value="Transfer Bank BRI / BNI">Transfer Bank BRI / BNI</option>
+                        <option value="Kas Tunai Operasional">Kas Tunai Operasional</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Nomor Rekening Tujuan:
+                      </label>
+                      <input
+                        type="text"
+                        value={refundAccount}
+                        onChange={(e) => setRefundAccount(e.target.value)}
+                        placeholder="Contoh: 1234567890 (BCA)"
+                        className="w-full p-2.5 rounded-xl bg-white border border-amber-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Nama Pemilik Rekening:
+                      </label>
+                      <input
+                        type="text"
+                        value={refundAccountName}
+                        onChange={(e) => setRefundAccountName(e.target.value)}
+                        placeholder="Nama pemilik rekening sesuai buku tabungan"
+                        className="w-full p-2.5 rounded-xl bg-white border border-amber-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Alasan Retur / Berita Acara Komplain:
+                      </label>
+                      <input
+                        type="text"
+                        value={refundReason}
+                        onChange={(e) => setRefundReason(e.target.value)}
+                        placeholder="Contoh: Barang cacat pabrik / Ketidaksesuaian spek telah disetujui"
+                        className="w-full p-2.5 rounded-xl bg-white border border-amber-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Form Khusus Pengiriman (Jika memilih ship_order) */}
               {actionType === "ship_order" && (
