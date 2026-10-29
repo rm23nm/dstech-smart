@@ -197,6 +197,7 @@ function renderSecurityLockScreen(params: {
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
 const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
 const SETTINGS_FILE = path.join(process.cwd(), "src", "data", "dstech_settings.json");
+const ORDERS_FILE = path.join(process.cwd(), "src", "data", "dstech_orders.json");
 
 function readGeneralSettings() {
   try {
@@ -230,6 +231,171 @@ function readProducts(): any[] {
     console.error("Error reading dstech_products.json:", err);
   }
   return [];
+}
+
+function readOrders(): any[] {
+  try {
+    if (fs.existsSync(ORDERS_FILE)) {
+      const data = fs.readFileSync(ORDERS_FILE, "utf-8");
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed.orders) ? parsed.orders : [];
+    }
+  } catch (err) {
+    console.error("Error reading dstech_orders.json:", err);
+  }
+  return [];
+}
+
+// Helper pencarian dokumen penjualan resmi (mencakup modul Finance ERP dan Pesanan E-Store)
+function findSaleOrEStoreOrder(docNo: string, sales: any[]): any {
+  if (!docNo) return null;
+  const cleanDoc = docNo.trim().toLowerCase();
+  const cleanDocAlphanum = cleanDoc.replace(/[^a-zA-Z0-9]/g, "");
+
+  // 1. Cari di modul Penjualan Finance ERP (dstech_finance_erp.json)
+  const matchedSale = (sales || []).find((s: any) => {
+    if (s.invoiceNumber && s.invoiceNumber.toLowerCase() === cleanDoc) return true;
+    if (s.id && s.id.toLowerCase() === cleanDoc) return true;
+    if (s.orderNumber && s.orderNumber.toLowerCase() === cleanDoc) return true;
+    if (s.orderId && s.orderId.toLowerCase() === cleanDoc) return true;
+    if (s.deliveryOrderNumber && s.deliveryOrderNumber.toLowerCase() === cleanDoc) return true;
+    if (s.receiptNumber && s.receiptNumber.toLowerCase() === cleanDoc) return true;
+    if (Array.isArray(s.payments)) {
+      if (s.payments.some((p: any) => p.receiptNumber && p.receiptNumber.toLowerCase() === cleanDoc)) return true;
+    }
+    // Cocokkan juga format alfanumerik tanpa strip / garis miring
+    const cleanInvAlphanum = (s.invoiceNumber || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    const cleanOrderAlphanum = (s.orderNumber || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    if (cleanInvAlphanum && cleanDocAlphanum && cleanInvAlphanum === cleanDocAlphanum) return true;
+    if (cleanOrderAlphanum && cleanDocAlphanum && cleanOrderAlphanum === cleanDocAlphanum) return true;
+    return false;
+  });
+
+  if (matchedSale) return matchedSale;
+
+  // 2. Cari di database Pesanan E-Store Toko Online (dstech_orders.json)
+  const orders = readOrders();
+  const matchedOrder = orders.find((o: any) => {
+    if (o.orderNumber && o.orderNumber.toLowerCase() === cleanDoc) return true;
+    if (o.id && o.id.toLowerCase() === cleanDoc) return true;
+    if (o.invoiceNumber && o.invoiceNumber.toLowerCase() === cleanDoc) return true;
+    if (o.deliveryOrderNumber && o.deliveryOrderNumber.toLowerCase() === cleanDoc) return true;
+    if (o.receiptNumber && o.receiptNumber.toLowerCase() === cleanDoc) return true;
+    const cleanOrderNum = (o.orderNumber || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    const cleanInvNum = (o.invoiceNumber || "").toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+    if (cleanOrderNum && cleanDocAlphanum && cleanOrderNum === cleanDocAlphanum) return true;
+    if (cleanInvNum && cleanDocAlphanum && cleanInvNum === cleanDocAlphanum) return true;
+    return false;
+  });
+
+  if (matchedOrder) {
+    const customerName = matchedOrder.customerName || matchedOrder.shippingAddress?.recipientName || "Pelanggan E-Store";
+    const customerPhone = matchedOrder.customerPhone || matchedOrder.shippingAddress?.phone || "";
+    const customerAddress = matchedOrder.shippingAddress?.address
+      ? `${matchedOrder.shippingAddress.address}, ${matchedOrder.shippingAddress.city || ""}, ${matchedOrder.shippingAddress.province || ""}`
+      : (matchedOrder.customerAddress || "-");
+    const cleanId = matchedOrder.orderNumber ? matchedOrder.orderNumber.replace(/[^a-zA-Z0-9]/g, "") : (matchedOrder.id || String(Date.now()));
+    const invoiceNo = matchedOrder.invoiceNumber || `INV-ESTORE-${cleanId}`;
+    const doNo = matchedOrder.deliveryOrderNumber || `DO-ESTORE-${cleanId}`;
+    const kwtNo = matchedOrder.receiptNumber || `KWT-ESTORE-${cleanId}`;
+
+    // Susun item produk untuk faktur resmi
+    const invoiceItems = (matchedOrder.items || []).map((it: any, idx: number) => ({
+      id: String(idx + 1),
+      productId: it.productId || "",
+      productName: it.productName || "Perangkat DSTech",
+      qty: Number(it.qty) || 1,
+      unit: "Unit",
+      price: Number(it.price) || 0,
+      discount: 0,
+      total: (Number(it.qty) || 1) * (Number(it.price) || 0),
+    }));
+
+    if (matchedOrder.includeInstallation && Number(matchedOrder.installationFee) > 0) {
+      invoiceItems.push({
+        id: String(invoiceItems.length + 1),
+        productId: "SRV-INST-01",
+        productName: "Jasa Pemasangan & Setup Teknisi Resmi DSTech Smart",
+        qty: 1,
+        unit: "Paket",
+        price: Number(matchedOrder.installationFee),
+        discount: 0,
+        total: Number(matchedOrder.installationFee),
+      });
+    }
+
+    if (Number(matchedOrder.shippingCost) > 0) {
+      invoiceItems.push({
+        id: String(invoiceItems.length + 1),
+        productId: "SRV-SHIP-01",
+        productName: `Ongkos Pengiriman (${matchedOrder.shippingCourier || "Armada DSTech"})`,
+        qty: 1,
+        unit: "Pengiriman",
+        price: Number(matchedOrder.shippingCost),
+        discount: 0,
+        total: Number(matchedOrder.shippingCost),
+      });
+    }
+
+    const dateStr = matchedOrder.createdAt ? matchedOrder.createdAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const isPaid = matchedOrder.status === "PAID" || matchedOrder.status === "DELIVERED" || matchedOrder.status === "SHIPPED";
+
+    const convertedSale: any = {
+      id: matchedOrder.id,
+      orderId: matchedOrder.id,
+      orderNumber: matchedOrder.orderNumber,
+      invoiceNumber: invoiceNo,
+      deliveryOrderNumber: doNo,
+      receiptNumber: kwtNo,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      customerAddress: customerAddress,
+      customerOrg: customerName,
+      city: matchedOrder.shippingAddress?.city || "Cilegon",
+      date: dateStr,
+      dueDate: dateStr,
+      invoiceType: "LUNAS",
+      items: invoiceItems,
+      subtotal: Number(matchedOrder.subtotal) || Number(matchedOrder.grandTotal),
+      discount: 0,
+      discountType: "fixed",
+      taxRate: matchedOrder.taxRate || 0,
+      taxAmount: Number(matchedOrder.taxAmount) || 0,
+      shippingCost: Number(matchedOrder.shippingCost) || 0,
+      grandTotal: Number(matchedOrder.grandTotal),
+      paymentMethod: matchedOrder.paymentBank || matchedOrder.paymentMethod || "Transfer Bank BCA",
+      paymentStatus: isPaid ? "Lunas" : "Menunggu Pembayaran",
+      paidAmount: isPaid ? Number(matchedOrder.grandTotal) : 0,
+      remainingAmount: isPaid ? 0 : Number(matchedOrder.grandTotal),
+      salesPerson: "DSTech E-Store System",
+      notes: `Faktur Penjualan Resmi E-Store #${matchedOrder.orderNumber} - Pembeli: ${customerName}`,
+      approvedBy: "RAMADHANI ST",
+      approvedTitle: "Direktur PT. DSTech Smart Perkasa",
+      approvalStatus: "Disetujui & Sah",
+      approvedAt: dateStr,
+      photos: [],
+      // Sinkronkan PIN dengan getDocPin(matchedOrder)
+      docPin: getDocPin(matchedOrder),
+      accessPin: getDocPin(matchedOrder),
+      verificationCode: getDocPin(matchedOrder),
+      payments: [
+        {
+          id: `pay_${matchedOrder.id}`,
+          receiptNumber: kwtNo,
+          amount: Number(matchedOrder.grandTotal),
+          paymentDate: dateStr,
+          paymentMethod: matchedOrder.paymentBank || matchedOrder.paymentMethod || "Transfer Bank BCA",
+          status: isPaid ? "Lunas" : "Menunggu Verifikasi",
+          notes: `Pembayaran Pesanan E-Store #${matchedOrder.orderNumber}`,
+        }
+      ]
+    };
+
+    return convertedSale;
+  }
+
+  // Jika tidak ditemukan di manapun, kembalikan null (JANGAN fallback ke sales[0]!)
+  return null;
 }
 
 function formatRupiah(num: number): string {
@@ -339,7 +505,7 @@ export async function GET(req: Request) {
       if (q.quotationNumber && q.quotationNumber.toLowerCase() === docNo.toLowerCase()) return true;
       if (q.id && q.id.toLowerCase() === docNo.toLowerCase()) return true;
       return false;
-    }) || quotations[0];
+    });
 
     if (!sph) {
       const errorHtml = `
@@ -1278,7 +1444,7 @@ export async function GET(req: Request) {
       if (p.poNumber && p.poNumber.toLowerCase() === docNo.toLowerCase()) return true;
       if (p.id && p.id.toLowerCase() === docNo.toLowerCase()) return true;
       return false;
-    }) || purchases[0];
+    });
 
     if (!po) {
       const errorHtml = `
@@ -1883,12 +2049,8 @@ export async function GET(req: Request) {
   // -------------------------------------------------------------
   // DOKUMEN TIPE FAKTUR / BAST / SURAT JALAN / FOTO PEKERJAAN
   // -------------------------------------------------------------
-  const sale = sales.find((s) => {
-    if (!docNo) return false;
-    if (s.invoiceNumber && s.invoiceNumber.toLowerCase() === docNo.toLowerCase()) return true;
-    if (s.id && s.id.toLowerCase() === docNo.toLowerCase()) return true;
-    return false;
-  }) || sales[0]; // fallback jika demo
+  // Cari dokumen resmi di Penjualan Finance ERP maupun di Pesanan E-Store
+  const sale = findSaleOrEStoreOrder(docNo, sales);
 
   if (!sale) {
     const errorHtml = `

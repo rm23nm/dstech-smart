@@ -3,9 +3,33 @@
 
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
-### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+#### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
 - **Status**: SEMUA ANTRIAN SELESAI (Idle / Menunggu Permintaan Baru)
 - Tidak ada tugas aktif yang tertunda.
+
+- **2026-10-29**: [SELESAI] Perbaikan Cetak Faktur Pesanan E-Store Ditujukan ke Orang yang Salah (Eliminasi Fallback Data Orang Lain & Integrasi Pembacaan Pesanan E-Store) (Tugas 281) (`src/app/api/finance/print/route.ts` & `src/app/admin/orders/page.tsx`).
+  *Permintaan User*: "pada pesanan estor, ketika saya tekan akse cetak faktur, saya melihat kenapa faktur ditujukan ke orang yang salah?"
+  *Penyebab Masalah yang Ditemukan*:
+  1. Di `src/app/api/finance/print/route.ts` baris 1891 terdapat fallback berbahaya: `const sale = sales.find(...) || sales[0]; // fallback jika demo`. Jika nomor dokumen pesanan tidak ditemukan di database sales ERP, sistem secara keliru menampilkan invoice pertama milik orang lain (`sales[0]`). Hal serupa juga terdapat pada SPH (`quotations[0]`) dan PO (`purchases[0]`).
+  2. Modul cetak `/api/finance/print/route.ts` sebelumnya hanya membaca `dstech_finance_erp.json` dan sama sekali tidak membaca `dstech_orders.json` (database pesanan e-store).
+  3. Ketika admin mengklik "Cetak Faktur Penjualan (A4)" di halaman `/admin/orders`, nomor pesanan (`orderNumber` misal `ORD/DST/202610/001`) tidak ditemukan di `sales`, sehingga kode jatuh ke `sales[0]` milik orang lain dan menyebabkan verifikasi PIN gagal serta menampilkan nama pemesan yang salah di lock screen dan lembar faktur.
+  *Penyelesaian & Hasil*:
+  1. **Eliminasi Fallback Berbahaya (`src/app/api/finance/print/route.ts`)**:
+     - Dihapus fallback `|| sales[0]` pada pencarian faktur/surat jalan/kuitansi.
+     - Dihapus fallback `|| quotations[0]` pada pencarian SPH/Quotation.
+     - Dihapus fallback `|| purchases[0]` pada pencarian PO/Purchase Order.
+     - Jika dokumen tidak ditemukan, sistem menampilkan layar HTTP 404 resmi "Dokumen Tidak Ditemukan" dan tidak pernah lagi membocorkan atau menampilkan data invoice/transaksi milik orang lain.
+  2. **Integrasi Database Pesanan E-Store (`dstech_orders.json`) ke Modul Cetak**:
+     - Ditambahkan helper `findSaleOrEStoreOrder(docNo, sales)` yang memindai data penjualan di modul Finance ERP sekaligus di database pesanan E-Store Toko Online (`dstech_orders.json`).
+     - Pencarian mendukung pencocokan terhadap `orderNumber`, `id`, `invoiceNumber`, `deliveryOrderNumber`, `receiptNumber`, serta variasi alfanumerik (case-insensitive & bebas format tanda hubung/garis miring).
+     - Data pesanan e-store dikonversikan secara komprehensif ke format faktur penjualan resmi PT. DSTech Smart Perkasa lengkap dengan:
+       * Nama pemesan sebenarnya (`customerName` / `recipientName`), nomor WhatsApp/telepon, dan alamat pengiriman lengkap.
+       * Rincian produk yang dibeli, harga satuan, subtotal, pos jasa pemasangan teknisi (jika dipilih), dan ongkos kirim kurir.
+       * Nomor faktur e-store (`INV-ESTORE-...`), surat jalan DO (`DO-ESTORE-...`), dan kuitansi pembayaran (`KWT-ESTORE-...`).
+       * Sinkronisasi PIN keamanan dokumen dengan `getDocPin(order)` sehingga akses verifikasi PIN langsung terbuka tanpa kendala.
+  3. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: **0 error**.
+     - `npm run build`: **Berhasil 100% (76/76 static & dynamic pages)**.
 
 - **2026-10-29**: [SELESAI] Penutupan Otomatis Presensi Pulang Staf (> 1 Jam dari Jam Kerja Terakhir), Penguncian Check-Out, Keterangan Tidak Absen Pulang, dan Eliminasi Lembur (Tugas 280) (`src/app/api/employee/attendance/route.ts`, `src/app/employee/page.tsx`, `src/app/admin/attendance/page.tsx`).
   *Permintaan User*: "pada absensi, jika staf employ telad absen pulang, maka 1 jam dari jam terakhir jam kerja maka secara otomatis sistem harus close absennya. jangan bisa di absen lagi. kemudian buat keterangan absen kalau staf tidak melakukan absensi pulang. dan jangan hitung kedalam lembur."
