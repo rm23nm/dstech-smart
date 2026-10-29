@@ -4,6 +4,34 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **2026-10-29**: [SELESAI] Penambahan Catatan Tagihan Vendor (Vendor Bills), Rekapitulasi Hutang Usaha Proyek, Tombol Catat Tagihan Vendor & Pelunasan Langsung pada Modal Detail Proyek (Tugas 299) (`src/app/admin/finance/page.tsx`).
+  *Permintaan User*: "pada project tolong juga tambahkan catatan tagihan vendor"
+  *Penyebab Masalah / Kebutuhan yang Diidentifikasi*:
+  1. Pada modal detail Proyek (`selectedProjectForDetail`), tab pengadaan sebelumnya hanya berlabel "PO Belanja Material" dan belum mengakomodasi pencatatan Tagihan Masuk dari Vendor (*Vendor Bills / Supplier Invoices*) secara eksplisit.
+  2. Belum tersedia tombol cepat "+ Catat Tagihan Vendor (Bill)" di dalam modal proyek yang langsung mengunci dan menautkan (`projectId` & `projectName`) tagihan ke proyek terkait.
+  3. Belum ada ringkasan KPI tagihan vendor (Berapa total tagihan vendor proyek, berapa yang sudah terbayar riil, dan berapa sisa hutang vendor belum lunas).
+  4. Pada tabel rincian belum ada tombol cepat aksi pelunasan / bayar tagihan vendor secara langsung dari modal proyek.
+  *Penyelesaian & Hasil*:
+  1. **Akumulasi Rekapitulasi Tagihan Vendor & Hutang Proyek (`src/app/admin/finance/page.tsx`)**:
+     - Menghitung `totalPurchasePaid` (total kas riil yang sudah dibayarkan ke vendor) dan `totalPurchaseOutstanding` (sisa kewajiban hutang vendor belum lunas).
+     - Menambahkan indikator peringatan sisa hutang vendor pada KPI Card Pengeluaran Proyek.
+  2. **Penyempurnaan Tab Navigasi & Label**:
+     - Mengubah tab menjadi **"Tagihan Vendor & PO Belanja ({prjPurchases.length})"** lengkap dengan badge indikator jika terdapat tagihan vendor yang belum lunas.
+  3. **Aksi Cepat & Ringkasan Tagihan Vendor**:
+     - Menambahkan tombol **"+ Catat Tagihan Vendor (Bill)"** (warna purple) yang otomatis mengunci `projectId`, `projectName`, dan entitas (`businessEntity`) ke proyek terkait saat membuka form tagihan vendor.
+     - Menyediakan 3 Mini KPI Card di dalam tab: Total Tagihan & PO, Total Sudah Terbayar, dan Sisa Hutang Vendor Belum Lunas.
+  4. **Penyempurnaan Tabel Tagihan Vendor & Tombol Bayar**:
+     - Tabel kini membedakan badge `[📥 Tagihan Vendor]` (dengan nomor faktur vendor) dan `[📄 PO Proyek]`.
+     - Menampilkan kategori barang, tanggal & jatuh tempo, total tagihan, nominal terbayar, sisa hutang, serta badge status pembayaran (`Lunas`, `Hutang Usaha`, `Sebagian`).
+     - Menyediakan tombol aksi cepat **"💳 Bayar"** langsung di setiap baris tagihan yang belum lunas untuk membuka modal pembayaran hutang vendor.
+     - Menyediakan tombol preview foto nota / lampiran berkas tagihan vendor (`Paperclip`).
+  5. **Ringkasan Kewajiban Vendor di Tab Summary (P&L)**:
+     - Menambahkan kartu ringkasan status kewajiban tagihan vendor & hutang usaha proyek di bawah kalkulasi laba rugi, lengkap dengan tombol langsung menuju tab tagihan vendor jika ada hutang yang belum terselesaikan.
+  6. **Pengujian & Validasi Lokal**:
+     - `npx tsc --noEmit`: Lolos 100% tanpa error TypeScript (Exit Code 0).
+     - `npm run build`: Sukses mengompilasi seluruh 76/76 static & dynamic pages (Exit Code 0).
+     - Folder cadangan sementara `_backup_project_vendor_bills` telah dibersihkan secara aman.
+
 - **2026-10-29**: [SELESAI] Sinkronisasi Tanggal Pembukuan Arus Kas dengan Tanggal Faktur & Kuitansi Lama, Penambahan Fitur Edit Transaksi Arus Kas Langsung, Auto-Sync Tanggal Kas saat Edit Faktur, dan Default Tanggal Pembayaran Mengikuti Tanggal Faktur (Tugas 298) (`src/app/api/finance/route.ts`, `src/app/admin/finance/page.tsx`, `src/data/dstech_finance_erp.json`).
   *Permintaan User*: "ini ada kesalahan pencatatan untuk tanggal pembukuan, saya membuat di kuitansi dan faktur itu lunas tanggal 2026-01-08, namun pada arus kas dia tercatat pada tanggal sekarang. padahal saya ingin input pembukuan yang lama sudah lewat. itu bagai mana solusinya?" -> "ya, lakukan sinkronisasi semua, termasuk dengan arus kas lama yang sudah terlanjur tercatat"
   *Penyebab Masalah yang Ditemukan (Root Cause)*:

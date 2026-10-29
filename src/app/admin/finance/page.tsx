@@ -20632,6 +20632,20 @@ export default function AdminFinanceERPPage() {
             (po) => po.projectId === prj.id || (po.notes && po.notes.includes(prj.projectCode))
           );
           const totalPurchaseCost = prjPurchases.reduce((acc, po) => acc + (po.grandTotal || 0), 0);
+          const totalPurchasePaid = prjPurchases.reduce((acc, po) => {
+            const p = po as any;
+            if (p.paidAmount !== undefined && p.paidAmount !== null) return acc + Number(p.paidAmount);
+            if (po.paymentStatus === "Lunas" || p.status === "Lunas") return acc + (po.grandTotal || 0);
+            return acc;
+          }, 0);
+          const totalPurchaseOutstanding = prjPurchases.reduce((acc, po) => {
+            const grand = po.grandTotal || 0;
+            const p = po as any;
+            const paid = p.paidAmount !== undefined && p.paidAmount !== null
+              ? Number(p.paidAmount)
+              : (po.paymentStatus === "Lunas" || p.status === "Lunas" ? grand : 0);
+            return acc + Math.max(0, grand - paid);
+          }, 0);
 
           const prjCashOut = cashFlow.filter((c) => c.type === "OUT" && c.projectId === prj.id);
           const totalCashFieldCost = prjCashOut.reduce((acc, c) => acc + (c.amount || 0), 0);
@@ -20776,6 +20790,11 @@ export default function AdminFinanceERPPage() {
                     <span className="text-[10px] text-amber-700 font-medium block mt-0.5">
                       PO: {formatRupiah(totalPurchaseCost)} | Kas: {formatRupiah(totalCashFieldCost)}
                     </span>
+                    {totalPurchaseOutstanding > 0 && (
+                      <span className="text-[10px] text-rose-600 font-black block mt-0.5">
+                        ⚠️ Sisa Hutang Vendor: {formatRupiah(totalPurchaseOutstanding)}
+                      </span>
+                    )}
                   </div>
 
                   <div
@@ -20855,7 +20874,10 @@ export default function AdminFinanceERPPage() {
                     }`}
                   >
                     <ShoppingBag className="w-3.5 h-3.5" />
-                    <span>PO Belanja Material ({prjPurchases.length})</span>
+                    <span>Tagihan Vendor &amp; PO ({prjPurchases.length})</span>
+                    {totalPurchaseOutstanding > 0 && (
+                      <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" title="Ada tagihan vendor belum lunas" />
+                    )}
                   </button>
                   <button
                     type="button"
@@ -20949,6 +20971,49 @@ export default function AdminFinanceERPPage() {
                           </span>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Ringkasan Catatan Tagihan Vendor & Hutang Usaha Proyek */}
+                    <div className="p-4 bg-white rounded-2xl border border-slate-200 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-black text-slate-800 text-sm flex items-center gap-1.5">
+                          <Receipt className="w-4 h-4 text-amber-600" />
+                          <span>Catatan Tagihan Vendor &amp; Pengadaan Proyek</span>
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => setProjectDossierTab("purchases")}
+                          className="text-[11px] font-bold text-amber-700 hover:text-amber-800 underline cursor-pointer"
+                        >
+                          Lihat Rincian ({prjPurchases.length} Dokumen) →
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                          <span className="text-[10px] text-slate-500 block">Total Tagihan &amp; PO:</span>
+                          <span className="font-black text-slate-800 text-xs mt-0.5">{formatRupiah(totalPurchaseCost)}</span>
+                        </div>
+                        <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
+                          <span className="text-[10px] text-emerald-700 block">Sudah Dibayar:</span>
+                          <span className="font-black text-emerald-800 text-xs mt-0.5">{formatRupiah(totalPurchasePaid)}</span>
+                        </div>
+                        <div className={`p-2.5 rounded-xl border ${totalPurchaseOutstanding > 0 ? "bg-rose-50 border-rose-200 text-rose-800" : "bg-slate-50 border-slate-200 text-slate-700"}`}>
+                          <span className="text-[10px] block">Sisa Hutang Vendor:</span>
+                          <span className="font-black text-xs mt-0.5">{formatRupiah(totalPurchaseOutstanding)}</span>
+                        </div>
+                      </div>
+                      {totalPurchaseOutstanding > 0 && (
+                        <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-center justify-between gap-2">
+                          <span>⚠️ Terdapat sisa kewajiban hutang tagihan vendor sebesar <strong>{formatRupiah(totalPurchaseOutstanding)}</strong> untuk proyek ini.</span>
+                          <button
+                            type="button"
+                            onClick={() => setProjectDossierTab("purchases")}
+                            className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] shrink-0 cursor-pointer shadow-xs"
+                          >
+                            Buka Tagihan Vendor
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -21311,38 +21376,107 @@ export default function AdminFinanceERPPage() {
                   </div>
                 )}
 
-                {/* Tab Content: Purchases */}
+                {/* Tab Content: Tagihan Vendor & PO Belanja Proyek (Tugas 299) */}
                 {projectDossierTab === "purchases" && (
-                  <div className="space-y-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-black text-slate-800">Daftar PO Belanja Material & Perlengkapan</h4>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const prjEnt = resolveProjectEntity(prj);
-                          setPoForm((prev) => ({
-                            ...prev,
-                            projectId: prj.id,
-                            projectName: prj.projectName,
-                            businessEntity: prjEnt,
-                            taxRate: prjEnt === "NON_PT" ? 0 : 12,
-                            notes: `Belanja Material Proyek: [${prj.projectCode}] ${prj.projectName}`,
-                          }));
-                          setIsNewPoModalOpen(true);
-                        }}
-                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 cursor-pointer"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>+ Buat PO Proyek</span>
-                      </button>
+                  <div className="space-y-4 text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h4 className="font-black text-slate-800 text-sm flex items-center gap-1.5">
+                          <ShoppingBag className="w-4 h-4 text-amber-600" />
+                          <span>Daftar Tagihan Vendor (Bills) &amp; PO Pengadaan Proyek</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500">
+                          Catatan tagihan masuk dari supplier/distributor dan Purchase Order untuk kebutuhan proyek ini.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Tombol Catat Tagihan Vendor */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const prjEnt = resolveProjectEntity(prj);
+                            setBillForm({
+                              vendorInvoiceNumber: "",
+                              billCategory: "Barang / Material Perangkat",
+                              supplierName: "",
+                              supplierContact: "",
+                              date: new Date().toISOString().split("T")[0],
+                              dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
+                              items: [{ id: `item_${Date.now()}`, productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
+                              taxRate: prjEnt === "NON_PT" ? 0 : 12,
+                              taxType: "exclude",
+                              paymentStatus: "Hutang Usaha",
+                              paidAmount: 0,
+                              paymentMethod: "Transfer Bank BCA PT",
+                              billAttachmentUrl: "",
+                              notes: `Tagihan Vendor Proyek: [${prj.projectCode}] ${prj.projectName}`,
+                              businessEntity: prjEnt,
+                              projectId: prj.id,
+                              projectName: prj.projectName,
+                            });
+                            setIsNewBillModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                          title="Catat invoice / tagihan masuk dari vendor untuk proyek ini"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>+ Catat Tagihan Vendor (Bill)</span>
+                        </button>
+
+                        {/* Tombol Buat PO Proyek */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const prjEnt = resolveProjectEntity(prj);
+                            setPoForm((prev) => ({
+                              ...prev,
+                              projectId: prj.id,
+                              projectName: prj.projectName,
+                              businessEntity: prjEnt,
+                              taxRate: prjEnt === "NON_PT" ? 0 : 12,
+                              notes: `Belanja Material Proyek: [${prj.projectCode}] ${prj.projectName}`,
+                            }));
+                            setIsNewPoModalOpen(true);
+                          }}
+                          className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Buat PO Proyek</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Ringkasan Akumulasi Tagihan & Hutang Vendor Proyek */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block">Total Nilai Tagihan &amp; PO</span>
+                        <span className="text-base font-black text-slate-900 block mt-0.5">{formatRupiah(totalPurchaseCost)}</span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">{prjPurchases.length} Dokumen Pengadaan</span>
+                      </div>
+                      <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200">
+                        <span className="text-[10px] font-bold text-emerald-700 uppercase block">Total Sudah Terbayar</span>
+                        <span className="text-base font-black text-emerald-800 block mt-0.5">{formatRupiah(totalPurchasePaid)}</span>
+                        <span className="text-[10px] text-emerald-600 block mt-0.5">Kas Riil Keluar</span>
+                      </div>
+                      <div className={`p-3 rounded-2xl border ${totalPurchaseOutstanding > 0 ? "bg-rose-50 border-rose-200" : "bg-slate-50 border-slate-200"}`}>
+                        <span className={`text-[10px] font-bold uppercase block ${totalPurchaseOutstanding > 0 ? "text-rose-700" : "text-slate-500"}`}>
+                          Sisa Hutang Vendor (Belum Lunas)
+                        </span>
+                        <span className={`text-base font-black block mt-0.5 ${totalPurchaseOutstanding > 0 ? "text-rose-900" : "text-slate-700"}`}>
+                          {formatRupiah(totalPurchaseOutstanding)}
+                        </span>
+                        <span className={`text-[10px] font-medium block mt-0.5 ${totalPurchaseOutstanding > 0 ? "text-rose-600" : "text-slate-400"}`}>
+                          {totalPurchaseOutstanding > 0 ? "Perlu Dijadwalkan Pembayaran" : "Semua Tagihan Vendor Lunas"}
+                        </span>
+                      </div>
                     </div>
 
                     {prjPurchases.length === 0 ? (
                       <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                         <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                        <p className="font-bold text-slate-600">Belum Ada PO Material untuk Proyek Ini</p>
+                        <p className="font-bold text-slate-600">Belum Ada Catatan Tagihan Vendor atau PO untuk Proyek Ini</p>
                         <p className="text-slate-400 text-[11px] mt-0.5">
-                          Klik tombol di atas untuk membuat PO pengadaan material proyek ke vendor/distributor.
+                          Gunakan tombol <strong>+ Catat Tagihan Vendor (Bill)</strong> untuk menginput faktur masuk dari supplier, atau <strong>+ Buat PO Proyek</strong> untuk pengadaan belanja material.
                         </p>
                       </div>
                     ) : (
@@ -21350,77 +21484,168 @@ export default function AdminFinanceERPPage() {
                         <table className="w-full text-left">
                           <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 text-[11px] uppercase font-bold">
                             <tr>
-                              <th className="p-2.5">No PO</th>
+                              <th className="p-2.5">No. Dokumen / Faktur Vendor</th>
                               <th className="p-2.5">Vendor / Supplier</th>
-                              <th className="p-2.5">Tanggal</th>
-                              <th className="p-2.5 text-right">Nilai Belanja</th>
-                              <th className="p-2.5 text-center">Status</th>
-                              <th className="p-2.5 text-center">Aksi</th>
+                              <th className="p-2.5">Tanggal &amp; Jatuh Tempo</th>
+                              <th className="p-2.5 text-right">Nilai Tagihan</th>
+                              <th className="p-2.5 text-right">Terbayar</th>
+                              <th className="p-2.5 text-center">Status Pembayaran</th>
+                              <th className="p-2.5 text-center">Aksi &amp; Pembayaran</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 font-medium">
-                            {prjPurchases.map((po) => (
-                              <tr key={po.id} className="hover:bg-slate-50">
-                                <td className="p-2.5 font-bold text-slate-900">{po.poNumber}</td>
-                                <td className="p-2.5 text-slate-700 font-medium">{po.supplierName}</td>
-                                <td className="p-2.5 text-slate-500">{po.date}</td>
-                                <td className="p-2.5 text-right font-black text-slate-900">{formatRupiah(po.grandTotal)}</td>
-                                <td className="p-2.5 text-center">
-                                  <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                                      po.status === "Approved" || po.status === "Selesai"
-                                        ? "bg-emerald-100 text-emerald-800"
-                                        : "bg-blue-100 text-blue-800"
-                                    }`}
-                                  >
-                                    {po.status || "Pending"}
-                                  </span>
-                                </td>
-                                <td className="p-2.5 text-center">
-                                  <div className="flex items-center justify-center gap-1">
-                                    {/* Lihat PO */}
-                                    <button
-                                      type="button"
-                                      onClick={() => setSelectedPoForPrint(po)}
-                                      className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition-all"
-                                      title="Lihat / Cetak Purchase Order"
-                                    >
-                                      <Eye className="w-3.5 h-3.5" />
-                                    </button>
+                            {prjPurchases.map((po) => {
+                              const p = po as any;
+                              const isBill = p.docType === "BILL" || Boolean(p.vendorInvoiceNumber);
+                              const grand = Number(po.grandTotal) || 0;
+                              const paid = p.paidAmount !== undefined && p.paidAmount !== null
+                                ? Number(p.paidAmount)
+                                : (po.paymentStatus === "Lunas" || p.status === "Lunas" ? grand : 0);
+                              const remaining = Math.max(0, grand - paid);
+                              const isLunas = remaining === 0 || po.paymentStatus === "Lunas" || p.status === "Lunas";
 
-                                    {/* Kwitansi Pembayaran PO */}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenReceiptModal({ type: "po", doc: po, project: prj })}
-                                      className="p-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer transition-all"
-                                      title="Kwitansi Pengeluaran / Bukti Pembayaran PO"
+                              return (
+                                <tr key={po.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="p-2.5 font-bold text-slate-900">
+                                    <div className="flex flex-col gap-0.5">
+                                      {isBill ? (
+                                        <>
+                                          <div className="flex items-center gap-1">
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-100 text-purple-800 border border-purple-200">
+                                              📥 Tagihan Vendor
+                                            </span>
+                                          </div>
+                                          <span className="font-mono text-purple-900 font-black">
+                                            {p.vendorInvoiceNumber || po.poNumber}
+                                          </span>
+                                          {p.vendorInvoiceNumber && p.vendorInvoiceNumber !== po.poNumber && (
+                                            <span className="text-[10px] text-slate-400 font-mono">PO: {po.poNumber}</span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <>
+                                          <div className="flex items-center gap-1">
+                                            <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-200">
+                                              📄 PO Proyek
+                                            </span>
+                                          </div>
+                                          <span className="font-mono text-slate-900 font-black">{po.poNumber}</span>
+                                        </>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 text-slate-700">
+                                    <span className="font-bold block text-slate-900">{po.supplierName}</span>
+                                    {p.billCategory && (
+                                      <span className="text-[10px] text-slate-500 block">{p.billCategory}</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2.5 text-slate-500">
+                                    <span className="block font-medium">{po.date}</span>
+                                    {p.dueDate && (
+                                      <span className="text-[10px] text-amber-600 block">Jth Tempo: {p.dueDate}</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2.5 text-right font-black text-slate-900">
+                                    {formatRupiah(grand)}
+                                  </td>
+                                  <td className="p-2.5 text-right">
+                                    <span className="font-bold text-emerald-600 block">{formatRupiah(paid)}</span>
+                                    {remaining > 0 && (
+                                      <span className="text-[10px] text-rose-600 font-bold block">Sisa: {formatRupiah(remaining)}</span>
+                                    )}
+                                  </td>
+                                  <td className="p-2.5 text-center">
+                                    <span
+                                      className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                        isLunas
+                                          ? "bg-emerald-100 text-emerald-800"
+                                          : paid > 0
+                                          ? "bg-amber-100 text-amber-800"
+                                          : "bg-rose-100 text-rose-800"
+                                      }`}
                                     >
-                                      <Receipt className="w-3.5 h-3.5" />
-                                    </button>
+                                      {isLunas ? "Lunas" : paid > 0 ? "Sebagian" : "Hutang Usaha"}
+                                    </span>
+                                  </td>
+                                  <td className="p-2.5 text-center">
+                                    <div className="flex items-center justify-center gap-1">
+                                      {/* Tombol Bayar / Pelunasan Tagihan Vendor */}
+                                      {!isLunas && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleOpenPayBill(po)}
+                                          className="px-2 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer shadow-xs transition-all shrink-0"
+                                          title="Catat Pembayaran / Pelunasan Tagihan Vendor Ini"
+                                        >
+                                          <CreditCard className="w-3 h-3" />
+                                          <span>Bayar</span>
+                                        </button>
+                                      )}
 
-                                    {/* Edit PO */}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleOpenEditPo(po)}
-                                      className="p-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 cursor-pointer transition-all"
-                                      title="Edit Purchase Order"
-                                    >
-                                      <Edit3 className="w-3.5 h-3.5" />
-                                    </button>
+                                      {/* Lihat / Cetak Dokumen */}
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedPoForPrint(po)}
+                                        className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer transition-all"
+                                        title="Lihat / Cetak Dokumen Pengadaan"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
 
-                                    {/* Hapus PO */}
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeletePo(po)}
-                                      className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer transition-all"
-                                      title="Hapus Purchase Order Ini"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
+                                      {/* Foto Nota / Lampiran Berkas Tagihan */}
+                                      {(p.billAttachmentUrl || (po.attachments && po.attachments.length > 0)) && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setPreviewAttachment({
+                                              name: `Tagihan Vendor - ${p.vendorInvoiceNumber || po.poNumber}`,
+                                              url: p.billAttachmentUrl || po.attachments?.[0]?.url || "",
+                                              category: "Tagihan Vendor / PO",
+                                              uploadedAt: po.date,
+                                            })
+                                          }
+                                          className="p-1 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 cursor-pointer transition-all"
+                                          title="Lihat Foto Bukti Nota / Lampiran Tagihan Vendor"
+                                        >
+                                          <Paperclip className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+
+                                      {/* Kwitansi Pembayaran PO */}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenReceiptModal({ type: "po", doc: po, project: prj })}
+                                        className="p-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer transition-all"
+                                        title="Kwitansi Pengeluaran / Bukti Pembayaran PO"
+                                      >
+                                        <Receipt className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Edit PO / Tagihan */}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenEditPo(po)}
+                                        className="p-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 cursor-pointer transition-all"
+                                        title="Edit Rincian Tagihan / PO"
+                                      >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                      </button>
+
+                                      {/* Hapus PO / Tagihan */}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeletePo(po)}
+                                        className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 cursor-pointer transition-all"
+                                        title="Hapus Tagihan / PO Ini"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
