@@ -1998,6 +1998,7 @@ export default function AdminFinanceERPPage() {
     taxInvoiceDate: string;
     taxInvoiceUrl: string;
     notes: string;
+    docType?: "sale" | "purchase";
   }>({
     invoiceId: "",
     invoiceNumber: "",
@@ -2006,6 +2007,7 @@ export default function AdminFinanceERPPage() {
     taxInvoiceDate: new Date().toISOString().split("T")[0],
     taxInvoiceUrl: "",
     notes: "",
+    docType: "sale",
   });
   const [isUploadingTaxPdf, setIsUploadingTaxPdf] = useState<boolean>(false);
 
@@ -6706,6 +6708,21 @@ export default function AdminFinanceERPPage() {
       taxInvoiceDate: inv.taxInvoiceDate || new Date().toISOString().split("T")[0],
       taxInvoiceUrl: inv.taxInvoiceUrl || "",
       notes: inv.taxInvoiceNotes || "",
+      docType: "sale",
+    });
+    setIsTaxInvoiceModalOpen(true);
+  };
+
+  const handleOpenPurchaseTaxModal = (po: PurchaseOrder) => {
+    setTaxInvoiceModalData({
+      invoiceId: po.id,
+      invoiceNumber: po.poNumber,
+      customerName: po.supplierName,
+      taxInvoiceNumber: po.taxInvoiceNumber || "",
+      taxInvoiceDate: po.taxInvoiceDate || new Date().toISOString().split("T")[0],
+      taxInvoiceUrl: po.taxInvoiceUrl || "",
+      notes: po.taxInvoiceNotes || "",
+      docType: "purchase",
     });
     setIsTaxInvoiceModalOpen(true);
   };
@@ -6754,6 +6771,7 @@ export default function AdminFinanceERPPage() {
           actionType: "attach_tax_invoice",
           payload: {
             invoiceId: taxInvoiceModalData.invoiceId || taxInvoiceModalData.invoiceNumber,
+            docType: taxInvoiceModalData.docType || "sale",
             taxInvoiceNumber: taxInvoiceModalData.taxInvoiceNumber.trim(),
             taxInvoiceDate: taxInvoiceModalData.taxInvoiceDate,
             taxInvoiceUrl: taxInvoiceModalData.taxInvoiceUrl,
@@ -6763,7 +6781,11 @@ export default function AdminFinanceERPPage() {
       });
       const result = await res.json();
       if (result.success) {
-        showToast("Faktur Pajak resmi DJP berhasil disimpan & dilampirkan ke Faktur Penjualan!");
+        showToast(
+          taxInvoiceModalData.docType === "purchase"
+            ? "Faktur Pajak Masukan (PPN Masukan) dari Vendor berhasil disimpan & disinkronkan ke Keuangan serta Menu Pajak!"
+            : "Faktur Pajak resmi DJP berhasil disimpan & dilampirkan ke Faktur Penjualan!"
+        );
         setIsTaxInvoiceModalOpen(false);
         if (sendDocModal.isOpen && (sendDocModal.docNumber === taxInvoiceModalData.invoiceNumber || sendDocModal.id === taxInvoiceModalData.invoiceId)) {
           setSendDocModal((prev) => ({
@@ -11169,27 +11191,54 @@ export default function AdminFinanceERPPage() {
                           {po.paymentStatus}
                         </td>
                         <td className="p-3 whitespace-nowrap">
-                          {po.approvalStatus === "Disetujui & Sah" ? (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
-                                <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                                <span>Disetujui & Sah</span>
-                              </span>
-                              <span className="text-[9px] text-slate-400 font-mono">
-                                {po.verificationCode || "DST-APP"}
-                              </span>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenApprovalPo(po)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors cursor-pointer"
-                              title="Klik untuk menyetujui & bubuhkan tanda tangan digital resmi"
-                            >
-                              <Clock className="w-3 h-3 text-amber-600" />
-                              <span>Menunggu Approval</span>
-                            </button>
-                          )}
+                          <div className="flex flex-col gap-1 items-start">
+                            {po.approvalStatus === "Disetujui & Sah" ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                  <span>Disetujui & Sah</span>
+                                </span>
+                                <span className="text-[9px] text-slate-400 font-mono">
+                                  {po.verificationCode || "DST-APP"}
+                                </span>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenApprovalPo(po)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 hover:bg-amber-200 transition-colors cursor-pointer"
+                                title="Klik untuk menyetujui & bubuhkan tanda tangan digital resmi"
+                              >
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                <span>Menunggu Approval</span>
+                              </button>
+                            )}
+
+                            {/* Badge Status Lampiran Faktur Pajak Masukan Khusus Entitas PT */}
+                            {po.businessEntity !== "NON_PT" && (
+                              po.taxInvoiceUrl || po.taxInvoiceNumber ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPurchaseTaxModal(po)}
+                                  title={`Faktur Pajak Masukan DJP ${po.taxInvoiceNumber ? `(${po.taxInvoiceNumber})` : ''} telah dilampirkan. Klik untuk kelola / ganti.`}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 transition-all cursor-pointer"
+                                >
+                                  <Landmark className="w-3 h-3 text-emerald-600" />
+                                  <span>Pajak Masukan Ada</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPurchaseTaxModal(po)}
+                                  title="Pembelian PO ini belum melampirkan Faktur Pajak Masukan resmi dari vendor. Klik untuk mencatat & melampirkan sekarang."
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-slate-100 text-slate-500 border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 transition-all cursor-pointer"
+                                >
+                                  <Landmark className="w-3 h-3" />
+                                  <span>+ Pajak Masukan</span>
+                                </button>
+                              )
+                            )}
+                          </div>
                         </td>
                         <td className="p-3 text-right whitespace-nowrap">
                           <div className="flex flex-col items-end gap-1.5 py-1">
@@ -11214,6 +11263,29 @@ export default function AdminFinanceERPPage() {
                               >
                                 <Receipt className="w-3.5 h-3.5" />
                               </button>
+
+                              {/* Tombol Kelola / Lampirkan Faktur Pajak Masukan dari Vendor (PPN Masukan) */}
+                              {po.businessEntity !== "NON_PT" && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenPurchaseTaxModal(po)}
+                                  title={
+                                    po.taxInvoiceUrl || po.taxInvoiceNumber
+                                      ? `Faktur Pajak Masukan Vendor Aktif: ${po.taxInvoiceNumber || 'Berkas Terlampir'}. Klik untuk mengelola / mengunduh / mengganti.`
+                                      : "Catat & Lampirkan Faktur Pajak Masukan dari Vendor (PPN Masukan)"
+                                  }
+                                  className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs hover:scale-105 shrink-0 relative ${
+                                    po.taxInvoiceUrl || po.taxInvoiceNumber
+                                      ? "bg-emerald-100 hover:bg-emerald-600 text-emerald-800 hover:text-white ring-1 ring-emerald-400"
+                                      : "bg-slate-100 hover:bg-slate-700 text-slate-700 hover:text-white border border-slate-300"
+                                  }`}
+                                >
+                                  <Landmark className="w-3.5 h-3.5" />
+                                  {(po.taxInvoiceUrl || po.taxInvoiceNumber) && (
+                                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                                  )}
+                                </button>
+                              )}
 
                               {/* Kirim PO via WhatsApp */}
                               <button
@@ -24044,6 +24116,27 @@ export default function AdminFinanceERPPage() {
                 Format Purchase Order Resmi (PO) PT. DSTech Smart Perkasa
               </span>
               <div className="flex flex-wrap items-center gap-2">
+                {/* Tombol Lampirkan / Kelola Faktur Pajak Masukan di Toolbar Cetak PO */}
+                {selectedPoForPrint.businessEntity !== "NON_PT" && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenPurchaseTaxModal(selectedPoForPrint)}
+                    title="Kelola & Lampirkan Faktur Pajak Masukan dari Vendor (PPN Masukan)"
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all ${
+                      selectedPoForPrint.taxInvoiceUrl || selectedPoForPrint.taxInvoiceNumber
+                        ? "bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                    }`}
+                  >
+                    <Landmark className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>
+                      {selectedPoForPrint.taxInvoiceUrl || selectedPoForPrint.taxInvoiceNumber
+                        ? "Pajak Masukan Terlampir"
+                        : "+ Pajak Masukan"}
+                    </span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={handleOpenSettingsModal}
@@ -33632,7 +33725,11 @@ export default function AdminFinanceERPPage() {
                 </span>
                 <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
                   <Landmark className="w-5 h-5 text-emerald-600" />
-                  <span>Lampirkan Faktur Pajak Elektronik</span>
+                  <span>
+                    {taxInvoiceModalData.docType === "purchase"
+                      ? "Pencatatan Faktur Pajak Masukan (Vendor / Supplier)"
+                      : "Lampirkan Faktur Pajak Elektronik (e-Faktur DJP)"}
+                  </span>
                 </h3>
               </div>
               <button
@@ -33646,10 +33743,18 @@ export default function AdminFinanceERPPage() {
 
             <form onSubmit={handleSaveTaxInvoiceSubmit} className="space-y-4">
               <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-950 space-y-1">
-                <p><strong>Faktur Penjualan:</strong> <span className="font-mono font-bold">{taxInvoiceModalData.invoiceNumber}</span></p>
-                <p><strong>Klien / Pembeli:</strong> <span>{taxInvoiceModalData.customerName}</span></p>
+                <p>
+                  <strong>{taxInvoiceModalData.docType === "purchase" ? "No. PO / Pembelian:" : "Faktur Penjualan:"}</strong>{" "}
+                  <span className="font-mono font-bold">{taxInvoiceModalData.invoiceNumber}</span>
+                </p>
+                <p>
+                  <strong>{taxInvoiceModalData.docType === "purchase" ? "Vendor / Supplier:" : "Klien / Pembeli:"}</strong>{" "}
+                  <span>{taxInvoiceModalData.customerName}</span>
+                </p>
                 <p className="text-[11px] text-emerald-800 pt-1 border-t border-emerald-200">
-                  Lampirkan Nomor Seri Faktur Pajak (NSFP) dan berkas PDF/Foto e-Faktur resmi dari KPP untuk diteruskan ke klien pada saat penagihan.
+                  {taxInvoiceModalData.docType === "purchase"
+                    ? "Lampirkan Faktur Pajak Masukan resmi dari rekanan vendor/supplier pengadaan untuk otomatis tercatat di Keuangan dan Menu Pajak PPh & PPN (PPN Masukan)."
+                    : "Lampirkan Nomor Seri Faktur Pajak (NSFP) dan berkas PDF/Foto e-Faktur resmi dari KPP untuk diteruskan ke klien pada saat penagihan."}
                 </p>
               </div>
 

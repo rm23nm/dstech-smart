@@ -4,6 +4,26 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **2026-10-29**: [SELESAI] Penambahan Pilihan Pencatatan Faktur Pajak Masukan (PPN Masukan DJP) pada Kolom Aksi Tabel Pembelian & Tagihan Vendor (PO/Bills), Badge Status Pajak Masukan, dan Toolbar Pratinjau PO Terintegrasi ke Keuangan & Menu Pajak PPh & PPN (Tugas 297) (`src/app/admin/finance/page.tsx`).
+  *Permintaan User*: "kemudian pada Pembelian & Tagihan Vendor, saya lihat belum ada pilihan pencatataan pajak masukkan pada aksinya seperti pada faktur"
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  1. Pada tabel Penjualan (`sales`), tombol aksi `🏛️ e-Faktur Pajak` dan badge status pajak telah tersedia lengkap, namun pada tabel Pembelian & Tagihan Vendor (`purchases` / PO / Bills) tombol aksi tersebut belum dipasang pada baris tombol aksi tabel.
+  2. Handler modal e-faktur di frontend (`taxInvoiceModalData`) sebelumnya hanya menangani dokumen penjualan (`SaleInvoice`) dan belum memiliki wrapper `handleOpenPurchaseTaxModal(po: PurchaseOrder)` dengan `docType: "purchase"`.
+  3. Meskipun backend `POST /api/finance` (`attach_tax_invoice`) sudah siap menerima `docType: "purchase"` dan mencatat `PPN_MASUKAN` ke `data.tax_records`, ketiadaan tombol aksi di tabel PO membuat admin tidak bisa mencatat atau melampirkan Faktur Pajak Masukan dari vendor dari tabel pembelian.
+  *Penyelesaian & Hasil*:
+  1. **Frontend Keuangan (`src/app/admin/finance/page.tsx`)**:
+     - Memperluas state `taxInvoiceModalData` dengan properti `docType?: "sale" | "purchase"`.
+     - Menambahkan fungsi handler `handleOpenPurchaseTaxModal(po: PurchaseOrder)` yang memuat data PO dan rekanan vendor.
+     - Memperbarui `handleSaveTaxInvoiceSubmit` agar menyertakan parameter `docType` dan menampilkan pesan toast dinamis sukses rekonsiliasi PPN Masukan.
+     - Menyesuaikan Modal `isTaxInvoiceModalOpen`: Judul otomatis berubah menjadi **"Pencatatan Faktur Pajak Masukan (Vendor / Supplier)"**, label menjadi No. PO & Vendor, serta informasi petunjuk rekonsiliasi PPN Masukan.
+     - Memasang tombol aksi khusus **`🏛️ Faktur Pajak Masukan`** (ikon `Landmark`) di Baris 1 kolom aksi tabel Pembelian & Tagihan Vendor berdampingan dengan tombol Kwitansi dan Cetak PO, lengkap dengan titik indikator aktif hijau jika e-faktur vendor sudah dilampirkan.
+     - Memasang badge interaktif status pajak masukan di kolom status PO (`Pajak Masukan Ada` / `+ Pajak Masukan`).
+     - Memasang tombol kelola Faktur Pajak Masukan di toolbar modal cetak PO (`selectedPoForPrint`).
+  2. **Pengujian & Validasi Lokal**:
+     - `npx tsc --noEmit`: Lolos 100% tanpa error tipe data (Exit Code 0).
+     - `npm run build`: Sukses mengompilasi 76/76 static & dynamic pages (Exit Code 0).
+     - Folder cadangan sementara `_backup_purchase_tax_invoice` telah dibersihkan secara aman.
+
 - **2026-10-29**: [SELESAI] Penguncian Permanen Pengesahan Tanda Tangan Dokumen Sah, Kebijakan Pembatasan Penerbitan Faktur E-Store Hanya Saat Pesanan Diterima (Delivered) & Pembersihan Faktur Pesanan Batal, Alur Refund & Retur Terintegrasi Buku Kas, Default Penandatangan Dokumen PT. DSTech Smart Perkasa (Direktur: RAMADHANI ST), serta Pengaturan Master Tanda Tangan & Stempel di Site Settings (Tugas 296) (`src/app/api/finance/route.ts`, `src/app/api/orders/route.ts`, `src/app/api/finance/print/route.ts`, `src/app/api/settings/route.ts`, `src/app/admin/settings/page.tsx`, `src/app/admin/orders/page.tsx`, `src/app/admin/finance/page.tsx`).
   *Permintaan User*:
   1. "setiap saya selesai mengesahkan surat tanda tangan. selalu saja pengesahaannya hilang tanpa tertanda tangan. tolong dikunci. jika sudah melakukan tanda tangan 1x pada seluruh dokumen maka jangan pernah hilang dan diubah. kecuali ada melakukan perbaikan surat, maka butuh pengesahan kembali."
