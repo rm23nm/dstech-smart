@@ -474,6 +474,7 @@ function findSaleOrEStoreOrder(docNo: string, sales: any[]): any {
       orderId: matchedOrder.id,
       orderNumber: matchedOrder.orderNumber,
       orderStatus: matchedOrder.status,
+      businessEntity: matchedOrder.businessEntity || "NON_PT",
       isCancelledOrder: isCancelled,
       isDeliveredOrder: isDelivered,
       isRefundedOrder: isRefunded,
@@ -509,7 +510,7 @@ function findSaleOrEStoreOrder(docNo: string, sales: any[]): any {
         ? `Pesanan E-Store #${matchedOrder.orderNumber} (BATAL) - Faktur Penjualan Dilarang Diterbitkan`
         : `Surat Pesanan / Bukti Belanja E-Store #${matchedOrder.orderNumber} (Status: ${matchedOrder.status}) - Pembeli: ${customerName}`,
       approvedBy: matchedOrder.approvedBy || orderSettings.signerName || "RAMADHANI ST",
-      approvedTitle: matchedOrder.approvedTitle || orderSettings.signerTitle || "Direktur",
+      approvedTitle: matchedOrder.approvedTitle || ((matchedOrder.businessEntity === "PT") ? "Direktur" : "Pimpinan Usaha / Pengelola Toko"),
       approvalStatus: matchedOrder.approvalStatus || (isDelivered ? "Disetujui & Sah" : "Menunggu Serah Terima"),
       approvedAt: matchedOrder.approvedAt || dateStr,
       signatureImage: matchedOrder.signatureImage || (isDelivered ? orderSettings.masterSignatureUrl || "" : ""),
@@ -643,12 +644,17 @@ export async function GET(req: Request) {
   const products: any[] = readProducts();
 
   // Pengaturan Kop Surat & Info Perusahaan Resmi (Prioritaskan berkas Base64 / upload user)
-  const letterheadUrl =
+  const letterheadUrl_PT =
     settings.letterheadUrl_PT ||
     settings.letterheadUrl ||
     generalSettings?.letterheadSettings?.letterheadUrl_PT ||
     generalSettings?.letterheadSettings?.letterheadUrl ||
     "/kop_surat_dstech.jpg";
+  const letterheadUrl_NON_PT =
+    settings.letterheadUrl_NON_PT ||
+    generalSettings?.letterheadSettings?.letterheadUrl_NON_PT ||
+    "";
+  const letterheadUrl = letterheadUrl_PT;
   const letterheadEnabled = settings.letterheadEnabled !== false;
   const masterStampUrl = settings.masterStampUrl || "";
   const defaultBank = bankAccounts.find((b) => b.isDefault) || bankAccounts[0] || {
@@ -2350,13 +2356,40 @@ export async function GET(req: Request) {
     });
   }
 
+  // Cek apakah sale terkait dengan project bertipe NON_PT atau transaksi toko/e-store
+  const saleProject = (data.projects || []).find((p: any) =>
+    (sale.projectId && (p.id === sale.projectId || p.projectCode === sale.projectId)) ||
+    (sale.projectName && p.projectName === sale.projectName)
+  );
+
+  const isSaleNonPt =
+    (sale.businessEntity || "") === "NON_PT" ||
+    (saleProject && saleProject.businessEntity === "NON_PT") ||
+    Boolean(sale.orderId || sale.orderNumber) ||
+    String(sale.invoiceNumber || "").includes("ESTORE");
+
+  if (isSaleNonPt && sale.businessEntity !== "NON_PT") {
+    sale.businessEntity = "NON_PT";
+  }
+
+  const sellerEntityName = isSaleNonPt ? "DSTECH SMART" : "PT. DSTECH SMART PERKASA";
+  const sellerEntityFullName = isSaleNonPt ? "DSTECH SMART (TOKO & USAHA MANDIRI)" : "PT. DSTECH SMART PERKASA";
+
   // Snapshot Penguncian Permanen (Tugas 284: Faktur/BAST yang dicetak/dikirim tidak boleh berubah)
   const isSaleLocked = sale.isLockedPermanently || sale.isLocked || Boolean(sale.frozenSignatureImage) || Boolean(sale.signatureImage);
   const signerName = sale.frozenSignerName || sale.approvedBy || (isSaleLocked ? "RAMADHANI ST" : (settings.signerName || "RAMADHANI ST"));
-  const signerTitle = sale.frozenSignerTitle || sale.approvedTitle || (isSaleLocked ? "Direktur" : (settings.signerTitle || "Direktur"));
+  const defaultTitle = isSaleNonPt ? "Pimpinan Usaha / Pengelola Toko" : "Direktur";
+  const signerTitle = sale.frozenSignerTitle || (sale.approvedTitle && sale.approvedTitle !== "Direktur" ? sale.approvedTitle : defaultTitle);
   const signatureImage = sale.frozenSignatureImage || sale.signatureImage || (isSaleLocked ? "" : (settings.masterSignatureUrl || ""));
-  const stampImage = sale.frozenStampUrl || sale.stampUrl || (isSaleLocked ? "" : masterStampUrl);
+  // Stempel resmi: Dokumen Toko (NON_PT) DILARANG KERAS menggunakan stempel PT. DSTECH SMART PERKASA!
+  const stampImage = isSaleNonPt ? (settings.masterStampUrl_NON_PT || "") : (sale.frozenStampUrl || sale.stampUrl || (isSaleLocked ? "" : masterStampUrl));
   const lastPrintedAt = sale.lastPrintedAt || (new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta", dateStyle: "long", timeStyle: "medium" }) + " WIB");
+
+  // Kop Surat Dinamis Berdasarkan Entitas Penjualan
+  // Untuk dokumen Toko (NON_PT): Hanya gunakan letterheadUrl_NON_PT jika ada.
+  // Jika tidak ada kop gambar khusus toko, DILARANG KERAS menggunakan kop gambar PT!
+  const saleLetterheadUrl = isSaleNonPt ? letterheadUrl_NON_PT : letterheadUrl_PT;
+  const saleLetterheadEnabled = isSaleNonPt ? Boolean(letterheadUrl_NON_PT) : letterheadEnabled;
 
   if (signatureImage && !sale.isLockedPermanently) {
     if (sale.orderId || sale.orderNumber) {
@@ -2392,6 +2425,37 @@ export async function GET(req: Request) {
     { id: "delivery", label: "🚚 Surat Jalan", active: docType === "delivery" },
     { id: "photos", label: "📸 Dokumentasi Foto", active: docType === "photos" },
   ];
+
+  // Resolver Nama Perusahaan & PIC Klien / Pengawas yang Akurat
+  const quotationOfSale = (data.quotations || []).find((q: any) =>
+    (sale.quotationNumber && (q.quotationNumber === sale.quotationNumber || q.id === sale.quotationNumber)) ||
+    (sale.notes && q.quotationNumber && sale.notes.includes(q.quotationNumber))
+  );
+  const matchedClient = (data.clients || []).find((c: any) =>
+    (c.name && sale.customerName && c.name.toLowerCase() === sale.customerName.toLowerCase()) ||
+    (c.company && sale.customerName && c.company.toLowerCase() === sale.customerName.toLowerCase()) ||
+    (c.company && sale.customerOrg && c.company.toLowerCase() === sale.customerOrg.toLowerCase())
+  );
+  const clientCompanyName = (
+    sale.photosSignerCompany ||
+    sale.bastSignerCompany ||
+    sale.deliverySignerCompany ||
+    sale.clientSignerCompany ||
+    sale.customerOrg ||
+    sale.customerCompany ||
+    quotationOfSale?.customerOrg ||
+    quotationOfSale?.customerCompany ||
+    matchedClient?.company ||
+    matchedClient?.org ||
+    (sale.customerName && /^(pt|cv|ud|yayasan|dinas|instansi|kantor|toko|badan|rs|klinik|pemerintah|kementerian)\b/i.test(sale.customerName.trim()) ? sale.customerName.trim() : '') ||
+    "Instansi / Perusahaan Klien"
+  );
+  const clientPicName = (
+    sale.customerPic ||
+    quotationOfSale?.customerPic ||
+    matchedClient?.pic ||
+    (sale.customerName && sale.customerName.toLowerCase() !== clientCompanyName.toLowerCase() ? sale.customerName : "")
+  );
 
   // Render Dokumen Sesuai Permintaan
   let documentContent = "";
@@ -2521,10 +2585,10 @@ export async function GET(req: Request) {
         <div class="relative z-10 flex flex-col justify-between min-h-[115mm]">
           <div>
             <!-- Kop Gambar Resmi DSTech Smart (Full Bleed Tepi-ke-Tepi Penuh Selebar Kertas A4) -->
-            <div id="receipt-letterhead-image-box" class="w-full relative select-none" style="display: ${letterheadEnabled ? 'block' : 'none'};">
+            <div id="receipt-letterhead-image-box" class="w-full relative select-none" style="display: ${saleLetterheadEnabled ? 'block' : 'none'};">
               <div class="w-full overflow-hidden relative bg-white" style="height: 125px;">
                 <img
-                  src="${letterheadUrl}"
+                  src="${saleLetterheadUrl}"
                   alt="Kop Surat Resmi DSTech"
                   class="w-full select-none pointer-events-none absolute top-0 left-0"
                   style="width: 100%; height: auto; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
@@ -2558,12 +2622,12 @@ export async function GET(req: Request) {
             </div>
 
             <!-- Header Bar: Kop Ringkas Teks Bawaan (Tampil jika Kop Gambar Dimatikan) -->
-            <div id="receipt-letterhead-text-box" class="px-6 pt-3 pb-1.5 border-b-2 border-slate-900 flex justify-between items-start gap-2" style="display: ${letterheadEnabled ? 'none' : 'flex'};">
+            <div id="receipt-letterhead-text-box" class="px-6 pt-3 pb-1.5 border-b-2 border-slate-900 flex justify-between items-start gap-2" style="display: ${saleLetterheadEnabled ? 'none' : 'flex'};">
               <div class="flex items-center gap-2.5">
-                <img src="/logo.png" alt="PT. DSTech Smart Perkasa" class="h-8 w-auto object-contain shrink-0" />
+                <img src="/logo.png" alt="${sellerEntityName}" class="h-8 w-auto object-contain shrink-0" />
                 <div>
-                  <h3 class="text-[11px] font-black tracking-wide text-slate-950 uppercase leading-none">PT. DSTECH SMART PERKASA</h3>
-                  <p class="text-[8px] text-slate-500 mt-0.5 leading-none">Solusi Teknologi, Jaringan &amp; Keamanan • Cilegon, Banten</p>
+                  <h3 class="text-[11px] font-black tracking-wide text-slate-950 uppercase leading-none">${sellerEntityFullName}</h3>
+                  <p class="text-[8px] text-slate-500 mt-0.5 leading-none">${isSaleNonPt ? "Penyedia Solusi Smart Security, IoT &amp; Smart Living • Cilegon, Banten" : "Solusi Teknologi, Jaringan &amp; Keamanan • Cilegon, Banten"}</p>
                 </div>
               </div>
               <div class="text-right shrink-0">
@@ -2680,11 +2744,11 @@ export async function GET(req: Request) {
                 <!-- Tanda Tangan Sah Penerima -->
                 <div class="col-span-5 text-center">
                   <p class="text-[8px] text-slate-500 leading-none">Cilegon, ${receiptDateDisplay}</p>
-                  <p class="font-black text-slate-950 text-[8.5px] leading-none mt-0.5">PT. DSTECH SMART PERKASA</p>
+                  <p class="font-black text-slate-950 text-[8.5px] leading-none mt-0.5">${sellerEntityName}</p>
                   <div class="h-8 flex items-center justify-center relative my-0.5">
                     ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-8 object-contain z-10" />` : ""}
-                    ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-8 opacity-75 absolute" />` : ""}
-                    ${!signatureImage && !masterStampUrl ? `<div class="h-5 w-20 border-b border-dashed border-slate-400"></div>` : ""}
+                    ${!isSaleNonPt && stampImage ? `<img src="${stampImage}" alt="Cap Resmi" class="h-8 opacity-75 absolute" />` : ""}
+                    ${!signatureImage && (!stampImage || isSaleNonPt) ? `<div class="h-5 w-20 border-b border-dashed border-slate-400"></div>` : ""}
                   </div>
                   <p class="font-black text-slate-950 text-[8.5px] underline leading-none">( ${signerName} )</p>
                   <p class="text-[7.5px] text-slate-500 font-bold leading-none mt-0.5">${signerTitle}</p>
@@ -2699,10 +2763,10 @@ export async function GET(req: Request) {
           </div>
 
           <!-- Footer Gambar Resmi DSTech Smart (Full Bleed Tepi-ke-Tepi Penuh Selebar Kertas A4) -->
-          <div id="receipt-letterhead-footer-box" class="w-full relative mt-2 select-none" style="display: ${letterheadEnabled ? 'block' : 'none'};">
+          <div id="receipt-letterhead-footer-box" class="w-full relative mt-2 select-none" style="display: ${saleLetterheadEnabled ? 'block' : 'none'};">
             <div class="w-full overflow-hidden relative bg-white" style="height: 54px;">
               <img
-                src="${letterheadUrl}"
+                src="${saleLetterheadUrl}"
                 alt="Footer Kop Surat Resmi DSTech"
                 class="w-full select-none pointer-events-none absolute bottom-0 left-0"
                 style="width: 100%; height: auto; display: block; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
@@ -2728,13 +2792,14 @@ export async function GET(req: Request) {
         <div class="grid grid-cols-2 gap-4 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
           <div>
             <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">PIHAK PERTAMA (Pelaksana):</span>
-            <p class="font-black text-slate-900 mt-0.5">PT. DSTECH SMART PERKASA</p>
-            <p class="text-slate-600 text-[11px]">Solusi Security System &amp; IT Infrastructure</p>
-            <p class="text-[10px] text-slate-500 mt-1">PIC: ${sale.salesPerson || "Tim Teknis DSTech"}</p>
+            <p class="font-black text-slate-900 mt-0.5">${sellerEntityName}</p>
+            <p class="text-slate-600 text-[11px]">${isSaleNonPt ? "Solusi Security System &amp; Smart Living (Toko DSTech Smart)" : "Solusi Security System &amp; IT Infrastructure"}</p>
+            <p class="text-[10px] text-slate-500 mt-1">PIC: ${sale.salesPerson || (isSaleNonPt ? "Staf Toko DSTech" : "Tim Teknis DSTech")}</p>
           </div>
           <div>
-            <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">PIHAK KEDUA (Penerima):</span>
-            <p class="font-black text-slate-900 mt-0.5">${sale.customerName}</p>
+            <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">PIHAK KEDUA (Pemberi Tugas / Penerima):</span>
+            <p class="font-black text-slate-900 mt-0.5 text-xs">${clientCompanyName}</p>
+            ${clientPicName ? `<p class="text-indigo-900 font-bold text-[11px]">Up. ${clientPicName}</p>` : ''}
             <p class="text-slate-600 text-[11px]">${sale.customerAddress || "Lokasi Klien"}</p>
             <p class="text-[10px] text-slate-500 mt-1">Telp: ${sale.customerPhone || "-"}</p>
           </div>
@@ -2772,8 +2837,9 @@ export async function GET(req: Request) {
         <!-- Tanda Tangan BAST -->
         <div class="grid grid-cols-2 gap-8 pt-6 mt-6 border-t border-slate-200 text-center">
           <div>
-            <span class="text-xs text-slate-500 block mb-1">PIHAK KEDUA (Penerima):</span>
-            <span class="font-bold text-slate-800 block">${sale.customerName}</span>
+            <span class="text-xs text-slate-500 block mb-1">PIHAK KEDUA (Pemberi Tugas / Penerima):</span>
+            <span class="font-black text-slate-950 block text-xs uppercase leading-tight">${sale.bastSignerCompany || clientCompanyName}</span>
+            ${clientPicName ? `<span class="text-[9.5px] text-slate-600 block mt-0.5 font-medium">Up. ${clientPicName}</span>` : ''}
             <div class="h-24 flex items-center justify-center border-b border-dashed border-slate-300 relative">
               ${sale.bastSignatureImage ? `
                 <img src="${sale.bastSignatureImage}" alt="Tanda Tangan Klien" class="h-20 object-contain z-10" />
@@ -2786,19 +2852,19 @@ export async function GET(req: Request) {
               `}
             </div>
             <p class="font-black text-slate-900 text-xs mt-2 underline">
-              ${sale.bastSignerName ? `( ${sale.bastSignerName} )` : "( .................................................... )"}
+              ${sale.bastSignerName ? `( ${sale.bastSignerName} )` : (clientPicName ? `( ${clientPicName} )` : "( .................................................... )")}
             </p>
             <p class="text-[10px] text-slate-500">
-              ${sale.bastSignerTitle || "Penanggung Jawab / PIC Klien"}
+              ${sale.bastSignerTitle || "Penanggung Jawab / PIC Klien"} • <strong class="text-slate-700">${sale.bastSignerCompany || clientCompanyName}</strong>
               ${sale.bastApprovedAt ? `<span class="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">Disetujui: ${sale.bastApprovedAt}</span>` : ""}
             </p>
           </div>
           <div>
             <span class="text-xs text-slate-500 block mb-1">PIHAK PERTAMA (Pelaksana):</span>
-            <span class="font-bold text-slate-800 block">PT. DSTECH SMART PERKASA</span>
+            <span class="font-bold text-slate-800 block">${isSaleNonPt ? "DSTECH SMART (TOKO)" : "PT. DSTECH SMART PERKASA"}</span>
             <div class="h-24 flex items-center justify-center border-b border-dashed border-slate-300 relative">
               ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-20 object-contain z-10" />` : ""}
-              ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-20 opacity-80 absolute" />` : ""}
+              ${!isSaleNonPt && stampImage ? `<img src="${stampImage}" alt="Cap Resmi" class="h-20 opacity-80 absolute" />` : ""}
             </div>
             <p class="font-black text-slate-900 text-xs mt-2 underline">( ${signerName} )</p>
             <p class="text-[10px] text-slate-500">${signerTitle}</p>
@@ -2827,13 +2893,14 @@ export async function GET(req: Request) {
         <div class="grid grid-cols-2 gap-4 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200">
           <div>
             <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">KIRIM DARI:</span>
-            <p class="font-black text-slate-900 mt-0.5">Gudang Logistik PT. DSTech Smart Perkasa</p>
+            <p class="font-black text-slate-900 mt-0.5">${isSaleNonPt ? "Gudang Toko DSTech Smart (Usaha Mandiri)" : "Gudang Logistik PT. DSTech Smart Perkasa"}</p>
             <p class="text-slate-600 text-[11px]">Kota Cilegon - Banten</p>
-            <p class="text-[10px] text-slate-500 mt-1">Petugas: ${sale.salesPerson || "Admin Logistik"}</p>
+            <p class="text-[10px] text-slate-500 mt-1">Petugas: ${sale.salesPerson || (isSaleNonPt ? "Admin Toko / Logistik" : "Admin Logistik PT")}</p>
           </div>
           <div>
             <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">KIRIM KEPADA (Penerima):</span>
-            <p class="font-black text-slate-900 mt-0.5">${sale.customerName}</p>
+            <p class="font-black text-slate-900 mt-0.5">${clientCompanyName}</p>
+            ${clientPicName ? `<p class="text-indigo-900 font-bold text-[11px]">Up. ${clientPicName}</p>` : ''}
             <p class="text-slate-600 text-[11px]">${sale.customerAddress || "Lokasi Pengiriman Klien"}</p>
             <p class="text-[10px] text-slate-500 mt-1">No. Kontak: ${sale.customerPhone || "-"}</p>
           </div>
@@ -2896,6 +2963,7 @@ export async function GET(req: Request) {
           </div>
           <div>
             <span class="text-[11px] text-slate-500 block mb-1">Diterima Oleh (Klien / Lapangan):</span>
+            <span class="font-black text-slate-950 block text-xs uppercase leading-tight">${sale.deliverySignerCompany || clientCompanyName}</span>
             <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
               ${sale.deliverySignatureImage ? `
                 <img src="${sale.deliverySignatureImage}" alt="Tanda Tangan Penerima" class="h-16 object-contain z-10" />
@@ -2908,10 +2976,10 @@ export async function GET(req: Request) {
               `}
             </div>
             <p class="font-bold text-slate-900 text-[11px] mt-1.5 underline">
-              ${sale.deliverySignerName ? `( ${sale.deliverySignerName} )` : "( ............................ )"}
+              ${sale.deliverySignerName ? `( ${sale.deliverySignerName} )` : (clientPicName ? `( ${clientPicName} )` : "( ............................ )")}
             </p>
             <p class="text-[9px] text-slate-500">
-              ${sale.deliverySignerTitle || sale.customerName}
+              ${sale.deliverySignerTitle || "Penerima Barang / Petugas Lapangan"} • <strong class="text-slate-700">${sale.deliverySignerCompany || clientCompanyName}</strong>
               ${sale.deliveryApprovedAt ? `<span class="block text-[7.5px] text-emerald-700 font-mono mt-0.5 font-bold">Diterima: ${sale.deliveryApprovedAt}</span>` : ""}
             </p>
           </div>
@@ -2929,80 +2997,88 @@ export async function GET(req: Request) {
     documentTitle = `Dokumentasi Foto - ${sale.invoiceNumber}`;
     const photos: any[] = sale.photos || [];
     documentContent = `
-      <!-- LEMBAR DOKUMENTASI FOTO -->
-      <div class="text-center pb-4 border-b border-slate-300">
-        <h2 class="text-lg font-black tracking-widest text-slate-900 uppercase">LAPORAN FOTO DOKUMENTASI &amp; PERGANTIAN PART</h2>
-        <p class="text-xs font-bold text-slate-600 tracking-wider">Lampiran Faktur No: ${sale.invoiceNumber}</p>
-        <p class="text-[11px] text-slate-500 mt-0.5">Klien: ${sale.customerName} | Tanggal: ${sale.date}</p>
-      </div>
-
-      <div class="py-4 space-y-4 text-xs text-slate-700">
-        ${photos.length === 0 ? `
-          <div class="p-8 text-center bg-slate-50/80 rounded-2xl border border-dashed border-slate-300 text-slate-400">
-            <span class="text-3xl block mb-2">📸</span>
-            <p class="font-bold">Foto dokumentasi fisik pekerjaan telah terarsip secara digital di server.</p>
-            <p class="text-[11px] mt-1">Silakan hubungi tim teknis DSTech untuk permintaan arsip foto beresolusi tinggi.</p>
-          </div>
-        ` : `
-          <div class="grid grid-cols-2 gap-4">
-            ${photos.map((photo: any, idx: number) => `
-              <div class="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/80 shadow-2xs">
-                <div class="h-44 bg-slate-200 flex items-center justify-center overflow-hidden">
-                  <img src="${photo.url || photo.photoUrl}" alt="${photo.caption || photo.title || 'Foto Pekerjaan'}" class="w-full h-full object-cover" />
-                </div>
-                <div class="p-2.5 space-y-0.5">
-                  <span class="text-[9px] font-bold px-2 py-0.5 rounded-full ${photo.category === 'part_replacement' ? 'bg-amber-100 text-amber-800' : 'bg-purple-100 text-purple-800'}">
-                    ${photo.category === 'part_replacement' ? '⚙️ Pergantian Part' : '📸 Dokumentasi Lapangan'}
-                  </span>
-                  <p class="font-bold text-slate-900 mt-1">${photo.caption || photo.title || `Foto Dokumentasi ${idx + 1}`}</p>
-                  <p class="text-[10px] text-slate-500">${photo.description || photo.notes || (photo.caption !== photo.title ? (photo.description || '') : '') || '-'}</p>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-        `}
-
-        <!-- Pengesahan Dokumentasi -->
-        <div class="grid grid-cols-2 gap-8 pt-6 mt-6 border-t border-slate-200 text-center">
-          <div>
-            <span class="text-xs text-slate-500 block mb-1">Pihak Klien / Pengawas:</span>
-            <span class="font-bold text-slate-800 block">${sale.customerName}</span>
-            <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
-              ${sale.photosSignatureImage ? `
-                <img src="${sale.photosSignatureImage}" alt="Tanda Tangan Pengawas" class="h-16 object-contain z-10" />
-                <span class="absolute bottom-1 right-2 text-[7px] text-emerald-700 font-bold bg-emerald-50 px-1 rounded border border-emerald-300">✓ Disetujui</span>
-              ` : `
-                <button type="button" onclick="openDocApprovalModal('photos')" class="print-hidden px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-black shadow-2xs transition cursor-pointer flex items-center gap-1">
-                  <span>✍️ Tanda Tangani Online</span>
-                </button>
-                <span class="hidden print:inline text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap )</span>
-              `}
-            </div>
-            <p class="font-black text-slate-900 text-xs mt-2 underline">
-              ${sale.photosSignerName ? `( ${sale.photosSignerName} )` : "( .................................................... )"}
-            </p>
-            <p class="text-[10px] text-slate-500">
-              ${sale.photosSignerTitle || "PIC Lapangan / Klien"}
-              ${sale.photosApprovedAt ? `<span class="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">Disetujui: ${sale.photosApprovedAt}</span>` : ""}
-            </p>
-          </div>
-          <div>
-            <span class="text-xs text-slate-500 block mb-1">Pelaksana Teknis Lapangan:</span>
-            <span class="font-bold text-slate-800 block">PT. DSTECH SMART PERKASA</span>
-            <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
-              ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-16 object-contain z-10" />` : ""}
-              ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-16 opacity-75 absolute right-4" />` : ""}
-            </div>
-            <p class="font-black text-slate-900 text-xs mt-2 underline">( ${sale.salesPerson || "Ahmad Romadhoni"} )</p>
-            <p class="text-[10px] text-slate-500">Project Coordinator / Teknisi Pelaksana</p>
-          </div>
+      <!-- LEMBAR DOKUMENTASI FOTO (Bersih, Rapi & Foto Kelihatan Penuh) -->
+      <div class="relative z-10 bg-white/95 rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-5">
+        <div class="text-center pb-4 border-b border-slate-300">
+          <h2 class="text-lg font-black tracking-widest text-slate-900 uppercase">LAPORAN FOTO DOKUMENTASI &amp; PERGANTIAN PART</h2>
+          <p class="text-xs font-bold text-slate-600 tracking-wider">Lampiran Faktur No: ${sale.invoiceNumber}</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">Klien: <strong>${clientCompanyName}</strong> ${clientPicName ? `(Up. ${clientPicName})` : ''} | Tanggal: ${sale.date}</p>
         </div>
 
-        <!-- Klausul Legalitas / Keterangan Pengesahan Dokumentasi -->
-        <div class="mt-3 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
-          <p class="text-[7.5px] text-slate-500 leading-tight">
-            <span class="font-bold text-slate-700">Keterangan Pengesahan Legalitas:</span> Dokumen Laporan Foto Dokumentasi &amp; Pergantian Part ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT. DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
-          </p>
+        <div class="space-y-4 text-xs text-slate-700">
+          ${photos.length === 0 ? `
+            <div class="p-8 text-center bg-white rounded-2xl border border-dashed border-slate-300 text-slate-400">
+              <span class="text-3xl block mb-2">📸</span>
+              <p class="font-bold">Foto dokumentasi fisik pekerjaan telah terarsip secara digital di server.</p>
+              <p class="text-[11px] mt-1">Silakan hubungi tim teknis DSTech untuk permintaan arsip foto beresolusi tinggi.</p>
+            </div>
+          ` : `
+            <div class="grid grid-cols-2 gap-4">
+              ${photos.map((photo: any, idx: number) => `
+                <div class="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm relative z-10 flex flex-col justify-between">
+                  <div class="w-full h-64 bg-slate-50 flex items-center justify-center overflow-hidden border-b border-slate-100 p-2">
+                    <img
+                      src="${photo.url || photo.photoUrl}"
+                      alt="${photo.caption || photo.title || 'Foto Pekerjaan'}"
+                      class="w-full h-full object-contain"
+                      onerror="this.onerror=null; this.src='/service-cctv.png';"
+                    />
+                  </div>
+                  <div class="p-3 space-y-1 bg-white">
+                    <span class="text-[9.5px] font-bold px-2 py-0.5 rounded-full ${photo.category === 'part_replacement' ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-purple-100 text-purple-900 border border-purple-200'}">
+                      ${photo.category === 'part_replacement' ? '⚙️ Pergantian Part' : '📸 Dokumentasi Lapangan'}
+                    </span>
+                    <p class="font-bold text-slate-900 text-xs mt-1">${photo.caption || photo.title || `Foto Dokumentasi ${idx + 1}`}</p>
+                    <p class="text-[10px] text-slate-600 leading-relaxed">${photo.description || photo.notes || (photo.caption !== photo.title ? (photo.description || '') : '') || '-'}</p>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          `}
+
+          <!-- Pengesahan Dokumentasi (Tersinkronisasi Klien & Direktur DSTech) -->
+          <div class="grid grid-cols-2 gap-8 pt-6 mt-6 border-t border-slate-200 text-center bg-white p-3 rounded-xl">
+            <div>
+              <span class="text-xs text-slate-500 block mb-1">Pihak Klien / Pengawas:</span>
+              <span class="font-black text-slate-950 block text-xs uppercase leading-tight">${sale.photosSignerCompany || clientCompanyName}</span>
+              ${clientPicName ? `<span class="text-[9.5px] text-slate-600 block mt-0.5 font-medium">Up. ${clientPicName}</span>` : ''}
+              <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+                ${sale.photosSignatureImage ? `
+                  <img src="${sale.photosSignatureImage}" alt="Tanda Tangan Pengawas" class="h-16 object-contain z-10" />
+                  <span class="absolute bottom-1 right-2 text-[7px] text-emerald-700 font-bold bg-emerald-50 px-1 rounded border border-emerald-300">✓ Disetujui</span>
+                ` : `
+                  <button type="button" onclick="openDocApprovalModal('photos')" class="print-hidden px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-300 rounded-xl text-xs font-black shadow-2xs transition cursor-pointer flex items-center gap-1">
+                    <span>✍️ Tanda Tangani Online</span>
+                  </button>
+                  <span class="hidden print:inline text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap )</span>
+                `}
+              </div>
+              <p class="font-black text-slate-900 text-xs mt-2 underline">
+                ${sale.photosSignerName ? `( ${sale.photosSignerName} )` : (clientPicName ? `( ${clientPicName} )` : "( .................................................... )")}
+              </p>
+              <p class="text-[10px] text-slate-500">
+                ${sale.photosSignerTitle || "PIC Lapangan / Klien"} • <strong class="text-slate-700">${sale.photosSignerCompany || clientCompanyName}</strong>
+                ${sale.photosApprovedAt ? `<span class="block text-[8px] text-emerald-700 font-mono mt-0.5 font-bold">Disetujui: ${sale.photosApprovedAt}</span>` : ""}
+              </p>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 block mb-1">Pelaksana / Penanggung Jawab Resmi:</span>
+              <span class="font-black text-slate-900 block text-xs">${isSaleNonPt ? "DSTECH SMART (TOKO / USAHA MANDIRI)" : "PT. DSTECH SMART PERKASA"}</span>
+              <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
+                ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-16 object-contain z-10" />` : ""}
+                ${!isSaleNonPt && stampImage ? `<img src="${stampImage}" alt="Cap Resmi" class="h-16 opacity-75 absolute right-4" />` : ""}
+              </div>
+              <p class="font-black text-slate-900 text-xs mt-2 underline">( ${signerName} )</p>
+              <p class="text-[10px] text-slate-500">${signerTitle}</p>
+            </div>
+          </div>
+
+          <!-- Klausul Legalitas / Keterangan Pengesahan Dokumentasi -->
+          <div class="mt-3 p-2 rounded-lg bg-slate-50 border border-slate-200/70 text-center">
+            <p class="text-[7.5px] text-slate-500 leading-tight">
+              <span class="font-bold text-slate-700">Keterangan Pengesahan Legalitas:</span> Dokumen Laporan Foto Dokumentasi &amp; Pergantian Part ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi ${isSaleNonPt ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+            </p>
+          </div>
         </div>
       </div>
     `;
@@ -3038,9 +3114,10 @@ export async function GET(req: Request) {
           <p class="text-slate-500 text-[11px] mt-0.5">Telp: ${sale.customerPhone || '-'}</p>
         </div>
         <div>
-          <span class="text-[10px] text-slate-400 font-bold block uppercase tracking-wider">DITERBITKAN OLEH:</span>
-          <p class="font-black text-slate-900 text-sm mt-0.5">PT. DSTECH SMART PERKASA</p>
-          <p class="text-slate-600 leading-relaxed text-[11px]">Jl. Raya Cilegon No. 18, Kota Cilegon - Banten</p>
+          <span class="text-[10px] ${isSaleNonPt ? 'text-emerald-700' : 'text-slate-400'} font-bold block uppercase tracking-wider">DITERBITKAN OLEH:</span>
+          <p class="font-black text-slate-900 text-sm mt-0.5">${sellerEntityName}</p>
+          <p class="text-slate-600 leading-relaxed text-[11px]">${isSaleNonPt ? 'Penyedia Solusi Smart Security, IoT &amp; Smart Living (Toko DSTech Smart)' : 'Jl. Raya Cilegon No. 18, Kota Cilegon - Banten'}</p>
+          <p class="text-slate-500 text-[10px]">${isSaleNonPt ? 'Jl. Raya Cilegon No. 18, Kota Cilegon - Banten | Status: Non-PKP (Bebas PPN 0%)' : 'NIB: 1909220127034 | NPWP: 60.648.216.4-102.000'}</p>
           <p class="text-slate-500 text-[10px]">Website: https://dstechsmart.com | Email: cs@dstechsmart.com</p>
         </div>
       </div>
@@ -3081,11 +3158,11 @@ export async function GET(req: Request) {
           </div>
 
           ${(() => {
-            const saleBanks = getFilteredBankAccounts(bankAccounts, sale.businessEntity);
+            const saleBanks = getFilteredBankAccounts(bankAccounts, isSaleNonPt ? "NON_PT" : "PT");
             const saleBank = saleBanks.find((b: any) => b.isDefault) || saleBanks[0];
             return `
               <div class="p-2.5 bg-indigo-50/70 rounded-xl border border-indigo-100 text-indigo-950 space-y-0.5">
-                <span class="text-[9px] text-indigo-700 font-bold block uppercase tracking-wider">REKENING RESMI TRANSFER (${sale.businessEntity === "NON_PT" ? "DSTECH SMART" : "PT. DSTECH SMART PERKASA"}):</span>
+                <span class="text-[9px] text-indigo-700 font-bold block uppercase tracking-wider">REKENING RESMI TRANSFER (${isSaleNonPt ? "DSTECH SMART" : "PT. DSTECH SMART PERKASA"}):</span>
                 <p class="font-bold text-xs">${saleBank.bankName}</p>
                 <p class="font-mono text-xs font-black text-indigo-900">${saleBank.accountNumber}</p>
                 <p class="text-[10px] text-indigo-800">a/n ${saleBank.accountHolder} (${saleBank.branch || 'KCU Cilegon'})</p>
@@ -3130,6 +3207,8 @@ export async function GET(req: Request) {
       <div class="grid grid-cols-2 gap-8 pt-4 mt-4 border-t border-slate-200 text-center">
         <div>
           <span class="text-[10px] text-slate-500 block mb-1">Penerima / Klien:</span>
+          <span class="font-black text-slate-950 block text-xs uppercase leading-tight">${sale.clientSignerCompany || clientCompanyName}</span>
+          ${clientPicName ? `<span class="text-[9px] text-slate-600 block mt-0.5 font-medium">Up. ${clientPicName}</span>` : ''}
           <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
             ${sale.clientSignatureImage ? `
               <img src="${sale.clientSignatureImage}" alt="Tanda Tangan Penerima" class="h-16 object-contain z-10" />
@@ -3141,15 +3220,15 @@ export async function GET(req: Request) {
               <span class="hidden print:inline text-[10px] text-slate-300 italic">( Tanda Tangan &amp; Cap )</span>
             `}
           </div>
-          <p class="font-bold text-slate-900 text-xs mt-1 underline">${sale.clientSignerName ? `( ${sale.clientSignerName} )` : `( ${sale.customerName} )`}</p>
-          <p class="text-[10px] text-slate-500">${sale.clientSignerTitle || "Penerima / Bagian Keuangan"}</p>
+          <p class="font-bold text-slate-900 text-xs mt-1 underline">${sale.clientSignerName ? `( ${sale.clientSignerName} )` : (clientPicName ? `( ${clientPicName} )` : `( ${sale.customerName} )`)}</p>
+          <p class="text-[10px] text-slate-500">${sale.clientSignerTitle || "Penerima / Bagian Keuangan"} • <strong class="text-slate-700">${sale.clientSignerCompany || clientCompanyName}</strong></p>
         </div>
         <div>
           <span class="text-[10px] text-slate-500 block mb-1">Hormat Kami,</span>
-          <span class="font-bold text-slate-900 text-xs block">PT. DSTECH SMART PERKASA</span>
+          <span class="font-bold text-slate-900 text-xs block">${isSaleNonPt ? "DSTECH SMART (TOKO)" : "PT. DSTECH SMART PERKASA"}</span>
           <div class="h-20 flex items-center justify-center border-b border-dashed border-slate-300 relative">
             ${signatureImage ? `<img src="${signatureImage}" alt="Tanda Tangan" class="h-16 object-contain z-10" />` : ""}
-            ${masterStampUrl ? `<img src="${masterStampUrl}" alt="Cap Resmi" class="h-16 opacity-75 absolute right-4" />` : ""}
+            ${!isSaleNonPt && stampImage ? `<img src="${stampImage}" alt="Cap Resmi" class="h-16 opacity-75 absolute right-4" />` : ""}
           </div>
           <p class="font-black text-slate-900 text-xs mt-1 underline">( ${signerName} )</p>
           <p class="text-[10px] text-slate-500">${signerTitle}</p>
@@ -3160,7 +3239,7 @@ export async function GET(req: Request) {
       <!-- Klausul Legalitas Keabsahan Tanda Tangan Digital Resmi Faktur -->
       <div class="mt-3 p-1.5 rounded-lg bg-slate-50/90 border border-slate-200/70 text-center">
         <p class="text-[7.5px] text-slate-500 leading-tight">
-          <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Dokumen Faktur ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi PT DSTech Smart Perkasa. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
+          <span class="font-bold text-slate-700">Keterangan Legalitas:</span> Dokumen Faktur ini diterbitkan secara elektronik dan ditandatangani secara digital melalui sistem informasi ${isSaleNonPt ? "DSTech Smart" : "PT DSTech Smart Perkasa"}. Sesuai ketentuan UU ITE No. 11 Thn 2008 Pasal 11 &amp; PP No. 71 Thn 2019, tanda tangan digital ini sah, mengikat, dan memiliki kekuatan hukum resmi tanpa memerlukan stempel basah.
           ${lastPrintedAt ? `<br/><span class="font-mono text-indigo-700 font-bold">• Waktu Terakhir Dicetak &amp; Dikirim Sah: ${lastPrintedAt} • Tanda Tangan Snapshot Permanen Tidak Berubah</span>` : ''}
         </p>
       </div>
@@ -3213,7 +3292,7 @@ export async function GET(req: Request) {
           </a>
           <div>
             <h1 class="font-black text-sm sm:text-base text-slate-900">${documentTitle}</h1>
-            <p class="text-[11px] text-slate-500">PT. DSTech Smart Perkasa • Portal Dokumen Resmi</p>
+            <p class="text-[11px] text-slate-500">${sellerEntityFullName} • Portal Dokumen Resmi</p>
           </div>
         </div>
 
@@ -3364,17 +3443,17 @@ export async function GET(req: Request) {
         <!-- Background Kop Surat Resmi Gambar A4 Penuh (Hanya untuk dokumen selain Kuitansi atau saat Kuitansi mode Full A4) -->
         <img
           id="letterhead-bg-img"
-          src="${letterheadUrl}"
+          src="${saleLetterheadUrl}"
           alt="Kop Surat Resmi"
           class="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
-          style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${!isReceipt && letterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
+          style="object-fit: fill; object-position: top center; width: 100%; height: 100%; display: ${!isReceipt && saleLetterheadEnabled ? 'block' : 'none'}; opacity: 1; -webkit-print-color-adjust: exact; print-color-adjust: exact;"
         />
 
         <!-- Area Isi Dokumen dengan Padding yang Disesuaikan -->
         <div
           id="document-content-wrapper"
           class="relative z-10 ${isReceipt ? 'space-y-0.5' : 'space-y-4'}"
-          style="padding-top: ${isReceipt ? '0px' : (letterheadEnabled ? '120px' : '30px')}; padding-bottom: ${isReceipt ? '0px' : (letterheadEnabled ? '90px' : '30px')}; padding-left: ${isReceipt ? '0px' : '42px'}; padding-right: ${isReceipt ? '0px' : '42px'};"
+          style="padding-top: ${isReceipt ? '0px' : (saleLetterheadEnabled ? '120px' : '30px')}; padding-bottom: ${isReceipt ? '0px' : (saleLetterheadEnabled ? '90px' : '30px')}; padding-left: ${isReceipt ? '0px' : '42px'}; padding-right: ${isReceipt ? '0px' : '42px'};"
         >
           ${documentContent}
         </div>
@@ -3653,8 +3732,13 @@ export async function GET(req: Request) {
 
           <div class="space-y-3">
             <div>
-              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nama Lengkap Penandatangan *</label>
-              <input type="text" id="input-doc-signer-name" value="${sale.customerPic || sale.customerName || ''}" placeholder="Nama lengkap Anda..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 bg-slate-50" />
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nama Perusahaan / Instansi Klien *</label>
+              <input type="text" id="input-doc-signer-company" value="${clientCompanyName !== 'Instansi / Perusahaan Klien' ? clientCompanyName : (sale.customerOrg || sale.customerName || '')}" placeholder="Contoh: PT. Maju Bersama / CV. Sukses..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 bg-slate-50" />
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nama Lengkap Penandatangan (PIC) *</label>
+              <input type="text" id="input-doc-signer-name" value="${clientPicName || sale.customerName || ''}" placeholder="Nama lengkap Anda..." class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 font-bold text-slate-900 bg-slate-50" />
             </div>
 
             <div>
@@ -3757,31 +3841,39 @@ export async function GET(req: Request) {
           const title = document.getElementById('modal-doc-title');
           const desc = document.getElementById('modal-doc-desc');
           const titleInput = document.getElementById('input-doc-signer-title');
+          const companyInput = document.getElementById('input-doc-signer-company');
+          const nameEl = document.getElementById('input-doc-signer-name');
 
           if (type === 'bast') {
             if (title) title.innerHTML = '<span>✍️ Tanda Tangan Berita Acara Serah Terima (BAST)</span>';
             if (desc) desc.innerHTML = 'Dengan menandatangani BAST ini, Pihak Klien menyatakan pekerjaan dan perangkat telah diterima dalam kondisi 100% baik, lengkap, dan lulus uji operasional.';
             if (titleInput) titleInput.value = 'Penanggung Jawab / PIC Klien';
+            if (companyInput) companyInput.value = '${sale.bastSignerCompany || clientCompanyName !== "Instansi / Perusahaan Klien" ? (sale.bastSignerCompany || clientCompanyName) : (sale.customerOrg || sale.customerName || "")}';
+            if (nameEl) nameEl.value = '${sale.bastSignerName || clientPicName || sale.customerName || ""}';
           } else if (type === 'delivery') {
             if (title) title.innerHTML = '<span>✍️ Tanda Tangan Surat Jalan Penerimaan Barang</span>';
             if (desc) desc.innerHTML = 'Dengan menandatangani Surat Jalan ini, Penerima menyatakan barang-barang kiriman telah tiba di lokasi dan diterima dalam kondisi tersegel baik.';
             if (titleInput) titleInput.value = 'Penerima Barang / Petugas Lapangan';
+            if (companyInput) companyInput.value = '${sale.deliverySignerCompany || clientCompanyName !== "Instansi / Perusahaan Klien" ? (sale.deliverySignerCompany || clientCompanyName) : (sale.customerOrg || sale.customerName || "")}';
+            if (nameEl) nameEl.value = '${sale.deliverySignerName || clientPicName || sale.customerName || ""}';
           } else if (type === 'photos') {
             if (title) title.innerHTML = '<span>✍️ Tanda Tangan Laporan Dokumentasi Foto</span>';
             if (desc) desc.innerHTML = 'Dengan menandatangani lembar ini, Pengawas Klien mengesahkan dokumentasi foto fisik hasil pekerjaan dan pergantian spare part.';
             if (titleInput) titleInput.value = 'Pengawas Lapangan / PIC Klien';
+            if (companyInput) companyInput.value = '${sale.photosSignerCompany || clientCompanyName !== "Instansi / Perusahaan Klien" ? (sale.photosSignerCompany || clientCompanyName) : (sale.customerOrg || sale.customerName || "")}';
+            if (nameEl) nameEl.value = '${sale.photosSignerName || clientPicName || sale.customerName || ""}';
           } else if (type === 'driver' || type === 'driver_delivery') {
             if (title) title.innerHTML = '<span>✍️ Tanda Tangan Supir / Kurir Ekspedisi</span>';
             if (desc) desc.innerHTML = 'Dengan menandatangani Surat Jalan ini, Pengemudi/Ekspedisi menyatakan telah menerima barang dari gudang pengirim dan bertanggung jawab mengantarkannya ke lokasi tujuan.';
             if (titleInput) titleInput.value = 'Driver / Petugas Ekspedisi';
-            const nameEl = document.getElementById('input-doc-signer-name');
-            if (nameEl) nameEl.value = '${sale.salesPerson || "Supir Ekspedisi"}';
+            if (companyInput) companyInput.value = 'Logistik & Ekspedisi Pengantar';
+            if (nameEl) nameEl.value = '${sale.driverSignerName || sale.salesPerson || "Supir Ekspedisi"}';
           } else if (type === 'invoice' || type === 'faktur') {
             if (title) title.innerHTML = '<span>✍️ Tanda Tangan Penerima Faktur Penjualan</span>';
             if (desc) desc.innerHTML = 'Dengan menandatangani faktur ini, Penerima/Klien menyatakan telah menerima tagihan/dokumen invoice ini secara sah dan resmi.';
             if (titleInput) titleInput.value = 'Bagian Keuangan / PIC Penerima';
-            const nameEl = document.getElementById('input-doc-signer-name');
-            if (nameEl) nameEl.value = '${sale.customerName || ""}';
+            if (companyInput) companyInput.value = '${sale.clientSignerCompany || clientCompanyName !== "Instansi / Perusahaan Klien" ? (sale.clientSignerCompany || clientCompanyName) : (sale.customerOrg || sale.customerName || "")}';
+            if (nameEl) nameEl.value = '${sale.clientSignerName || clientPicName || sale.customerName || ""}';
           }
 
           if (modal) {
@@ -3807,6 +3899,7 @@ export async function GET(req: Request) {
         }
 
         async function submitDocApproval() {
+          const signerCompany = document.getElementById('input-doc-signer-company')?.value.trim();
           const signerName = document.getElementById('input-doc-signer-name')?.value.trim();
           const signerTitle = document.getElementById('input-doc-signer-title')?.value.trim();
           const notes = document.getElementById('input-doc-note')?.value.trim();
@@ -3839,6 +3932,7 @@ export async function GET(req: Request) {
                   docType: currentTargetDocType,
                   invoiceNumber: '${sale.invoiceNumber}',
                   id: '${sale.id || ""}',
+                  signerCompany: signerCompany,
                   signerName: signerName,
                   signerTitle: signerTitle,
                   signatureImage: signatureImage,

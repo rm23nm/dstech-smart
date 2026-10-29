@@ -4,7 +4,37 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-*Tidak ada pekerjaan tertunda. Seluruh perbaikan telah selesai 100%, teruji via npx tsc dan npm run build tanpa error, tersinkronisasi ke GitHub, dan telah berhasil dideploy langsung ke server live VPS.*
+- **Tugas 289 (ANTREAN BERIKUTNYA)**: Fitur Pengiriman Surat Resmi (SPH, Invoice/Faktur, BAST, Surat Jalan, Kuitansi) ke Beberapa Nomor Kontak WhatsApp Sekaligus (Multi-Recipient WhatsApp Dispatch).
+  *Permintaan User*: "ketika saya ingin mengirimkan SPH, Invoice, atau surat-suarat lainnya, tolong buatkan fiturnya agar bisa kirim ke beberapa nomor." (disertai tangkapan layar modal Kirim Dokumen ke WhatsApp).
+  *Catatan Antrean*: Sesuai aturan kerja, tugas ini telah dicatat ke dalam antrean dan siap dikerjakan setelah penyelesaian Tugas 288.
+
+- **2026-10-29**: [SELESAI] Pemisahan Total dan Ketat Antara Entitas Perusahaan (PT. DSTech Smart Perkasa) dengan Entitas Toko / E-Store / Usaha Mandiri (DSTech Smart Non-PT) pada Seluruh Penerbitan Dokumen (Faktur, BAST, Kuitansi, Surat Jalan, dan Dokumentasi Foto) serta Pembukuan Keuangan ERP (Tugas 288) (`src/app/api/finance/print/route.ts`, `src/app/api/orders/route.ts`, `src/app/api/finance/route.ts`).
+  *Permintaan User*: "ada kesalahan sangat faktal dalam penerbitan Faktur, BAST, Kuitansi, Surat Jalan, dan laporan dokumentasi. semuanya masih tercampur antara ensitas perusahan dengan toko. contoh pada faktur ni, disini sebenarnya project toko, namun kenapa semuanya masih keluar kop dan tercatat di PT? ini sangat berbahaya" (disertai tangkapan layar lembar cetak faktur proyek/pesanan toko yang masih menampilkan kop surat PT dan penerbit PT).
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  1. Pada helper `findSaleOrEStoreOrder` di `src/app/api/finance/print/route.ts`, pesanan toko e-store dikonversi tanpa menyertakan atribut `businessEntity: matchedOrder.businessEntity || "NON_PT"`, sehingga jatuh ke nilai default `undefined` yang secara salah diperlakukan sebagai PT.
+  2. Kop surat gambar latar belakang (`letterheadUrl`) di-hardcode mengambil `letterheadUrl_PT` untuk SEMUA jenis dokumen tanpa memeriksa atribut `businessEntity`. Akibatnya dokumen transaksi toko ikut dicetak dengan kop surat PT.
+  3. Template cetak Faktur, BAST, Kuitansi, Surat Jalan, dan Dokumentasi Foto memiliki teks penerbit/penjual yang di-hardcode sebagai `PT. DSTECH SMART PERKASA`, stempel resmi PT `masterStampUrl`, dan penandatangan `Direktur PT. DSTECH SMART PERKASA`, alih-alih menyesuaikan secara dinamis dengan entitas toko (`DSTech Smart Toko / Non-PT`, `Non-PKP Bebas PPN 0%`, rekening transfer khusus toko, dan penandatangan toko).
+  *Penyelesaian & Hasil*:
+  1. **Pemisahan Identitas Dokumen Berdasarkan Entitas (`src/app/api/finance/print/route.ts`)**:
+     - Ditambahkan variabel penentu entitas: `isSaleNonPt = sale.businessEntity === "NON_PT"`.
+     - `sellerEntityName`: `"DSTECH SMART"` untuk toko vs `"PT. DSTECH SMART PERKASA"` untuk PT.
+     - `sellerEntityFullName`: `"DSTech Smart (Toko & Smart Home Solutions)"` untuk toko vs `"PT. DSTECH SMART PERKASA"` untuk PT.
+     - Kop surat (`saleLetterheadUrl`): Untuk dokumen Toko Non-PT HANYA menggunakan `letterheadUrl_NON_PT`. Jika tidak tersedia, dinonaktifkan (`saleLetterheadEnabled = false`) agar kop PT 100% dilarang tampil di dokumen toko.
+     - Stempel resmi (`stampImage`): Sesuai hukum perpajakan, stempel resmi PT dilarang keras tampil di dokumen Non-PT. Stempel PT hanya tampil jika `!isSaleNonPt`.
+     - Penandatangan toko: Menampilkan nama penandatangan dengan jabatan `"Pimpinan Usaha / Pengelola Toko"` untuk transaksi toko, dan `"Direktur"` untuk transaksi PT.
+  2. **Penyelarasan Seluruh Template Cetak Dokumen**:
+     - **Faktur Penjualan (Invoice)**: Blok DITERBITKAN OLEH menampilkan `DSTECH SMART`, status Non-PKP (Bebas PPN 0%), rekening transfer khusus Toko DSTech Smart (`getFilteredBankAccounts(bankAccounts, "NON_PT")`), dan tanda tangan pengelola toko tanpa stempel PT.
+     - **Berita Acara Serah Terima (BAST)**: PIHAK PERTAMA menampilkan `DSTECH SMART`, pelaksana `Staf Toko DSTech`, dan pengesahan Pelaksana `DSTECH SMART (TOKO)`.
+     - **Kuitansi Pembayaran**: Header teks/kop gambar menggunakan logo & entitas toko, tanda tangan penerima menggunakan `DSTECH SMART` tanpa stempel PT.
+     - **Surat Jalan (Delivery Order)**: KIRIM DARI menampilkan `Gudang Toko DSTech Smart (Usaha Mandiri)`.
+     - **Laporan Foto Dokumentasi**: Pelaksana / Penanggung Jawab Resmi menampilkan `DSTECH SMART (TOKO / USAHA MANDIRI)`.
+  3. **Penyempurnaan Modul Pesanan (`src/app/api/orders/route.ts`)**:
+     - Transaksi pesanan toko otomatis dikunci dengan atribut `businessEntity: "NON_PT"`.
+     - Sinkronisasi pesanan ke modul keuangan ERP (`financeData.sales`) menyematkan `businessEntity: "NON_PT"` dan `taxRate: 0` (Non-PKP).
+  4. **Pengujian & Validasi**:
+     - Validasi tipe TypeScript `npx tsc --noEmit` lolos 100% (exit code 0).
+     - Kompilasi produksi `npm run build` sukses 100% untuk seluruh 76/76 halaman statis & dinamis.
+     - Folder cadangan sementara `_backup_entity_separation` telah dibersihkan.
 
 - **2026-10-29**: [SELESAI] Penyesuaian Mutlak Keterangan Tujuan Pembayaran Kuitansi Resmi Tanpa Teks Usang "Pembayaran Angsuran / Termin", Sanitasi Catatan Historis, dan Sinkronisasi Deployment ke Server Live VPS (Tugas 286) (`src/app/api/finance/print/route.ts`, `src/app/api/finance/route.ts`, `src/app/admin/finance/page.tsx`).
   *Permintaan User*: "masih tertulis pembayaran angsuran/termin" (disertai tangkapan layar cetak Kuitansi Pembayaran di browser).
@@ -3548,9 +3578,9 @@
   3. Hal yang sama juga berlaku pada tab `purchases` (PO) di Dossier Proyek yang baru memiliki tombol `Lihat PO` (`Eye`), tanpa tombol Edit dan Hapus PO.
 - **Rencana Pengerjaan Step-by-Step**:
   - [x] **Langkah 1**: Backup berkas `src/app/admin/finance/page.tsx` ke `_backup/finance_page.tsx.bak_task82_83`.
-  - [ ] **Langkah 2**: Tambahkan tombol **Edit Faktur** (`handleOpenEditSale`) dan tombol **Hapus Faktur** (`handleDeleteSale`) pada setiap baris faktur di modal Dossier Proyek (`projectDossierTab === 'sales'`).
-  - [ ] **Langkah 3**: Tambahkan tombol **Edit PO** (`handleOpenEditPo`) dan tombol **Hapus PO** (`handleDeletePo`) pada setiap baris PO di modal Dossier Proyek (`projectDossierTab === 'purchases'`).
-  - [ ] **Langkah 4**: Verifikasi kesiapan modal Edit Faktur (`isEditSaleModalOpen`) dan modal Edit PO (`isEditPoModalOpen`) agar dapat dipanggil dari dalam modal Dossier tanpa konflik z-index (z-index 60+).
+  - [x] **Langkah 2**: Tambahkan tombol **Edit Faktur** (`handleOpenEditSale`) dan tombol **Hapus Faktur** (`handleDeleteSale`) pada setiap baris faktur di modal Dossier Proyek (`projectDossierTab === 'sales'`).
+  - [x] **Langkah 3**: Tambahkan tombol **Edit PO** (`handleOpenEditPo`) dan tombol **Hapus PO** (`handleDeletePo`) pada setiap baris PO di modal Dossier Proyek (`projectDossierTab === 'purchases'`).
+  - [x] **Langkah 4**: Verifikasi kesiapan modal Edit Faktur (`isEditSaleModalOpen`) dan modal Edit PO (`isEditPoModalOpen`) agar dapat dipanggil dari dalam modal Dossier tanpa konflik z-index (z-index 60+).
 
 ---
 
@@ -4341,11 +4371,11 @@
     3. **Pencarian Real-Time Master Proyek**: Input filter teks pencarian langsung di atas dropdown alokasi proyek pada modal SPH dan Faktur.
     4. **Tombol "+ Buat Proyek Baru"**: Tombol langsung di header selector proyek yang membuka modal Buat Master Proyek Baru (dengan `z-[70]`). Saat disimpan, proyek baru langsung otomatis tertaut pada SPH/Faktur.
 - **Rencana Langkah Pelaksanaan**:
-  - [ ] **Langkah 1**: Buat cadangan (backup) file `src/app/admin/finance/page.tsx` ke folder `_backup/`.
+  - [x] **Langkah 1**: Buat cadangan (backup) file `src/app/admin/finance/page.tsx` ke folder `_backup/`.
   - [ ] **Langkah 2**: Tambahkan state filter pencarian klien dan proyek untuk SPH dan Faktur (`quotationClientSearchQuery`, `quotationProjectSearchQuery`, `saleClientSearchQuery`, `saleProjectSearchQuery`).
   - [ ] **Langkah 3**: Sesuaikan z-index modal Klien (`isClientModalOpen`) dan modal Proyek (`isProjectModalOpen`) ke `z-[70]` agar dapat muncul di atas modal SPH/Faktur (`z-50`).
   - [ ] **Langkah 4**: Pasang input pencarian real-time dan tombol `+ Tambah Klien Baru` pada formulir SPH dan Faktur.
-  - [ ] **Langkah 5**: Pasang input pencarian real-time dan tombol `+ Buat Proyek Baru` pada formulir SPH dan Faktur.
+  - [x] **Langkah 5**: Pasang input pencarian real-time dan tombol `+ Buat Proyek Baru` pada formulir SPH dan Faktur.
   - [ ] **Langkah 6**: Sambungkan handler `handleSaveClientSubmit` dan `handleSaveProjectSubmit` agar melakukan auto-select data baru ke SPH/Faktur yang sedang aktif.
   - [ ] **Langkah 7**: Validasi lokal dengan `npm run build` di folder `dstech-smart`.
   - [ ] **Langkah 8**: Push ke repositori GitHub via `push_with_native_git.js`.

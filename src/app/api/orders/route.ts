@@ -175,11 +175,14 @@ function syncOrderToFinanceErp(order: any, targetStatus?: string) {
       });
     }
 
+    const isOrderNonPt = (order.businessEntity || "NON_PT") === "NON_PT";
+
     const saleRecord = {
       id: `dstech_inv_${cleanId}`,
       invoiceNumber: invoiceNo,
       orderId: order.id,
       orderNumber: order.orderNumber,
+      businessEntity: order.businessEntity || "NON_PT",
       customerName: order.customerName,
       customerPhone: order.customerPhone,
       customerAddress: order.shippingAddress?.address || "-",
@@ -191,11 +194,11 @@ function syncOrderToFinanceErp(order: any, targetStatus?: string) {
       subtotal: Number(order.subtotal) + (Number(order.installationFee) || 0),
       discount: 0,
       discountType: "fixed",
-      taxRate: order.taxRate || 11,
-      taxAmount: Number(order.taxAmount) || 0,
+      taxRate: isOrderNonPt ? 0 : (order.taxRate || 11),
+      taxAmount: isOrderNonPt ? 0 : (Number(order.taxAmount) || 0),
       shippingCost: Number(order.shippingCost) || 0,
       grandTotal: Number(order.grandTotal),
-      paymentMethod: order.paymentBank || "Transfer Bank BCA PT",
+      paymentMethod: order.paymentBank || (isOrderNonPt ? "Transfer Bank BCA (Toko DSTech Smart)" : "Transfer Bank BCA PT"),
       paymentStatus: "Lunas",
       paidAmount: Number(order.grandTotal),
       remainingAmount: 0,
@@ -207,7 +210,7 @@ function syncOrderToFinanceErp(order: any, targetStatus?: string) {
       notes: `Faktur Penjualan Resmi E-Store #${order.orderNumber} (Barang Diterima Konsumen) - Pembeli: ${order.customerName}`,
       approvalStatus: "Disetujui & Sah",
       approvedBy: "RAMADHANI ST",
-      approvedTitle: "Direktur PT. DSTech Smart Perkasa",
+      approvedTitle: isOrderNonPt ? "Pimpinan Usaha / Pengelola Toko" : "Direktur PT. DSTech Smart Perkasa",
       approvedAt: dateStr,
       verificationCode: `VER-DST-${Math.floor(Math.random() * 899999 + 100000)}`,
       isLocked: true,
@@ -230,8 +233,9 @@ function syncOrderToFinanceErp(order: any, targetStatus?: string) {
         type: "IN",
         category: "Penerimaan Penjualan Produk E-Store",
         amount: Number(order.subtotal) || 0,
-        account: order.paymentBank || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+        account: order.paymentBank || (isOrderNonPt ? "Bank BCA - 6520490131 (RAMADHANI ST - Toko DSTech Smart)" : "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)"),
         reference: order.orderNumber,
+        businessEntity: order.businessEntity || "NON_PT",
         description: `Penerimaan Pembayaran Pesanan #${order.orderNumber} - ${order.customerName} (Barang Diterima)`,
         balanceAfter: 0,
         receiptUrl: "",
@@ -334,7 +338,7 @@ export async function POST(req: Request) {
       shippingCourier = "Armada Teknisi DSTech (Cilegon/Serang/Banten)",
       shippingCost = 0,
       paymentMethod = "TRANSFER_BANK",
-      paymentBank = "BCA - 1234567890 a.n PT DSTech Smart Perkasa",
+      paymentBank = "Bank BCA - 6520490131 a.n RAMADHANI ST (Toko DSTech Smart)",
       notes = "",
     } = body;
 
@@ -379,6 +383,7 @@ export async function POST(req: Request) {
     const newOrder = {
       id: `order_${Date.now()}`,
       orderNumber,
+      businessEntity: body.businessEntity || "NON_PT",
       userId: userId || `guest_${Date.now()}`,
       customerName,
       customerEmail: customerEmail || "",

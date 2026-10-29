@@ -1943,6 +1943,77 @@ export default function AdminFinanceERPPage() {
     projectName: "",
   });
 
+  // State Faktur Tagihan Masuk dari Vendor/Pihak Luar (Vendor Bills & Hutang Usaha)
+  const [isNewBillModalOpen, setIsNewBillModalOpen] = useState<boolean>(false);
+  const [isPayBillModalOpen, setIsPayBillModalOpen] = useState<boolean>(false);
+  const [billDocTypeFilter, setBillDocTypeFilter] = useState<"ALL" | "PO" | "BILL">("ALL");
+
+  const [billForm, setBillForm] = useState<{
+    vendorInvoiceNumber: string;
+    billCategory: string;
+    supplierName: string;
+    supplierContact: string;
+    date: string;
+    dueDate: string;
+    items: PurchaseItem[];
+    taxRate: number;
+    taxType: "exclude" | "include";
+    paymentStatus: string;
+    paidAmount: number;
+    paymentMethod: string;
+    billAttachmentUrl: string;
+    notes: string;
+    businessEntity: "PT" | "NON_PT";
+    projectId?: string;
+    projectName?: string;
+  }>({
+    vendorInvoiceNumber: "",
+    billCategory: "Barang / Material Perangkat",
+    supplierName: "",
+    supplierContact: "",
+    date: new Date().toISOString().split("T")[0],
+    dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+    items: [
+      { id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
+    ],
+    taxRate: 12,
+    taxType: "exclude",
+    paymentStatus: "Hutang Usaha",
+    paidAmount: 0,
+    paymentMethod: "Transfer Bank BCA PT",
+    billAttachmentUrl: "",
+    notes: "",
+    businessEntity: "PT",
+    projectId: "",
+    projectName: "",
+  });
+
+  const [payBillForm, setPayBillForm] = useState<{
+    purchaseId: string;
+    poNumber: string;
+    vendorInvoiceNumber: string;
+    supplierName: string;
+    grandTotal: number;
+    paidAmount: number;
+    remainingAmount: number;
+    paymentAmount: number;
+    paymentDate: string;
+    paymentMethod: string;
+    notes: string;
+  }>({
+    purchaseId: "",
+    poNumber: "",
+    vendorInvoiceNumber: "",
+    supplierName: "",
+    grandTotal: 0,
+    paidAmount: 0,
+    remainingAmount: 0,
+    paymentAmount: 0,
+    paymentDate: new Date().toISOString().split("T")[0],
+    paymentMethod: "Transfer Bank BCA PT",
+    notes: "",
+  });
+
   // New Cash Transaction Form
   const [cashForm, setCashForm] = useState<{
     date: string;
@@ -4477,17 +4548,23 @@ export default function AdminFinanceERPPage() {
       });
   }, [sales, selectedEntity, searchQuery, statusFilter, saleDateFilter, saleStartDate, saleEndDate, saleSortBy]);
 
-  // Hook Filter & Sort: Pembelian & PO
+  // Hook Filter & Sort: Pembelian & PO / Tagihan Masuk
   const filteredAndSortedPurchases = useMemo(() => {
     return purchases
       .filter((po) => {
         const matchEntity = selectedEntity === "ALL" || (po.businessEntity || "PT") === selectedEntity;
         if (!matchEntity) return false;
 
+        const isBillDoc = (po as any).docType === "BILL" || Boolean((po as any).vendorInvoiceNumber);
+        if (billDocTypeFilter === "BILL" && !isBillDoc) return false;
+        if (billDocTypeFilter === "PO" && isBillDoc) return false;
+
         const q = poSearchQuery.toLowerCase().trim();
         const matchQuery =
           !q ||
           (po.poNumber && po.poNumber.toLowerCase().includes(q)) ||
+          ((po as any).vendorInvoiceNumber && (po as any).vendorInvoiceNumber.toLowerCase().includes(q)) ||
+          ((po as any).billCategory && (po as any).billCategory.toLowerCase().includes(q)) ||
           (po.supplierName && po.supplierName.toLowerCase().includes(q)) ||
           (po.supplierContact && po.supplierContact.toLowerCase().includes(q)) ||
           (po.notes && po.notes.toLowerCase().includes(q)) ||
@@ -4519,7 +4596,7 @@ export default function AdminFinanceERPPage() {
         }
         return 0;
       });
-  }, [purchases, selectedEntity, poSearchQuery, poStatusFilter, poDateFilter, poStartDate, poEndDate, poSortBy]);
+  }, [purchases, selectedEntity, billDocTypeFilter, poSearchQuery, poStatusFilter, poDateFilter, poStartDate, poEndDate, poSortBy]);
 
   // Hook Filter & Sort: Retur Barang
   const filteredAndSortedReturnsSales = useMemo(() => {
@@ -6508,6 +6585,207 @@ export default function AdminFinanceERPPage() {
       }
     } catch {
       showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  // Helper & Handler untuk Faktur Tagihan Masuk dari Vendor (Bills & Hutang Usaha)
+  const calculateBillTotals = () => {
+    const subtotal = billForm.items.reduce((acc, curr) => acc + (curr.total || 0), 0);
+    const afterDiscount = subtotal;
+    const taxRate = Number(billForm.taxRate ?? 12);
+    const taxType = billForm.taxType || "exclude";
+    let taxAmount = 0;
+    let grandTotal = afterDiscount;
+    if (taxRate > 0) {
+      if (taxType === "include") {
+        taxAmount = Math.round(afterDiscount - (afterDiscount / (1 + taxRate / 100)));
+        grandTotal = afterDiscount;
+      } else {
+        taxAmount = Math.round((afterDiscount * taxRate) / 100);
+        grandTotal = afterDiscount + taxAmount;
+      }
+    }
+    return { subtotal, afterDiscount, taxAmount, grandTotal };
+  };
+
+  const handleAddBillItem = () => {
+    setBillForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { id: Date.now().toString(), productName: "", qty: 1, unit: "Unit", price: 0, total: 0 },
+      ],
+    }));
+  };
+
+  const handleRemoveBillItem = (index: number) => {
+    if (billForm.items.length <= 1) {
+      showToast("Faktur tagihan harus memiliki minimal 1 baris item");
+      return;
+    }
+    setBillForm((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const handleBillItemChange = (index: number, field: keyof PurchaseItem, value: any) => {
+    setBillForm((prev) => {
+      const updated = [...prev.items];
+      const item = { ...updated[index], [field]: value };
+      if (field === "qty" || field === "price") {
+        const qty = field === "qty" ? Number(value) || 0 : Number(item.qty) || 0;
+        const price = field === "price" ? Number(value) || 0 : Number(item.price) || 0;
+        item.total = qty * price;
+      }
+      updated[index] = item;
+      return { ...prev, items: updated };
+    });
+  };
+
+  const handleCreateBillSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!billForm.vendorInvoiceNumber.trim()) {
+      showToast("Nomor Faktur / Invoice Vendor wajib diisi!");
+      return;
+    }
+    if (!billForm.supplierName.trim()) {
+      showToast("Nama Vendor / Supplier penerbit tagihan wajib diisi!");
+      return;
+    }
+    if (billForm.items.some((it) => !it.productName || it.price <= 0)) {
+      showToast("Mohon isi deskripsi tagihan dan nominal harga valid untuk semua baris item!");
+      return;
+    }
+
+    const { subtotal, taxAmount, grandTotal } = calculateBillTotals();
+    const paidAmt = Number(billForm.paidAmount) || 0;
+    const remainingAmt = Math.max(0, grandTotal - paidAmt);
+    const paymentStatus = paidAmt >= grandTotal ? "Lunas" : paidAmt > 0 ? "Sebagian" : "Hutang Usaha";
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "bill",
+          payload: {
+            docType: "BILL",
+            vendorInvoiceNumber: billForm.vendorInvoiceNumber.trim(),
+            billCategory: billForm.billCategory,
+            supplierName: billForm.supplierName.trim(),
+            supplierContact: billForm.supplierContact.trim(),
+            date: billForm.date,
+            dueDate: billForm.dueDate,
+            paymentStatus,
+            paidAmount: paidAmt,
+            remainingAmount: remainingAmt,
+            paymentMethod: billForm.paymentMethod,
+            billAttachmentUrl: billForm.billAttachmentUrl,
+            items: billForm.items,
+            subtotal,
+            taxAmount,
+            grandTotal,
+            taxRate: billForm.taxRate ?? 12,
+            taxType: billForm.taxType || "exclude",
+            status: paymentStatus === "Lunas" ? "Diterima & Lunas" : "Draf",
+            warehouseId: "dstech_wh_1",
+            notes: billForm.notes,
+            businessEntity: billForm.businessEntity || "PT",
+            projectId: billForm.projectId || "",
+            projectName: billForm.projectName || "",
+          },
+        }),
+      });
+
+      if (res.ok) {
+        showToast("Faktur Tagihan Masuk dari Vendor berhasil dicatat ke Buku Keuangan!");
+        setIsNewBillModalOpen(false);
+        setBillForm({
+          vendorInvoiceNumber: "",
+          billCategory: "Barang / Material Perangkat",
+          supplierName: "",
+          supplierContact: "",
+          date: new Date().toISOString().split("T")[0],
+          dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+          items: [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
+          taxRate: 12,
+          taxType: "exclude",
+          paymentStatus: "Hutang Usaha",
+          paidAmount: 0,
+          paymentMethod: "Transfer Bank BCA PT",
+          billAttachmentUrl: "",
+          notes: "",
+          businessEntity: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
+          projectId: "",
+          projectName: "",
+        });
+        fetchFinanceData();
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        showToast(errJson.error || "Gagal mencatat tagihan vendor");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat mencatat tagihan vendor");
+    }
+  };
+
+  const handleOpenPayBill = (po: PurchaseOrder) => {
+    const grand = Number(po.grandTotal) || 0;
+    const paid = Number((po as any).paidAmount) || 0;
+    const remaining = (po as any).remainingAmount !== undefined ? Number((po as any).remainingAmount) : Math.max(0, grand - paid);
+
+    setPayBillForm({
+      purchaseId: po.id,
+      poNumber: po.poNumber,
+      vendorInvoiceNumber: (po as any).vendorInvoiceNumber || "",
+      supplierName: po.supplierName,
+      grandTotal: grand,
+      paidAmount: paid,
+      remainingAmount: remaining,
+      paymentAmount: remaining > 0 ? remaining : grand,
+      paymentDate: new Date().toISOString().split("T")[0],
+      paymentMethod: "Transfer Bank BCA PT",
+      notes: `Pembayaran tagihan ${ (po as any).vendorInvoiceNumber || po.poNumber } kepada ${po.supplierName}`,
+    });
+    setIsPayBillModalOpen(true);
+  };
+
+  const handlePayBillSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payAmt = Number(payBillForm.paymentAmount) || 0;
+    if (payAmt <= 0) {
+      showToast("Nominal pembayaran harus lebih dari Rp 0!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "pay_purchase_bill",
+          payload: {
+            purchaseId: payBillForm.purchaseId,
+            poNumber: payBillForm.poNumber,
+            paymentAmount: payAmt,
+            paymentDate: payBillForm.paymentDate,
+            paymentMethod: payBillForm.paymentMethod,
+            notes: payBillForm.notes,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        showToast("Pembayaran tagihan vendor berhasil dicatat & kas keluar diperbarui!");
+        setIsPayBillModalOpen(false);
+        fetchFinanceData();
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        showToast(errJson.error || "Gagal memproses pembayaran tagihan");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat memproses pembayaran tagihan");
     }
   };
 

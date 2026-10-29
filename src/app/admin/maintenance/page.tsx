@@ -2361,35 +2361,27 @@ export default function MaintenancePage() {
 
                 {/* Kanan: Pelaksana DSTech */}
                 <div className="text-center space-y-1">
-                  <span className="text-[11px] text-slate-500 font-bold block">Pihak Pelaksana:</span>
+                  <span className="text-[11px] text-slate-500 font-bold block">Pihak Pelaksana Resmi:</span>
                   <span className="font-black text-slate-900 block text-xs">
-                    {selectedTaskForPrint.entityType === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
+                    PT. DSTech Smart Perkasa
                   </span>
                   <div className="h-24 flex flex-col items-center justify-center relative border-b border-dashed border-slate-300">
                     {/* Stempel bulat digital */}
-                    {selectedTaskForPrint.entityType !== "NON_PT" ? (
-                      <div className="w-16 h-16 rounded-full border-2 border-indigo-600/60 text-indigo-700/80 text-[7px] font-black uppercase flex flex-col items-center justify-center rotate-[-12deg] pointer-events-none">
-                        <span>PT. DSTECH</span>
-                        <span className="text-[6px]">SMART PERKASA</span>
-                        <span className="text-[5px]">CILEGON</span>
-                      </div>
-                    ) : (
-                      <div className="w-16 h-16 rounded-full border-2 border-purple-600/60 text-purple-700/80 text-[7px] font-black uppercase flex flex-col items-center justify-center rotate-[-12deg] pointer-events-none">
-                        <span>DSTECH</span>
-                        <span className="text-[6px]">SMART</span>
-                        <span className="text-[5px]">CILEGON</span>
-                      </div>
-                    )}
+                    <div className="w-16 h-16 rounded-full border-2 border-indigo-600/60 text-indigo-700/80 text-[7px] font-black uppercase flex flex-col items-center justify-center rotate-[-12deg] pointer-events-none">
+                      <span>PT. DSTECH</span>
+                      <span className="text-[6px]">SMART PERKASA</span>
+                      <span className="text-[5px]">CILEGON</span>
+                    </div>
                   </div>
                   <div className="pt-1">
                     <p className="font-black text-slate-900 underline text-xs">
-                      ( {selectedTaskForPrint.technician} )
+                      ( RAMADHANI ST )
                     </p>
                     <p className="text-[10px] text-slate-500">
-                      {selectedTaskForPrint.entityType === "NON_PT" ? "Teknisi DSTech Smart" : "Teknisi Lapangan DSTech"}
+                      Direktur
                     </p>
                     <p className="text-[9px] font-mono text-slate-400 mt-0.5">
-                      [VERIFIKASI SISTEM: DST-APP-MTC-{selectedTaskForPrint.id.slice(-6)}]
+                      PIC Teknisi: {selectedTaskForPrint.technician} • [VERIFIKASI SISTEM: DST-APP-MTC-{selectedTaskForPrint.id.slice(-6)}]
                     </p>
                   </div>
                 </div>
@@ -2802,24 +2794,24 @@ export default function MaintenancePage() {
                       .map((photo, idx) => (
                         <div
                           key={photo.id || idx}
-                          className="rounded-xl border border-slate-200 overflow-hidden bg-slate-50/50 space-y-2 p-2.5 shadow-2xs"
+                          className="rounded-xl border border-slate-200 overflow-hidden bg-white space-y-2 p-3 shadow-sm relative z-10 flex flex-col justify-between"
                         >
-                          <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-300 relative">
+                          <div className="w-full h-64 bg-slate-50 rounded-lg overflow-hidden border border-slate-200 relative p-2 flex items-center justify-center">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={photo.url}
                               alt={photo.caption}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = "/service-cctv.png";
                               }}
                             />
-                            <span className="absolute bottom-1 right-1 bg-black/70 text-white text-[8px] font-mono px-1.5 py-0.5 rounded">
+                            <span className="absolute bottom-1 right-1 bg-black/75 text-white text-[8px] font-mono px-1.5 py-0.5 rounded shadow">
                               Foto #{idx + 1}
                             </span>
                           </div>
-                          <div className="text-[11px] space-y-0.5">
-                            <span className="text-[9px] font-bold text-cyan-700 uppercase block">Keterangan:</span>
+                          <div className="text-[11px] space-y-0.5 bg-white">
+                            <span className="text-[9px] font-bold text-cyan-800 uppercase block">Keterangan:</span>
                             <p className="font-medium text-slate-800 leading-snug">{photo.caption}</p>
                           </div>
                         </div>
@@ -2849,23 +2841,23 @@ export default function MaintenancePage() {
                       .map((photo, idx) => (
                         <div
                           key={photo.id || idx}
-                          className="rounded-xl border border-amber-200 overflow-hidden bg-amber-50/30 space-y-2 p-2.5 shadow-2xs"
+                          className="rounded-xl border border-amber-200 overflow-hidden bg-white space-y-2 p-3 shadow-sm relative z-10 flex flex-col justify-between"
                         >
-                          <div className="aspect-[16/10] bg-slate-200 rounded-lg overflow-hidden border border-slate-300 relative">
+                          <div className="w-full h-64 bg-slate-50 rounded-lg overflow-hidden border border-amber-200 relative p-2 flex items-center justify-center">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={photo.url}
                               alt={photo.caption}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = "/service-it.png";
                               }}
                             />
-                            <span className="absolute bottom-1 right-1 bg-amber-700 text-white text-[8px] font-mono px-1.5 py-0.5 rounded">
+                            <span className="absolute bottom-1 right-1 bg-amber-700 text-white text-[8px] font-mono px-1.5 py-0.5 rounded shadow">
                               Part #{idx + 1}
                             </span>
                           </div>
-                          <div className="text-[11px] space-y-0.5">
+                          <div className="text-[11px] space-y-0.5 bg-white">
                             <span className="text-[9px] font-bold text-amber-800 uppercase block">Rincian Komponen / Tindakan:</span>
                             <p className="font-medium text-slate-800 leading-snug">{photo.caption}</p>
                           </div>
@@ -2876,7 +2868,7 @@ export default function MaintenancePage() {
               </div>
 
               {/* III. PERNYATAAN FISIK & KOLOM TANDA TANGAN LEGALITAS */}
-              <div className="space-y-4 pt-4 border-t border-slate-200 text-xs">
+              <div className="space-y-4 pt-4 border-t border-slate-200 text-xs bg-white p-3 rounded-xl relative z-10">
                 <p className="text-[11px] text-slate-600 leading-relaxed text-justify">
                   Demikian lampiran dokumentasi foto ini dibuat secara sebenar-benarnya sebagai bukti fisik pelaksanaan pekerjaan di lapangan guna memenuhi kelengkapan administrasi penagihan dan Berita Acara Serah Terima (BAST).
                 </p>
@@ -2899,7 +2891,7 @@ export default function MaintenancePage() {
 
                   {/* Kanan: Pelaksana DSTech */}
                   <div className="text-center space-y-1">
-                    <span className="text-[11px] text-slate-500 font-bold block">Pihak Pelaksana:</span>
+                    <span className="text-[11px] text-slate-500 font-bold block">Pihak Pelaksana Resmi:</span>
                     <span className="font-black text-slate-900 block text-xs">PT. DSTech Smart Perkasa</span>
                     <div className="h-20 flex flex-col items-center justify-center relative border-b border-dashed border-slate-300">
                       {/* Stempel bulat digital */}
@@ -2911,11 +2903,11 @@ export default function MaintenancePage() {
                     </div>
                     <div className="pt-1">
                       <p className="font-black text-slate-900 underline text-xs">
-                        ( {selectedTaskForPhotoPrint.technician} )
+                        ( RAMADHANI ST )
                       </p>
-                      <p className="text-[10px] text-slate-500">Teknisi Lapangan DSTech</p>
+                      <p className="text-[10px] text-slate-500">Direktur</p>
                       <p className="text-[9px] font-mono text-slate-400 mt-0.5">
-                        [VERIFIKASI SISTEM: DST-APP-MTC-PHOTO-{selectedTaskForPhotoPrint.id.slice(-6)}]
+                        Teknisi Lapangan: {selectedTaskForPhotoPrint.technician} • [VERIFIKASI SISTEM: DST-APP-MTC-PHOTO-{selectedTaskForPhotoPrint.id.slice(-6)}]
                       </p>
                     </div>
                   </div>

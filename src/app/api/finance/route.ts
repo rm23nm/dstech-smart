@@ -927,6 +927,7 @@ export async function POST(request: Request) {
         docType,
         invoiceNumber,
         id,
+        signerCompany,
         signerName,
         signerTitle,
         signatureImage,
@@ -958,9 +959,14 @@ export async function POST(request: Request) {
             (index !== -1 && sales[index]?.invoiceNumber && o.invoiceNumber?.toLowerCase() === sales[index].invoiceNumber.toLowerCase())
           );
           if (ordIdx !== -1) {
+            if (signerCompany) {
+              orders[ordIdx].customerOrg = signerCompany;
+              if (!orders[ordIdx].customerCompany) orders[ordIdx].customerCompany = signerCompany;
+            }
             if (docType === "bast") {
               orders[ordIdx].bastApproved = true;
               orders[ordIdx].bastApprovedAt = approvedAt;
+              orders[ordIdx].bastSignerCompany = signerCompany || orders[ordIdx].customerOrg || "";
               orders[ordIdx].bastSignerName = signerName || orders[ordIdx].customerName || "Pihak Kedua / Klien";
               orders[ordIdx].bastSignerTitle = signerTitle || "Penanggung Jawab / PIC Klien";
               orders[ordIdx].bastSignatureImage = signatureImage;
@@ -968,6 +974,7 @@ export async function POST(request: Request) {
             } else if (docType === "delivery") {
               orders[ordIdx].deliveryApproved = true;
               orders[ordIdx].deliveryApprovedAt = approvedAt;
+              orders[ordIdx].deliverySignerCompany = signerCompany || orders[ordIdx].customerOrg || "";
               orders[ordIdx].deliverySignerName = signerName || orders[ordIdx].customerName || "Penerima Barang";
               orders[ordIdx].deliverySignerTitle = signerTitle || "Penerima di Lapangan";
               orders[ordIdx].deliverySignatureImage = signatureImage;
@@ -975,6 +982,7 @@ export async function POST(request: Request) {
             } else if (docType === "photos") {
               orders[ordIdx].photosApproved = true;
               orders[ordIdx].photosApprovedAt = approvedAt;
+              orders[ordIdx].photosSignerCompany = signerCompany || orders[ordIdx].customerOrg || "";
               orders[ordIdx].photosSignerName = signerName || orders[ordIdx].customerName || "Pemeriksa Pekerjaan";
               orders[ordIdx].photosSignerTitle = signerTitle || "PIC Lapangan / Klien";
               orders[ordIdx].photosSignatureImage = signatureImage;
@@ -989,6 +997,7 @@ export async function POST(request: Request) {
             } else if (docType === "invoice" || docType === "faktur") {
               orders[ordIdx].clientApproved = true;
               orders[ordIdx].clientApprovedAt = approvedAt;
+              orders[ordIdx].clientSignerCompany = signerCompany || orders[ordIdx].customerOrg || "";
               orders[ordIdx].clientSignerName = signerName || orders[ordIdx].customerName || "Penerima Faktur";
               orders[ordIdx].clientSignerTitle = signerTitle || "Bagian Keuangan / PIC Penerima";
               orders[ordIdx].clientSignatureImage = signatureImage;
@@ -1008,9 +1017,14 @@ export async function POST(request: Request) {
       }
 
       if (index !== -1) {
+        if (signerCompany) {
+          sales[index].customerOrg = signerCompany;
+          if (!sales[index].customerCompany) sales[index].customerCompany = signerCompany;
+        }
         if (docType === "bast") {
           sales[index].bastApproved = true;
           sales[index].bastApprovedAt = approvedAt;
+          sales[index].bastSignerCompany = signerCompany || sales[index].customerOrg || "";
           sales[index].bastSignerName = signerName || sales[index].customerName || "Pihak Kedua / Klien";
           sales[index].bastSignerTitle = signerTitle || "Penanggung Jawab / PIC Klien";
           sales[index].bastSignatureImage = signatureImage;
@@ -1018,6 +1032,7 @@ export async function POST(request: Request) {
         } else if (docType === "delivery") {
           sales[index].deliveryApproved = true;
           sales[index].deliveryApprovedAt = approvedAt;
+          sales[index].deliverySignerCompany = signerCompany || sales[index].customerOrg || "";
           sales[index].deliverySignerName = signerName || sales[index].customerName || "Penerima Barang";
           sales[index].deliverySignerTitle = signerTitle || "Penerima di Lapangan";
           sales[index].deliverySignatureImage = signatureImage;
@@ -1025,6 +1040,7 @@ export async function POST(request: Request) {
         } else if (docType === "photos") {
           sales[index].photosApproved = true;
           sales[index].photosApprovedAt = approvedAt;
+          sales[index].photosSignerCompany = signerCompany || sales[index].customerOrg || "";
           sales[index].photosSignerName = signerName || sales[index].customerName || "Pemeriksa Pekerjaan";
           sales[index].photosSignerTitle = signerTitle || "PIC Lapangan / Klien";
           sales[index].photosSignatureImage = signatureImage;
@@ -1039,6 +1055,7 @@ export async function POST(request: Request) {
         } else if (docType === "invoice" || docType === "faktur") {
           sales[index].clientApproved = true;
           sales[index].clientApprovedAt = approvedAt;
+          sales[index].clientSignerCompany = signerCompany || sales[index].customerOrg || "";
           sales[index].clientSignerName = signerName || sales[index].customerName || "Penerima Faktur";
           sales[index].clientSignerTitle = signerTitle || "Bagian Keuangan / PIC Penerima";
           sales[index].clientSignatureImage = signatureImage;
@@ -1198,8 +1215,10 @@ export async function POST(request: Request) {
       });
     }
 
-    if (actionType === "purchase") {
-      const newPoNumber = `PO-DSTECH-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(
+    if (actionType === "purchase" || actionType === "bill") {
+      const isVendorBill = actionType === "bill" || payload.docType === "BILL" || Boolean(payload.vendorInvoiceNumber);
+      const prefix = isVendorBill ? "BILL-DST" : "PO-DSTECH";
+      const newPoNumber = `${prefix}-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(
         (data.purchases?.length || 0) + 1
       ).padStart(3, "0")}`;
 
@@ -1236,48 +1255,138 @@ export async function POST(request: Request) {
       const taxAmount = payload.taxAmount !== undefined ? Number(payload.taxAmount) : computedTaxAmount;
       const grandTotal = payload.grandTotal !== undefined ? Number(payload.grandTotal) : computedGrandTotal;
 
+      const initialPaidAmount = Number(payload.paidAmount) || (payload.paymentStatus === "Lunas" ? grandTotal : 0);
+      const initialRemaining = Math.max(0, grandTotal - initialPaidAmount);
+      const computedPaymentStatus = initialPaidAmount >= grandTotal ? "Lunas" : initialPaidAmount > 0 ? "Sebagian" : (payload.paymentStatus || "Hutang Usaha");
+
       const newPurchase = {
-        id: `dstech_po_${Date.now()}`,
+        id: isVendorBill ? `dstech_bill_${Date.now()}` : `dstech_po_${Date.now()}`,
+        docType: isVendorBill ? "BILL" : "PO",
         poNumber: payload.poNumber || newPoNumber,
-        supplierName: payload.supplierName || "Supplier Mitra",
+        vendorInvoiceNumber: payload.vendorInvoiceNumber || "", // Nomor faktur asli dari pihak luar/vendor
+        billCategory: payload.billCategory || payload.category || (isVendorBill ? "Barang/Material" : "Pengadaan Barang"),
+        supplierName: payload.supplierName || payload.vendorName || "Supplier Mitra",
         supplierContact: payload.supplierContact || "-",
         date: payload.date || new Date().toISOString().split("T")[0],
-        expectedDelivery: payload.expectedDelivery || new Date().toISOString().split("T")[0],
+        dueDate: payload.dueDate || payload.expectedDelivery || new Date().toISOString().split("T")[0],
+        expectedDelivery: payload.expectedDelivery || payload.dueDate || new Date().toISOString().split("T")[0],
         items: items,
         subtotal: subtotal,
         taxRate: taxRate,
         taxType: taxType,
         taxAmount: taxAmount,
         grandTotal: grandTotal,
-        status: payload.status || "Draf",
-        paymentStatus: payload.paymentStatus || "Hutang Usaha",
+        paidAmount: initialPaidAmount,
+        remainingAmount: initialRemaining,
+        status: payload.status || (isVendorBill ? "Diterima" : "Draf"),
+        paymentStatus: computedPaymentStatus,
+        paymentMethod: payload.paymentMethod || "Transfer Bank BCA PT",
         warehouseId: payload.warehouseId || "dstech_wh_1",
         notes: payload.notes || "-",
-        approvalStatus: payload.approvalStatus || "Menunggu Approval",
-        approvedBy: payload.approvedBy || "",
-        approvedTitle: payload.approvedTitle || "",
-        approvedAt: payload.approvedAt || "",
+        approvalStatus: payload.approvalStatus || (isVendorBill ? "Disetujui & Sah" : "Menunggu Approval"),
+        approvedBy: payload.approvedBy || "RAMADHANI ST",
+        approvedTitle: payload.approvedTitle || "Direktur",
+        approvedAt: payload.approvedAt || `${new Date().toISOString().split("T")[0]} 12:00 WIB`,
         verificationCode: payload.verificationCode || "",
-        attachments: Array.isArray(payload.attachments) ? payload.attachments : [],
+        billAttachmentUrl: payload.billAttachmentUrl || (Array.isArray(payload.attachments) ? payload.attachments[0] : "") || "",
+        attachments: Array.isArray(payload.attachments) ? payload.attachments : (payload.billAttachmentUrl ? [payload.billAttachmentUrl] : []),
         businessEntity: payload.businessEntity || "PT",
         projectId: payload.projectId || "",
         projectName: payload.projectName || "",
+        payments: initialPaidAmount > 0 ? [{
+          id: `pay_${Date.now()}`,
+          date: payload.date || new Date().toISOString().split("T")[0],
+          amount: initialPaidAmount,
+          method: payload.paymentMethod || "Transfer Bank BCA PT",
+          notes: "Pembayaran awal saat pencatatan tagihan",
+        }] : [],
       };
 
       if (!data.purchases) data.purchases = [];
       data.purchases.unshift(newPurchase);
 
-      // Otomatisasi Moving Average HPP & Stok Masuk jika status PO diterima
+      // Jika langsung lunas / ada pembayaran awal, catat arus kas keluar otomatis
+      if (initialPaidAmount > 0) {
+        if (!data.cash_flow) data.cash_flow = [];
+        data.cash_flow.unshift({
+          id: `cash_out_${Date.now()}`,
+          date: newPurchase.date,
+          type: "OUT",
+          category: isVendorBill ? `Tagihan Masuk: ${newPurchase.billCategory}` : "Pembelian Barang / PO",
+          amount: initialPaidAmount,
+          recipient: newPurchase.supplierName,
+          refNumber: newPurchase.vendorInvoiceNumber ? `${newPurchase.poNumber} (Ref: ${newPurchase.vendorInvoiceNumber})` : newPurchase.poNumber,
+          sourceAccount: newPurchase.paymentMethod,
+          notes: `Pembayaran ${isVendorBill ? 'Faktur Tagihan Masuk Vendor' : 'PO'} kepada ${newPurchase.supplierName}`,
+        });
+      }
+
+      // Otomatisasi Moving Average HPP & Stok Masuk jika kategori barang dagangan & status diterima
       const poStatus = String(newPurchase.status || "").toLowerCase();
-      if (poStatus.includes("diterima") || poStatus.includes("lunas") || poStatus.includes("selesai")) {
+      if ((poStatus.includes("diterima") || poStatus.includes("lunas") || poStatus.includes("selesai")) && newPurchase.billCategory !== "Jasa Subkontraktor" && newPurchase.billCategory !== "Utilitas & Operasional") {
         syncProductStockAndMovingAverageCost(newPurchase.items, newPurchase.warehouseId);
       }
 
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
-        message: `Purchase Order ${newPurchase.poNumber} berhasil disimpan`,
+        message: `${isVendorBill ? 'Faktur Tagihan Masuk' : 'Purchase Order'} ${newPurchase.poNumber} berhasil disimpan`,
         data: newPurchase,
+      });
+    }
+
+    if (actionType === "pay_purchase_bill") {
+      const { purchaseId, poNumber, paymentAmount, paymentDate, paymentMethod, notes } = payload;
+      const amount = Number(paymentAmount) || 0;
+      if (amount <= 0) {
+        return NextResponse.json({ success: false, error: "Nominal pembayaran harus lebih dari 0" }, { status: 400 });
+      }
+
+      if (!data.purchases) data.purchases = [];
+      const pIdx = data.purchases.findIndex((p: any) => p.id === purchaseId || p.poNumber === poNumber);
+      if (pIdx === -1) {
+        return NextResponse.json({ success: false, error: "Tagihan / PO tidak ditemukan" }, { status: 404 });
+      }
+
+      const pDoc = data.purchases[pIdx];
+      const curPaid = Number(pDoc.paidAmount) || 0;
+      const gTotal = Number(pDoc.grandTotal) || 0;
+      const newPaid = curPaid + amount;
+      const newRemaining = Math.max(0, gTotal - newPaid);
+      const newStatus = newRemaining <= 0 ? "Lunas" : "Sebagian";
+
+      if (!Array.isArray(pDoc.payments)) pDoc.payments = [];
+      pDoc.payments.push({
+        id: `pay_${Date.now()}`,
+        date: paymentDate || new Date().toISOString().split("T")[0],
+        amount: amount,
+        method: paymentMethod || "Transfer Bank BCA PT",
+        notes: notes || "Pembayaran Tagihan / PO",
+      });
+
+      pDoc.paidAmount = newPaid;
+      pDoc.remainingAmount = newRemaining;
+      pDoc.paymentStatus = newStatus;
+
+      // Catat pengeluaran arus kas keluar
+      if (!data.cash_flow) data.cash_flow = [];
+      data.cash_flow.unshift({
+        id: `cash_out_${Date.now()}`,
+        date: paymentDate || new Date().toISOString().split("T")[0],
+        type: "OUT",
+        category: pDoc.docType === "BILL" ? `Pelunasan Tagihan: ${pDoc.billCategory || 'Vendor'}` : "Pelunasan Hutang Dagang / PO",
+        amount: amount,
+        recipient: pDoc.supplierName,
+        refNumber: pDoc.vendorInvoiceNumber ? `${pDoc.poNumber} (Ref: ${pDoc.vendorInvoiceNumber})` : pDoc.poNumber,
+        sourceAccount: paymentMethod || "Transfer Bank BCA PT",
+        notes: notes || `Pelunasan ${pDoc.docType === 'BILL' ? 'Faktur Tagihan' : 'PO'} kepada ${pDoc.supplierName}`,
+      });
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Pembayaran ${pDoc.poNumber} sebesar Rp ${amount.toLocaleString('id-ID')} berhasil dicatat`,
+        data: pDoc,
       });
     }
 
@@ -1998,10 +2107,10 @@ export async function PUT(request: Request) {
       });
     }
 
-    if (actionType === "purchase") {
+    if (actionType === "purchase" || actionType === "bill") {
       const index = (data.purchases || []).findIndex((p: any) => p.id === id || p.poNumber === id);
       if (index === -1) {
-        return NextResponse.json({ success: false, error: "Purchase Order tidak ditemukan" }, { status: 404 });
+        return NextResponse.json({ success: false, error: "Purchase Order / Tagihan tidak ditemukan" }, { status: 404 });
       }
 
       const safeUpdates = applySignatureLockProtection(data.purchases[index], updates);
@@ -2046,13 +2155,25 @@ export async function PUT(request: Request) {
         data.purchases[index].grandTotal = grandTotal;
       }
 
+      // Hitung ulang sisa tagihan & status pembayaran
+      const currentGrand = Number(data.purchases[index].grandTotal) || 0;
+      const currentPaid = Number(data.purchases[index].paidAmount) || 0;
+      data.purchases[index].remainingAmount = Math.max(0, currentGrand - currentPaid);
+      if (currentPaid >= currentGrand && currentGrand > 0) {
+        data.purchases[index].paymentStatus = "Lunas";
+      } else if (currentPaid > 0) {
+        data.purchases[index].paymentStatus = "Sebagian";
+      }
+
       // Otomatisasi Moving Average HPP & Stok Masuk jika status PO diperbarui menjadi diterima
       const updatedStatus = String(data.purchases[index].status || "").toLowerCase();
       if (
-        updates.syncInventoryCost === true ||
+        (updates.syncInventoryCost === true ||
         updatedStatus.includes("diterima") ||
         updatedStatus.includes("lunas") ||
-        updatedStatus.includes("selesai")
+        updatedStatus.includes("selesai")) &&
+        data.purchases[index].billCategory !== "Jasa Subkontraktor" &&
+        data.purchases[index].billCategory !== "Utilitas & Operasional"
       ) {
         syncProductStockAndMovingAverageCost(data.purchases[index].items, data.purchases[index].warehouseId);
       }
@@ -2060,7 +2181,7 @@ export async function PUT(request: Request) {
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
-        message: `Purchase Order ${data.purchases[index].poNumber} berhasil diperbarui`,
+        message: `${data.purchases[index].docType === 'BILL' ? 'Faktur Tagihan' : 'Purchase Order'} ${data.purchases[index].poNumber} berhasil diperbarui`,
         data: data.purchases[index],
       });
     }
