@@ -16,6 +16,7 @@ import {
   Building2,
   FileText,
   Printer,
+  Pencil,
   Plus,
   Search,
   Filter,
@@ -1989,6 +1990,10 @@ export default function AdminFinanceERPPage() {
   // State Faktur Tagihan Masuk dari Vendor/Pihak Luar (Vendor Bills & Hutang Usaha)
   
   // State Lampirkan Faktur Pajak Elektronik (e-Faktur DJP / KPP) - Tugas 290
+  // State Edit Transaksi Arus Kas (Tugas 298)
+  const [isEditCashFlowModalOpen, setIsEditCashFlowModalOpen] = useState<boolean>(false);
+  const [editingCashFlow, setEditingCashFlow] = useState<any>(null);
+
   const [isTaxInvoiceModalOpen, setIsTaxInvoiceModalOpen] = useState<boolean>(false);
   const [taxInvoiceModalData, setTaxInvoiceModalData] = useState<{
     invoiceId: string;
@@ -5574,7 +5579,7 @@ export default function AdminFinanceERPPage() {
     setPaymentForm({
       amount: defaultAmount,
       paymentMethod: defaultAcc,
-      paymentDate: new Date().toISOString().split("T")[0],
+      paymentDate: invoice.date || new Date().toISOString().split("T")[0],
       notes: payNotes,
       terminId: selectedTerminId,
     });
@@ -6753,6 +6758,50 @@ export default function AdminFinanceERPPage() {
       showToast("Terjadi kesalahan jaringan saat mengunggah berkas e-Faktur");
     } finally {
       setIsUploadingTaxPdf(false);
+    }
+  };
+
+  const handleOpenEditCashFlow = (cash: any) => {
+    setEditingCashFlow({
+      ...cash,
+      date: cash.date || new Date().toISOString().split("T")[0],
+    });
+    setIsEditCashFlowModalOpen(true);
+  };
+
+  const handleSaveEditCashFlowSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCashFlow) return;
+    try {
+      const res = await fetch("/api/finance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "cash_flow",
+          id: editingCashFlow.id,
+          updates: {
+            date: editingCashFlow.date,
+            type: editingCashFlow.type,
+            category: editingCashFlow.category,
+            amount: Number(editingCashFlow.amount) || 0,
+            account: editingCashFlow.account,
+            reference: editingCashFlow.reference,
+            description: editingCashFlow.description,
+            businessEntity: editingCashFlow.businessEntity || "PT",
+          },
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast(`Transaksi kas berhasil diperbarui (Tanggal Pembukuan: ${editingCashFlow.date})!`);
+        setIsEditCashFlowModalOpen(false);
+        setEditingCashFlow(null);
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal memperbarui transaksi kas");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat memperbarui transaksi kas");
     }
   };
 
@@ -13243,6 +13292,14 @@ export default function AdminFinanceERPPage() {
                         </td>
                         <td className="p-3 text-center whitespace-nowrap">
                           <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditCashFlow(cash)}
+                              className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white transition-all cursor-pointer shadow-xs hover:scale-105 shrink-0"
+                              title="Edit Transaksi Kas & Koreksi Tanggal Pembukuan"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
                             <button
                               type="button"
                               onClick={() => openArchiveModal("cash_flow", cash)}
@@ -33704,6 +33761,177 @@ export default function AdminFinanceERPPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT TRANSAKSI ARUS KAS (TUGAS 298) */}
+      {isEditCashFlowModalOpen && editingCashFlow && (
+        <div
+          className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsEditCashFlowModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    Edit Transaksi &amp; Tanggal Pembukuan Kas
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Koreksi tanggal transaksi pembukuan lama atau penyesuaian catatan kas.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditCashFlowModalOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditCashFlowSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Tanggal Transaksi / Pembukuan Kas:
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={editingCashFlow.date}
+                  onChange={(e) =>
+                    setEditingCashFlow((prev: any) => ({ ...prev, date: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-bold text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Tipe Arus Kas:</label>
+                  <select
+                    value={editingCashFlow.type}
+                    onChange={(e) =>
+                      setEditingCashFlow((prev: any) => ({ ...prev, type: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"
+                  >
+                    <option value="IN">Penerimaan Kas (Masuk)</option>
+                    <option value="OUT">Pengeluaran Kas (Keluar)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Entitas Usaha:</label>
+                  <select
+                    value={editingCashFlow.businessEntity || "PT"}
+                    onChange={(e) =>
+                      setEditingCashFlow((prev: any) => ({ ...prev, businessEntity: e.target.value }))
+                    }
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"
+                  >
+                    <option value="PT">PT. DSTech Smart Perkasa</option>
+                    <option value="NON_PT">DSTech Smart Solution (Non-PT)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Nominal Transaksi (Rp):</label>
+                <input
+                  type="number"
+                  min={1}
+                  required
+                  value={editingCashFlow.amount}
+                  onChange={(e) =>
+                    setEditingCashFlow((prev: any) => ({ ...prev, amount: Number(e.target.value) }))
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-black text-sm text-slate-900 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Kategori Transaksi:</label>
+                <input
+                  type="text"
+                  required
+                  value={editingCashFlow.category}
+                  onChange={(e) =>
+                    setEditingCashFlow((prev: any) => ({ ...prev, category: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Akun / Rekening Kas:</label>
+                <select
+                  value={editingCashFlow.account}
+                  onChange={(e) =>
+                    setEditingCashFlow((prev: any) => ({ ...prev, account: e.target.value }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-bold bg-white"
+                >
+                  {bankAccounts.map((b) => (
+                    <option key={b.id} value={`${b.bankName} - ${b.accountNumber} (${b.accountHolder})`}>
+                      {b.bankName} - {b.accountNumber} ({b.accountHolder})
+                    </option>
+                  ))}
+                  <option value="Kas Tunai Operasional">Kas Tunai Operasional</option>
+                  <option value="Kas Kecil (Petty Cash Kantor)">Kas Kecil (Petty Cash Kantor)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Keterangan / Deskripsi:</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={editingCashFlow.description}
+                  onChange={(e) =>
+                    setEditingCashFlow((prev: any) => ({ ...prev, description: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">No. Referensi (Faktur / PO / Dokumen):</label>
+                <input
+                  type="text"
+                  value={editingCashFlow.reference || ""}
+                  onChange={(e) =>
+                    setEditingCashFlow((prev: any) => ({ ...prev, reference: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsEditCashFlowModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Perubahan Kas</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

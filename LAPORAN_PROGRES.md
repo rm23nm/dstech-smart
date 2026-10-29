@@ -4,6 +4,31 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **2026-10-29**: [SELESAI] Sinkronisasi Tanggal Pembukuan Arus Kas dengan Tanggal Faktur & Kuitansi Lama, Penambahan Fitur Edit Transaksi Arus Kas Langsung, Auto-Sync Tanggal Kas saat Edit Faktur, dan Default Tanggal Pembayaran Mengikuti Tanggal Faktur (Tugas 298) (`src/app/api/finance/route.ts`, `src/app/admin/finance/page.tsx`, `src/data/dstech_finance_erp.json`).
+  *Permintaan User*: "ini ada kesalahan pencatatan untuk tanggal pembukuan, saya membuat di kuitansi dan faktur itu lunas tanggal 2026-01-08, namun pada arus kas dia tercatat pada tanggal sekarang. padahal saya ingin input pembukuan yang lama sudah lewat. itu bagai mana solusinya?" -> "ya, lakukan sinkronisasi semua, termasuk dengan arus kas lama yang sudah terlanjur tercatat"
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  1. Pada form modal Catat Pembayaran Masuk (`paymentDate`), default tanggal disetel ke tanggal hari ini (`new Date()`) saat membuka form, bukan mengambil tanggal faktur aslinya (`invoice.date`), sehingga saat pengguna menginput faktur masa lalu (misal: 2026-01-08), arus kas membukukan tanggal input saat itu (2026-10-26 / hari ini).
+  2. Saat faktur diedit tanggalnya melalui modal edit faktur (`PUT /api/finance`), backend belum menyinkronkan tanggal pada catatan arus kas yang mereferensikan nomor faktur tersebut.
+  3. Pada tabel Arus Kas & Rekonsiliasi Bank (`activeTab === "cash_flow"`), belum tersedia tombol aksi dan modal Edit Transaksi Kas (hanya ada tombol Hapus dan Arsip), sehingga admin tidak bisa langsung mengoreksi tanggal pembukuan kas yang salah tanggal.
+  4. Transaksi arus kas lama (seperti `INV-DSTECH-202610-041` bertanggal 2026-01-08) di database masih tercatat dengan tanggal input saat itu (`2026-10-26`).
+  *Penyelesaian & Hasil*:
+  1. **Sinkronisasi Database Eksisting (`src/data/dstech_finance_erp.json`)**:
+     - Telah disinkronkan 11 catatan transaksi arus kas lama yang tanggalnya melompat ke tanggal input, dicocokkan 100% dengan tanggal faktur penjualan sesungguhnya.
+     - Khususnya transaksi kas untuk Faktur `INV-DSTECH-202610-041` telah berubah dari `2026-10-26` menjadi `2026-01-08` tepat sesuai kuitansi dan faktur penjualan.
+  2. **Penyempurnaan Backend Modul Keuangan (`src/app/api/finance/route.ts`)**:
+     - Menambahkan handler `actionType === "cash_flow"` pada method `PUT` untuk memproses pembaruan data transaksi kas (tanggal transaksi/pembukuan, jenis arus kas, kategori, nominal, rekening akun, deskripsi, no referensi, dan entitas usaha).
+     - Menambahkan logika Auto-Sync tanggal pada `PUT actionType === "sale"`: Jika tanggal faktur (`safeUpdates.date`) diperbarui, seluruh catatan arus kas terkait otomatis disesuaikan tanggalnya.
+     - Menambahkan logika Auto-Sync tanggal pada `PUT actionType === "purchase"`: Jika tanggal PO (`safeUpdates.date`) diperbarui, seluruh catatan arus kas terkait otomatis disesuaikan tanggalnya.
+     - Memastikan `actionType === "record_payment"` menggunakan `paymentDate || invoice.date`.
+  3. **Penyempurnaan Frontend Modul Keuangan (`src/app/admin/finance/page.tsx`)**:
+     - Pada modal Catat Pembayaran Masuk (`handleOpenPaymentModal`), menyetel default `paymentDate: invoice.date || new Date().toISOString().split("T")[0]` sehingga saat input pembayaran faktur lama, tanggal kuitansi & kas langsung terisi tanggal faktur tanpa perlu dikoreksi manual.
+     - Menambahkan tombol aksi **`✏️ Edit Transaksi Kas`** (ikon `Pencil`) pada setiap baris di tabel Arus Kas & Rekonsiliasi Bank (`activeTab === "cash_flow"`).
+     - Menyediakan Modal Interaktif **"Edit Transaksi & Tanggal Pembukuan Kas"** (`isEditCashFlowModalOpen`) lengkap dengan form input tanggal pembukuan kas, tipe arus kas, entitas usaha, nominal, kategori, akun bank/kas, deskripsi, dan referensi.
+  4. **Pengujian & Validasi Lokal**:
+     - `npx tsc --noEmit`: Lolos 100% tanpa error tipe data (Exit Code 0).
+     - `npm run build`: Sukses mengompilasi seluruh 76/76 static & dynamic pages (Exit Code 0).
+     - Folder cadangan sementara `_backup_cash_flow_date_sync` telah dibersihkan secara aman.
+
 - **2026-10-29**: [SELESAI] Penambahan Pilihan Pencatatan Faktur Pajak Masukan (PPN Masukan DJP) pada Kolom Aksi Tabel Pembelian & Tagihan Vendor (PO/Bills), Badge Status Pajak Masukan, dan Toolbar Pratinjau PO Terintegrasi ke Keuangan & Menu Pajak PPh & PPN (Tugas 297) (`src/app/admin/finance/page.tsx`).
   *Permintaan User*: "kemudian pada Pembelian & Tagihan Vendor, saya lihat belum ada pilihan pencatataan pajak masukkan pada aksinya seperti pada faktur"
   *Penyebab Masalah yang Ditemukan (Root Cause)*:

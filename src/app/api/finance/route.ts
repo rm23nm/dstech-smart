@@ -2240,6 +2240,37 @@ export async function PUT(request: Request) {
       });
     }
 
+    if (actionType === "cash_flow") {
+      const index = (data.cash_flow || []).findIndex((c: any) => c.id === id);
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Transaksi kas tidak ditemukan" }, { status: 404 });
+      }
+
+      data.cash_flow[index] = {
+        ...data.cash_flow[index],
+        date: updates.date || data.cash_flow[index].date,
+        type: updates.type || data.cash_flow[index].type,
+        category: updates.category || data.cash_flow[index].category,
+        amount: updates.amount !== undefined ? Number(updates.amount) : data.cash_flow[index].amount,
+        account: updates.account || data.cash_flow[index].account,
+        reference: updates.reference !== undefined ? updates.reference : data.cash_flow[index].reference,
+        description: updates.description || data.cash_flow[index].description,
+        businessEntity: updates.businessEntity || data.cash_flow[index].businessEntity || "PT",
+        receiptUrl: updates.receiptUrl !== undefined ? updates.receiptUrl : data.cash_flow[index].receiptUrl,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Urutkan kembali arus kas berdasarkan tanggal terbaru ke terlama
+      data.cash_flow.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Transaksi kas berhasil diperbarui (Tanggal Pembukuan: ${data.cash_flow[index].date})`,
+        data: data.cash_flow[index],
+      });
+    }
+
     if (!id) {
       return NextResponse.json({ success: false, error: "ID wajib disertakan" }, { status: 400 });
     }
@@ -2368,6 +2399,17 @@ export async function PUT(request: Request) {
         ...safeUpdates,
       };
 
+      // Auto-Sync tanggal pada arus kas terkait jika tanggal faktur (date) diubah
+      if (safeUpdates.date) {
+        const invNum = data.sales[index].invoiceNumber;
+        const invId = data.sales[index].id;
+        (data.cash_flow || []).forEach((c: any) => {
+          if (c.reference === invNum || c.reference === invId || (c.description && c.description.includes(invNum))) {
+            c.date = safeUpdates.date;
+          }
+        });
+      }
+
       // Recalculate remaining amount and status
       const currentGrand = Number(data.sales[index].grandTotal) || 0;
       const currentPaid = Number(data.sales[index].paidAmount) || 0;
@@ -2421,6 +2463,17 @@ export async function PUT(request: Request) {
         ...data.purchases[index],
         ...safeUpdates,
       };
+
+      // Auto-Sync tanggal pada arus kas terkait jika tanggal PO (date) diubah
+      if (safeUpdates.date) {
+        const poNum = data.purchases[index].poNumber;
+        const poId = data.purchases[index].id;
+        (data.cash_flow || []).forEach((c: any) => {
+          if (c.reference === poNum || c.reference === poId || (c.description && c.description.includes(poNum))) {
+            c.date = safeUpdates.date;
+          }
+        });
+      }
 
       if (updates.items || updates.taxRate !== undefined || updates.taxType !== undefined) {
         const items = data.purchases[index].items || [];
