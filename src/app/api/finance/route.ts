@@ -1073,6 +1073,33 @@ export async function POST(request: Request) {
       });
     }
 
+    if (actionType === "attach_tax_invoice" || actionType === "upload_tax_invoice") {
+      const { invoiceId, taxInvoiceNumber, taxInvoiceDate, taxInvoiceUrl, notes } = payload;
+      const sales = data.sales || [];
+      const index = sales.findIndex((s: any) => s.id === invoiceId || s.invoiceNumber === invoiceId);
+
+      if (index === -1) {
+        return NextResponse.json({ success: false, error: "Faktur penjualan tidak ditemukan" }, { status: 404 });
+      }
+
+      sales[index].taxInvoiceNumber = taxInvoiceNumber ? String(taxInvoiceNumber).trim() : sales[index].taxInvoiceNumber;
+      sales[index].taxInvoiceDate = taxInvoiceDate || sales[index].taxInvoiceDate || new Date().toISOString().split("T")[0];
+      if (taxInvoiceUrl) {
+        sales[index].taxInvoiceUrl = taxInvoiceUrl;
+      }
+      sales[index].taxInvoiceUploadedAt = new Date().toISOString();
+      if (notes) {
+        sales[index].taxInvoiceNotes = notes;
+      }
+
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: `Faktur Pajak resmi DJP (${sales[index].taxInvoiceNumber || "e-Faktur"}) berhasil dilampirkan ke Faktur ${sales[index].invoiceNumber}!`,
+        data: sales[index],
+      });
+    }
+
     if (actionType === "record_payment") {
       const { invoiceId, paymentAmount, paymentMethod, paymentDate, notes, terminId } = payload;
       const sales = data.sales || [];
@@ -2047,8 +2074,11 @@ export async function PUT(request: Request) {
       if (existingDoc.clientApproved) protectedUpdates.clientApproved = existingDoc.clientApproved;
       if (existingDoc.supplierSignatureImage && !protectedUpdates.supplierSignatureImage) protectedUpdates.supplierSignatureImage = existingDoc.supplierSignatureImage;
       if (existingDoc.supplierApproved) protectedUpdates.supplierApproved = existingDoc.supplierApproved;
-      if (existingDoc.photosSignatureImage && !protectedUpdates.photosSignatureImage) protectedUpdates.photosSignatureImage = existingDoc.photosSignatureImage;
-      if (existingDoc.photosApproved) protectedUpdates.photosApproved = existingDoc.photosApproved;
+      // Pertahankan lampiran e-Faktur Pajak resmi DJP jika ada
+      if (existingDoc.taxInvoiceNumber && !protectedUpdates.taxInvoiceNumber) protectedUpdates.taxInvoiceNumber = existingDoc.taxInvoiceNumber;
+      if (existingDoc.taxInvoiceDate && !protectedUpdates.taxInvoiceDate) protectedUpdates.taxInvoiceDate = existingDoc.taxInvoiceDate;
+      if (existingDoc.taxInvoiceUrl && !protectedUpdates.taxInvoiceUrl) protectedUpdates.taxInvoiceUrl = existingDoc.taxInvoiceUrl;
+      if (existingDoc.taxInvoiceUploadedAt && !protectedUpdates.taxInvoiceUploadedAt) protectedUpdates.taxInvoiceUploadedAt = existingDoc.taxInvoiceUploadedAt;
 
       return protectedUpdates;
     };

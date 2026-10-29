@@ -3091,6 +3091,19 @@ export async function GET(req: Request) {
         <div>
           <h2 class="text-xl font-black text-slate-900 tracking-wider uppercase">FAKTUR PENJUALAN</h2>
           <p class="text-xs font-mono font-bold text-indigo-700 mt-0.5">NO: ${sale.invoiceNumber}</p>
+          ${sale.taxInvoiceNumber ? `
+            <div class="mt-1 flex items-center gap-1.5 flex-wrap">
+              <span class="text-[10px] font-mono font-bold text-emerald-900 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-300 inline-flex items-center gap-1">
+                <span>🏛️ e-Faktur DJP:</span>
+                <strong>${sale.taxInvoiceNumber}</strong>
+              </span>
+              ${sale.taxInvoiceUrl ? `
+                <a href="${sale.taxInvoiceUrl}" target="_blank" rel="noopener noreferrer" class="print-hidden text-[9px] font-black text-emerald-700 hover:underline bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-2xs">
+                  📥 Buka PDF Asli DJP
+                </a>
+              ` : ''}
+            </div>
+          ` : ''}
           <div class="mt-2 inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
             sale.paymentStatus === 'Lunas' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
           }">

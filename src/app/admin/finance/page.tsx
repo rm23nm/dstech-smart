@@ -44,6 +44,7 @@ import {
   Truck,
   Edit3,
   Trash2,
+  Save,
   Mail,
   Landmark,
   UserCheck,
@@ -182,6 +183,11 @@ export interface ProjectPhoto {
 }
 
 interface SaleInvoice {
+  taxInvoiceNumber?: string;
+  taxInvoiceDate?: string;
+  taxInvoiceUrl?: string;
+  taxInvoiceUploadedAt?: string;
+  taxInvoiceNotes?: string;
   id: string;
   invoiceNumber: string;
   customerName: string;
@@ -1221,8 +1227,8 @@ export default function AdminFinanceERPPage() {
     letterheadPaddingTop: 80,
     letterheadPaddingBottom: 75,
     letterheadFitMode: "fill",
-    signerName: "H. Agus Supriyadi, S.T., M.Kom.",
-    signerTitle: "Direktur Keuangan & Operasional",
+    signerName: "RAMADHANI ST",
+    signerTitle: "Direktur",
     masterSignatureUrl: "",
     masterStampUrl: "",
   });
@@ -1398,8 +1404,8 @@ export default function AdminFinanceERPPage() {
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState<boolean>(false);
   const [selectedInvoiceForApproval, setSelectedInvoiceForApproval] = useState<SaleInvoice | null>(null);
   const [approvalMode, setApprovalMode] = useState<"canvas" | "master" | "upload">("canvas");
-  const [signerNameInput, setSignerNameInput] = useState<string>("H. Agus Supriyadi, S.T., M.Kom.");
-  const [signerTitleInput, setSignerTitleInput] = useState<string>("Direktur Keuangan & Operasional");
+  const [signerNameInput, setSignerNameInput] = useState<string>("RAMADHANI ST");
+  const [signerTitleInput, setSignerTitleInput] = useState<string>("Direktur");
   const [approvalNotesInput, setApprovalNotesInput] = useState<string>("Disetujui untuk diterbitkan secara sah kepada klien.");
   const [uploadedSignatureBase64, setUploadedSignatureBase64] = useState<string>("");
   const [isSubmittingApproval, setIsSubmittingApproval] = useState<boolean>(false);
@@ -1944,6 +1950,28 @@ export default function AdminFinanceERPPage() {
   });
 
   // State Faktur Tagihan Masuk dari Vendor/Pihak Luar (Vendor Bills & Hutang Usaha)
+  
+  // State Lampirkan Faktur Pajak Elektronik (e-Faktur DJP / KPP) - Tugas 290
+  const [isTaxInvoiceModalOpen, setIsTaxInvoiceModalOpen] = useState<boolean>(false);
+  const [taxInvoiceModalData, setTaxInvoiceModalData] = useState<{
+    invoiceId: string;
+    invoiceNumber: string;
+    customerName: string;
+    taxInvoiceNumber: string;
+    taxInvoiceDate: string;
+    taxInvoiceUrl: string;
+    notes: string;
+  }>({
+    invoiceId: "",
+    invoiceNumber: "",
+    customerName: "",
+    taxInvoiceNumber: "",
+    taxInvoiceDate: new Date().toISOString().split("T")[0],
+    taxInvoiceUrl: "",
+    notes: "",
+  });
+  const [isUploadingTaxPdf, setIsUploadingTaxPdf] = useState<boolean>(false);
+
   const [isNewBillModalOpen, setIsNewBillModalOpen] = useState<boolean>(false);
   const [isPayBillModalOpen, setIsPayBillModalOpen] = useState<boolean>(false);
   const [billDocTypeFilter, setBillDocTypeFilter] = useState<"ALL" | "PO" | "BILL">("ALL");
@@ -2109,6 +2137,8 @@ export default function AdminFinanceERPPage() {
     paymentMethod?: string;
     approvalStatus?: string;
     notes?: string;
+    taxInvoiceNumber?: string;
+    taxInvoiceUrl?: string;
   }>({
     isOpen: false,
     docType: "SPH",
@@ -2133,6 +2163,8 @@ export default function AdminFinanceERPPage() {
     paymentMethod: "",
     approvalStatus: "",
     notes: "",
+    taxInvoiceNumber: "",
+    taxInvoiceUrl: "",
   });
   const [sendTab, setSendTab] = useState<"whatsapp" | "email">("whatsapp");
   const [customPhoneInput, setCustomPhoneInput] = useState<string>("");
@@ -2145,6 +2177,16 @@ export default function AdminFinanceERPPage() {
   const [isSendingInAppMail, setIsSendingInAppMail] = useState<boolean>(false);
   const [docMailSendAlert, setDocMailSendAlert] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [selectedRecipientClientId, setSelectedRecipientClientId] = useState<string>("");
+
+  interface WaRecipientItem {
+    id: string;
+    phone: string;
+    label: string;
+    isSent?: boolean;
+  }
+  const [waRecipients, setWaRecipients] = useState<WaRecipientItem[]>([]);
+  const [newWaPhoneInput, setNewWaPhoneInput] = useState<string>("");
+  const [newWaLabelInput, setNewWaLabelInput] = useState<string>("Kontak Tambahan");
 
   const fetchInternalMailAccounts = async () => {
     try {
@@ -2199,6 +2241,8 @@ export default function AdminFinanceERPPage() {
     paymentMethod?: string;
     approvalStatus?: string;
     notes?: string;
+    taxInvoiceNumber?: string;
+    taxInvoiceUrl?: string;
     initialTab?: "whatsapp" | "email";
   }) => {
     // 1. Auto-lookup email & phone dari master clients / suppliers jika belum terisi
@@ -2261,6 +2305,8 @@ export default function AdminFinanceERPPage() {
       paymentMethod: params.paymentMethod || "",
       approvalStatus: params.approvalStatus || "",
       notes: params.notes || "",
+      taxInvoiceNumber: (params as any).taxInvoiceNumber || "",
+      taxInvoiceUrl: (params as any).taxInvoiceUrl || "",
     };
 
     setSendDocModal(newModalState);
@@ -2402,9 +2448,12 @@ export default function AdminFinanceERPPage() {
       waText += `📄 *1. Faktur Penjualan (Invoice):*\n${portalUrl}/api/finance/print?doc=invoice&no=${encodedNo}\n\n`;
       waText += `📝 *2. Berita Acara Serah Terima (BAST):*\n${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n\n`;
       waText += `🚚 *3. Surat Jalan Material (Delivery Order):*\n${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n\n`;
-      waText += `📸 *4. Laporan Foto Dokumentasi & Part:*\n${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n`;
-      if ((doc.paidAmount && doc.paidAmount > 0) || doc.paymentStatus === "Lunas" || doc.paymentStatus === "Sebagian") {
-        waText += `🧾 *5. Kuitansi Pembayaran Sah:*\n${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n`;
+      waText += `📸 *4. Laporan Foto Dokumentasi & Part:*\n${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n\n`;
+      waText += `🧾 *5. Kuitansi Pembayaran Sah:*\n${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n\n`;
+      if ((doc as any).taxInvoiceUrl) {
+        waText += `🏛️ *6. Faktur Pajak Elektronik (e-Faktur DJP / KPP):*\n${(doc as any).taxInvoiceUrl}\n${(doc as any).taxInvoiceNumber ? `(No. Seri Faktur Pajak: ${(doc as any).taxInvoiceNumber})\n\n` : '\n'}`;
+      } else if ((doc as any).taxInvoiceNumber) {
+        waText += `🏛️ *6. Faktur Pajak Elektronik (e-Faktur DJP):*\nNo. Seri Faktur Pajak (NSFP): ${(doc as any).taxInvoiceNumber}\n\n`;
       }
 
       waText += `\n💳 *Rekening Resmi Pembayaran Transfer:*\n`;
@@ -2448,6 +2497,15 @@ export default function AdminFinanceERPPage() {
     if (isInvoice) {
       emailBody += `\nUnduh Berkas Resmi Pekerjaan:\n`;
       emailBody += `• Faktur Penjualan: ${portalUrl}/api/finance/print?doc=invoice&no=${encodedNo}\n`;
+      emailBody += `• Berita Acara Serah Terima (BAST): ${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n`;
+      emailBody += `• Surat Jalan Material (Delivery Order): ${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n`;
+      emailBody += `• Laporan Foto Dokumentasi: ${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n`;
+      emailBody += `• Kuitansi Pembayaran: ${portalUrl}/api/finance/print?doc=receipt&no=${encodedNo}\n`;
+      if ((doc as any).taxInvoiceUrl) {
+        emailBody += `• Faktur Pajak Elektronik (e-Faktur DJP): ${(doc as any).taxInvoiceUrl}${(doc as any).taxInvoiceNumber ? ` (NSFP: ${(doc as any).taxInvoiceNumber})` : ''}\n`;
+      } else if ((doc as any).taxInvoiceNumber) {
+        emailBody += `• No. Seri Faktur Pajak (NSFP DJP): ${(doc as any).taxInvoiceNumber}\n`;
+      }
       emailBody += `• Berita Acara (BAST): ${portalUrl}/api/finance/print?doc=bast&no=${encodedNo}\n`;
       emailBody += `• Surat Jalan: ${portalUrl}/api/finance/print?doc=delivery&no=${encodedNo}\n`;
       emailBody += `• Foto Dokumentasi: ${portalUrl}/api/finance/print?doc=photos&no=${encodedNo}\n`;
@@ -6279,8 +6337,8 @@ export default function AdminFinanceERPPage() {
       : invoice;
 
     setSelectedInvoiceForApproval(mappedDoc);
-    setSignerNameInput(invoice.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom.");
-    setSignerTitleInput(invoice.approvedTitle || financeSettings.signerTitle || "Direktur Keuangan & Operasional");
+    setSignerNameInput(invoice.approvedBy || financeSettings.signerName || "RAMADHANI ST");
+    setSignerTitleInput(invoice.approvedTitle || financeSettings.signerTitle || "Direktur");
     setApprovalNotesInput(
       invoice.approvalNotes ||
         (isQuotation
@@ -6312,6 +6370,10 @@ export default function AdminFinanceERPPage() {
         signatureImage = financeSettings.masterSignatureUrl || "";
       }
 
+      if (!signatureImage && (financeSettings as any)?.masterSignatureUrl) {
+        signatureImage = (financeSettings as any).masterSignatureUrl;
+      }
+
       const isQuotation =
         (selectedInvoiceForApproval as any).quotationNumber !== undefined ||
         selectedInvoiceForApproval.id?.startsWith("dstech_quot_") ||
@@ -6328,8 +6390,8 @@ export default function AdminFinanceERPPage() {
             id: selectedInvoiceForApproval.id,
             documentType: docType,
             signatureImage,
-            signerName: signerNameInput,
-            signerTitle: signerTitleInput,
+            signerName: signerNameInput || (financeSettings as any)?.signerName || "RAMADHANI ST",
+            signerTitle: signerTitleInput || (financeSettings as any)?.signerTitle || "Direktur",
             notes: approvalNotesInput,
           },
         }),
@@ -6585,6 +6647,92 @@ export default function AdminFinanceERPPage() {
       }
     } catch {
       showToast("Terjadi kesalahan jaringan");
+    }
+  };
+
+  
+  // Helper & Handler untuk Faktur Pajak Elektronik (e-Faktur DJP / KPP) - Tugas 290
+  const handleOpenTaxInvoiceModal = (inv: SaleInvoice) => {
+    setTaxInvoiceModalData({
+      invoiceId: inv.id,
+      invoiceNumber: inv.invoiceNumber,
+      customerName: inv.customerName,
+      taxInvoiceNumber: inv.taxInvoiceNumber || "",
+      taxInvoiceDate: inv.taxInvoiceDate || new Date().toISOString().split("T")[0],
+      taxInvoiceUrl: inv.taxInvoiceUrl || "",
+      notes: inv.taxInvoiceNotes || "",
+    });
+    setIsTaxInvoiceModalOpen(true);
+  };
+
+  const handleUploadTaxInvoiceFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingTaxPdf(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success && (data.url || data.filePath)) {
+        const uploadedUrl = data.url || data.filePath;
+        setTaxInvoiceModalData((prev) => ({
+          ...prev,
+          taxInvoiceUrl: uploadedUrl,
+        }));
+        showToast("Berkas e-Faktur Pajak DJP berhasil diunggah!");
+      } else {
+        showToast(data.message || "Gagal mengunggah berkas e-Faktur Pajak");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat mengunggah berkas e-Faktur");
+    } finally {
+      setIsUploadingTaxPdf(false);
+    }
+  };
+
+  const handleSaveTaxInvoiceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taxInvoiceModalData.taxInvoiceNumber.trim() && !taxInvoiceModalData.taxInvoiceUrl) {
+      showToast("Mohon isi Nomor Seri Faktur Pajak (NSFP) atau unggah berkas e-Faktur DJP!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "attach_tax_invoice",
+          payload: {
+            invoiceId: taxInvoiceModalData.invoiceId || taxInvoiceModalData.invoiceNumber,
+            taxInvoiceNumber: taxInvoiceModalData.taxInvoiceNumber.trim(),
+            taxInvoiceDate: taxInvoiceModalData.taxInvoiceDate,
+            taxInvoiceUrl: taxInvoiceModalData.taxInvoiceUrl,
+            notes: taxInvoiceModalData.notes,
+          },
+        }),
+      });
+      const result = await res.json();
+      if (result.success) {
+        showToast("Faktur Pajak resmi DJP berhasil disimpan & dilampirkan ke Faktur Penjualan!");
+        setIsTaxInvoiceModalOpen(false);
+        if (sendDocModal.isOpen && (sendDocModal.docNumber === taxInvoiceModalData.invoiceNumber || sendDocModal.id === taxInvoiceModalData.invoiceId)) {
+          setSendDocModal((prev) => ({
+            ...prev,
+            taxInvoiceNumber: taxInvoiceModalData.taxInvoiceNumber.trim(),
+            taxInvoiceUrl: taxInvoiceModalData.taxInvoiceUrl,
+          }));
+        }
+        fetchFinanceData();
+      } else {
+        showToast(result.error || "Gagal menyimpan Faktur Pajak");
+      }
+    } catch {
+      showToast("Terjadi kesalahan jaringan saat menyimpan Faktur Pajak");
     }
   };
 
@@ -6996,8 +7144,8 @@ export default function AdminFinanceERPPage() {
 
   const handleOpenApprovalPo = (po: PurchaseOrder) => {
     setSelectedPoForApproval(po);
-    setSignerNameInput(po.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom.");
-    setSignerTitleInput(po.approvedTitle || financeSettings.signerTitle || "Direktur Keuangan & Operasional");
+    setSignerNameInput(po.approvedBy || financeSettings.signerName || "RAMADHANI ST");
+    setSignerTitleInput(po.approvedTitle || financeSettings.signerTitle || "Direktur");
     setApprovalNotesInput(po.approvalNotes || "Disetujui untuk pengadaan barang operasional/proyek resmi.");
     setUploadedSignatureBase64(po.signatureImage || "");
     setApprovalMode("canvas");
@@ -7024,6 +7172,10 @@ export default function AdminFinanceERPPage() {
         signatureImage = financeSettings.masterSignatureUrl || "";
       }
 
+      if (!signatureImage && (financeSettings as any)?.masterSignatureUrl) {
+        signatureImage = (financeSettings as any).masterSignatureUrl;
+      }
+
       const res = await fetch("/api/finance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -7033,8 +7185,8 @@ export default function AdminFinanceERPPage() {
             id: selectedPoForApproval.id,
             documentType: "purchase",
             signatureImage,
-            signerName: signerNameInput,
-            signerTitle: signerTitleInput,
+            signerName: signerNameInput || (financeSettings as any)?.signerName || "RAMADHANI ST",
+            signerTitle: signerTitleInput || (financeSettings as any)?.signerTitle || "Direktur",
             notes: approvalNotesInput,
           },
         }),
@@ -7207,7 +7359,7 @@ export default function AdminFinanceERPPage() {
 
   const handleOpenApprovalReturnSale = (ret: SalesReturn) => {
     setSelectedReturnSaleForApproval(ret);
-    setSignerNameInput(ret.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom.");
+    setSignerNameInput(ret.approvedBy || financeSettings.signerName || "RAMADHANI ST");
     setSignerTitleInput(ret.approvedTitle || "Kepala Penjamin Mutu & QC");
     setApprovalNotesInput(ret.approvalNotes || "Pemeriksaan unit selesai. Klaim garansi / retur disetujui & sah.");
     setUploadedSignatureBase64(ret.signatureImage || "");
@@ -7419,7 +7571,7 @@ export default function AdminFinanceERPPage() {
 
   const handleOpenApprovalReturnPurchase = (ret: PurchaseReturn) => {
     setSelectedReturnPurchaseForApproval(ret);
-    setSignerNameInput(ret.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom.");
+    setSignerNameInput(ret.approvedBy || financeSettings.signerName || "RAMADHANI ST");
     setSignerTitleInput(ret.approvedTitle || "Kepala Logistik & Pengadaan");
     setApprovalNotesInput(ret.approvalNotes || "Dokumen retur pengembalian vendor disetujui & sah untuk klaim RMA.");
     setUploadedSignatureBase64(ret.signatureImage || "");
@@ -9384,7 +9536,7 @@ export default function AdminFinanceERPPage() {
             }`}
           >
             <ShoppingCart className="w-4 h-4 text-amber-500" />
-            <span>Pembelian & PO</span>
+            <span>Pembelian & Tagihan Vendor</span>
             <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-[10px]">
               {scopedCounts.purchases}
             </span>
@@ -9938,6 +10090,8 @@ export default function AdminFinanceERPPage() {
                                     paymentStatus: sale.paymentStatus,
                                     paymentMethod: sale.paymentMethod,
                                     approvalStatus: sale.approvalStatus,
+                                    taxInvoiceNumber: sale.taxInvoiceNumber,
+                                    taxInvoiceUrl: sale.taxInvoiceUrl,
                                     initialTab: "whatsapp",
                                   })
                                 }
@@ -9969,6 +10123,8 @@ export default function AdminFinanceERPPage() {
                                     paymentStatus: sale.paymentStatus,
                                     paymentMethod: sale.paymentMethod,
                                     approvalStatus: sale.approvalStatus,
+                                    taxInvoiceNumber: sale.taxInvoiceNumber,
+                                    taxInvoiceUrl: sale.taxInvoiceUrl,
                                     initialTab: "email",
                                   })
                                 }
@@ -10661,7 +10817,18 @@ export default function AdminFinanceERPPage() {
                   <option value="Dibatalkan">Dibatalkan</option>
                 </select>
 
-                {/* Tombol Form Input Utama */}
+                {/* Filter Jenis Dokumen: PO vs Tagihan Masuk Vendor */}
+                <select
+                  value={billDocTypeFilter}
+                  onChange={(e) => setBillDocTypeFilter(e.target.value as any)}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-700 focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                >
+                  <option value="ALL">📋 Semua (PO &amp; Tagihan Vendor)</option>
+                  <option value="PO">🛒 Hanya Purchase Order (PO)</option>
+                  <option value="BILL">📥 Hanya Tagihan Masuk Vendor (Bills)</option>
+                </select>
+
+                {/* Tombol Buat PO */}
                 <button
                   type="button"
                   onClick={() => setIsNewPoModalOpen(true)}
@@ -10669,6 +10836,37 @@ export default function AdminFinanceERPPage() {
                 >
                   <Plus className="w-4 h-4" />
                   <span>Buat PO Baru</span>
+                </button>
+
+                {/* Tombol Catat Tagihan Masuk Vendor (Tugas 290) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBillForm({
+                      vendorInvoiceNumber: "",
+                      billCategory: "Barang / Material Perangkat",
+                      supplierName: "",
+                      supplierContact: "",
+                      date: new Date().toISOString().split("T")[0],
+                      dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split("T")[0],
+                      items: [{ id: "1", productName: "", qty: 1, unit: "Unit", price: 0, total: 0 }],
+                      taxRate: 12,
+                      taxType: "exclude",
+                      paymentStatus: "Hutang Usaha",
+                      paidAmount: 0,
+                      paymentMethod: "Transfer Bank BCA PT",
+                      billAttachmentUrl: "",
+                      notes: "",
+                      businessEntity: selectedEntity === "NON_PT" ? "NON_PT" : "PT",
+                      projectId: "",
+                      projectName: "",
+                    });
+                    setIsNewBillModalOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md transition-all shrink-0"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Catat Tagihan Vendor (Bill)</span>
                 </button>
               </div>
             </div>
@@ -10700,9 +10898,26 @@ export default function AdminFinanceERPPage() {
                   ) : (
                     filteredAndSortedPurchases.map((po) => (
                       <tr key={po.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="p-3 font-mono font-black text-amber-700 whitespace-nowrap">
+                        <td className="p-3 font-mono font-black whitespace-nowrap">
                           <div className="flex flex-col gap-1">
-                            <span>{po.poNumber}</span>
+                            {(po as any).docType === "BILL" || Boolean((po as any).vendorInvoiceNumber) ? (
+                              <div className="space-y-0.5">
+                                <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-purple-100 text-purple-800 uppercase tracking-wider inline-flex items-center gap-1">
+                                  <span>📥 Tagihan Vendor</span>
+                                </span>
+                                <p className="text-purple-900 font-bold text-xs">{po.poNumber}</p>
+                                {(po as any).vendorInvoiceNumber && (
+                                  <p className="text-[10px] text-slate-500 font-normal">Faktur Asli: <strong className="text-purple-700 font-mono">{(po as any).vendorInvoiceNumber}</strong></p>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-0.5">
+                                <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-100 text-amber-800 uppercase tracking-wider inline-flex items-center gap-1">
+                                  <span>🛒 Purchase Order</span>
+                                </span>
+                                <p className="text-amber-700 font-bold text-xs">{po.poNumber}</p>
+                              </div>
+                            )}
                             {(po.businessEntity || "PT") === "NON_PT" ? (
                               <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-wider w-fit">
                                 🏬 DSTech Smart
@@ -16925,7 +17140,7 @@ export default function AdminFinanceERPPage() {
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
-                              {selectedInvoiceForPrint.approvedBy || "H. Agus Supriyadi"}
+                              {selectedInvoiceForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"}
                             </div>
                           )}
                         </>
@@ -16951,7 +17166,7 @@ export default function AdminFinanceERPPage() {
 
                     <div className="pt-2 border-t border-slate-300">
                       <p className="font-bold text-slate-900 underline text-xs">
-                        {selectedInvoiceForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom."}
+                        {selectedInvoiceForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"}
                       </p>
                       <p className="text-[10px] text-slate-600 mt-0.5 font-medium">
                         {selectedInvoiceForPrint.approvedTitle || financeSettings.signerTitle || "Direktur Keuangan & Operasional"}
@@ -18989,7 +19204,7 @@ export default function AdminFinanceERPPage() {
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
-                              {selectedQuotationForPrint.approvedBy || "H. Agus Supriyadi"}
+                              {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"}
                             </div>
                           )}
                         </>
@@ -19013,7 +19228,7 @@ export default function AdminFinanceERPPage() {
 
                     <div className="pt-2 border-t border-slate-300">
                       <p className="font-bold text-slate-900 underline text-xs">
-                        {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom."}
+                        {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"}
                       </p>
                       <p className="text-[10px] text-slate-600 mt-0.5 font-medium">
                         {selectedQuotationForPrint.approvedTitle || financeSettings.signerTitle || "Direktur Keuangan & Operasional"}
@@ -19270,7 +19485,7 @@ export default function AdminFinanceERPPage() {
                                 Paraf {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
                               </p>
                               <div className="h-8 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
-                                {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
+                                {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"}
                               </div>
                             </div>
                           </div>
@@ -19292,7 +19507,7 @@ export default function AdminFinanceERPPage() {
                                 Paraf {selectedQuotationForPrint.businessEntity === "NON_PT" ? "DSTech Smart" : "PT. DSTech Smart Perkasa"}
                               </p>
                               <div className="h-7 flex items-center justify-center font-serif italic text-xs font-bold text-indigo-700">
-                                {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "H. Agus Supriyadi, S.T."}
+                                {selectedQuotationForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"}
                               </div>
                             </div>
                           </div>
@@ -23202,7 +23417,7 @@ export default function AdminFinanceERPPage() {
                       />
                     ) : (
                       <div className="font-serif italic text-2xl font-black text-slate-800 tracking-wider">
-                        {signerNameInput || "H. Agus Supriyadi"}
+                        {signerNameInput || financeSettings.signerName || "RAMADHANI ST"}
                       </div>
                     )}
                   </div>
@@ -23641,7 +23856,7 @@ export default function AdminFinanceERPPage() {
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
-                              {selectedPoForPrint.approvedBy || "H. Agus Supriyadi"}
+                              {selectedPoForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"}
                             </div>
                           )}
                         </>
@@ -23665,7 +23880,7 @@ export default function AdminFinanceERPPage() {
 
                     <div className="pt-2 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
-                        ( {selectedPoForPrint.approvedBy || "H. Agus Supriyadi, S.T., M.Kom."} )
+                        ( {selectedPoForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"} )
                       </p>
                       <p className="text-[10px] text-slate-500 mt-0.5">
                         {selectedPoForPrint.approvedTitle || "Direktur Keuangan & Operasional"}
@@ -24393,7 +24608,7 @@ export default function AdminFinanceERPPage() {
                       />
                     ) : (
                       <div className="font-serif italic text-2xl font-black text-slate-800 tracking-wider">
-                        {signerNameInput || "H. Agus Supriyadi"}
+                        {signerNameInput || financeSettings.signerName || "RAMADHANI ST"}
                       </div>
                     )}
                   </div>
@@ -24625,7 +24840,7 @@ export default function AdminFinanceERPPage() {
                       />
                     ) : (
                       <div className="font-serif italic text-2xl font-black text-slate-800 tracking-wider">
-                        {signerNameInput || "H. Agus Supriyadi"}
+                        {signerNameInput || financeSettings.signerName || "RAMADHANI ST"}
                       </div>
                     )}
                   </div>
@@ -25005,7 +25220,7 @@ export default function AdminFinanceERPPage() {
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
-                              {selectedReturnSaleForPrint.approvedBy || "H. Agus Supriyadi"}
+                              {selectedReturnSaleForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"}
                             </div>
                           )}
                         </>
@@ -25029,7 +25244,7 @@ export default function AdminFinanceERPPage() {
 
                     <div className="pt-2 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
-                        ( {selectedReturnSaleForPrint.approvedBy || "H. Agus Supriyadi, S.T., M.Kom."} )
+                        ( {selectedReturnSaleForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"} )
                       </p>
                       <p className="text-[10px] text-slate-500 mt-0.5">
                         {selectedReturnSaleForPrint.approvedTitle || "Kepala Penjamin Mutu & QC"}
@@ -25316,7 +25531,7 @@ export default function AdminFinanceERPPage() {
                             />
                           ) : (
                             <div className="font-serif italic text-base text-slate-800 font-black relative z-10 select-none tracking-wider">
-                              {selectedReturnPurchaseForPrint.approvedBy || "H. Agus Supriyadi"}
+                              {selectedReturnPurchaseForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"}
                             </div>
                           )}
                         </>
@@ -25340,7 +25555,7 @@ export default function AdminFinanceERPPage() {
 
                     <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
-                        ( {selectedReturnPurchaseForPrint.approvedBy || "H. Agus Supriyadi, S.T., M.Kom."} )
+                        ( {selectedReturnPurchaseForPrint.approvedBy || financeSettings.signerName || "RAMADHANI ST"} )
                       </p>
                       <p className="text-[9px] text-slate-500 mt-0.5">
                         {selectedReturnPurchaseForPrint.approvedTitle || "Kepala Logistik & Pengadaan"}
@@ -25712,13 +25927,13 @@ export default function AdminFinanceERPPage() {
                         />
                       ) : (
                         <div className="font-serif italic text-sm font-bold text-emerald-800">
-                          {financeSettings.signerName || "H. Agus Supriyadi, S.T."}
+                          {financeSettings.signerName || "RAMADHANI ST"}
                         </div>
                       )}
                     </div>
                     <div className="pt-1 border-t border-slate-300">
                       <p className="font-bold text-slate-900 text-xs">
-                        ( {financeSettings.signerName || "H. Agus Supriyadi, S.T., M.Kom."} )
+                        ( {financeSettings.signerName || "RAMADHANI ST"} )
                       </p>
                       <p className="text-[9px] text-slate-500">
                         {financeSettings.signerTitle || "Direktur Utama"}
@@ -25874,7 +26089,7 @@ export default function AdminFinanceERPPage() {
                   <p className="text-[10px] font-bold text-slate-500 uppercase">Mengetahui & Menyetujui,</p>
                   <p className="text-xs font-bold text-slate-800">PT. DSTech Smart Perkasa</p>
                   <div className="h-10"></div>
-                  <p className="font-bold text-xs text-slate-900">( {financeSettings.signerName || "H. Agus Supriyadi, S.T."} )</p>
+                  <p className="font-bold text-xs text-slate-900">( {financeSettings.signerName || "RAMADHANI ST"} )</p>
                 </div>
               </div>
             </div>
@@ -26013,7 +26228,7 @@ export default function AdminFinanceERPPage() {
                   <p className="text-[10px] font-bold text-slate-500 uppercase">Mengetahui & Menyetujui,</p>
                   <p className="text-xs font-bold text-slate-800">PT. DSTech Smart Perkasa</p>
                   <div className="h-10"></div>
-                  <p className="font-bold text-xs text-slate-900">( {financeSettings.signerName || "H. Agus Supriyadi, S.T."} )</p>
+                  <p className="font-bold text-xs text-slate-900">( {financeSettings.signerName || "RAMADHANI ST"} )</p>
                 </div>
               </div>
             </div>
@@ -26158,7 +26373,7 @@ export default function AdminFinanceERPPage() {
                   <p className="text-[10px] font-bold text-slate-500 uppercase">Mengetahui & Mengesahkan (Direksi),</p>
                   <p className="text-xs font-bold text-slate-800">PT. DSTech Smart Perkasa</p>
                   <div className="h-10"></div>
-                  <p className="font-bold text-xs text-slate-900">( {financeSettings.signerName || "H. Agus Supriyadi, S.T."} )</p>
+                  <p className="font-bold text-xs text-slate-900">( {financeSettings.signerName || "RAMADHANI ST"} )</p>
                 </div>
               </div>
             </div>
@@ -29729,7 +29944,7 @@ export default function AdminFinanceERPPage() {
                       />
                     ) : (
                       <div className="font-serif italic text-2xl font-black text-slate-800 tracking-wider">
-                        {signerNameInput || "H. Agus Supriyadi"}
+                        {signerNameInput || financeSettings.signerName || "RAMADHANI ST"}
                       </div>
                     )}
                   </div>
@@ -30036,7 +30251,7 @@ export default function AdminFinanceERPPage() {
                   </span>
                   <span className="text-[10px] text-purple-700 font-bold">Siap Kirim / Akses Langsung</span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 pt-1">
                   {/* Link 1: Faktur */}
                   {(() => {
                     const portal = typeof window !== "undefined" ? window.location.origin : "https://dstechsmart.com";
@@ -30054,6 +30269,7 @@ export default function AdminFinanceERPPage() {
                     const bastUrl = `${portal}/api/finance/print?doc=bast&no=${enc}`;
                     const doUrl = `${portal}/api/finance/print?doc=delivery&no=${enc}`;
                     const photoUrl = `${portal}/api/finance/print?doc=photos&no=${enc}`;
+                    const receiptUrl = `${portal}/api/finance/print?doc=receipt&no=${enc}`;
 
                     return (
                       <>
@@ -30150,6 +30366,78 @@ export default function AdminFinanceERPPage() {
                             >
                               <ExternalLink className="w-2.5 h-2.5" />
                             </a>
+                          </div>
+                        </div>
+                        {/* Link 5: Kuitansi Pembayaran */}
+                        <div className="p-2 bg-white rounded-xl border border-emerald-300 shadow-2xs space-y-1">
+                          <span className="text-[10px] font-black text-emerald-950 block truncate">🧾 Kuitansi</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyContent(receiptUrl, "Link Kuitansi Resmi")}
+                              className="flex-1 py-1 px-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                              title="Salin Link Kuitansi"
+                            >
+                              <Copy className="w-2.5 h-2.5" />
+                              <span>Salin</span>
+                            </button>
+                            <a
+                              href={`${receiptUrl}&pin=${modalDocPin}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                              title="Buka / Unduh Lembar Kuitansi"
+                            >
+                              <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          </div>
+                        </div>
+
+                        {/* Link 6: Faktur Pajak DJP */}
+                        <div className="p-2 bg-white rounded-xl border border-blue-300 shadow-2xs space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black text-blue-950 block truncate">🏛️ e-Faktur DJP</span>
+                            {(sendDocModal as any).taxInvoiceNumber && (
+                              <span className="text-[8px] font-mono font-bold bg-emerald-100 text-emerald-800 px-1 rounded">✓</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {(sendDocModal as any).taxInvoiceUrl ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyContent((sendDocModal as any).taxInvoiceUrl, "Link Berkas e-Faktur Pajak DJP")}
+                                  className="flex-1 py-1 px-1.5 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-800 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer"
+                                  title="Salin Link File e-Faktur DJP"
+                                >
+                                  <Copy className="w-2.5 h-2.5" />
+                                  <span>Salin</span>
+                                </button>
+                                <a
+                                  href={(sendDocModal as any).taxInvoiceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="py-1 px-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[9px] font-bold flex items-center justify-center cursor-pointer"
+                                  title="Buka Berkas e-Faktur DJP Asli"
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const matched = sales.find((s) => s.id === sendDocModal.id || s.invoiceNumber === sendDocModal.docNumber);
+                                  if (matched) handleOpenTaxInvoiceModal(matched);
+                                  else showToast("Invoice tidak ditemukan untuk melampirkan Faktur Pajak");
+                                }}
+                                className="w-full py-1 px-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-bold flex items-center justify-center gap-0.5 cursor-pointer truncate"
+                                title="Lampirkan File / No. e-Faktur Pajak dari KPP"
+                              >
+                                <Plus className="w-2.5 h-2.5 shrink-0" />
+                                <span>Upload e-Faktur</span>
+                              </button>
+                            )}
                           </div>
                         </div>
                       </>
@@ -32804,6 +33092,636 @@ export default function AdminFinanceERPPage() {
           </div>
         </div>
       )}
+
+      {/* MODAL: LAMPIRKAN FAKTUR PAJAK ELEKTRONIK (E-FAKTUR DJP / KPP) - TUGAS 290 */}
+      {isTaxInvoiceModalOpen && (
+        <div
+          className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsTaxInvoiceModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                  Integrasi Perpajakan Resmi DJP
+                </span>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Landmark className="w-5 h-5 text-emerald-600" />
+                  <span>Lampirkan Faktur Pajak Elektronik</span>
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTaxInvoiceModalOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTaxInvoiceSubmit} className="space-y-4">
+              <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200 text-xs text-emerald-950 space-y-1">
+                <p><strong>Faktur Penjualan:</strong> <span className="font-mono font-bold">{taxInvoiceModalData.invoiceNumber}</span></p>
+                <p><strong>Klien / Pembeli:</strong> <span>{taxInvoiceModalData.customerName}</span></p>
+                <p className="text-[11px] text-emerald-800 pt-1 border-t border-emerald-200">
+                  Lampirkan Nomor Seri Faktur Pajak (NSFP) dan berkas PDF/Foto e-Faktur resmi dari KPP untuk diteruskan ke klien pada saat penagihan.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nomor Seri Faktur Pajak (NSFP) dari DJP:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 010.033-26.00000001"
+                  value={taxInvoiceModalData.taxInvoiceNumber}
+                  onChange={(e) =>
+                    setTaxInvoiceModalData((prev) => ({ ...prev, taxInvoiceNumber: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Tanggal Faktur Pajak:
+                </label>
+                <input
+                  type="date"
+                  value={taxInvoiceModalData.taxInvoiceDate}
+                  onChange={(e) =>
+                    setTaxInvoiceModalData((prev) => ({ ...prev, taxInvoiceDate: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Unggah Berkas e-Faktur Asli (PDF / Gambar Scan):
+                </label>
+                <div className="flex items-center gap-3">
+                  <label className="flex-1 border-2 border-dashed border-slate-300 hover:border-emerald-500 p-3.5 rounded-2xl flex items-center justify-center gap-2 cursor-pointer transition bg-slate-50/50">
+                    <Upload className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-700">
+                      {isUploadingTaxPdf ? "Sedang Mengunggah Berkas..." : "Pilih File PDF / Foto Faktur Pajak..."}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={handleUploadTaxInvoiceFile}
+                      className="hidden"
+                      disabled={isUploadingTaxPdf}
+                    />
+                  </label>
+                </div>
+
+                {taxInvoiceModalData.taxInvoiceUrl && (
+                  <div className="mt-2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="font-mono text-[11px] truncate">{taxInvoiceModalData.taxInvoiceUrl}</span>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <a
+                        href={taxInvoiceModalData.taxInvoiceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-lg font-bold text-[10px] flex items-center gap-1 cursor-pointer"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Buka</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setTaxInvoiceModalData((prev) => ({ ...prev, taxInvoiceUrl: "" }))}
+                        className="p-1 hover:bg-rose-100 text-rose-600 rounded-lg cursor-pointer"
+                        title="Hapus Lampiran"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Catatan / Keterangan Tambahan:
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Misal: Faktur Pajak Masukan/Keluaran telah dilaporkan pada SPT Masa PPN..."
+                  value={taxInvoiceModalData.notes}
+                  onChange={(e) =>
+                    setTaxInvoiceModalData((prev) => ({ ...prev, notes: e.target.value }))
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsTaxInvoiceModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingTaxPdf}
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Simpan &amp; Lampirkan</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CATAT TAGIHAN MASUK DARI VENDOR / SUPPLIER (VENDOR BILLS) - TUGAS 290 */}
+      {isNewBillModalOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsNewBillModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-purple-700">
+                  Modul Hutang Usaha &amp; Pengeluaran
+                </span>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-purple-600" />
+                  <span>Catat Tagihan Masuk Vendor (Vendor Bill)</span>
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNewBillModalOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateBillSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nomor Faktur / Invoice Vendor (*):
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Contoh: INV/VEND/2026/10/001"
+                    value={billForm.vendorInvoiceNumber}
+                    onChange={(e) => setBillForm((prev) => ({ ...prev, vendorInvoiceNumber: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-mono font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Nama Vendor / Supplier (*):
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    list="supplier-options-list"
+                    placeholder="Ketik atau pilih nama supplier..."
+                    value={billForm.supplierName}
+                    onChange={(e) => setBillForm((prev) => ({ ...prev, supplierName: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                  <datalist id="supplier-options-list">
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.name} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Kategori Tagihan / Pengeluaran:
+                  </label>
+                  <select
+                    value={billForm.billCategory}
+                    onChange={(e) => setBillForm((prev) => ({ ...prev, billCategory: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Barang / Material Perangkat">Barang / Material Perangkat</option>
+                    <option value="Jasa Subkontraktor">Jasa Subkontraktor / Tenaga Ahli</option>
+                    <option value="Sewa Alat &amp; Kendaraan">Sewa Alat &amp; Kendaraan Operasional</option>
+                    <option value="Utilitas &amp; Operasional">Utilitas, Listrik &amp; Server</option>
+                    <option value="Lainnya">Pengeluaran Lainnya</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Tanggal Tagihan:
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={billForm.date}
+                    onChange={(e) => setBillForm((prev) => ({ ...prev, date: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Tanggal Jatuh Tempo:
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={billForm.dueDate}
+                    onChange={(e) => setBillForm((prev) => ({ ...prev, dueDate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Entitas Pembukuan:
+                  </label>
+                  <select
+                    value={billForm.businessEntity}
+                    onChange={(e) => setBillForm((prev) => ({ ...prev, businessEntity: e.target.value as any }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="PT">🏢 PT. DSTech Smart Perkasa</option>
+                    <option value="NON_PT">🏬 DSTech Smart (Toko Non-PT)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Pajak PPN:
+                  </label>
+                  <div className="flex gap-1.5">
+                    <select
+                      value={billForm.taxRate}
+                      onChange={(e) => setBillForm((prev) => ({ ...prev, taxRate: Number(e.target.value) }))}
+                      className="flex-1 px-2.5 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value={0}>0% (Non-PPN)</option>
+                      <option value={11}>11%</option>
+                      <option value={12}>12%</option>
+                    </select>
+                    <select
+                      value={billForm.taxType}
+                      onChange={(e) => setBillForm((prev) => ({ ...prev, taxType: e.target.value as any }))}
+                      className="px-2 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none cursor-pointer"
+                    >
+                      <option value="exclude">Exclude</option>
+                      <option value="include">Include</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabel Rincian Item Tagihan */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                    Rincian Barang / Jasa yang Ditagihkan:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleAddBillItem}
+                    className="px-3 py-1 rounded-xl bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200 text-xs font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Baris</span>
+                  </button>
+                </div>
+
+                <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                      <tr>
+                        <th className="p-2.5">Deskripsi Item / Layanan</th>
+                        <th className="p-2.5 w-20 text-center">Qty</th>
+                        <th className="p-2.5 w-24">Satuan</th>
+                        <th className="p-2.5 w-32 text-right">Harga Satuan</th>
+                        <th className="p-2.5 w-32 text-right">Total</th>
+                        <th className="p-2.5 w-10 text-center"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {billForm.items.map((it, idx) => (
+                        <tr key={it.id || idx}>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              required
+                              placeholder="Nama barang atau rincian pekerjaan..."
+                              value={it.productName}
+                              onChange={(e) => handleBillItemChange(idx, "productName", e.target.value)}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              min={1}
+                              required
+                              value={it.qty}
+                              onChange={(e) => handleBillItemChange(idx, "qty", Number(e.target.value))}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs text-center focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="text"
+                              value={it.unit}
+                              onChange={(e) => handleBillItemChange(idx, "unit", e.target.value)}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              min={0}
+                              required
+                              value={it.price}
+                              onChange={(e) => handleBillItemChange(idx, "price", Number(e.target.value))}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs text-right font-mono focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="p-2 text-right font-mono font-bold text-slate-800">
+                            {formatRupiah(it.total)}
+                          </td>
+                          <td className="p-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveBillItem(idx)}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Ringkasan Biaya & Status Pembayaran */}
+              {(() => {
+                const { subtotal, taxAmount, grandTotal } = calculateBillTotals();
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-200">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          Status Pembayaran Awal:
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="p-2.5 border rounded-xl flex items-center gap-2 cursor-pointer bg-slate-50">
+                            <input
+                              type="radio"
+                              name="billPaymentStatus"
+                              checked={billForm.paidAmount === 0}
+                              onChange={() => setBillForm((prev) => ({ ...prev, paidAmount: 0 }))}
+                            />
+                            <span className="text-xs font-bold text-slate-700">Hutang Usaha (Tempo)</span>
+                          </label>
+                          <label className="p-2.5 border rounded-xl flex items-center gap-2 cursor-pointer bg-slate-50">
+                            <input
+                              type="radio"
+                              name="billPaymentStatus"
+                              checked={billForm.paidAmount > 0}
+                              onChange={() => setBillForm((prev) => ({ ...prev, paidAmount: grandTotal }))}
+                            />
+                            <span className="text-xs font-bold text-slate-700">Bayar / Lunas Langsung</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {billForm.paidAmount > 0 && (
+                        <div className="grid grid-cols-2 gap-2 p-3 bg-purple-50/60 rounded-xl border border-purple-200">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">Nominal Dibayar (Rp):</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={grandTotal}
+                              value={billForm.paidAmount}
+                              onChange={(e) => setBillForm((prev) => ({ ...prev, paidAmount: Number(e.target.value) }))}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-purple-300 font-mono text-xs font-bold bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-700 mb-1">Metode / Akun Kas:</label>
+                            <select
+                              value={billForm.paymentMethod}
+                              onChange={(e) => setBillForm((prev) => ({ ...prev, paymentMethod: e.target.value }))}
+                              className="w-full px-2 py-1.5 rounded-lg border border-purple-300 text-xs font-bold bg-white"
+                            >
+                              <option value="Transfer Bank BCA PT">Transfer Bank BCA PT</option>
+                              <option value="Transfer Bank Mandiri PT">Transfer Bank Mandiri PT</option>
+                              <option value="Kas Tunai Operasional">Kas Tunai Operasional</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2 text-xs">
+                      <div className="flex justify-between text-slate-600">
+                        <span>Subtotal:</span>
+                        <span className="font-mono font-bold text-slate-800">{formatRupiah(subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-600">
+                        <span>PPN ({billForm.taxRate}%):</span>
+                        <span className="font-mono font-bold text-slate-800">{formatRupiah(taxAmount)}</span>
+                      </div>
+                      <div className="flex justify-between text-base font-black text-slate-900 border-t border-slate-200 pt-2">
+                        <span>Total Tagihan:</span>
+                        <span className="font-mono text-purple-700">{formatRupiah(grandTotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs font-bold text-slate-500 pt-1">
+                        <span>Sisa Hutang:</span>
+                        <span className="font-mono text-rose-600">{formatRupiah(Math.max(0, grandTotal - (billForm.paidAmount || 0)))}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsNewBillModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Simpan Tagihan Vendor</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: BAYAR / LUNASI TAGIHAN VENDOR (PAY BILL) - TUGAS 290 */}
+      {isPayBillModalOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsPayBillModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                  Pembayaran Hutang Usaha
+                </span>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-emerald-600" />
+                  <span>Pelunasan Tagihan Vendor</span>
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsPayBillModalOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handlePayBillSubmit} className="space-y-4">
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">No. Dokumen:</span>
+                  <span className="font-mono font-bold text-purple-700">{payBillForm.poNumber}</span>
+                </div>
+                {payBillForm.vendorInvoiceNumber && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">No. Faktur Vendor:</span>
+                    <span className="font-mono font-bold text-slate-800">{payBillForm.vendorInvoiceNumber}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Penerima (Vendor):</span>
+                  <span className="font-bold text-slate-900">{payBillForm.supplierName}</span>
+                </div>
+                <div className="flex justify-between border-t border-slate-200 pt-1.5">
+                  <span className="text-slate-500">Total Tagihan:</span>
+                  <span className="font-mono font-bold text-slate-900">{formatRupiah(payBillForm.grandTotal)}</span>
+                </div>
+                <div className="flex justify-between text-rose-600 font-bold">
+                  <span>Sisa Hutang Belum Bayar:</span>
+                  <span className="font-mono">{formatRupiah(payBillForm.remainingAmount)}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nominal yang Dibayarkan Sekarang (Rp):
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={payBillForm.remainingAmount || payBillForm.grandTotal}
+                  required
+                  value={payBillForm.paymentAmount}
+                  onChange={(e) => setPayBillForm((prev) => ({ ...prev, paymentAmount: Number(e.target.value) }))}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Tanggal Bayar:
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={payBillForm.paymentDate}
+                    onChange={(e) => setPayBillForm((prev) => ({ ...prev, paymentDate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Metode Pembayaran:
+                  </label>
+                  <select
+                    value={payBillForm.paymentMethod}
+                    onChange={(e) => setPayBillForm((prev) => ({ ...prev, paymentMethod: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none cursor-pointer"
+                  >
+                    <option value="Transfer Bank BCA PT">Transfer Bank BCA PT</option>
+                    <option value="Transfer Bank Mandiri PT">Transfer Bank Mandiri PT</option>
+                    <option value="Kas Tunai Operasional">Kas Tunai Operasional</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Catatan / Keterangan Pembayaran:
+                </label>
+                <input
+                  type="text"
+                  value={payBillForm.notes}
+                  onChange={(e) => setPayBillForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Keterangan transfer / bukti mutasi..."
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsPayBillModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Konfirmasi Pembayaran</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

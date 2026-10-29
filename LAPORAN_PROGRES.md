@@ -4,9 +4,69 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Tugas 289 (ANTREAN BERIKUTNYA)**: Fitur Pengiriman Surat Resmi (SPH, Invoice/Faktur, BAST, Surat Jalan, Kuitansi) ke Beberapa Nomor Kontak WhatsApp Sekaligus (Multi-Recipient WhatsApp Dispatch).
-  *Permintaan User*: "ketika saya ingin mengirimkan SPH, Invoice, atau surat-suarat lainnya, tolong buatkan fiturnya agar bisa kirim ke beberapa nomor." (disertai tangkapan layar modal Kirim Dokumen ke WhatsApp).
-  *Catatan Antrean*: Sesuai aturan kerja, tugas ini telah dicatat ke dalam antrean dan siap dikerjakan setelah penyelesaian Tugas 288.
+- **Tugas 289**: Fitur Pengiriman Surat Resmi (SPH, Invoice/Faktur, BAST, Surat Jalan, Kuitansi, Laporan Foto) ke Beberapa Nomor Kontak WhatsApp Sekaligus (Multi-Recipient WhatsApp Dispatch) pada Modul Finance & Penagihan.
+  *Permintaan User*: "ketika saya ingin mengirimkan SPH, Invoice, atau surat-suarat lainnya, tolong buatkan fiturnya agar bisa kirim ke beberapa nomor." (disertai instruksi: "ok, lanjutkan").
+  *Akar Masalah yang Ditemukan (Root Cause)*:
+  1. Pada modal `sendDocModal` di `src/app/admin/finance/page.tsx`, input nomor telepon WhatsApp penerima saat ini hanya berupa satu textfield `customPhoneInput`.
+  2. Saat pengguna ingin mengirimkan paket dokumen resmi ke beberapa pihak sekaligus (misalnya: PIC Pengadaan, Direktur Keuangan Klien, dan Pengawas Lapangan), pengguna harus menghapus dan mengetik ulang nomor satu per satu secara manual.
+  *Rencana Langkah Pengerjaan (Step-by-Step)*:
+  1. **Pencadangan Berkas (Backup)**: Membuat folder cadangan `dstech-smart/_backup_multi_wa_dispatch` dan menyalin `src/app/admin/finance/page.tsx`.
+  2. **Penambahan Fitur Multi-Recipient WhatsApp di Frontend (`src/app/admin/finance/page.tsx`)**:
+     - Menambahkan state manajemen daftar nomor WhatsApp: `waRecipients: { phone: string; label: string; isSent?: boolean }[]`.
+     - Saat modal dibuka, otomatis menyematkan nomor utama klien (`sendDocModal.recipientPhone`) sebagai penerima awal.
+     - Menyediakan antarmuka input nomor tambahan:
+       * Form input nomor baru + label (misal: "Keuangan / Accounting", "Owner / Direktur", "Pengawas Lapangan").
+       * Chip / tag list nomor penerima yang bisa ditambah dan dihapus dengan mudah.
+       * Pilihan nomor cepat dari daftar kontak klien terkait jika tersimpan di master data `clients`.
+     - Menyediakan aksi pengiriman:
+       * Tombol kirim ke masing-masing nomor dengan status ceklis jika sudah dikirim (`Sudah Dibuka`).
+       * Tombol "Kirim Cepat ke Semua Nomor Terpilih" yang membuka WhatsApp Web / App untuk masing-masing kontak.
+       * Tombol salin nomor semua kontak atau salin format teks WhatsApp.
+  3. **Validasi & Pengujian**:
+     - Uji tipe TypeScript dengan `npx tsc --noEmit`.
+     - Uji kompilasi dengan `npm run build`.
+  4. **Pembersihan Berkas Cadangan & Deployment**:
+     - Hapus folder cadangan sementara `_backup_multi_wa_dispatch`.
+     - Git commit & push ke master, lalu deploy ke server live VPS.
+     - Perbarui status Tugas 289 menjadi `[SELESAI]`.
+
+- **2026-10-29**: [SELESAI] Pencatatan Pengeluaran Tagihan Masuk dari Vendor/Supplier (Vendor Bills & Hutang Usaha) serta Fitur Unggah & Lampiran Faktur Pajak Elektronik (e-Faktur DJP / KPP) dan Link Kuitansi pada Modul Penagihan Klien (Tugas 290) (`src/app/admin/finance/page.tsx`, `src/app/api/finance/route.ts`, `src/app/api/finance/print/route.ts`).
+  *Permintaan User*: 
+  1. "saya cek belum ada untuk pencatatan pengeluaran tagihan dari vendor/suplayer ke saya,itu dimana? kemudian untuk faktur pajak yang harus dilampirkan saya upload kemana untuk dikirimkan ke client"
+  2. "pada pesan yang dikirimkan, tidak ada link untuk download kuitansi, dan juga Lampiran Faktur pajak"
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  1. State `billForm` dan handler API untuk `docType: "BILL"` sebelumnya telah dibuat di backend, namun tombol pembuka modal `Catat Tagihan Masuk Vendor` dan render modal JSX di `src/app/admin/finance/page.tsx` belum dipasang di antarmuka tab Pembelian/PO. Akibatnya admin tidak menemukan lokasi input tagihan masuk dari vendor.
+  2. Dokumen faktur penjualan (`SaleInvoice`) belum memiliki antarmuka untuk mengunggah berkas Faktur Pajak resmi (e-Faktur KPP/DJP) beserta Nomor Seri Faktur Pajak (NSFP).
+  3. Pada fungsi `generateDocShareContent` dan grid modal download berkas klien (`sendDocModal`), tautan Kuitansi Pembayaran hanya muncul jika berstatus lunas/sebagian (tidak selalu muncul) dan belum ada kartu serta tautan untuk mengunduh Faktur Pajak Elektronik (e-Faktur DJP).
+  *Penyelesaian & Hasil*:
+  1. **Antarmuka Pencatatan Tagihan Masuk Vendor (Vendor Bills & Hutang Usaha)**:
+     - Di `src/app/admin/finance/page.tsx`:
+       * Menambahkan tombol mencolok *"Catat Tagihan Vendor (Bill)"* dengan warna ungu di samping tombol *"Buat PO Baru"*.
+       * Menambahkan dropdown filter dokumen di tab Pembelian: *"Semua (PO & Tagihan Vendor)"*, *"Hanya PO"*, dan *"Hanya Tagihan Masuk Vendor (Bills)"*.
+       * Di tabel data, dokumen tagihan masuk vendor kini diberi badge khusus *"📥 Tagihan Vendor"* warna ungu beserta nomor faktur asli vendor (`vendorInvoiceNumber`).
+       * Disediakan tombol aksi *"Bayar"* langsung di tabel jika tagihan belum lunas yang membuka modal pelunasan (`isPayBillModalOpen`).
+       * Menghadirkan modal input lengkap `isNewBillModalOpen`: input nomor faktur vendor, nama supplier, kategori tagihan (Material, Jasa Subkon, Sewa Alat, Utilitas), tanggal jatuh tempo, rincian barang/jasa, kalkulasi PPN (11%/12%), dan pilihan pembayaran lunas langsung atau hutang usaha (tempo).
+       * Menghadirkan modal pelunasan hutang `isPayBillModalOpen` yang mencatat pengeluaran kas keluar ke buku kas (`cash_flow`) dan memperbarui sisa hutang secara realtime.
+  2. **Fitur Unggah & Lampiran Faktur Pajak Elektronik (e-Faktur DJP / KPP)**:
+     - Di backend `src/app/api/finance/route.ts`:
+       * Menambahkan field `taxInvoiceNumber`, `taxInvoiceDate`, `taxInvoiceUrl`, `taxInvoiceUploadedAt` pada `sales`.
+       * Menambahkan handler `actionType === "attach_tax_invoice"` dan mengunci perlindungan tanda tangan digital agar penambahan Faktur Pajak DJP tidak menghapus tanda tangan sah sebelumnya.
+     - Di frontend `src/app/admin/finance/page.tsx`:
+       * Disediakan tombol cepat *"🏛️ e-Faktur"* pada setiap baris tabel faktur penjualan.
+       * Disediakan modal khusus `isTaxInvoiceModalOpen` untuk menginput Nomor Seri Faktur Pajak (NSFP) dari DJP, memilih tanggal faktur, dan mengunggah berkas PDF/foto scan e-Faktur resmi via API `/api/upload`.
+     - Di lembar cetak dokumen `src/app/api/finance/print/route.ts`:
+       * Mencantumkan badge resmi e-Faktur DJP dengan nomor NSFP pada Faktur Penjualan serta tombol unduh berkas PDF asli DJP.
+  3. **Penyempurnaan Pesan Penagihan Klien (WhatsApp, Email & Modal Tautan Unduh)**:
+     - Pada generator pesan WhatsApp (`waText`) & Email (`emailBody`):
+       * Tautan Kuitansi Pembayaran Resmi (`doc=receipt`) kini **selalu otomatis terlampir** di nomor urut 5.
+       * Tautan Faktur Pajak Elektronik resmi DJP (`taxInvoiceUrl`) dan nomor NSFP kini **otomatis terlampir** di nomor urut 6 jika telah diunggah.
+     - Pada modal kirim dokumen (`sendDocModal`):
+       * Grid tautan berkas resmi kini mencakup 6 dokumen lengkap: Faktur Penjualan, BAST, Surat Jalan, Laporan Foto, Kuitansi Pembayaran, dan Faktur Pajak DJP.
+       * Terdapat tombol cepat salin tautan dan tombol unggah e-Faktur langsung dari modal tanpa harus keluar.
+  4. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: **0 error (Lolos validasi ketat)**.
+     - `npm run build`: **Berhasil 100% (76/76 static & dynamic pages)**.
+     - Folder cadangan sementara `_backup_vendor_bill_and_efaktur` telah dibersihkan secara aman.
 
 - **2026-10-29**: [SELESAI] Pemisahan Total dan Ketat Antara Entitas Perusahaan (PT. DSTech Smart Perkasa) dengan Entitas Toko / E-Store / Usaha Mandiri (DSTech Smart Non-PT) pada Seluruh Penerbitan Dokumen (Faktur, BAST, Kuitansi, Surat Jalan, dan Dokumentasi Foto) serta Pembukuan Keuangan ERP (Tugas 288) (`src/app/api/finance/print/route.ts`, `src/app/api/orders/route.ts`, `src/app/api/finance/route.ts`).
   *Permintaan User*: "ada kesalahan sangat faktal dalam penerbitan Faktur, BAST, Kuitansi, Surat Jalan, dan laporan dokumentasi. semuanya masih tercampur antara ensitas perusahan dengan toko. contoh pada faktur ni, disini sebenarnya project toko, namun kenapa semuanya masih keluar kop dan tercatat di PT? ini sangat berbahaya" (disertai tangkapan layar lembar cetak faktur proyek/pesanan toko yang masih menampilkan kop surat PT dan penerbit PT).
