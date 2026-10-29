@@ -4,30 +4,37 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Tugas 293 (SEDANG BERJALAN)**: Penempatan Tombol Aksi e-Faktur Pajak di Kolom Aksi Tabel Penjualan, Badge Status Pajak, Toolbar Cetak Faktur, dan Sinkronisasi Deployment Langsung ke Server Live VPS (`src/app/admin/finance/page.tsx`).
+*Tidak ada pekerjaan aktif yang tertunda. Semua instruksi telah selesai dikerjakan, diuji coba bebas error, dan telah dideploy langsung ke server live VPS 100%.*
+
+- **2026-10-29**: [SELESAI] Penempatan Tombol Aksi e-Faktur Pajak di Kolom Aksi Tabel Penjualan, Badge Status Pajak, Toolbar Cetak Faktur, dan Deployment Langsung ke Live VPS (Tugas 293) (`src/app/admin/finance/page.tsx`).
   *Permintaan User*: 
   1. "pada tombol akse saya tidak menemukan tombol faktur pajak" (disertai foto layar browser pada tabel penjualan).
   2. "setelah selesai perbaikan, uanggah langsung ke server laive jika sudah tidak ada eror saat dilakukan ujicoba."
   *Penyebab Masalah yang Ditemukan (Root Cause)*:
   Pada pembaruan sebelumnya (Tugas 292), handler `handleOpenTaxInvoiceModal` baru tersambung di modal kirim pesan `sendDocModal`, namun belum dipasang secara visual di baris tombol kolom Aksi (Baris 1) tabel penjualan (`sales`) dan kolom Status Dokumen. Akibatnya pengguna yang membuka menu Penjualan & Faktur tidak melihat tombol atau badge khusus e-Faktur Pajak di tabel daftar faktur.
-  *Rencana Langkah Pengerjaan (Step-by-Step)*:
-  1. **Pencadangan Berkas (Backup)**: Membuat folder cadangan `dstech-smart/_backup_tax_invoice_table_action/` yang berisi `src/app/admin/finance/page.tsx`.
-  2. **Penambahan Tombol & Badge e-Faktur di Tabel Penjualan (`src/app/admin/finance/page.tsx`)**:
-     - **Di Kolom Aksi (Baris 1)**: Memasang tombol aksi khusus `🏛️ e-Faktur Pajak` (ikon `Landmark`) bersebelahan dengan dokumen resmi lainnya (Cetak Faktur, Kuitansi, BAST, Surat Jalan, Foto) khusus untuk faktur entitas PT (`sale.businessEntity !== "NON_PT"`).
-       * Status aktif (sudah ada berkas / NSFP): Latar hijau emerald dengan tooltip NSFP & titik indikator.
-       * Status belum diisi: Latar slate dengan border dan tooltip siap unggah.
-     - **Di Kolom Status Dokumen**: Memasang badge tombol e-Faktur di bawah status Approval (`+ Lampirkan Pajak` / `e-Faktur Dilampirkan`) yang dapat diklik langsung untuk mempermudah identifikasi status pajak setiap faktur.
-     - **Di Toolbar Cetak Faktur (`selectedInvoiceForPrint`)**: Menambahkan tombol kelola e-Faktur agar admin dapat melampirkan berkas pajak langsung saat sedang meninjau dokumen faktur.
-  3. **Pengujian & Validasi Lokal**:
-     - Menjalankan `npx tsc --noEmit` untuk validasi tipe TypeScript.
-     - Menjalankan `npm run build` untuk memverifikasi kompilasi produksi 76/76 halaman.
-  4. **Deployment Langsung ke Server Live VPS**:
-     - Mengunggah berkas `src/app/admin/finance/page.tsx` ke server live VPS via SFTP SSH (`157.66.34.199:11587`).
-     - Menjalankan `npm run build` dan `pm2 restart dstech-main` di server live VPS.
-     - Memverifikasi status PM2 `dstech-main` adalah `online` dan halaman live bebas error.
-  5. **Pembersihan & Penyelesaian Laporan**:
-     - Menghapus folder cadangan sementara `_backup_tax_invoice_table_action`.
-     - Mengubah status Tugas 293 di `LAPORAN_PROGRES.md` menjadi `[SELESAI]`.
+  *Penyelesaian & Hasil*:
+  1. **Penambahan Tombol Aksi e-Faktur di Kolom Aksi (Baris 1) Tabel Penjualan (`src/app/admin/finance/page.tsx`)**:
+     - Memasang tombol aksi khusus `🏛️ e-Faktur Pajak` (ikon `Landmark`) bersebelahan dengan dokumen resmi lainnya (Cetak Faktur, Kuitansi, BAST, Surat Jalan, Foto) khusus untuk faktur entitas PT (`sale.businessEntity !== "NON_PT"`).
+     - Jika e-Faktur sudah dilampirkan: Tombol berlatar hijau emerald dengan tooltip NSFP & titik indikator hijau aktif.
+     - Jika e-Faktur belum diisi: Tombol berlatar slate dengan border dan tooltip siap unggah.
+     - Saat diklik langsung membuka modal `handleOpenTaxInvoiceModal(sale)` untuk input NSFP dan upload berkas PDF e-Faktur DJP.
+  2. **Penambahan Badge Status Lampiran Pajak di Kolom Status Dokumen**:
+     - Memasang badge interaktif di bawah status Approval:
+       * `+ Lampirkan Pajak` (abu-abu) jika belum ada berkas e-Faktur.
+       * `e-Faktur Dilampirkan` (hijau emerald) jika berkas/NSFP sudah ada.
+     - Badge ini dapat diklik langsung untuk mempermudah identifikasi status pajak setiap faktur tanpa harus mencari di kolom aksi.
+  3. **Penambahan Tombol e-Faktur di Toolbar Cetak Faktur (`selectedInvoiceForPrint`)**:
+     - Memasang tombol kelola e-Faktur di header toolbar pratinjau faktur sehingga admin dapat langsung melampirkan berkas pajak saat sedang meninjau dokumen faktur.
+  4. **Pengujian & Validasi Lokal**:
+     - `npx tsc --noEmit` lolos 100% tanpa error tipe.
+     - `npm run build` sukses mengompilasi 76/76 static & dynamic pages.
+  5. **Deployment Langsung ke Server Live VPS**:
+     - Commit dan push ke repository GitHub `rm23nm/dstech-smart` (Commit `1b3099f`).
+     - Menjalankan `deploy_live.js` via SSH ke VPS `157.66.34.199:11587` (`git pull origin master && npm install && npm run build && pm2 restart dstech-main`).
+     - Hasil kompilasi live: 76/76 static & dynamic pages sukses.
+     - Status PM2 `dstech-main` (PID 2258880) aktif `online` dengan penggunaan memori normal (47.6 MB).
+     - Verifikasi live `https://dstechsmart.com/admin/finance` menghasilkan respon HTTP `200 OK`.
+
 
 
 - **2026-10-29**: [SELESAI] Penempatan Tombol Aksi e-Faktur Pajak di Kolom Aksi Tabel Penjualan dan Penyempurnaan Modal Pengiriman Pesan agar Langsung Melampirkan Link Download Siap Jadi (Tugas 292) (`src/app/admin/finance/page.tsx`).
