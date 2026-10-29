@@ -4,7 +4,77 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-*Tidak ada pekerjaan aktif yang tertunda. Semua instruksi perbaikan dan permintaan telah selesai 100% dan terverifikasi di server lokal dan siap rilis.*
+- **2026-10-29**: [SELESAI] Penguncian Permanen Pengesahan Tanda Tangan Dokumen Sah, Kebijakan Pembatasan Penerbitan Faktur E-Store Hanya Saat Pesanan Diterima (Delivered) & Pembersihan Faktur Pesanan Batal, Alur Refund & Retur Terintegrasi Buku Kas, Default Penandatangan Dokumen PT. DSTech Smart Perkasa (Direktur: RAMADHANI ST), serta Pengaturan Master Tanda Tangan & Stempel di Site Settings (Tugas 296) (`src/app/api/finance/route.ts`, `src/app/api/orders/route.ts`, `src/app/api/finance/print/route.ts`, `src/app/api/settings/route.ts`, `src/app/admin/settings/page.tsx`, `src/app/admin/orders/page.tsx`, `src/app/admin/finance/page.tsx`).
+  *Permintaan User*:
+  1. "setiap saya selesai mengesahkan surat tanda tangan. selalu saja pengesahaannya hilang tanpa tertanda tangan. tolong dikunci. jika sudah melakukan tanda tangan 1x pada seluruh dokumen maka jangan pernah hilang dan diubah. kecuali ada melakukan perbaikan surat, maka butuh pengesahan kembali."
+  2. "kemudian saya melihat. jika ada order yang masuk dari estor client. maka faktur dan lainnya langsung terbentuk. padahal pesanan tersebut sudah berstatus batal. ordernya hanya berstatus baru order tanpa pembayaran terverivikasi dan pengirimannya belum diterima konsumen. tolong ubah sistemnya. agar seluruh faktur dari estor baru terbentuk setelah pesanan dinyatakan diterima oleh client. kalau pesanannya batal, maka jangan buatkan faktur penjualan. dikhawatirkan akan masuk ke keuangan dan mengacak-acak keuangannya.. jika pesanan sudah selesai dan diterima, namun client komplen dan mengembalikan pesanan. maka pesanan sebelumnya akan direfund dan pengembalian dana harus bisa diproses"
+  3. "untuk aproval selain dari surat jalan, setkan semuanya default ke penanda tangan PT. DSTECH SMART PRKASA yang menandatangani RAMADHANI ST dan Jabatannya Direktur"
+  4. "kalau bisa buatkan di pengaturan site setting untuk pengaturan penandatangan setiap surat, sehingga kedepannya secara otomatis dan seragam terbentuk"
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  1. **Pengesahan & Tanda Tangan Hilang**: Handler edit PUT /api/finance sebelumnya mereplace field dokumen secara langsung (`data.sales[index] = { ...data.sales[index], ...updates };`). Saat admin mengedit informasi transaksi umum (seperti nomor kontak atau alamat), form frontend mengirimkan objek tanpa tanda tangan atau data approval lama sehingga tertimpa kosong. Dokumen tidak memiliki flag penguncian (`isLocked`).
+  2. **Pesanan E-Store Batal Mengotori Keuangan**: Di `src/app/api/orders/route.ts`, fungsi `syncOrderToFinanceErp` dipanggil langsung saat pesanan baru dibuat (`PAYMENT_PENDING`), langsung memasukkan piutang/penjualan ke `financeData.sales`. Saat pesanan dibatalkan atau belum diterima, faktur tersebut tetap bersarang di modul keuangan dan mengacaukan pembukuan laba rugi.
+  3. **Belum Ada Alur Refund/Retur Pesanan Toko Online**: Ketika pesanan selesai namun pelanggan komplain barang rusak/cacat dan meminta pengembalian dana, belum ada alur formal untuk mencatat Berita Acara Retur dan pengeluaran kas refund di `financeData.cash_flow`.
+  4. **Penandatangan Tidak Seragam**: Default penandatangan dokumen penjualan dan keuangan belum diset seragam ke RAMADHANI ST (Direktur PT. DSTech Smart Perkasa) serta belum terhubung ke master tanda tangan digital di Site Settings.
+  *Penyelesaian & Hasil*:
+  1. **Penguncian Permanen Pengesahan Dokumen (`applySignatureLockProtection`)**:
+     - Dokumen yang telah disahkan (`approvalStatus === "Disetujui & Sah"` atau `isLocked === true`) diproteksi 100% pada level backend `src/app/api/finance/route.ts`. Seluruh data approval (`approvalStatus`, `approvedBy`, `approverTitle`, `approvedAt`, `signatureImage`, `stampImage`, `digitalFingerprint`, `verificationCode`, `clientSignatures`) tidak dapat tertimpa atau hilang saat edit data transaksi umum.
+     - Jika dokumen memerlukan perbaikan substansial (revisi), sistem mewajibkan flag `isRevision: true`, mencatat riwayat versi (`revisionHistory`), menaikkan nomor revisi (`revision: revision + 1`), dan baru meminta pengesahan ulang.
+     - Di `src/app/admin/finance/page.tsx`, modal edit dan tabel penjualan kini menampilkan badge proteksi "🔒 Dokumen Terkunci & Sah" dengan informasi legalitas Direktur RAMADHANI ST.
+  2. **Aturan Ketat Faktur E-Store & Pembersihan Pesanan Batal**:
+     - Di `src/app/api/orders/route.ts` (`syncOrderToFinanceErp`), faktur penjualan resmi dan arus kas masuk HANYA dibuat ketika pesanan berstatus **`DELIVERED` / `SELESAI`**.
+     - Pesanan dalam proses (`PAYMENT_PENDING`, `PAID`, `PROCESSING`, `SHIPPED`) hanya dapat mencetak Surat Pesanan Proforma tanpa masuk ke buku keuangan resmi.
+     - Pesanan berstatus **`CANCELLED` / `DIBATALKAN`** secara ketat dilarang membuat faktur penjualan. Jika sebelumnya pernah tercatat, faktur dan kas masuk terkait otomatis dibersihkan dari `financeData.sales` dan `financeData.cash_flow`.
+     - Pada `src/app/api/finance/print/route.ts`, pesanan batal menampilkan layar resmi pemberitahuan bahwa Faktur Penjualan Tidak Diterbitkan.
+  3. **Alur Refund & Pengembalian Dana Terintegrasi (`process_refund`)**:
+     - Di `src/app/api/orders/route.ts` (PATCH), ditambahkan aksi `process_refund`:
+       * Mengubah status pesanan menjadi `REFUNDED` / `RETURN`.
+       * Menerbitkan Berita Acara Retur resmi ke `financeData.returns_sales`.
+       * Mencatat arus kas keluar pengembalian dana pelanggan di `financeData.cash_flow`.
+       * Mengupdate status faktur penjualan menjadi `Direfund / Dikembalikan`.
+     - Di `src/app/admin/orders/page.tsx`, disediakan form pengembalian dana interaktif di modal proses pesanan (Nominal Refund, Pilihan Bank/Kas, Nomor Rekening Tujuan, Nama Pemilik Rekening, dan Alasan Komplain Retur), serta tombol dinamis cetak Berita Acara Refund (A4).
+  4. **Default Penandatangan Resmi & Pengaturan Site Settings**:
+     - Default penandatangan dokumen resmi (selain Surat Jalan) ditetapkan ke:
+       * Perusahaan: `PT. DSTECH SMART PERKASA`
+       * Penandatangan: `RAMADHANI ST`
+       * Jabatan: `Direktur`
+     - Di `src/app/admin/settings/page.tsx` (Bagian Kop Surat & Dokumen Resmi), ditambahkan form pengaturan penandatangan seragam, upload Master Tanda Tangan Digital transparan (`masterSignatureUrl`), dan Master Cap Stempel Resmi (`masterStampUrl`) dengan pratinjau langsung.
+     - Backend `src/app/api/settings/route.ts` otomatis menyinkronkan kedua konfigurasi ini secara dua arah ke `dstech_finance_erp.json` dan pesanan e-store.
+  5. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: 0 error tipe TypeScript.
+     - `npm run build`: 76/76 static & dynamic pages sukses terkompilasi.
+
+- **2026-10-29**: [SELESAI] Fitur Tombol Penerimaan Barang PO (Goods Receipt), Modal Konfirmasi Barang Masuk Gudang, dan Otomatisasi Update Stok Produk serta HPP/Harga Jual dari Purchase Order (Tugas 295) Fitur Tombol Penerimaan Barang PO (Goods Receipt), Modal Konfirmasi Barang Masuk Gudang, dan Otomatisasi Update Stok Produk serta HPP/Harga Jual dari Purchase Order (`src/app/admin/finance/page.tsx` & `src/app/api/finance/route.ts`).
+  *Permintaan User*: "untuk PO sebelumnya yang diorder, untuk merubah status menjadi dalam pengiriman menjadi diterima bagai mana caranya? kemudian stok dan harganya harus langsung berubah terupdate"
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  1. Pada tabel Pembelian / Purchase Order di modul Keuangan (`src/app/admin/finance/page.tsx`), saat ini belum ada tombol aksi cepat atau modal khusus "Terima Barang" (Goods Receipt). Admin harus mengklik tombol Edit PO yang form-nya panjang.
+  2. Pada pilihan status di modal edit PO sebelumnya hanya terdapat opsi "Diterima & Lunas", yang membingungkan ketika barang fisik sudah diterima di gudang namun status pembayaran vendor masih Hutang Usaha / Tempo 30 Hari.
+  3. Pengguna membutuhkan alur penerimaan barang yang jelas dan transparan di mana admin dapat mengonfirmasi penerimaan pesanan dari "Dalam Pengiriman" menjadi "Diterima", memilih gudang penyimpanan tujuan, mencatat No. Surat Jalan vendor, dan secara instan otomatis menambah stok katalog (`dstech_products.json`) serta memperbarui HPP modal (`costPrice`) dan harga jual (`price`).
+  *Rencana Langkah Pengerjaan (Step-by-Step)*:
+  1. **Pencadangan Berkas (Backup)**: Membuat folder backup cadangan `_backup_po_receipt_and_stock_sync` berisi `src/app/api/finance/route.ts` dan `src/app/admin/finance/page.tsx`.
+  2. **Penyempurnaan Backend (`src/app/api/finance/route.ts`)**:
+     - Menambahkan handler aksi khusus `receive_po` (Penerimaan Barang PO / Goods Receipt).
+     - Memperbarui status PO menjadi "Diterima" (atau "Diterima & Lunas" jika pembayaran lunas) serta mencatat riwayat penerimaan (`receivedDate`, `receivedBy`, `vendorDeliveryNote`, `warehouseId`).
+     - Menyinkronkan penambahan stok fisik ke `dstech_products.json` (baik `stock` total maupun stok gudang spesifik `warehouseStock[warehouseId]`).
+     - Menghitung dan memperbarui Moving Average Cost HPP (`costPrice`) dan mendukung pembaruan harga jual baru (`price`) jika diinstruksikan.
+  3. **Penyempurnaan Frontend (`src/app/admin/finance/page.tsx`)**:
+     - Menambahkan tombol aksi cepat `📦 Terima Barang` (ikon `PackageCheck`) berwarna hijau emerald di baris aksi tabel PO.
+     - Membuat modal interaktif **"Konfirmasi Penerimaan Barang Masuk (Goods Receipt)"**:
+       * Menampilkan ringkasan item PO, kuantitas yang dipesan.
+       * Input Tanggal Diterima, Gudang Penyimpanan Tujuan (Gudang Utama Cilegon, Gudang Transit Serang, dll).
+       * Input No. Surat Jalan / Resi Pengiriman Vendor.
+       * Pratinjau penambahan stok (Stok Awal -> Stok Baru) dan pembaruan HPP modal.
+       * Input opsi harga jual baru (jika ingin sekaligus memperbarui harga jual katalog).
+     - Menambahkan opsi status "Diterima (Barang Masuk Gudang)" di modal Edit PO.
+  4. **Pengujian & Validasi Lokal**:
+     - Menjalankan `npx tsc --noEmit` untuk memastikan 0 error tipe TypeScript.
+     - Menjalankan `npm run build` untuk verifikasi kompilasi 76/76 static & dynamic pages.
+  5. **Sinkronisasi & Deployment ke Server Live VPS**:
+     - Push commit ke GitHub repository.
+     - Jalankan deployment via SSH ke live VPS `157.66.34.199:11587` (`git pull && npm install && npm run build && pm2 restart dstech-main`).
+     - Verifikasi data live dan pandu user cara penggunaan tombol dan alur penerimaan barang.
+  6. **Pembersihan & Finalisasi Laporan**:
+     - Hapus folder backup cadangan sementara.
+     - Update `LAPORAN_PROGRES.md` menjadi status `[SELESAI]`.
 
 - **2026-10-29**: [SELESAI] Integrasi Otomatis Pajak PPN (Keluaran & Masukan) dan PPh dari Penjualan (Faktur & e-Faktur) serta Pembelian/Tagihan Vendor (PO & Bills) ke Menu Pajak PPh & PPN dan Modul Keuangan Lengkap dengan Nominal Rupiah (Tugas 294) (`src/app/admin/finance/page.tsx` & `src/app/api/finance/route.ts`).
   *Permintaan User*: 

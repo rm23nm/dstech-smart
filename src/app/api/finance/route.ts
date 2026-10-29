@@ -59,8 +59,9 @@ function deductProductCatalogStock(items: any[], warehouseId: string = "dstech_w
  * HPP Baru = ((Stok Lama * HPP Lama) + (Qty Beli PO * Harga Beli PO)) / (Stok Lama + Qty Beli PO)
  */
 function syncProductStockAndMovingAverageCost(items: any[], warehouseId: string = "dstech_wh_1") {
+  const updatedSummaries: any[] = [];
   try {
-    if (!fs.existsSync(PRODUCTS_FILE)) return;
+    if (!fs.existsSync(PRODUCTS_FILE)) return updatedSummaries;
     const raw = fs.readFileSync(PRODUCTS_FILE, "utf-8");
     const products: any[] = JSON.parse(raw);
     let changed = false;
@@ -69,7 +70,7 @@ function syncProductStockAndMovingAverageCost(items: any[], warehouseId: string 
       if (!item) continue;
       const qtyPurchased = Number(item.qty) || 0;
       const purchasePrice = Number(item.price) || 0;
-      if (qtyPurchased <= 0 || purchasePrice <= 0) continue;
+      if (qtyPurchased <= 0) continue;
 
       const targetProd = products.find((p) => {
         if (item.productId && String(p.id) === String(item.productId)) return true;
@@ -83,19 +84,28 @@ function syncProductStockAndMovingAverageCost(items: any[], warehouseId: string 
           const oldStock = Math.max(0, Number(targetProd.stock) || 0);
           const oldCost = Number(targetProd.costPrice) > 0 ? Number(targetProd.costPrice) : purchasePrice;
 
-          // Hitung Moving Average HPP
-          const totalInventoryValue = (oldStock * oldCost) + (qtyPurchased * purchasePrice);
+          // Hitung Moving Average HPP jika harga beli > 0
+          let newMovingAverageCost = oldCost;
           const totalNewStock = oldStock + qtyPurchased;
-          const newMovingAverageCost = totalNewStock > 0 ? Math.round(totalInventoryValue / totalNewStock) : purchasePrice;
+          if (purchasePrice > 0) {
+            const totalInventoryValue = (oldStock * oldCost) + (qtyPurchased * purchasePrice);
+            newMovingAverageCost = totalNewStock > 0 ? Math.round(totalInventoryValue / totalNewStock) : purchasePrice;
+          }
 
           targetProd.costPrice = newMovingAverageCost;
           targetProd.stock = totalNewStock;
 
+          // Update harga jual baru jika diinstruksikan oleh admin
+          const oldSellingPrice = Number(targetProd.price) || 0;
+          if (item.newSellingPrice !== undefined && Number(item.newSellingPrice) > 0) {
+            targetProd.price = Number(item.newSellingPrice);
+          }
+
           if (!targetProd.warehouseStock) {
             targetProd.warehouseStock = {
-              dstech_wh_1: totalNewStock,
-              dstech_wh_2: 0,
-              dstech_wh_3: 0,
+              dstech_wh_1: warehouseId === "dstech_wh_1" ? totalNewStock : oldStock,
+              dstech_wh_2: warehouseId === "dstech_wh_2" ? qtyPurchased : 0,
+              dstech_wh_3: warehouseId === "dstech_wh_3" ? qtyPurchased : 0,
             };
           } else {
             const currentWh = Number(targetProd.warehouseStock[warehouseId]) || 0;
@@ -104,6 +114,19 @@ function syncProductStockAndMovingAverageCost(items: any[], warehouseId: string 
 
           targetProd.updatedAt = new Date().toISOString();
           changed = true;
+
+          updatedSummaries.push({
+            productId: targetProd.id,
+            productName: targetProd.name,
+            qtyAdded: qtyPurchased,
+            oldStock: oldStock,
+            newStock: totalNewStock,
+            oldCostPrice: oldCost,
+            newCostPrice: newMovingAverageCost,
+            oldSellingPrice: oldSellingPrice,
+            newSellingPrice: targetProd.price,
+            warehouseId: warehouseId,
+          });
         }
       }
     }
@@ -111,8 +134,10 @@ function syncProductStockAndMovingAverageCost(items: any[], warehouseId: string 
     if (changed) {
       fs.writeFileSync(PRODUCTS_FILE, JSON.stringify(products, null, 2), "utf-8");
     }
+    return updatedSummaries;
   } catch (err) {
     console.error("Error in syncProductStockAndMovingAverageCost:", err);
+    return updatedSummaries;
   }
 }
 
@@ -1431,6 +1456,64 @@ export async function POST(request: Request) {
       });
     }
 
+    // Aksi Khusus: Konfirmasi Penerimaan Barang Masuk (Goods Receipt PO) & Auto-Sync Stok / HPP
+    if (actionType === "receive_po") {
+      const { poId, receivedDate, warehouseId, receivedBy, vendorDeliveryNote, notes, items, updateStatusTo } = payload || {};
+      if (!poId) {
+        return NextResponse.json({ success: false, error: "Nomor atau ID Purchase Order wajib disertakan" }, { status: 400 });
+      }
+
+      if (!data.purchases) data.purchases = [];
+      const poIndex = data.purchases.findIndex((p: any) => p.id === poId || p.poNumber === poId);
+      if (poIndex === -1) {
+        return NextResponse.json({ success: false, error: `Purchase Order '${poId}' tidak ditemukan di database` }, { status: 404 });
+      }
+
+      const targetPo = data.purchases[poIndex];
+      const effectiveWarehouse = warehouseId || targetPo.warehouseId || "dstech_wh_1";
+      const effectiveDate = receivedDate || new Date().toISOString().split("T")[0];
+      const effectiveReceiver = receivedBy || "Admin Logistik & Penerimaan Gudang PT. DSTech Smart Perkasa";
+      const effectiveStatus = updateStatusTo || (targetPo.paymentStatus === "Lunas" ? "Diterima & Lunas" : "Diterima");
+
+      // Item yang diterima
+      const effectiveItems = Array.isArray(items) && items.length > 0 ? items : (targetPo.items || []);
+
+      // 1. Eksekusi Sinkronisasi Stok Masuk & HPP Moving Average ke dstech_products.json
+      const updatedProducts = syncProductStockAndMovingAverageCost(effectiveItems, effectiveWarehouse);
+
+      // 2. Perbarui status dan metadata Purchase Order
+      targetPo.status = effectiveStatus;
+      targetPo.receivedAt = new Date().toISOString();
+      targetPo.receivedDate = effectiveDate;
+      targetPo.receivedBy = effectiveReceiver;
+      targetPo.warehouseId = effectiveWarehouse;
+      if (vendorDeliveryNote) targetPo.vendorDeliveryNote = vendorDeliveryNote;
+      targetPo.isStockReceived = true;
+
+      // 3. Catat riwayat log penerimaan barang resmi
+      if (!targetPo.receivingLogs) targetPo.receivingLogs = [];
+      targetPo.receivingLogs.unshift({
+        id: `rcv_${Date.now()}`,
+        receivedAt: new Date().toISOString(),
+        receivedDate: effectiveDate,
+        receivedBy: effectiveReceiver,
+        warehouseId: effectiveWarehouse,
+        vendorDeliveryNote: vendorDeliveryNote || "-",
+        notes: notes || "Barang fisik pengadaan telah diperiksa dan diterima lengkap di gudang",
+        items: effectiveItems,
+        updatedProductsSummary: updatedProducts,
+      });
+
+      writeFinanceData(data);
+
+      return NextResponse.json({
+        success: true,
+        message: `✓ Barang untuk Purchase Order ${targetPo.poNumber} berhasil diterima! Status diperbarui menjadi '${effectiveStatus}', stok produk di gudang telah bertambah, dan harga HPP/modal otomatis terupdate.`,
+        data: targetPo,
+        updatedProducts,
+      });
+    }
+
     if (actionType === "purchase" || actionType === "bill") {
       const isVendorBill = actionType === "bill" || payload.docType === "BILL" || Boolean(payload.vendorInvoiceNumber);
       const prefix = isVendorBill ? "BILL-DST" : "PO-DSTECH";
@@ -2386,15 +2469,20 @@ export async function PUT(request: Request) {
 
       // Otomatisasi Moving Average HPP & Stok Masuk jika status PO diperbarui menjadi diterima
       const updatedStatus = String(data.purchases[index].status || "").toLowerCase();
+      const shouldSyncStock =
+        updates.syncInventoryCost === true ||
+        ((updatedStatus.includes("diterima") || updatedStatus.includes("selesai")) && !data.purchases[index].isStockReceived);
+
       if (
-        (updates.syncInventoryCost === true ||
-        updatedStatus.includes("diterima") ||
-        updatedStatus.includes("lunas") ||
-        updatedStatus.includes("selesai")) &&
+        shouldSyncStock &&
         data.purchases[index].billCategory !== "Jasa Subkontraktor" &&
         data.purchases[index].billCategory !== "Utilitas & Operasional"
       ) {
         syncProductStockAndMovingAverageCost(data.purchases[index].items, data.purchases[index].warehouseId);
+        data.purchases[index].isStockReceived = true;
+        if (!data.purchases[index].receivedAt) {
+          data.purchases[index].receivedAt = new Date().toISOString();
+        }
       }
 
       writeFinanceData(data);

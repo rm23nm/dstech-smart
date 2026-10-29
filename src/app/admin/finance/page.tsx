@@ -35,6 +35,7 @@ import {
   ArrowDownRight,
   ShieldCheck,
   Package,
+  PackageCheck,
   Phone,
   MapPin,
   RefreshCw,
@@ -95,6 +96,7 @@ interface ProductCatalogItem {
   commissionType?: string;
   image?: string;
   desc?: string;
+  costPrice?: number;
   warehouseStock?: Record<string, number>;
 }
 
@@ -826,6 +828,36 @@ export default function AdminFinanceERPPage() {
     return true;
   };
   const [isEditPoModalOpen, setIsEditPoModalOpen] = useState<boolean>(false);
+  // State Khusus Penerimaan Barang Masuk (Goods Receipt PO) - Tugas 295
+  const [isReceivePoModalOpen, setIsReceivePoModalOpen] = useState<boolean>(false);
+  const [receivingPo, setReceivingPo] = useState<PurchaseOrder | null>(null);
+  const [receivePoForm, setReceivePoForm] = useState<{
+    receivedDate: string;
+    warehouseId: string;
+    receivedBy: string;
+    vendorDeliveryNote: string;
+    notes: string;
+    updateStatusTo: string;
+    items: Array<{
+      productId?: string;
+      productName: string;
+      qty: number;
+      unit?: string;
+      price: number;
+      currentStock?: number;
+      currentCostPrice?: number;
+      newSellingPrice?: number;
+    }>;
+  }>({
+    receivedDate: new Date().toISOString().split("T")[0],
+    warehouseId: "dstech_wh_1",
+    receivedBy: "Admin Logistik & Penerimaan Gudang PT. DSTech Smart Perkasa",
+    vendorDeliveryNote: "",
+    notes: "",
+    updateStatusTo: "Diterima",
+    items: [],
+  });
+  const [isSubmittingReceivePo, setIsSubmittingReceivePo] = useState<boolean>(false);
   const [editingPo, setEditingPo] = useState<PurchaseOrder | null>(null);
   const [editPoForm, setEditPoForm] = useState<{
     id: string;
@@ -7155,6 +7187,79 @@ export default function AdminFinanceERPPage() {
     }
   };
 
+  // Handler Khusus Penerimaan Barang PO (Goods Receipt) - Tugas 295
+  const handleOpenReceivePoModal = (po: PurchaseOrder) => {
+    setReceivingPo(po);
+    const mappedItems = (po.items || []).map((it) => {
+      const catProd = products.find(
+        (p) =>
+          (it.productId && String(p.id) === String(it.productId)) ||
+          (p.name && it.productName && p.name.trim().toLowerCase() === it.productName.trim().toLowerCase())
+      );
+      return {
+        productId: it.productId || catProd?.id || "",
+        productName: it.productName,
+        qty: Number(it.qty) || 1,
+        unit: it.unit || "Unit",
+        price: Number(it.price) || 0,
+        currentStock: Number(catProd?.stock) || 0,
+        currentCostPrice: Number(catProd?.costPrice) || 0,
+        newSellingPrice: Number(catProd?.price) || Number(it.price) || 0,
+      };
+    });
+
+    setReceivePoForm({
+      receivedDate: new Date().toISOString().split("T")[0],
+      warehouseId: po.warehouseId || "dstech_wh_1",
+      receivedBy: "Admin Logistik & Penerimaan Gudang PT. DSTech Smart Perkasa",
+      vendorDeliveryNote: (po as any).vendorDeliveryNote || "",
+      notes: `Penerimaan barang fisik untuk PO ${po.poNumber} dari ${po.supplierName}`,
+      updateStatusTo: po.paymentStatus === "Lunas" ? "Diterima & Lunas" : "Diterima",
+      items: mappedItems,
+    });
+    setIsReceivePoModalOpen(true);
+  };
+
+  const handleSubmitReceivePo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!receivingPo) return;
+    try {
+      setIsSubmittingReceivePo(true);
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "receive_po",
+          payload: {
+            poId: receivingPo.id || receivingPo.poNumber,
+            receivedDate: receivePoForm.receivedDate,
+            warehouseId: receivePoForm.warehouseId,
+            receivedBy: receivePoForm.receivedBy,
+            vendorDeliveryNote: receivePoForm.vendorDeliveryNote,
+            notes: receivePoForm.notes,
+            updateStatusTo: receivePoForm.updateStatusTo,
+            items: receivePoForm.items,
+          },
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        showToast(json.message || "✓ Barang PO berhasil diterima & stok/HPP produk terupdate!");
+        setIsReceivePoModalOpen(false);
+        setReceivingPo(null);
+        fetchFinanceData();
+      } else {
+        alert(json.error || "Gagal memproses penerimaan barang PO");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan jaringan saat memproses penerimaan barang");
+    } finally {
+      setIsSubmittingReceivePo(false);
+    }
+  };
+
   const handleOpenApprovalPo = (po: PurchaseOrder) => {
     setSelectedPoForApproval(po);
     setSignerNameInput(po.approvedBy || financeSettings.signerName || "RAMADHANI ST");
@@ -11021,19 +11126,39 @@ export default function AdminFinanceERPPage() {
                           {formatRupiah(po.grandTotal)}
                         </td>
                         <td className="p-3 whitespace-nowrap">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
-                              po.status === "Diterima & Lunas"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : po.status === "Dibatalkan"
-                                ? "bg-rose-100 text-rose-800"
-                                : (po as any).supplierApproved || po.status === "Dikonfirmasi Vendor"
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {po.status}
-                          </span>
+                          {po.status === "Dalam Pengiriman" ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReceivePoModal(po)}
+                              className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200 transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs hover:scale-105"
+                              title="Status Dalam Pengiriman: Klik untuk konfirmasi penerimaan barang & update stok ke katalog"
+                            >
+                              <Truck className="w-3 h-3 text-amber-700 animate-pulse" />
+                              <span>Dalam Pengiriman (Klik Terima)</span>
+                            </button>
+                          ) : (po.status?.includes("Diterima") || po.status === "Diterima & Lunas") ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReceivePoModal(po)}
+                              className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 hover:bg-emerald-200 transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Barang telah diterima di gudang (Klik untuk lihat/update rincian penerimaan)"
+                            >
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>{po.status}</span>
+                            </button>
+                          ) : (
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                                po.status === "Dibatalkan"
+                                  ? "bg-rose-100 text-rose-800"
+                                  : (po as any).supplierApproved || po.status === "Dikonfirmasi Vendor"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-blue-100 text-blue-800"
+                              }`}
+                            >
+                              {po.status}
+                            </span>
+                          )}
                           {(po as any).supplierApproved && (
                             <span className="block text-[8px] text-emerald-700 font-bold mt-1">
                               ✓ Dikonfirmasi Vendor
@@ -11147,6 +11272,24 @@ export default function AdminFinanceERPPage() {
 
                             {/* Baris 2 (Pasti 1 Baris): Approval, Arsip & Manajemen */}
                             <div className="flex items-center justify-end gap-1 flex-nowrap">
+                              {/* Tombol Cepat Terima Barang PO Masuk Gudang (Tugas 295) */}
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReceivePoModal(po)}
+                                title={
+                                  po.status?.includes("Diterima")
+                                    ? "Lihat / Update Data Penerimaan Barang Gudang"
+                                    : "📦 Konfirmasi Terima Barang Masuk (Update Stok & HPP Otomatis)"
+                                }
+                                className={`p-1.5 rounded-lg transition-all cursor-pointer shadow-xs hover:scale-105 shrink-0 ${
+                                  po.status?.includes("Diterima")
+                                    ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-600 hover:text-white"
+                                    : "bg-emerald-600 text-white hover:bg-emerald-700 ring-2 ring-emerald-300 animate-pulse"
+                                }`}
+                              >
+                                <PackageCheck className="w-3.5 h-3.5" />
+                              </button>
+
                               {/* Approval PO */}
                               <button
                                 type="button"
@@ -23084,6 +23227,7 @@ export default function AdminFinanceERPPage() {
                   >
                     <option value="Draf">Draf</option>
                     <option value="Dalam Pengiriman">Dalam Pengiriman</option>
+                    <option value="Diterima">Diterima (Barang Masuk Gudang)</option>
                     <option value="Diterima & Lunas">Diterima & Lunas</option>
                     <option value="Dibatalkan">Dibatalkan</option>
                   </select>
@@ -23360,6 +23504,270 @@ export default function AdminFinanceERPPage() {
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Simpan Perubahan PO</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PENERIMAAN BARANG PO MASUK GUDANG (GOODS RECEIPT) - Tugas 295 */}
+      {isReceivePoModalOpen && receivingPo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsReceivePoModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl max-w-3xl w-full max-h-[92vh] overflow-y-auto border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-emerald-600 text-white shadow-md shadow-emerald-600/30">
+                  <PackageCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-slate-900 text-lg">Penerimaan Barang Masuk (Goods Receipt)</h3>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black">
+                      PO #{receivingPo.poNumber}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Konfirmasi kedatangan barang fisik dari vendor <strong>{receivingPo.supplierName}</strong> &amp; perbarui stok katalog secara instan
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsReceivePoModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-white/80 transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitReceivePo} className="p-6 space-y-6 text-xs">
+              {/* Info Pengadaan & Supplier */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-slate-50 border border-slate-200/80">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Vendor / Rekanan:</span>
+                  <p className="font-black text-slate-900 text-xs mt-0.5">{receivingPo.supplierName}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">{receivingPo.supplierContact || "-"}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Tanggal Order PO:</span>
+                  <p className="font-black text-slate-800 text-xs mt-0.5">{receivingPo.date}</p>
+                  <p className="text-[11px] text-slate-500 font-medium">Est. Pengiriman: {receivingPo.expectedDelivery || "-"}</p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Status Pembayaran:</span>
+                  <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-black ${
+                    receivingPo.paymentStatus === "Lunas"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
+                  }`}>
+                    {receivingPo.paymentStatus}
+                  </span>
+                  <p className="text-[11px] text-slate-500 font-bold mt-0.5">Total PO: {formatRupiah(receivingPo.grandTotal)}</p>
+                </div>
+              </div>
+
+              {/* Rincian Parameter Penerimaan Barang */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1.5">
+                    Tanggal Barang Diterima di Gudang: <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={receivePoForm.receivedDate}
+                    onChange={(e) => setReceivePoForm({ ...receivePoForm, receivedDate: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1.5">
+                    Gudang Penyimpanan Tujuan: <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={receivePoForm.warehouseId}
+                    onChange={(e) => setReceivePoForm({ ...receivePoForm, warehouseId: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="dstech_wh_1">🏢 Gudang Utama DSTech - Cilegon (Pusat Logistik)</option>
+                    <option value="dstech_wh_2">🏬 Gudang Transit Serang - Banten</option>
+                    <option value="dstech_wh_3">🏭 Gudang Workshop / Perakitan Khusus</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1.5">
+                    Nomor Surat Jalan / Resi Pengiriman Vendor:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: SJ-SM-994821 / Resi JNE JTR"
+                    value={receivePoForm.vendorDeliveryNote}
+                    onChange={(e) => setReceivePoForm({ ...receivePoForm, vendorDeliveryNote: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-mono font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1.5">
+                    Nama Petugas Penerima Gudang:
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={receivePoForm.receivedBy}
+                    onChange={(e) => setReceivePoForm({ ...receivePoForm, receivedBy: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1.5">
+                    Ubah Status PO Menjadi:
+                  </label>
+                  <select
+                    value={receivePoForm.updateStatusTo}
+                    onChange={(e) => setReceivePoForm({ ...receivePoForm, updateStatusTo: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-bold text-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="Diterima">📦 Diterima (Barang Masuk Gudang)</option>
+                    <option value="Diterima & Lunas">✅ Diterima &amp; Lunas (Barang Masuk &amp; Pembayaran Selesai)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1.5">
+                    Catatan Pemeriksaan Fisik Barang (QC):
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Segel utuh, kardus aman, unit dicek menyala normal"
+                    value={receivePoForm.notes}
+                    onChange={(e) => setReceivePoForm({ ...receivePoForm, notes: e.target.value })}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Tabel Rincian Barang & Auto-Sync Stok / Harga */}
+              <div className="space-y-3 pt-3 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-emerald-600" />
+                    <h4 className="font-black text-slate-900 text-xs uppercase tracking-wider">
+                      Daftar Barang Masuk &amp; Simulasi Update Stok Katalog ({receivePoForm.items.length} Item)
+                    </h4>
+                  </div>
+                  <span className="text-[11px] text-emerald-700 font-bold">
+                    ✓ Otomatis menambah stok &amp; Moving Average HPP
+                  </span>
+                </div>
+
+                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-bold text-[10px] uppercase">
+                        <th className="p-3">Nama Produk (Katalog)</th>
+                        <th className="p-3 text-center">Qty Diterima</th>
+                        <th className="p-3 text-center">Stok Awal ➔ Baru</th>
+                        <th className="p-3 text-right">Harga Beli PO (Rp)</th>
+                        <th className="p-3 text-right">Estimasi HPP Baru</th>
+                        <th className="p-3 text-right">Harga Jual Katalog (Rp)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs">
+                      {receivePoForm.items.map((it, idx) => {
+                        const curStock = Number(it.currentStock) || 0;
+                        const qtyIn = Number(it.qty) || 0;
+                        const nextStock = curStock + qtyIn;
+                        const curCost = Number(it.currentCostPrice) || 0;
+                        const buyPrice = Number(it.price) || 0;
+                        const nextCost = nextStock > 0 ? Math.round(((curStock * curCost) + (qtyIn * buyPrice)) / nextStock) : buyPrice;
+
+                        return (
+                          <tr key={idx} className="hover:bg-emerald-50/30 transition-colors">
+                            <td className="p-3 font-bold text-slate-900">
+                              <p className="line-clamp-2">{it.productName}</p>
+                              {it.productId ? (
+                                <span className="text-[9px] text-slate-400 font-mono">ID: {it.productId}</span>
+                              ) : (
+                                <span className="text-[9px] text-amber-600 font-bold">⚠️ Produk Baru / Cocokkan Nama</span>
+                              )}
+                            </td>
+                            <td className="p-3 text-center font-black text-emerald-800">
+                              <span className="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg">
+                                +{it.qty} {it.unit}
+                              </span>
+                            </td>
+                            <td className="p-3 text-center font-mono font-bold text-slate-700">
+                              <span className="text-slate-400">{curStock}</span>
+                              <span className="text-emerald-600 mx-1.5 font-black">➔</span>
+                              <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-black">
+                                {nextStock}
+                              </span>
+                            </td>
+                            <td className="p-3 text-right font-bold text-slate-800">
+                              {formatRupiah(it.price)}
+                            </td>
+                            <td className="p-3 text-right font-bold font-mono text-indigo-700">
+                              {formatRupiah(nextCost)}
+                            </td>
+                            <td className="p-3 text-right">
+                              <input
+                                type="number"
+                                value={it.newSellingPrice || it.price}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  const updated = [...receivePoForm.items];
+                                  updated[idx].newSellingPrice = val;
+                                  setReceivePoForm({ ...receivePoForm, items: updated });
+                                }}
+                                className="w-28 p-1.5 text-right font-mono font-bold rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-xs"
+                                title="Ubah harga jual di katalog produk jika ingin memperbarui harga jual"
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Alert Edukatif */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-3 text-emerald-900">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed">
+                  <strong>Otomatisasi ERP Terintegrasi:</strong> Saat tombol konfirmasi ditekan, status PO akan berubah dari <strong>&quot;Dalam Pengiriman&quot;</strong> menjadi <strong>&quot;{receivePoForm.updateStatusTo}&quot;</strong>, stok barang di gudang yang dipilih otomatis bertambah, dan harga modal (HPP Moving Average) langsung terupdate di katalog produk tanpa perlu input manual di menu persediaan.
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsReceivePoModalOpen(false)}
+                  disabled={isSubmittingReceivePo}
+                  className="px-5 py-2.5 rounded-xl border border-slate-200 font-bold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReceivePo}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black flex items-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <PackageCheck className="w-4 h-4" />
+                  <span>{isSubmittingReceivePo ? "Menyimpan & Menambah Stok..." : "✓ Konfirmasi Barang Diterima & Update Stok Sekarang"}</span>
                 </button>
               </div>
             </form>
