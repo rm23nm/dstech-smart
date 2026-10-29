@@ -4,43 +4,38 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Tugas 286**: Penyesuaian Mutlak Keterangan Tujuan Pembayaran Kuitansi Resmi Tanpa Teks Usang "Pembayaran Angsuran / Termin", Sanitasi Catatan Historis, dan Sinkronisasi Deployment ke Server Live VPS.
+*Tidak ada pekerjaan tertunda. Seluruh perbaikan telah selesai 100%, teruji via npx tsc dan npm run build tanpa error, tersinkronisasi ke GitHub, dan telah berhasil dideploy langsung ke server live VPS.*
+
+- **2026-10-29**: [SELESAI] Penyesuaian Mutlak Keterangan Tujuan Pembayaran Kuitansi Resmi Tanpa Teks Usang "Pembayaran Angsuran / Termin", Sanitasi Catatan Historis, dan Sinkronisasi Deployment ke Server Live VPS (Tugas 286) (`src/app/api/finance/print/route.ts`, `src/app/api/finance/route.ts`, `src/app/admin/finance/page.tsx`).
   *Permintaan User*: "masih tertulis pembayaran angsuran/termin" (disertai tangkapan layar cetak Kuitansi Pembayaran di browser).
-  *Akar Masalah yang Ditemukan*:
-  1. Pada lembar cetak kuitansi (`src/app/api/finance/print/route.ts`), logika pengecekan `selectedPayment?.notes` hanya mengecualikan string yang diawali `"Penerimaan Pembayaran Faktur INV-"`. Jika pembayaran pada database telah tersimpan dengan teks bawaan lama `"Pembayaran Angsuran / Termin atas Faktur INV-..."`, sistem langsung mencetak teks lama tersebut tanpa melakukan sanitasi atau regenerasi otomatis.
+  *Penyebab Masalah yang Ditemukan*:
+  1. Pada lembar cetak kuitansi (`src/app/api/finance/print/route.ts`), logika pengecekan `selectedPayment?.notes` sebelumnya langsung mencetak string apa pun yang tidak berawalan `"Penerimaan Pembayaran Faktur INV-"`. Jika pembayaran pada database telah tersimpan dengan teks bawaan lama `"Pembayaran Angsuran / Termin atas Faktur INV-..."`, sistem langsung mencetak teks lama tersebut tanpa melakukan sanitasi atau regenerasi otomatis.
   2. Masih terdapat fallback baris lama yang menghasilkan teks `Pembayaran Angsuran atas Faktur...` di skema bertahap.
-  3. Server live VPS belum menerima sinkronisasi git push & deploy build terbaru dari perbaikan skema faktur sebelumnya.
-  *Rencana Langkah Pengerjaan (Step-by-Step)*:
-  1. **Pencadangan Berkas (Backup)**: Membuat folder `_backup_kwitansi_purpose_fix` dan menyalin:
-     - `src/app/api/finance/print/route.ts`
-     - `src/app/api/finance/route.ts`
-     - `src/app/admin/finance/page.tsx`
-  2. **Sanitasi Total & Regenerasi Cerdas Tujuan Pembayaran Kuitansi (`src/app/api/finance/print/route.ts`)**:
-     - Mendeteksi catatan historis generik/usang (`isLegacyOrGenericNote`: memuat "angsuran / termin", "angsuran/termin", "pembayaran angsuran", "pembayaran sebagian", atau awalan generik).
-     - Mengharuskan regenerasi dinamis 100% berdasarkan skema faktur:
+  3. Server live VPS sebelumnya belum menerima sinkronisasi build terbaru dari perbaikan skema faktur.
+  *Penyelesaian & Hasil*:
+  1. **Sanitasi Total & Regenerasi Cerdas Tujuan Pembayaran Kuitansi (`src/app/api/finance/print/route.ts`)**:
+     - Ditambahkan pendeteksi catatan generik/usang (`isLegacyOrGenericNote`): mendeteksi keberadaan frase `"angsuran / termin"`, `"angsuran/termin"`, `"pembayaran angsuran"`, `"pembayaran sebagian"`, atau awalan generik.
+     - Jika terdeteksi catatan lama/generik, sistem secara cerdas meregenerasi keterangan pembayaran (`calculatedPurpose`) 100% presisi berdasarkan skema faktur:
        * **Skema DP**:
-         - Pembayaran DP: `Pembayaran Uang Muka (DP {pct}%) atas Faktur {no} - {subject/project}`.
+         - Pembayaran Uang Muka: `Pembayaran Uang Muka (DP {pct}%) atas Faktur {no} - {subject/project}`.
          - Pelunasan DP: `Pelunasan Sisa Pembayaran Kontrak ({100-pct}%) atas Faktur {no} - {subject/project} setelah Berita Acara Serah Terima (BAST)`.
          - Pembayaran Bertahap: `Pembayaran Bertahap Tahap {X} atas Faktur {no} - {subject/project}`.
        * **Skema Multi-Termin Progresif**:
-         - Mengidentifikasi termin yang cocok berdasarkan `terminId`, `terminName`, atau urutan pembayaran `paymentIndex`.
+         - Termin dicocokkan otomatis berdasarkan `terminId`, `terminName`, atau urutan transaksi pembayaran `paymentIndex`.
          - Format: `Pembayaran {terminName} ({pct}%) - Syarat: {condition} atas Faktur {no} - {subject/project}`.
-         - Pelunasan Akhir: `Pelunasan Pembayaran Termin Tahap Akhir ({terminName}) atas Faktur {no} - {subject/project} (BAST Selesai)`.
+         - Pelunasan Akhir: `Pelunasan Pembayaran {terminName} ({pct}%) - Syarat: {condition} atas Faktur {no} - {subject/project} (BAST Selesai)`.
        * **Skema Standar 100%**:
          - Pelunasan: `Pembayaran Penuh (100%) atas Faktur {no} - {subject/project}`.
-         - Sebagian: `Pembayaran Sebagian (Tahap {X}) atas Faktur {no} - {subject/project}`.
-     - Memperbarui badge kuitansi agar mencantumkan nama termin spesifik secara dinamis.
-  3. **Penyempurnaan Backend Pencatatan Pembayaran (`src/app/api/finance/route.ts`)**:
-     - Menghilangkan segala bentukan default "Pembayaran Angsuran / Termin" pada saat `record_payment`.
-  4. **Validasi & Build Lokal**:
-     - Memeriksa kode via `npx tsc --noEmit`.
-     - Menguji kompilasi produksi via `npm run build`.
-  5. **Pembersihan Berkas Cadangan**:
-     - Menghapus folder cadangan `_backup_kwitansi_purpose_fix` setelah pengujian lokal sukses.
-  6. **Deployment ke Server Live VPS**:
-     - Melakukan sinkronisasi push ke GitHub dan trigger remote build & restart PM2 di server VPS.
-  7. **Pelaporan & Dokumentasi**:
-     - Memperbarui status Tugas 286 menjadi `[SELESAI]` pada `LAPORAN_PROGRES.md` di kedua lokasi.
+         - Sebagian: `Pembayaran Bertahap Tahap {X} atas Faktur {no} - {subject/project}`.
+     - Memperbarui badge kuitansi agar menampilkan termin spesifik secara dinamis: `${isDp ? 'DP X%' : isTermin ? matchedTermin.name + ' (' + matchedTermin.percentage + '%)' : 'PENUH 100%'}`.
+  2. **Penyempurnaan Backend Pencatatan Pembayaran (`src/app/api/finance/route.ts`)**:
+     - Pada `actionType === "record_payment"`, `finalNotes` otomatis disusun presisi sesuai jenis skema (DP/Termin/Standar) dan nama subjek/proyek invoice, sehingga data yang tersimpan ke database baru langsung bersih dan akurat.
+  3. **Pengujian & Validasi**:
+     - `npx tsc --noEmit` lolos 100% tanpa error.
+     - `npm run build` lokal sukses mengompilasi 76/76 static & dynamic pages.
+  4. **Sinkronisasi Git & Deployment ke Server Live VPS**:
+     - Berhasil di-push ke branch master GitHub (`cc87261`).
+     - Berhasil dideploy langsung ke VPS live (`157.66.34.199:11587`): `git pull`, `npm run build` sukses (76/76 pages), dan `pm2 restart dstech-main` sukses online.
 
 - **2026-10-29**: [SELESAI] Perbaikan Skema Penerbitan Faktur pada Modal Edit Faktur (Khususnya Faktur Konversi SPH) dan Otomatisasi Keterangan Pembayaran Kuitansi Sesuai Skema Pembayaran (Standar 100%, Uang Muka DP, Multi-Termin Progresif) (Tugas 285) (`src/app/admin/finance/page.tsx`, `src/app/api/finance/route.ts`, `src/app/api/finance/print/route.ts`).
   *Permintaan User*: "pada saat edit faktur yang dikonvert dari SPH, kenapa tidak ada muncul skema penerbitan faktur. kemudian apada kuitansi yang terbentuk. keterangan pembayaran masih tidak sesuai dengan skema pembayaran yang dipilh."
