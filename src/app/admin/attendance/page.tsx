@@ -80,6 +80,9 @@ interface AttendanceRecord {
   projectId?: string | null;
   projectName?: string | null;
   projectRole?: string | null;
+  isAutoClosed?: boolean;
+  autoClosedAt?: string;
+  overtimeHours?: number;
 }
 
 interface OvertimeRecord {
@@ -1232,6 +1235,13 @@ export default function AdminAttendancePage() {
             Lembur
           </span>
         );
+      case "Tidak Absen Pulang":
+        return (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-300 shadow-2xs">
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+            Tidak Absen Pulang (Auto-Close)
+          </span>
+        );
       case "Izin":
       case "Sakit":
       case "Cuti":
@@ -1627,6 +1637,7 @@ export default function AdminAttendancePage() {
                 <option value="ALL">Semua Status</option>
                 <option value="Hadir Lapangan">Hadir Lapangan</option>
                 <option value="Tepat Waktu">Tepat Waktu</option>
+                <option value="Tidak Absen Pulang">Tidak Absen Pulang (Auto-Close)</option>
                 <option value="Lembur">Lembur</option>
                 <option value="Terlambat">Terlambat</option>
                 <option value="Izin">Izin</option>
@@ -1812,10 +1823,17 @@ export default function AdminAttendancePage() {
                         <td className="py-4 px-6">
                           <div className="space-y-1">
                             <div className="flex items-center gap-2">
-                              <p className={`font-extrabold flex items-center gap-1.5 ${item.checkOut && item.checkOut !== "-" ? "text-slate-800" : "text-slate-400"}`}>
-                                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                                {item.checkOut || "-"}
-                              </p>
+                              {item.status === "Tidak Absen Pulang" || item.isAutoClosed ? (
+                                <p className="font-extrabold flex items-center gap-1 text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-xs">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                  {item.checkOut || "Auto-Close"}
+                                </p>
+                              ) : (
+                                <p className={`font-extrabold flex items-center gap-1.5 ${item.checkOut && item.checkOut !== "-" ? "text-slate-800" : "text-slate-400"}`}>
+                                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                  {item.checkOut || "-"}
+                                </p>
+                              )}
                               {item.selfieCheckOut && (
                                 <button
                                   type="button"

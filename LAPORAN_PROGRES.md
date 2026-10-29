@@ -7,6 +7,41 @@
 - **Status**: SEMUA ANTRIAN SELESAI (Idle / Menunggu Permintaan Baru)
 - Tidak ada tugas aktif yang tertunda.
 
+- **2026-10-29**: [SELESAI] Penutupan Otomatis Presensi Pulang Staf (> 1 Jam dari Jam Kerja Terakhir), Penguncian Check-Out, Keterangan Tidak Absen Pulang, dan Eliminasi Lembur (Tugas 280) (`src/app/api/employee/attendance/route.ts`, `src/app/employee/page.tsx`, `src/app/admin/attendance/page.tsx`).
+  *Permintaan User*: "pada absensi, jika staf employ telad absen pulang, maka 1 jam dari jam terakhir jam kerja maka secara otomatis sistem harus close absennya. jangan bisa di absen lagi. kemudian buat keterangan absen kalau staf tidak melakukan absensi pulang. dan jangan hitung kedalam lembur."
+  *Penyebab & Analisis Sistem*:
+  1. Sebelumnya, jika karyawan lupa atau telat melakukan absen pulang (check-out), record kehadiran tetap menggantung dengan status `checkOut: "-"` tanpa batas waktu penutupan otomatis.
+  2. Karyawan masih dapat memanggil API check-out kapan saja di luar jam kerja shift yang berpotensi memicu klaim lembur yang tidak sah.
+  3. Belum ada mekanisme sistem otomatis untuk mendeteksi batas toleransi maksimal 1 jam setelah jam kerja berakhir (`endTime + 60 menit`) berdasarkan kontrak kerja PKWT aktif (`dstech_contracts.json`).
+  *Penyelesaian & Hasil*:
+  1. **Logika Auto-Close Otomatis di Backend (`src/app/api/employee/attendance/route.ts`)**:
+     - Ditambahkan helper `parseTimeToMinutes` dan `getWibCurrentMinutes` untuk menghitung waktu akurat di zona waktu WIB (Asia/Jakarta).
+     - Ditambahkan fungsi pemindaian `checkAndApplyAutoClose(data)` yang membaca jadwal jam kerja karyawan (`startTime` default 08:00, `endTime` default 17:00 atau dari kontrak PKWT aktif).
+     - Batas toleransi ditetapkan tepat 1 jam (60 menit) setelah jam kerja berakhir (misal jam kerja selesai 17:00, batas auto-close adalah 18:00 WIB).
+     - Jika waktu sekarang telah melewati batas tersebut (atau record presensi hari kemarin yang belum checkout), sistem otomatis me-close absensi:
+       * `checkOut`: `${schedule.endTime} WIB (Auto-Close)`
+       * `status`: `"Tidak Absen Pulang"`
+       * `isAutoClosed`: `true`
+       * `autoClosedAt`: `${record.date} ${schedule.endTime} WIB`
+       * `overtimeHours`: `0` (dipastikan tidak ada lembur yang dihitung)
+       * `notes`: `(record.notes ? record.notes + " | " : "") + "Sistem Otomatis: Staf Tidak Melakukan Absensi Pulang (Telat > 1 Jam dari Jam Kerja)"`
+     - Fungsi `checkAndApplyAutoClose` dieksekusi otomatis pada setiap request `GET` dan `POST`.
+     - Pada handler `action === "checkout"`, sistem memvalidasi batas toleransi 1 jam: jika staf mencoba check-out setelah melewati batas atau record telah berstatus auto-close, request ditolak dengan pesan edukatif (HTTP 400) dan staf tidak bisa melakukan absen pulang lagi.
+     - Pada handler `action === "overtime"`, pengajuan lembur pada tanggal di mana staf tercatat tidak absen pulang / auto-close otomatis ditolak.
+  2. **Penguncian Check-Out & Peringatan di Portal Karyawan (`src/app/employee/page.tsx`)**:
+     - Ditambahkan field `isAutoClosed`, `autoClosedAt`, `overtimeHours` pada interface `AttendanceLog`.
+     - Fungsi `openCheckOutModal` otomatis memblokir modal dan menampilkan toast edukatif jika presensi hari ini telah di-auto-close.
+     - Tombol Check-Out diubah menjadi badge penguncian bertuliskan *"🔒 Pulang Ditutup Otomatis (Telat > 1 Jam)"* berlatar rose/merah muda.
+     - Di kotak Log Presensi Aktif Hari Ini, ditambahkan alert peringatan: *"⚠️ Keterangan: Staf Tidak Melakukan Absensi Pulang Tepat Waktu. Sistem secara otomatis menutup presensi karena waktu telah melewati batas toleransi 1 jam setelah jam kerja berakhir. Presensi pulang tidak dapat dilakukan lagi dan tidak dihitung ke dalam jam lembur."*
+     - Pada tabel riwayat kehadiran karyawan, baris auto-close menampilkan badge *"Tidak Absen Pulang"* lengkap dengan ikon peringatan dan catatan auto-close.
+  3. **Penyesuaian Dashboard Admin Kehadiran (`src/app/admin/attendance/page.tsx`)**:
+     - Ditambahkan badge khusus status `"Tidak Absen Pulang"` di `renderStatusBadge`.
+     - Ditambahkan filter status `"Tidak Absen Pulang (Auto-Close)"` pada dropdown filter absensi admin.
+     - Kolom jam pulang di tabel admin menampilkan label jelas `Auto-Close` dengan ikon peringatan jika staf ditutup otomatis oleh sistem.
+  4. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: **0 error**.
+     - `npm run build`: **Berhasil 100%** (76/76 static & dynamic pages teroptimasi Turbopack).
+
 - **2026-10-28**: [SELESAI] Perbaikan Scroll Kembali ke Atas Macet di Android WebView & Penyimpanan Data Laporan Dokumentasi (Tugas 274) (`MainActivity.kt`, `src/app/api/finance/print/route.ts`, `src/app/employee/page.tsx`, `src/app/api/employee/tasks/route.ts`, & Android APK).
   *Permintaan User*: "terkait perbaikan sebelumnya jika sudah dikursor kebawah kembali lagi ketas masih belum bisa. kemudian saat saya update data laporan dokumentasi saya save, namun tidak tersimpan."
   *Penyebab Masalah yang Ditemukan*:

@@ -202,6 +202,76 @@ function getEmployeeContractSchedule(employeeName?: string) {
   };
 }
 
+// Helper konversi string jam "HH:mm" atau "HH:mm WIB" ke total menit
+function parseTimeToMinutes(timeStr?: string | null): number {
+  if (!timeStr) return 0;
+  const clean = timeStr.replace(/WIB/i, "").trim();
+  const parts = clean.split(":");
+  const hours = parseInt(parts[0], 10) || 0;
+  const minutes = parseInt(parts[1], 10) || 0;
+  return hours * 60 + minutes;
+}
+
+// Helper mendapatkan waktu menit saat ini di zona waktu WIB (Asia/Jakarta)
+function getWibCurrentMinutes(now: Date = new Date()): number {
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jakarta",
+      hour: "numeric",
+      minute: "numeric",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(now);
+    const h = parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10);
+    const m = parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10);
+    return h * 60 + m;
+  } catch {
+    return now.getHours() * 60 + now.getMinutes();
+  }
+}
+
+// Helper pemeriksaan dan auto-close otomatis jika staf telat absen pulang > 1 jam dari batas jam kerja
+function checkAndApplyAutoClose(data: any): boolean {
+  if (!data || !Array.isArray(data.attendance)) return false;
+
+  const now = new Date();
+  const todayStr = getWIBDateStr(now);
+  const currentWibMinutes = getWibCurrentMinutes(now);
+  let hasModified = false;
+
+  for (const record of data.attendance) {
+    // Periksa record yang sudah checkIn tapi belum checkOut dan belum di-auto close
+    const hasCheckIn = record.checkIn && record.checkIn !== "-";
+    const hasNotCheckOut = !record.checkOut || record.checkOut === "-";
+
+    if (hasCheckIn && hasNotCheckOut && !record.isAutoClosed && record.status !== "Tidak Absen Pulang") {
+      const schedule = getEmployeeContractSchedule(record.employeeName);
+      const endWorkMinutes = parseTimeToMinutes(schedule.endTime || "17:00");
+      // Batas toleransi maksimal adalah 1 jam (60 menit) setelah jam kerja berakhir
+      const autoCloseDeadlineMinutes = endWorkMinutes + 60;
+
+      const isPastDate = record.date < todayStr;
+      const isTodayAndPastDeadline = record.date === todayStr && currentWibMinutes >= autoCloseDeadlineMinutes;
+
+      if (isPastDate || isTodayAndPastDeadline) {
+        record.checkOut = `${schedule.endTime || "17:00"} WIB (Auto-Close)`;
+        record.status = "Tidak Absen Pulang";
+        record.isAutoClosed = true;
+        record.autoClosedAt = `${record.date} ${schedule.endTime || "17:00"} WIB`;
+        record.overtimeHours = 0; // JANGAN hitung kedalam lembur!
+        
+        const autoNote = "Sistem Otomatis: Staf Tidak Melakukan Absensi Pulang (Telat > 1 Jam dari Jam Kerja)";
+        if (!record.notes || !record.notes.includes(autoNote)) {
+          record.notes = record.notes ? `${record.notes} | ${autoNote}` : autoNote;
+        }
+        hasModified = true;
+      }
+    }
+  }
+
+  return hasModified;
+}
+
 function readAttendance() {
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -230,6 +300,10 @@ function writeAttendance(data: any) {
 
 export async function GET() {
   const data = readAttendance();
+  const modified = checkAndApplyAutoClose(data);
+  if (modified) {
+    writeAttendance(data);
+  }
   const officeSettings = getOfficeLocationSettings();
   return NextResponse.json(
     {
@@ -265,6 +339,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action } = body;
     const data = readAttendance();
+
+    // Jalankan auto-close otomatis untuk membersihkan data absensi yang telat > 1 jam
+    const autoCloseApplied = checkAndApplyAutoClose(data);
+    if (autoCloseApplied) {
+      writeAttendance(data);
+    }
 
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} WIB`;
@@ -546,11 +626,47 @@ export async function POST(request: Request) {
         return Boolean(matchName || matchEmail);
       });
 
+      // Validasi Jadwal Kerja Staf & Batas Toleransi 1 Jam dari Jam Kerja Terakhir
+      const schedule = getEmployeeContractSchedule(body.employeeName);
+      const endWorkMinutes = parseTimeToMinutes(schedule.endTime || "17:00");
+      const autoCloseDeadlineMinutes = endWorkMinutes + 60; // Toleransi maksimal: 1 jam (60 menit) setelah jam kerja berakhir
+      const currentWibMinutes = getWibCurrentMinutes(now);
+
+      // PENGUNCIAN ABSENSI: Jika staf telat absen pulang (> 1 jam dari jam kerja) ATAU sudah di-auto close sistem:
+      if (
+        (existingToday && (existingToday.isAutoClosed || existingToday.status === "Tidak Absen Pulang")) ||
+        currentWibMinutes >= autoCloseDeadlineMinutes
+      ) {
+        if (existingToday && !existingToday.isAutoClosed) {
+          existingToday.checkOut = `${schedule.endTime || "17:00"} WIB (Auto-Close)`;
+          existingToday.status = "Tidak Absen Pulang";
+          existingToday.isAutoClosed = true;
+          existingToday.autoClosedAt = `${dateStr} ${schedule.endTime || "17:00"} WIB`;
+          existingToday.overtimeHours = 0; // JANGAN dihitung ke dalam lembur!
+          const autoNote = "Sistem Otomatis: Staf Tidak Melakukan Absensi Pulang (Telat > 1 Jam dari Jam Kerja)";
+          if (!existingToday.notes || !existingToday.notes.includes(autoNote)) {
+            existingToday.notes = existingToday.notes ? `${existingToday.notes} | ${autoNote}` : autoNote;
+          }
+          writeAttendance(data);
+        }
+
+        return NextResponse.json(
+          {
+            success: false,
+            isAutoClosed: true,
+            error: `Presensi Pulang DITOLAK: Batas waktu absensi pulang telah berakhir (toleransi maksimal 1 jam setelah jam kerja selesai pukul ${schedule.endTime || "17:00"} WIB). Sistem telah menutup absensi Anda secara otomatis dengan status "Tidak Absen Pulang" dan tidak dihitung ke dalam lembur.`,
+          },
+          { status: 400 }
+        );
+      }
+
       const computedMapsUrl = mapsUrl || (latitude && longitude ? `https://www.google.com/maps?q=${latitude},${longitude}` : null);
       let savedRecord: any = null;
 
       if (existingToday) {
         existingToday.checkOut = timeStr;
+        existingToday.isAutoClosed = false;
+        existingToday.overtimeHours = 0;
         if (body.employeeEmail && !existingToday.employeeEmail) {
           existingToday.employeeEmail = body.employeeEmail;
         }
@@ -593,6 +709,8 @@ export async function POST(request: Request) {
           status: "Hadir",
           notes: notes || `Absen pulang via GPS (${distanceToOffice}m dari kantor) & Foto Selfie terverifikasi`,
           isGpsLocked: true,
+          isAutoClosed: false,
+          overtimeHours: 0,
         };
         data.attendance.unshift(newRecord);
         savedRecord = newRecord;
@@ -611,6 +729,22 @@ export async function POST(request: Request) {
 
       if (!date || !startTime || !endTime || !hours) {
         return NextResponse.json({ success: false, error: "Mohon lengkapi jadwal dan durasi jam lembur" }, { status: 400 });
+      }
+
+      // Validasi Ketat: Jangan hitung/izinkan lembur jika karyawan tercatat tidak absen pulang pada tanggal tersebut!
+      const attendanceOnDate = (data.attendance || []).find((a: any) =>
+        a.date === date &&
+        a.employeeName &&
+        a.employeeName.trim().toLowerCase() === (body.employeeName || "").trim().toLowerCase()
+      );
+      if (attendanceOnDate && (attendanceOnDate.isAutoClosed || attendanceOnDate.status === "Tidak Absen Pulang")) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Pengajuan lembur DITOLAK: Anda terdata tidak melakukan absensi pulang (Sistem Auto-Close) pada tanggal ini sehingga lembur tidak diakui.",
+          },
+          { status: 400 }
+        );
       }
 
       const newOT = {
