@@ -403,6 +403,11 @@ interface PurchaseOrder {
   frozenStampUrl?: string;
   lastPrintedAt?: string;
   firstPrintedAt?: string;
+  taxInvoiceNumber?: string;
+  taxInvoiceDate?: string;
+  taxInvoiceUrl?: string;
+  taxInvoiceUploadedAt?: string;
+  taxInvoiceNotes?: string;
 }
 
 interface SalesReturn {
@@ -7395,6 +7400,10 @@ export default function AdminFinanceERPPage() {
         signatureImage = financeSettings.masterSignatureUrl || "";
       }
 
+      if (!signatureImage && (financeSettings as any)?.masterSignatureUrl) {
+        signatureImage = (financeSettings as any).masterSignatureUrl;
+      }
+
       const res = await fetch("/api/finance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -7404,8 +7413,8 @@ export default function AdminFinanceERPPage() {
             id: selectedReturnSaleForApproval.id,
             documentType: "return_sales",
             signatureImage,
-            signerName: signerNameInput,
-            signerTitle: signerTitleInput,
+            signerName: signerNameInput || (financeSettings as any)?.signerName || "RAMADHANI ST",
+            signerTitle: signerTitleInput || (financeSettings as any)?.signerTitle || "Direktur",
             notes: approvalNotesInput,
           },
         }),
@@ -7607,6 +7616,10 @@ export default function AdminFinanceERPPage() {
         signatureImage = financeSettings.masterSignatureUrl || "";
       }
 
+      if (!signatureImage && (financeSettings as any)?.masterSignatureUrl) {
+        signatureImage = (financeSettings as any).masterSignatureUrl;
+      }
+
       const res = await fetch("/api/finance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -7616,8 +7629,8 @@ export default function AdminFinanceERPPage() {
             id: selectedReturnPurchaseForApproval.id,
             documentType: "return_purchase",
             signatureImage,
-            signerName: signerNameInput,
-            signerTitle: signerTitleInput,
+            signerName: signerNameInput || (financeSettings as any)?.signerName || "RAMADHANI ST",
+            signerTitle: signerTitleInput || (financeSettings as any)?.signerTitle || "Direktur",
             notes: approvalNotesInput,
           },
         }),
@@ -28470,6 +28483,21 @@ export default function AdminFinanceERPPage() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Proteksi Pengesahan & Tanda Tangan Terkunci (Tugas 283) */}
+            {(editingSale.approvalStatus === "Disetujui & Sah" || (editingSale as any).isLocked) && (
+              <div className="p-3.5 bg-indigo-50/90 border border-indigo-200 rounded-2xl flex items-start gap-3 text-indigo-900 animate-in fade-in duration-200">
+                <ShieldCheck className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                <div className="text-[11px] leading-relaxed space-y-1">
+                  <div className="font-bold text-indigo-950">
+                    🔒 Dokumen Ini Telah Disahkan &amp; Bertanda Tangan Sah:
+                  </div>
+                  <div className="text-indigo-800">
+                    Disahkan oleh <strong>{editingSale.approvedBy || "RAMADHANI ST (Direktur)"}</strong>. Tanda tangan digital dan stempel resmi tetap terkunci aman dan tidak akan terhapus saat Anda memperbarui data ini.
+                  </div>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleEditSaleSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

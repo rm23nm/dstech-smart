@@ -193,6 +193,91 @@ export async function GET() {
   const suppliers = data.suppliers || [];
   const quotations = data.quotations || [];
 
+  // Sinkronisasi otomatis Pajak PPN & e-Faktur ke data.tax_records agar tidak perlu 2x input
+  let taxSyncUpdated = false;
+  if (!data.tax_records) {
+    data.tax_records = [];
+    taxSyncUpdated = true;
+  }
+
+  // 1. Sinkronisasi PPN Keluaran dari Penjualan (Sales)
+  sales.forEach((s: any) => {
+    if ((Number(s.taxAmount) > 0 || s.taxInvoiceNumber) && s.businessEntity !== "NON_PT") {
+      const exists = data.tax_records.some(
+        (t: any) => t.referenceNo === s.invoiceNumber && t.taxType === "PPN_KELUARAN"
+      );
+      if (!exists) {
+        const dppVal = Number(s.subtotal) || (Number(s.grandTotal) - Number(s.taxAmount || 0));
+        const rateVal = Number(s.taxRate) || 11;
+        const taxAmtVal = Number(s.taxAmount) || Math.round((dppVal * rateVal) / 100);
+        const dateVal = s.taxInvoiceDate || s.date || new Date().toISOString().split("T")[0];
+        data.tax_records.unshift({
+          id: `dstech_tax_sale_${s.id || Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          taxType: "PPN_KELUARAN",
+          period: dateVal.slice(0, 7),
+          date: dateVal,
+          entityType: s.businessEntity || "PT",
+          partyName: s.customerName || "Klien PT. DSTech",
+          npwp: s.customerNpwp || "-",
+          referenceNo: s.invoiceNumber,
+          dpp: dppVal,
+          taxRate: rateVal,
+          taxAmount: taxAmtVal,
+          bupotNumber: s.taxInvoiceNumber || "",
+          proofUrl: s.taxInvoiceUrl || "",
+          status: s.paymentStatus === "Lunas" ? "PAID" : "UNPAID",
+          billingCode: "",
+          ntpn: "",
+          notes: s.taxInvoiceNotes || `PPN Keluaran dari Faktur Penjualan ${s.invoiceNumber}`,
+          createdAt: s.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        taxSyncUpdated = true;
+      }
+    }
+  });
+
+  // 2. Sinkronisasi PPN Masukan dari Pembelian / Tagihan Vendor (Purchases / Bills)
+  purchases.forEach((p: any) => {
+    if ((Number(p.taxAmount) > 0 || p.taxInvoiceNumber) && p.businessEntity !== "NON_PT") {
+      const exists = data.tax_records.some(
+        (t: any) => t.referenceNo === p.poNumber && t.taxType === "PPN_MASUKAN"
+      );
+      if (!exists) {
+        const dppVal = Number(p.subtotal) || (Number(p.grandTotal) - Number(p.taxAmount || 0));
+        const rateVal = Number(p.taxRate) || 11;
+        const taxAmtVal = Number(p.taxAmount) || Math.round((dppVal * rateVal) / 100);
+        const dateVal = p.taxInvoiceDate || p.date || new Date().toISOString().split("T")[0];
+        data.tax_records.unshift({
+          id: `dstech_tax_po_${p.id || Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          taxType: "PPN_MASUKAN",
+          period: dateVal.slice(0, 7),
+          date: dateVal,
+          entityType: p.businessEntity || "PT",
+          partyName: p.supplierName || "Supplier / Vendor",
+          npwp: p.supplierNpwp || "-",
+          referenceNo: p.poNumber,
+          dpp: dppVal,
+          taxRate: rateVal,
+          taxAmount: taxAmtVal,
+          bupotNumber: p.taxInvoiceNumber || p.vendorInvoiceNumber || "",
+          proofUrl: p.taxInvoiceUrl || "",
+          status: p.paymentStatus === "Lunas" ? "PAID" : "UNPAID",
+          billingCode: "",
+          ntpn: "",
+          notes: p.taxInvoiceNotes || `PPN Masukan dari ${p.docType === "BILL" ? "Tagihan Vendor" : "PO"} ${p.poNumber}`,
+          createdAt: p.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        taxSyncUpdated = true;
+      }
+    }
+  });
+
+  if (taxSyncUpdated) {
+    writeFinanceData(data);
+  }
+
   const totalSalesRevenue = sales.reduce((acc: number, curr: any) => acc + (Number(curr.grandTotal) || 0), 0);
   const totalSalesPaid = sales.reduce((acc: number, curr: any) => acc + (Number(curr.paidAmount) || 0), 0);
   const totalAccountsReceivable = sales.reduce((acc: number, curr: any) => acc + (Number(curr.remainingAmount) || 0), 0);
@@ -1074,29 +1159,133 @@ export async function POST(request: Request) {
     }
 
     if (actionType === "attach_tax_invoice" || actionType === "upload_tax_invoice") {
-      const { invoiceId, taxInvoiceNumber, taxInvoiceDate, taxInvoiceUrl, notes } = payload;
+      const {
+        invoiceId,
+        docType = "sale",
+        taxInvoiceNumber,
+        taxInvoiceDate,
+        taxInvoiceUrl,
+        notes,
+        dpp,
+        taxRate,
+        taxAmount,
+        taxType,
+        status,
+        billingCode,
+        ntpn,
+      } = payload;
+
       const sales = data.sales || [];
-      const index = sales.findIndex((s: any) => s.id === invoiceId || s.invoiceNumber === invoiceId);
+      const purchases = data.purchases || [];
 
-      if (index === -1) {
-        return NextResponse.json({ success: false, error: "Faktur penjualan tidak ditemukan" }, { status: 404 });
+      let isSale = docType === "sale";
+      let saleIndex = sales.findIndex((s: any) => s.id === invoiceId || s.invoiceNumber === invoiceId);
+      let purchaseIndex = -1;
+
+      if (saleIndex === -1) {
+        purchaseIndex = purchases.findIndex((p: any) => p.id === invoiceId || p.poNumber === invoiceId);
+        if (purchaseIndex !== -1) {
+          isSale = false;
+        }
       }
 
-      sales[index].taxInvoiceNumber = taxInvoiceNumber ? String(taxInvoiceNumber).trim() : sales[index].taxInvoiceNumber;
-      sales[index].taxInvoiceDate = taxInvoiceDate || sales[index].taxInvoiceDate || new Date().toISOString().split("T")[0];
-      if (taxInvoiceUrl) {
-        sales[index].taxInvoiceUrl = taxInvoiceUrl;
+      if (saleIndex === -1 && purchaseIndex === -1) {
+        return NextResponse.json({ success: false, error: "Dokumen Penjualan atau Pembelian tidak ditemukan" }, { status: 404 });
       }
-      sales[index].taxInvoiceUploadedAt = new Date().toISOString();
-      if (notes) {
-        sales[index].taxInvoiceNotes = notes;
+
+      let targetDoc: any = null;
+      let referenceNumber = "";
+      let partyName = "";
+      const defaultTaxType = isSale ? "PPN_KELUARAN" : "PPN_MASUKAN";
+      const effectiveTaxType = taxType || defaultTaxType;
+
+      if (isSale) {
+        targetDoc = sales[saleIndex];
+        referenceNumber = targetDoc.invoiceNumber;
+        partyName = targetDoc.customerName || "Klien PT. DSTech";
+
+        targetDoc.taxInvoiceNumber = taxInvoiceNumber ? String(taxInvoiceNumber).trim() : targetDoc.taxInvoiceNumber;
+        targetDoc.taxInvoiceDate = taxInvoiceDate || targetDoc.taxInvoiceDate || new Date().toISOString().split("T")[0];
+        if (taxInvoiceUrl) targetDoc.taxInvoiceUrl = taxInvoiceUrl;
+        targetDoc.taxInvoiceUploadedAt = new Date().toISOString();
+        if (notes) targetDoc.taxInvoiceNotes = notes;
+
+        if (dpp !== undefined && Number(dpp) > 0) targetDoc.subtotal = Number(dpp);
+        if (taxRate !== undefined) targetDoc.taxRate = Number(taxRate);
+        if (taxAmount !== undefined) {
+          targetDoc.taxAmount = Number(taxAmount);
+          targetDoc.grandTotal = (Number(targetDoc.subtotal) || 0) + Number(targetDoc.taxAmount);
+        }
+      } else {
+        targetDoc = purchases[purchaseIndex];
+        referenceNumber = targetDoc.poNumber;
+        partyName = targetDoc.supplierName || "Supplier / Vendor DSTech";
+
+        targetDoc.taxInvoiceNumber = taxInvoiceNumber ? String(taxInvoiceNumber).trim() : targetDoc.taxInvoiceNumber;
+        targetDoc.taxInvoiceDate = taxInvoiceDate || targetDoc.taxInvoiceDate || new Date().toISOString().split("T")[0];
+        if (taxInvoiceUrl) targetDoc.taxInvoiceUrl = taxInvoiceUrl;
+        targetDoc.taxInvoiceUploadedAt = new Date().toISOString();
+        if (notes) targetDoc.taxInvoiceNotes = notes;
+
+        if (dpp !== undefined && Number(dpp) > 0) targetDoc.subtotal = Number(dpp);
+        if (taxRate !== undefined) targetDoc.taxRate = Number(taxRate);
+        if (taxAmount !== undefined) {
+          targetDoc.taxAmount = Number(taxAmount);
+          targetDoc.grandTotal = (Number(targetDoc.subtotal) || 0) + Number(targetDoc.taxAmount);
+        }
+      }
+
+      // SINKRONISASI OTOMATIS KE data.tax_records LENGKAP DENGAN NOMINAL
+      if (!data.tax_records) data.tax_records = [];
+      const effectiveDpp = dpp !== undefined ? Number(dpp) : (Number(targetDoc.subtotal) || (Number(targetDoc.grandTotal) - Number(targetDoc.taxAmount || 0)));
+      const effectiveTaxRate = taxRate !== undefined ? Number(taxRate) : (Number(targetDoc.taxRate) || 11);
+      const effectiveTaxAmount = taxAmount !== undefined ? Number(taxAmount) : (Number(targetDoc.taxAmount) || Math.round((effectiveDpp * effectiveTaxRate) / 100));
+      const effectiveDate = taxInvoiceDate || targetDoc.taxInvoiceDate || targetDoc.date || new Date().toISOString().split("T")[0];
+      const effectivePeriod = effectiveDate.slice(0, 7);
+
+      const existingTaxIndex = data.tax_records.findIndex(
+        (t: any) => t.referenceNo === referenceNumber && (t.taxType === effectiveTaxType || (isSale && t.taxType === "PPN_KELUARAN") || (!isSale && t.taxType === "PPN_MASUKAN"))
+      );
+
+      const taxRecordPayload = {
+        id: existingTaxIndex !== -1 ? data.tax_records[existingTaxIndex].id : `dstech_tax_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        taxType: effectiveTaxType,
+        period: effectivePeriod,
+        date: effectiveDate,
+        entityType: targetDoc.businessEntity || "PT",
+        partyName: partyName,
+        npwp: targetDoc.customerNpwp || targetDoc.supplierNpwp || "-",
+        referenceNo: referenceNumber,
+        dpp: effectiveDpp,
+        taxRate: effectiveTaxRate,
+        taxAmount: effectiveTaxAmount,
+        bupotNumber: taxInvoiceNumber ? String(taxInvoiceNumber).trim() : (existingTaxIndex !== -1 ? data.tax_records[existingTaxIndex].bupotNumber : ""),
+        status: status || (targetDoc.paymentStatus === "Lunas" ? "PAID" : "UNPAID"),
+        billingCode: billingCode || (existingTaxIndex !== -1 ? data.tax_records[existingTaxIndex].billingCode : ""),
+        ntpn: ntpn || (existingTaxIndex !== -1 ? data.tax_records[existingTaxIndex].ntpn : ""),
+        proofUrl: taxInvoiceUrl || targetDoc.taxInvoiceUrl || (existingTaxIndex !== -1 ? data.tax_records[existingTaxIndex].proofUrl : ""),
+        notes: notes || `e-Faktur ${effectiveTaxType} terkait ${referenceNumber}`,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (existingTaxIndex !== -1) {
+        data.tax_records[existingTaxIndex] = {
+          ...data.tax_records[existingTaxIndex],
+          ...taxRecordPayload,
+        };
+      } else {
+        data.tax_records.unshift({
+          ...taxRecordPayload,
+          createdAt: new Date().toISOString(),
+        });
       }
 
       writeFinanceData(data);
       return NextResponse.json({
         success: true,
-        message: `Faktur Pajak resmi DJP (${sales[index].taxInvoiceNumber || "e-Faktur"}) berhasil dilampirkan ke Faktur ${sales[index].invoiceNumber}!`,
-        data: sales[index],
+        message: `Faktur Pajak resmi DJP (${targetDoc.taxInvoiceNumber || "e-Faktur"}) berhasil disimpan & terintegrasi ke Keuangan dan Menu Pajak PPh/PPN!`,
+        data: targetDoc,
+        taxRecord: taxRecordPayload,
       });
     }
 
@@ -2508,9 +2697,13 @@ export async function DELETE(request: Request) {
 
     if (actionType === "sale") {
       const initialLen = (data.sales || []).length;
+      const targetSale = (data.sales || []).find((s: any) => s.id === id || s.invoiceNumber === id);
       data.sales = (data.sales || []).filter((s: any) => s.id !== id && s.invoiceNumber !== id);
       if (data.sales.length === initialLen) {
         return NextResponse.json({ success: false, error: "Faktur tidak ditemukan" }, { status: 404 });
+      }
+      if (targetSale && data.tax_records) {
+        data.tax_records = data.tax_records.filter((t: any) => t.referenceNo !== targetSale.invoiceNumber && t.referenceNo !== id);
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Faktur penjualan berhasil dihapus" });
@@ -2541,9 +2734,13 @@ export async function DELETE(request: Request) {
 
     if (actionType === "purchase") {
       const initialLen = (data.purchases || []).length;
+      const targetPo = (data.purchases || []).find((p: any) => p.id === id || p.poNumber === id);
       data.purchases = (data.purchases || []).filter((p: any) => p.id !== id && p.poNumber !== id);
       if (data.purchases.length === initialLen) {
         return NextResponse.json({ success: false, error: "Purchase Order tidak ditemukan" }, { status: 404 });
+      }
+      if (targetPo && data.tax_records) {
+        data.tax_records = data.tax_records.filter((t: any) => t.referenceNo !== targetPo.poNumber && t.referenceNo !== id);
       }
       writeFinanceData(data);
       return NextResponse.json({ success: true, message: "Purchase Order berhasil dihapus" });

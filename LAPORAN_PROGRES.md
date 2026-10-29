@@ -4,7 +4,31 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-*Tidak ada pekerjaan aktif yang tertunda. Semua instruksi telah selesai dikerjakan, diuji coba bebas error, dan telah dideploy langsung ke server live VPS 100%.*
+*Tidak ada pekerjaan aktif yang tertunda. Semua instruksi perbaikan dan permintaan telah selesai 100% dan terverifikasi di server lokal dan siap rilis.*
+
+- **2026-10-29**: [SELESAI] Integrasi Otomatis Pajak PPN (Keluaran & Masukan) dan PPh dari Penjualan (Faktur & e-Faktur) serta Pembelian/Tagihan Vendor (PO & Bills) ke Menu Pajak PPh & PPN dan Modul Keuangan Lengkap dengan Nominal Rupiah (Tugas 294) (`src/app/admin/finance/page.tsx` & `src/app/api/finance/route.ts`).
+  *Permintaan User*: 
+  1. "apakah ini sudah terintegrasi kedalam keuangan dan menu pajak pph dan PPN. kalau belum sekalian integrasikan, agar tidak 2 x input dan tambahkan juga nominalnya."
+  2. "untuk pembelian&Tagihan Vendor juga sama, langsung integrasikan pajaknya ke keuangan dan pajak PPh&PPN"
+  *Penyebab Masalah yang Ditemukan (Root Cause)*:
+  1. Pada modal lampiran e-Faktur Penjualan (`handleOpenTaxInvoiceModal`), saat ini hanya menampung nomor NSFP, tanggal, berkas PDF, dan catatan, tanpa menampilkan atau menyertakan nominal DPP, tarif %, dan nominal pajak (PPN/PPh).
+  2. Handler backend `attach_tax_invoice` saat ini hanya menyimpan metadata e-faktur di dalam objek `data.sales[index]`, belum menyinkronkannya ke `data.tax_records`. Akibatnya di Menu Pajak PPh & PPN (`activeTab === 'tax'`), catatan pajak penjualan tidak muncul secara otomatis dan mengharuskan input 2 kali.
+  3. Pada modul Pembelian & Tagihan Vendor (`purchases` / `bills`), belum terdapat integrasi otomatis pajak masukan (`PPN_MASUKAN`) ke `data.tax_records`, serta belum tersedia tombol / modal untuk mencatat e-Faktur Pajak Masukan dari rekanan vendor.
+  *Penyelesaian & Hasil*:
+  1. **Backend Keuangan (`src/app/api/finance/route.ts`)**:
+     - Handler `attach_tax_invoice` diperluas untuk menerima nominal `dpp`, `taxRate`, `taxAmount`, `taxType` (`PPN_KELUARAN` / `PPN_MASUKAN` / `PPH23`), `status`, `billingCode`, dan `ntpn`.
+     - Mendukung pelampiran e-faktur untuk Penjualan (`sales`) dan Pembelian/Tagihan Vendor (`purchases`).
+     - Menyinkronkan secara otomatis dan dua arah ke buku catatan pajak (`data.tax_records`) lengkap dengan nominal Rupiah dan berkas PDF faktur pajak.
+     - Membersihkan catatan pajak terkait di `data.tax_records` apabila dokumen penjualan atau pembelian dihapus via `DELETE`.
+  2. **Frontend Keuangan (`src/app/admin/finance/page.tsx`)**:
+     - Memperluas modal e-Faktur (`taxInvoiceModalData`) dengan field nominal: DPP, Tarif Pajak (%), Nominal Pajak PPN/PPh (Rp), Pilihan Jenis Pajak (`PPN_KELUARAN`, `PPN_MASUKAN`, `PPH23`), dan Status Setor.
+     - Menyediakan handler `handleOpenPurchaseTaxModal` dan modal Faktur Pajak Masukan untuk Pembelian & Tagihan Vendor.
+     - Memasang tombol `🏛️ Pajak Masukan` di kolom aksi tabel Pembelian & Tagihan Vendor.
+     - Sinkronisasi otomatis ke Menu Pajak PPh & PPN (`activeTab === 'tax'`) sehingga tidak perlu 2x input.
+  3. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: Lolos 100% tanpa error tipe.
+     - `npm run build`: Sukses mengompilasi seluruh 76/76 static & dynamic pages.
+     - Folder cadangan sementara telah dibersihkan secara aman.
 
 - **2026-10-29**: [SELESAI] Penempatan Tombol Aksi e-Faktur Pajak di Kolom Aksi Tabel Penjualan, Badge Status Pajak, Toolbar Cetak Faktur, dan Deployment Langsung ke Live VPS (Tugas 293) (`src/app/admin/finance/page.tsx`).
   *Permintaan User*: 
