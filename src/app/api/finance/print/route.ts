@@ -740,7 +740,9 @@ export async function GET(req: Request) {
       sph.lastPrintedAt = lastPrintedAt;
     }
 
-    const terbilangRupiah = angkaKeTerbilang(sph.grandTotal) + " Rupiah";
+    const isHideTax = Boolean(sph.hideTaxInPrint);
+    const effectiveTotal = isHideTax ? Math.max(0, (sph.subtotal || 0) - (sph.discount || 0)) : (sph.grandTotal || 0);
+    const terbilangRupiah = angkaKeTerbilang(effectiveTotal) + " Rupiah";
 
     // Lengkapi foto/gambar item produk dari katalog
     const itemsWithImages = (sph.items || []).map((it: any) => {
@@ -1028,6 +1030,11 @@ export async function GET(req: Request) {
                   <p class="font-serif italic font-bold text-slate-800">
                     "${terbilangRupiah}"
                   </p>
+                  ${isHideTax ? `
+                    <p class="text-[9.5px] text-amber-900 font-bold mt-1 pt-1 border-t border-amber-200/70">
+                      *Total di atas belum termasuk PPN ${sph.taxRate === 11.12 ? '12%' : `${sph.taxRate || 11}%`} (Exclude PPN)
+                    </p>
+                  ` : ''}
                 </div>
 
                 <div class="p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[10.5px] space-y-0.5">
@@ -1060,12 +1067,23 @@ export async function GET(req: Request) {
                 ` : ''}
                 <div class="flex items-center justify-between text-slate-600 text-[11px]">
                   <span>PPN (${sph.taxRate === 11.12 ? '12%' : `${sph.taxRate || 11}%`}):</span>
-                  <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
+                  ${isHideTax ? `
+                    <span class="font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded text-[10px] border border-amber-300">
+                      Exclude (Belum Termasuk)
+                    </span>
+                  ` : `
+                    <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
+                  `}
                 </div>
                 <div class="border-t-2 border-indigo-950 pt-1.5 flex items-center justify-between font-black text-slate-900">
                   <span class="text-indigo-900 text-xs">TOTAL PENAWARAN:</span>
-                  <span class="text-sm text-emerald-600">${formatRupiah(sph.grandTotal)}</span>
+                  <span class="text-sm text-emerald-600">${formatRupiah(effectiveTotal)}</span>
                 </div>
+                ${isHideTax ? `
+                  <div class="p-1 rounded bg-amber-50 border border-amber-200 text-[9px] font-bold text-amber-900 text-center mt-1">
+                    *Harga penawaran di atas belum termasuk PPN ${sph.taxRate === 11.12 ? '12%' : `${sph.taxRate || 11}%`} (Exclude)
+                  </div>
+                ` : ''}
               </div>
             </div>
 
@@ -1077,6 +1095,11 @@ export async function GET(req: Request) {
                 </h5>
                 <div class="text-[9.5px] text-slate-600 whitespace-pre-line leading-relaxed font-sans">
                   ${sph.terms}
+                  ${isHideTax ? `
+                    <p class="mt-1 font-bold text-amber-900 bg-amber-100/70 p-1.5 rounded border border-amber-200">
+                      • Seluruh harga penawaran di atas adalah harga Netto/DPP dan belum termasuk PPN (Exclude PPN). Pajak Pertambahan Nilai akan diperhitungkan saat penerbitan Faktur Penjualan resmi.
+                    </p>
+                  ` : ''}
                 </div>
               </div>
             ` : ''}
@@ -1264,15 +1287,25 @@ export async function GET(req: Request) {
                     <span>${sph.discountLabel || "Diskon Negosiasi"}:</span>
                     <span class="font-bold">-${formatRupiah(sph.discount)}</span>
                   </div>` : ""}
-                  ${sph.taxAmount && sph.taxAmount > 0 ? `
                   <div class="flex justify-between text-slate-600 text-[11px]">
                     <span>PPN (${sph.taxRate === 11.12 ? '12%' : `${sph.taxRate || 11}%`}):</span>
-                    <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
-                  </div>` : ""}
+                    ${isHideTax ? `
+                      <span class="font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded text-[9.5px] border border-amber-300">
+                        Exclude (Belum Termasuk)
+                      </span>
+                    ` : `
+                      <span class="font-bold text-slate-900">${formatRupiah(sph.taxAmount)}</span>
+                    `}
+                  </div>
                   <div class="border-t-2 border-slate-900 pt-1 flex justify-between font-black text-xs text-slate-900">
                     <span class="text-indigo-900">TOTAL PENAWARAN:</span>
-                    <span class="text-emerald-700 text-sm">${formatRupiah(sph.grandTotal)}</span>
+                    <span class="text-emerald-700 text-sm">${formatRupiah(effectiveTotal)}</span>
                   </div>
+                  ${isHideTax ? `
+                    <div class="p-1 rounded bg-amber-50 border border-amber-200 text-[9px] font-bold text-amber-900 text-center mt-1">
+                      *Harga Netto/DPP belum termasuk PPN (Exclude)
+                    </div>
+                  ` : ''}
                 </div>
               </div>
 

@@ -251,6 +251,50 @@ interface SaleInvoice {
   firstPrintedAt?: string;
 }
 
+export interface RecurringBillTemplate {
+  id: string;
+  title: string;
+  category: string;
+  businessEntity: "PT" | "NON_PT";
+  recurringDay: number;
+  estimatedAmount: number;
+  vendorName: string;
+  customerNumber: string;
+  paymentMethod: string;
+  isActive: boolean;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface OperationalBillInstance {
+  id: string;
+  templateId: string;
+  billNumber: string;
+  title: string;
+  category: string;
+  period: string;
+  billDate: string;
+  dueDate: string;
+  businessEntity: "PT" | "NON_PT";
+  nominal: number;
+  estimatedNominal: number;
+  vendorName: string;
+  customerNumber: string;
+  paymentMethod: string;
+  status: "MENUNGGU_DANA" | "DISETUJUI_LUNAS" | "DILEWATI";
+  approvedAt?: string | null;
+  approvedBy?: string | null;
+  approverTitle?: string | null;
+  paidDate?: string | null;
+  paidFromAccount?: string | null;
+  receiptUrl?: string | null;
+  cashFlowId?: string | null;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 interface QuotationItem {
   id: string;
   productId?: string;
@@ -289,6 +333,7 @@ interface Quotation {
   taxType?: "exclude" | "include";
   taxAmount: number;
   grandTotal: number;
+  hideTaxInPrint?: boolean;
   terms: string;
   status: "Draf" | "Terkirim" | "Disetujui Klien" | "Ditolak" | "Terkonversi Faktur" | string;
   convertedInvoiceId?: string;
@@ -613,7 +658,7 @@ interface FinanceSummary {
 
 export default function AdminFinanceERPPage() {
   const [activeTab, setActiveTab] = useState<
-    "sales" | "quotations" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses" | "clients" | "suppliers" | "projects" | "trial_balance" | "tax"
+    "sales" | "quotations" | "purchases" | "returns" | "pl_report" | "cash_flow" | "warehouses" | "clients" | "suppliers" | "projects" | "trial_balance" | "tax" | "recurring_bills"
   >("sales");
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -634,6 +679,79 @@ export default function AdminFinanceERPPage() {
   const [suppliers, setSuppliers] = useState<SupplierItem[]>([]);
   const [products, setProducts] = useState<ProductCatalogItem[]>([]);
   const [taxRecords, setTaxRecords] = useState<TaxRecord[]>([]);
+
+  // Tagihan Operasional Rutin & Berulang States
+  const [recurringBills, setRecurringBills] = useState<RecurringBillTemplate[]>([]);
+  const [operationalBills, setOperationalBills] = useState<OperationalBillInstance[]>([]);
+  const [opBillSearchQuery, setOpBillSearchQuery] = useState<string>("");
+  const [opBillPeriodFilter, setOpBillPeriodFilter] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [opBillStatusFilter, setOpBillStatusFilter] = useState<string>("ALL");
+  const [opBillEntityFilter, setOpBillEntityFilter] = useState<string>("ALL");
+
+  // Approval Modal State
+  const [selectedBillForApproval, setSelectedBillForApproval] = useState<OperationalBillInstance | null>(null);
+  const [approvalBillForm, setApprovalBillForm] = useState<{
+    actualNominal: number;
+    paidDate: string;
+    paymentMethod: string;
+    receiptUrl: string;
+    notes: string;
+  }>({
+    actualNominal: 0,
+    paidDate: new Date().toISOString().split("T")[0],
+    paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+    receiptUrl: "",
+    notes: "",
+  });
+  const [isSubmittingBillApproval, setIsSubmittingBillApproval] = useState<boolean>(false);
+
+  // Master Template Modal State
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState<boolean>(false);
+  const [editingTemplate, setEditingTemplate] = useState<RecurringBillTemplate | null>(null);
+  const [templateForm, setTemplateForm] = useState<{
+    id?: string;
+    title: string;
+    category: string;
+    businessEntity: "PT" | "NON_PT";
+    recurringDay: number;
+    estimatedAmount: number;
+    vendorName: string;
+    customerNumber: string;
+    paymentMethod: string;
+    isActive: boolean;
+    notes: string;
+  }>({
+    title: "",
+    category: "Beban Listrik, Air & Internet",
+    businessEntity: "PT",
+    recurringDay: 5,
+    estimatedAmount: 0,
+    vendorName: "",
+    customerNumber: "",
+    paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+    isActive: true,
+    notes: "",
+  });
+  const [isSubmittingTemplate, setIsSubmittingTemplate] = useState<boolean>(false);
+
+  // Edit Instance Modal State
+  const [editingOpBill, setEditingOpBill] = useState<OperationalBillInstance | null>(null);
+  const [editOpBillForm, setEditOpBillForm] = useState<{
+    nominal: number;
+    dueDate: string;
+    customerNumber: string;
+    vendorName: string;
+    notes: string;
+  }>({
+    nominal: 0,
+    dueDate: "",
+    customerNumber: "",
+    vendorName: "",
+    notes: "",
+  });
 
   // Pajak PPh & PPN States
   const [taxSearchQuery, setTaxSearchQuery] = useState<string>("");
@@ -1845,6 +1963,7 @@ export default function AdminFinanceERPPage() {
     isRevision?: boolean;
     taxRate: number;
     taxType: "exclude" | "include";
+    hideTaxInPrint?: boolean;
     terms: string;
     notes: string;
     businessEntity: "PT" | "NON_PT";
@@ -1872,6 +1991,7 @@ export default function AdminFinanceERPPage() {
     isRevision: false,
     taxRate: 12,
     taxType: "exclude",
+    hideTaxInPrint: false,
     terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
     notes: "",
     businessEntity: "PT",
@@ -3232,6 +3352,8 @@ export default function AdminFinanceERPPage() {
           setClients(d.data.clients || []);
           setSuppliers(d.data.suppliers || []);
           setTaxRecords(d.data.tax_records || []);
+          setRecurringBills(d.data.recurring_bills || []);
+          setOperationalBills(d.data.operational_bills || []);
           if (d.data.bank_accounts && d.data.bank_accounts.length > 0) {
             setBankAccounts(d.data.bank_accounts);
             const def = d.data.bank_accounts.find((b: any) => b.isDefault && b.status === "Aktif") || d.data.bank_accounts.find((b: any) => b.status === "Aktif") || d.data.bank_accounts[0];
@@ -4338,6 +4460,7 @@ export default function AdminFinanceERPPage() {
             taxType: quotationForm.taxType || "exclude",
             taxAmount,
             grandTotal,
+            hideTaxInPrint: Boolean(quotationForm.hideTaxInPrint),
             terms: quotationForm.terms,
             notes: quotationForm.notes,
             businessEntity: quotationForm.businessEntity || "PT",
@@ -4374,6 +4497,7 @@ export default function AdminFinanceERPPage() {
           isRevision: false,
           taxRate: 12,
           taxType: "exclude",
+          hideTaxInPrint: false,
           terms: "1. Harga sudah termasuk pengiriman, instalasi kabel pelindung pipa konduit, dan uji kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan garansi pemeliharaan teknis selama 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah penandatanganan Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak tanggal diterbitkan.",
           notes: "",
           businessEntity: "PT",
@@ -4409,6 +4533,7 @@ export default function AdminFinanceERPPage() {
       isRevision: false,
       taxRate: q.taxRate !== undefined ? q.taxRate : 12,
       taxType: (q as any).taxType || "exclude",
+      hideTaxInPrint: Boolean(q.hideTaxInPrint),
       terms: q.terms,
       notes: q.notes || "",
       businessEntity: q.businessEntity || "PT",
@@ -4454,6 +4579,7 @@ export default function AdminFinanceERPPage() {
             taxType: quotationForm.taxType || "exclude",
             taxAmount,
             grandTotal,
+            hideTaxInPrint: Boolean(quotationForm.hideTaxInPrint),
             terms: quotationForm.terms,
             notes: quotationForm.notes,
             projectId: quotationForm.projectId || "",
@@ -5215,31 +5341,33 @@ export default function AdminFinanceERPPage() {
 
   // Hook Filter & Sort: Buku Arus Kas
   const filteredAndSortedCashFlow = useMemo(() => {
-    return cashFlow
+    return (cashFlow || [])
       .filter((cash) => {
+        if (!cash) return false;
         const matchEntity = selectedEntity === "ALL" || (cash.businessEntity || "PT") === selectedEntity;
         if (!matchEntity) return false;
 
+        const cashAcc = (cash.account || "").toLowerCase();
         if (cashAccountFilter !== "ALL") {
           if (cashAccountFilter === "TUNAI") {
             const isTunai =
-              cash.account.toLowerCase().includes("tunai") ||
-              cash.account.toLowerCase().includes("kas kecil") ||
-              cash.account.toLowerCase().includes("petty");
+              cashAcc.includes("tunai") ||
+              cashAcc.includes("kas kecil") ||
+              cashAcc.includes("petty");
             if (!isTunai) return false;
           } else {
-            if (!cash.account.toLowerCase().includes(cashAccountFilter.toLowerCase())) return false;
+            if (!cashAcc.includes((cashAccountFilter || "").toLowerCase())) return false;
           }
         }
 
-        const q = cashSearchQuery.toLowerCase().trim();
+        const q = (cashSearchQuery || "").toLowerCase().trim();
         const matchQuery =
           !q ||
-          (cash.description && cash.description.toLowerCase().includes(q)) ||
-          (cash.category && cash.category.toLowerCase().includes(q)) ||
-          (cash.account && cash.account.toLowerCase().includes(q)) ||
-          (cash.reference && cash.reference.toLowerCase().includes(q)) ||
-          (cash.projectName && cash.projectName.toLowerCase().includes(q));
+          ((cash.description || "").toLowerCase().includes(q)) ||
+          ((cash.category || "").toLowerCase().includes(q)) ||
+          (cashAcc.includes(q)) ||
+          ((cash.reference || "").toLowerCase().includes(q)) ||
+          ((cash.projectName || "").toLowerCase().includes(q));
 
         if (!matchQuery) return false;
 
@@ -9087,8 +9215,9 @@ export default function AdminFinanceERPPage() {
       cashFlow: cashFlow.filter((c) => selectedEntity === "ALL" || (c.businessEntity || "PT") === selectedEntity).length,
       projects: projects.filter((prj) => selectedEntity === "ALL" || (prj.businessEntity || "PT") === selectedEntity).length,
       taxes: taxRecords.filter((t) => selectedEntity === "ALL" || (t.entityType || "PT") === selectedEntity).length,
+      recurringBills: operationalBills.filter((b) => (selectedEntity === "ALL" || (b.businessEntity || "PT") === selectedEntity) && b.status === "MENUNGGU_DANA").length,
     };
-  }, [sales, quotations, purchases, cashFlow, projects, selectedEntity]);
+  }, [sales, quotations, purchases, cashFlow, projects, taxRecords, operationalBills, selectedEntity]);
 
   const getSupplierStats = (sup: SupplierItem) => {
     const relatedPo = purchases.filter((p) => {
@@ -9239,6 +9368,51 @@ export default function AdminFinanceERPPage() {
       difference: Math.abs(debitTotal - finalCreditTotal),
     };
   }, [cashFlow, sales, warehouses, purchases, expenses, taxRecords, selectedEntity]);
+
+  // ==========================================
+  // PERHITUNGAN TAGIHAN RUTIN OPERASIONAL
+  // ==========================================
+  const filteredOperationalBills = useMemo(() => {
+    return operationalBills.filter((bill) => {
+      if (selectedEntity !== "ALL" && (bill.businessEntity || "PT") !== selectedEntity) return false;
+      if (opBillEntityFilter !== "ALL" && (bill.businessEntity || "PT") !== opBillEntityFilter) return false;
+      if (opBillPeriodFilter && opBillPeriodFilter !== "ALL" && bill.period !== opBillPeriodFilter) return false;
+      if (opBillStatusFilter !== "ALL" && bill.status !== opBillStatusFilter) return false;
+
+      if (opBillSearchQuery.trim()) {
+        const q = opBillSearchQuery.toLowerCase();
+        const matchTitle = bill.title?.toLowerCase().includes(q);
+        const matchNumber = bill.billNumber?.toLowerCase().includes(q);
+        const matchCategory = bill.category?.toLowerCase().includes(q);
+        const matchVendor = bill.vendorName?.toLowerCase().includes(q);
+        const matchCust = bill.customerNumber?.toLowerCase().includes(q);
+        if (!matchTitle && !matchNumber && !matchCategory && !matchVendor && !matchCust) return false;
+      }
+      return true;
+    });
+  }, [operationalBills, selectedEntity, opBillEntityFilter, opBillPeriodFilter, opBillStatusFilter, opBillSearchQuery]);
+
+  const opBillMetrics = useMemo(() => {
+    const scoped = operationalBills.filter((b) => {
+      if (selectedEntity !== "ALL" && (b.businessEntity || "PT") !== selectedEntity) return false;
+      return !opBillPeriodFilter || opBillPeriodFilter === "ALL" || b.period === opBillPeriodFilter;
+    });
+
+    const totalEstimated = scoped.reduce((acc, b) => acc + (Number(b.nominal) || Number(b.estimatedNominal) || 0), 0);
+    const pendingBills = scoped.filter((b) => b.status === "MENUNGGU_DANA");
+    const pendingAmount = pendingBills.reduce((acc, b) => acc + (Number(b.nominal) || Number(b.estimatedNominal) || 0), 0);
+    const paidBills = scoped.filter((b) => b.status === "DISETUJUI_LUNAS");
+    const paidAmount = paidBills.reduce((acc, b) => acc + (Number(b.nominal) || 0), 0);
+
+    return {
+      totalEstimated,
+      totalCount: scoped.length,
+      pendingCount: pendingBills.length,
+      pendingAmount,
+      paidCount: paidBills.length,
+      paidAmount,
+    };
+  }, [operationalBills, selectedEntity, opBillPeriodFilter]);
 
   // ==========================================
   // PERHITUNGAN & HANDLERS PAJAK PPH & PPN
@@ -9471,6 +9645,230 @@ export default function AdminFinanceERPPage() {
     });
     setEditingTaxRecord(null);
     setIsTaxModalOpen(true);
+  };
+
+  // Handler untuk Tagihan Rutin & Operasional Bulanan
+  const handleOpenApproveBillModal = (bill: OperationalBillInstance) => {
+    setSelectedBillForApproval(bill);
+    const defaultAcc = bill.businessEntity === "NON_PT"
+      ? "Transfer Bank BCA (6520490131 - RAMADHANI ST)"
+      : "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)";
+    setApprovalBillForm({
+      actualNominal: bill.nominal || bill.estimatedNominal || 0,
+      paidDate: new Date().toISOString().split("T")[0],
+      paymentMethod: bill.paymentMethod || defaultAcc,
+      receiptUrl: bill.receiptUrl || "",
+      notes: bill.notes || "",
+    });
+  };
+
+  const handleApproveBillSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBillForApproval) return;
+    try {
+      setIsSubmittingBillApproval(true);
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "approve_operational_bill",
+          payload: {
+            billId: selectedBillForApproval.id,
+            actualNominal: Number(approvalBillForm.actualNominal) || 0,
+            paidDate: approvalBillForm.paidDate,
+            paymentMethod: approvalBillForm.paymentMethod,
+            receiptUrl: approvalBillForm.receiptUrl,
+            notes: approvalBillForm.notes,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage(`✅ Tagihan ${selectedBillForApproval.title} berhasil disetujui & dicairkan ke kas!`);
+        setSelectedBillForApproval(null);
+        await fetchFinanceData();
+      } else {
+        alert(data.error || "Gagal menyetujui tagihan");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat menyetujui tagihan");
+    } finally {
+      setIsSubmittingBillApproval(false);
+    }
+  };
+
+  const handleSkipBill = async (bill: OperationalBillInstance) => {
+    const reason = prompt(`Masukkan alasan melewati tagihan "${bill.title}" bulan ini:`, "Tidak ada pemakaian / Nihil");
+    if (reason === null) return;
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "skip_operational_bill",
+          payload: {
+            billId: bill.id,
+            reason: reason || "Dilewati oleh admin",
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage(`Tagihan "${bill.title}" dilewati untuk bulan ini`);
+        await fetchFinanceData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleGenerateMonthlyBills = async (period: string) => {
+    try {
+      setIsLoading(true);
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "generate_monthly_bills",
+          payload: { period },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage(data.message || "Tagihan bulanan berhasil dibentuk");
+        await fetchFinanceData();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleOpenNewTemplateModal = () => {
+    setEditingTemplate(null);
+    setTemplateForm({
+      title: "",
+      category: "Beban Listrik, Air & Internet",
+      businessEntity: "PT",
+      recurringDay: 5,
+      estimatedAmount: 0,
+      vendorName: "",
+      customerNumber: "",
+      paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+      isActive: true,
+      notes: "",
+    });
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleEditTemplate = (tmpl: RecurringBillTemplate) => {
+    setEditingTemplate(tmpl);
+    setTemplateForm({
+      id: tmpl.id,
+      title: tmpl.title,
+      category: tmpl.category,
+      businessEntity: tmpl.businessEntity || "PT",
+      recurringDay: tmpl.recurringDay || 1,
+      estimatedAmount: tmpl.estimatedAmount || 0,
+      vendorName: tmpl.vendorName || "",
+      customerNumber: tmpl.customerNumber || "",
+      paymentMethod: tmpl.paymentMethod || (tmpl.businessEntity === "NON_PT" 
+        ? "Transfer Bank BCA (6520490131 - RAMADHANI ST)" 
+        : "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)"),
+      isActive: tmpl.isActive !== false,
+      notes: tmpl.notes || "",
+    });
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleSaveTemplateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setIsSubmittingTemplate(true);
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "save_recurring_template",
+          payload: templateForm,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage("✅ Master template tagihan berulang berhasil disimpan");
+        setIsTemplateModalOpen(false);
+        setEditingTemplate(null);
+        await fetchFinanceData();
+      } else {
+        alert(data.error || "Gagal menyimpan template");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan saat menyimpan template");
+    } finally {
+      setIsSubmittingTemplate(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string, title: string) => {
+    if (!confirm(`Yakin ingin menghapus master template "${title}"?`)) return;
+    try {
+      const res = await fetch(`/api/finance?actionType=recurring_bill_template&id=${encodeURIComponent(templateId)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage(`Template "${title}" berhasil dihapus`);
+        await fetchFinanceData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleOpenEditOpBill = (bill: OperationalBillInstance) => {
+    setEditingOpBill(bill);
+    setEditOpBillForm({
+      nominal: bill.nominal || bill.estimatedNominal || 0,
+      dueDate: bill.dueDate || "",
+      customerNumber: bill.customerNumber || "",
+      vendorName: bill.vendorName || "",
+      notes: bill.notes || "",
+    });
+  };
+
+  const handleSaveEditOpBillSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingOpBill) return;
+    try {
+      const res = await fetch("/api/finance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actionType: "update_operational_bill",
+          payload: {
+            billId: editingOpBill.id,
+            updates: {
+              nominal: Number(editOpBillForm.nominal) || 0,
+              dueDate: editOpBillForm.dueDate,
+              customerNumber: editOpBillForm.customerNumber,
+              vendorName: editOpBillForm.vendorName,
+              notes: editOpBillForm.notes,
+            },
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setToastMessage(`✅ Tagihan ${editingOpBill.title} berhasil diperbarui`);
+        setEditingOpBill(null);
+        await fetchFinanceData();
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -9870,6 +10268,27 @@ export default function AdminFinanceERPPage() {
               {scopedCounts.taxes}
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("recurring_bills")}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "recurring_bills"
+                ? "bg-slate-900 text-white shadow-md"
+                : "bg-rose-50 text-rose-700 hover:bg-rose-100"
+            }`}
+          >
+            <Calendar className="w-4 h-4 text-rose-600" />
+            <span>Tagihan Rutin & Operasional</span>
+            {scopedCounts.recurringBills > 0 ? (
+              <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white text-[10px] font-black animate-pulse">
+                {scopedCounts.recurringBills} Butuh Dana
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-500/20 text-[10px] font-black text-rose-700">
+                {operationalBills.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* TAB 1: PENJUALAN & FAKTUR */}
@@ -10116,15 +10535,15 @@ export default function AdminFinanceERPPage() {
                             >
                               {sale.paymentStatus}
                             </span>
-                            {sale.approvalStatus === "Disetujui & Sah" ? (
+                            {sale.approvalStatus === "Disetujui & Sah" || (sale as any).isLocked ? (
                               <button
                                 type="button"
                                 onClick={() => handleOpenApprovalModal(sale)}
-                                title="Faktur sudah disetujui & sah digital. Klik untuk melihat / memperbarui tanda tangan digital"
+                                title="Faktur sudah disetujui & terkunci sah digital. Klik untuk melihat / memperbarui tanda tangan digital"
                                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-all cursor-pointer"
                               >
                                 <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                                <span>Sah Digital</span>
+                                <span>🔒 Dokumen Terkunci &amp; Sah</span>
                               </button>
                             ) : (
                               <button
@@ -10763,10 +11182,10 @@ export default function AdminFinanceERPPage() {
                             )}
 
                             <div>
-                              {sph.approvalStatus === "Disetujui & Sah" ? (
+                              {sph.approvalStatus === "Disetujui & Sah" || (sph as any).isLocked ? (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200">
                                   <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                                  Sah Digital
+                                  🔒 Dokumen Terkunci &amp; Sah
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
@@ -11241,11 +11660,11 @@ export default function AdminFinanceERPPage() {
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <div className="flex flex-col gap-1 items-start">
-                            {po.approvalStatus === "Disetujui & Sah" ? (
+                            {po.approvalStatus === "Disetujui & Sah" || (po as any).isLocked ? (
                               <div className="flex flex-col gap-0.5">
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
                                   <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                                  <span>Disetujui & Sah</span>
+                                  <span>🔒 Dokumen Terkunci &amp; Sah</span>
                                 </span>
                                 <span className="text-[9px] text-slate-400 font-mono">
                                   {po.verificationCode || "DST-APP"}
@@ -11664,10 +12083,10 @@ export default function AdminFinanceERPPage() {
                               {ret.status}
                             </span>
 
-                            {ret.approvalStatus === "Disetujui & Sah" ? (
+                            {ret.approvalStatus === "Disetujui & Sah" || (ret as any).isLocked ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800">
                                 <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
-                                <span>Sah</span>
+                                <span>🔒 Terkunci &amp; Sah</span>
                               </span>
                             ) : (
                               <button
@@ -11832,10 +12251,10 @@ export default function AdminFinanceERPPage() {
                               {ret.status}
                             </span>
 
-                            {ret.approvalStatus === "Disetujui & Sah" ? (
+                            {ret.approvalStatus === "Disetujui & Sah" || (ret as any).isLocked ? (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-100 text-emerald-800">
                                 <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
-                                <span>Sah</span>
+                                <span>🔒 Terkunci &amp; Sah</span>
                               </span>
                             ) : (
                               <button
@@ -13275,12 +13694,14 @@ export default function AdminFinanceERPPage() {
                         </td>
                         <td className="p-3 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/60">
-                            {cash.account.toLowerCase().includes("tunai") || cash.account.toLowerCase().includes("petty") ? (
+                            {(cash.account || "").toLowerCase().includes("tunai") ||
+                            (cash.account || "").toLowerCase().includes("petty") ||
+                            (cash.account || "").toLowerCase().includes("kas kecil") ? (
                               <Wallet className="w-3 h-3 text-amber-600 shrink-0" />
                             ) : (
                               <Landmark className="w-3 h-3 text-dstech-blue shrink-0" />
                             )}
-                            <span>{cash.account}</span>
+                            <span>{cash.account || "Kas Tunai"}</span>
                           </span>
                         </td>
                         <td
@@ -14604,7 +15025,955 @@ export default function AdminFinanceERPPage() {
             </div>
           </div>
         )}
+
+        {/* TAB 13: TAGIHAN RUTIN & OPERASIONAL BERULANG */}
+        {activeTab === "recurring_bills" && (
+          <div className="space-y-6 animate-fadeIn">
+            {/* Header Control Panel */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-rose-950/40 via-slate-900 to-slate-950 p-5 rounded-3xl border border-rose-900/40 shadow-xl">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-1.5">
+                    <Calendar className="w-3 h-3 text-rose-400" />
+                    Otomatisasi Beban Operasional
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-400">
+                    Periode Aktif: <strong className="text-white font-mono">{opBillPeriodFilter || "Semua"}</strong>
+                  </span>
+                </div>
+                <h3 className="text-lg font-black text-white flex items-center gap-2">
+                  Tagihan Rutin Bulanan & Approval Kas Operasional
+                </h3>
+                <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                  Tagihan rutin (Listrik PLN, PDAM Air, Sewa Kantor, Sewa Kendaraan, Internet, dll) terbentuk otomatis setiap bulan. 
+                  Anda cukup menekan tombol <strong className="text-emerald-400">⚡ Setujui & Bayar</strong> saat dana operasional telah siap untuk membukukan arus kas keluar.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleGenerateMonthlyBills(opBillPeriodFilter)}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all border border-slate-700 flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  title="Generate otomatis tagihan bulan ini jika ada template baru"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Sinkronisasi Bulan Ini</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenNewTemplateModal}
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-500 hover:to-rose-600 text-white text-xs font-black transition-all flex items-center gap-2 shadow-lg shadow-rose-900/40 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ Kelola Master Tagihan Rutin</span>
+                </button>
+              </div>
+            </div>
+
+            {/* KPI Cards Ringkasan Pengeluaran Operasional */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Card 1: Total Estimasi Tagihan */}
+              <div className="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500">Estimasi Total Tagihan Periode Ini</span>
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
+                    <Receipt className="w-4 h-4" />
+                  </div>
+                </div>
+                <h4 className="text-xl font-black text-slate-900">{formatRupiah(opBillMetrics.totalEstimated)}</h4>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Total dari <strong className="text-slate-800">{opBillMetrics.totalCount}</strong> tagihan rutin terdaftar
+                </p>
+              </div>
+
+              {/* Card 2: Menunggu Persetujuan / Dana Belum Ada */}
+              <div className="p-5 rounded-2xl bg-rose-50/60 border border-rose-200 shadow-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-700 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-rose-600" />
+                    Menunggu Dana / Approval
+                  </span>
+                  <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center font-black text-xs shadow-md shadow-rose-500/20">
+                    {opBillMetrics.pendingCount}
+                  </div>
+                </div>
+                <h4 className="text-xl font-black text-rose-700">{formatRupiah(opBillMetrics.pendingAmount)}</h4>
+                <p className="text-[11px] text-rose-600 font-medium">
+                  {opBillMetrics.pendingCount > 0 ? "Siap disetujui begitu kas tersedia" : "Seluruh tagihan periode ini sudah selesai"}
+                </p>
+              </div>
+
+              {/* Card 3: Sudah Disetujui & Lunas */}
+              <div className="p-5 rounded-2xl bg-emerald-50/60 border border-emerald-200 shadow-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Disetujui & Kas Dicairkan
+                  </span>
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-black text-xs shadow-md shadow-emerald-500/20">
+                    {opBillMetrics.paidCount}
+                  </div>
+                </div>
+                <h4 className="text-xl font-black text-emerald-700">{formatRupiah(opBillMetrics.paidAmount)}</h4>
+                <p className="text-[11px] text-emerald-600 font-medium">
+                  Sudah terbukukan ke Arus Kas Keluar & Beban
+                </p>
+              </div>
+            </div>
+
+            {/* Filter & Search Bar */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                {/* Search */}
+                <div className="relative flex-1 md:w-64">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={opBillSearchQuery}
+                    onChange={(e) => setOpBillSearchQuery(e.target.value)}
+                    placeholder="Cari tagihan, vendor, no id..."
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Periode Bulan Filter */}
+                <div className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-500">Bulan:</span>
+                  <input
+                    type="month"
+                    value={opBillPeriodFilter}
+                    onChange={(e) => setOpBillPeriodFilter(e.target.value)}
+                    className="bg-transparent text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
+                  />
+                  {opBillPeriodFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setOpBillPeriodFilter("")}
+                      className="text-[10px] text-slate-400 hover:text-slate-600 font-bold ml-1"
+                      title="Lihat semua periode"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+
+                {/* Status Filter */}
+                <select
+                  value={opBillStatusFilter}
+                  onChange={(e) => setOpBillStatusFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                >
+                  <option value="ALL">Semua Status ({operationalBills.length})</option>
+                  <option value="MENUNGGU_DANA">⏳ Menunggu Dana (Pending)</option>
+                  <option value="DISETUJUI_LUNAS">✅ Disetujui & Lunas</option>
+                  <option value="DILEWATI">⏭️ Dilewati</option>
+                </select>
+
+                {/* Entitas Filter */}
+                <select
+                  value={opBillEntityFilter}
+                  onChange={(e) => setOpBillEntityFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 bg-white focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                >
+                  <option value="ALL">Semua Entitas Usaha</option>
+                  <option value="PT">PT (PT. DSTech Smart Perkasa)</option>
+                  <option value="NON_PT">Non-PT (Toko DSTech Smart)</option>
+                </select>
+              </div>
+
+              <div className="text-xs font-bold text-slate-500 w-full md:w-auto text-right">
+                Menampilkan <strong className="text-slate-900">{filteredOperationalBills.length}</strong> tagihan
+              </div>
+            </div>
+
+            {/* Tabel Tagihan Operasional Bulanan */}
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-rose-600" />
+                  Daftar Tagihan Operasional Rutin Periode {opBillPeriodFilter || "Semua"}
+                </span>
+                <span className="text-[11px] font-bold text-slate-400">
+                  {filteredOperationalBills.length} Dokumen Tagihan
+                </span>
+              </div>
+
+              {filteredOperationalBills.length === 0 ? (
+                <div className="p-12 text-center space-y-3">
+                  <Calendar className="w-12 h-12 text-slate-300 mx-auto" />
+                  <p className="text-sm font-bold text-slate-700">Tidak ada tagihan operasional untuk kriteria ini</p>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Klik tombol &quot;+ Kelola Master Tagihan Rutin&quot; untuk menambahkan jadwal tagihan rutin kantor, atau klik &quot;Sinkronisasi Bulan Ini&quot;.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-100/70 text-[11px] font-black text-slate-600 uppercase tracking-wider">
+                        <th className="px-4 py-3.5">No. Dokumen & Keperluan</th>
+                        <th className="px-4 py-3.5">Kategori & Rekanan</th>
+                        <th className="px-4 py-3.5">Jadwal & Jatuh Tempo</th>
+                        <th className="px-4 py-3.5 text-right">Nominal Tagihan</th>
+                        <th className="px-4 py-3.5 text-center">Status & Pengesahan</th>
+                        <th className="px-4 py-3.5 text-center">Aksi Cepat</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs font-medium">
+                      {filteredOperationalBills.map((bill) => {
+                        const isPending = bill.status === "MENUNGGU_DANA";
+                        const isPaid = bill.status === "DISETUJUI_LUNAS";
+                        const isSkipped = bill.status === "DILEWATI";
+
+                        return (
+                          <tr key={bill.id} className="hover:bg-rose-50/20 transition-colors">
+                            {/* No. Dokumen & Keperluan */}
+                            <td className="px-4 py-3.5 space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                                  {bill.billNumber}
+                                </span>
+                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                                  bill.businessEntity === "NON_PT" 
+                                    ? "bg-amber-100 text-amber-800 border border-amber-300" 
+                                    : "bg-blue-100 text-blue-800 border border-blue-300"
+                                }`}>
+                                  {bill.businessEntity === "NON_PT" ? "NON-PT" : "PT"}
+                                </span>
+                              </div>
+                              <p className="font-black text-slate-900 text-sm">{bill.title}</p>
+                              {bill.customerNumber && bill.customerNumber !== "-" && (
+                                <p className="text-[10px] text-slate-500 font-mono">
+                                  ID / No. Pelanggan: <strong>{bill.customerNumber}</strong>
+                                </p>
+                              )}
+                            </td>
+
+                            {/* Kategori & Rekanan */}
+                            <td className="px-4 py-3.5 space-y-1">
+                              <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-[10px] font-bold text-slate-700">
+                                {bill.category}
+                              </span>
+                              <p className="text-slate-800 font-semibold">{bill.vendorName || "-"}</p>
+                              <p className="text-[10px] text-slate-400 font-medium">Periode: {bill.period}</p>
+                            </td>
+
+                            {/* Jadwal & Jatuh Tempo */}
+                            <td className="px-4 py-3.5 space-y-0.5">
+                              <div className="flex items-center gap-1.5 text-slate-700 text-xs">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                                <span>Tagihan: {bill.billDate}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-rose-600">
+                                <Clock className="w-3.5 h-3.5 text-rose-500" />
+                                <span>Tempo: {bill.dueDate}</span>
+                              </div>
+                            </td>
+
+                            {/* Nominal */}
+                            <td className="px-4 py-3.5 text-right space-y-0.5">
+                              <span className="font-mono text-sm font-black text-slate-900">
+                                {formatRupiah(bill.nominal || bill.estimatedNominal || 0)}
+                              </span>
+                              {bill.nominal !== bill.estimatedNominal && bill.estimatedNominal > 0 && (
+                                <p className="text-[10px] text-slate-400 font-mono">
+                                  Estimasi: {formatRupiah(bill.estimatedNominal)}
+                                </p>
+                              )}
+                            </td>
+
+                            {/* Status & Pengesahan */}
+                            <td className="px-4 py-3.5 text-center">
+                              {isPending && (
+                                <div className="inline-flex flex-col items-center gap-1">
+                                  <span className="px-3 py-1 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1 animate-pulse">
+                                    <Clock className="w-3 h-3 text-amber-600" />
+                                    Menunggu Dana (Pending)
+                                  </span>
+                                  <span className="text-[9px] text-slate-400 font-medium">Siap di-approve</span>
+                                </div>
+                              )}
+
+                              {isPaid && (
+                                <div className="inline-flex flex-col items-center gap-0.5">
+                                  <span className="px-3 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-xs">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    Disetujui & Lunas
+                                  </span>
+                                  <span className="text-[10px] font-bold text-slate-700">
+                                    {bill.approvedBy || "RAMADHANI ST"} ({bill.approverTitle || "Direktur"})
+                                  </span>
+                                  <span className="text-[9px] text-slate-400">
+                                    Tgl Bayar: {bill.paidDate}
+                                  </span>
+                                </div>
+                              )}
+
+                              {isSkipped && (
+                                <span className="px-3 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-300 flex items-center gap-1 justify-center">
+                                  <Ban className="w-3 h-3 text-slate-400" />
+                                  Dilewati Bulan Ini
+                                </span>
+                              )}
+                            </td>
+
+                            {/* Aksi Cepat */}
+                            <td className="px-4 py-3.5 text-center">
+                              <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                {isPending && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenApproveBillModal(bill)}
+                                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs transition-all shadow-md shadow-emerald-900/20 flex items-center gap-1 cursor-pointer"
+                                      title="Setujui dan cairkan kas keluar"
+                                    >
+                                      <Check className="w-3.5 h-3.5" />
+                                      <span>⚡ Setujui & Bayar</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenEditOpBill(bill)}
+                                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                                      title="Sesuaikan nominal / info tagihan"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSkipBill(bill)}
+                                      className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 transition-colors cursor-pointer"
+                                      title="Lewati tagihan bulan ini (Nihil / Tidak Ada Pemakaian)"
+                                    >
+                                      <Ban className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
+
+                                {isPaid && (
+                                  <div className="space-y-1">
+                                    {bill.receiptUrl ? (
+                                      <a
+                                        href={bill.receiptUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold inline-flex items-center gap-1"
+                                      >
+                                        <Paperclip className="w-3 h-3" />
+                                        <span>Bukti Bayar</span>
+                                      </a>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-400 font-medium italic">
+                                        Kas Keluar Tercatat
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+
+                                {isSkipped && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenApproveBillModal(bill)}
+                                    className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold"
+                                    title="Buka kembali untuk approval"
+                                  >
+                                    Pulihkan
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* MODAL APPROVAL TAGIHAN & PENCAIRAN KAS */}
+      {selectedBillForApproval && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setSelectedBillForApproval(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-7 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header Modal */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Pengesahan & Pencairan Kas Operasional
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">
+                  Setujui & Bayar: {selectedBillForApproval.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedBillForApproval(null)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Info Kartu Ringkasan Tagihan */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white space-y-2 border border-slate-700 shadow-sm">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-mono text-slate-400">{selectedBillForApproval.billNumber}</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                  selectedBillForApproval.businessEntity === "NON_PT" ? "bg-amber-400 text-slate-900" : "bg-blue-400 text-slate-900"
+                }`}>
+                  Entitas Usaha: {selectedBillForApproval.businessEntity === "NON_PT" ? "NON-PT (Toko DSTech Smart)" : "PT (PT. DSTech Smart Perkasa)"}
+                </span>
+              </div>
+              <div className="text-sm font-black">{selectedBillForApproval.title}</div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300 pt-1 border-t border-slate-700">
+                <div>Kategori: <strong>{selectedBillForApproval.category}</strong></div>
+                <div>Periode: <strong>{selectedBillForApproval.period}</strong></div>
+                <div>Rekanan/Vendor: <strong>{selectedBillForApproval.vendorName}</strong></div>
+                <div>ID/No Pelanggan: <strong>{selectedBillForApproval.customerNumber || "-"}</strong></div>
+              </div>
+            </div>
+
+            {/* Form Input Approval */}
+            <form onSubmit={handleApproveBillSubmit} className="space-y-4">
+              {/* Nominal Pembayaran Riil */}
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-700 flex items-center justify-between">
+                  <span>Nominal Riil Pembayaran (Rp) *</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    Estimasi Awal: {formatRupiah(selectedBillForApproval.estimatedNominal)}
+                  </span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 text-sm">Rp</span>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={approvalBillForm.actualNominal || ""}
+                    onChange={(e) => setApprovalBillForm({ ...approvalBillForm, actualNominal: Number(e.target.value) })}
+                    className="w-full pl-11 pr-4 py-2.5 rounded-2xl border border-slate-300 font-mono text-base font-black text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    placeholder="Masukkan nominal sesuai struk tagihan"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  *Anda dapat mengoreksi nominal di atas jika tagihan riil (seperti PLN/PDAM) berbeda dari estimasi awal.
+                </p>
+              </div>
+
+              {/* Tanggal Pembayaran & Pencairan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Tanggal Pencairan / Bayar *</label>
+                  <input
+                    type="date"
+                    required
+                    value={approvalBillForm.paidDate}
+                    onChange={(e) => setApprovalBillForm({ ...approvalBillForm, paidDate: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Akun Kas / Rekening Sumber Dana (Terkunci Sesuai Entitas) */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Akun Sumber Dana (Kas/Bank) *</label>
+                  <select
+                    value={approvalBillForm.paymentMethod}
+                    onChange={(e) => setApprovalBillForm({ ...approvalBillForm, paymentMethod: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-2xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                  >
+                    {selectedBillForApproval.businessEntity === "NON_PT" ? (
+                      <>
+                        <option value="Transfer Bank BCA (6520490131 - RAMADHANI ST)">
+                          Transfer Bank BCA - 6520490131 (a.n RAMADHANI ST)
+                        </option>
+                        <option value="Kas Tunai Operasional">Kas Tunai Operasional Toko</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)">
+                          Transfer Bank BCA - 295-074-0321 (a.n PT. DSTech Smart Perkasa)
+                        </option>
+                        <option value="Kas Tunai Operasional">Kas Tunai Operasional PT</option>
+                      </>
+                    )}
+                  </select>
+                  <p className="text-[10px] text-slate-400">
+                    🔒 Rekening kas otomatis disesuaikan sesuai entitas dokumen.
+                  </p>
+                </div>
+              </div>
+
+              {/* Tautan Berkas / URL Bukti Struk Bayar */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Tautan / Berkas Bukti Struk Bayar (Opsional)</label>
+                <div className="relative">
+                  <Paperclip className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={approvalBillForm.receiptUrl}
+                    onChange={(e) => setApprovalBillForm({ ...approvalBillForm, receiptUrl: e.target.value })}
+                    placeholder="https://... atau /uploads/struk_pln.pdf"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Catatan Approval */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Catatan Pembayaran (Opsional)</label>
+                <textarea
+                  rows={2}
+                  value={approvalBillForm.notes}
+                  onChange={(e) => setApprovalBillForm({ ...approvalBillForm, notes: e.target.value })}
+                  placeholder="Misal: Sudah ditransfer via KlikBCA / Lunas ke loket PLN"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Badge Legalitas Penandatangan */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                  <div>
+                    <span className="font-black text-emerald-950 block">Pengesahan Approval Otomatis</span>
+                    <span className="text-[10px] text-emerald-800">
+                      Disahkan oleh: <strong>RAMADHANI ST</strong> (Direktur)
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black">
+                  Valid & Sah
+                </span>
+              </div>
+
+              {/* Tombol Aksi Form */}
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setSelectedBillForApproval(null)}
+                  className="px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingBillApproval}
+                  className="px-6 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs transition-all shadow-lg shadow-emerald-900/30 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmittingBillApproval ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Memproses Kas...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span>Sah & Cairkan Kas Keluar Sekarang</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL MASTER TEMPLATE TAGIHAN RUTIN */}
+      {isTemplateModalOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setIsTemplateModalOpen(false)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-7 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-rose-600 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  Konfigurasi Jadwal Rutin
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-0.5">
+                  Kelola Master Template Tagihan Rutin Bulanan
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTemplateModalOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Input Template */}
+            <form onSubmit={handleSaveTemplateSubmit} className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Plus className="w-3.5 h-3.5 text-rose-600" />
+                {editingTemplate ? "Edit Template Tagihan" : "Tambah Template Tagihan Baru"}
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700">Nama Tagihan / Keperluan *</label>
+                  <input
+                    type="text"
+                    required
+                    value={templateForm.title}
+                    onChange={(e) => setTemplateForm({ ...templateForm, title: e.target.value })}
+                    placeholder="Misal: Tagihan Listrik PLN Kantor PT"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700">Kategori Biaya Operasional *</label>
+                  <select
+                    value={templateForm.category}
+                    onChange={(e) => setTemplateForm({ ...templateForm, category: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none bg-white"
+                  >
+                    <option value="Beban Listrik, Air & Internet">Beban Listrik, Air & Internet</option>
+                    <option value="Beban Sewa Gedung & Kantor">Beban Sewa Gedung & Kantor</option>
+                    <option value="Beban Sewa Kendaraan">Beban Sewa Kendaraan</option>
+                    <option value="Beban Telekomunikasi & Internet">Beban Telekomunikasi & Internet</option>
+                    <option value="Beban Pemeliharaan & Perbaikan">Beban Pemeliharaan & Perbaikan</option>
+                    <option value="Beban Operasional Kantor">Beban Operasional Kantor Lainnya</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700">Entitas Usaha Pembukuan *</label>
+                  <select
+                    value={templateForm.businessEntity}
+                    onChange={(e) => {
+                      const entity = e.target.value as "PT" | "NON_PT";
+                      setTemplateForm({
+                        ...templateForm,
+                        businessEntity: entity,
+                        paymentMethod: entity === "NON_PT" 
+                          ? "Transfer Bank BCA (6520490131 - RAMADHANI ST)" 
+                          : "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+                      });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none bg-white"
+                  >
+                    <option value="PT">PT. DSTech Smart Perkasa</option>
+                    <option value="NON_PT">DSTech Smart (Toko Non-PT)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700">Tanggal Rutin Tiap Bulan (1 - 28) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="28"
+                    required
+                    value={templateForm.recurringDay || ""}
+                    onChange={(e) => setTemplateForm({ ...templateForm, recurringDay: Number(e.target.value) })}
+                    placeholder="Contoh: 5"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700">Estimasi Nominal Bulanan (Rp) *</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={templateForm.estimatedAmount || ""}
+                    onChange={(e) => setTemplateForm({ ...templateForm, estimatedAmount: Number(e.target.value) })}
+                    placeholder="Contoh: 1500000"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700">Nama Rekanan / Vendor</label>
+                  <input
+                    type="text"
+                    value={templateForm.vendorName}
+                    onChange={(e) => setTemplateForm({ ...templateForm, vendorName: e.target.value })}
+                    placeholder="Contoh: PT. PLN (Persero)"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-700">No. ID Pelanggan / Rekening / NoPol</label>
+                  <input
+                    type="text"
+                    value={templateForm.customerNumber}
+                    onChange={(e) => setTemplateForm({ ...templateForm, customerNumber: e.target.value })}
+                    placeholder="Contoh: 5328-9102-4821"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1 sm:col-span-2">
+                  <label className="text-[11px] font-bold text-slate-700">Catatan / Keterangan Tagihan</label>
+                  <input
+                    type="text"
+                    value={templateForm.notes}
+                    onChange={(e) => setTemplateForm({ ...templateForm, notes: e.target.value })}
+                    placeholder="Misal: Tagihan listrik operasional kantor setiap tanggal 5"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={templateForm.isActive}
+                    onChange={(e) => setTemplateForm({ ...templateForm, isActive: e.target.checked })}
+                    className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500"
+                  />
+                  <span>Template Aktif (Otomatis bentuk tagihan bulanan)</span>
+                </label>
+
+                <div className="flex items-center gap-2">
+                  {editingTemplate && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTemplate(null);
+                        setTemplateForm({
+                          title: "",
+                          category: "Beban Listrik, Air & Internet",
+                          businessEntity: "PT",
+                          recurringDay: 5,
+                          estimatedAmount: 0,
+                          vendorName: "",
+                          customerNumber: "",
+                          paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+                          isActive: true,
+                          notes: "",
+                        });
+                      }}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200"
+                    >
+                      Batal Edit
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isSubmittingTemplate}
+                    className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{editingTemplate ? "Simpan Perubahan" : "+ Tambahkan Template"}</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+
+            {/* Daftar Template yang Tersimpan */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center justify-between">
+                <span>Daftar Template Tagihan Rutin Terdaftar ({recurringBills.length})</span>
+                <span className="text-[10px] text-slate-400 font-normal">
+                  Sistem mengecek template ini untuk membentuk tagihan setiap bulan
+                </span>
+              </h4>
+
+              <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-600 font-bold text-[10px] uppercase">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Nama & Keperluan</th>
+                      <th className="px-3.5 py-2.5">Kategori</th>
+                      <th className="px-3.5 py-2.5">Jadwal Tanggal</th>
+                      <th className="px-3.5 py-2.5 text-right">Estimasi Bulanan</th>
+                      <th className="px-3.5 py-2.5 text-center">Entitas</th>
+                      <th className="px-3.5 py-2.5 text-center">Status</th>
+                      <th className="px-3.5 py-2.5 text-center">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-medium">
+                    {recurringBills.map((tmpl) => (
+                      <tr key={tmpl.id} className="hover:bg-slate-50">
+                        <td className="px-3.5 py-2.5">
+                          <p className="font-bold text-slate-900">{tmpl.title}</p>
+                          <p className="text-[10px] text-slate-500 font-mono">
+                            {tmpl.vendorName} {tmpl.customerNumber ? `(${tmpl.customerNumber})` : ""}
+                          </p>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-slate-700">{tmpl.category}</td>
+                        <td className="px-3.5 py-2.5 font-bold text-slate-800">
+                          Setiap Tgl {tmpl.recurringDay}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right font-mono font-bold text-slate-900">
+                          {formatRupiah(tmpl.estimatedAmount)}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-center">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            tmpl.businessEntity === "NON_PT" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800"
+                          }`}>
+                            {tmpl.businessEntity === "NON_PT" ? "NON-PT" : "PT"}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-center">
+                          {tmpl.isActive !== false ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                              Aktif
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
+                              Non-Aktif
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleEditTemplate(tmpl)}
+                              className="p-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-600"
+                              title="Edit Template"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTemplate(tmpl.id, tmpl.title)}
+                              className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600"
+                              title="Hapus Template"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT DETAIL TAGIHAN OPERASIONAL BULANAN */}
+      {editingOpBill && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setEditingOpBill(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Koreksi Tagihan
+                </span>
+                <h3 className="text-base font-black text-slate-900 mt-0.5">
+                  Sesuaikan: {editingOpBill.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingOpBill(null)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditOpBillSubmit} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Nominal Tagihan (Rp) *</label>
+                <input
+                  type="number"
+                  min="0"
+                  required
+                  value={editOpBillForm.nominal || ""}
+                  onChange={(e) => setEditOpBillForm({ ...editOpBillForm, nominal: Number(e.target.value) })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-sm font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Jatuh Tempo *</label>
+                <input
+                  type="date"
+                  required
+                  value={editOpBillForm.dueDate}
+                  onChange={(e) => setEditOpBillForm({ ...editOpBillForm, dueDate: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">No. ID Pelanggan</label>
+                <input
+                  type="text"
+                  value={editOpBillForm.customerNumber}
+                  onChange={(e) => setEditOpBillForm({ ...editOpBillForm, customerNumber: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Nama Vendor / Rekanan</label>
+                <input
+                  type="text"
+                  value={editOpBillForm.vendorName}
+                  onChange={(e) => setEditOpBillForm({ ...editOpBillForm, vendorName: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-700">Catatan</label>
+                <input
+                  type="text"
+                  value={editOpBillForm.notes}
+                  onChange={(e) => setEditOpBillForm({ ...editOpBillForm, notes: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingOpBill(null)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-black shadow-md cursor-pointer"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* MODAL 1: BUAT FAKTUR PENJUALAN BARU */}
       {isNewSaleModalOpen && (
@@ -18649,6 +20018,36 @@ export default function AdminFinanceERPPage() {
                       </div>
                     </div>
 
+                    {/* Opsi Sembunyikan Nilai PPN di Surat Penawaran */}
+                    <div className="p-2.5 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center justify-between text-xs">
+                      <div className="space-y-0.5 pr-2">
+                        <div className="flex items-center gap-1.5 font-bold text-white text-[11px]">
+                          {quotationForm.hideTaxInPrint ? (
+                            <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                          ) : (
+                            <Eye className="w-3.5 h-3.5 text-indigo-400" />
+                          )}
+                          <span>Sembunyikan Nilai Pajak PPN di SPH (Exclude PPN)</span>
+                        </div>
+                        <p className="text-[10px] text-slate-300">
+                          {quotationForm.hideTaxInPrint
+                            ? "Nilai Rupiah PPN disembunyikan. SPH akan menampilkan keterangan 'Exclude PPN / Belum Termasuk' dan Total Penawaran dicantumkan sebesar DPP/Netto."
+                            : "Nilai nominal Rupiah PPN akan ditampilkan seperti biasa di SPH."}
+                        </p>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer bg-slate-900 px-2.5 py-1.5 rounded-lg border border-slate-700 hover:border-amber-500/50 transition-colors shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(quotationForm.hideTaxInPrint)}
+                          onChange={(e) => setQuotationForm({ ...quotationForm, hideTaxInPrint: e.target.checked })}
+                          className="w-4 h-4 rounded text-amber-500 focus:ring-0 cursor-pointer"
+                        />
+                        <span className={`text-[11px] font-bold ${quotationForm.hideTaxInPrint ? "text-amber-400" : "text-slate-400"}`}>
+                          {quotationForm.hideTaxInPrint ? "Sembunyikan PPN" : "Tampilkan PPN"}
+                        </span>
+                      </label>
+                    </div>
+
                     {/* Rincian Transparan */}
                     <div className="pt-2 border-t border-slate-800 space-y-1 text-xs">
                       {discountVal > 0 && (
@@ -18670,20 +20069,35 @@ export default function AdminFinanceERPPage() {
                         <span>
                           Pajak Pertambahan Nilai ({quotationForm.taxRate === 11.12 ? "12% (11/12)" : `${quotationForm.taxRate}%`} {quotationForm.taxType === "include" ? "Include" : "Exclude"}):
                         </span>
-                        <span className="font-bold">{formatRupiah(taxAmount)}</span>
+                        {quotationForm.hideTaxInPrint ? (
+                          <span className="font-bold text-amber-400 bg-amber-500/20 px-2 py-0.5 rounded text-[10px] border border-amber-500/40">
+                            Exclude (Belum Termasuk)
+                          </span>
+                        ) : (
+                          <span className="font-bold">{formatRupiah(taxAmount)}</span>
+                        )}
                       </div>
                     </div>
 
                     <div className="border-t border-white/20 pt-2 flex items-center justify-between text-base font-black">
-                      <span className="text-indigo-400">TOTAL PENAWARAN (GRAND TOTAL):</span>
-                      <span className="text-xl text-emerald-400">{formatRupiah(grandTotal)}</span>
+                      <span className="text-indigo-400">TOTAL PENAWARAN (SPH):</span>
+                      <span className="text-xl text-emerald-400">
+                        {formatRupiah(quotationForm.hideTaxInPrint ? afterDiscount : grandTotal)}
+                      </span>
                     </div>
 
-                    <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-[11px]">
-                      <span className="text-slate-400">Terbilang: </span>
-                      <span className="font-bold text-amber-300 italic">
-                        "{angkaTerbilang(grandTotal)} Rupiah"
-                      </span>
+                    <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-[11px] space-y-0.5">
+                      <div>
+                        <span className="text-slate-400">Terbilang: </span>
+                        <span className="font-bold text-amber-300 italic">
+                          &quot;{angkaTerbilang(quotationForm.hideTaxInPrint ? afterDiscount : grandTotal)} Rupiah&quot;
+                        </span>
+                      </div>
+                      {quotationForm.hideTaxInPrint && (
+                        <p className="text-[10px] text-amber-400 font-medium pt-1">
+                          *Harga di atas adalah DPP/Netto belum termasuk PPN. Pada cetak SPH akan dicantumkan klausul resmi Exclude PPN.
+                        </p>
+                      )}
                     </div>
                   </div>
                 );
@@ -19209,6 +20623,47 @@ export default function AdminFinanceERPPage() {
                   <span>Format Resmi 2 Halaman</span>
                 </div>
 
+                {/* Tombol Cepat Toggle Sembunyikan / Munculkan Nilai PPN */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedQuotationForPrint((prev) => {
+                      if (!prev) return null;
+                      const nextHide = !prev.hideTaxInPrint;
+                      const updated = { ...prev, hideTaxInPrint: nextHide };
+                      setQuotations((list) => list.map((item) => (item.id === prev.id ? { ...item, hideTaxInPrint: nextHide } : item)));
+                      fetch("/api/finance", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          actionType: "quotation",
+                          id: prev.id,
+                          updates: { hideTaxInPrint: nextHide },
+                        }),
+                      }).catch(console.error);
+                      return updated;
+                    });
+                  }}
+                  title="Klik untuk menyembunyikan atau memunculkan nilai PPN pada surat penawaran ini"
+                  className={`px-3.5 py-1.5 rounded-xl font-black text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer border ${
+                    selectedQuotationForPrint.hideTaxInPrint
+                      ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-600 shadow-amber-500/20"
+                      : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
+                  }`}
+                >
+                  {selectedQuotationForPrint.hideTaxInPrint ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5 text-white" />
+                      <span>Nilai PPN: Disembunyikan (Exclude)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5 text-slate-600" />
+                      <span>Nilai PPN: Dimunculkan (Rp)</span>
+                    </>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={() =>
@@ -19414,8 +20869,17 @@ export default function AdminFinanceERPPage() {
                     <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-[11px]">
                       <span className="font-bold text-amber-900 uppercase text-[10px] block mb-0.5">Terbilang:</span>
                       <p className="font-serif italic font-bold text-slate-800">
-                        "{angkaTerbilang(selectedQuotationForPrint.grandTotal)} Rupiah"
+                        &quot;{angkaTerbilang(
+                          selectedQuotationForPrint.hideTaxInPrint
+                            ? Math.max(0, selectedQuotationForPrint.subtotal - (selectedQuotationForPrint.discount || 0))
+                            : selectedQuotationForPrint.grandTotal
+                        )} Rupiah&quot;
                       </p>
+                      {selectedQuotationForPrint.hideTaxInPrint && (
+                        <p className="text-[10px] text-amber-900 font-bold mt-1 pt-1 border-t border-amber-200/70">
+                          *Total di atas belum termasuk PPN {selectedQuotationForPrint.taxRate === 11.12 ? "12%" : `${selectedQuotationForPrint.taxRate}%`} (Exclude PPN)
+                        </p>
+                      )}
                     </div>
 
                     <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 text-[11px] space-y-1">
@@ -19463,13 +20927,33 @@ export default function AdminFinanceERPPage() {
                       </>
                     )}
                     <div className="flex items-center justify-between text-slate-600">
-                      <span>PPN ({selectedQuotationForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedQuotationForPrint.taxRate}%`}{(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}):</span>
-                      <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.taxAmount)}</span>
+                      <span>PPN ({selectedQuotationForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedQuotationForPrint.taxRate}%`}):</span>
+                      {selectedQuotationForPrint.hideTaxInPrint ? (
+                        <span className="font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded text-[10px] border border-amber-300">
+                          Exclude (Belum Termasuk)
+                        </span>
+                      ) : (
+                        <span className="font-bold text-slate-900">
+                          {formatRupiah(selectedQuotationForPrint.taxAmount)}
+                          {(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}
+                        </span>
+                      )}
                     </div>
                     <div className="border-t-2 border-indigo-950 pt-2 flex items-center justify-between text-sm font-black text-slate-900">
                       <span className="text-indigo-900">TOTAL PENAWARAN:</span>
-                      <span className="text-base text-emerald-600">{formatRupiah(selectedQuotationForPrint.grandTotal)}</span>
+                      <span className="text-base text-emerald-600">
+                        {formatRupiah(
+                          selectedQuotationForPrint.hideTaxInPrint
+                            ? Math.max(0, selectedQuotationForPrint.subtotal - (selectedQuotationForPrint.discount || 0))
+                            : selectedQuotationForPrint.grandTotal
+                        )}
+                      </span>
                     </div>
+                    {selectedQuotationForPrint.hideTaxInPrint && (
+                      <div className="p-1.5 rounded bg-amber-50 border border-amber-200 text-[9.5px] font-bold text-amber-900 text-center">
+                        *Harga penawaran di atas belum termasuk PPN {selectedQuotationForPrint.taxRate === 11.12 ? "12%" : `${selectedQuotationForPrint.taxRate}%`} (Exclude)
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -19482,6 +20966,11 @@ export default function AdminFinanceERPPage() {
                     </h5>
                     <div className="text-[10px] text-slate-600 whitespace-pre-line leading-relaxed font-sans">
                       {selectedQuotationForPrint.terms}
+                      {selectedQuotationForPrint.hideTaxInPrint && (
+                        <p className="mt-1.5 font-bold text-amber-900 bg-amber-100/70 p-1.5 rounded border border-amber-200">
+                          • Seluruh harga penawaran di atas adalah harga Netto/DPP dan belum termasuk PPN (Exclude PPN). Pajak Pertambahan Nilai akan diperhitungkan saat penerbitan Faktur Penjualan resmi.
+                        </p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -19810,12 +21299,27 @@ export default function AdminFinanceERPPage() {
                                 </div>
                               )}
                               <div className="flex items-center justify-between text-slate-600 text-[11px]">
-                                <span>PPN ({selectedQuotationForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedQuotationForPrint.taxRate}%`}{(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}):</span>
-                                <span className="font-bold text-slate-900">{formatRupiah(selectedQuotationForPrint.taxAmount)}</span>
+                                <span>PPN ({selectedQuotationForPrint.taxRate === 11.12 ? "12% (11/12)" : `${selectedQuotationForPrint.taxRate}%`}):</span>
+                                {selectedQuotationForPrint.hideTaxInPrint ? (
+                                  <span className="font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded text-[9.5px] border border-amber-300">
+                                    Exclude (Belum Termasuk)
+                                  </span>
+                                ) : (
+                                  <span className="font-bold text-slate-900">
+                                    {formatRupiah(selectedQuotationForPrint.taxAmount)}
+                                    {(selectedQuotationForPrint as any).taxType === "include" ? " Include" : ""}
+                                  </span>
+                                )}
                               </div>
                               <div className="border-t-2 border-indigo-950 pt-1 flex items-center justify-between text-xs font-black text-slate-900">
                                 <span className="text-indigo-900 uppercase">Total Penawaran:</span>
-                                <span className="text-sm text-emerald-600">{formatRupiah(selectedQuotationForPrint.grandTotal)}</span>
+                                <span className="text-sm text-emerald-600">
+                                  {formatRupiah(
+                                    selectedQuotationForPrint.hideTaxInPrint
+                                      ? Math.max(0, selectedQuotationForPrint.subtotal - (selectedQuotationForPrint.discount || 0))
+                                      : selectedQuotationForPrint.grandTotal
+                                  )}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -19826,6 +21330,11 @@ export default function AdminFinanceERPPage() {
                             <p className="text-[9.5px] text-slate-600 leading-snug">
                               • Seluruh unit perangkat hardware baru dan bergaransi resmi distributor/pabrikan selama 1 (satu) tahun.<br />
                               • Biaya instalasi teknis sudah termasuk penarikan kabel, crimping/konektor, pemasangan bracket, pengujian operasional, dan garansi instalasi 30 hari kalender.<br />
+                              {selectedQuotationForPrint.hideTaxInPrint && (
+                                <>
+                                  • Harga penawaran di atas adalah harga Netto/DPP belum termasuk PPN (Exclude PPN). Pajak Pertambahan Nilai akan diperhitungkan saat penerbitan Faktur Penjualan resmi.<br />
+                                </>
+                              )}
                               • Lampiran rincian ini merupakan dokumen sah yang tidak terpisahkan dari Surat Penawaran Harga Nomor {selectedQuotationForPrint.quotationNumber}.
                             </p>
                           </div>

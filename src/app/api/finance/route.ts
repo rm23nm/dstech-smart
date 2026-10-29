@@ -206,8 +206,153 @@ function formatAccountFromPaymentMethod(method: string, data: any): string {
   return m;
 }
 
+function initAndSyncRecurringBills(data: any): boolean {
+  let changed = false;
+  if (!data.recurring_bills || !Array.isArray(data.recurring_bills) || data.recurring_bills.length === 0) {
+    data.recurring_bills = [
+      {
+        id: "dstech_rec_bill_1",
+        title: "Tagihan Listrik PLN Kantor PT",
+        category: "Beban Listrik, Air & Internet",
+        businessEntity: "PT",
+        recurringDay: 5,
+        estimatedAmount: 1500000,
+        vendorName: "PT. PLN (Persero) Rayon Cilegon",
+        customerNumber: "5328-9102-4821",
+        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+        isActive: true,
+        notes: "Pembayaran tagihan listrik operasional kantor setiap tanggal 5",
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: "dstech_rec_bill_2",
+        title: "Tagihan PDAM Air Bersih Kantor",
+        category: "Beban Listrik, Air & Internet",
+        businessEntity: "PT",
+        recurringDay: 10,
+        estimatedAmount: 350000,
+        vendorName: "PDAM Tirta Madani Cilegon",
+        customerNumber: "021-884-129",
+        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+        isActive: true,
+        notes: "Tagihan air bersih kantor operasional setiap tanggal 10",
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: "dstech_rec_bill_3",
+        title: "Tagihan Internet Wifi & Fiber Optic Kantor",
+        category: "Beban Telekomunikasi & Internet",
+        businessEntity: "PT",
+        recurringDay: 15,
+        estimatedAmount: 650000,
+        vendorName: "Indihome / Telkom Indonesia",
+        customerNumber: "1224-8902-182",
+        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+        isActive: true,
+        notes: "Langganan internet dedicated kantor setiap tanggal 15",
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: "dstech_rec_bill_4",
+        title: "Sewa Kendaraan Operasional Lapangan",
+        category: "Beban Sewa Kendaraan",
+        businessEntity: "PT",
+        recurringDay: 20,
+        estimatedAmount: 3500000,
+        vendorName: "Rental Mobil DSTech Perkasa",
+        customerNumber: "NOPOL: A 8192 BM",
+        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+        isActive: true,
+        notes: "Sewa bulanan mobil operasional operasional & teknisi lapangan",
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: "dstech_rec_bill_5",
+        title: "Sewa Ruko & Kantor Operasional Cilegon",
+        category: "Beban Sewa Gedung & Kantor",
+        businessEntity: "PT",
+        recurringDay: 25,
+        estimatedAmount: 5000000,
+        vendorName: "Pemilik Ruko Cilegon Indah",
+        customerNumber: "RUKO NO. 12B CILEGON",
+        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
+        isActive: true,
+        notes: "Biaya sewa ruko operasional kantor per bulan",
+        createdAt: new Date().toISOString()
+      }
+    ];
+    changed = true;
+  }
+
+  if (!data.operational_bills || !Array.isArray(data.operational_bills)) {
+    data.operational_bills = [];
+    changed = true;
+  }
+
+  // Generate for current month
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, "0");
+  const currentPeriod = `${currentYear}-${currentMonth}`;
+
+  const activeTemplates = data.recurring_bills.filter((t: any) => t.isActive !== false);
+
+  activeTemplates.forEach((template: any, index: number) => {
+    const exists = data.operational_bills.find(
+      (b: any) => b.templateId === template.id && b.period === currentPeriod
+    );
+
+    if (!exists) {
+      const dayNum = Math.min(Math.max(Number(template.recurringDay) || 1, 1), 28);
+      const dayStr = String(dayNum).padStart(2, "0");
+      const billDateStr = `${currentYear}-${currentMonth}-${dayStr}`;
+      
+      const dueDayNum = Math.min(dayNum + 7, 28);
+      const dueDateStr = `${currentYear}-${currentMonth}-${String(dueDayNum).padStart(2, "0")}`;
+
+      const newOpBill = {
+        id: `dstech_opbill_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 6)}`,
+        templateId: template.id,
+        billNumber: `BILL-OP-${currentYear}${currentMonth}-${String(data.operational_bills.length + 1).padStart(3, "0")}`,
+        title: template.title,
+        category: template.category || "Beban Operasional Rutin",
+        period: currentPeriod,
+        billDate: billDateStr,
+        dueDate: dueDateStr,
+        businessEntity: template.businessEntity || "PT",
+        nominal: Number(template.estimatedAmount) || 0,
+        estimatedNominal: Number(template.estimatedAmount) || 0,
+        vendorName: template.vendorName || "-",
+        customerNumber: template.customerNumber || "-",
+        paymentMethod: template.paymentMethod || (template.businessEntity === "NON_PT" 
+          ? "Transfer Bank BCA (6520490131 - RAMADHANI ST)" 
+          : "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)"),
+        status: "MENUNGGU_DANA", // MENUNGGU_DANA | DISETUJUI_LUNAS | DILEWATI
+        approvedAt: null,
+        approvedBy: null,
+        approverTitle: null,
+        paidDate: null,
+        paidFromAccount: null,
+        cashFlowId: null,
+        receiptUrl: null,
+        notes: template.notes || "",
+        createdAt: new Date().toISOString()
+      };
+
+      data.operational_bills.unshift(newOpBill);
+      changed = true;
+    }
+  });
+
+  return changed;
+}
+
 export async function GET() {
   const data = readFinanceData();
+  const recurringUpdated = initAndSyncRecurringBills(data);
+  if (recurringUpdated) {
+    writeFinanceData(data);
+  }
 
   // Hitung ringkasan kalkulasi keuangan real-time
   const sales = data.sales || [];
@@ -413,6 +558,8 @@ export async function GET() {
     totalQuotationsPending,
     totalQuotationsApproved,
     totalProjectsCount: (data.projects || []).length,
+    totalOperationalBillsPending: (data.operational_bills || []).filter((b: any) => b.status === "MENUNGGU_DANA").length,
+    totalOperationalBillsPendingAmount: (data.operational_bills || []).filter((b: any) => b.status === "MENUNGGU_DANA").reduce((acc: number, b: any) => acc + (Number(b.nominal) || 0), 0),
   };
 
   return NextResponse.json({
@@ -434,6 +581,248 @@ export async function POST(request: Request) {
 
     if (!payload) {
       return NextResponse.json({ success: false, error: "Payload data wajib disertakan" }, { status: 400 });
+    }
+
+    // 0. APPROVAL TAGIHAN OPERASIONAL BULANAN & PENCAIRAN KAS OTOMATIS
+    if (actionType === "approve_operational_bill") {
+      const { billId, actualNominal, paidDate, paymentMethod, notes, receiptUrl } = payload;
+      if (!billId) {
+        return NextResponse.json({ success: false, error: "billId wajib disertakan" }, { status: 400 });
+      }
+      if (!data.operational_bills) data.operational_bills = [];
+      const billIndex = data.operational_bills.findIndex((b: any) => b.id === billId);
+      if (billIndex === -1) {
+        return NextResponse.json({ success: false, error: "Tagihan operasional tidak ditemukan" }, { status: 404 });
+      }
+
+      const bill = data.operational_bills[billIndex];
+      const nominalBayar = Number(actualNominal) > 0 ? Number(actualNominal) : Number(bill.nominal);
+      const tglBayar = paidDate || new Date().toISOString().split("T")[0];
+      const metodeBayar = paymentMethod || bill.paymentMethod || (bill.businessEntity === "NON_PT" 
+        ? "Transfer Bank BCA (6520490131 - RAMADHANI ST)" 
+        : "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)");
+
+      // Otomatis catat ke arus kas keluar (cash_flow)
+      const cashFlowId = `dstech_cf_${Date.now()}`;
+      const cashAccount = formatAccountFromPaymentMethod(metodeBayar, data);
+
+      const cfEntry = {
+        id: cashFlowId,
+        date: tglBayar,
+        type: "OUT",
+        category: bill.category || "Beban Operasional Rutin",
+        amount: nominalBayar,
+        account: cashAccount,
+        referenceNumber: bill.billNumber || bill.id,
+        description: `Pembayaran Tagihan Operasional: ${bill.title} Periode ${bill.period} (Disetujui: RAMADHANI ST - Direktur)`,
+        notes: notes || `Disetujui & dicairkan dari Tagihan Rutin Bulanan`,
+        businessEntity: bill.businessEntity || "PT",
+        status: "Sukses",
+        approvedBy: "RAMADHANI ST",
+        signerTitle: "Direktur",
+        approvalStatus: "Disetujui & Sah",
+        isLocked: true,
+        receiptUrl: receiptUrl || bill.receiptUrl || "",
+        createdAt: new Date().toISOString()
+      };
+
+      if (!data.cash_flow) data.cash_flow = [];
+      data.cash_flow.unshift(cfEntry);
+
+      // Otomatis catat ke expenses (Beban Operasional)
+      if (!data.expenses) data.expenses = [];
+      data.expenses.push({
+        id: `dstech_exp_${Date.now()}`,
+        date: tglBayar,
+        category: bill.category || "Beban Operasional Rutin",
+        amount: nominalBayar,
+        recipient: bill.vendorName || bill.title,
+        notes: `Pembayaran ${bill.title} Periode ${bill.period} (Ref: ${bill.billNumber})`,
+        businessEntity: bill.businessEntity || "PT",
+        receiptUrl: receiptUrl || bill.receiptUrl || ""
+      });
+
+      // Update data tagihan operasional
+      bill.nominal = nominalBayar;
+      bill.status = "DISETUJUI_LUNAS";
+      bill.approvedAt = new Date().toISOString();
+      bill.approvedBy = "RAMADHANI ST";
+      bill.approverTitle = "Direktur";
+      bill.paidDate = tglBayar;
+      bill.paymentMethod = metodeBayar;
+      bill.paidFromAccount = cashAccount;
+      bill.cashFlowId = cashFlowId;
+      if (receiptUrl) bill.receiptUrl = receiptUrl;
+      if (notes) bill.notes = notes;
+
+      data.operational_bills[billIndex] = bill;
+      writeFinanceData(data);
+
+      return NextResponse.json({
+        success: true,
+        message: `Tagihan ${bill.title} berhasil disetujui & dana sebesar Rp ${nominalBayar.toLocaleString("id-ID")} dicairkan ke buku kas!`,
+        data: bill,
+        cashFlow: cfEntry
+      });
+    }
+
+    // 0B. SIMPAN / UPDATE MASTER TEMPLATE TAGIHAN BERULANG
+    if (actionType === "save_recurring_template") {
+      if (!data.recurring_bills) data.recurring_bills = [];
+      const templateData = payload;
+      let savedItem: any = null;
+
+      if (templateData.id) {
+        const idx = data.recurring_bills.findIndex((t: any) => t.id === templateData.id);
+        if (idx !== -1) {
+          data.recurring_bills[idx] = {
+            ...data.recurring_bills[idx],
+            ...templateData,
+            recurringDay: Number(templateData.recurringDay) || 1,
+            estimatedAmount: Number(templateData.estimatedAmount) || 0,
+            updatedAt: new Date().toISOString()
+          };
+          savedItem = data.recurring_bills[idx];
+        } else {
+          data.recurring_bills.push(templateData);
+          savedItem = templateData;
+        }
+      } else {
+        savedItem = {
+          id: `dstech_rec_bill_${Date.now()}`,
+          title: templateData.title || "Tagihan Operasional Baru",
+          category: templateData.category || "Beban Operasional Kantor",
+          businessEntity: templateData.businessEntity || "PT",
+          recurringDay: Number(templateData.recurringDay) || 1,
+          estimatedAmount: Number(templateData.estimatedAmount) || 0,
+          vendorName: templateData.vendorName || "-",
+          customerNumber: templateData.customerNumber || "-",
+          paymentMethod: templateData.paymentMethod || (templateData.businessEntity === "NON_PT" 
+            ? "Transfer Bank BCA (6520490131 - RAMADHANI ST)" 
+            : "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)"),
+          isActive: templateData.isActive !== false,
+          notes: templateData.notes || "",
+          createdAt: new Date().toISOString()
+        };
+        data.recurring_bills.push(savedItem);
+      }
+
+      initAndSyncRecurringBills(data);
+      writeFinanceData(data);
+
+      return NextResponse.json({
+        success: true,
+        message: "Template tagihan berulang berhasil disimpan",
+        data: savedItem,
+        templates: data.recurring_bills
+      });
+    }
+
+    // 0C. PERBARUI TAGIHAN OPERASIONAL BULANAN (EDIT NOMINAL / JATUH TEMPO)
+    if (actionType === "update_operational_bill") {
+      const { billId, updates } = payload;
+      if (!data.operational_bills) data.operational_bills = [];
+      const idx = data.operational_bills.findIndex((b: any) => b.id === billId);
+      if (idx === -1) {
+        return NextResponse.json({ success: false, error: "Tagihan operasional tidak ditemukan" }, { status: 404 });
+      }
+      data.operational_bills[idx] = {
+        ...data.operational_bills[idx],
+        ...updates,
+        updatedAt: new Date().toISOString()
+      };
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: "Tagihan operasional berhasil diperbarui",
+        data: data.operational_bills[idx]
+      });
+    }
+
+    // 0D. LEWATI / TIDAK ADA TAGIHAN BULAN INI
+    if (actionType === "skip_operational_bill") {
+      const { billId, reason } = payload;
+      if (!data.operational_bills) data.operational_bills = [];
+      const idx = data.operational_bills.findIndex((b: any) => b.id === billId);
+      if (idx === -1) {
+        return NextResponse.json({ success: false, error: "Tagihan operasional tidak ditemukan" }, { status: 404 });
+      }
+      data.operational_bills[idx].status = "DILEWATI";
+      data.operational_bills[idx].notes = (data.operational_bills[idx].notes ? data.operational_bills[idx].notes + " | " : "") + `Dilewati: ${reason || "Tidak ada tagihan bulan ini"}`;
+      writeFinanceData(data);
+      return NextResponse.json({
+        success: true,
+        message: "Tagihan operasional berhasil dilewati",
+        data: data.operational_bills[idx]
+      });
+    }
+
+    // 0E. TRIGGER GENERATE TAGIHAN BULAN TERTENTU
+    if (actionType === "generate_monthly_bills") {
+      const targetPeriod = payload.period || `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+      if (!data.recurring_bills) data.recurring_bills = [];
+      if (!data.operational_bills) data.operational_bills = [];
+
+      const [yearStr, monthStr] = targetPeriod.split("-");
+      const activeTemplates = data.recurring_bills.filter((t: any) => t.isActive !== false);
+      let countCreated = 0;
+
+      activeTemplates.forEach((template: any, index: number) => {
+        const exists = data.operational_bills.find(
+          (b: any) => b.templateId === template.id && b.period === targetPeriod
+        );
+
+        if (!exists) {
+          const dayNum = Math.min(Math.max(Number(template.recurringDay) || 1, 1), 28);
+          const dayStr = String(dayNum).padStart(2, "0");
+          const billDateStr = `${yearStr}-${monthStr}-${dayStr}`;
+          const dueDayNum = Math.min(dayNum + 7, 28);
+          const dueDateStr = `${yearStr}-${monthStr}-${String(dueDayNum).padStart(2, "0")}`;
+
+          const newOpBill = {
+            id: `dstech_opbill_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 6)}`,
+            templateId: template.id,
+            billNumber: `BILL-OP-${yearStr}${monthStr}-${String(data.operational_bills.length + 1).padStart(3, "0")}`,
+            title: template.title,
+            category: template.category || "Beban Operasional Rutin",
+            period: targetPeriod,
+            billDate: billDateStr,
+            dueDate: dueDateStr,
+            businessEntity: template.businessEntity || "PT",
+            nominal: Number(template.estimatedAmount) || 0,
+            estimatedNominal: Number(template.estimatedAmount) || 0,
+            vendorName: template.vendorName || "-",
+            customerNumber: template.customerNumber || "-",
+            paymentMethod: template.paymentMethod || (template.businessEntity === "NON_PT" 
+              ? "Transfer Bank BCA (6520490131 - RAMADHANI ST)" 
+              : "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)"),
+            status: "MENUNGGU_DANA",
+            approvedAt: null,
+            approvedBy: null,
+            approverTitle: null,
+            paidDate: null,
+            paidFromAccount: null,
+            cashFlowId: null,
+            receiptUrl: null,
+            notes: template.notes || "",
+            createdAt: new Date().toISOString()
+          };
+
+          data.operational_bills.unshift(newOpBill);
+          countCreated++;
+        }
+      });
+
+      if (countCreated > 0) {
+        writeFinanceData(data);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `${countCreated} tagihan operasional untuk periode ${targetPeriod} berhasil dibentuk!`,
+        countCreated,
+        data: data.operational_bills
+      });
     }
 
     if (actionType === "tax_record" || actionType === "tax") {
@@ -1589,14 +1978,27 @@ export async function POST(request: Request) {
         verificationCode: payload.verificationCode || "",
         billAttachmentUrl: payload.billAttachmentUrl || (Array.isArray(payload.attachments) ? payload.attachments[0] : "") || "",
         attachments: Array.isArray(payload.attachments) ? payload.attachments : (payload.billAttachmentUrl ? [payload.billAttachmentUrl] : []),
-        businessEntity: payload.businessEntity || "PT",
+        businessEntity: (() => {
+          if (payload.projectId) {
+            const foundPrj = (data.projects || []).find((p: any) => p.id === payload.projectId);
+            if (foundPrj) {
+              const code = (foundPrj.projectCode || "").toUpperCase();
+              const name = (foundPrj.projectName || "").toUpperCase();
+              if (foundPrj.businessEntity === "NON_PT" || code.includes("NON-PT") || name.includes("NON-PT") || name.includes("TOKO") || name.includes("RETAIL")) {
+                return "NON_PT";
+              }
+              return "PT";
+            }
+          }
+          return payload.businessEntity || "PT";
+        })(),
         projectId: payload.projectId || "",
         projectName: payload.projectName || "",
         payments: initialPaidAmount > 0 ? [{
           id: `pay_${Date.now()}`,
           date: payload.date || new Date().toISOString().split("T")[0],
           amount: initialPaidAmount,
-          method: payload.paymentMethod || "Transfer Bank BCA PT",
+          method: payload.paymentMethod || (payload.businessEntity === "NON_PT" ? "Transfer Bank BCA - 6520490131 (RAMADHANI ST)" : "Transfer Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)"),
           notes: "Pembayaran awal saat pencatatan tagihan",
         }] : [],
       };
@@ -1677,7 +2079,7 @@ export async function POST(request: Request) {
         amount: amount,
         recipient: pDoc.supplierName,
         refNumber: pDoc.vendorInvoiceNumber ? `${pDoc.poNumber} (Ref: ${pDoc.vendorInvoiceNumber})` : pDoc.poNumber,
-        sourceAccount: paymentMethod || "Transfer Bank BCA PT",
+        sourceAccount: paymentMethod || (pDoc.businessEntity === "NON_PT" ? "Transfer Bank BCA - 6520490131 (RAMADHANI ST)" : "Transfer Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)"),
         notes: notes || `Pelunasan ${pDoc.docType === 'BILL' ? 'Faktur Tagihan' : 'PO'} kepada ${pDoc.supplierName}`,
       });
 
@@ -1905,6 +2307,7 @@ export async function POST(request: Request) {
         taxType: taxType,
         taxAmount: taxAmount,
         grandTotal: grandTotal,
+        hideTaxInPrint: Boolean(payload.hideTaxInPrint),
         terms: payload.terms || "1. Harga sudah termasuk instalasi, kabel pelindung, dan pengujian kelayakan sistem.\n2. Garansi resmi unit perangkat selama 2 (dua) tahun dan pemeliharaan teknis 6 (enam) bulan.\n3. Skema Pembayaran: Down Payment (DP) 50% saat penerbitan SPK, Pelunasan 50% setelah Berita Acara Serah Terima (BAST).\n4. Penawaran harga ini berlaku selama 14 (empat belas) hari kalender sejak diterbitkan.",
         status: payload.status || "Terkirim",
         convertedInvoiceId: "",
@@ -2815,6 +3218,26 @@ export async function DELETE(request: Request) {
     }
 
     const data = readFinanceData();
+
+    if (actionType === "recurring_bill_template") {
+      const initialLen = (data.recurring_bills || []).length;
+      data.recurring_bills = (data.recurring_bills || []).filter((t: any) => t.id !== id);
+      if (data.recurring_bills.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Template tagihan berulang tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Template tagihan berulang berhasil dihapus" });
+    }
+
+    if (actionType === "operational_bill") {
+      const initialLen = (data.operational_bills || []).length;
+      data.operational_bills = (data.operational_bills || []).filter((b: any) => b.id !== id);
+      if (data.operational_bills.length === initialLen) {
+        return NextResponse.json({ success: false, error: "Tagihan operasional tidak ditemukan" }, { status: 404 });
+      }
+      writeFinanceData(data);
+      return NextResponse.json({ success: true, message: "Tagihan operasional berhasil dihapus" });
+    }
 
     if (actionType === "client") {
       const initialLen = (data.clients || []).length;

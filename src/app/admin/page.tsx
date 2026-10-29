@@ -147,21 +147,20 @@ export default function AdminDashboard() {
     return () => clearInterval(timer);
   }, []);
 
-  // Helper mendapatkan format tanggal resmi WIB (Asia/Jakarta) & ISO fallback
-  const getTodayDateStrings = () => {
-    const dates: string[] = [];
+  // Helper mendapatkan format tanggal resmi WIB (Asia/Jakarta) murni tanpa fallback UTC
+  const getTodayWIBDate = (): string => {
     try {
-      const wib = new Intl.DateTimeFormat("en-CA", {
+      return new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Jakarta",
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
       }).format(new Date());
-      dates.push(wib);
-    } catch {}
-    const iso = new Date().toISOString().split("T")[0];
-    if (!dates.includes(iso)) dates.push(iso);
-    return dates;
+    } catch {
+      const now = new Date();
+      const wibTime = new Date(now.getTime() + (7 * 60 + now.getTimezoneOffset()) * 60000);
+      return wibTime.toISOString().split("T")[0];
+    }
   };
 
   // Load Admin User Session & Today's Attendance (Anti-Cache & Real-time)
@@ -169,7 +168,7 @@ export default function AdminDashboard() {
     try {
       const targetName = (userName || adminUser?.name || "Super Admin DStech").trim().toLowerCase();
       const targetEmail = (userEmail || adminUser?.email || "admin@dstechsmart.com").trim().toLowerCase();
-      const validDates = getTodayDateStrings();
+      const todayWibDate = getTodayWIBDate();
 
       const res = await fetch(`/api/employee/attendance?t=${Date.now()}`, {
         cache: "no-store",
@@ -178,8 +177,7 @@ export default function AdminDashboard() {
       const json = await res.json();
       if (json.success && Array.isArray(json.attendance)) {
         const match = json.attendance.find((a: any) => {
-          const matchDate = validDates.includes(a.date);
-          if (!matchDate) return false;
+          if (a.date !== todayWibDate) return false;
           const aName = (a.employeeName || "").trim().toLowerCase();
           const aEmail = (a.employeeEmail || "").trim().toLowerCase();
           const matchName =
@@ -192,6 +190,8 @@ export default function AdminDashboard() {
         });
         if (match) {
           setTodayAttendance(match);
+        } else {
+          setTodayAttendance(null);
         }
       }
     } catch (e) {
@@ -219,7 +219,10 @@ export default function AdminDashboard() {
       // Listener sinkronisasi absensi real-time antar tab & komponen
       const handleAttendanceSync = (e: any) => {
         if (e?.detail) {
-          setTodayAttendance(e.detail);
+          const todayWib = getTodayWIBDate();
+          if (e.detail.date === todayWib) {
+            setTodayAttendance(e.detail);
+          }
         }
         loadAdminAttendance(currentAuthUser.name, currentAuthUser.email);
       };

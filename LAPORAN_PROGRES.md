@@ -4,6 +4,225 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **2026-10-30**: [SELESAI] Perbaikan Layar Crash "This page couldn't load - Cannot read properties of undefined (reading 'toLowerCase')" pada Tab Buku Arus Kas Keuangan ERP (`src/app/admin/finance/page.tsx`).
+  *Permintaan User*: "untuk buku arus kas eror" (disertai tangkapan layar console TypeError: Cannot read properties of undefined reading 'toLowerCase')
+  *Penyebab Masalah yang Diidentifikasi*:
+  1. Pada [src/app/admin/finance/page.tsx](file:///d:/OneDrive/My%20Project%20Aplikasi/Website%20DStech%20Smart/dstech-smart/src/app/admin/finance/page.tsx) di fungsi hook `filteredAndSortedCashFlow` (baris 5352 dan 5357), kode memanggil `cash.account.toLowerCase()` secara langsung tanpa memeriksa apakah properti `cash.account` bernilai `undefined`, `null`, atau string kosong.
+  2. Jika ada record transaksi arus kas yang tidak memiliki properti `account` (misalnya hasil integrasi modul lain atau data lama), seketika terjadi eksepsi fatal runtime JavaScript: `TypeError: Cannot read properties of undefined (reading 'toLowerCase')`.
+  3. Pada baris 13695 di bagian rendering tabel baris Arus Kas (`TAB 5: BUKU ARUS KAS`), kode juga memanggil `cash.account.toLowerCase().includes("tunai")` tanpa fallback string aman `(cash.account || "").toLowerCase()`.
+  4. Akibatnya saat tab "Buku Arus Kas" dibuka oleh pengguna di browser, seluruh halaman `/admin/finance` mengalami unhandled crash dan memunculkan layar putih error: "This page couldn't load".
+  *Rencana Langkah Pengerjaan Step-by-Step*:
+  1. [x] Buat folder cadangan `_backup_cash_flow_fix` dan salin berkas `src/app/admin/finance/page.tsx`.
+  2. [x] Perbaiki fungsi `filteredAndSortedCashFlow` pada baris 5343-5390 agar menggunakan safe string variable `const cashAcc = (cash.account || "").toLowerCase();` serta fallback string aman pada filter query pencarian.
+  3. [x] Perbaiki baris 13695 dan 13700 pada render tabel buku arus kas dengan safe string check `(cash.account || "").toLowerCase()` dan fallback display label `cash.account || "Kas Tunai"`.
+  4. [x] Periksa seluruh fungsi terkait arus kas untuk memastikan tidak ada pemanggilan `.toLowerCase()` atau properti lain yang berpotensi crash.
+  5. [x] Validasi tipe TypeScript dengan `npx tsc --noEmit` (lolos 0 error).
+  6. [x] Uji build produksi dengan `npm run build` (sukses 76/76 static & dynamic pages).
+  7. [x] Hapus folder cadangan setelah verifikasi berhasil.
+  8. [x] Perbarui `LAPORAN_PROGRES.md` menandai Tugas 305 sebagai `[SELESAI]`.
+  *Hasil*:
+  - Tab "Buku Arus Kas" di `/admin/finance` kini sepenuhnya stabil dan tidak akan crash lagi sekalipun terdapat transaksi kas yang properti akunnya kosong/tidak terdefinisi.
+  - Tampilan baris tabel kas otomatis menggunakan fallback aman "Kas Tunai" dan ikon yang sesuai tanpa menyebabkan runtime exception.
+
+- **2026-10-30**: [SELESAI] Perbaikan Masalah Presensi Terbaca Sudah Masuk & Pulang Serta Terkunci di Pagi Hari Akibat Perbedaan Timezone UTC vs WIB (Asia/Jakarta) pada Portal Karyawan dan Admin Presensi (`src/app/employee/page.tsx`, `src/app/admin/attendance/page.tsx`, `src/app/admin/page.tsx`).
+  *Permintaan User*: "pada absensi, kenapa sudah terabsen masuk dan pulang untuk hari ini. padahal saya belum melakukan absen sama sekali, dan absen terkunci"
+  *Penyebab Masalah yang Diidentifikasi*:
+  1. Pada `src/app/employee/page.tsx` (`getWIBTodayDates`) dan `src/app/admin/page.tsx` (`getTodayDateStrings`), sistem memasukkan dua format tanggal sekaligus ke dalam array tanggal yang dianggap "hari ini": tanggal WIB (`Asia/Jakarta`) dan tanggal UTC (`toISOString().split("T")[0]`).
+  2. Karena waktu Indonesia bagian Barat (WIB) adalah UTC+7, pada rentang waktu dini hari hingga pagi (pukul 00:00 s/d 06:59 WIB), waktu UTC masih berada pada H-1 (tanggal kemarin).
+  3. Akibatnya, pada pagi hari sistem menganggap tanggal kemarin sebagai "hari ini". Logika pencarian `todayAttendance` mencocokkan record kehadiran milik pengguna pada tanggal kemarin (`2026-10-29`), yang pada kemarin sore sudah selesai check-in dan check-out (atau ditutup otomatis 17:00 WIB).
+  4. Dampaknya, di antarmuka pengguna pagi ini langsung muncul status:
+     - `✓ Masuk: (Terkunci)`
+     - `✓ Pulang: (Terkunci)` / `🔒 Pulang Ditutup Otomatis`
+     sehingga tombol presensi masuk dan pulang hari ini terkunci dan tidak dapat ditekan, padahal pengguna belum absen sama sekali hari ini.
+  5. Pada `src/app/admin/attendance/page.tsx`, variabel `todayStr` sebelumnya menggunakan `new Date().toISOString().split("T")[0]` (UTC murni) alih-alih WIB, menyebabkan filter hari ini di panel presensi admin juga membaca tanggal kemarin di pagi hari.
+  6. Pada `src/app/employee/page.tsx`, terdapat celah `if (!currentEmpName && !currentEmpEmail) return true` yang mencocokkan sembarang record jika sesi belum selesai dimuat, serta fuzzy matching nama yang terlalu longgar.
+  *Tindakan Perbaikan yang Dilakukan*:
+  1. **Standardisasi Helper Tanggal Tunggal WIB (Asia/Jakarta) Murni**:
+     - Mengubah fungsi `getWIBTodayDates` di `src/app/employee/page.tsx` dan `getTodayDateStrings` di `src/app/admin/page.tsx` menjadi `getWIBTodayDate()` / `getTodayWIBDate()` yang strictly hanya mengembalikan tanggal WIB (`en-CA`, `Asia/Jakarta`, format `YYYY-MM-DD`).
+     - Menghapus total penyertaan tanggal UTC fallback (`toISOString().split("T")[0]`) dari pencarian presensi hari ini.
+  2. **Penyempurnaan Pencocokan Presensi Hari Ini (`todayAttendance`) di `src/app/employee/page.tsx`**:
+     - Mengubah pencarian presensi menjadi strict check: `a.date === todayWibDate`.
+     - Menambahkan proteksi awal: jika sesi `currentUser` belum termuat atau tidak memiliki identitas (nama/email), fungsi seketika mengembalikan `null` (tidak mencocokkan record orang lain / record acak).
+     - Mengetatkan pencocokan nama dan email agar eksak dan aman dari false-positive.
+  3. **Perbaikan Panel Presensi Admin (`src/app/admin/attendance/page.tsx`)**:
+     - Mengubah variabel `todayStr` agar diformat berdasarkan zona waktu `Asia/Jakarta` (`YYYY-MM-DD`), sehingga filter daftar kehadiran hari ini di admin tidak lagi tertukar dengan tanggal kemarin di pagi hari.
+     - Memperbaiki `myTodayAttendance` agar strictly tanggal WIB dan pencocokan nama pengguna secara eksak.
+  4. **Perbaikan Widget Presensi Dashboard Admin (`src/app/admin/page.tsx`)**:
+     - Mengganti array `validDates` dengan `todayWibDate = getTodayWIBDate()` murni.
+     - Menambahkan penanganan `else { setTodayAttendance(null); }` pada `loadAdminAttendance` sehingga jika pengguna memang belum melakukan presensi hari ini, status presensi akan di-reset bersih ke null (tombol presensi terbuka normal).
+     - Menyelaraskan event listener `dstech_attendance_updated` agar hanya memperbarui state presensi jika tanggal event sesuai dengan tanggal hari ini di WIB.
+  5. **Pengujian & Validasi**:
+     - Berkas cadangan dibuat sebelum pengeditan di `_backup_attendance_timezone_fix/`.
+     - Validasi TypeScript kompilasi `npx tsc --noEmit` lolos tanpa error (exit code 0).
+     - Berkas cadangan dibersihkan setelah perbaikan terverifikasi normal.
+  *Hasil*:
+  - Saat pengguna membuka portal karyawan maupun admin di pagi hari (sebelum jam 07:00 WIB), sistem tidak akan lagi menarik data presensi tanggal kemarin.
+  - Pengguna yang belum absen hari ini akan mendapati tombol Check-In dan Check-Out dalam status normal (belum diabsen dan tidak terkunci).
+
+
+- **2026-10-30**: [SELESAI] Fitur Sembunyikan & Tampilkan Nilai Pajak PPN pada Surat Penawaran Harga (SPH Exclude PPN), Toggle Cepat di Toolbar Cetak SPH, Perhitungan Terbilang Netto/DPP Dinamis, dan Catatan Resmi Penawaran (`src/app/admin/finance/page.tsx`, `src/app/api/finance/route.ts`, `src/app/api/finance/print/route.ts`).
+  *Permintaan User*: "pada SPH, saya ingin menyembunyikan nilai pajak PPN saat penawaran. namun nantinya kita kasih keterangan PPN Exclude belum termasuk. tolong buatkan fitur agar saya bisa menyembunyikan dan memunculkan nilai PPN seperti sekarang."
+  *Penyebab Masalah / Kebutuhan yang Diidentifikasi*:
+  1. Sebelumnya seluruh surat penawaran harga (SPH) selalu menampilkan nilai nominal Rupiah PPN (11% atau 12%) dan menjumlahkannya ke Total Penawaran (Grand Total), tanpa opsi untuk menyembunyikan nilai Rupiah pajak.
+  2. Dalam praktik bisnis B2B dan proyek pengadaan, banyak penawaran diajukan dengan skema harga dasar/Netto (Exclude PPN), di mana besaran pajak PPN baru ditagihkan resmi saat penerbitan Faktur Penjualan (Invoice) setelah penawaran disetujui.
+  3. Pengguna menginginkan fleksibilitas agar nilai PPN dapat disembunyikan atau dimunculkan sesuka hati baik dari form penawaran maupun langsung dari layar cetak/pratinjau dokumen sebelum dicetak atau diunduh ke PDF.
+  *Penyelesaian & Hasil*:
+  1. **Penambahan Atribut `hideTaxInPrint` pada Model `Quotation`**:
+     - Memperbarui interface `Quotation` dan state `quotationForm` di `src/app/admin/finance/page.tsx` dengan field `hideTaxInPrint?: boolean`.
+     - Memperbarui endpoint `POST /api/finance` dan `PUT /api/finance` di `src/app/api/finance/route.ts` agar menyimpan dan mempertahankan nilai `hideTaxInPrint`.
+  2. **Formulir Buat & Edit SPH (`src/app/admin/finance/page.tsx`)**:
+     - Ditambahkan kartu interaktif dengan switch toggle: *"Sembunyikan Nilai Pajak PPN di SPH (Exclude PPN)"*.
+     - Ketika dicentang, ringkasan penawaran seketika mengkalkulasi ulang secara visual:
+       * Baris PPN berganti menjadi badge amber: `Exclude (Belum Termasuk)`.
+       * Total Penawaran menampilkan nominal Netto/DPP kesepakatan (tanpa penambahan nilai PPN).
+       * Terbilang otomatis membaca nominal Netto/DPP tersebut.
+       * Diberi catatan instruksi: *"Harga di atas adalah DPP/Netto belum termasuk PPN. Pada cetak SPH akan dicantumkan klausul resmi Exclude PPN."*
+  3. **Tombol Cepat Toggle di Toolbar Modal Cetak SPH (`selectedQuotationForPrint`)**:
+     - Ditambahkan tombol aksi di header toolbar pratinjau SPH:
+       * `[👁️ Nilai PPN: Dimunculkan (Rp)]` / `[👁️ Nilai PPN: Disembunyikan (Exclude)]`
+     - Tombol ini membuat admin dapat beralih tampilan seketika saat sedang meninjau dokumen SPH sebelum dicetak atau diekspor ke PDF, dan secara otomatis memperbarui data dokumen ke database via `PUT /api/finance`.
+  4. **Tata Letak Cetak SPH Halaman 1 & Halaman 2 (Lampiran)**:
+     - **Halaman 1 (Surat Penawaran)**:
+       * Ketika `hideTaxInPrint` aktif: Baris PPN menampilkan badge `Exclude (Belum Termasuk)` berwarna amber, Total Penawaran dicantumkan sebesar Netto/DPP, Terbilang menyebutkan nominal Netto/DPP tersebut, dan kotak rekapitulasi diberi keterangan penegas: `*Harga penawaran di atas belum termasuk PPN (Exclude)`.
+       * Pada Syarat & Ketentuan Teknis (Terms & Conditions), otomatis ditambahkan klausul resmi: `• Seluruh harga penawaran di atas adalah harga Netto/DPP dan belum termasuk PPN (Exclude PPN). Pajak Pertambahan Nilai akan diperhitungkan saat penerbitan Faktur Penjualan resmi.`
+     - **Halaman 2 (Lampiran Rincian Barang/Jasa)**:
+       * Bagian Rekapitulasi Total Lampiran menampilkan badge `Exclude (Belum Termasuk)` dan Total Penawaran Netto/DPP.
+       * Pada Catatan Lampiran & Ketentuan Teknis, dicantumkan klausul resmi bahwa harga belum termasuk PPN.
+  5. **Dukungan Tampilan pada Endpoint Publik/Tautan SPH (`src/app/api/finance/print/route.ts`)**:
+     - Tampilan web SPH saat dibuka klien melalui link online WhatsApp/Email secara presisi mengikuti nilai `hideTaxInPrint`: menampilkan badge Exclude PPN, Total Penawaran Netto, dan Terbilang Netto.
+  6. **Pengujian & Validasi Ketat**:
+     - `npx tsc --noEmit`: 0 error (100% lolos validasi tipe).
+     - `npm run build`: Kompilasi sukses 100% untuk seluruh 76/76 static & dynamic pages.
+     - Berkas cadangan sementara `_backup_quotation_hide_tax` telah dibersihkan secara aman.
+
+
+
+- **2026-10-30**: [SELESAI] Fitur Tagihan Berulang & Pengeluaran Operasional Rutin Otomatis (Recurring Operational Bills & Approval System), Master Template Pengeluaran Bulanan, Pencatatan Kas Keluar Otomatis, dan Pengesahan Legalitas Direktur (Tugas 302) (`src/app/api/finance/route.ts`, `src/app/admin/finance/page.tsx`, `src/data/dstech_finance_erp.json`).
+  *Permintaan User*: "fitur sebelumnya sudah selesai semua kah? saya ingin membuat fitur tagihan berulang setiap tanggal dan bulan untuk oprasional. misaloanya listrik, air, sewa kendaraan, kantor dan lain-lain. secara otomatis akan terbentuk. saya hanya tinggal aprove saja setiap bulan pengeluaran tersebut kalau dana sudah tersedia" -> "ok, langsung eksekusi?"
+  *Penyebab Masalah / Kebutuhan yang Diidentifikasi*:
+  1. Sebelumnya belum tersedia sistem pencatatan tagihan operasional rutin bulanan (listrik PLN, PDAM air, internet dedicated, sewa kendaraan teknisi lapangan, dan sewa kantor/ruko) yang secara otomatis terjadwal per bulan.
+  2. Beban operasional kantor sebelumnya harus diinput manual satu per satu ke arus kas keluar setiap bulan, rawan terlewat atau terlambat bayar saat jatuh tempo.
+  3. Pengguna menginginkan alur kerja di mana sistem otomatis membentuk draf tagihan bulanan berstatus "Menunggu Dana (Pending Approval)". Begitu dana operasional tersedia di kas perusahaan, Direktur tinggal mengklik satu tombol "⚡ Setujui & Bayar (Approve)", dan kas keluar langsung terpotong secara otomatis tanpa perlu input berulang.
+  *Penyelesaian & Hasil*:
+  1. **Struktur Master Template Tagihan Berulang (`recurring_bills` dengan prefix `dstech_rec_bill_`)**:
+     - Dibuatkan struktur data template tagihan operasional rutin di `src/app/api/finance/route.ts` dan `dstech_finance_erp.json`.
+     - Menyimpan konfigurasi: Nama Keperluan, Kategori Beban Operasional, Entitas Usaha (PT / Non-PT), Jadwal Rutin Tanggal Tiap Bulan (1 - 28), Estimasi Nominal Bulanan (Rp), Rekanan / Vendor, No. ID Pelanggan / Nopol / Rekening Tujuan, Akun Kas Default, Status Aktif, dan Catatan.
+     - Telah disiapkan master template bawaan operasional PT. DSTech Smart Perkasa:
+       * Tagihan Listrik PLN Kantor PT (Setiap Tgl 5 - Rp 1.500.000)
+       * Tagihan PDAM Air Bersih Kantor (Setiap Tgl 10 - Rp 350.000)
+       * Tagihan Internet Wifi & Fiber Optic Kantor (Setiap Tgl 15 - Rp 650.000)
+       * Sewa Kendaraan Operasional Lapangan (Setiap Tgl 20 - Rp 3.500.000)
+       * Sewa Ruko & Kantor Operasional Cilegon (Setiap Tgl 25 - Rp 5.000.000)
+  2. **Engine Auto-Generate Tagihan Bulanan (`syncMonthlyOperationalBills`)**:
+     - Setiap kali modul keuangan dimuat atau bulan baru berganti, backend secara otomatis mengecek seluruh master template aktif dan membentuk draf instance tagihan operasional (`operational_bills` dengan prefix `dstech_opbill_`) untuk periode bulan tersebut.
+     - Status default: `MENUNGGU_DANA` (Pending Approval).
+     - Menghitung tanggal jatuh tempo otomatis (misal 7 hari setelah tanggal tagihan).
+     - Mencegah duplikasi tagihan pada periode bulan yang sama.
+     - Tersedia endpoint `generate_monthly_bills` untuk sinkronisasi paksa periode tertentu.
+  3. **Backend API Approval & Pencatatan Kas Keluar Otomatis (`approve_operational_bill`)**:
+     - Handler `actionType === "approve_operational_bill"` di `POST /api/finance`:
+       * Mengubah status tagihan menjadi `DISETUJUI_LUNAS`.
+       * Menyesuaikan nominal riil yang dibayarkan jika tagihan (seperti PLN/PDAM) berbeda dari estimasi awal.
+       * Mengesahkan tagihan secara resmi atas nama Direktur `RAMADHANI ST` (`isLocked: true`).
+       * **Otomatis mencatat pengeluaran ke Arus Kas Keluar (`data.cash_flow`)** dengan kategori beban terkait, nomor referensi bill, akun rekening kas sumber dana, dan deskripsi approval.
+       * **Otomatis mencatatkan ke Beban Operasional (`data.expenses`)** untuk rekap laba rugi.
+     - Mendukung aksi `save_recurring_template`, `update_operational_bill`, `skip_operational_bill`, dan `DELETE` template / tagihan.
+  4. **Antarmuka Tab Baru "Tagihan Rutin & Operasional" (`src/app/admin/finance/page.tsx`)**:
+     - Ditambahkan Tab ke-13 pada navigasi tab Finance ERP lengkap dengan badge indikator berdenyut (*"X Butuh Dana"*).
+     - **3 KPI Cards Real-Time**:
+       * Estimasi Total Tagihan Periode Ini (Rp)
+       * Menunggu Dana / Approval (Badge merah/rose berdenyut)
+       * Disetujui & Kas Dicairkan (Badge hijau emerald)
+     - **Filter Bar Lengkap**: Pencarian teks, Filter Bulan (Datepicker Month), Filter Status (Menunggu Dana, Disetujui & Lunas, Dilewati), dan Filter Entitas Usaha (PT / Non-PT).
+     - **Tabel Tagihan Operasional Bulanan**:
+       * Menampilkan No. Dokumen, Judul Keperluan, ID Pelanggan, Kategori, Rekanan, Jadwal & Jatuh Tempo, Nominal Riil vs Estimasi, Status Pengesahan Direktur RAMADHANI ST.
+       * Tombol Aksi Cepat: **`⚡ Setujui & Bayar`** (warna emerald), **`Edit`** (sesuaikan nominal sebelum bayar), dan **`Lewati Bulan Ini`** (jika pemakaian nihil).
+     - **Modal Approval & Pencairan Kas**:
+       * Menampilkan ringkasan tagihan & entitas pembukuan.
+       * Input nominal riil pembayaran (Rp), tanggal pencairan kas, input upload struk bukti bayar, dan catatan kuitansi.
+       * Pilihan Akun Kas otomatis terkunci dan dibatasi sesuai aturan entitas: PT hanya menggunakan rekening BCA PT atau Kas Tunai; Non-PT hanya menggunakan rekening BCA Non-PT atau Kas Tunai (Tanpa Bank Mandiri).
+       * Legalitas Direktur RAMADHANI ST otomatis tercantum dan disahkan.
+     - **Modal Master Template Tagihan Rutin**:
+       * Form lengkap untuk menambah atau mengedit template tagihan bulanan kantor.
+       * Tabel daftar template terdaftar dengan aksi edit dan hapus.
+     - **Modal Edit Detail Tagihan Operasional**:
+       * Memungkinkan koreksi nominal, tanggal jatuh tempo, vendor, dan catatan pada tagihan bulan berjalan.
+  5. **Pengujian & Validasi Ketat**:
+     - `npx tsc --noEmit`: 0 error (100% lolos validasi tipe TypeScript).
+     - `npm run build`: Kompilasi sukses 100% untuk seluruh 76/76 static & dynamic pages.
+     - Berkas cadangan sementara `_backup_recurring_bills` telah dibersihkan secara aman.
+
+
+- **2026-10-29**: [SELESAI] Penguncian Permanen Pengesahan & Tanda Tangan Dokumen Resmi, Pembatasan Faktur E-Store Hanya Saat Pesanan Diterima (Tanpa Faktur untuk Pesanan Batal), Alur Retur & Pengembalian Dana (Refund) Kas, serta Penyeragaman Default Penandatangan Dokumen (RAMADHANI ST - Direktur) & Site Settings (Tugas 301) (`src/app/api/finance/route.ts`, `src/app/api/orders/route.ts`, `src/app/api/finance/print/route.ts`, `src/app/api/settings/route.ts`, `src/app/admin/settings/page.tsx`, `src/app/admin/orders/page.tsx`, dan `src/app/admin/finance/page.tsx`).
+  *Permintaan User*:
+  1. "setiap saya selesai mengesahkan surat tanda tangan. selalu saja pengesahaannya hilang tanpa tertanda tangan. tolong dikunci. jika sudah melakukan tanda tangan 1x pada seluruh dokumen maka jangan pernah hilang dan diubah. kecuali ada melakukan perbaikan surat, maka butuh pengesahan kembali."
+  2. "kemudian saya melihat. jika ada order yang masuk dari estor client. maka faktur dan lainnya langsung terbentuk. padahal pesanan tersebut sudah berstatus batal. ordernya hanya berstatus baru order tanpa pembayaran terverivikasi dan pengirimannya belum diterima konsumen. tolong ubah sistemnya. agar seluruh faktur dari estor baru terbentuk setelah pesanan dinyatakan diterima oleh client. kalau pesanannya batal, maka jangan buatkan faktur penjualan. dikhawatirkan akan masuk ke keuangan dan mengacak-acak keuangannya.. jika pesanan sudah selesai dan diterima, namun client komplen dan mengembalikan pesanan. maka pesanan sebelumnya akan direfund dan pengembalian dana harus bisa diproses"
+  3. "untuk aproval selain dari surat jalan, setkan semuanya default ke penanda tangan PT. DSTECH SMART PRKASA yang menandatangani RAMADHANI ST dan Jabatannya Direktur"
+  4. "kalau bisa buatkan di pengaturan site setting untuk pengaturan penandatangan setiap surat, sehingga kedepannya secara otomatis dan seragam terbentuk"
+  *Penyebab Masalah / Kebutuhan yang Diidentifikasi*:
+  1. Pengesahan tanda tangan sebelumnya hilang karena saat form edit invoice / PO / dokumen disubmit via `PUT /api/finance`, data payload menimpa field lama (`...updates`) di mana field `approvalStatus`, `signatureImage`, `approvedBy`, `signerTitle`, dll tidak disertakan oleh form client atau ter-reset menjadi string kosong, menghapus tanda tangan yang sudah disahkan.
+  2. Pesanan e-store sebelumnya langsung memanggil pembuatan faktur ke `financeData.sales` begitu checkout pesanan selesai (status `PAYMENT_PENDING`), bahkan pesanan berstatus `CANCELLED` tetap meninggalkan jejak faktur penjualan dan mencatat omset yang keliru di pembukuan keuangan.
+  3. Belum tersedia alur pemrosesan pengembalian dana (refund) e-store yang langsung mencatatkan Berita Acara Retur ke `financeData.returns_sales` dan arus kas keluar refund ke `financeData.cash_flow`.
+  4. Penandatangan dokumen di beberapa modul masih acak atau kosong, dan belum ada sinkronisasi kop surat serta tanda tangan / stempel digital terpusat dari menu Site Settings ke modul keuangan.
+  *Penyelesaian & Hasil*:
+  1. **Penguncian Permanen Pengesahan & Tanda Tangan Dokumen (`src/app/api/finance/route.ts`)**:
+     - Ditambahkan helper `applySignatureLockProtection(existingDoc, updates)`: Dokumen yang telah disahkan (`approvalStatus === "Disetujui & Sah"` atau `isLocked === true`) 100% mempertahankan seluruh metadata tanda tangan digital (`signatureImage`, `approvedBy`, `signerTitle`, `approvalDate`, `isLocked`) dari penimpaan form edit biasa.
+     - Proteksi revisi resmi: Jika ada perbaikan substansi dokumen yang memerlukan revisi (`isRevision: true`), sistem mencatat riwayat versi ke `revisionHistory`, menaikkan nomor revisi (`revision: (existing.revision || 0) + 1`), dan baru meminta pengesahan ulang.
+     - Pada `actionType === "approve_document"`: Dokumen diverifikasi ketat (menolak approval jika tanda tangan kosong), otomatis menetapkan penandatangan default `RAMADHANI ST` (Direktur), dan mengunci dokumen (`isLocked: true`).
+     - Pada `actionType === "client_approve_doc"`: Ditambahkan fallback pencarian ke pesanan e-store `dstech_orders.json` dan menyinkronkan status tanda tangan BAST / Surat Jalan secara dua arah.
+  2. **Pembatasan Faktur Penjualan E-Store Sesuai Status Pesanan (`src/app/api/orders/route.ts`)**:
+     - Pesanan `CANCELLED` / `DIBATALKAN`: DILARANG KERAS membuat faktur penjualan. Jika faktur lama sebelumnya pernah tersimpan, otomatis dibersihkan dan dihapus dari `financeData.sales` dan kas bersangkutan di `financeData.cash_flow`.
+     - Pesanan yang belum diterima konsumen (`PAYMENT_PENDING`, `PAID`, `PROCESSING`, `SHIPPED`): Tidak dimasukkan ke faktur penjualan resmi buku keuangan.
+     - Pesanan `DELIVERED` / `SELESAI`: Baru membentuk Faktur Penjualan resmi buku keuangan lengkap dengan tanda tangan Direktur `RAMADHANI ST`, status `isLocked: true`, dan pencatatan kas masuk operasional.
+  3. **Alur Komplain & Refund Dana Kas E-Store (`src/app/api/orders/route.ts` & `src/app/admin/orders/page.tsx`)**:
+     - Ditambahkan aksi `action === "process_refund"` pada `PATCH /api/orders`:
+       * Mengubah status pesanan menjadi `REFUNDED` dan komplain menjadi `RESOLVED`.
+       * Otomatis menerbitkan Berita Acara Retur Penjualan ke `financeData.returns_sales`.
+       * Otomatis mencatat pengeluaran arus kas keluar refund ke `financeData.cash_flow`.
+       * Memperbarui status faktur penjualan menjadi `Direfund / Dikembalikan`.
+     - Pada UI Admin Pesanan (`src/app/admin/orders/page.tsx`):
+       * Modal proses pesanan dilengkapi opsi *"5. Proses Pengembalian Dana & Retur (Refund)"* dengan input form nominal refund, metode pengembalian, nomor rekening tujuan, nama penerima, dan berita acara retur.
+       * Tombol cetak faktur dinamis: Pesanan batal menampilkan badge abu-abu non-aktif *"🚫 Pesanan Batal (Tanpa Faktur)"*, pesanan selesai menampilkan *"📄 Faktur Penjualan Sah (A4)"*, pesanan refund menampilkan *"💸 Berita Acara Refund (A4)"*, dan pesanan sebelum selesai menampilkan *"📄 Surat Pesanan Proforma (A4)"*.
+  4. **Proteksi Cetak Faktur (`src/app/api/finance/print/route.ts`)**:
+     - Pesanan batal diblokir dari pencetakan dan menampilkan layar peringatan resmi *"Faktur Penjualan Tidak Diterbitkan untuk Pesanan yang Telah Dibatalkan"*.
+     - Pesanan sebelum diterima konsumen dicetak sebagai *"Surat Pesanan / Bukti Belanja (Proforma Order)"*.
+  5. **Default Penandatangan & Pengaturan Kop Surat di Site Settings (`src/app/api/settings/route.ts` & `src/app/admin/settings/page.tsx`)**:
+     - Default penandatangan selain Surat Jalan diseragamkan ke: Perusahaan: `PT. DSTECH SMART PERKASA`, Penandatangan: `RAMADHANI ST`, Jabatan: `Direktur`.
+     - Ditambahkan Bagian 6 "Tanda Tangan Digital & Stempel Resmi Perusahaan" pada Tab Kop Surat di `src/app/admin/settings/page.tsx` untuk mengunggah `masterSignatureUrl` dan `masterStampUrl` transparan beresolusi tinggi.
+     - Setiap perubahan kop surat dan penandatangan di Site Settings otomatis tersinkronisasi dua arah ke `dstech_finance_erp.json`.
+  6. **Pengujian & Validasi**:
+     - `npx tsc --noEmit`: 0 error (lulus bersih).
+     - `npm run build`: Kompilasi sukses 76/76 static & dynamic pages (exit code 0).
+
+
+- **2026-10-29**: [SELESAI] Penguncian Otomatis Entitas Usaha Pembukuan Sesuai Entitas Proyek Tercatat & Penyesuaian Rekening Kas / Metode Pembayaran Sesuai Rekening Terdaftar (Tanpa Opsi Mandiri & Tanpa Rekening PT pada Non-PT) (Tugas 300) (`src/app/admin/finance/page.tsx` dan `src/app/api/finance/route.ts`).
+  *Permintaan User*:
+  1. "untuk entitas pembukuan, tolong dikunci sesuai dengan entitas pembukuan tercatat proyeknya. jangan bisa ditukar. otomatis"
+  2. "kemudian jika entintasnya non PT, untuk metode /akun kas jangan buat PT. langsung sesuaikan dengan rekening terdaftar. dalam rekening terdaftar tidak ada pilihan mandiri"
+  *Penyebab Masalah / Kebutuhan yang Diidentifikasi*:
+  1. Pada form modal Catat Tagihan Vendor (Vendor Bill `isNewBillModalOpen`), pilihan entitas usaha pembukuan sebelumnya masih berupa dropdown aktif bebas yang dapat dipilih/ditukar pengguna sekalipun tagihan ditautkan ke Proyek PT atau Non-PT.
+  2. Pilihan dropdown Metode / Akun Kas pada form Vendor Bill dan Pelunasan Tagihan (`payBillForm`) sebelumnya di-hardcode dengan opsi "Transfer Bank Mandiri PT" (padahal tidak ada di rekening master terdaftar) dan "Transfer Bank BCA PT" (bahkan ketika entitas yang dipilih adalah Non-PT).
+  3. Berdasarkan data master `bank_accounts` di `dstech_finance_erp.json`:
+     - Rekening Non-PT resmi: `Bank BCA - 6520490131 (a.n RAMADHANI ST)` + opsi `Kas Tunai Operasional`. (Tidak boleh ada rekening PT, dan tidak ada Bank Mandiri).
+     - Rekening PT resmi: `Bank BCA - 295-074-0321 (a.n PT. DSTech Smart Perkasa)` + opsi `Kas Tunai Operasional`.
+  *Penyelesaian & Hasil*:
+  1. **Penguncian Otomatis Entitas Pembukuan Proyek (`src/app/admin/finance/page.tsx`)**:
+     - Pada Modal Catat Tagihan Vendor (`isNewBillModalOpen`):
+       * Jika tagihan dibuka dari dalam proyek (`selectedProjectForDetail`), field proyek ditampilkan sebagai kartu info terkunci dan entitas pembukuan otomatis disinkronkan dan dikunci permanen (`disabled`) dengan badge status `🔒 Terkunci Otomatis Sesuai Proyek (Dilarang Ditukar)`.
+       * Jika dibuka dari menu umum, pengguna memilih proyek dari dropdown proyek aktif; begitu proyek dipilih, sistem seketika mendeteksi `project.businessEntity` dan otomatis mengunci dropdown entitas pembukuan tanpa bisa ditukar secara manual.
+     - Diterapkan juga pada Modal PO Belanja Baru, Modal Buat Faktur Penjualan (Sale Invoice), dan Modal Tambah Arus Kas Masuk/Keluar.
+  2. **Pembersihan & Penyesuaian Rekening Kas / Metode Pembayaran Sesuai Rekening Terdaftar**:
+     - Dihapus opsi `Transfer Bank Mandiri PT` secara menyeluruh dari seluruh form modal (Vendor Bill, Bayar Tagihan, PO, Faktur Penjualan, Arus Kas).
+     - Pada Modal Catat Tagihan Vendor (`isNewBillModalOpen`) dan Modal Pelunasan Tagihan Vendor (`isPayBillModalOpen`):
+       * Jika entitas adalah `NON_PT`: Rekening kas otomatis dibatasi dan diarahkan hanya ke rekening terdaftar Non-PT: `Bank BCA - 6520490131 (RAMADHANI ST)` dan `Kas Tunai Operasional`. Rekening PT dihilangkan 100%.
+       * Jika entitas adalah `PT`: Rekening kas otomatis diarahkan ke rekening terdaftar PT: `Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)` dan `Kas Tunai Operasional`.
+  3. **Backend Enforcing (`src/app/api/finance/route.ts`)**:
+     - Pada `POST /api/finance` (`actionType === "purchase"`): Jika terdapat `projectId`, backend otomatis memvalidasi ke daftar proyek dan memaksakan `businessEntity` dokumen mengikuti entitas proyek yang tersimpan di database.
+     - Pada `actionType === "pay_purchase_bill"`: Arus kas keluar (`cash_flow`) mencatat `sourceAccount` default sesuai entitas dokumen (`NON_PT` -> `Bank BCA - 6520490131 (RAMADHANI ST)`, `PT` -> `Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)`).
+  4. **Pengujian & Validasi Lokal**:
+     - `npx tsc --noEmit`: 0 error (lulus bersih).
+     - `npm run build`: Kompilasi sukses 76/76 static & dynamic pages tanpa error.
+
 - **2026-10-29**: [SELESAI] Penambahan Catatan Tagihan Vendor (Vendor Bills), Rekapitulasi Hutang Usaha Proyek, Tombol Catat Tagihan Vendor & Pelunasan Langsung pada Modal Detail Proyek (Tugas 299) (`src/app/admin/finance/page.tsx`).
   *Permintaan User*: "pada project tolong juga tambahkan catatan tagihan vendor"
   *Penyebab Masalah / Kebutuhan yang Diidentifikasi*:

@@ -2449,36 +2449,54 @@ export default function EmployeeDashboard() {
   const activeTask = tasks.find((t) => t.status === "In Progress") || tasks[0];
 
   // Today's attendance record (WIB Asia/Jakarta & pencocokan akun staf aktif)
-  const getWIBTodayDates = () => {
-    const list: string[] = [];
+  const getWIBTodayDate = (): string => {
     try {
-      const wib = new Intl.DateTimeFormat("en-CA", {
+      return new Intl.DateTimeFormat("en-CA", {
         timeZone: "Asia/Jakarta",
         year: "numeric",
         month: "2-digit",
         day: "2-digit",
       }).format(new Date());
-      list.push(wib);
-    } catch {}
-    const iso = new Date().toISOString().split("T")[0];
-    if (!list.includes(iso)) list.push(iso);
-    return list;
+    } catch {
+      const now = new Date();
+      const wibTime = new Date(now.getTime() + (7 * 60 + now.getTimezoneOffset()) * 60000);
+      return wibTime.toISOString().split("T")[0];
+    }
   };
 
-  const validEmployeeTodayDates = getWIBTodayDates();
+  const todayWIBDate = getWIBTodayDate();
   const currentEmpName = (currentUser?.name || "").trim().toLowerCase();
   const currentEmpEmail = (currentUser?.email || "").trim().toLowerCase();
 
-  const todayAttendance = attendanceLogs.find((a) => {
-    const matchDate = validEmployeeTodayDates.includes(a.date);
-    if (!matchDate) return false;
-    if (!currentEmpName && !currentEmpEmail) return true;
-    const aName = (a.employeeName || "").trim().toLowerCase();
-    const aEmail = (a.employeeEmail || "").trim().toLowerCase();
-    const matchName = currentEmpName && (aName === currentEmpName || aName.includes(currentEmpName) || currentEmpName.includes(aName));
-    const matchEmail = currentEmpEmail && aEmail && aEmail === currentEmpEmail;
-    return Boolean(matchName || matchEmail);
-  });
+  const todayAttendance = useMemo(() => {
+    if (!currentUser || (!currentEmpName && !currentEmpEmail)) {
+      return null;
+    }
+    return (
+      attendanceLogs.find((a) => {
+        // Hanya cocokkan catatan absensi yang TEPAT SAMA dengan tanggal hari ini di WIB (Asia/Jakarta)
+        if (a.date !== todayWIBDate) return false;
+
+        const aName = (a.employeeName || "").trim().toLowerCase();
+        const aEmail = (a.employeeEmail || "").trim().toLowerCase();
+
+        // 1. Pencocokan utama via Email jika tersedia
+        if (currentEmpEmail && aEmail) {
+          if (aEmail === currentEmpEmail) return true;
+        }
+
+        // 2. Pencocokan via Nama Lengkap (persis sama atau format terstandar)
+        if (currentEmpName && aName) {
+          if (aName === currentEmpName) return true;
+          const cleanCur = currentEmpName.replace(/[^a-z0-9]/g, "");
+          const cleanA = aName.replace(/[^a-z0-9]/g, "");
+          if (cleanCur && cleanA && cleanCur === cleanA) return true;
+        }
+
+        return false;
+      }) || null
+    );
+  }, [attendanceLogs, todayWIBDate, currentUser, currentEmpName, currentEmpEmail]);
 
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900">

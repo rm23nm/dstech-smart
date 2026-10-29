@@ -629,11 +629,34 @@ export default function AdminAttendancePage() {
     return Array.from(names).sort();
   }, [attendanceList, usersList]);
 
-  // Check today's presence for current superadmin
-  const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
+  // Check today's presence for current superadmin (Strict WIB Asia/Jakarta)
+  const todayStr = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Jakarta",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+    } catch {
+      const now = new Date();
+      const wibTime = new Date(now.getTime() + (7 * 60 + now.getTimezoneOffset()) * 60000);
+      return wibTime.toISOString().split("T")[0];
+    }
+  }, []);
+
   const myTodayAttendance = useMemo(() => {
-    return attendanceList.find(
-      (a) => a.date === todayStr && a.employeeName.toLowerCase().includes(currentUser.name.toLowerCase().split(" ")[0])
+    if (!currentUser?.name) return null;
+    const curName = currentUser.name.trim().toLowerCase();
+    const cleanCur = curName.replace(/[^a-z0-9]/g, "");
+
+    return (
+      attendanceList.find((a) => {
+        if (a.date !== todayStr) return false;
+        const aName = (a.employeeName || "").trim().toLowerCase();
+        const cleanA = aName.replace(/[^a-z0-9]/g, "");
+        return cleanA === cleanCur || aName === curName;
+      }) || null
     );
   }, [attendanceList, todayStr, currentUser.name]);
 
