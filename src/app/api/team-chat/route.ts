@@ -9,6 +9,7 @@ const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp
 const TASKS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_tasks.json");
 const REPORTS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_daily_reports.json");
 const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
+const ORDERS_FILE = path.join(process.cwd(), "src", "data", "dstech_orders.json");
 
 function readJsonSafe(filePath: string, fallback: any) {
   try {
@@ -500,6 +501,63 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: products.slice(0, 50), projectInfo });
     }
 
+    // 5. Lampirkan Pesanan & Status Pengiriman Toko DStech Smart
+    if (dataType === "orders") {
+      const ordersData = readJsonSafe(ORDERS_FILE, { orders: [] });
+      const rawOrders = Array.isArray(ordersData) ? ordersData : (Array.isArray(ordersData.orders) ? ordersData.orders : []);
+
+      let orders = rawOrders.map((o: any) => {
+        const statusMap: Record<string, string> = {
+          PENDING: "Menunggu Pembayaran",
+          BELUM_BAYAR: "Menunggu Pembayaran",
+          PAID: "Lunas / Terverifikasi",
+          MENUNGGU_KONFIRMASI: "Menunggu Konfirmasi Gudang",
+          PROCESSING: "Sedang Diproses Gudang",
+          DIPROSES: "Sedang Diproses",
+          SHIPPED: "Sedang Dikirim",
+          DIKIRIM: "Dalam Pengiriman",
+          DELIVERED: "Pesanan Diterima",
+          SELESAI: "Selesai",
+          CANCELLED: "Dibatalkan",
+          DIBATALKAN: "Dibatalkan"
+        };
+        const totalVal = o.total || o.grandTotal || 0;
+        return {
+          id: o.id,
+          orderNumber: o.orderNumber || o.id,
+          createdAt: o.createdAt || new Date().toISOString(),
+          customerName: o.customerName || o.shippingAddress?.recipientName || "Pelanggan",
+          customerPhone: o.customerPhone || o.shippingAddress?.phone || "-",
+          city: o.shippingAddress?.city || "-",
+          status: o.status || "PENDING",
+          friendlyStatus: statusMap[(o.status || "").toUpperCase()] || o.status || "Dalam Proses",
+          shippingCourier: o.shippingCourier || "Armada DSTech",
+          trackingNumber: o.trackingNumber || "",
+          total: totalVal,
+          totalFormatted: new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(totalVal),
+          items: (o.items || []).map((it: any) => ({
+            name: it.productName || it.name,
+            qty: it.qty || 1,
+            price: it.price || 0,
+            image: it.image || "/service-software.png"
+          }))
+        };
+      });
+
+      if (query) {
+        const qClean = query.toLowerCase();
+        const digits = query.replace(/\D/g, "");
+        orders = orders.filter((o: any) =>
+          o.orderNumber.toLowerCase().includes(qClean) ||
+          o.customerName.toLowerCase().includes(qClean) ||
+          o.shippingCourier.toLowerCase().includes(qClean) ||
+          o.trackingNumber.toLowerCase().includes(qClean) ||
+          (digits.length >= 4 && o.customerPhone.replace(/\D/g, "").includes(digits))
+        );
+      }
+      return NextResponse.json({ success: true, data: orders.slice(0, 50), projectInfo });
+    }
+
     return NextResponse.json({ success: false, error: "Tipe data perusahaan tidak valid" }, { status: 400 });
   }
 
@@ -594,6 +652,23 @@ export async function POST(request: Request) {
           }
         }
 
+        // Jika ada pesanan yang sedang dikonsultasikan/bermasalah, lampirkan kartu status pesanan otomatis
+        if (body.matchedOrder) {
+          const ord = body.matchedOrder;
+          messages.push({
+            id: `dstech_msg_${Date.now()}_ord_${ord.id || Math.random()}`,
+            chatId: chatObj.id,
+            senderId: resolvedClientId,
+            senderName: "Asisten AI Dani",
+            senderRole: "AI",
+            type: "order",
+            content: `📦 [Status Pesanan] ${ord.orderNumber} (${ord.friendlyStatus || ord.status})`,
+            orderData: ord,
+            timestamp: new Date().toISOString(),
+            readBy: [resolvedClientId],
+          });
+        }
+
         writeJsonSafe(MESSAGES_FILE, messages);
       }
 
@@ -655,10 +730,11 @@ export async function POST(request: Request) {
         reportData,
         projectData,
         productData,
+        orderData,
         callData,
       } = body;
 
-      if (!chatId || !senderId || (!content && !mediaUrl && !invoiceData && !taskData && !reportData && !projectData && !productData && !callData)) {
+      if (!chatId || !senderId || (!content && !mediaUrl && !invoiceData && !taskData && !reportData && !projectData && !productData && !orderData && !callData)) {
         return NextResponse.json({ success: false, error: "Parameter pesan tidak lengkap" }, { status: 400 });
       }
 
@@ -680,6 +756,7 @@ export async function POST(request: Request) {
         reportData: reportData || undefined,
         projectData: projectData || undefined,
         productData: productData || undefined,
+        orderData: orderData || undefined,
         callData: callData || undefined,
         timestamp: new Date().toISOString(),
         readBy: [senderId],
@@ -691,6 +768,7 @@ export async function POST(request: Request) {
       // Update ringkasan lastMessage di chat terkait
       let lastPreview = content || "";
       if (type === "invoice") lastPreview = `📑 [Invoice] ${invoiceData?.invoiceNumber || ""}`;
+      else if (type === "order") lastPreview = `📦 [Pesanan] ${orderData?.orderNumber || "Status Pesanan"}`;
       else if (type === "task") lastPreview = `📋 [SPK Penugasan] ${taskData?.title || ""}`;
       else if (type === "project_info") lastPreview = `📁 [Info Proyek] ${projectData?.projectName || ""}`;
       else if (type === "daily_report") lastPreview = `📸 [Bukti Pekerjaan] ${reportData?.taskTitle || ""}`;

@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 const SETTINGS_FILE = path.join(process.cwd(), "src", "data", "dstech_settings.json");
 const CRM_FILE = path.join(process.cwd(), "src", "data", "dstech_crm.json");
+const ORDERS_FILE = path.join(process.cwd(), "src", "data", "dstech_orders.json");
 
 function getSettings() {
   try {
@@ -20,6 +21,68 @@ function getSettings() {
     whatsappTechnical: "6282259494242",
     whatsappComplaint: "6282259494242"
   };
+}
+
+function getOrders(): any[] {
+  try {
+    if (fs.existsSync(ORDERS_FILE)) {
+      const data = JSON.parse(fs.readFileSync(ORDERS_FILE, "utf-8"));
+      return Array.isArray(data.orders) ? data.orders : [];
+    }
+  } catch (e) {}
+  return [];
+}
+
+function findOrderByQuery(query: string, visitorPhone?: string): any | null {
+  const orders = getOrders();
+  if (!orders || orders.length === 0) return null;
+  const qClean = query.trim().toLowerCase();
+  const digits = query.replace(/\D/g, "");
+  const visPhoneDigits = (visitorPhone || "").replace(/\D/g, "");
+
+  // 1. Coba match Order Number (misal: ORD/DST/202610/001 atau ORD-DST atau order_...)
+  const orderNumMatch = query.match(/ORD[\/\-_]?DST[\/\-_]?\d+[\/\-_]?\d+/i) || query.match(/order_\d+/i);
+  if (orderNumMatch) {
+    const rawTarget = orderNumMatch[0].toLowerCase().replace(/[\/\-_]/g, "");
+    const found = orders.find((o) => {
+      const oNum = (o.orderNumber || "").toLowerCase().replace(/[\/\-_]/g, "");
+      const oId = (o.id || "").toLowerCase().replace(/[\/\-_]/g, "");
+      return oNum.includes(rawTarget) || oId.includes(rawTarget) || rawTarget.includes(oNum);
+    });
+    if (found) return found;
+  }
+
+  // 2. Coba match Tracking / Resi Number
+  const foundByResi = orders.find((o) => {
+    if (!o.trackingNumber || !o.trackingNumber.trim()) return false;
+    const resi = o.trackingNumber.trim().toLowerCase();
+    return qClean.includes(resi) || resi.includes(qClean);
+  });
+  if (foundByResi) return foundByResi;
+
+  // 3. Coba match Nomor Telepon jika ada digit >= 9
+  if (digits.length >= 9) {
+    const foundByPhone = orders.find((o) => {
+      const p1 = (o.customerPhone || "").replace(/\D/g, "");
+      const p2 = (o.shippingAddress?.phone || "").replace(/\D/g, "");
+      return (p1 && (p1.includes(digits) || digits.includes(p1))) ||
+             (p2 && (p2.includes(digits) || digits.includes(p2)));
+    });
+    if (foundByPhone) return foundByPhone;
+  }
+
+  // 4. Jika visitorPhone ada dan pertanyaan menanyakan pesanan
+  if (visPhoneDigits.length >= 9) {
+    const foundByVisitorPhone = orders.find((o) => {
+      const p1 = (o.customerPhone || "").replace(/\D/g, "");
+      const p2 = (o.shippingAddress?.phone || "").replace(/\D/g, "");
+      return (p1 && (p1.includes(visPhoneDigits) || visPhoneDigits.includes(p1))) ||
+             (p2 && (p2.includes(visPhoneDigits) || visPhoneDigits.includes(p2)));
+    });
+    if (foundByVisitorPhone) return foundByVisitorPhone;
+  }
+
+  return null;
 }
 
 export async function POST(req: Request) {
@@ -301,43 +364,141 @@ export async function POST(req: Request) {
         };
 
       // ==========================================
-      // KASUS 4: PENGUNJUNG PUBLIK / CALON KLIEN (SALES CONSULTANT)
+      // KASUS 4: PENGUNJUNG PUBLIK / CALON KLIEN (SALES & ORDER TRACKING)
       // ==========================================
       } else {
-        let dept = "SALES";
-        let deptLabel = "Tim Support Sales & Penawaran";
-        let isReady = false;
+        const isOrderKeyword = /pesanan|order|resi|tracking|lacak|pengiriman|kirim|barang saya|sampai mana|belum sampai|status barang/i.test(lower);
+        const matchedOrder = findOrderByQuery(message, visitorInfo?.phone);
 
-        if (lower.includes("rusak") || lower.includes("mati") || lower.includes("kendala") || lower.includes("servis") || lower.includes("bantuan") || lower.includes("error") || lower.includes("macet") || lower.includes("teknisi")) {
-          dept = "TECHNICAL";
-          deptLabel = "Tim Teknikal Maintenance";
-          isReady = lower.includes("teknisi") || lower.includes("tolong") || lower.includes("segera");
-        } else if (lower.includes("komplain") || lower.includes("komplen") || lower.includes("retur") || lower.includes("refund") || lower.includes("pesanan") || lower.includes("salah kirim") || lower.includes("belum sampai")) {
-          dept = "COMPLAINT";
-          deptLabel = "Tim Penanganan Komplain";
-          isReady = lower.includes("pesanan") || lower.includes("retur") || lower.includes("komplain");
-        } else if (lower.includes("beli") || lower.includes("pasang") || lower.includes("harga") || lower.includes("sph") || lower.includes("penawaran") || lower.includes("cctv") || lower.includes("gate")) {
-          dept = "SALES";
-          deptLabel = "Tim Support Sales & Penawaran";
-          isReady = lower.includes("cilegon") || lower.includes("serang") || lower.includes("titik") || lower.includes("paket");
+        if (matchedOrder) {
+          const statusMap: Record<string, string> = {
+            PENDING: "Menunggu Pembayaran",
+            BELUM_BAYAR: "Menunggu Pembayaran Transfer",
+            PAID: "Lunas (Diverifikasi, Siap Dipacking)",
+            MENUNGGU_KONFIRMASI: "Lunas (Menunggu Konfirmasi Gudang)",
+            PROCESSING: "Sedang Diproses & Dipacking di Gudang Logistik",
+            DIPROSES: "Sedang Diproses di Gudang Logistik",
+            SHIPPED: "Sedang Dikirim Menuju Alamat Tujuan",
+            DIKIRIM: "Dalam Pengiriman",
+            DELIVERED: "Pesanan Telah Sampai / Diterima",
+            SELESAI: "Selesai & Diterima",
+            CANCELLED: "Dibatalkan",
+            DIBATALKAN: "Dibatalkan"
+          };
+          const friendlyStatus = statusMap[(matchedOrder.status || "").toUpperCase()] || matchedOrder.status || "Dalam Proses";
+          const courier = matchedOrder.shippingCourier || "Armada Ekspedisi DSTech";
+          const resi = matchedOrder.trackingNumber || "(Resi sedang disiapkan tim logistik)";
+          const totalVal = matchedOrder.total || matchedOrder.grandTotal || 0;
+          const totalFormatted = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(totalVal);
+          const itemsSummary = (matchedOrder.items || []).map((it: any) => `• ${it.productName || it.name} (${it.qty || 1}x)`).join("\n") || "Item pesanan DSTech Smart";
+          const recipient = matchedOrder.shippingAddress?.recipientName || matchedOrder.customerName || "Pelanggan";
+          const city = matchedOrder.shippingAddress?.city || "Kota Tujuan";
+
+          const hasTrouble = /rusak|pecah|salah kirim|lama|komplain|komplen|kendala|batal|belum sampai/i.test(lower);
+
+          const replyText = `Halo Kak ${recipient}! Berikut data pelacakan resmi pesanan Anda di DSTech Smart:\n\n` +
+            `📦 Nomor Pesanan: ${matchedOrder.orderNumber}\n` +
+            `📊 Status Pesanan: ${friendlyStatus}\n` +
+            `🚚 Ekspedisi: ${courier}\n` +
+            `🏷️ No. Resi: ${resi}\n` +
+            `📍 Kota Tujuan: ${city}\n` +
+            `💰 Total Nilai: ${totalFormatted}\n\n` +
+            `🛒 Rincian Barang:\n${itemsSummary}\n\n` +
+            (hasTrouble
+              ? `⚠️ Kami mendeteksi Anda mengalami kendala pada pesanan ini. Anda dapat langsung mengklik tombol "Hubungkan ke Tim Admin / CS" atau Panggilan Telepon di bawah agar tim kami segera membantu menyelesaikan kendala Anda!`
+              : `Pesanan Anda terpantau aman dalam sistem kami. Jika ada perubahan alamat, konfirmasi pengiriman, atau pertanyaan lainnya, silakan hubungkan langsung ke tim Admin/CS kami!`);
+
+          aiResponseData = {
+            reply: replyText,
+            department: hasTrouble ? "COMPLAINT" : "SALES",
+            department_label: hasTrouble ? "Tim Penanganan Komplain & Logistik" : "Tim Layanan Pelanggan & Logistik",
+            client_name: recipient,
+            client_phone: matchedOrder.customerPhone || matchedOrder.shippingAddress?.phone || visitorInfo?.phone || null,
+            ready_for_handover: hasTrouble || isOrderKeyword,
+            handover_reason: hasTrouble 
+              ? `Kendala pesanan ${matchedOrder.orderNumber}: ${message}` 
+              : `Konsultasi pesanan ${matchedOrder.orderNumber} (${friendlyStatus})`,
+            handover_summary: `Halo Admin/CS PT. DSTech Smart Perkasa,\nSaya ingin menanyakan pesanan [${matchedOrder.orderNumber}] atas nama ${recipient}.\nStatus: ${friendlyStatus}\nKeluhan/Pertanyaan: "${message}".\nMohon dibantu. Terima kasih!`,
+            matched_products: [],
+            matched_order: {
+              id: matchedOrder.id,
+              orderNumber: matchedOrder.orderNumber,
+              status: matchedOrder.status,
+              friendlyStatus,
+              shippingCourier: courier,
+              trackingNumber: matchedOrder.trackingNumber || "",
+              customerName: recipient,
+              customerPhone: matchedOrder.customerPhone || matchedOrder.shippingAddress?.phone || "",
+              city: city,
+              totalFormatted,
+              items: matchedOrder.items || []
+            },
+            quick_replies: [
+              hasTrouble ? "🚨 Komplain ke Admin/CS" : "💬 Tanya CS Pengiriman",
+              "📞 Panggilan Suara CS",
+              "📹 Panggilan Video CS",
+              "🛒 Belanja Produk Lain"
+            ]
+          };
+        } else if (isOrderKeyword) {
+          aiResponseData = {
+            reply: `Halo! Saya Dani, siap membantu mengecek status pesanan dan pengiriman Anda secara real-time. 📦🚚\n\n` +
+                   `Agar saya dapat mencarikan data pesanan Anda dengan akurat, silakan ketikkan:\n` +
+                   `• **Nomor Pesanan** Anda (contoh: *ORD/DST/202610/001*), atau\n` +
+                   `• **Nomor Resi Pengiriman**, atau\n` +
+                   `• **Nomor WhatsApp** yang Anda gunakan saat memesan.\n\n` +
+                   `Jika Anda mengalami kendala atau paket belum sampai, Anda juga bisa langsung klik tombol **"Hubungkan ke Tim Admin / CS"** di bawah!`,
+            department: "COMPLAINT",
+            department_label: "Tim Penanganan Komplain & Pengiriman",
+            client_name: visitorInfo?.name || null,
+            client_phone: visitorInfo?.phone || null,
+            ready_for_handover: true,
+            handover_reason: "Klien menanyakan status pesanan & pengiriman.",
+            handover_summary: `Halo Tim Admin / CS PT. DSTech Smart Perkasa,\nSaya ingin melacak pesanan saya via website mengenai: "${message}".\nMohon dibantu cek status pengiriman. Terima kasih!`,
+            matched_products: [],
+            quick_replies: [
+              "💬 Hubungkan ke Admin/CS",
+              "📞 Panggilan Suara CS",
+              "📹 Panggilan Video CS",
+              "🛒 Cek Toko Online"
+            ]
+          };
+        } else {
+          let dept = "SALES";
+          let deptLabel = "Tim Support Sales & Penawaran";
+          let isReady = false;
+
+          if (lower.includes("rusak") || lower.includes("mati") || lower.includes("kendala") || lower.includes("servis") || lower.includes("bantuan") || lower.includes("error") || lower.includes("macet") || lower.includes("teknisi")) {
+            dept = "TECHNICAL";
+            deptLabel = "Tim Teknikal Maintenance";
+            isReady = lower.includes("teknisi") || lower.includes("tolong") || lower.includes("segera");
+          } else if (lower.includes("komplain") || lower.includes("komplen") || lower.includes("retur") || lower.includes("refund") || lower.includes("pesanan") || lower.includes("salah kirim") || lower.includes("belum sampai")) {
+            dept = "COMPLAINT";
+            deptLabel = "Tim Penanganan Komplain";
+            isReady = lower.includes("pesanan") || lower.includes("retur") || lower.includes("komplain");
+          } else if (lower.includes("beli") || lower.includes("pasang") || lower.includes("harga") || lower.includes("sph") || lower.includes("penawaran") || lower.includes("cctv") || lower.includes("gate")) {
+            dept = "SALES";
+            deptLabel = "Tim Support Sales & Penawaran";
+            isReady = lower.includes("cilegon") || lower.includes("serang") || lower.includes("titik") || lower.includes("paket");
+          }
+
+          // Personalisasi berbasis geolokasi & halaman aktif pengunjung
+          const locText = visitorInfo?.city ? ` untuk area ${visitorInfo.city}${visitorInfo.region ? `, ${visitorInfo.region}` : ""}` : "";
+          const pageText = visitorInfo?.currentPath && visitorInfo.currentPath !== "/" ? ` (terkait halaman ${visitorInfo.currentPath})` : "";
+
+          aiResponseData = {
+            reply: `Halo! Saya Dani, Asisten Virtual AI PT. DSTech Smart Perkasa. Terkait kebutuhan Anda mengenai "${message}"${locText}${pageText}, kami siap membantu dengan solusi terbaik. Boleh kami tahu nama dan detail spesifik yang Anda butuhkan agar kami bisa siapkan rekomendasi terbaik?`,
+            department: dept,
+            department_label: deptLabel,
+            client_name: visitorInfo?.name || null,
+            client_phone: visitorInfo?.phone || null,
+            ready_for_handover: isReady,
+            handover_reason: isReady ? "Klien membutuhkan tindak lanjut langsung dari tim terkait." : null,
+            handover_summary: `Halo ${deptLabel} PT. DSTech Smart Perkasa,\nSaya ingin konsultasi lanjutan mengenai: "${message}".\n[Info Pengunjung: Kota ${visitorInfo?.city || "Indonesia"}, Halaman: ${visitorInfo?.currentPath || "/"}]\nMohon dibantu. Terima kasih!`,
+            matched_products: [],
+            quick_replies: ["📹 Rekomendasi Paket CCTV", "🚪 Solusi Smart Home", "🚧 Barrier Gate Otomatis", "🛠️ Bantuan Servis Teknis"]
+          };
         }
-
-        // Personalisasi berbasis geolokasi & halaman aktif pengunjung
-        const locText = visitorInfo?.city ? ` untuk area ${visitorInfo.city}${visitorInfo.region ? `, ${visitorInfo.region}` : ""}` : "";
-        const pageText = visitorInfo?.currentPath && visitorInfo.currentPath !== "/" ? ` (terkait halaman ${visitorInfo.currentPath})` : "";
-
-        aiResponseData = {
-          reply: `Halo! Saya Dani, Asisten Virtual AI PT. DSTech Smart Perkasa. Terkait kebutuhan Anda mengenai "${message}"${locText}${pageText}, kami siap membantu dengan solusi terbaik. Boleh kami tahu nama dan detail spesifik yang Anda butuhkan agar kami bisa siapkan rekomendasi terbaik?`,
-          department: dept,
-          department_label: deptLabel,
-          client_name: visitorInfo?.name || null,
-          client_phone: visitorInfo?.phone || null,
-          ready_for_handover: isReady,
-          handover_reason: isReady ? "Klien membutuhkan tindak lanjut langsung dari tim terkait." : null,
-          handover_summary: `Halo ${deptLabel} PT. DSTech Smart Perkasa,\nSaya ingin konsultasi lanjutan mengenai: "${message}".\n[Info Pengunjung: Kota ${visitorInfo?.city || "Indonesia"}, Halaman: ${visitorInfo?.currentPath || "/"}]\nMohon dibantu. Terima kasih!`,
-          matched_products: [],
-          quick_replies: ["📹 Rekomendasi Paket CCTV", "🚪 Solusi Smart Home", "🚧 Barrier Gate Otomatis", "🛠️ Bantuan Servis Teknis"]
-        };
       }
     }
 
