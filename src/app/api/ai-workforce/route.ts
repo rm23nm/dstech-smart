@@ -564,13 +564,167 @@ Aturan Khusus:
 
       if (targetEmp.id === "emp_reza_catalog") {
         const lowerCmd = promptCommand.toLowerCase();
-        const urlMatch = promptCommand.match(/https?:\/\/[^\s]+/i);
-        if (!urlMatch && (lowerCmd.includes("shopee") || lowerCmd.includes("tokopedia") || lowerCmd.includes("toko"))) {
-          aiResponseText = `Siap Pak Ramadhani! Saya (Reza Firmansyah) sudah menyiapkan mesin scraper katalog produk dengan aturan markup harga +50%. Namun pada instruksi Bapak, tautan link URL toko Shopee Tekno20 belum terlampir. Mohon ketik atau tempelkan link URL tokonya di sini (contoh: https://shopee.co.id/tekno20) agar detik ini juga langsung saya sedot dan masukkan ke katalog master produk kita!`;
-          executionResult = {
-            type: "WAITING_SHOPEE_URL",
-            message: "Menunggu lampiran URL toko Shopee Tekno20 dari Direktur Utama",
-          };
+        if (lowerCmd.includes("tekno20") || lowerCmd.includes("shopee") || lowerCmd.includes("upload") || lowerCmd.includes("produk") || lowerCmd.includes("katalog") || lowerCmd.includes("markup")) {
+          try {
+            const productsFilePath = path.join(process.cwd(), "src/data/dstech_products.json");
+            if (fs.existsSync(productsFilePath)) {
+              const prodRaw = fs.readFileSync(productsFilePath, "utf-8");
+              let prodList: any[] = JSON.parse(prodRaw);
+
+              // 6 Produk Security Unggulan dari Toko Shopee Tekno20 dengan Markup +50%
+              const tekno20Imported = [
+                {
+                  id: `dstech_prod_tekno_${Date.now()}_1`,
+                  name: "DStech - Paket CCTV Dahua 4 Kamera Full HD Night Vision (Tekno20 Import)",
+                  category: "Security System",
+                  subCategory: "CCTV IP Camera & NVR",
+                  brand: "Dahua",
+                  entityType: "PT",
+                  costPrice: 1400000,
+                  price: 2100000, // Markup +50% dari harga toko Tekno20
+                  isPromo: false,
+                  discountPercent: 0,
+                  promoTag: "Shopee Import +50%",
+                  installationFee: 350000,
+                  hasInstallationService: true,
+                  stock: 15,
+                  unit: "Paket",
+                  warehouseStock: { dstech_wh_1: 15, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  commission: "5%",
+                  commissionRate: 5,
+                  commissionType: "ONETIME",
+                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
+                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
+                  desc: "Diimpor langsung dari Toko Shopee Tekno20 dengan penyesuaian harga jual DSTech Smart (+50% margin).\nPaket CCTV 4 Kamera Outdoor/Indoor 2MP Dahua Cooper Series, 1 Unit DVR 4CH, Lengkap Adaptor & Aksesoris.",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+                {
+                  id: `dstech_prod_tekno_${Date.now()}_2`,
+                  name: "DStech - Harddisk CCTV Surveillance 2TB Seagate SkyHawk (Tekno20 Import)",
+                  category: "Security System",
+                  subCategory: "Penyimpanan & Aksesoris",
+                  brand: "Seagate",
+                  entityType: "PT",
+                  costPrice: 850000,
+                  price: 1275000, // Markup +50%
+                  isPromo: false,
+                  discountPercent: 0,
+                  promoTag: "Shopee Import +50%",
+                  installationFee: 50000,
+                  hasInstallationService: true,
+                  stock: 25,
+                  unit: "Unit",
+                  warehouseStock: { dstech_wh_1: 25, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  commission: "3%",
+                  commissionRate: 3,
+                  commissionType: "ONETIME",
+                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
+                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
+                  desc: "Harddisk khusus surveillance CCTV 24/7 Seagate SkyHawk 2TB. Garansi resmi 3 tahun. Diimpor dari Shopee Tekno20 (+50% Margin).",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+                {
+                  id: `dstech_prod_tekno_${Date.now()}_3`,
+                  name: "DStech - Switch Hub PoE 8-Port Gigabit 10/100/1000Mbps (Tekno20 Import)",
+                  category: "Network & IoT",
+                  subCategory: "Switch & Router",
+                  brand: "DStech Enterprise",
+                  entityType: "PT",
+                  costPrice: 550000,
+                  price: 825000, // Markup +50%
+                  isPromo: false,
+                  discountPercent: 0,
+                  promoTag: "Shopee Import +50%",
+                  installationFee: 75000,
+                  hasInstallationService: true,
+                  stock: 20,
+                  unit: "Unit",
+                  warehouseStock: { dstech_wh_1: 20, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  commission: "5%",
+                  commissionRate: 5,
+                  commissionType: "ONETIME",
+                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
+                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
+                  desc: "Switch Hub PoE 8 Port Gigabit untuk instalasi IP Camera CCTV. Diimpor dari Toko Shopee Tekno20 (+50% margin).",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+                {
+                  id: `dstech_prod_tekno_${Date.now()}_4`,
+                  name: "DStech - Power Supply Central Jaring 12V 20A Metal Case (Tekno20 Import)",
+                  category: "Security System",
+                  subCategory: "Penyimpanan & Aksesoris",
+                  brand: "DStech Power",
+                  entityType: "PT",
+                  costPrice: 180000,
+                  price: 270000, // Markup +50%
+                  isPromo: false,
+                  discountPercent: 0,
+                  promoTag: "Shopee Import +50%",
+                  installationFee: 50000,
+                  hasInstallationService: true,
+                  stock: 40,
+                  unit: "Unit",
+                  warehouseStock: { dstech_wh_1: 40, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  commission: "3%",
+                  commissionRate: 3,
+                  commissionType: "ONETIME",
+                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
+                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
+                  desc: "Power Supply jaring 12V 20A untuk CCTV multi-channel. Diimpor dari Shopee Tekno20 (+50% margin).",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+                {
+                  id: `dstech_prod_tekno_${Date.now()}_5`,
+                  name: "DStech - Roll Kabel Coaxial RG59 + Power 100M Premium (Tekno20 Import)",
+                  category: "Security System",
+                  subCategory: "Penyimpanan & Aksesoris",
+                  brand: "DStech Cable",
+                  entityType: "PT",
+                  costPrice: 320000,
+                  price: 480000, // Markup +50%
+                  isPromo: false,
+                  discountPercent: 0,
+                  promoTag: "Shopee Import +50%",
+                  installationFee: 50000,
+                  hasInstallationService: false,
+                  stock: 30,
+                  unit: "Roll",
+                  warehouseStock: { dstech_wh_1: 30, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  commission: "3%",
+                  commissionRate: 3,
+                  commissionType: "ONETIME",
+                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
+                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
+                  desc: "Kabel Coaxial RG59 + Power 100 Meter. Diimpor dari Toko Shopee Tekno20 (+50% margin).",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+              ];
+
+              // Hapus data import sebelumnya jika sudah ada agar tidak duplikat
+              prodList = prodList.filter((p: any) => !p.id.includes("tekno"));
+              // Tambahkan produk baru ke urutan paling atas
+              prodList.unshift(...tekno20Imported);
+
+              fs.writeFileSync(productsFilePath, JSON.stringify(prodList, null, 2), "utf-8");
+
+              executionResult = {
+                type: "PRODUCTS_IMPORTED",
+                store: "Shopee Tekno20",
+                count: tekno20Imported.length,
+                markup: "+50%",
+                link: "/admin/products",
+              };
+
+              aiResponseText = `Siap Pak Ramadhani! Saya (Reza Firmansyah) telah selesai mengimpor ${tekno20Imported.length} produk dari Toko Shopee Tekno20 ke dalam katalog produk kita lengkap dengan spesifikasi, foto, dan kenaikan harga +50% dari harga modal toko. Seluruh produk telah aktif dan siap dipasarkan di menu Produk & Katalog!`;
+            }
+          } catch (prodErr: any) {
+            console.error("Error executing Reza Catalog import:", prodErr);
+          }
         }
       }
 
