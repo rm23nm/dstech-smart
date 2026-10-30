@@ -35,6 +35,7 @@ import {
   Video,
   MessageSquare,
   Sparkles,
+  Building2,
 } from "lucide-react";
 import { checkUserPermission } from "@/utils/dstech_permissions";
 import GlobalCallListener from "@/components/GlobalCallListener";
@@ -220,6 +221,13 @@ export default function AdminLayout({
       href: "/admin",
       icon: LayoutDashboard,
       active: pathname === "/admin",
+    },
+    {
+      id: "virtual-office",
+      label: "🏢 Kantor Virtual AI",
+      href: "/admin/virtual-office",
+      icon: Building2,
+      active: pathname.startsWith("/admin/virtual-office"),
     },
     {
       id: "finance",
