@@ -4,6 +4,25 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 309 (2026-10-30)**: [SEDANG DIKERJAKAN] Tindak Lanjut Nyata Perintah Eksekutif Direktur: Pembuatan Otomatis SPH Paket CCTV 4 Kamera untuk PT Purna Jual Baru & Engine Eksekusi Aksi Nyata Karyawan AI (`/admin/virtual-office` & `/admin/finance`).
+  *Permintaan User*: "saya sudah memberikan 2 perintah, namun kenapa tidak ada tindak lanjut dari permintaan saya, padahal sudah diterima perintahnya."
+  *Analisis Permasalahan*:
+  1. User memberikan 2 instruksi di Kantor Virtual:
+     - Ke Dewi Sartika (Finance): *"buatkan saya sebuah penawaran paket instalasi CCTV 4 kamera untuk pt purna jual baru"*
+     - Ke Reza Firmansyah (Catalog): *"tolong kamu upload seluruh produk yang ada ditoko Tekno20 shopee ini kedalam daftar produk kita lengkap dengan harga dan gambarnya serta deskripsinya. link tokonya ada disini, kamu naikkan harganya 50% dari harga mereka"*
+  2. Masalah yang terjadi: Sebelumnya modul AI workforce hanya menghasilkan respons percakapan teks / balon dialog konfirmasi dan mencatat status di log, namun belum memiliki *Autonomous Action Execution Engine* yang benar-benar memproses pembuatan data fisik draft SPH di ERP Keuangan atau scraper impor katalog produk.
+  3. Pada perintah kedua, link spesifik toko Shopee belum disertakan oleh user (hanya teks *"link tokonya ada disini"*), sehingga butuh input tautan spesifik toko atau opsi upload katalog.
+  *Rencana Langkah Pengerjaan Step-by-Step*:
+  1. [ ] Menerbitkan dokumen Surat Penawaran Harga (SPH) resmi lengkap untuk PT Purna Jual Baru (Paket CCTV 4 Kamera HD, DVR, Harddisk 1TB, Power Supply, Kabel & Jasa Instalasi Online) di modul ERP Keuangan (`src/data/dstech_finance_erp.json`) dengan opsi PPN Exclude.
+  2. [ ] Menambahkan *Action Execution Engine* pada `src/app/api/ai-workforce/route.ts` sehingga ketika Direktur meminta penawaran SPH, AI secara otomatis memparsing rincian dan menerbitkan draf SPH resmi ke database finance ERP serta mengembalikan link dokumen langsung ke layar.
+  3. [ ] Meminta input URL spesifik toko Shopee Tekno20 kepada user atau menyediakan template import produk dengan markup +50% otomatis untuk Reza Firmansyah.
+  4. [ ] Membuat folder cadangan sebelum mengedit berkas.
+  5. [ ] Memvalidasi tipe data TypeScript dengan `npx tsc --noEmit`.
+  6. [ ] Menguji kompilasi produksi dengan `npm run build`.
+  7. [ ] Membersihkan folder cadangan setelah verifikasi sukses.
+  8. [ ] Mengunggah dan men-deploy ke live server VPS 157.66.34.199.
+  9. [ ] Memperbarui `LAPORAN_PROGRES.md` menandai Tugas 309 sebagai `[SELESAI]`.
+
 - **Tugas 308 (2026-10-30)**: [SELESAI] Pembangunan Dunia Fisik Kantor Virtual 3D Realistis & Simulasi Karyawan AI Bergerak Dinamis Menggunakan Three.js (`/admin/virtual-office`).
   *Permintaan User*: "tampilannya hanya seperti ini, tidak seperti kantor yang kita harapkan dan saya ceritakan sebelumnya. tidak ada anmasi 3d sama sekali"
   *Penyebab & Analisis Kebutuhan*:

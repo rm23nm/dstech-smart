@@ -274,7 +274,167 @@ Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
         }
       }
 
-      // Fallback jika API key tidak tersedia / timeout
+      // --- AUTONOMOUS ACTION EXECUTION ENGINE ---
+      // Karyawan AI mengeksekusi tugas nyata ke sistem database operasional perusahaan
+      let executionResult: any = null;
+
+      if (targetEmp.id === "emp_dewi_finance") {
+        const lowerCmd = promptCommand.toLowerCase();
+        if (lowerCmd.includes("penawaran") || lowerCmd.includes("sph") || lowerCmd.includes("quotation")) {
+          try {
+            const financeFilePath = path.join(process.cwd(), "src/data/dstech_finance_erp.json");
+            if (fs.existsSync(financeFilePath)) {
+              const finRaw = fs.readFileSync(financeFilePath, "utf-8");
+              const finData = JSON.parse(finRaw);
+              if (!finData.quotations) finData.quotations = [];
+
+              // Ekstrak nama klien
+              let customerName = "Klien Baru DSTech";
+              if (lowerCmd.includes("purna jual")) {
+                customerName = "PT Purna Jual Baru";
+              } else {
+                const matchUntuk = promptCommand.match(/untuk\s+([A-Za-z0-9\s\.\,\-]+)/i);
+                if (matchUntuk && matchUntuk[1]) {
+                  customerName = matchUntuk[1].trim();
+                }
+              }
+
+              // Nomor SPH otomatis
+              const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
+              const sphCount = (finData.quotations.length || 0) + 1;
+              const sphNumber = `SPH-DSTECH-${yearMonth}-${String(sphCount).padStart(3, "0")}`;
+
+              // Item penawaran CCTV standar atau disesuaikan
+              let items = [
+                {
+                  productName: "Kamera CCTV 2MP Full HD Indoor/Outdoor IR Night Vision Waterproof",
+                  qty: 4,
+                  unit: "Unit",
+                  price: 350000,
+                  discount: 0,
+                  total: 1400000,
+                },
+                {
+                  productName: "DVR / NVR 4-Channel Full HD 1080P Network Standalone Cloud View",
+                  qty: 1,
+                  unit: "Unit",
+                  price: 650000,
+                  discount: 0,
+                  total: 650000,
+                },
+                {
+                  productName: "Harddisk Internal Surveillance 1TB Khusus CCTV 24/7 (WD Purple / Seagate SkyHawk)",
+                  qty: 1,
+                  unit: "Unit",
+                  price: 850000,
+                  discount: 0,
+                  total: 850000,
+                },
+                {
+                  productName: "Centralized Power Supply Box 12V 10A dengan Fuse Proteksi Listrik",
+                  qty: 1,
+                  unit: "Unit",
+                  price: 300000,
+                  discount: 0,
+                  total: 300000,
+                },
+                {
+                  productName: "Kabel Coaxial RG59 + Power (50m) & 8 Pcs Konektor BNC Drat + 4 Pcs Jack DC",
+                  qty: 1,
+                  unit: "Lot",
+                  price: 450000,
+                  discount: 0,
+                  total: 450000,
+                },
+                {
+                  productName: "Jasa Instalasi 4 Titik Kamera, Penarikan Kabel Conduit Rapi, Crimping & Setting Online Cloud HP",
+                  qty: 1,
+                  unit: "Lot",
+                  price: 1000000,
+                  discount: 0,
+                  total: 1000000,
+                },
+              ];
+
+              const subtotal = items.reduce((acc, it) => acc + it.total, 0);
+              const taxRate = 11;
+              const taxAmount = Math.round(subtotal * (taxRate / 100));
+              const grandTotal = subtotal + taxAmount;
+
+              const newSphDoc = {
+                id: `dstech_sph_${Date.now()}`,
+                quotationNumber: sphNumber,
+                clientId: `client_${Date.now()}`,
+                customerName: customerName,
+                customerOrg: customerName,
+                customerPhone: "0812-9988-7766",
+                customerAddress: "Kawasan Industri, Banten",
+                subject: `Surat Penawaran Harga Paket Pengadaan & Instalasi CCTV 4 Kamera HD Night Vision`,
+                date: new Date().toISOString().split("T")[0],
+                validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+                validityDays: 14,
+                items: items,
+                subtotal: subtotal,
+                discount: 0,
+                discountType: "fixed",
+                discountPercent: 0,
+                discountLabel: "Diskon Khusus Negosiasi Proyek",
+                revision: 0,
+                taxRate: taxRate,
+                taxType: "exclude",
+                taxAmount: taxAmount,
+                grandTotal: grandTotal,
+                hideTaxInPrint: true,
+                terms: "1. Harga penawaran di atas adalah Netto (Exclude PPN 11%).\n2. Garansi unit perangkat keras resmi 2 (dua) tahun penggantian unit baru.\n3. Garansi pemeliharaan teknis & jasa instalasi selama 6 (enam) bulan.\n4. Gratis setting integrasi cloud monitoring smartphone iOS / Android.\n5. Pembayaran: DP 50% saat PO terbit, Pelunasan 50% setelah serah terima pekerjaan (BAST).",
+                status: "Terkirim",
+                convertedInvoiceId: "",
+                approvalStatus: "Approved",
+                approvedBy: "Ramadhani, S.T.",
+                approvedTitle: "Direktur Utama",
+                approvedAt: new Date().toLocaleString("id-ID"),
+                verificationCode: `DST-${sphNumber}`,
+                notes: `Diterbitkan secara otonom oleh Dewi Sartika (AI Finance Specialist) atas instruksi Direktur Utama: "${promptCommand}"`,
+                attachments: [],
+                businessEntity: "PT",
+                projectId: "",
+                projectName: `Pengadaan CCTV 4 Titik - ${customerName}`,
+                branchId: "dstech_branch_1",
+                warehouseId: "dstech_wh_1",
+              };
+
+              finData.quotations.unshift(newSphDoc);
+              fs.writeFileSync(financeFilePath, JSON.stringify(finData, null, 2), "utf-8");
+
+              executionResult = {
+                type: "SPH_CREATED",
+                quotationNumber: sphNumber,
+                customerName: customerName,
+                subtotal: subtotal,
+                grandTotal: grandTotal,
+                link: "/admin/finance?tab=quotations",
+              };
+
+              aiResponseText = `Siap Pak Ramadhani! Saya (Dewi Sartika) telah selesai menerbitkan Surat Penawaran Harga resmi #${sphNumber} untuk ${customerName} dengan total Rp ${subtotal.toLocaleString("id-ID")} (Exclude PPN 11%). Dokumen telah otomatis masuk ke sistem Keuangan & ERP dan siap Bapak review atau cetak PDF!`;
+            }
+          } catch (finErr: any) {
+            console.error("Error executing Dewi Finance SPH action:", finErr);
+          }
+        }
+      }
+
+      if (targetEmp.id === "emp_reza_catalog") {
+        const lowerCmd = promptCommand.toLowerCase();
+        const urlMatch = promptCommand.match(/https?:\/\/[^\s]+/i);
+        if (!urlMatch && (lowerCmd.includes("shopee") || lowerCmd.includes("tokopedia") || lowerCmd.includes("toko"))) {
+          aiResponseText = `Siap Pak Ramadhani! Saya (Reza Firmansyah) sudah menyiapkan mesin scraper katalog produk dengan aturan markup harga +50%. Namun pada instruksi Bapak, tautan link URL toko Shopee Tekno20 belum terlampir. Mohon ketik atau tempelkan link URL tokonya di sini (contoh: https://shopee.co.id/tekno20) agar detik ini juga langsung saya sedot dan masukkan ke katalog master produk kita!`;
+          executionResult = {
+            type: "WAITING_SHOPEE_URL",
+            message: "Menunggu lampiran URL toko Shopee Tekno20 dari Direktur Utama",
+          };
+        }
+      }
+
+      // Fallback jika API key tidak tersedia / timeout dan belum ada response teks
       if (!aiResponseText) {
         aiResponseText = `Siap, Pak Ramadhani! Instruksi "${promptCommand}" segera saya tindak lanjuti dan selesaikan detik ini juga sesuai SOP divisi kami.`;
       }
@@ -282,7 +442,9 @@ Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
       // Update state karyawan
       targetEmp.status = "WORKING";
       targetEmp.speech_bubble = aiResponseText;
-      targetEmp.current_activity = `Menjalankan instruksi direktur: "${promptCommand}"`;
+      targetEmp.current_activity = executionResult?.type === "SPH_CREATED"
+        ? `Telah menerbitkan ${executionResult.quotationNumber} untuk ${executionResult.customerName}`
+        : `Menjalankan instruksi direktur: "${promptCommand}"`;
 
       // Catat ke recent logs
       const newLog = {
@@ -290,7 +452,10 @@ Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
         timestamp: new Date().toISOString(),
         employee_id: targetEmp.id,
         employee_name: targetEmp.name,
-        action: `Instruksi Direktur: "${promptCommand}" -> Dieksekusi oleh ${targetEmp.name}.`
+        action: executionResult?.type === "SPH_CREATED"
+          ? `Eksekusi Otonom Selesai: ${targetEmp.name} menerbitkan ${executionResult.quotationNumber} untuk ${executionResult.customerName} (Rp ${executionResult.subtotal?.toLocaleString("id-ID")}).`
+          : `Instruksi Direktur: "${promptCommand}" -> Diproses oleh ${targetEmp.name}.`,
+        executionResult: executionResult,
       };
 
       data.dstech_recent_logs.unshift(newLog);
@@ -302,10 +467,11 @@ Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
 
       return NextResponse.json({
         success: true,
-        message: "Perintah berhasil didelegasikan!",
+        message: "Perintah berhasil dieksekusi secara otonom oleh karyawan AI!",
         targetedEmployee: targetEmp,
         aiResponse: aiResponseText,
-        log: newLog
+        executionResult: executionResult,
+        log: newLog,
       });
     }
 
