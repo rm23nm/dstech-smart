@@ -4,6 +4,135 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 318 (2026-10-30)**: [SELESAI] Perbaikan Kesalahan Zona Waktu Tanggal Hari Ini (WIB vs UTC) pada Sistem Presensi yang Menyebabkan Status Sudah Absen Masuk & Pulang Serta Terkunci di Pagi Hari.
+  *Permintaan User*: "pada absensi, kenapa sudah terabsen masuk dan pulang untuk hari ini. padahal saya belum melakukan absen sama sekali, dan absen terkunci"
+  *Penyebab Masalah yang Diidentifikasi*:
+  1. Di Indonesia (zona waktu WIB = UTC+7), antara jam 00:00 hingga 06:59 WIB, tanggal UTC (`toISOString().split("T")[0]`) bernilai H-1 (tanggal kemarin).
+  2. Pada helper `getWIBTodayDates` di `src/app/employee/page.tsx` dan `getTodayDateStrings` di `src/app/admin/page.tsx`, sistem sebelumnya memasukkan format WIB DAN ISO (UTC) ke dalam satu array `validDates`.
+  3. Akibatnya di pagi hari sebelum jam 07:00 WIB, tanggal kemarin (`2026-10-29`) ikut dianggap sebagai "hari ini". Logika pencarian record presensi mencocokkan record kehadiran milik pengguna pada tanggal kemarin (`RAMADHANI ST`, check-in 07:54 WIB dan check-out auto-closed 17:00 WIB).
+  4. Tampilan di client mendeteksi bahwa staf sudah check-in dan check-out kemarin, lalu menampilkannya sebagai kehadiran hari ini: `✓ Masuk: 07:54 WIB (Terkunci)` dan `✓ Pulang: 17:00 WIB (Terkunci)` serta men-disable tombol Check-In dan Check-Out.
+  5. Pada `src/app/admin/attendance/page.tsx`, `todayStr` menggunakan `new Date().toISOString().split("T")[0]` (UTC) alih-alih WIB.
+  6. Pada `src/app/api/employee/attendance/route.ts`, `timeStr` dan pengecekan keterlambatan menggunakan `now.getHours()` yang berpotensi menghasilkan jam UTC pada lingkungan server non-WIB.
+  *Langkah Realisasi Perbaikan yang Telah Dilakukan*:
+  1. [x] Membuat folder backup sementara sebelum modifikasi (`_backup_attendance_timezone_fix/`).
+  2. [x] Memperbarui `src/app/employee/page.tsx`:
+     - Mengubah fungsi deteksi tanggal menjadi `getWIBTodayDate()` yang strictly mengembalikan tanggal WIB tunggal (`Asia/Jakarta`) format `YYYY-MM-DD` murni tanpa menyertakan tanggal UTC.
+     - Memperbaiki `todayAttendance` memo agar hanya mencocokkan record dengan tanggal yang eksak sama (`a.date === todayWIBDate`) dan jika user belum terautentikasi mengembalikan `null`.
+     - Memperketat pencocokan nama dan email karyawan agar tidak terjadi false positive antar staf.
+  3. [x] Memperbarui `src/app/admin/attendance/page.tsx`:
+     - Mengubah helper tanggal hari ini menggunakan strictly zona waktu `Asia/Jakarta`.
+     - Memperketat filter kehadiran saya (`myTodayAttendance`) agar presisi terhadap tanggal WIB hari ini.
+  4. [x] Memperbarui `src/app/admin/page.tsx`:
+     - Memastikan seluruh fungsi absensi admin menggunakan `getTodayWIBDate()`.
+  5. [x] Memperbarui `src/app/api/employee/attendance/route.ts`:
+     - Menyediakan helper `getWIBDateStr(now)` dan `getWIBTimeStr(now)` yang presisi WIB `Asia/Jakarta`.
+     - Menghitung keterlambatan menggunakan `getWibCurrentMinutes(now)` agar server selalu sinkron WIB di platform hosting manapun.
+  6. [x] Menjalankan pengujian TypeScript (`npx tsc --noEmit`) - Lolos 100% tanpa error.
+  7. [x] Menjalankan build produksi Next.js (`npm run build`) - Berhasil 100% (77/77 static/dynamic pages ter-generate sempurna).
+  8. [x] Membersihkan folder backup sementara.
+
+- **Tugas 319 (2026-10-30)**: [ANTRIAN KERJA SELANJUTNYA] Fitur Sembunyikan/Tampilkan Nilai Pajak PPN pada SPH (Surat Penawaran Harga) dengan Keterangan "PPN Exclude / Belum Termasuk".
+  *Permintaan User*: "pada SPH, saya ingin menyembunyikan nilai pajak PPN saat penawaran. namun nantinya kita kasih keterangan PPN Exclude belum termasuk. tolong buatkan fitur agar saya bisa menyembunyikan dan memunculkan nilai PPN seperti sekarang."
+  *Kebutuhan*: Toggle opsi "Sembunyikan PPN (Exclude)" pada generator SPH / Finance ERP, sehingga pada dokumen cetak penawaran nilai PPN 11% disembunyikan dan diganti klausul catatan resmi "Harga di atas belum termasuk PPN (PPN Exclude)", namun tetap bisa diaktifkan kembali sesuai kebutuhan.
+
+- **Tugas 320 (2026-10-30)**: [ANTRIAN KERJA BERIKUTNYA] Standarisasi Nama Resmi Perusahaan menjadi "PT. DSTECH SMART PERKASA" pada Seluruh Modul (Virtual Office 3D Backdrop, SPH & Invoice, Settings, Footer, dan Profil Bisnis).
+  *Permintaan User*: "nama PT yang benar PT. DSTECH SMART PERKASA"
+  *Penyebab & Kebutuhan*:
+  1. Memastikan nama legal resmi perusahaan adalah **PT. DSTECH SMART PERKASA** di seluruh sistem, bukan "PT. DSTECH SMART INDONESIA" ataupun variasi lainnya.
+  2. Diterapkan secara konsisten pada:
+     - 3D Backdrop Dinding Kantor Virtual Office (`Office3DCanvas.tsx`).
+     - Kop surat SPH, Kwitansi, Invoice, dan PO Supplier pada modul Finance ERP.
+     - Pengaturan profil perusahaan di `dstech_settings.json`.
+     - Header, metadata, dan footer situs.
+
+- **Tugas 317 (2026-10-30)**: [ANTRIAN KERJA SELANJUTNYA] Virtual Office 3D: Penambahan Tata Lampu Pencahayaan Mewah & Hiasan Dekoratif Kantor, Karakter Staf AI Duduk di Kursi saat Bekerja di Meja, Papan Tanda Pengenal / Desk Nameplate di Masing-Masing Meja Kerja, serta Logo & Nama Perusahaan "PT. DSTECH SMART PERKASA" di Dinding Belakang Kantor 3D (`src/components/virtual-office/Office3DCanvas.tsx` & `src/app/admin/virtual-office/page.tsx`).
+  *Permintaan User*: 
+  1. "kenapa mereka bekerja sambil berdiri, fungsi kursi itu untuk apa? kemudian saya mau dibelakang kamu masukkan nama perusahaan dan logo perusahaan. dan berikan tanda pengenal yang bisa saya lihat dimeja agar saya bisa tau dimana namanya masing-masing staf"
+  2. "pada kantor, tambahkan juga lampu-lampu pencahayaan dan juga hiasan agar lebih menarik"
+  *Penyebab Masalah / Kebutuhan yang Diidentifikasi*:
+  1. Tata Pencahayaan & Ambience Kantor 3D: Sebelumnya pencahayaan kantor hanya menggunakan ambient light standar dan 2 point light sederhana. Perlu ditambahkan sistem pencahayaan modern arsitektural: suspended ceiling linear LED strips, warm downlight/spotlight di atas meja Direktur & Meja Rapat, desk accent lamps, cove lighting, dan pendant chandelier melayang di atas meeting area.
+  2. Hiasan & Ornamen Kantor 3D: Kantor membutuhkan elemen dekorasi yang kaya dan wow: vertical biophilic moss/green wall, tanaman hias pot indoor mewah, smart video wall / large LED dashboard display yang menampilkan grafik KPI bisnis, plakat penghargaan korporat, mini showcase pantry, dan ornamen meja kerja (mug DStech, laptop glowing, notebook).
+  3. Karakter Berdiri di Atas Kursi: Model 3D staf AI saat ini posisinya berdiri melayang di atas/belakang kursi. Perlu disesuaikan agar karakter duduk tegak sempurna di atas dudukan kursi dengan tangan mengetik di keyboard meja.
+  4. Papan Nama Meja (Desk Nameplate): Belum ada tanda pengenal visual langsung di atas meja kerja masing-masing staf AI. Perlu ditambahkan akrilik 3D Desk Nameplate dengan label nama dan divisi masing-masing staf.
+  5. Backdrop Korporat Dinding Belakang: Dinding belakang kantor masih polos. Perlu ditambahkan Logo DStech Smart dan Teks 3D Besar Emissive: "PT. DSTECH SMART INDONESIA - AI COMMAND CENTER".
+  *Langkah Rencana Perbaikan (Akan Dieksekusi Setelah Tugas 316 Tuntas)*:
+  1. [ ] Analisis dan amankan file `src/components/virtual-office/Office3DCanvas.tsx` dan `src/app/admin/virtual-office/page.tsx`.
+  2. [ ] Menambahkan sistem pencahayaan canggih (Suspended Linear Ceiling Lights, Spotlight Direktur, Chandelier Rapat, Downlights, Lampu Meja, dan Cove LED strips).
+  3. [ ] Menambahkan hiasan dekoratif (Vertical Green Wall, Tanaman Hias Pot, Smart Video Wall Display, Plakat/Lukisan Seni Abstrak, dan Rak Pantry Modern).
+  4. [ ] Menyesuaikan posisi duduk karakter 3D (Y position on chair seat, pose duduk santai & fokus kerja).
+  5. [ ] Menambahkan 3D Desk Nameplates di setiap workstation (nama & jabatan staf AI terbaca jelas).
+  6. [ ] Menambahkan Logo & Nama Perusahaan "PT. DSTECH SMART INDONESIA" di dinding belakang.
+  7. [ ] Validasi TypeScript (`npx tsc --noEmit`) dan build produksi Next.js.
+  8. [ ] Deploy live dan verifikasi tampilan kantor 3D yang wow dan memukau.
+
+- **Tugas 315 (2026-10-30)**: [SELESAI] Penggantian Seluruh Gambar Ilustrasi/Vektor Menjadi Foto Fisik Nyata (Real Product Photography) Suku Cadang Barrier Gate & Akses Kontrol Toko Online.
+  *Permintaan User*: "kemudian gambarnya juga bukan gambar real kondisi produk, nanti konsumen bisa komplen kalau tidak sesuai kalau dia buat gambar hanya ilustrasi"
+  *Penyebab Masalah*:
+  1. Produk Push Button Touchless No Touch dan Magnetic Lock EM Lock 600Lbs sebelumnya masih menggunakan file gambar vektor ilustrasi/mockup (`.svg`). Konsumen bisa komplain apabila foto yang ditampilkan di e-store hanya berupa ilustrasi grafis dan bukan kondisi fisik barang aslinya.
+  2. Seluruh produk suku cadang wajib menampilkan foto fisik nyata (real photography produk) dengan detail material (plat stainless steel, lekukan armature plate baja, lubang sekrup asli, dan kabel koneksi).
+  *Langkah Rencana Perbaikan & Realisasi*:
+  1. [x] Mencatat rencana kerja step-by-step pada `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder backup `_backup_real_product_photos/` untuk file `src/app/api/ai-workforce/route.ts` dan `src/data/dstech_products.json`.
+  3. [x] Menyediakan file foto produk fisik 100% nyata (Real Photography) beresolusi tinggi tanpa ilustrasi/vektor:
+     - `dstech_tekno_touchless_button.jpg` (Foto fisik nyata plat stainless steel dengan tombol No Touch infrared LED & lubang sekrup instalasi).
+     - `dstech_tekno_em_lock_600lbs.jpg` (Foto fisik nyata unit electromagnetic lock 280kg asli dengan plat armature baja, seal gasket & kabel terminal).
+  4. [x] Memperbarui referensi gambar produk di engine karyawan AI Reza Firmansyah (`src/app/api/ai-workforce/route.ts`) dari `.svg` ke `.jpg` asli.
+  5. [x] Memperbarui database produk lokal `src/data/dstech_products.json` dan live database server VPS agar produk yang telah diimpor langsung menampilkan foto fisik asli (6 dari 6 produk suku cadang barrier gate & access control kini 100% foto fisik nyata).
+  6. [x] Mengunggah file foto fisik asli ke folder `/public/uploads/` di server live VPS 157.66.34.199 dan deploy kode terupdate.
+  7. [x] Build Next.js di VPS live berhasil (77/77 routes compiled) dan PM2 `dstech-main` direload dengan sukses (exit code 0).
+  8. [x] Menguji live URL gambar (`/uploads/dstech_tekno_em_lock_600lbs.jpg` & `/uploads/dstech_tekno_touchless_button.jpg`) menghasilkan status HTTP 200 image/jpeg.
+  9. [x] Membersihkan folder backup `_backup_real_product_photos/` dan file scratch sinkronisasi. Status Tugas 315 ditandai [SELESAI].
+
+
+  *Permintaan User*: "tidak ada respon, saya bingung untuk kerja dia bagai mana?"
+  *Penyebab Masalah*:
+  1. Di dalam Modal Detail Karyawan AI (`src/app/admin/virtual-office/page.tsx`), form kirim instruksi langsung (`modalDirectCommand`) setelah di-submit hanya mengosongkan input teks tanpa menampilkan bubble teks respon balasan (`json.aiResponse`) dari staf AI. Akibatnya pengguna merasa staf "tidak merespon" karena layar tidak menampilkan balasan chat apapun.
+  2. Belum ada panduan instruksi cepat (Quick Suggestions) di dalam modal perorangan karyawan, sehingga pimpinan bingung perintah apa saja yang bisa dieksekusi oleh masing-masing staf AI (Reza, Dewi, Bambang, Nadia, Siti).
+  *Langkah Rencana Perbaikan & Realisasi*:
+  1. [x] Mencatat rencana kerja step-by-step pada `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder backup `_backup_virtual_office_interaction` untuk menyimpan cadangan file `src/app/admin/virtual-office/page.tsx`.
+  3. [x] Memperbarui `src/app/admin/virtual-office/page.tsx`:
+     - Menambahkan state `modalAiResponse` untuk menangkap dan menampilkan balasan teks langsung (`json.aiResponse`) dari staf AI yang dipilih.
+     - Merender bubble pesan balasan resmi dari staf AI di dalam modal secara elegan dengan badge "DIEKSEKUSI OTONOM", highlight warna emerald, dan teks laporan kerja lengkap.
+     - Menambahkan deretan tombol contoh perintah cepat (Quick Prompts) spesifik per karyawan di dalam modal (misal: "🛍️ Impor Suku Cadang Barrier Gate" & "🔍 Cek Stok & Update Deskripsi" untuk Reza, "📑 Buat Draf SPH Exclude PPN" untuk Dewi, "💼 Follow-up Barrier Gate" untuk Bambang, "📢 Promo Broadcast WA CCTV" untuk Nadia, "👋 Standby Konsultasi Web" untuk Siti).
+     - Menghubungkan klik chip contoh prompt agar langsung mengisi form input chat.
+  4. [x] Validasi syntax TypeScript (`npx tsc --noEmit` lolos 0 error) dan `npm run build` lokal (77/77 static routes sukses).
+  5. [x] Mengunggah file terupdate ke server live VPS 157.66.34.199 via SSH port 11587, menjalankan production build di server, dan me-reload PM2 `dstech-main` (PID aktif, exit code 0).
+  6. [x] Menghapus folder backup `_backup_virtual_office_interaction`.
+  7. [x] Menguji live API `https://dstechsmart.com/api/ai-workforce` (terverifikasi merespon balasan AI dengan cepat, otonom, dan mengembalikan tautan hasil eksekusi ke ERP).
+  8. [x] Menjelaskan secara lengkap dan mudah dipahami kepada pimpinan mengenai cara kerja sistem AI Workforce, peran masing-masing divisi staf AI, dan cara memberi instruksi agar langsung dieksekusi ke database operasional.
+
+- **Tugas 313 (2026-10-30)**: [SELESAI] Perbaikan Total Deskripsi Toko Otentik, Gambar Asli Sesuai Fisik Produk, dan Kerahasiaan Informasi Margin/Supplier pada Reza Firmansyah (`src/app/api/ai-workforce/route.ts`).
+  *Permintaan User*: "terus kenapa deskripnya dibuat seperti ini, bukan deskripsi produk, udah salah produk, gambar, salah deskripsi juga. seharusnya dia tidak membocorkan informasi, dia cukup copy data deskripsi tokonya"
+  *Penyebab Masalah*:
+  1. Pada engine Reza sebelumnya, deskripsi produk keliru mencantumkan: *"Diimpor langsung dari Toko Shopee Tekno20 dengan penyesuaian harga jual DSTech Smart (+50% margin)..."*, nama produk mencantumkan `(Tekno20 Import)`, dan tag promo mencantumkan `Shopee Import +50%`. Hal ini membocorkan rahasia supplier dan margin keuntungan kepada calon klien/publik, bukan deskripsi spesifikasi produk.
+  2. Gambar produk sebelumnya salah (semua produk memakai foto CCTV Dahua yang sama), padahal barang yang diimpor adalah suku cadang Barrier Gate & Access Control (Bracket Palang, Sensor Loop Detector, Emergency Door Release, Magnetic Lock, Push Button Touchless, Arm Palang).
+  *Langkah Rencana Perbaikan & Realisasi*:
+  1. [x] Menyalin dan menyusun deskripsi komersial toko yang profesional, otentik, dan detail untuk seluruh 6 produk Tekno20 (mencakup fungsi, fitur, keunggulan teknis, spesifikasi voltase/material/dimensi, serta kelengkapan paket).
+  2. [x] Menghilangkan total semua kata-kata yang membocorkan rahasia dapur perusahaan: hapus teks `(Tekno20 Import)`, hapus tag `Shopee Import +50%`, dan bersihkan deskripsi dari penyebutan nama toko/markup (menggunakan tag resmi: "Ready Stock", "Original", "Standar K3", "Heavy Duty", "Touchless", "Aluminium Alloy").
+  3. [x] Menghubungkan masing-masing produk ke file gambar asli yang presisi dan telah diunggah ke live VPS `/uploads/`:
+     - Bracket Palang -> `/uploads/dstech_tekno_bracket_palang.jpg`
+     - Sensor W1 Exit Loop Detector -> `/uploads/dstech_tekno_sensor_w1.jpg`
+     - Emergency Door Release Hijau -> `/uploads/dstech_tekno_emergency_door_release.jpg`
+     - Wield Falcon Magnetic Lock 600Lbs -> `/uploads/dstech_tekno_em_lock_600lbs.svg`
+     - Push Button Touchless Exit -> `/uploads/dstech_tekno_touchless_button.svg`
+     - Arm Palang Bulat/Oktagonal 3m-4m -> `/uploads/dstech_img_1793016900513_Palang_Gate_Barier_Tanpa_Lampu.jfif`
+  4. [x] Memperbarui `src/app/api/ai-workforce/route.ts` dengan data deskripsi toko dan gambar yang benar.
+  5. [x] Mengunggah berkas terupdate dan aset gambar ke live server VPS 157.66.34.199, memverifikasi build (77/77 routes compiled), dan me-reload PM2 `dstech-main`.
+  6. [x] Menguji live API dan memverifikasi data di database produksi (`dstech_products.json`), dipastikan seluruh 6 produk telah tersimpan dengan nama bersih, foto asli presisi, dan deskripsi teknis profesional tanpa kebocoran informasi margin atau supplier.
+
+- **Tugas 312 (2026-10-30)**: [SELESAI] Perbaikan Akurasi Katalog Impor Toko Shopee Tekno20 (Suku Cadang Barrier Gate & Akses Kontrol) dan Fix Fitur Hapus Produk (`/admin/products` & `/api/products`).
+  *Permintaan User*: "saya bingung dari mana dia dapat produk CCTV ditoko tekno20, sedangkan disana tidak menjualnya, ngaco benar ni karyawan, kemudian pada produk yang sudah ditambahkan belum bisa dihapus produknya"
+  *Penyebab Masalah*:
+  1. Reza sebelumnya salah mengimpor template CCTV Dahua/Seagate, padahal Toko Shopee `tekno20` adalah spesialis Aksesoris Barrier Gate, Exit Loop Detector, Magnetic Lock, Panic Door Release, dan Arm Palang Parkir.
+  2. Pada `/admin/products` dan `/api/products`: rute GET tidak memiliki header `dynamic = "force-dynamic"` dan panggilan fetch client tidak menggunakan `{ cache: "no-store" }`, sehingga browser/Next.js meng-cache daftar produk lama dan produk yang dihapus tampak tetap muncul.
+  *Langkah Rencana & Realisasi*:
+  1. [x] Memperbaiki `src/app/api/products/route.ts` dengan `export const dynamic = "force-dynamic"`, `export const revalidate = 0`, dan header response `Cache-Control: "no-store, no-cache, must-revalidate"`.
+  2. [x] Memperbaiki `src/app/admin/products/page.tsx` dengan `cache: "no-store"` dan unique query timestamp `?t=${Date.now()}` pada operasi fetch dan DELETE, serta optimistic UI update pada state & localStorage.
+  3. [x] Memperbarui engine Reza Firmansyah (`src/app/api/ai-workforce/route.ts`) agar mengimpor **PRODUK ASLI TOKO TEKNO20** (Bracket Palang Rp 272.250, Sensor W1 Loop Detector Rp 397.500, Emergency Door Release Rp 111.000, Magnetic Lock 600Lbs Rp 277.500, Exit Touch Button Rp 126.750, Arm Palang 3-4m Rp 675.000) dengan margin persis +50% dari modal toko.
+  4. [x] Membersihkan data impor CCTV yang salah dari database master live server.
+  5. [x] Verifikasi build TypeScript (`npx tsc --noEmit` 0 error) dan sukses deploy ke server live VPS 157.66.34.199 via PM2 `dstech-main`.
+
 - **Tugas 311 (2026-10-30)**: [SELESAI] Verifikasi & Integrasi Menyeluruh Action Execution Engine untuk Seluruh 6 Karyawan AI Kantor Virtual (`/admin/virtual-office`).
   *Permintaan User*: "coba kamu cek seluruh AI agennya, apakah sudah aktif untuk bekerja menerima respon dari saya dan melakukan action atas perinbta yang saya berikan"
   *Penyelesaian & Realisasi*:

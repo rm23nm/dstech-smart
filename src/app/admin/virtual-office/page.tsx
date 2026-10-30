@@ -33,7 +33,13 @@ import {
   MessageSquare,
   Box,
   LayoutGrid,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck,
+  Clock,
+  Check,
+  Eye,
+  AlertTriangle,
+  Zap
 } from "lucide-react";
 
 interface Employee {
@@ -59,9 +65,35 @@ interface ActivityLog {
   action: string;
 }
 
+export interface ApprovalItem {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  employee_role: string;
+  department: string;
+  task_type: "SPH_PROPOSAL" | "PRODUCT_IMPORT" | "PROMO_CAMPAIGN" | "CRM_LEAD" | "SPK_FIELD";
+  title: string;
+  target_client?: string;
+  value?: number;
+  tax_type?: string;
+  summary: string;
+  status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+  created_at: string;
+  reviewed_at?: string;
+  reviewer_notes?: string;
+  payload: any;
+}
+
 export default function VirtualOfficePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [approvalQueue, setApprovalQueue] = useState<ApprovalItem[]>([]);
+  const [approvalFilter, setApprovalFilter] = useState<"ALL" | "PENDING" | "APPROVED">("PENDING");
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [isTriggeringAutopilot, setIsTriggeringAutopilot] = useState(false);
+  const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<ApprovalItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
@@ -77,6 +109,7 @@ export default function VirtualOfficePage() {
   const [modalDirectCommand, setModalDirectCommand] = useState("");
   const [isSubmittingModalCommand, setIsSubmittingModalCommand] = useState(false);
   const [modalExecutionResult, setModalExecutionResult] = useState<any>(null);
+  const [modalAiResponse, setModalAiResponse] = useState<string | null>(null);
   const officeContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch initial workforce data
@@ -87,6 +120,7 @@ export default function VirtualOfficePage() {
       if (json.success && json.data) {
         setEmployees(json.data.dstech_employees || []);
         setLogs(json.data.dstech_recent_logs || []);
+        setApprovalQueue(json.data.dstech_approval_queue || []);
         if (selectedEmployee) {
           const updated = json.data.dstech_employees.find((e: Employee) => e.id === selectedEmployee.id);
           if (updated) setSelectedEmployee(updated);
@@ -112,6 +146,73 @@ export default function VirtualOfficePage() {
       officeContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
     } else {
       document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+    }
+  };
+
+  // Approval Handlers (Kotak Persetujuan Direktur Utama)
+  const handleApprove = async (item: ApprovalItem) => {
+    setApprovingId(item.id);
+    try {
+      const res = await fetch("/api/ai-workforce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve_queue_item", itemId: item.id })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApprovalNotice(`✅ Berhasil disetujui! Pekerjaan "${item.title}" telah dicatat resmi ke dalam sistem database.`);
+        fetchWorkforce();
+        setTimeout(() => setApprovalNotice(null), 7000);
+      } else {
+        alert("Gagal menyetujui: " + (json.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleReject = async (item: ApprovalItem) => {
+    if (!confirm(`Apakah Anda yakin ingin menolak usulan pekerjaan "${item.title}"?`)) return;
+    setRejectingId(item.id);
+    try {
+      const res = await fetch("/api/ai-workforce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject_queue_item", itemId: item.id })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApprovalNotice(`Usulan pekerjaan "${item.title}" telah ditolak dan tidak dimasukkan ke database.`);
+        fetchWorkforce();
+        setTimeout(() => setApprovalNotice(null), 5000);
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    } finally {
+      setRejectingId(null);
+    }
+  };
+
+  const handleTriggerAutopilot = async () => {
+    setIsTriggeringAutopilot(true);
+    try {
+      const res = await fetch("/api/ai-workforce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "trigger_autopilot" })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApprovalNotice("⚡ Staf AI telah selesai bekerja otonom & menghasilkan draf baru di Kotak Persetujuan Anda!");
+        fetchWorkforce();
+        setTimeout(() => setApprovalNotice(null), 6000);
+      }
+    } catch (err: any) {
+      alert("Gagal memicu autopilot: " + err.message);
+    } finally {
+      setIsTriggeringAutopilot(false);
     }
   };
 
@@ -162,6 +263,45 @@ export default function VirtualOfficePage() {
         return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/10 text-amber-600 border border-amber-500/30">☕ ISTIRAHAT KOPI</span>;
       default:
         return <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-slate-500/10 text-slate-600 border border-slate-500/30">IDLE STANDBY</span>;
+    }
+  };
+
+  // Contoh Instruksi Cepat sesuai Peran & Divisi Karyawan
+  const getQuickSuggestions = (empId: string) => {
+    switch (empId) {
+      case "emp_reza_catalog":
+        return [
+          { label: "🛍️ Impor Suku Cadang Barrier Gate", text: "Reza, tolong impor katalog suku cadang barrier gate dari tekno20 dengan foto asli dan deskripsi lengkap." },
+          { label: "🔍 Cek Stok & Update Deskripsi", text: "Reza, cek stok barang barrier gate dan update spesifikasi produk di toko online." },
+          { label: "🏷️ Sinkronisasi Harga & Status", text: "Reza, pastikan harga dan spesifikasi produk toko online sudah rapi dan siap tayang." }
+        ];
+      case "emp_dewi_finance":
+        return [
+          { label: "📑 Buat Draf SPH Exclude PPN", text: "Dewi, tolong siapkan draf SPH penawaran harga dengan opsi PPN Exclude untuk proyek baru." },
+          { label: "💰 Rincian Invoice Proyek", text: "Dewi, buatkan rincian invoice tagihan termin untuk proyek barrier gate." },
+          { label: "📊 Cek Arus Kas & Piutang", text: "Dewi, bagaimana rekap arus kas masuk dan piutang pelanggan saat ini?" }
+        ];
+      case "emp_bambang_sales":
+        return [
+          { label: "💼 Follow-up Barrier Gate", text: "Bambang, tolong follow-up calon klien pabrik kimia Cilegon untuk paket Barrier Gate RFID." },
+          { label: "📋 Catat Prospek Baru", text: "Bambang, tolong catat prospek klien baru proyek perumahan klaster di Serang." },
+          { label: "🤝 Jadwal Presentasi Proyek", text: "Bambang, buatkan agenda konsultasi teknis sistem akses kontrol minggu ini." }
+        ];
+      case "emp_nadia_marketing":
+        return [
+          { label: "📢 Promo Broadcast WA CCTV", text: "Nadia, buatkan materi promosi broadcast WhatsApp paket CCTV 8 Channel untuk perumahan." },
+          { label: "🎯 Promo Barrier Gate Kawasan", text: "Nadia, buat materi promosi solusi Barrier Gate otomatis anti-antrean untuk kawasan industri." },
+          { label: "📱 Jadwal Konten Edukasi", text: "Nadia, siapkan jadwal konten edukasi keamanan smart parking minggu ini." }
+        ];
+      case "emp_siti_cs":
+        return [
+          { label: "👋 Standby Konsultasi Web", text: "Siti, pastikan chatbot standby dan layani pengunjung yang bertanya seputar CCTV dan Barrier Gate." },
+          { label: "📞 Rekap Kebutuhan Klien", text: "Siti, rekap pertanyaan dan kebutuhan spesifikasi klien yang masuk hari ini." }
+        ];
+      default:
+        return [
+          { label: "📋 Laporkan Progress Pekerjaan", text: "Tolong laporkan progres dan status pekerjaan Anda saat ini." }
+        ];
     }
   };
 
@@ -448,6 +588,239 @@ export default function VirtualOfficePage() {
       </div>
       )}
 
+      {/* KOTAK PERSETUJUAN PIMPINAN (AI AUTOPILOT & APPROVAL QUEUE) */}
+      {(() => {
+        const pendingCount = approvalQueue.filter((x) => x.status === "PENDING_APPROVAL").length;
+        const approvedCount = approvalQueue.filter((x) => x.status === "APPROVED").length;
+        const filteredApprovalQueue = approvalQueue.filter((x) => {
+          if (approvalFilter === "PENDING") return x.status === "PENDING_APPROVAL";
+          if (approvalFilter === "APPROVED") return x.status === "APPROVED";
+          return true;
+        });
+
+        return (
+          <div className="bg-slate-900/95 border-2 border-amber-500/30 rounded-3xl p-6 shadow-2xl space-y-5 relative overflow-hidden backdrop-blur-md">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Header Kotak Persetujuan */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-white shadow-lg shadow-amber-500/20 text-xl font-black shrink-0">
+                  👑
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black text-white flex items-center gap-2">
+                      Kotak Persetujuan Pimpinan
+                      <span className="text-amber-400 font-extrabold text-xs">
+                        (AI Autopilot Hub)
+                      </span>
+                    </h3>
+                    {pendingCount > 0 && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[10px] font-black uppercase animate-pulse shadow-sm shadow-amber-500/30">
+                        {pendingCount} Menunggu Approval
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Semua hasil kerja staf AI (SPH penawaran, produk suku cadang, materi promo, SPK) tersimpan di sini. Sistem aman &amp; 100% tidak akan menulis ke database sebelum Bapak Ramadhani ST menyetujuinya.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Filter Tabs */}
+                <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setApprovalFilter("PENDING")}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition ${approvalFilter === "PENDING" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"}`}
+                  >
+                    Menunggu ({pendingCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApprovalFilter("APPROVED")}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition ${approvalFilter === "APPROVED" ? "bg-emerald-600 text-white" : "text-slate-400 hover:text-white"}`}
+                  >
+                    Disetujui ({approvedCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setApprovalFilter("ALL")}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition ${approvalFilter === "ALL" ? "bg-slate-800 text-white" : "text-slate-400 hover:text-white"}`}
+                  >
+                    Semua ({approvalQueue.length})
+                  </button>
+                </div>
+
+                {/* Tombol Picu Autopilot Staf AI */}
+                <button
+                  type="button"
+                  onClick={handleTriggerAutopilot}
+                  disabled={isTriggeringAutopilot}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 text-xs font-black rounded-xl shadow-lg shadow-amber-500/20 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  title="Perintahkan staf AI bekerja otomatis menghasilkan draf tugas baru"
+                >
+                  <Zap className={`w-3.5 h-3.5 ${isTriggeringAutopilot ? "animate-spin" : ""}`} />
+                  <span>{isTriggeringAutopilot ? "Staf AI Sedang Bekerja..." : "⚡ Jalankan Autopilot Kerja Staf"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Notifikasi Pop-up Hasil Aksi */}
+            {approvalNotice && (
+              <div className="p-3.5 bg-emerald-950/80 border border-emerald-500/40 rounded-2xl text-xs text-emerald-200 flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="font-medium">{approvalNotice}</span>
+                </div>
+                <button
+                  onClick={() => setApprovalNotice(null)}
+                  className="text-emerald-400 hover:text-white text-xs px-2 py-0.5"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Daftar Item Usulan Pekerjaan */}
+            {filteredApprovalQueue.length === 0 ? (
+              <div className="text-center py-10 bg-slate-950/50 rounded-2xl border border-slate-800/80 p-6 space-y-2">
+                <ShieldCheck className="w-10 h-10 text-slate-600 mx-auto" />
+                <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider">
+                  {approvalFilter === "PENDING" ? "Tidak Ada Pekerjaan Menunggu Persetujuan" : "Belum Ada Riwayat Pekerjaan"}
+                </h4>
+                <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+                  Semua tugas staf AI telah Anda review. Klik tombol <b>⚡ Jalankan Autopilot Kerja Staf</b> di atas untuk memicu staf AI bekerja menghasilkan draf baru secara otomatis.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredApprovalQueue.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`p-4 rounded-2xl border transition-all flex flex-col justify-between relative group ${
+                      item.status === "APPROVED"
+                        ? "bg-emerald-950/20 border-emerald-500/30"
+                        : item.status === "REJECTED"
+                        ? "bg-slate-950/40 border-slate-800 opacity-60"
+                        : "bg-slate-950/70 border-amber-500/30 hover:border-amber-500/60 shadow-lg"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      {/* Badge Header Pengusul & Status */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-xl bg-slate-800 flex items-center justify-center text-xs font-black text-amber-300 border border-slate-700">
+                            {item.employee_name.charAt(0)}
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black text-white">{item.employee_name}</h4>
+                            <span className="text-[9.5px] text-slate-400 block -mt-0.5">{item.employee_role}</span>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                            item.status === "APPROVED"
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                              : item.status === "REJECTED"
+                              ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                              : "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+                          }`}
+                        >
+                          {item.status === "APPROVED" ? "✓ Disetujui" : item.status === "REJECTED" ? "✕ Ditolak" : "⏳ Menunggu"}
+                        </span>
+                      </div>
+
+                      {/* Judul & Sasaran */}
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="px-2 py-0.5 rounded bg-slate-800 text-cyan-400 text-[9px] font-mono font-bold uppercase">
+                            {item.task_type.replace("_", " ")}
+                          </span>
+                          {item.tax_type === "exclude" && (
+                            <span className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 text-[9px] font-bold border border-indigo-800">
+                              Exclude PPN
+                            </span>
+                          )}
+                        </div>
+                        <h5 className="text-xs font-black text-white leading-snug line-clamp-2 group-hover:text-amber-300 transition-colors">
+                          {item.title}
+                        </h5>
+                        {item.target_client && (
+                          <p className="text-[10.5px] text-slate-400 mt-1 flex items-center gap-1">
+                            <Building2 className="w-3 h-3 text-slate-500 shrink-0" />
+                            <span className="font-semibold text-slate-300 line-clamp-1">{item.target_client}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Ringkasan & Estimasi Nilai */}
+                      <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800/80 text-[11px] space-y-1.5">
+                        <p className="text-slate-300 leading-relaxed line-clamp-3 text-[10.5px]">
+                          {item.summary}
+                        </p>
+                        {item.value && item.value > 0 ? (
+                          <div className="pt-1.5 border-t border-slate-800 flex items-center justify-between text-xs">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase">Estimasi Nilai</span>
+                            <span className="font-mono font-black text-amber-400">
+                              Rp {item.value.toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Footer Action Buttons */}
+                    <div className="mt-4 pt-3 border-t border-slate-800 flex items-center gap-2">
+                      {item.status === "PENDING_APPROVAL" ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleApprove(item)}
+                            disabled={approvingId === item.id || rejectingId === item.id}
+                            className="flex-1 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          >
+                            {approvingId === item.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Check className="w-3.5 h-3.5" />
+                            )}
+                            <span>{approvingId === item.id ? "Menyimpan..." : "Setujui & Terapkan"}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleReject(item)}
+                            disabled={approvingId === item.id || rejectingId === item.id}
+                            className="px-3 py-2 bg-slate-800 hover:bg-rose-950 hover:text-rose-300 text-slate-400 rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                            title="Tolak Pekerjaan"
+                          >
+                            {rejectingId === item.id ? "..." : "Tolak"}
+                          </button>
+                        </>
+                      ) : (
+                        <div className="w-full text-center py-1 text-[11px] font-bold text-slate-500">
+                          {item.status === "APPROVED" ? (
+                            <span className="text-emerald-400 flex items-center justify-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Disetujui resmi oleh Direktur Utama
+                            </span>
+                          ) : (
+                            <span className="text-rose-400">Ditolak</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* EXECUTIVE COMMAND BAR (KOTAK PERINTAH LANGSUNG DARI DIREKTUR UTAMA) */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-2 border-indigo-500/40 p-5 rounded-3xl shadow-2xl space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -561,8 +934,13 @@ export default function VirtualOfficePage() {
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-700 max-w-xl w-full rounded-3xl p-6 text-white shadow-2xl space-y-5 relative">
             <button
-              onClick={() => setSelectedEmployee(null)}
-              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white bg-slate-800 rounded-xl transition"
+              onClick={() => {
+                setSelectedEmployee(null);
+                setModalAiResponse(null);
+                setModalExecutionResult(null);
+                setModalDirectCommand("");
+              }}
+              className="absolute top-5 right-5 p-2 text-slate-400 hover:text-white bg-slate-800 rounded-xl transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -658,6 +1036,9 @@ export default function VirtualOfficePage() {
                     if (json.executionResult) {
                       setModalExecutionResult(json.executionResult);
                     }
+                    if (json.aiResponse) {
+                      setModalAiResponse(json.aiResponse);
+                    }
                     setModalDirectCommand("");
                     fetchWorkforce();
                   } else {
@@ -669,16 +1050,78 @@ export default function VirtualOfficePage() {
                   setIsSubmittingModalCommand(false);
                 }
               }}
-              className="pt-3 border-t border-slate-800 space-y-2.5"
+              className="pt-3 border-t border-slate-800 space-y-3"
             >
-              <div className="flex items-center justify-between">
+              {/* Balasan Langsung Karyawan AI jika baru saja diberi instruksi */}
+              {modalAiResponse && (
+                <div className="p-4 bg-gradient-to-br from-emerald-950/90 via-slate-900 to-indigo-950/80 border-2 border-emerald-500/60 rounded-2xl shadow-xl space-y-2 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                        <Bot className="w-4 h-4 text-emerald-400" />
+                        Respon &amp; Laporan Kerja {selectedEmployee.name}:
+                      </span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      DIEKSEKUSI OTONOM
+                    </span>
+                  </div>
+                  <div className="bg-black/40 p-3 rounded-xl border border-emerald-500/20 text-xs text-emerald-100 leading-relaxed font-medium whitespace-pre-line">
+                    {modalAiResponse}
+                  </div>
+                </div>
+              )}
+
+              {/* Tautan Cepat Hasil Eksekusi Tugas */}
+              {modalExecutionResult && (
+                <div className="p-3 bg-emerald-950/70 border border-emerald-800/80 rounded-xl flex items-center justify-between gap-3 text-xs">
+                  <span className="text-emerald-300 font-medium text-[11px]">
+                    ✓ Tugas berhasil dieksekusi secara otonom!
+                  </span>
+                  {modalExecutionResult.link && (
+                    <a
+                      href={modalExecutionResult.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 shadow-sm"
+                    >
+                      <span>Lihat Hasil di ERP</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Contoh Perintah Siap Pakai Spesifik Karyawan */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-cyan-400" />
+                  Contoh Perintah Siap Pakai untuk {selectedEmployee.name}:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {getQuickSuggestions(selectedEmployee.id).map((sug, sIdx) => (
+                    <button
+                      key={sIdx}
+                      type="button"
+                      onClick={() => setModalDirectCommand(sug.text)}
+                      className="px-2.5 py-1 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-[10.5px] border border-slate-700 hover:border-cyan-500/50 transition cursor-pointer text-left"
+                      title="Klik untuk memasukkan instruksi ini ke kotak input"
+                    >
+                      {sug.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
                 <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
                   <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Kirim Perintah Langsung ke {selectedEmployee.name}:</span>
                 </span>
                 {isSubmittingModalCommand && (
                   <span className="text-[10px] text-cyan-400 font-mono animate-pulse">
-                    Sedang memproses instruksi...
+                    Sedang memproses instruksi &amp; mengeksekusi...
                   </span>
                 )}
               </div>
@@ -701,26 +1144,6 @@ export default function VirtualOfficePage() {
                   <span>Kirim</span>
                 </button>
               </div>
-
-              {/* Tautan Cepat Hasil Eksekusi Tugas */}
-              {modalExecutionResult && (
-                <div className="p-3 bg-emerald-950/70 border border-emerald-800/80 rounded-xl flex items-center justify-between gap-3 text-xs">
-                  <span className="text-emerald-300 font-medium text-[11px]">
-                    ✓ Tugas berhasil dieksekusi secara otonom!
-                  </span>
-                  {modalExecutionResult.link && (
-                    <a
-                      href={modalExecutionResult.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 shadow-sm"
-                    >
-                      <span>Lihat Hasil di ERP</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
-                </div>
-              )}
             </form>
           </div>
         </div>

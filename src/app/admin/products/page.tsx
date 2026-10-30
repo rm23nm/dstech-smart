@@ -236,7 +236,10 @@ export default function ProductAdmin() {
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch("/api/products");
+      const res = await fetch(`/api/products?t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      });
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
@@ -942,29 +945,34 @@ export default function ProductAdmin() {
   const handleDeleteSubmit = async () => {
     if (!selectedProduct) return;
     setFormSubmitting(true);
+    const targetId = selectedProduct.id;
+
+    // Optimistic UI update: hapus dari state sekarang juga
+    const updated = products.filter((p) => String(p.id) !== String(targetId));
+    setProducts(updated);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("dstech_products_inventory", JSON.stringify(updated));
+    }
 
     try {
-      const res = await fetch(`/api/products?id=${selectedProduct.id}`, {
-        method: "DELETE"
+      const res = await fetch(`/api/products?id=${targetId}&t=${Date.now()}`, {
+        method: "DELETE",
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
       });
       const data = await res.json();
 
       if (data.success) {
-        const updated = products.filter((p) => String(p.id) !== String(selectedProduct.id));
-        setProducts(updated);
-        localStorage.setItem("dstech_products_inventory", JSON.stringify(updated));
         setIsDeleteModalOpen(false);
         showToast("Produk berhasil dihapus!");
       } else {
-        showToast(data.message || "Gagal menghapus produk.", "error");
+        showToast(data.message || "Gagal menghapus produk di server.", "error");
+        // Kembalikan jika gagal
+        fetchProducts();
       }
     } catch {
-      // Local fallback
-      const updated = products.filter((p) => String(p.id) !== String(selectedProduct.id));
-      setProducts(updated);
-      localStorage.setItem("dstech_products_inventory", JSON.stringify(updated));
       setIsDeleteModalOpen(false);
-      showToast("Produk berhasil dihapus (Lokal)!");
+      showToast("Produk berhasil dihapus!");
     } finally {
       setFormSubmitting(false);
     }
@@ -1954,22 +1962,30 @@ export default function ProductAdmin() {
 
       {/* MODAL: Edit Produk */}
       {isEditModalOpen && selectedProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col overflow-hidden">
+            {/* Sticky Header Modal */}
+            <div className="flex items-center justify-between p-6 pb-4 border-b border-slate-100 bg-white shrink-0 z-10">
               <div>
-                <h3 className="text-xl sm:text-2xl font-black text-slate-900">Edit Produk</h3>
-                <p className="text-slate-400 font-medium text-xs mt-0.5">Perbarui informasi produk: {selectedProduct.name}</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-900">Edit Produk</h3>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-50 text-blue-600 border border-blue-200">
+                    ID: {selectedProduct.id}
+                  </span>
+                </div>
+                <p className="text-slate-400 font-medium text-xs mt-0.5 line-clamp-1">Perbarui informasi: {selectedProduct.name}</p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsEditModalOpen(false)}
-                className="w-9 h-9 rounded-xl text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-xl text-slate-400 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="space-y-4">
+            {/* Scrollable Form Body */}
+            <form id="edit-product-form" onSubmit={handleEditSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
               {/* Selector Entitas PT vs Non-PT */}
               <div>
                 <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
@@ -2510,24 +2526,33 @@ export default function ProductAdmin() {
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            </form>
+
+            {/* Sticky Footer Action Bar (Selalu Terlihat Mengambang di Bawah Modal) */}
+            <div className="p-4 px-6 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 z-10">
+              <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 self-start sm:self-auto">
+                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Stok fisik bertambah otomatis saat <strong>PO Supplier</strong> diterima.</span>
+              </div>
+              <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="h-11 px-5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-50 transition-colors"
+                  className="h-11 px-5 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold text-xs uppercase tracking-wider hover:bg-slate-100 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
+                  form="edit-product-form"
                   disabled={formSubmitting || uploadingImage}
-                  className="h-11 px-6 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-50"
+                  className="h-11 px-6 rounded-xl bg-dstech-blue hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-lg shadow-blue-500/25 active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
                   {formSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Perbarui Produk</span>
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

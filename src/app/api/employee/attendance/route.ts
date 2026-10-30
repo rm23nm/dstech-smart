@@ -330,7 +330,25 @@ function getWIBDateStr(d: Date = new Date()): string {
       day: "2-digit",
     }).format(d);
   } catch {
-    return d.toISOString().split("T")[0];
+    const wibTime = new Date(d.getTime() + (7 * 60 + d.getTimezoneOffset()) * 60000);
+    return wibTime.toISOString().split("T")[0];
+  }
+}
+
+function getWIBTimeStr(d: Date = new Date()): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jakarta",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).formatToParts(d);
+    const h = parts.find((p) => p.type === "hour")?.value || "00";
+    const m = parts.find((p) => p.type === "minute")?.value || "00";
+    return `${h}:${m} WIB`;
+  } catch {
+    const wibTime = new Date(d.getTime() + (7 * 60 + d.getTimezoneOffset()) * 60000);
+    return `${String(wibTime.getHours()).padStart(2, "0")}:${String(wibTime.getMinutes()).padStart(2, "0")} WIB`;
   }
 }
 
@@ -347,7 +365,7 @@ export async function POST(request: Request) {
     }
 
     const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")} WIB`;
+    const timeStr = getWIBTimeStr(now);
     const dateStr = getWIBDateStr(now);
     const targetEmpName = (body.employeeName || "").trim().toLowerCase();
     const targetEmpEmail = (body.employeeEmail || "").trim().toLowerCase();
@@ -453,7 +471,7 @@ export async function POST(request: Request) {
       const contractSched = getEmployeeContractSchedule(body.employeeName);
       const [schedHour, schedMin] = (contractSched.startTime || "08:00").split(":").map(Number);
       const schedTotalMin = (isNaN(schedHour) ? 8 : schedHour) * 60 + (isNaN(schedMin) ? 0 : schedMin);
-      const nowTotalMin = now.getHours() * 60 + now.getMinutes();
+      const nowTotalMin = getWibCurrentMinutes(now);
       const lateMinutes = nowTotalMin - schedTotalMin;
       const isLate = lateMinutes > 5; // Toleransi dispensasi keterlambatan 5 menit
 

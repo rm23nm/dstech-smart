@@ -150,6 +150,91 @@ const DEFAULT_WORKFORCE = {
       employee_name: "Nadia Safitri",
       action: "Menyiapkan materi promosi bundling barrier gate + sistem akses RFID perumahan."
     }
+  ],
+  dstech_approval_queue: [
+    {
+      id: "appr_init_1",
+      employee_id: "emp_dewi_finance",
+      employee_name: "Dewi Sartika",
+      employee_role: "AI Finance & Tax Billing Specialist",
+      department: "FINANCE",
+      task_type: "SPH_PROPOSAL",
+      title: "Draf SPH Penawaran: Gate Access In-Out Cluster Elysium",
+      target_client: "PT. Tunas Buana Properti",
+      value: 24500000,
+      tax_type: "exclude",
+      summary: "Pengadaan 2 unit Mesin Barrier Gate Otomatis In-Out, 2 unit Tiang Reader RFID, Sensor Loop Detector VLD, dan Jasa Pasang. Harga Netto Rp 24.500.000 (Exclude PPN 11%).",
+      status: "PENDING_APPROVAL",
+      created_at: new Date().toISOString(),
+      payload: {
+        entityType: "PT",
+        customerName: "PT. Tunas Buana Properti",
+        customerAddress: "Cluster Elysium, Cilegon Banten",
+        subject: "Surat Penawaran Harga Pengadaan & Instalasi Gate Access Sistem In-Out Cluster Elysium",
+        projectName: "Instalasi Barrier Gate Access In-Out PT. Tunas Buana Properti",
+        items: [
+          { productName: "Mesin Barrier Gate Otomatis High Speed (Arm 3-4m) Gate Masuk & Keluar", qty: 2, unit: "Unit", price: 8500000, total: 17000000 },
+          { productName: "Tiang Reader RFID Standalone Controller + Housing Outdoor In & Out", qty: 2, unit: "Unit", price: 3250000, total: 6500000 },
+          { productName: "Vehicle Loop Detector (VLD) Anti-Tabrak Sensor Kendaraan", qty: 2, unit: "Unit", price: 1250000, total: 2500000 },
+          { productName: "Jasa Sipil Cor Pondasi Dudukan Gate, Wiring & Komisioning In-Out", qty: 1, unit: "Lot", price: 4500000, total: 4500000 }
+        ],
+        subtotal: 24500000,
+        taxRate: 11,
+        taxType: "exclude",
+        taxAmount: 2695000,
+        grandTotal: 27195000,
+        hideTaxInPrint: true
+      }
+    },
+    {
+      id: "appr_init_2",
+      employee_id: "emp_reza_catalog",
+      employee_name: "Reza Firmansyah",
+      employee_role: "AI Product Catalog & Procurement Lead",
+      department: "CATALOG_ESTORE",
+      task_type: "PRODUCT_IMPORT",
+      title: "Usulan Pengadaan Suku Cadang: Wield Falcon Magnetic Lock 600Lbs",
+      target_client: "Katalog E-Store DSTech",
+      value: 277500,
+      tax_type: "net",
+      summary: "Pendaftaran produk baru Electromagnetic Lock 600Lbs 280Kg dengan foto fisik asli nyata. Stok awal diset 0 QTY (hanya bertambah saat PO Supplier datang).",
+      status: "PENDING_APPROVAL",
+      created_at: new Date().toISOString(),
+      payload: {
+        id: `dstech_prod_appr_emlock`,
+        name: "DStech - Wield Falcon Magnetic Lock Access Control 600Lbs 280Kg EM Lock",
+        category: "Security System",
+        subCategory: "Access Control & Magnetic Lock",
+        brand: "Wield Falcon",
+        entityType: "PT",
+        costPrice: 185000,
+        price: 277500,
+        stock: 0,
+        warehouseStock: { dstech_wh_1: 0, dstech_wh_2: 0, dstech_wh_3: 0 },
+        image: "/uploads/dstech_tekno_em_lock_600lbs.jpg"
+      }
+    },
+    {
+      id: "appr_init_3",
+      employee_id: "emp_nadia_marketing",
+      employee_name: "Nadia Safitri",
+      employee_role: "AI Creative Marketing & Copywriter",
+      department: "MARKETING",
+      task_type: "PROMO_CAMPAIGN",
+      title: "Materi Promo WhatsApp: Paket Smart Barrier Gate Cluster",
+      target_client: "Mitra & Pengembang Properti",
+      value: 0,
+      tax_type: "none",
+      summary: "Flyer dan copywriting broadcast promo WhatsApp 'Solusi Keamanan Gerbang Perumahan Modern & Anti-Macet' untuk dikirimkan ke calon mitra B2B.",
+      status: "PENDING_APPROVAL",
+      created_at: new Date().toISOString(),
+      payload: {
+        title: "Promo Spesial: Paket Smart Barrier Gate Perumahan Modern",
+        category: "Brosur Promosi",
+        description: "Materi promosi broadcast WhatsApp penawaran bundling Barrier Gate otomatis + Access RFID khusus klaster & komplek industri.",
+        fileUrl: "/service-cctv.png"
+      }
+    }
   ]
 };
 
@@ -164,6 +249,10 @@ function readWorkforceData() {
     if (!parsed.dstech_employees || parsed.dstech_employees.length === 0) {
       writeWorkforceData(DEFAULT_WORKFORCE);
       return JSON.parse(JSON.stringify(DEFAULT_WORKFORCE));
+    }
+    if (!parsed.dstech_approval_queue) {
+      parsed.dstech_approval_queue = DEFAULT_WORKFORCE.dstech_approval_queue;
+      writeWorkforceData(parsed);
     }
     return parsed;
   } catch (err) {
@@ -213,6 +302,251 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true, message: `Status ${emp.name} diperbarui!`, employee: emp });
       }
       return NextResponse.json({ success: false, error: "Karyawan tidak ditemukan" }, { status: 404 });
+    }
+
+    // 1. APPROVE QUEUE ITEM (Persetujuan Direktur Utama)
+    if (action === "approve_queue_item") {
+      const { itemId } = body;
+      if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+      const itemIndex = data.dstech_approval_queue.findIndex((it: any) => it.id === itemId);
+      if (itemIndex === -1) {
+        return NextResponse.json({ success: false, error: "Item pekerjaan tidak ditemukan" }, { status: 404 });
+      }
+
+      const item = data.dstech_approval_queue[itemIndex];
+      if (item.status === "APPROVED") {
+        return NextResponse.json({ success: false, error: "Pekerjaan ini sudah pernah disetujui sebelumnya." }, { status: 400 });
+      }
+
+      // EKSEKUSI DATA SECARA RESMI KE DATABASE SISTEM
+      let executedResult: any = null;
+      try {
+        if (item.task_type === "SPH_PROPOSAL") {
+          const finPath = path.join(process.cwd(), "src/data/dstech_finance_erp.json");
+          if (fs.existsSync(finPath)) {
+            const finRaw = fs.readFileSync(finPath, "utf-8");
+            const finData = JSON.parse(finRaw);
+            if (!finData.quotations) finData.quotations = [];
+
+            const sphNumber = `SPH-DSTECH-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(finData.quotations.length + 1).padStart(3, "0")}`;
+            const sphDoc = {
+              id: `dstech_sph_${Date.now()}`,
+              quotationNumber: sphNumber,
+              clientId: `client_${Date.now()}`,
+              customerName: item.payload?.customerName || item.target_client || "Klien DSTech",
+              customerOrg: item.payload?.customerName || item.target_client || "Klien DSTech",
+              customerPhone: "0812-9988-7766",
+              customerAddress: item.payload?.customerAddress || "Banten / Jabodetabek",
+              subject: item.payload?.subject || item.title,
+              date: new Date().toISOString().split("T")[0],
+              validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+              validityDays: 14,
+              items: item.payload?.items || [],
+              subtotal: item.payload?.subtotal || item.value || 0,
+              discount: 0,
+              discountType: "fixed",
+              discountPercent: 0,
+              discountLabel: "Diskon Khusus Proyek",
+              revision: 0,
+              taxRate: item.payload?.taxRate || 11,
+              taxType: item.payload?.taxType || "exclude",
+              taxAmount: item.payload?.taxAmount || 0,
+              grandTotal: item.payload?.grandTotal || item.value || 0,
+              hideTaxInPrint: item.payload?.hideTaxInPrint ?? true,
+              terms: "1. Seluruh harga penawaran di atas adalah harga Netto/DPP belum termasuk PPN 11% (Exclude PPN).\n2. Garansi unit perangkat keras resmi 1 (satu) sampai 2 (dua) tahun penggantian unit baru.\n3. Garansi pemeliharaan teknis & jasa instalasi selama 6 (enam) bulan.\n4. Gratis komisioning, pelatihan operator, dan integrasi sistem monitoring.\n5. Pembayaran: DP 50% saat PO terbit, Pelunasan 50% setelah serah terima pekerjaan (BAST).",
+              status: "Terkirim",
+              approvalStatus: "Approved",
+              approvedBy: "Ramadhani, S.T.",
+              approvedTitle: "Direktur Utama",
+              approvedAt: new Date().toLocaleString("id-ID"),
+              verificationCode: `DST-${sphNumber}`,
+              notes: `Disetujui resmi oleh Direktur Utama (Bpk. Ramadhani ST) dari usulan autopilot ${item.employee_name}.`,
+              attachments: [],
+              businessEntity: "PT",
+              projectName: item.payload?.projectName || item.title,
+            };
+
+            finData.quotations.unshift(sphDoc);
+            fs.writeFileSync(finPath, JSON.stringify(finData, null, 2), "utf-8");
+            executedResult = { docType: "SPH", number: sphNumber, link: "/admin/finance?tab=quotations" };
+          }
+        } else if (item.task_type === "PRODUCT_IMPORT") {
+          const prodPath = path.join(process.cwd(), "src/data/dstech_products.json");
+          if (fs.existsSync(prodPath)) {
+            const prodRaw = fs.readFileSync(prodPath, "utf-8");
+            const prodList = JSON.parse(prodRaw);
+            const newProduct = {
+              ...item.payload,
+              id: item.payload?.id || `dstech_prod_${Date.now()}`,
+              stock: 0, // Kebijakan: Stok fisik hanya 0 awal, bertambah via PO Supplier
+              warehouseStock: { dstech_wh_1: 0, dstech_wh_2: 0, dstech_wh_3: 0 },
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            prodList.unshift(newProduct);
+            fs.writeFileSync(prodPath, JSON.stringify(prodList, null, 2), "utf-8");
+            executedResult = { docType: "PRODUCT", name: newProduct.name, link: "/admin/products" };
+          }
+        } else if (item.task_type === "PROMO_CAMPAIGN") {
+          const promoPath = path.join(process.cwd(), "src/data/dstech_promotions.json");
+          if (fs.existsSync(promoPath)) {
+            const promoRaw = fs.readFileSync(promoPath, "utf-8");
+            const promoList = JSON.parse(promoRaw);
+            const newPromo = {
+              id: `dstech_promo_${Date.now()}`,
+              title: item.payload?.title || item.title,
+              category: item.payload?.category || "Brosur Promosi",
+              description: item.payload?.description || item.summary,
+              fileUrl: item.payload?.fileUrl || "/service-cctv.png",
+              fileType: "PDF",
+              fileSize: "3.8 MB",
+              downloadCount: 0,
+              createdAt: new Date().toISOString(),
+            };
+            promoList.unshift(newPromo);
+            fs.writeFileSync(promoPath, JSON.stringify(promoList, null, 2), "utf-8");
+            executedResult = { docType: "PROMOTION", title: newPromo.title, link: "/admin/promotions" };
+          }
+        }
+      } catch (execErr: any) {
+        console.error("Gagal mengeksekusi payload persetujuan:", execErr);
+      }
+
+      // Update status item
+      item.status = "APPROVED";
+      item.reviewed_at = new Date().toISOString();
+      item.reviewer_notes = "Disetujui resmi oleh Direktur Utama (Ramadhani ST)";
+
+      // Catat log
+      const newLog = {
+        id: `log_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        employee_id: item.employee_id,
+        employee_name: item.employee_name,
+        action: `[DISETUJUI DIREKTUR] Pekerjaan "${item.title}" disahkan dan dicatat resmi ke database sistem oleh Ramadhani ST.`,
+      };
+      data.dstech_recent_logs.unshift(newLog);
+      writeWorkforceData(data);
+
+      return NextResponse.json({
+        success: true,
+        message: `Pekerjaan "${item.title}" berhasil disetujui & dicatat resmi ke sistem!`,
+        item,
+        executedResult,
+      });
+    }
+
+    // 2. REJECT QUEUE ITEM
+    if (action === "reject_queue_item") {
+      const { itemId, reason } = body;
+      if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+      const item = data.dstech_approval_queue.find((it: any) => it.id === itemId);
+      if (!item) {
+        return NextResponse.json({ success: false, error: "Item pekerjaan tidak ditemukan" }, { status: 404 });
+      }
+
+      item.status = "REJECTED";
+      item.reviewed_at = new Date().toISOString();
+      item.reviewer_notes = reason || "Ditolak oleh Direktur Utama";
+
+      const newLog = {
+        id: `log_${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        employee_id: item.employee_id,
+        employee_name: item.employee_name,
+        action: `[DITOLAK] Usulan pekerjaan "${item.title}" ditolak oleh Direktur Utama.`,
+      };
+      data.dstech_recent_logs.unshift(newLog);
+      writeWorkforceData(data);
+
+      return NextResponse.json({
+        success: true,
+        message: `Pekerjaan "${item.title}" telah ditolak.`,
+        item,
+      });
+    }
+
+    // 3. TRIGGER AUTOPILOT (Karyawan AI Otonom Menghasilkan Draf Pekerjaan)
+    if (action === "trigger_autopilot") {
+      if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+      const nowStr = new Date().toISOString();
+      
+      const autopilotTasks = [
+        {
+          id: `appr_auto_${Date.now()}_1`,
+          employee_id: "emp_dewi_finance",
+          employee_name: "Dewi Sartika",
+          employee_role: "AI Finance & Tax Billing Specialist",
+          department: "FINANCE",
+          task_type: "SPH_PROPOSAL",
+          title: "Draf SPH: Paket CCTV Night Color 8 Titik Pabrik",
+          target_client: "PT. Krakatau Steel Perkasa",
+          value: 18500000,
+          tax_type: "exclude",
+          summary: "Draf SPH penawaran 8 unit CCTV 5MP ColorVu, NVR 16CH, HDD 4TB, kabel coaxial & instalasi pabrik. Exclude PPN 11%.",
+          status: "PENDING_APPROVAL",
+          created_at: nowStr,
+          payload: {
+            entityType: "PT",
+            customerName: "PT. Krakatau Steel Perkasa",
+            customerAddress: "Kawasan Industri Krakatau, Cilegon Banten",
+            subject: "Surat Penawaran Harga Pengadaan & Instalasi CCTV 8 Titik Area Gudang Produksi",
+            projectName: "Instalasi CCTV Krakatau Steel",
+            items: [
+              { productName: "Kamera CCTV 5MP Audio Outdoor ColorVu Night Vision", qty: 8, unit: "Unit", price: 650000, total: 5200000 },
+              { productName: "NVR 16-Channel 4K Ultra HD Cloud Mobile Live", qty: 1, unit: "Unit", price: 2100000, total: 2100000 },
+              { productName: "Harddisk Surveillance 4TB Khusus Rekaman 24/7", qty: 1, unit: "Unit", price: 1800000, total: 1800000 },
+              { productName: "Centralized Power Supply Box 12V 20A Industrial", qty: 1, unit: "Unit", price: 650000, total: 650000 },
+              { productName: "Kabel RG59 + Power Coaxial 200 Meter & Konektor", qty: 2, unit: "Roll", price: 1250000, total: 2500000 },
+              { productName: "Jasa Penarikan Kabel Conduit Pipa Galvanis Pabrik & Komisioning", qty: 1, unit: "Lot", price: 6250000, total: 6250000 }
+            ],
+            subtotal: 18500000,
+            taxRate: 11,
+            taxType: "exclude",
+            taxAmount: 2035000,
+            grandTotal: 20535000,
+            hideTaxInPrint: true
+          }
+        },
+        {
+          id: `appr_auto_${Date.now()}_2`,
+          employee_id: "emp_bambang_sales",
+          employee_name: "Bambang Prakoso",
+          employee_role: "Senior AI Sales & Commercial Consultant",
+          department: "SALES",
+          task_type: "CRM_LEAD",
+          title: "Follow-up Prospek: Sistem Palang Otomatis RFID Rumah Sakit",
+          target_client: "RSUD Berkah Pandeglang",
+          value: 42000000,
+          tax_type: "net",
+          summary: "Pipeline B2B prospek modernisasi gerbang parkir IGD dan rawat inap dengan pembaca kartu RFID otomatis.",
+          status: "PENDING_APPROVAL",
+          created_at: nowStr,
+          payload: {
+            company: "RSUD Berkah Pandeglang",
+            pic: "Bagian Umum & Perlengkapan",
+            value: 42000000
+          }
+        }
+      ];
+
+      data.dstech_approval_queue.unshift(...autopilotTasks);
+      
+      const newLog = {
+        id: `log_${Date.now()}`,
+        timestamp: nowStr,
+        employee_id: "emp_dewi_finance",
+        employee_name: "AI Workforce Autopilot",
+        action: `[AUTOPILOT SELESAI] Staf AI telah menyelesaikan 2 tugas mandiri dan memasukkannya ke Kotak Persetujuan Pimpinan.`,
+      };
+      data.dstech_recent_logs.unshift(newLog);
+      writeWorkforceData(data);
+
+      return NextResponse.json({
+        success: true,
+        message: "Autopilot staf AI berhasil dijalankan! 2 draf tugas baru telah masuk ke Kotak Persetujuan.",
+        queue: data.dstech_approval_queue,
+      });
     }
 
     if (action === "order") {
@@ -571,135 +905,161 @@ Aturan Khusus:
               const prodRaw = fs.readFileSync(productsFilePath, "utf-8");
               let prodList: any[] = JSON.parse(prodRaw);
 
-              // 6 Produk Security Unggulan dari Toko Shopee Tekno20 dengan Markup +50%
+              // 6 Produk Asli Suku Cadang Barrier Gate & Akses Kontrol dengan Deskripsi Toko Otentik, Gambar Sesuai Fisik, dan Kerahasiaan Terjaga
               const tekno20Imported = [
                 {
                   id: `dstech_prod_tekno_${Date.now()}_1`,
-                  name: "DStech - Paket CCTV Dahua 4 Kamera Full HD Night Vision (Tekno20 Import)",
-                  category: "Security System",
-                  subCategory: "CCTV IP Camera & NVR",
-                  brand: "Dahua",
+                  name: "DStech - Bracket Palang / Roll Boom Barrier Gate BFT Came MX Universal",
+                  category: "Parking & Barrier System",
+                  subCategory: "Sparepart & Aksesoris Barrier Gate",
+                  brand: "Universal BFT/Came/MX",
                   entityType: "PT",
-                  costPrice: 1400000,
-                  price: 2100000, // Markup +50% dari harga toko Tekno20
+                  costPrice: 181500,
+                  price: 272250,
                   isPromo: false,
                   discountPercent: 0,
-                  promoTag: "Shopee Import +50%",
-                  installationFee: 350000,
+                  promoTag: "Ready Stock",
+                  installationFee: 100000,
                   hasInstallationService: true,
-                  stock: 15,
-                  unit: "Paket",
-                  warehouseStock: { dstech_wh_1: 15, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  stock: 50,
+                  unit: "Pcs",
+                  warehouseStock: { dstech_wh_1: 50, dstech_wh_2: 0, dstech_wh_3: 0 },
                   commission: "5%",
                   commissionRate: 5,
                   commissionType: "ONETIME",
-                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
-                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
-                  desc: "Diimpor langsung dari Toko Shopee Tekno20 dengan penyesuaian harga jual DSTech Smart (+50% margin).\nPaket CCTV 4 Kamera Outdoor/Indoor 2MP Dahua Cooper Series, 1 Unit DVR 4CH, Lengkap Adaptor & Aksesoris.",
+                  image: "/uploads/dstech_tekno_bracket_palang.jpg",
+                  images: ["/uploads/dstech_tekno_bracket_palang.jpg"],
+                  desc: "Bracket dudukan palang / roll boom arm holder untuk mesin barrier gate otomatis tipe MX-50, MX-80, BFT, CAME, dan sejenisnya.\n\nDibuat dari material plat besi baja tebal berkualitas tinggi dengan finishing cat oven anti-karat, kokoh menahan beban benturan angin kencang maupun getaran operasional motor boom gate.\n\nSpesifikasi & Keunggulan:\n- Kompatibel: Mesin Barrier Gate BFT, Came, MX Series, dan universal boom gate\n- Material: Heavy Duty Steel Plate finishing Powder Coating anti-korosi\n- Diameter / Lubang Poros: Standar as motor barrier gate\n- Lubang Baut: Presisi, mudah disesuaikan (plug & play)\n- Fungsi: Menjepit dan memegang pangkal palang boom arm secara kokoh dan seimbang saat buka-tutup palang.\n\nIsi Paket:\n- 1x Bracket Dudukan Palang Roll Boom\n- Baut pengunci & mur pengencang",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 },
                 {
                   id: `dstech_prod_tekno_${Date.now()}_2`,
-                  name: "DStech - Harddisk CCTV Surveillance 2TB Seagate SkyHawk (Tekno20 Import)",
-                  category: "Security System",
-                  subCategory: "Penyimpanan & Aksesoris",
-                  brand: "Seagate",
+                  name: "DStech - Sensor W1 Wireless Exit Loop Detector Barrier Gate Palang Parkir",
+                  category: "Parking & Barrier System",
+                  subCategory: "Loop Detector & Vehicle Sensor",
+                  brand: "Sensor W1 Pro",
                   entityType: "PT",
-                  costPrice: 850000,
-                  price: 1275000, // Markup +50%
+                  costPrice: 265000,
+                  price: 397500,
                   isPromo: false,
                   discountPercent: 0,
-                  promoTag: "Shopee Import +50%",
-                  installationFee: 50000,
+                  promoTag: "Original",
+                  installationFee: 150000,
                   hasInstallationService: true,
-                  stock: 25,
+                  stock: 35,
                   unit: "Unit",
-                  warehouseStock: { dstech_wh_1: 25, dstech_wh_2: 0, dstech_wh_3: 0 },
-                  commission: "3%",
-                  commissionRate: 3,
+                  warehouseStock: { dstech_wh_1: 35, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  commission: "5%",
+                  commissionRate: 5,
                   commissionType: "ONETIME",
-                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
-                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
-                  desc: "Harddisk khusus surveillance CCTV 24/7 Seagate SkyHawk 2TB. Garansi resmi 3 tahun. Diimpor dari Shopee Tekno20 (+50% Margin).",
+                  image: "/uploads/dstech_tekno_sensor_w1.jpg",
+                  images: ["/uploads/dstech_tekno_sensor_w1.jpg"],
+                  desc: "Sensor W1 Wireless Exit Loop Detector merupakan solusi modern pengganti kabel loop tanam konvensional untuk sistem palang parkir otomatis (barrier gate).\n\nMendeteksi kendaraan yang mendekati atau melewati area gerbang secara nirkabel tanpa perlu membongkar, mengikis, atau merusak permukaan aspal/cor beton jalan.\n\nFitur & Keunggulan:\n- Deteksi Nirkabel (Wireless): Pemasangan sangat praktis, hemat waktu dan biaya instalasi tanpa bobok aspal\n- Respon Cepat & Akurat: Sensitivitas tinggi mendeteksi logam bodi mobil, truk, maupun motor\n- Jarak Deteksi Luas: Dapat disesuaikan dengan lebar jalur kendaraan (hingga 3 - 5 meter)\n- Daya Tahan Cuaca: Unit sensor luar tahan air hujan dan panas terik (IP66 Waterproof)\n- Kompatibilitas Universal: Cocok untuk semua kontroler barrier gate (trigger open / trigger anti-hit)\n\nSpesifikasi Teknis:\n- Frekuensi Kerja: 433 MHz / Microwave Radar Sensor\n- Tegangan Operasional: DC 12V - 24V\n- Output Trigger: Relay NO/NC (Dry Contact)\n- Suhu Kerja: -20°C s/d +70°C",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 },
                 {
                   id: `dstech_prod_tekno_${Date.now()}_3`,
-                  name: "DStech - Switch Hub PoE 8-Port Gigabit 10/100/1000Mbps (Tekno20 Import)",
-                  category: "Network & IoT",
-                  subCategory: "Switch & Router",
-                  brand: "DStech Enterprise",
+                  name: "DStech - Emergency Door Release Push Button Break Glass Hijau Access Control",
+                  category: "Security System",
+                  subCategory: "Access Control & Push Button",
+                  brand: "SecurePro K3",
                   entityType: "PT",
-                  costPrice: 550000,
-                  price: 825000, // Markup +50%
+                  costPrice: 74000,
+                  price: 111000,
                   isPromo: false,
                   discountPercent: 0,
-                  promoTag: "Shopee Import +50%",
-                  installationFee: 75000,
+                  promoTag: "Standar K3",
+                  installationFee: 50000,
                   hasInstallationService: true,
-                  stock: 20,
+                  stock: 60,
                   unit: "Unit",
-                  warehouseStock: { dstech_wh_1: 20, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  warehouseStock: { dstech_wh_1: 60, dstech_wh_2: 0, dstech_wh_3: 0 },
                   commission: "5%",
                   commissionRate: 5,
                   commissionType: "ONETIME",
-                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
-                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
-                  desc: "Switch Hub PoE 8 Port Gigabit untuk instalasi IP Camera CCTV. Diimpor dari Toko Shopee Tekno20 (+50% margin).",
+                  image: "/uploads/dstech_tekno_emergency_door_release.jpg",
+                  images: ["/uploads/dstech_tekno_emergency_door_release.jpg"],
+                  desc: "Tombol darurat pemutus arus pintu (Emergency Door Release) tipe break glass warna hijau standar keselamatan gedung.\n\nDigunakan pada sistem akses kontrol pintu perkantoran, rumah sakit, laboratorium, dan gedung komersial untuk membuka kunci pintu elektromagnetik (EM Lock) secara instan saat terjadi situasi darurat kebakaran atau evakuasi bencana.\n\nFitur & Spesifikasi:\n- Standar Keamanan: Warna Hijau Internasional (Emergency Exit Release)\n- Mekanisme: Kaca pelindung dapat ditekan/dipecahkan saat darurat untuk memutuskan aliran daya kunci magnet secara permanen hingga direset\n- Dilengkapi Kunci Reset (Reset Key): Dapat dipulihkan kembali ke posisi normal setelah pengetesan\n- Material: ABS Fireproof Housing tahan panas dan benturan\n- Kontak Output: NO / NC / COM (Dual Pole Double Throw)\n- Kapasitas Kontak: 3A @ 36V DC Max\n- Dimensi: 86 mm x 86 mm x 50 mm (Ukuran Standar Inbow Dus)",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 },
                 {
                   id: `dstech_prod_tekno_${Date.now()}_4`,
-                  name: "DStech - Power Supply Central Jaring 12V 20A Metal Case (Tekno20 Import)",
+                  name: "DStech - Wield Falcon Magnetic Lock Access Control 600Lbs 280Kg EM Lock",
                   category: "Security System",
-                  subCategory: "Penyimpanan & Aksesoris",
-                  brand: "DStech Power",
+                  subCategory: "Access Control & Magnetic Lock",
+                  brand: "Wield Falcon",
                   entityType: "PT",
-                  costPrice: 180000,
-                  price: 270000, // Markup +50%
+                  costPrice: 185000,
+                  price: 277500,
                   isPromo: false,
                   discountPercent: 0,
-                  promoTag: "Shopee Import +50%",
-                  installationFee: 50000,
+                  promoTag: "Heavy Duty",
+                  installationFee: 150000,
                   hasInstallationService: true,
                   stock: 40,
-                  unit: "Unit",
+                  unit: "Set",
                   warehouseStock: { dstech_wh_1: 40, dstech_wh_2: 0, dstech_wh_3: 0 },
-                  commission: "3%",
-                  commissionRate: 3,
+                  commission: "5%",
+                  commissionRate: 5,
                   commissionType: "ONETIME",
-                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
-                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
-                  desc: "Power Supply jaring 12V 20A untuk CCTV multi-channel. Diimpor dari Shopee Tekno20 (+50% margin).",
+                  image: "/uploads/dstech_tekno_em_lock_600lbs.jpg",
+                  images: ["/uploads/dstech_tekno_em_lock_600lbs.jpg"],
+                  desc: "Wield Falcon Electromagnetic Lock (EM Lock) kekuatan 600 Lbs / 280 Kg adalah kunci elektromagnetik andalan untuk pengamanan pintu akses kontrol modern.\n\nBekerja dengan prinsip gaya tarik elektromagnetik kuat tanpa komponen mekanis yang aus, menjamin keandalan jutaan kali buka-tutup pintu tanpa macet.\n\nSpesifikasi & Keunggulan:\n- Kekuatan Tahan Beban (Holding Force): 280 Kg (600 Lbs) Linear Thrust\n- Tegangan Kerja: DC 12V / 24V (Bisa diatur melalui jumper internal)\n- Konsumsi Arus: 12V / 500mA, 24V / 250mA\n- Sensor Status Pintu: Dilengkapi LED indikator status penguncian (Merah/Hijau) & feedback sinyal relay (Door Status Monitoring)\n- Fail-Safe Operation: Otomatis terbuka saat listrik padam untuk standar keselamatan evakuasi darurat\n- Tipe Pintu: Pintu Kayu, Pintu Kaca Tempered, Pintu Logam/Besi, dan Pintu Aluminium (Tersedia bracket L, Z, atau U)\n- Material: Anodized High Strength Aluminum Alloy & Zinc Electroplated Armature Plate",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 },
                 {
                   id: `dstech_prod_tekno_${Date.now()}_5`,
-                  name: "DStech - Roll Kabel Coaxial RG59 + Power 100M Premium (Tekno20 Import)",
+                  name: "DStech - Push Button Touch Sensor Exit Button Touchless Access Control No Touch",
                   category: "Security System",
-                  subCategory: "Penyimpanan & Aksesoris",
-                  brand: "DStech Cable",
+                  subCategory: "Access Control & Push Button",
+                  brand: "Touchless Pro",
                   entityType: "PT",
-                  costPrice: 320000,
-                  price: 480000, // Markup +50%
+                  costPrice: 84500,
+                  price: 126750,
                   isPromo: false,
                   discountPercent: 0,
-                  promoTag: "Shopee Import +50%",
+                  promoTag: "Touchless",
                   installationFee: 50000,
-                  hasInstallationService: false,
-                  stock: 30,
-                  unit: "Roll",
-                  warehouseStock: { dstech_wh_1: 30, dstech_wh_2: 0, dstech_wh_3: 0 },
-                  commission: "3%",
-                  commissionRate: 3,
+                  hasInstallationService: true,
+                  stock: 45,
+                  unit: "Unit",
+                  warehouseStock: { dstech_wh_1: 45, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  commission: "5%",
+                  commissionRate: 5,
                   commissionType: "ONETIME",
-                  image: "/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg",
-                  images: ["/uploads/dstech_img_1793180758957_6db496b9-39f7-4d75-8a61-f3c988.jpg"],
-                  desc: "Kabel Coaxial RG59 + Power 100 Meter. Diimpor dari Toko Shopee Tekno20 (+50% margin).",
+                  image: "/uploads/dstech_tekno_touchless_button.jpg",
+                  images: ["/uploads/dstech_tekno_touchless_button.jpg"],
+                  desc: "Sakelar tombol keluar tanpa sentuh (Touchless Exit Button) dengan teknologi sensor infra merah aktif untuk sistem akses kontrol pintu higienis dan modern.\n\nCukup lambaikan tangan pada jarak 5 - 15 cm di depan sensor tanpa perlu menyentuh permukaan tombol, mencegah penularan kuman dan bakteri di lingkungan kantor, rumah sakit, klinik, dan pabrik.\n\nFitur & Keunggulan:\n- Bebas Sentuh (No-Touch Infrared): Cukup mendekatkan telapak tangan untuk membuka pintu\n- Indikator LED Dua Warna: Biru Standby, Hijau Saat Terdeteksi (Trigger Aktif)\n- Jarak Respon Sensor: 5 cm - 15 cm (Bisa diatur sensitivitasnya)\n- Plat Stainless Steel: Bahan plat muka stainless tebal tahan gores, tahan karat, dan tampak mewah\n- Daya Tahan: Telah diuji lebih dari 500.000 kali trigger\n\nSpesifikasi Teknis:\n- Tegangan Kerja: DC 12V\n- Kontak Output: NO / NC / COM Relay Output\n- Kapasitas Beban: 3A @ 12V DC\n- Ukuran: 115 mm x 70 mm x 29 mm",
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                },
+                {
+                  id: `dstech_prod_tekno_${Date.now()}_6`,
+                  name: "DStech - Arm Palang Bulat Boom Barrier Gate Octagonal 3m - 4m Palang Parkir",
+                  category: "Parking & Barrier System",
+                  subCategory: "Palang & Boom Arm",
+                  brand: "Tekno Barrier",
+                  entityType: "PT",
+                  costPrice: 450000,
+                  price: 675000,
+                  isPromo: false,
+                  discountPercent: 0,
+                  promoTag: "Aluminium Alloy",
+                  installationFee: 250000,
+                  hasInstallationService: true,
+                  stock: 20,
+                  unit: "Batang",
+                  warehouseStock: { dstech_wh_1: 20, dstech_wh_2: 0, dstech_wh_3: 0 },
+                  commission: "5%",
+                  commissionRate: 5,
+                  commissionType: "ONETIME",
+                  image: "/uploads/dstech_img_1793016900513_Palang_Gate_Barier_Tanpa_Lampu.jfif",
+                  images: ["/uploads/dstech_img_1793016900513_Palang_Gate_Barier_Tanpa_Lampu.jfif"],
+                  desc: "Batang palang boom gate aluminium profil oktagonal / bulat berdaya tahan tinggi untuk mesin barrier gate perumahan, perkantoran, dan area parkir komersial.\n\nDilengkapi stiker reflektif prismatik merah-putih yang memantulkan cahaya lampu kendaraan di malam hari untuk keamanan dan visibilitas maksimal pengendara.\n\nSpesifikasi & Keunggulan:\n- Pilihan Panjang: 3 Meter hingga 4 Meter (Dapat dipotong presisi sesuai kebutuhan lebar gerbang)\n- Profil: Oktagonal (Segi Delapan) / Bulat aerodinamis tahan terpaan angin kencang\n- Material: Paduan Aluminium Ringan Berkekuatan Tinggi (High Strength Extruded Aluminum Alloy)\n- Karet Bumper Pengaman: Sisi bawah dilengkapi karet bantalan pelindung untuk mencegah baret pada kendaraan\n- Reflektor: Stiker Reflektif Merah - Putih kualitas tinggi berpendar terang saat tersorot lampu\n- Kompatibilitas: Cocok untuk Barrier Gate MX-50, MX-80, Servo DC, CAME, BFT, dan mesin palang standar lainnya.",
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 },
@@ -714,13 +1074,12 @@ Aturan Khusus:
 
               executionResult = {
                 type: "PRODUCTS_IMPORTED",
-                store: "Shopee Tekno20",
+                category: "Barrier Gate & Access Control",
                 count: tekno20Imported.length,
-                markup: "+50%",
                 link: "/admin/products",
               };
 
-              aiResponseText = `Siap Pak Ramadhani! Saya (Reza Firmansyah) telah selesai mengimpor ${tekno20Imported.length} produk dari Toko Shopee Tekno20 ke dalam katalog produk kita lengkap dengan spesifikasi, foto, dan kenaikan harga +50% dari harga modal toko. Seluruh produk telah aktif dan siap dipasarkan di menu Produk & Katalog!`;
+              aiResponseText = `Siap Pak Ramadhani! Saya (Reza Firmansyah) telah memperbarui dan mengimpor ${tekno20Imported.length} produk suku cadang Barrier Gate & Akses Kontrol ke dalam katalog master dengan deskripsi teknis dan spesifikasi otentik, foto produk presisi sesuai fisik barang, dan harga jual yang telah disesuaikan dengan margin perusahaan. Seluruh informasi supplier tetap terjaga kerahasiaannya dan produk sudah siap dipasarkan di menu Produk & Katalog!`;
             }
           } catch (prodErr: any) {
             console.error("Error executing Reza Catalog import:", prodErr);

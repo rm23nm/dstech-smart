@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="plateSteel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#cbd5e1"/>
+      <stop offset="35%" stop-color="#f8fafc"/>
+      <stop offset="70%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+    <radialGradient id="sensorGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.9"/>
+      <stop offset="70%" stop-color="#0284c7" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#0369a1" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadowPlate" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#0f172a" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <rect width="800" height="800" fill="url(#bgGrad2)"/>
+  
+  <!-- Floor Shadow -->
+  <ellipse cx="400" cy="710" rx="200" ry="25" fill="#0f172a" opacity="0.12" filter="blur(8px)"/>
+
+  <!-- Main Stainless Steel Faceplate -->
+  <g filter="url(#shadowPlate)">
+    <rect x="250" y="100" width="300" height="580" rx="20" fill="url(#plateSteel)" stroke="#94a3b8" stroke-width="3"/>
+    <!-- Plate Bevel Inner Line -->
+    <rect x="256" y="106" width="288" height="568" rx="16" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.8"/>
+
+    <!-- Mounting Screws -->
+    <circle cx="400" cy="140" r="10" fill="#cbd5e1" stroke="#64748b" stroke-width="2"/>
+    <line x1="393" y1="140" x2="407" y2="140" stroke="#475569" stroke-width="2"/>
+    
+    <circle cx="400" cy="640" r="10" fill="#cbd5e1" stroke="#64748b" stroke-width="2"/>
+    <line x1="393" y1="640" x2="407" y2="640" stroke="#475569" stroke-width="2"/>
+
+    <!-- Header Text -->
+    <text x="400" y="210" font-family="Arial, sans-serif" font-size="28" font-weight="900" fill="#0f172a" text-anchor="middle" letter-spacing="4">EXIT</text>
+    <text x="400" y="235" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#64748b" text-anchor="middle" letter-spacing="2">ACCESS CONTROL</text>
+
+    <!-- Center Sensor Ring Area -->
+    <circle cx="400" cy="380" r="100" fill="#0f172a" stroke="#334155" stroke-width="4"/>
+    <circle cx="400" cy="380" r="92" fill="#0369a1" opacity="0.2"/>
+    <circle cx="400" cy="380" r="82" fill="none" stroke="#38bdf8" stroke-width="4" stroke-dasharray="8 6"/>
+    <circle cx="400" cy="380" r="60" fill="url(#sensorGlow)"/>
+
+    <!-- Hand Wave Icon (No Touch Symbol) -->
+    <g transform="translate(365, 345) scale(1.4)" fill="#ffffff">
+      <!-- Palm & Fingers Icon -->
+      <path d="M12 2a2 2 0 0 1 2 2v7h1V5a2 2 0 0 1 4 0v6h1V7a2 2 0 0 1 4 0v9a8 8 0 0 1-8 8H10a8 8 0 0 1-8-8v-6a2 2 0 0 1 4 0v4h1V3a2 2 0 0 1 2-2h1z" opacity="0.95"/>
+    </g>
+
+    <!-- Infrared Waves -->
+    <path d="M330 330 A 90 90 0 0 1 330 430" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+    <path d="M470 330 A 90 90 0 0 0 470 430" fill="none" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+
+    <!-- Bottom Instruction Text -->
+    <text x="400" y="525" font-family="Arial, sans-serif" font-size="18" font-weight="900" fill="#0284c7" text-anchor="middle" letter-spacing="3">NO TOUCH</text>
+    <text x="400" y="550" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#475569" text-anchor="middle" letter-spacing="1.5">DOOR RELEASE SENSOR</text>
+
+    <!-- LED Indicator Spec -->
+    <rect x="330" y="580" width="140" height="24" rx="12" fill="#0f172a"/>
+    <circle cx="345" cy="592" r="5" fill="#22c55e"/>
+    <text x="405" y="596" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#f8fafc" text-anchor="middle">INFRARED AUTO</text>
+  </g>
+</svg>

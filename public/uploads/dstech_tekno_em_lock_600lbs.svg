@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="metalBody" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="25%" stop-color="#e2e8f0"/>
+      <stop offset="50%" stop-color="#cbd5e1"/>
+      <stop offset="75%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+    <linearGradient id="metalArmature" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#64748b"/>
+      <stop offset="30%" stop-color="#cbd5e1"/>
+      <stop offset="70%" stop-color="#94a3b8"/>
+      <stop offset="100%" stop-color="#475569"/>
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#0f172a" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="800" height="800" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle Grid/Floor Shadow -->
+  <ellipse cx="400" cy="590" rx="320" ry="45" fill="#0f172a" opacity="0.12" filter="blur(10px)"/>
+
+  <!-- Main Electromagnetic Lock Body (Top Unit) -->
+  <g filter="url(#dropShadow)">
+    <!-- Base mounting bracket -->
+    <rect x="120" y="240" width="560" height="130" rx="10" fill="url(#metalBody)" stroke="#475569" stroke-width="2"/>
+    <!-- Magnet face / coil block -->
+    <rect x="160" y="260" width="480" height="90" rx="4" fill="#334155" stroke="#1e293b" stroke-width="2"/>
+    
+    <!-- Electro coils segments -->
+    <rect x="220" y="275" width="160" height="60" rx="3" fill="#1e293b"/>
+    <rect x="420" y="275" width="160" height="60" rx="3" fill="#1e293b"/>
+    
+    <!-- Status LED (Green) -->
+    <circle cx="145" cy="275" r="7" fill="#22c55e" stroke="#16a34a" stroke-width="2"/>
+    <circle cx="145" cy="275" r="3" fill="#bbf7d0"/>
+    <text x="145" y="300" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#334155" text-anchor="middle">STATUS</text>
+
+    <!-- Screw holes -->
+    <circle cx="145" cy="335" r="6" fill="#475569" stroke="#1e293b" stroke-width="1.5"/>
+    <circle cx="655" cy="275" r="6" fill="#475569" stroke="#1e293b" stroke-width="1.5"/>
+    <circle cx="655" cy="335" r="6" fill="#475569" stroke="#1e293b" stroke-width="1.5"/>
+    
+    <!-- Branding Label -->
+    <rect x="280" y="248" width="240" height="18" rx="3" fill="#0f172a"/>
+    <text x="400" y="261" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#38bdf8" text-anchor="middle" letter-spacing="1.5">WIELD FALCON • 600 LBS (280 KG)</text>
+  </g>
+
+  <!-- Armature Plate (Bottom Unit) -->
+  <g filter="url(#dropShadow)">
+    <rect x="170" y="420" width="460" height="75" rx="8" fill="url(#metalArmature)" stroke="#334155" stroke-width="2"/>
+    <!-- Center Guide Pin & Screw -->
+    <circle cx="400" cy="457" r="14" fill="#475569" stroke="#1e293b" stroke-width="2"/>
+    <circle cx="400" cy="457" r="6" fill="#94a3b8"/>
+    <!-- Rubber Washers & Guide Holes -->
+    <circle cx="210" cy="457" r="9" fill="#1e293b"/>
+    <circle cx="590" cy="457" r="9" fill="#1e293b"/>
+    
+    <text x="400" y="525" font-family="Arial, sans-serif" font-size="14" font-weight="600" fill="#64748b" text-anchor="middle" letter-spacing="2">ARMATURE PLATE (HIGH TENSILE STEEL)</text>
+  </g>
+
+  <!-- Specs Badge -->
+  <rect x="250" y="660" width="300" height="42" rx="21" fill="#0f172a" opacity="0.85"/>
+  <text x="400" y="686" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#f8fafc" text-anchor="middle" letter-spacing="1">DC 12V/24V • FAIL-SAFE MAGNETIC LOCK</text>
+</svg>

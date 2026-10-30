@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
 
 const DEFAULT_PRODUCTS = [
@@ -229,7 +232,10 @@ export async function GET(req: Request) {
     });
   }
 
-  return NextResponse.json({ success: true, data: products });
+  return NextResponse.json(
+    { success: true, data: products },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+  );
 }
 
 export async function POST(req: Request) {
@@ -433,7 +439,10 @@ export async function DELETE(req: Request) {
 
     writeProducts(filtered);
 
-    return NextResponse.json({ success: true, message: "Produk berhasil dihapus", id });
+    return NextResponse.json(
+      { success: true, message: "Produk berhasil dihapus", id },
+      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+    );
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : "Terjadi kesalahan server";
     return NextResponse.json({ success: false, message: errorMessage }, { status: 500 });
