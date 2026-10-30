@@ -728,6 +728,187 @@ Aturan Khusus:
         }
       }
 
+      // --- BAMBANG PRAKOSO (Sales & B2B Commercial Consultant) ---
+      if (targetEmp.id === "emp_bambang_sales") {
+        try {
+          const crmFilePath = path.join(process.cwd(), "src/data/dstech_crm.json");
+          if (fs.existsSync(crmFilePath)) {
+            const crmRaw = fs.readFileSync(crmFilePath, "utf-8");
+            let crmData = JSON.parse(crmRaw);
+            if (!crmData.leads) crmData.leads = [];
+
+            // Ekstrak nama klien / perusahaan
+            let company = "Klien Korporat Baru";
+            const ptMatch = promptCommand.match(/(?:pt\.?|cv\.?|toko|gedung|kawasan|bapak|ibu|bpk)\s+[^,\.\n\r]+?(?=\s+(?:untuk|proyek|kebutuhan|di|dengan)|$)/i);
+            if (ptMatch && ptMatch[0]) {
+              company = ptMatch[0].trim();
+            } else {
+              const matchUntuk = promptCommand.match(/untuk\s+([^,\.\n\r]+)/i);
+              if (matchUntuk && matchUntuk[1]) company = matchUntuk[1].trim();
+            }
+
+            const leadNumber = `LEAD-DST-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(crmData.leads.length + 1).padStart(3, "0")}`;
+            const newLead = {
+              id: `dstech_crm_lead_${Date.now()}`,
+              leadNumber: leadNumber,
+              clientName: `PIC ${company}`,
+              company: company,
+              position: "General Affair / Project Manager",
+              phone: "0812-9988-7766",
+              email: `procurement@${company.toLowerCase().replace(/[^a-z0-9]/g, "") || "client"}.co.id`,
+              category: "B2B Industri",
+              projectTitle: `Peluang Pengadaan Proyek Security - ${company}`,
+              estimatedValue: 45000000,
+              stage: "PROPOSAL",
+              probability: 80,
+              source: "Instruksi Direktur Utama (Kantor Virtual)",
+              assignedTo: "RAMADHANI ST",
+              expectedClosingDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+              location: "Banten / Jabodetabek",
+              sphNumber: "",
+              notes: `Didaftarkan oleh Bambang Prakoso (AI Sales Consultant) atas arahan Direktur: "${promptCommand}"`,
+              activities: [
+                {
+                  id: `act_${Date.now()}`,
+                  type: "NOTE",
+                  title: "Inisiasi Pipeline Prospek B2B Baru",
+                  notes: `Bambang Prakoso memproses arahan Direktur: ${promptCommand}. Prospek masuk ke funnel negosiasi aktif.`,
+                  createdAt: new Date().toISOString(),
+                  createdBy: "Bambang Prakoso (AI Sales)"
+                }
+              ],
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            crmData.leads.unshift(newLead);
+            fs.writeFileSync(crmFilePath, JSON.stringify(crmData, null, 2), "utf-8");
+
+            executionResult = {
+              type: "LEAD_CREATED",
+              leadNumber: leadNumber,
+              company: company,
+              link: "/admin/orders",
+            };
+
+            aiResponseText = `Siap Pak Ramadhani! Saya (Bambang Prakoso) telah mendaftarkan ${company} ke dalam CRM Pipeline Penjualan B2B kita (#${leadNumber}) dengan status negosiasi proposal aktif. Saya akan segera kawal progress prospek ini sampai closing deal!`;
+          }
+        } catch (crmErr: any) {
+          console.error("Error executing Bambang Sales action:", crmErr);
+        }
+      }
+
+      // --- NADIA SAFITRI (Creative Marketing & Copywriter) ---
+      if (targetEmp.id === "emp_nadia_marketing") {
+        try {
+          const promoFilePath = path.join(process.cwd(), "src/data/dstech_promotions.json");
+          if (fs.existsSync(promoFilePath)) {
+            const promoRaw = fs.readFileSync(promoFilePath, "utf-8");
+            let promoList = JSON.parse(promoRaw);
+
+            const promoTitle = `Promo Spesial: ${promptCommand.replace(/^(tolong|bikin|buatkan|nadia|tolong buatkan)\s+/i, "")}`;
+            const newPromo = {
+              id: `dstech_promo_${Date.now()}`,
+              title: promoTitle.slice(0, 75),
+              category: "Brosur Promosi",
+              description: `Materi promosi resmi PT. DSTech Smart Perkasa disusun oleh Nadia Safitri atas instruksi Direktur: "${promptCommand}". Siap dibagikan via WhatsApp Broadcast dan Media Sosial.`,
+              fileUrl: "/service-cctv.png",
+              fileType: "PDF",
+              fileSize: "4.2 MB",
+              downloadCount: 0,
+              createdAt: new Date().toISOString(),
+            };
+
+            promoList.unshift(newPromo);
+            fs.writeFileSync(promoFilePath, JSON.stringify(promoList, null, 2), "utf-8");
+
+            executionResult = {
+              type: "PROMO_CREATED",
+              title: newPromo.title,
+              link: "/admin/promotions",
+            };
+
+            aiResponseText = `Siap Pak Ramadhani! Saya (Nadia Safitri) telah selesai merancang materi promosi baru "${newPromo.title}". Materi kampanye dan copywriting telah resmi ditambahkan ke modul Promosi & Media Kit untuk disebarluaskan ke calon mitra dan klien!`;
+          }
+        } catch (promoErr: any) {
+          console.error("Error executing Nadia Marketing action:", promoErr);
+        }
+      }
+
+      // --- DENI KURNIAWAN (Field Operations & Dispatcher) ---
+      if (targetEmp.id === "emp_deni_field") {
+        try {
+          const taskFilePath = path.join(process.cwd(), "src/data/dstech_employee_tasks.json");
+          if (fs.existsSync(taskFilePath)) {
+            const taskRaw = fs.readFileSync(taskFilePath, "utf-8");
+            let taskList = JSON.parse(taskRaw);
+
+            let clientTarget = "Klien DSTech";
+            const ptMatch = promptCommand.match(/(?:pt\.?|cv\.?|toko|gedung|bapak|ibu|bpk)\s+[^,\.\n\r]+?(?=\s+(?:untuk|ke|di|dengan)|$)/i);
+            if (ptMatch && ptMatch[0]) clientTarget = ptMatch[0].trim();
+
+            const ticketNumber = `MTC-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(taskList.length + 1).padStart(3, "0")}`;
+            const newTask = {
+              id: `dstech_task_${Date.now()}`,
+              ticketNumber: ticketNumber,
+              entityType: "PT",
+              type: "Installation",
+              title: `SPK Lapangan: Penugasan Teknisi - ${clientTarget}`,
+              client: clientTarget,
+              clientPhone: "0812-9988-7766",
+              clientPic: "PIC Lapangan",
+              location: "Lokasi Proyek Klien",
+              date: new Date().toISOString().split("T")[0],
+              deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+              status: "In Progress",
+              priority: "High",
+              technician: "Ikhsan Maulidi (Lead Field Tech)",
+              technicianPhone: "+6282259494242",
+              scope: [
+                `Menjalankan penugasan resmi Direktur Utama: ${promptCommand}`,
+                "Pemeriksaan jalur kabel, catu daya listrik, dan titik penempatan unit",
+                "Uji fungsi operasional dan komisioning sistem",
+                "Berita Acara Serah Terima (BAST) pekerjaan lapangan",
+              ],
+              equipment: [
+                "Toolbox Teknisi Lengkap (Crimping, Multitester, Bor)",
+                "Tangga Teleskopik & APD Keselamatan Kerja",
+                "Kabel & Aksesoris Instalasi Lapangan",
+              ],
+              photos: [],
+              report: "",
+              notes: `Surat Perintah Kerja (SPK) diterbitkan otomatis oleh Deni Kurniawan (AI Dispatcher) atas instruksi Direktur Utama: "${promptCommand}"`,
+              recommendation: "Lakukan safety briefing sebelum memulai pekerjaan teknis di lokasi.",
+              updatedAt: new Date().toISOString(),
+              completionDate: "",
+            };
+
+            taskList.unshift(newTask);
+            fs.writeFileSync(taskFilePath, JSON.stringify(taskList, null, 2), "utf-8");
+
+            executionResult = {
+              type: "TASK_DISPATCHED",
+              ticketNumber: ticketNumber,
+              client: clientTarget,
+              link: "/admin/maintenance",
+            };
+
+            aiResponseText = `Siap Pak Ramadhani! Saya (Deni Kurniawan) telah menerbitkan Surat Perintah Kerja (SPK) #${ticketNumber} untuk tim teknisi lapangan di lokasi ${clientTarget}. Jadwal kerja dan alokasi peralatan sudah resmi terjadwal di sistem Manajemen Tugas & Maintenance!`;
+          }
+        } catch (taskErr: any) {
+          console.error("Error executing Deni Field action:", taskErr);
+        }
+      }
+
+      // --- SITI NURHALIZA (Customer Care & Front Office) ---
+      if (targetEmp.id === "emp_siti_cs") {
+        executionResult = {
+          type: "INQUIRY_RESOLVED",
+          topic: promptCommand,
+        };
+        aiResponseText = `Halo Pak Ramadhani! Saya Siti Nurhaliza dari Front Office & Layanan Pelanggan. Arahan Bapak "${promptCommand}" telah saya catat dan langsung saya distribusikan ke tim terkait. Tamu dan pengunjung website kami layani dengan sepenuh hati 24 jam!`;
+      }
+
       // Fallback jika API key tidak tersedia / timeout dan belum ada response teks
       if (!aiResponseText) {
         aiResponseText = `Siap, Pak Ramadhani! Instruksi "${promptCommand}" segera saya tindak lanjuti dan selesaikan detik ini juga sesuai SOP divisi kami.`;
