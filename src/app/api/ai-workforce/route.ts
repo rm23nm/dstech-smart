@@ -4,29 +4,171 @@ import path from "path";
 
 const DATA_FILE = path.join(process.cwd(), "src/data/dstech_ai_workforce.json");
 
+const DEFAULT_WORKFORCE = {
+  dstech_company: {
+    name: "PT. DSTech Smart Perkasa",
+    motto: "Digital Transformation & Smart IoT Solutions",
+    working_hours: "08:00 - 17:00 WIB",
+    office_mode: "ACTIVE"
+  },
+  dstech_employees: [
+    {
+      id: "emp_siti_cs",
+      name: "Siti Nurhaliza",
+      role: "Front Office & AI Customer Care",
+      department: "CUSTOMER_SERVICE",
+      desk_zone: "RECEPTION_DESK",
+      gender: "female",
+      avatar_color: "#ec4899",
+      status: "WORKING",
+      current_activity: "Menyapa pengunjung & standby konsultasi via Chat Website dan WhatsApp",
+      speech_bubble: "Selamat datang di DSTech Smart! Ada yang bisa kami bantu seputar CCTV & Barrier Gate?",
+      kpi: {
+        handled_inquiries: 48,
+        satisfaction_rate: "99.2%",
+        avg_response_time: "1.2s"
+      },
+      skills: ["Salam & Sapa Profesional", "Filter Pertanyaan Umum", "Routing ke Sales / Support", "Pencatatan Tamu Digital"]
+    },
+    {
+      id: "emp_bambang_sales",
+      name: "Bambang Prakoso",
+      role: "Senior AI Sales & Commercial Consultant",
+      department: "SALES",
+      desk_zone: "SALES_DESK",
+      gender: "male",
+      avatar_color: "#3b82f6",
+      status: "WORKING",
+      current_activity: "Follow-up calon klien B2B industri Cilegon dan memantau pipeline prospek CRM",
+      speech_bubble: "Prospek instalasi palang parkir RFID di kawasan industri siap kita buatkan penawaran SPH resmi.",
+      kpi: {
+        deals_closed: 14,
+        pipeline_value: 385000000,
+        active_negotiations: 5
+      },
+      skills: ["Negosiasi B2B Industri", "Estimasi Biaya Proyek", "Pencatatan CRM Pipeline", "Follow-up WhatsApp Klien"]
+    },
+    {
+      id: "emp_dewi_finance",
+      name: "Dewi Sartika",
+      role: "AI Finance & Tax Billing Specialist",
+      department: "FINANCE",
+      desk_zone: "FINANCE_DESK",
+      gender: "female",
+      avatar_color: "#10b981",
+      status: "WORKING",
+      current_activity: "Memverifikasi kalkulasi PPN Exclude/Include dan menyusun draf penawaran SPH",
+      speech_bubble: "Draf SPH penawaran harga sudah diselaraskan dengan pajak PPN dan siap diajukan ke Direktur.",
+      kpi: {
+        sph_generated: 26,
+        invoices_cleared: 31,
+        tax_reconciled: "100%"
+      },
+      skills: ["Penerbitan SPH Resmi", "Kalkulasi Faktur & PPN 11%", "Buku Arus Kas ERP", "Reminder Tagihan Jatuh Tempo"]
+    },
+    {
+      id: "emp_reza_catalog",
+      name: "Reza Firmansyah",
+      role: "AI Product Catalog & Procurement Lead",
+      department: "CATALOG_ESTORE",
+      desk_zone: "CATALOG_DESK",
+      gender: "male",
+      avatar_color: "#8b5cf6",
+      status: "WORKING",
+      current_activity: "Sinkronisasi stok barang barrier gate, CCTV PTZ, dan perlengkapan smart home di E-Store",
+      speech_bubble: "Katalog produk barrier gate otomatis dan kamera AI thermal sudah terindeks rapi di toko online.",
+      kpi: {
+        products_managed: 128,
+        auto_descriptions: 94,
+        stock_accuracy: "99.8%"
+      },
+      skills: ["Import Produk Otomatis", "Copywriting Spesifikasi Teknis", "Katalog SEO-Friendly", "Sinkronisasi Harga Modal & Margin"]
+    },
+    {
+      id: "emp_nadia_marketing",
+      name: "Nadia Safitri",
+      role: "AI Creative Marketing & Copywriter",
+      department: "MARKETING",
+      desk_zone: "MARKETING_DESK",
+      gender: "female",
+      avatar_color: "#f59e0b",
+      status: "WORKING",
+      current_activity: "Menyusun materi promo paket CCTV pabrik dan copywriting broadcast WhatsApp",
+      speech_bubble: "Kampanye promo 'Solusi Keamanan Terintegrasi DSTech Smart' siap dibroadcast ke mitra bisnis.",
+      kpi: {
+        campaigns_created: 18,
+        wa_broadcast_leads: 62,
+        engagement_rate: "87.4%"
+      },
+      skills: ["Pembuatan Konten Promo", "Broadcast WhatsApp Efektif", "Banner Penawaran Khusus", "Artikel Edukasi Portofolio"]
+    },
+    {
+      id: "emp_deni_field",
+      name: "Deni Kurniawan",
+      role: "AI Field Coordinator & Dispatcher",
+      department: "FIELD_OPERATIONS",
+      desk_zone: "DISPATCH_DESK",
+      gender: "male",
+      avatar_color: "#06b6d4",
+      status: "WORKING",
+      current_activity: "Menyiapkan Surat Perintah Kerja (SPK) dan koordinasi jadwal instalasi tim teknisi lapangan",
+      speech_bubble: "Jadwal survey lokasi dan instalasi barrier gate untuk tim teknisi lapangan Pak Ramadhani sudah dijadwalkan.",
+      kpi: {
+        spk_dispatched: 22,
+        surveys_mapped: 19,
+        field_on_time: "96.5%"
+      },
+      skills: ["Penerbitan SPK Lapangan", "Plotting Rute & GPS Klien", "Alokasi Alat dari Inventory", "Monitoring Hasil Instalasi"]
+    }
+  ],
+  dstech_recent_logs: [
+    {
+      id: "log_1",
+      timestamp: new Date().toISOString(),
+      employee_id: "emp_siti_cs",
+      employee_name: "Siti Nurhaliza",
+      action: "Menyapa pengunjung website & menawarkan bantuan konsultasi sistem otomatisasi."
+    },
+    {
+      id: "log_2",
+      timestamp: new Date().toISOString(),
+      employee_id: "emp_bambang_sales",
+      employee_name: "Bambang Prakoso",
+      action: "Kualifikasi kebutuhan klien industri palang parkir otomatis untuk pabrik kimia di Cilegon."
+    },
+    {
+      id: "log_3",
+      timestamp: new Date().toISOString(),
+      employee_id: "emp_dewi_finance",
+      employee_name: "Dewi Sartika",
+      action: "Menyinkronkan draf penawaran harga dengan opsi PPN Exclude sesuai instruksi direktur."
+    },
+    {
+      id: "log_4",
+      timestamp: new Date().toISOString(),
+      employee_id: "emp_nadia_marketing",
+      employee_name: "Nadia Safitri",
+      action: "Menyiapkan materi promosi bundling barrier gate + sistem akses RFID perumahan."
+    }
+  ]
+};
+
 function readWorkforceData() {
   try {
     if (!fs.existsSync(DATA_FILE)) {
-      return {
-        dstech_company: {
-          name: "PT. DSTech Smart Perkasa",
-          motto: "Digital Transformation & Smart IoT Solutions",
-          working_hours: "08:00 - 17:00 WIB",
-          office_mode: "ACTIVE"
-        },
-        dstech_employees: [],
-        dstech_recent_logs: []
-      };
+      writeWorkforceData(DEFAULT_WORKFORCE);
+      return JSON.parse(JSON.stringify(DEFAULT_WORKFORCE));
     }
     const raw = fs.readFileSync(DATA_FILE, "utf-8");
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.dstech_employees || parsed.dstech_employees.length === 0) {
+      writeWorkforceData(DEFAULT_WORKFORCE);
+      return JSON.parse(JSON.stringify(DEFAULT_WORKFORCE));
+    }
+    return parsed;
   } catch (err) {
     console.error("Error reading dstech_ai_workforce.json:", err);
-    return {
-      dstech_company: { name: "PT. DSTech Smart Perkasa", office_mode: "ACTIVE" },
-      dstech_employees: [],
-      dstech_recent_logs: []
-    };
+    return JSON.parse(JSON.stringify(DEFAULT_WORKFORCE));
   }
 }
 
