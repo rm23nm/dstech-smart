@@ -4,6 +4,25 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 306 (SEDANG DIKERJAKAN)**: Perbaikan Masalah Prospek CRM Muncul Kembali Setelah Dihapus Semua Akibat Auto-Seeding Saat Array Prospek Kosong (`src/app/api/crm/route.ts`).
+  *Permintaan User*: "semua list prospek sudah saya hapus, namun kenapa muncul kembali?" (disertai tangkapan layar kanban CRM yang menampilkan 5 kartu prospek bawaan)
+  *Penyebab Masalah yang Diidentifikasi*:
+  1. Pada [src/app/api/crm/route.ts](file:///d:/OneDrive/My%20Project%20Aplikasi/Website%20DStech%20Smart/dstech-smart/src/app/api/crm/route.ts) di fungsi `readCrmData()` (baris 202), terdapat kondisi pengecekan:
+     `if (Array.isArray(parsed.leads) && parsed.leads.length > 0)`
+  2. Ketika pengguna menghapus seluruh prospek (baik satu per satu maupun via "Hapus Terpilih / Bulk Delete"), array `leads` menjadi kosong `[]` (`length === 0`).
+  3. Saat frontend me-refresh data via `GET /api/crm`, fungsi `readCrmData()` membaca file JSON yang berisi `{ leads: [] }`. Karena `parsed.leads.length > 0` bernilai FALSE, sistem keliru menganggap database CRM belum pernah diinisialisasi atau korup.
+  4. Akibatnya, pada baris 210-219, sistem secara otomatis meng-overwrite file `dstech_crm.json` dengan 5 dummy lead bawaan (`INITIAL_LEADS`: Ir. Hendra Gunawan, Ibu Ratna Dewi, Drs. H. Mulyadi, Bpk. Aris Munandar, Cynthia Paramitha), sehingga prospek yang baru saja dihapus bersih oleh pengguna seketika muncul kembali.
+  *Rencana Langkah Pengerjaan Step-by-Step*:
+  1. Buat folder cadangan `_backup_crm_leads_delete_fix` dan salin berkas `src/app/api/crm/route.ts`.
+  2. Perbaiki fungsi `readCrmData()` di `src/app/api/crm/route.ts`:
+     - Ubah validasi menjadi `if (Array.isArray(parsed.leads)) { return { leads: parsed.leads }; }` tanpa syarat `length > 0`.
+     - Tandai status inisialisasi pada file JSON agar sistem mengetahui bahwa file sudah resmi diinisialisasi dan tidak boleh di-seed ulang jika pengguna sengaja mengosongkan daftar prospek.
+  3. Kosongkan array `leads` pada `src/data/dstech_crm.json` lokal menjadi `{ "leads": [] }` sesuai yang diinginkan pengguna saat menghapus seluruh prospek.
+  4. Validasi tipe dengan `npx tsc --noEmit` dan `npm run build`.
+  5. Hapus folder cadangan setelah verifikasi berhasil.
+  6. Perbarui `LAPORAN_PROGRES.md` menandai Tugas 306 sebagai `[SELESAI]`.
+  7. Push ke GitHub repository dan deploy live ke VPS 157.66.34.199 via `deploy_live.js` agar di website live prospek juga bersih dan tidak muncul kembali.
+
 - **2026-10-30**: [SELESAI] Perbaikan Layar Crash "This page couldn't load - Cannot read properties of undefined (reading 'toLowerCase')" pada Tab Buku Arus Kas Keuangan ERP (`src/app/admin/finance/page.tsx`).
   *Permintaan User*: "untuk buku arus kas eror" (disertai tangkapan layar console TypeError: Cannot read properties of undefined reading 'toLowerCase')
   *Penyebab Masalah yang Diidentifikasi*:

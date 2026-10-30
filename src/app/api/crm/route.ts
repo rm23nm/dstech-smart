@@ -199,7 +199,7 @@ function readCrmData(): { leads: any[] } {
     if (fs.existsSync(CRM_FILE)) {
       const content = fs.readFileSync(CRM_FILE, "utf-8");
       const parsed = JSON.parse(content);
-      if (Array.isArray(parsed.leads) && parsed.leads.length > 0) {
+      if (Array.isArray(parsed.leads)) {
         return { leads: parsed.leads };
       }
     }
@@ -207,7 +207,7 @@ function readCrmData(): { leads: any[] } {
     console.error("Gagal membaca dstech_crm.json:", err);
   }
 
-  // Jika file belum ada atau kosong, inisialisasi dengan data default
+  // Hanya jika file fisik belum pernah ada sama sekali, inisialisasi dengan data default
   const defaultData = { leads: INITIAL_LEADS };
   try {
     const dir = path.dirname(CRM_FILE);
@@ -417,6 +417,17 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         message: `${deletedCount} prospek berhasil dihapus dari sistem!`,
+        deletedCount
+      });
+    }
+
+    if (action === "clear_all") {
+      const deletedCount = data.leads.length;
+      data.leads = [];
+      writeCrmData(data);
+      return NextResponse.json({
+        success: true,
+        message: "Seluruh data prospek CRM berhasil dikosongkan secara permanen!",
         deletedCount
       });
     }
