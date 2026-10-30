@@ -49,6 +49,7 @@ interface SearchResult {
 
 const SEARCH_CATALOG: SearchResult[] = [
   { title: "Dashboard Overview", category: "Navigasi", url: "/admin", desc: "Ringkasan metrik omset, stok, dan partner" },
+  { title: "Kantor Virtual AI (3D Simulation)", category: "Operasional", url: "/admin/virtual-office", desc: "Simulasi 3D kantor digital interaktif, divisi armada karyawan AI & komando direktur" },
   { title: "Email & Webmail Perusahaan", category: "Operasional", url: "/admin/mail", desc: "Kelola akun email resmi, kotak masuk webmail dan kirim email via SMTP SSL" },
   { title: "Kontrak Kerja & Rekrutmen", category: "Operasional", url: "/admin/contracts", desc: "Kelola kontrak kerja staf bulanan/tahunan dan teknisi harian (Tipe 1 & 2), cetak PKWT resmi A4" },
   { title: "Rekap Absensi Karyawan & Teknisi", category: "Operasional", url: "/admin/attendance", desc: "Pantau presensi masuk/pulang, titik GPS Google Maps, dan riwayat kehadiran" },

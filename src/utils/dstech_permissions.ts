@@ -35,6 +35,13 @@ export const DSTECH_SYSTEM_MENUS: MenuItemConfig[] = [
     desc: "Ringkasan metrik omset, stok, presensi & performa bisnis",
   },
   {
+    id: "virtual-office",
+    name: "Kantor Virtual AI 3D",
+    category: "Operasional",
+    path: "/admin/virtual-office",
+    desc: "Simulasi 3D kantor digital, divisi karyawan AI dan delegasi instruksi direktur",
+  },
+  {
     id: "finance",
     name: "Keuangan & ERP",
     category: "Keuangan",
@@ -354,6 +361,9 @@ export function checkUserPermission(
   action: PermissionAction = "view"
 ): boolean {
   if (userRole === "SUPERADMIN") return true;
+  if (menuId === "virtual-office") {
+    if (userRole === "ADMIN" || !permissions || permissions[menuId]?.[action] !== false) return true;
+  }
   if (!permissions) {
     const defaultPerms = getDefaultPermissionsByRole(userRole || "EMPLOYEE");
     return defaultPerms[menuId]?.[action] ?? false;

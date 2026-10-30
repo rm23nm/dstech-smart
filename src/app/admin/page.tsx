@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import {
   TrendingUp,
   Package,
@@ -669,6 +670,39 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Banner Akses Cepat: Kantor Virtual & Karyawan AI 3D */}
+      <Link
+        href="/admin/virtual-office"
+        className="block rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 border-2 border-cyan-500/30 hover:border-cyan-400 p-6 text-white shadow-xl hover:shadow-cyan-500/20 transition-all group relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-cyan-500/10 to-transparent pointer-events-none" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30 shrink-0 group-hover:scale-105 transition-transform">
+              <Building2 className="w-7 h-7" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider text-cyan-400 bg-cyan-950/60 px-2.5 py-0.5 rounded-full border border-cyan-500/30">
+                  Fitur Baru 3D WebGL
+                </span>
+                <span className="text-xs text-slate-400">• 6 Divisi Karyawan AI Aktif</span>
+              </div>
+              <h3 className="text-lg font-black text-white mt-0.5 group-hover:text-cyan-300 transition-colors">
+                🏢 Kantor Virtual AI &amp; Simulasi Dunia 3D Digital
+              </h3>
+              <p className="text-xs text-slate-300 mt-1 max-w-xl">
+                Pantau langsung armada karyawan AI beraktivitas di ruang kantor 3D interaktif, beri instruksi tugas otomatis, dan kelola operasional perusahaan.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-5 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/30 shrink-0 transition-all group-hover:translate-x-1">
+            <span>Buka Kantor 3D</span>
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </div>
+      </Link>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">

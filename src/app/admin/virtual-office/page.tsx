@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Office3DCanvas from "@/components/virtual-office/Office3DCanvas";
 import {
   Sparkles,
   Bot,
@@ -29,7 +30,9 @@ import {
   ChevronRight,
   X,
   Play,
-  MessageSquare
+  MessageSquare,
+  Box,
+  LayoutGrid
 } from "lucide-react";
 
 interface Employee {
@@ -69,6 +72,7 @@ export default function VirtualOfficePage() {
   // Office Sound & Display
   const [isMuted, setIsMuted] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [viewMode, setViewMode] = useState<"3D" | "GRID">("3D");
   const officeContainerRef = useRef<HTMLDivElement>(null);
 
   // Fetch initial workforce data
@@ -182,6 +186,32 @@ export default function VirtualOfficePage() {
         </div>
 
         <div className="relative z-10 flex flex-wrap items-center gap-2.5">
+          {/* Mode Switcher 3D vs Grid */}
+          <div className="flex items-center p-1 rounded-xl bg-slate-900/80 border border-slate-700 shadow-inner">
+            <button
+              onClick={() => setViewMode("3D")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === "3D"
+                  ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/30"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span>Simulasi 3D</span>
+            </button>
+            <button
+              onClick={() => setViewMode("GRID")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === "GRID"
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Denah Kartu</span>
+            </button>
+          </div>
+
           <button
             onClick={() => setIsMuted(!isMuted)}
             className="p-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 border border-white/10"
@@ -211,7 +241,17 @@ export default function VirtualOfficePage() {
         </div>
       </div>
 
-      {/* DENAH KANTOR VIRTUAL (ISOMETRIC / 2.5D INTERACTIVE FLOOR PLAN) */}
+      {/* VIEWPORT 3D UTAMA ATAU DENAH KANTOR */}
+      {viewMode === "3D" ? (
+        <div className="relative">
+          <Office3DCanvas
+            employees={employees}
+            selectedEmployee={selectedEmployee}
+            onSelectEmployee={(emp) => setSelectedEmployee(emp as Employee)}
+          />
+        </div>
+      ) : (
+      /* DENAH KANTOR VIRTUAL (ISOMETRIC / 2.5D INTERACTIVE FLOOR PLAN) */
       <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl p-6 relative overflow-hidden min-h-[580px]">
         {/* Background Grid Ambience */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
@@ -402,6 +442,7 @@ export default function VirtualOfficePage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* EXECUTIVE COMMAND BAR (KOTAK PERINTAH LANGSUNG DARI DIREKTUR UTAMA) */}
       <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-2 border-indigo-500/40 p-5 rounded-3xl shadow-2xl space-y-3">
