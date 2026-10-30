@@ -288,88 +288,227 @@ Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
               const finData = JSON.parse(finRaw);
               if (!finData.quotations) finData.quotations = [];
 
-              // Ekstrak nama klien
-              let customerName = "Klien Baru DSTech";
-              if (lowerCmd.includes("purna jual")) {
-                customerName = "PT Purna Jual Baru";
-              } else {
-                const matchUntuk = promptCommand.match(/untuk\s+([A-Za-z0-9\s\.\,\-]+)/i);
-                if (matchUntuk && matchUntuk[1]) {
-                  customerName = matchUntuk[1].trim();
+              // 1. Ekstrak rincian SPH menggunakan AI Gemini atau Fallback Parser yang cerdas
+              let extractedSph: any = null;
+
+              if (apiKey) {
+                try {
+                  const sphExtractionPrompt = `Anda adalah sistem ERP Intelligence DSTech Smart Perkasa.
+Direktur Utama memberikan perintah: "${promptCommand}".
+Tugas Anda: Buat spesifikasi Surat Penawaran Harga (SPH) resmi yang akurat dalam format JSON MURNI tanpa markdown (jangan gunakan \`\`\`json).
+Format JSON yang wajib dihasilkan:
+{
+  "customerName": "Nama Perusahaan / Klien yang bersih tanpa kata sambung atau instruksi (contoh: 'PT. Tunas Buana Properti')",
+  "customerAddress": "Alamat / Lokasi yang tertera (contoh: 'Cluster Elysium') atau 'Indonesia'",
+  "subject": "Judul Subjek Penawaran Resmi (contoh: 'Surat Penawaran Harga Pengadaan & Instalasi Gate Access Sistem In-Out Cluster Elysium')",
+  "projectName": "Nama Proyek Ringkas (contoh: 'Instalasi Gate Access In-Out Cluster Elysium')",
+  "items": [
+    {
+      "productName": "Nama barang/jasa yang spesifik dan profesional sesuai kebutuhan (jika barrier gate berikan barrier gate & controller, jika CCTV berikan CCTV & DVR)",
+      "qty": 1,
+      "unit": "Unit / Pcs / Lot / Set",
+      "price": 1000000,
+      "discount": 0,
+      "total": 1000000
+    }
+  ]
+}
+Aturan Khusus:
+- Jika permintaan mengenai Barrier Gate / Gate Access / Palang Parkir In-Out: Masukkan Barrier Gate Otomatis (2 Unit jika In-Out), Tiang Reader RFID, Loop Detector Sensor Anti-Tabrak, Kartu Akses Warga, dan Jasa Pemasangan & Wiring.
+- Jika permintaan mengenai CCTV: Masukkan Kamera CCTV sesuai jumlah unit, DVR/NVR, Harddisk CCTV, Power Supply, Kabel & Jasa Pasang.
+- Harga wajar standar pasar profesional Indonesia. Pastikan total = qty * price.`;
+
+                  const resExtraction = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      contents: [{ role: "user", parts: [{ text: sphExtractionPrompt }] }],
+                      generationConfig: { responseMimeType: "application/json" }
+                    }),
+                    signal: AbortSignal.timeout(12000)
+                  });
+
+                  if (resExtraction.ok) {
+                    const parsed = await resExtraction.json();
+                    const textOut = parsed?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+                    if (textOut) {
+                      extractedSph = JSON.parse(textOut);
+                    }
+                  }
+                } catch (geminiErr: any) {
+                  console.warn("Gemini SPH parsing fallback:", geminiErr.message);
                 }
               }
 
-              // Nomor SPH otomatis
-              const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
-              const sphCount = (finData.quotations.length || 0) + 1;
-              const sphNumber = `SPH-DSTECH-${yearMonth}-${String(sphCount).padStart(3, "0")}`;
+              // 2. Fallback cerdas jika Gemini tidak tersedia / error
+              if (!extractedSph || !extractedSph.items || extractedSph.items.length === 0) {
+                let customerName = "Klien DSTech Smart";
+                let customerAddress = "Banten / Jabodetabek";
+                let projectName = "Proyek Pengadaan & Instalasi DSTech";
+                let subject = "Surat Penawaran Harga Pengadaan Perangkat & Jasa Instalasi";
+                let items: any[] = [];
 
-              // Item penawaran CCTV standar atau disesuaikan
-              let items = [
-                {
-                  productName: "Kamera CCTV 2MP Full HD Indoor/Outdoor IR Night Vision Waterproof",
-                  qty: 4,
-                  unit: "Unit",
-                  price: 350000,
-                  discount: 0,
-                  total: 1400000,
-                },
-                {
-                  productName: "DVR / NVR 4-Channel Full HD 1080P Network Standalone Cloud View",
-                  qty: 1,
-                  unit: "Unit",
-                  price: 650000,
-                  discount: 0,
-                  total: 650000,
-                },
-                {
-                  productName: "Harddisk Internal Surveillance 1TB Khusus CCTV 24/7 (WD Purple / Seagate SkyHawk)",
-                  qty: 1,
-                  unit: "Unit",
-                  price: 850000,
-                  discount: 0,
-                  total: 850000,
-                },
-                {
-                  productName: "Centralized Power Supply Box 12V 10A dengan Fuse Proteksi Listrik",
-                  qty: 1,
-                  unit: "Unit",
-                  price: 300000,
-                  discount: 0,
-                  total: 300000,
-                },
-                {
-                  productName: "Kabel Coaxial RG59 + Power (50m) & 8 Pcs Konektor BNC Drat + 4 Pcs Jack DC",
-                  qty: 1,
-                  unit: "Lot",
-                  price: 450000,
-                  discount: 0,
-                  total: 450000,
-                },
-                {
-                  productName: "Jasa Instalasi 4 Titik Kamera, Penarikan Kabel Conduit Rapi, Crimping & Setting Online Cloud HP",
-                  qty: 1,
-                  unit: "Lot",
-                  price: 1000000,
-                  discount: 0,
-                  total: 1000000,
-                },
-              ];
+                // Parsing nama perusahaan yang bersih
+                const ptMatch = promptCommand.match(/(?:pt\.?|cv\.?|toko|yayasan|gedung|bapak|ibu|bpk)\s+[^,\.\n\r]+?(?=\s+(?:atas|untuk|permintaan|kebutuhan|proyek|di|dengan|dalam)|$)/i);
+                if (ptMatch && ptMatch[0]) {
+                  customerName = ptMatch[0].trim();
+                } else {
+                  const matchUntuk = promptCommand.match(/untuk\s+([^,\.\n\r]+?)(?=\s+(?:atas|permintaan|kebutuhan|proyek|di|dengan)|$)/i);
+                  if (matchUntuk && matchUntuk[1]) {
+                    customerName = matchUntuk[1].trim();
+                  }
+                }
 
-              const subtotal = items.reduce((acc, it) => acc + it.total, 0);
+                // Ekstrak lokasi jika ada (misal di Cluster Elysium)
+                const locMatch = promptCommand.match(/(?:di|lokasi|area)\s+([^,\.\n\r]+)/i);
+                if (locMatch && locMatch[1]) {
+                  customerAddress = locMatch[1].trim();
+                }
+
+                // Deteksi tipe barang (Gate Access vs CCTV vs Perangkat Lain)
+                const isGateAccess = lowerCmd.includes("gate") || lowerCmd.includes("palang") || lowerCmd.includes("barrier") || lowerCmd.includes("portal") || lowerCmd.includes("akses");
+                const isInOut = lowerCmd.includes("in out") || lowerCmd.includes("in-out") || lowerCmd.includes("masuk keluar") || lowerCmd.includes("2 gate");
+
+                if (isGateAccess) {
+                  subject = `Surat Penawaran Harga Pengadaan & Instalasi Gate Access ${isInOut ? "Sistem In-Out" : "Otomatis"}${customerAddress ? ` di ${customerAddress}` : ""}`;
+                  projectName = `Instalasi Barrier Gate Access ${isInOut ? "In-Out" : ""} ${customerName}`;
+                  const gateQty = isInOut ? 2 : 1;
+                  items = [
+                    {
+                      productName: `Mesin Barrier Gate Otomatis High Speed (Arm 3-4m) ${isInOut ? "Gate Masuk & Keluar" : "Sistem Akses"}`,
+                      qty: gateQty,
+                      unit: "Unit",
+                      price: 8500000,
+                      discount: 0,
+                      total: gateQty * 8500000,
+                    },
+                    {
+                      productName: `Tiang Reader RFID Standalone Controller + Housing Outdoor ${isInOut ? "In & Out" : ""}`,
+                      qty: gateQty,
+                      unit: "Unit",
+                      price: 3250000,
+                      discount: 0,
+                      total: gateQty * 3250000,
+                    },
+                    {
+                      productName: "Vehicle Loop Detector (VLD) Anti-Tabrak Sensor Keamanan Kendaraan",
+                      qty: gateQty,
+                      unit: "Unit",
+                      price: 1250000,
+                      discount: 0,
+                      total: gateQty * 1250000,
+                    },
+                    {
+                      productName: "Kartu Akses RFID Proximity Terdaftar Khusus Penghuni / Karyawan",
+                      qty: 100,
+                      unit: "Pcs",
+                      price: 25000,
+                      discount: 0,
+                      total: 2500000,
+                    },
+                    {
+                      productName: `Jasa Sipil Cor Pondasi Dudukan Gate, Penarikan Kabel Conduit & Setting Komisioning ${isInOut ? "In-Out" : ""}`,
+                      qty: 1,
+                      unit: "Lot",
+                      price: 4500000,
+                      discount: 0,
+                      total: 4500000,
+                    },
+                  ];
+                } else {
+                  // Default CCTV
+                  subject = `Surat Penawaran Harga Paket Pengadaan & Instalasi CCTV HD Night Vision - ${customerName}`;
+                  projectName = `Pengadaan & Instalasi CCTV - ${customerName}`;
+                  items = [
+                    {
+                      productName: "Kamera CCTV 2MP Full HD Indoor/Outdoor IR Night Vision Waterproof",
+                      qty: 4,
+                      unit: "Unit",
+                      price: 350000,
+                      discount: 0,
+                      total: 1400000,
+                    },
+                    {
+                      productName: "DVR / NVR 4-Channel Full HD 1080P Network Standalone Cloud View",
+                      qty: 1,
+                      unit: "Unit",
+                      price: 650000,
+                      discount: 0,
+                      total: 650000,
+                    },
+                    {
+                      productName: "Harddisk Internal Surveillance 1TB Khusus CCTV 24/7 (WD Purple / Seagate SkyHawk)",
+                      qty: 1,
+                      unit: "Unit",
+                      price: 850000,
+                      discount: 0,
+                      total: 850000,
+                    },
+                    {
+                      productName: "Centralized Power Supply Box 12V 10A dengan Fuse Proteksi Listrik",
+                      qty: 1,
+                      unit: "Unit",
+                      price: 300000,
+                      discount: 0,
+                      total: 300000,
+                    },
+                    {
+                      productName: "Kabel Coaxial RG59 + Power (50m) & 8 Pcs Konektor BNC Drat + 4 Pcs Jack DC",
+                      qty: 1,
+                      unit: "Lot",
+                      price: 450000,
+                      discount: 0,
+                      total: 450000,
+                    },
+                    {
+                      productName: "Jasa Instalasi 4 Titik Kamera, Penarikan Kabel Conduit Rapi, Crimping & Setting Online Cloud HP",
+                      qty: 1,
+                      unit: "Lot",
+                      price: 1000000,
+                      discount: 0,
+                      total: 1000000,
+                    },
+                  ];
+                }
+
+                extractedSph = {
+                  customerName,
+                  customerAddress,
+                  projectName,
+                  subject,
+                  items,
+                };
+              }
+
+              // Hitung subtotal dan PPN
+              const items = extractedSph.items.map((it: any) => ({
+                productName: it.productName,
+                qty: Number(it.qty) || 1,
+                unit: it.unit || "Unit",
+                price: Number(it.price) || 0,
+                discount: Number(it.discount) || 0,
+                total: Number(it.total) || (Number(it.qty) || 1) * (Number(it.price) || 0),
+              }));
+
+              const subtotal = items.reduce((acc: number, it: any) => acc + it.total, 0);
               const taxRate = 11;
               const taxAmount = Math.round(subtotal * (taxRate / 100));
               const grandTotal = subtotal + taxAmount;
+
+              // Nomor SPH urut
+              const yearMonth = new Date().toISOString().slice(0, 7).replace("-", "");
+              const sphCount = (finData.quotations.length || 0) + 1;
+              const sphNumber = `SPH-DSTECH-${yearMonth}-${String(sphCount).padStart(3, "0")}`;
 
               const newSphDoc = {
                 id: `dstech_sph_${Date.now()}`,
                 quotationNumber: sphNumber,
                 clientId: `client_${Date.now()}`,
-                customerName: customerName,
-                customerOrg: customerName,
+                customerName: extractedSph.customerName || "Klien DSTech",
+                customerOrg: extractedSph.customerName || "Klien DSTech",
                 customerPhone: "0812-9988-7766",
-                customerAddress: "Kawasan Industri, Banten",
-                subject: `Surat Penawaran Harga Paket Pengadaan & Instalasi CCTV 4 Kamera HD Night Vision`,
+                customerAddress: extractedSph.customerAddress || "Banten / Jabodetabek",
+                subject: extractedSph.subject || `Surat Penawaran Harga - ${extractedSph.customerName}`,
                 date: new Date().toISOString().split("T")[0],
                 validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
                 validityDays: 14,
@@ -378,14 +517,14 @@ Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
                 discount: 0,
                 discountType: "fixed",
                 discountPercent: 0,
-                discountLabel: "Diskon Khusus Negosiasi Proyek",
+                discountLabel: "Diskon Khusus Proyek",
                 revision: 0,
                 taxRate: taxRate,
                 taxType: "exclude",
                 taxAmount: taxAmount,
                 grandTotal: grandTotal,
                 hideTaxInPrint: true,
-                terms: "1. Harga penawaran di atas adalah Netto (Exclude PPN 11%).\n2. Garansi unit perangkat keras resmi 2 (dua) tahun penggantian unit baru.\n3. Garansi pemeliharaan teknis & jasa instalasi selama 6 (enam) bulan.\n4. Gratis setting integrasi cloud monitoring smartphone iOS / Android.\n5. Pembayaran: DP 50% saat PO terbit, Pelunasan 50% setelah serah terima pekerjaan (BAST).",
+                terms: "1. Seluruh harga penawaran di atas adalah harga Netto/DPP belum termasuk PPN 11% (Exclude PPN).\n2. Garansi unit perangkat keras resmi 1 (satu) sampai 2 (dua) tahun penggantian unit baru.\n3. Garansi pemeliharaan teknis & jasa instalasi selama 6 (enam) bulan.\n4. Gratis komisioning, pelatihan operator, dan integrasi sistem monitoring.\n5. Pembayaran: DP 50% saat PO terbit, Pelunasan 50% setelah serah terima pekerjaan (BAST).",
                 status: "Terkirim",
                 convertedInvoiceId: "",
                 approvalStatus: "Approved",
@@ -397,7 +536,7 @@ Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
                 attachments: [],
                 businessEntity: "PT",
                 projectId: "",
-                projectName: `Pengadaan CCTV 4 Titik - ${customerName}`,
+                projectName: extractedSph.projectName || `Proyek ${extractedSph.customerName}`,
                 branchId: "dstech_branch_1",
                 warehouseId: "dstech_wh_1",
               };
@@ -408,13 +547,14 @@ Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
               executionResult = {
                 type: "SPH_CREATED",
                 quotationNumber: sphNumber,
-                customerName: customerName,
+                customerName: extractedSph.customerName,
+                subject: extractedSph.subject,
                 subtotal: subtotal,
                 grandTotal: grandTotal,
                 link: "/admin/finance?tab=quotations",
               };
 
-              aiResponseText = `Siap Pak Ramadhani! Saya (Dewi Sartika) telah selesai menerbitkan Surat Penawaran Harga resmi #${sphNumber} untuk ${customerName} dengan total Rp ${subtotal.toLocaleString("id-ID")} (Exclude PPN 11%). Dokumen telah otomatis masuk ke sistem Keuangan & ERP dan siap Bapak review atau cetak PDF!`;
+              aiResponseText = `Siap Pak Ramadhani! Saya (Dewi Sartika) telah selesai menyusun dan menerbitkan draf Surat Penawaran Harga resmi #${sphNumber} untuk ${extractedSph.customerName} (${extractedSph.subject}) dengan total Netto Rp ${subtotal.toLocaleString("id-ID")} (Exclude PPN 11%). Dokumen telah otomatis masuk ke sistem Keuangan ERP dan siap ditinjau atau dicetak PDF!`;
             }
           } catch (finErr: any) {
             console.error("Error executing Dewi Finance SPH action:", finErr);
