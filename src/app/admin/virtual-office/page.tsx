@@ -30,6 +30,12 @@ import {
   ChevronRight,
   X,
   Play,
+  Pause,
+  Film,
+  Video,
+  Copy,
+  Download,
+  Smartphone,
   MessageSquare,
   Box,
   LayoutGrid,
@@ -39,7 +45,12 @@ import {
   Check,
   Eye,
   AlertTriangle,
-  Zap
+  Zap,
+  Heart,
+  Music,
+  RotateCcw,
+  Loader2,
+  Trash2
 } from "lucide-react";
 
 interface Employee {
@@ -71,7 +82,7 @@ export interface ApprovalItem {
   employee_name: string;
   employee_role: string;
   department: string;
-  task_type: "SPH_PROPOSAL" | "PRODUCT_IMPORT" | "PROMO_CAMPAIGN" | "CRM_LEAD" | "SPK_FIELD";
+  task_type: "SPH_PROPOSAL" | "PRODUCT_IMPORT" | "PROMO_CAMPAIGN" | "CRM_LEAD" | "SPK_FIELD" | "VIDEO_BRANDING" | "SOCIAL_MEDIA_CONTENT";
   title: string;
   target_client?: string;
   value?: number;
@@ -88,14 +99,414 @@ export default function VirtualOfficePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [approvalQueue, setApprovalQueue] = useState<ApprovalItem[]>([]);
-  const [approvalFilter, setApprovalFilter] = useState<"ALL" | "PENDING" | "APPROVED">("PENDING");
+  const [approvalFilter, setApprovalFilter] = useState<"ALL" | "PENDING" | "APPROVED" | "REJECTED">("PENDING");
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isClearingRejected, setIsClearingRejected] = useState(false);
   const [isTriggeringAutopilot, setIsTriggeringAutopilot] = useState(false);
   const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<ApprovalItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+
+  // Media Preview State for Video Branding & Dynamic Living Reels Engine
+  const [activeVideoScene, setActiveVideoScene] = useState<number>(0);
+  const [isPlayingVoiceover, setIsPlayingVoiceover] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [videoProgressSeconds, setVideoProgressSeconds] = useState<number>(0);
+  const [videoLikeCount, setVideoLikeCount] = useState<number>(1420);
+  const [isVideoLiked, setIsVideoLiked] = useState<boolean>(false);
+  const [activeMediaTab, setActiveMediaTab] = useState<"storyboard" | "script" | "caption" | "flyer">("storyboard");
+  const [copiedCaption, setCopiedCaption] = useState(false);
+
+  // Auto-play Timeline Video Reels Engine (0 - 30 Detik)
+  useEffect(() => {
+    let timer: any = null;
+    if (isVideoPlaying && previewItem?.payload) {
+      timer = setInterval(() => {
+        setVideoProgressSeconds((prev) => {
+          const next = prev + 1;
+          if (next > 30) {
+            return 0; // Otomatis loop ke awal
+          }
+          return next;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isVideoPlaying, previewItem]);
+
+  // Sinkronisasi Adegan Storyboard Otomatis Berdasarkan Detik Video:
+  // 0s - 6s   : Adegan 1 (Hook / CCTV ColorVu)
+  // 7s - 14s  : Adegan 2 (Palang Barrier Gate)
+  // 15s - 22s : Adegan 3 (Keamanan Industri & Pabrik)
+  // 23s - 30s : Adegan 4 (Outro & Call To Action)
+  useEffect(() => {
+    if (!isVideoPlaying) return;
+    if (videoProgressSeconds <= 6) {
+      setActiveVideoScene(0);
+    } else if (videoProgressSeconds <= 14) {
+      setActiveVideoScene(1);
+    } else if (videoProgressSeconds <= 22) {
+      setActiveVideoScene(2);
+    } else {
+      setActiveVideoScene(3);
+    }
+  }, [videoProgressSeconds, isVideoPlaying]);
+
+  // Reset player saat modal ditutup atau previewItem berganti
+  useEffect(() => {
+    if (!previewItem) {
+      setIsVideoPlaying(false);
+      setVideoProgressSeconds(0);
+      setIsPlayingVoiceover(false);
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    }
+  }, [previewItem]);
+
+  const handlePlayVoiceover = (text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      alert("Browser Anda belum mendukung speech synthesis suara otomatis.");
+      return;
+    }
+    if (isPlayingVoiceover) {
+      window.speechSynthesis.cancel();
+      setIsPlayingVoiceover(false);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "id-ID";
+    utterance.rate = 1.0;
+    utterance.pitch = 1.05;
+    utterance.onend = () => setIsPlayingVoiceover(false);
+    utterance.onerror = () => setIsPlayingVoiceover(false);
+    setIsPlayingVoiceover(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Toggle Play / Pause Video Reels Lengkap (sinkron narasi suara otomatis)
+  const handleTogglePlayVideo = () => {
+    if (isVideoPlaying) {
+      setIsVideoPlaying(false);
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+      setIsPlayingVoiceover(false);
+    } else {
+      setIsVideoPlaying(true);
+      if (previewItem?.payload?.fullVoiceoverScript) {
+        handlePlayVoiceover(previewItem.payload.fullVoiceoverScript);
+      }
+    }
+  };
+
+  // Navigasi manual langsung ke adegan tertentu
+  const handleSelectScene = (idx: number) => {
+    setActiveVideoScene(idx);
+    const sceneSeconds = [0, 7, 15, 23];
+    setVideoProgressSeconds(sceneSeconds[idx] || 0);
+  };
+
+  const handleCopyCaption = (text: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedCaption(true);
+      setTimeout(() => setCopiedCaption(false), 3000);
+    }
+  };
+
+  const [isRenderingVideo, setIsRenderingVideo] = useState(false);
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [renderedVideoUrl, setRenderedVideoUrl] = useState<string | null>(null);
+  const [videoDisplayMode, setVideoDisplayMode] = useState<"SIMULATION" | "REAL_VIDEO">("SIMULATION");
+
+  // ENGINE RENDER BERKAS VIDEO FISIK NYATA (.MP4 / .WEBM 9:16)
+  const handleRenderAndDownloadVideo = async (item: ApprovalItem) => {
+    if (typeof window === "undefined") return;
+    const scenes = item.payload?.scenes || [];
+    if (!scenes.length) {
+      alert("Adegan storyboard belum tersedia untuk dirender.");
+      return;
+    }
+
+    setIsRenderingVideo(true);
+    setRenderProgress(5);
+
+    try {
+      // 1. Inisialisasi Canvas Full HD 9:16 (720 x 1280 agar rendering cepat dan super tajam di HP/Laptop)
+      const canvas = document.createElement("canvas");
+      canvas.width = 720;
+      canvas.height = 1280;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas 2D context tidak didukung pada browser ini.");
+
+      // 2. Muat seluruh gambar adegan terlebih dahulu
+      const loadedImages: HTMLImageElement[] = [];
+      for (let i = 0; i < scenes.length; i++) {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = scenes[i].image || item.payload?.flyer_image_url || "/service-cctv.png";
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve; // Fallback toleran jika ada kendala jaringan
+        });
+        loadedImages.push(img);
+      }
+      setRenderProgress(15);
+
+      // 3. Setup MediaStream dari Canvas
+      const stream = canvas.captureStream(30); // 30 FPS
+      let selectedMime = "video/webm;codecs=vp9";
+      if (typeof MediaRecorder !== "undefined") {
+        if (!MediaRecorder.isTypeSupported(selectedMime)) selectedMime = "video/webm";
+        if (!MediaRecorder.isTypeSupported(selectedMime)) selectedMime = "video/mp4";
+      }
+
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported(selectedMime) ? selectedMime : undefined,
+        videoBitsPerSecond: 2800000,
+      });
+
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
+
+      const recordFinishedPromise = new Promise<Blob>((resolve) => {
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: selectedMime.includes("mp4") ? "video/mp4" : "video/webm" });
+          resolve(blob);
+        };
+      });
+
+      recorder.start();
+
+      // Durasi render video reels: 4 adegan x 2.2 detik = 8.8 detik padat
+      const fps = 30;
+      const durationPerSceneSec = 2.2;
+      const totalFrames = scenes.length * durationPerSceneSec * fps;
+      let frameCounter = 0;
+
+      for (let sIdx = 0; sIdx < scenes.length; sIdx++) {
+        const sc = scenes[sIdx];
+        const scImg = loadedImages[sIdx];
+        const sceneFrames = durationPerSceneSec * fps;
+
+        for (let f = 0; f < sceneFrames; f++) {
+          frameCounter++;
+          const currentPct = Math.min(94, Math.round((frameCounter / totalFrames) * 80) + 15);
+          setRenderProgress(currentPct);
+
+          const progressRatio = f / sceneFrames;
+          const scale = 1.0 + progressRatio * 0.14; // Efek Ken Burns motion
+
+          ctx.save();
+          // Latar Belakang Hitam Gelap
+          ctx.fillStyle = "#020617";
+          ctx.fillRect(0, 0, 720, 1280);
+
+          // Gambar Produk
+          if (scImg && scImg.width > 0) {
+            const drawW = 720 * scale;
+            const drawH = 1280 * scale;
+            const ox = (720 - drawW) / 2;
+            const oy = (1280 - drawH) / 2;
+            ctx.drawImage(scImg, ox, oy, drawW, drawH);
+          }
+
+          // Gradien Gelap Atas & Bawah
+          const gradTop = ctx.createLinearGradient(0, 0, 0, 240);
+          gradTop.addColorStop(0, "rgba(0,0,0,0.85)");
+          gradTop.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = gradTop;
+          ctx.fillRect(0, 0, 720, 240);
+
+          const gradBot = ctx.createLinearGradient(0, 800, 0, 1280);
+          gradBot.addColorStop(0, "rgba(0,0,0,0)");
+          gradBot.addColorStop(0.5, "rgba(0,0,0,0.85)");
+          gradBot.addColorStop(1, "rgba(0,0,0,0.98)");
+          ctx.fillStyle = gradBot;
+          ctx.fillRect(0, 800, 720, 480);
+
+          // Laser Scanner HUD Bar
+          const scanY = 320 + Math.sin(frameCounter * 0.12) * 140;
+          const laserGrad = ctx.createLinearGradient(0, 0, 720, 0);
+          laserGrad.addColorStop(0, "rgba(6,182,212,0)");
+          laserGrad.addColorStop(0.5, "rgba(6,182,212,0.9)");
+          laserGrad.addColorStop(1, "rgba(6,182,212,0)");
+          ctx.fillStyle = laserGrad;
+          ctx.fillRect(0, scanY, 720, 5);
+
+          // Top Header Reels
+          ctx.fillStyle = "#f43f5e";
+          ctx.beginPath();
+          ctx.arc(45, 60, 8, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.font = "bold 22px Arial, sans-serif";
+          ctx.fillStyle = "#ffffff";
+          ctx.fillText("DSTECH REELS OFFICIAL", 65, 68);
+
+          ctx.fillStyle = "rgba(0,0,0,0.7)";
+          ctx.fillRect(520, 40, 160, 36);
+          ctx.font = "bold 18px monospace";
+          ctx.fillStyle = "#fde047";
+          const sec = Math.floor(frameCounter / fps);
+          ctx.fillText(`00:${sec.toString().padStart(2, "0")} / 00:09`, 535, 65);
+
+          // Badge Adegan
+          ctx.fillStyle = "#f59e0b";
+          ctx.fillRect(40, 920, 160, 36);
+          ctx.font = "bold 16px monospace";
+          ctx.fillStyle = "#020617";
+          ctx.fillText(`ADEGAN ${sIdx + 1}/4`, 55, 944);
+
+          // Kotak Subtitle Kinetik
+          ctx.fillStyle = "rgba(0, 0, 0, 0.9)";
+          ctx.fillRect(35, 970, 650, 160);
+          ctx.strokeStyle = "rgba(245, 158, 11, 0.7)";
+          ctx.lineWidth = 3;
+          ctx.strokeRect(35, 970, 650, 160);
+
+          ctx.font = "bold 28px Arial, sans-serif";
+          ctx.fillStyle = "#fde047";
+          const capText = sc.captionOverlay || item.payload?.hook || "";
+          const words = capText.split(" ");
+          let curLine = "";
+          let curY = 1025;
+          for (let w = 0; w < words.length; w++) {
+            const test = curLine + words[w] + " ";
+            if (ctx.measureText(test).width > 590 && w > 0) {
+              ctx.fillText(curLine, 55, curY);
+              curLine = words[w] + " ";
+              curY += 38;
+            } else {
+              curLine = test;
+            }
+          }
+          ctx.fillText(curLine, 55, curY);
+
+          // Watermark PT & Nadia Safitri
+          ctx.font = "bold 20px Arial, sans-serif";
+          ctx.fillStyle = "#67e8f9";
+          ctx.fillText("@dstechsmart • PT. DSTech Smart Perkasa", 40, 1175);
+
+          ctx.font = "15px Arial, sans-serif";
+          ctx.fillStyle = "#94a3b8";
+          ctx.fillText("🎵 Naskah & Dubbing: Nadia Safitri (AI Content Creator)", 40, 1205);
+
+          ctx.restore();
+
+          await new Promise((resolve) => setTimeout(resolve, 1000 / fps));
+        }
+      }
+
+      setRenderProgress(98);
+      recorder.stop();
+      const videoBlob = await recordFinishedPromise;
+      setRenderProgress(100);
+
+      // 4. Unduh Berkas Video Nyata dan Siapkan URL Playback Native
+      const objectUrl = URL.createObjectURL(videoBlob);
+      setRenderedVideoUrl(objectUrl);
+      setVideoDisplayMode("REAL_VIDEO");
+
+      const downloadEl = document.createElement("a");
+      downloadEl.href = objectUrl;
+      downloadEl.download = `DSTech_Video_Branding_Official_${Date.now()}.mp4`;
+      document.body.appendChild(downloadEl);
+      downloadEl.click();
+      document.body.removeChild(downloadEl);
+
+      alert("🎉 BERKAS VIDEO FISIK BERHASIL DIRENDER!\n\nFormat: Video Asli 9:16 Full HD (.MP4).\nBerkas video telah otomatis diunduh ke folder Download Anda dan kini langsung aktif di layar smartphone modal.");
+    } catch (err: any) {
+      console.error("Gagal merender video:", err);
+      alert("Terjadi kendala saat merender berkas video: " + err.message);
+    } finally {
+      setIsRenderingVideo(false);
+      setRenderProgress(0);
+    }
+  };
+
+  const handleDownloadScript = (item: ApprovalItem) => {
+    const payload = item.payload || {};
+    const content = `=====================================================
+PT. DSTECH SMART PERKASA - DRAF KONTEN VIDEO BRANDING MEDSOS
+=====================================================
+Judul Video: ${payload.videoTitle || item.title}
+Platform Target: ${(payload.platforms || []).join(", ")}
+Format: ${payload.aspectRatio || "9:16 (Vertikal)"} • Durasi: ${payload.duration || 30} Detik
+Hook 3 Detik Pertama: ${payload.hook || "-"}
+
+-----------------------------------------------------
+NASKAH LENGKAP VOICEOVER (DUBBING SUARA):
+-----------------------------------------------------
+${payload.fullVoiceoverScript || item.summary}
+
+-----------------------------------------------------
+RANGKAIAN ADEGAN & STORYBOARD VIDEO:
+-----------------------------------------------------
+${(payload.scenes || []).map((s: any) => `[${s.timeRange}] ${s.title || "Scene " + s.sceneNumber}
+Visual: ${s.visual}
+Overlay Teks: ${s.captionOverlay}
+Narasi Suara: ${s.voiceoverText}`).join("\n\n")}
+
+-----------------------------------------------------
+CAPTION LENGKAP & HASHTAG MEDSOS:
+-----------------------------------------------------
+${payload.captionText || item.summary}
+
+Call to Action: ${payload.cta || "Chat WhatsApp: 0821-2533-3555 | Website: https://dstechsmart.com"}
+=====================================================
+Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
+`;
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `DSTech_Video_Branding_${Date.now()}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Handler 1-Klik Pasang ke Status WhatsApp (Tugas 332)
+  const handleShareToWhatsAppStatus = async (item: ApprovalItem) => {
+    const payload = item.payload || {};
+    const title = payload.title || item.title || "Inovasi Keamanan & Smart System DSTech Smart Perkasa";
+    const hook = payload.hook ? `🎯 *${payload.hook}*\n\n` : "";
+    const caption = payload.captionText || payload.fullVoiceoverScript || item.summary || "";
+    const tags = Array.isArray(payload.tags)
+      ? payload.tags.map((t: string) => (t.startsWith("#") ? t : `#${t}`)).join(" ")
+      : "#DSTechSmart #CCTVCilegon #BarrierGate #Shorts";
+    const cta = payload.cta || "Hubungi Kami: 0822-5949-4242 | https://dstechsmart.com";
+
+    const textToShare = `${hook}*${title.toUpperCase()}*\n\n${caption}\n\n${cta}\n\n${tags}`;
+
+    // 1. Coba Web Share API (Di smartphone langsung memicu menu Bagikan -> WhatsApp Status)
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({
+          title,
+          text: textToShare,
+          url: "https://dstechsmart.com",
+        });
+        return;
+      } catch (err: any) {
+        if (err.name === "AbortError") return;
+      }
+    }
+
+    // 2. Fallback WhatsApp Web / Intent URL
+    const encodedText = encodeURIComponent(textToShare);
+    const waUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
+    window.open(waUrl, "_blank");
+  };
 
   // Command Bar State
   const [executiveCommand, setExecutiveCommand] = useState("");
@@ -192,6 +603,64 @@ export default function VirtualOfficePage() {
       alert("Terjadi kesalahan: " + err.message);
     } finally {
       setRejectingId(null);
+    }
+  };
+
+  const handleDeleteQueueItem = async (item: ApprovalItem) => {
+    if (!confirm(`Apakah Anda yakin ingin menghapus usulan pekerjaan "${item.title}" ini secara permanen dari antrean?`)) return;
+    setDeletingId(item.id);
+    try {
+      const res = await fetch("/api/ai-workforce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_queue_item", itemId: item.id })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApprovalNotice(`🗑️ Pekerjaan "${item.title}" berhasil dihapus secara permanen.`);
+        setApprovalQueue((prev) => prev.filter((x) => x.id !== item.id));
+        if (previewItem?.id === item.id) {
+          setPreviewItem(null);
+        }
+        fetchWorkforce();
+        setTimeout(() => setApprovalNotice(null), 5000);
+      } else {
+        alert("Gagal menghapus: " + (json.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleClearRejectedQueue = async () => {
+    const rejectedCount = approvalQueue.filter((x) => x.status === "REJECTED").length;
+    if (rejectedCount === 0) {
+      alert("Tidak ada usulan pekerjaan dengan status ditolak di antrean.");
+      return;
+    }
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${rejectedCount} pekerjaan yang berstatus DITOLAK secara permanen?`)) return;
+    setIsClearingRejected(true);
+    try {
+      const res = await fetch("/api/ai-workforce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear_rejected_queue" })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setApprovalNotice(`🗑️ Sebanyak ${json.removedCount ?? rejectedCount} pekerjaan yang ditolak berhasil dibersihkan dari antrean.`);
+        setApprovalQueue((prev) => prev.filter((x) => x.status !== "REJECTED"));
+        fetchWorkforce();
+        setTimeout(() => setApprovalNotice(null), 5000);
+      } else {
+        alert("Gagal membersihkan: " + (json.error || "Terjadi kesalahan"));
+      }
+    } catch (err: any) {
+      alert("Terjadi kesalahan: " + err.message);
+    } finally {
+      setIsClearingRejected(false);
     }
   };
 
@@ -592,9 +1061,11 @@ export default function VirtualOfficePage() {
       {(() => {
         const pendingCount = approvalQueue.filter((x) => x.status === "PENDING_APPROVAL").length;
         const approvedCount = approvalQueue.filter((x) => x.status === "APPROVED").length;
+        const rejectedCount = approvalQueue.filter((x) => x.status === "REJECTED").length;
         const filteredApprovalQueue = approvalQueue.filter((x) => {
           if (approvalFilter === "PENDING") return x.status === "PENDING_APPROVAL";
           if (approvalFilter === "APPROVED") return x.status === "APPROVED";
+          if (approvalFilter === "REJECTED") return x.status === "REJECTED";
           return true;
         });
 
@@ -645,6 +1116,15 @@ export default function VirtualOfficePage() {
                   >
                     Disetujui ({approvedCount})
                   </button>
+                  {rejectedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setApprovalFilter("REJECTED")}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition ${approvalFilter === "REJECTED" ? "bg-rose-600 text-white" : "text-rose-400 hover:text-rose-200"}`}
+                    >
+                      Ditolak ({rejectedCount})
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setApprovalFilter("ALL")}
@@ -653,6 +1133,20 @@ export default function VirtualOfficePage() {
                     Semua ({approvalQueue.length})
                   </button>
                 </div>
+
+                {/* Tombol Bersihkan Ditolak Sekaligus */}
+                {rejectedCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearRejectedQueue}
+                    disabled={isClearingRejected}
+                    className="px-3 py-2 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/40 text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    title="Hapus permanen semua pekerjaan yang berstatus ditolak"
+                  >
+                    <Trash2 className={`w-3.5 h-3.5 ${isClearingRejected ? "animate-spin" : "text-rose-400"}`} />
+                    <span>{isClearingRejected ? "Membersihkan..." : `Bersihkan Ditolak (${rejectedCount})`}</span>
+                  </button>
+                )}
 
                 {/* Tombol Picu Autopilot Staf AI */}
                 <button
@@ -773,14 +1267,24 @@ export default function VirtualOfficePage() {
                       </div>
                     </div>
 
+                    {/* Tombol Tinjau Rincian Draf */}
+                    <button
+                      type="button"
+                      onClick={() => setPreviewItem(item)}
+                      className="w-full mt-3 py-1.5 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-cyan-500/30 hover:border-cyan-500/60 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs group/btn"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-cyan-400 group-hover/btn:scale-110 transition-transform" />
+                      <span>👁️ Tinjau Rincian Draf Lengkap</span>
+                    </button>
+
                     {/* Footer Action Buttons */}
-                    <div className="mt-4 pt-3 border-t border-slate-800 flex items-center gap-2">
+                    <div className="mt-2 pt-2.5 border-t border-slate-800 flex items-center gap-2">
                       {item.status === "PENDING_APPROVAL" ? (
                         <>
                           <button
                             type="button"
                             onClick={() => handleApprove(item)}
-                            disabled={approvingId === item.id || rejectingId === item.id}
+                            disabled={approvingId === item.id || rejectingId === item.id || deletingId === item.id}
                             className="flex-1 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                           >
                             {approvingId === item.id ? (
@@ -788,33 +1292,1121 @@ export default function VirtualOfficePage() {
                             ) : (
                               <Check className="w-3.5 h-3.5" />
                             )}
-                            <span>{approvingId === item.id ? "Menyimpan..." : "Setujui & Terapkan"}</span>
+                            <span>
+                              {approvingId === item.id
+                                ? "Memproses..."
+                                : item.task_type === "VIDEO_BRANDING" || item.task_type === "SOCIAL_MEDIA_CONTENT" || item.task_type === "PROMO_CAMPAIGN"
+                                ? "🚀 Setujui & Posting"
+                                : "Setujui & Terapkan"}
+                            </span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => handleReject(item)}
-                            disabled={approvingId === item.id || rejectingId === item.id}
+                            disabled={approvingId === item.id || rejectingId === item.id || deletingId === item.id}
                             className="px-3 py-2 bg-slate-800 hover:bg-rose-950 hover:text-rose-300 text-slate-400 rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50"
                             title="Tolak Pekerjaan"
                           >
                             {rejectingId === item.id ? "..." : "Tolak"}
                           </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteQueueItem(item)}
+                            disabled={approvingId === item.id || rejectingId === item.id || deletingId === item.id}
+                            className="px-2.5 py-2 bg-rose-950/40 hover:bg-rose-900/80 text-rose-400 hover:text-rose-200 border border-rose-500/30 rounded-xl text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                            title="Hapus Usulan Ini Secara Permanen Dari Antrean"
+                          >
+                            {deletingId === item.id ? (
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                          </button>
                         </>
                       ) : (
-                        <div className="w-full text-center py-1 text-[11px] font-bold text-slate-500">
+                        <div className="w-full flex items-center justify-between gap-2 py-1 text-[11px] font-bold text-slate-500">
                           {item.status === "APPROVED" ? (
-                            <span className="text-emerald-400 flex items-center justify-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5" /> Disetujui resmi oleh Direktur Utama
-                            </span>
+                            <>
+                              <div className="flex-1 text-left">
+                                {item.payload?.is_auto_published ? (
+                                  <div className="space-y-0.5">
+                                    <span className="text-emerald-400 flex items-center gap-1 font-black">
+                                      <CheckCircle2 className="w-3.5 h-3.5" /> 🚀 Tayang di Medsos (IG, TikTok, YT, FB)
+                                    </span>
+                                    <span className="text-[9.5px] text-cyan-300 font-medium block">
+                                      Diposting otomatis oleh Nadia Safitri
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-emerald-400 flex items-center gap-1">
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Disetujui resmi oleh Direktur Utama
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteQueueItem(item)}
+                                disabled={deletingId === item.id}
+                                className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
+                                title="Hapus Dari Riwayat Antrean"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
                           ) : (
-                            <span className="text-rose-400">Ditolak</span>
+                            <>
+                              <span className="text-rose-400 flex items-center gap-1">
+                                ✕ Ditolak
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteQueueItem(item)}
+                                disabled={deletingId === item.id}
+                                className="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-500/40 rounded-lg text-[10.5px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                title="Hapus Permanen Dari Antrean"
+                              >
+                                {deletingId === item.id ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3" />
+                                )}
+                                <span>Hapus Permanen</span>
+                              </button>
+                            </>
                           )}
                         </div>
                       )}
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* MODAL PRATINJAU DOKUMEN DRAF LENGKAP HASIL KERJA STAF AI */}
+            {previewItem && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+                <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-slate-900 border-2 border-indigo-500/50 rounded-3xl shadow-2xl overflow-hidden">
+                  
+                  {/* Modal Header */}
+                  <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-indigo-500/30 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center text-lg font-black shadow-inner">
+                        {previewItem.task_type === "SPH_PROPOSAL" ? "📑" : previewItem.task_type === "PRODUCT_IMPORT" ? "🛍️" : "📢"}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                            {previewItem.task_type.replace("_", " ")}
+                          </span>
+                          <span className="text-xs text-slate-400">• Disusun oleh:</span>
+                          <span className="text-xs font-black text-amber-300">{previewItem.employee_name} ({previewItem.employee_role})</span>
+                        </div>
+                        <h3 className="text-sm md:text-base font-black text-white mt-1">
+                          {previewItem.title}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setPreviewItem(null)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Modal Body Scrollable */}
+                  <div className="p-6 overflow-y-auto space-y-6 text-sm text-slate-300">
+                    
+                    {/* Ringkasan Draf */}
+                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                        Deskripsi &amp; Ringkasan Rekomendasi AI
+                      </span>
+                      <p className="text-xs leading-relaxed text-slate-200">
+                        {previewItem.summary}
+                      </p>
+                      {previewItem.target_client && (
+                        <div className="pt-2 mt-2 border-t border-slate-800/80 flex items-center gap-2 text-xs">
+                          <span className="text-slate-400 font-bold">Sasaran / Calon Klien:</span>
+                          <span className="font-bold text-white bg-slate-800/80 px-2.5 py-0.5 rounded-lg border border-slate-700">
+                            {previewItem.target_client}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* DETAIL SESUAI JENIS PEKERJAAN */}
+                    {/* 1. DOKUMEN SPH PENAWARAN HARGA */}
+                    {previewItem.task_type === "SPH_PROPOSAL" && previewItem.payload && (
+                      <div className="p-5 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                          <div>
+                            <span className="text-[11px] font-black text-cyan-400 uppercase tracking-wider">
+                              Lembar Draf Surat Penawaran Harga (SPH)
+                            </span>
+                            <h4 className="text-sm font-black text-white">{previewItem.payload.subject || previewItem.title}</h4>
+                          </div>
+                          {previewItem.tax_type === "exclude" && (
+                            <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black border border-amber-500/40">
+                              Skema: Exclude PPN (Harga Netto)
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Tabel Rincian Item Barang/Jasa */}
+                        {Array.isArray(previewItem.payload.items) && previewItem.payload.items.length > 0 ? (
+                          <div className="overflow-x-auto rounded-xl border border-slate-800">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-900 text-slate-400 font-bold uppercase text-[10px] border-b border-slate-800">
+                                <tr>
+                                  <th className="py-2.5 px-3">No</th>
+                                  <th className="py-2.5 px-3">Nama Produk / Layanan Proyek</th>
+                                  <th className="py-2.5 px-3 text-center">Qty</th>
+                                  <th className="py-2.5 px-3 text-right">Harga Satuan (Rp)</th>
+                                  <th className="py-2.5 px-3 text-right">Total (Rp)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/60 font-medium">
+                                {previewItem.payload.items.map((it: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-slate-900/40 transition">
+                                    <td className="py-2.5 px-3 text-slate-500">{idx + 1}</td>
+                                    <td className="py-2.5 px-3 font-semibold text-white">{it.productName}</td>
+                                    <td className="py-2.5 px-3 text-center text-slate-300">{it.qty} {it.unit || "Unit"}</td>
+                                    <td className="py-2.5 px-3 text-right font-mono text-slate-300">
+                                      {(it.price || 0).toLocaleString("id-ID")}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-400">
+                                      {(it.total || (it.price * it.qty) || 0).toLocaleString("id-ID")}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : null}
+
+                        {/* Rekapitulasi Finansial & Pajak */}
+                        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
+                          <div className="flex justify-between text-slate-300">
+                            <span>Subtotal (Harga DPP / Netto Proyek):</span>
+                            <span className="font-mono font-bold text-white">
+                              Rp {(previewItem.payload.subtotal || previewItem.value || 0).toLocaleString("id-ID")}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center text-slate-300">
+                            <span>Pajak PPN (11%):</span>
+                            {previewItem.tax_type === "exclude" || previewItem.payload.hideTaxInPrint ? (
+                              <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 text-[11px] font-bold border border-amber-800">
+                                Exclude (Belum Termasuk PPN)
+                              </span>
+                            ) : (
+                              <span className="font-mono font-bold text-white">
+                                Rp {(previewItem.payload.taxAmount || 0).toLocaleString("id-ID")}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-sm">
+                            <span className="font-black text-white">Grand Total Penawaran SPH:</span>
+                            <span className="font-mono font-black text-lg text-emerald-400">
+                              Rp {(previewItem.tax_type === "exclude" ? (previewItem.payload.subtotal || previewItem.value || 0) : (previewItem.payload.grandTotal || previewItem.value || 0)).toLocaleString("id-ID")}
+                            </span>
+                          </div>
+
+                          {previewItem.tax_type === "exclude" && (
+                            <p className="text-[10px] text-amber-400 italic pt-1">
+                              *Klausul resmi tercantum: &ldquo;Harga di atas adalah DPP/Netto belum termasuk PPN (PPN Exclude). Pajak Pertambahan Nilai akan diperhitungkan saat penerbitan Faktur Penjualan.&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 2. DRAF PENGADAAN & IMPOR PRODUK E-STORE */}
+                    {previewItem.task_type === "PRODUCT_IMPORT" && previewItem.payload && (
+                      <div className="p-5 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-4">
+                        <span className="text-[11px] font-black text-cyan-400 uppercase tracking-wider block">
+                          Spesifikasi Produk Baru E-Store Toko Online
+                        </span>
+
+                        <div className="flex flex-col sm:flex-row gap-4 items-start">
+                          {previewItem.payload.image && (
+                            <div className="w-full sm:w-44 h-44 rounded-2xl bg-slate-900 border border-slate-700 overflow-hidden shrink-0 flex items-center justify-center p-2 relative group">
+                              <img
+                                src={previewItem.payload.image}
+                                alt={previewItem.payload.name}
+                                className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                              />
+                              <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[8.5px] font-black bg-emerald-950/80 text-emerald-400 border border-emerald-800">
+                                📸 FOTO ASLI NYATA
+                              </span>
+                            </div>
+                          )}
+
+                          <div className="space-y-2 flex-1">
+                            <h4 className="text-sm font-black text-white leading-snug">
+                              {previewItem.payload.name}
+                            </h4>
+
+                            <div className="flex flex-wrap gap-2 text-[10.5px]">
+                              <span className="px-2.5 py-0.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700">
+                                Brand: {previewItem.payload.brand || "DSTech Original"}
+                              </span>
+                              <span className="px-2.5 py-0.5 rounded-lg bg-slate-800 text-slate-300 font-bold border border-slate-700">
+                                Kategori: {previewItem.payload.category || "Security System"}
+                              </span>
+                              <span className="px-2.5 py-0.5 rounded-lg bg-emerald-950 text-emerald-300 font-bold border border-emerald-800">
+                                Stok Awal Pendaftaran: 0 Unit
+                              </span>
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 grid grid-cols-2 gap-3 text-xs mt-3">
+                              <div>
+                                <span className="text-[10px] text-slate-400 block font-bold uppercase">Harga Modal Kulakan</span>
+                                <span className="font-mono font-bold text-slate-300">
+                                  Rp {(previewItem.payload.costPrice || 0).toLocaleString("id-ID")}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] text-slate-400 block font-bold uppercase">Harga Jual (+50% Margin)</span>
+                                <span className="font-mono font-black text-amber-400">
+                                  Rp {(previewItem.payload.price || previewItem.value || 0).toLocaleString("id-ID")}
+                                </span>
+                              </div>
+                            </div>
+
+                            <p className="text-[11px] text-slate-400 pt-1">
+                              ✓ Data bersih tanpa kebocoran margin/supplier. Siap tayang di katalog e-store setelah persetujuan Direktur.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 3. DRAF PROMOSI & BROADCAST WHATSAPP */}
+                    {previewItem.task_type === "PROMO_CAMPAIGN" && previewItem.payload && (
+                      <div className="p-5 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-4">
+                        <span className="text-[11px] font-black text-cyan-400 uppercase tracking-wider block">
+                          Materi Promosi &amp; Pesan Broadcast WhatsApp
+                        </span>
+
+                        <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 space-y-2">
+                          <div className="flex items-center gap-2 text-xs font-black text-emerald-400">
+                            <span>💬 Mockup Pesan WhatsApp Siap Kirim</span>
+                          </div>
+                          <div className="p-3.5 rounded-xl bg-slate-900/90 text-xs font-mono text-emerald-100 whitespace-pre-line border border-emerald-900/50 leading-relaxed">
+                            {previewItem.payload.description || previewItem.summary}
+                            {"\n\n"}
+                            📲 Info &amp; Pemesanan Hubungi Official CS PT. DSTech Smart Perkasa: 0822-5949-4242
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 4. DRAF VIDEO BRANDING & KONTEN MEDIA SOSIAL (TIKTOK / REELS / SHORTS) */}
+                    {(previewItem.task_type === "VIDEO_BRANDING" || previewItem.task_type === "SOCIAL_MEDIA_CONTENT") && previewItem.payload && (
+                      <div className="space-y-4">
+                        {/* Target Platforms Badge & Info */}
+                        <div className="p-4 rounded-2xl bg-gradient-to-r from-purple-950/40 via-slate-950 to-indigo-950/40 border border-purple-500/30 flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black text-purple-300 flex items-center gap-1.5">
+                              <Film className="w-4 h-4 text-purple-400" />
+                              <span>Platform Target:</span>
+                            </span>
+                            {(previewItem.payload.platforms || ["TikTok", "Instagram Reels", "YouTube Shorts", "Facebook"]).map((plat: string, idx: number) => (
+                              <span key={idx} className="px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-purple-900/50 text-purple-200 border border-purple-500/40">
+                                {plat}
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-amber-300 font-mono font-bold border border-amber-500/30">
+                              Format: 9:16 Vertikal
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg bg-slate-900 text-emerald-300 font-mono font-bold border border-emerald-500/30">
+                              ⏱ Durasi: {previewItem.payload.duration || 30} Detik
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Hook 3 Detik Box */}
+                        {previewItem.payload.hook && (
+                          <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 flex items-start gap-2.5">
+                            <span className="text-base shrink-0">🎯</span>
+                            <div>
+                              <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider block">
+                                Hook 3 Detik Pertama (Pemicu Penasaran Audiens):
+                              </span>
+                              <p className="text-xs font-bold text-amber-100 italic mt-0.5">
+                                "{previewItem.payload.hook}"
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tab Navigasi Media */}
+                        <div className="flex items-center gap-1.5 border-b border-slate-800 pb-2">
+                          <button
+                            type="button"
+                            onClick={() => setActiveMediaTab("storyboard")}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              activeMediaTab === "storyboard"
+                                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                                : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
+                            }`}
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            <span>Player Smartphone &amp; Storyboard</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveMediaTab("caption")}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              activeMediaTab === "caption"
+                                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                                : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
+                            }`}
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Caption &amp; Tagar Siap Salin</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveMediaTab("script")}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              activeMediaTab === "script"
+                                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                                : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
+                            }`}
+                          >
+                            <Volume2 className="w-3.5 h-3.5" />
+                            <span>Naskah Narator Suara</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveMediaTab("flyer")}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                              activeMediaTab === "flyer"
+                                ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                                : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
+                            }`}
+                          >
+                            <Package className="w-3.5 h-3.5" />
+                            <span>Poster Flyer 1:1 Feed</span>
+                          </button>
+                        </div>
+
+                        {/* CONTENT TAB 1: SMARTPHONE REELS PLAYER & STORYBOARD */}
+                        {activeMediaTab === "storyboard" && (
+                          <div className="space-y-4">
+                            {/* Banner Info Autopilot Social Media Publishing */}
+                            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/40 via-indigo-950/40 to-slate-950 border border-purple-500/30 flex flex-wrap items-center justify-between gap-3">
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-xl shrink-0">🚀</span>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11.5px] font-black text-white block">
+                                      Autopilot Auto-Publishing Media Sosial PT. DSTech Smart Perkasa
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                      0 MB Disk VPS
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-purple-200">
+                                    Begitu Anda menekan tombol <strong>Setujui</strong>, Staf AI Nadia Safitri langsung mempublikasikan video/flyer ini ke Instagram Reels, TikTok, YouTube Shorts, dan Facebook Page secara otonom tanpa membebani kapasitas server!
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <a
+                                  href="/admin/settings"
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-purple-900/60 hover:bg-purple-800 text-purple-200 border border-purple-400/40 transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>🌐 Atur Kunci API Medsos</span>
+                                  <ExternalLink className="w-3 h-3 text-purple-300" />
+                                </a>
+                                <span className="px-2.5 py-1 rounded-full text-[9.5px] font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40">
+                                  ✓ Autopilot Aktif
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Status Terbit Media Sosial jika sudah disetujui */}
+                            {previewItem.payload?.social_posts && (
+                              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-950 to-indigo-950/40 border border-emerald-500/40 space-y-2">
+                                <div className="flex items-center justify-between text-xs font-black text-emerald-400">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                                    🚀 Konten Telah Berhasil Terbit di Seluruh Media Sosial:
+                                  </span>
+                                  <span className="text-[10px] text-slate-400">Dipublikasikan otonom oleh Nadia Safitri</span>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                  {previewItem.payload.social_posts.map((sp: any, spIdx: number) => (
+                                    <a
+                                      key={spIdx}
+                                      href={sp.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="p-2.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 hover:border-emerald-400 hover:bg-slate-800 transition flex flex-col justify-between group shadow-sm"
+                                    >
+                                      <span className="text-[10px] font-black text-white flex items-center justify-between">
+                                        {sp.platform}
+                                        <ExternalLink className="w-3 h-3 text-cyan-400 group-hover:translate-x-0.5 transition-transform" />
+                                      </span>
+                                      <span className="text-[9.5px] font-bold text-emerald-400 mt-1">✓ Berhasil Tayang</span>
+                                      <span className="text-[8px] font-mono text-slate-400">{sp.reach_estimate}</span>
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+                              {/* Smartphone 9:16 Mockup & Video Controls */}
+                              <div className="md:col-span-5 flex flex-col items-center">
+                                {/* Toggle Pilihan Mode Tampilan: Simulasi Player vs Berkas Video Asli */}
+                                <div className="w-[250px] mb-2 p-1 rounded-2xl bg-slate-900 border border-slate-800 flex items-center gap-1 shadow-inner">
+                                  <button
+                                    type="button"
+                                    onClick={() => setVideoDisplayMode("SIMULATION")}
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-[10px] font-black transition flex items-center justify-center gap-1 cursor-pointer ${
+                                      videoDisplayMode === "SIMULATION"
+                                        ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                                        : "text-slate-400 hover:text-white"
+                                    }`}
+                                  >
+                                    <span>📱 Simulasi Reels</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (!renderedVideoUrl) {
+                                        handleRenderAndDownloadVideo(previewItem);
+                                      } else {
+                                        setVideoDisplayMode("REAL_VIDEO");
+                                      }
+                                    }}
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-[10px] font-black transition flex items-center justify-center gap-1 cursor-pointer ${
+                                      videoDisplayMode === "REAL_VIDEO"
+                                        ? "bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30"
+                                        : "text-amber-400 hover:text-white"
+                                    }`}
+                                  >
+                                    <span>🎬 Video Asli (.MP4)</span>
+                                  </button>
+                                </div>
+
+                                <div
+                                  onClick={videoDisplayMode === "SIMULATION" ? handleTogglePlayVideo : undefined}
+                                  className="w-[250px] h-[460px] rounded-[38px] bg-slate-950 p-2.5 border-4 border-slate-700 shadow-2xl relative flex flex-col overflow-hidden cursor-pointer select-none group"
+                                  title={videoDisplayMode === "SIMULATION" ? "Klik layar smartphone untuk Putar / Jeda Video" : "Pemutar Berkas Video Fisik Asli"}
+                                >
+                                  {/* Notch Camera */}
+                                  <div className="absolute top-3.5 left-1/2 -translate-x-1/2 w-16 h-3.5 bg-black rounded-full z-30 flex items-center justify-center pointer-events-none">
+                                    <div className="w-2 h-2 rounded-full bg-slate-800" />
+                                  </div>
+
+                                  {/* TAMPILAN 1: BERKAS VIDEO FISIK NYATA (.MP4 / .WEBM DARI RENDER CANVAS) */}
+                                  {videoDisplayMode === "REAL_VIDEO" && renderedVideoUrl ? (
+                                    <div className="w-full h-full rounded-[28px] relative overflow-hidden flex flex-col justify-between p-1 border border-amber-500/50 bg-black">
+                                      <video
+                                        src={renderedVideoUrl}
+                                        controls
+                                        autoPlay
+                                        loop
+                                        playsInline
+                                        className="w-full h-full object-cover rounded-[24px]"
+                                      />
+                                    </div>
+                                  ) : (
+                                    /* TAMPILAN 2: SIMULASI PLAYER INTERAKTIF BERANIMASI HIDUP */
+                                    <div className="w-full h-full rounded-[28px] relative overflow-hidden flex flex-col justify-between p-3 border border-slate-800 bg-slate-950">
+                                      {/* Real Background Illustration / Scene Photo with Ken-Burns Motion */}
+                                      <img
+                                        src={
+                                          previewItem.payload.scenes?.[activeVideoScene]?.image ||
+                                          previewItem.payload.flyer_image_url ||
+                                          "/service-cctv.png"
+                                        }
+                                        alt={previewItem.payload.scenes?.[activeVideoScene]?.title || "Scene Visual"}
+                                        className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out ${
+                                          isVideoPlaying ? "scale-115 translate-x-1 brightness-105" : "scale-100 brightness-95"
+                                        }`}
+                                      />
+                                      {/* Cinematic Dark Overlay for Contrast & Text Readability */}
+                                      <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/25 to-black/95 pointer-events-none" />
+
+                                      {/* AI Tech Laser Scanner Beam Animation (Aktif saat video berputar) */}
+                                      {isVideoPlaying && (
+                                        <>
+                                          <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] pointer-events-none animate-pulse top-1/2 -translate-y-1/2" />
+                                          <div className="absolute top-12 left-3 right-3 pointer-events-none flex items-center justify-between text-[7.5px] font-mono text-cyan-300 bg-cyan-950/60 backdrop-blur-xs px-2 py-0.5 rounded border border-cyan-500/40">
+                                            <span className="flex items-center gap-1 font-bold">
+                                              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                                              {activeVideoScene === 0
+                                                ? "AI VISION: CCTV COLORVU HD"
+                                                : activeVideoScene === 1
+                                                ? "RADAR: FAST BARRIER GATE"
+                                                : activeVideoScene === 2
+                                                ? "PERIMETER: INDUSTRIAL SECURE"
+                                                : "OFFICIAL: DSTECH SMART PERKASA"}
+                                            </span>
+                                            <span className="text-amber-300 font-bold">LIVE 4K</span>
+                                          </div>
+                                        </>
+                                      )}
+
+                                      {/* Top Reels Progress Bars (4 Segmen Cerita Otomatis) */}
+                                      <div className="pt-3 z-20 space-y-1.5">
+                                        <div className="grid grid-cols-4 gap-1 w-full px-0.5">
+                                          {[0, 1, 2, 3].map((segIdx) => {
+                                            const bounds = [
+                                              { start: 0, end: 6 },
+                                              { start: 7, end: 14 },
+                                              { start: 15, end: 22 },
+                                              { start: 23, end: 30 }
+                                            ];
+                                            const b = bounds[segIdx];
+                                            let segPercent = 0;
+                                            if (videoProgressSeconds > b.end) {
+                                              segPercent = 100;
+                                            } else if (videoProgressSeconds >= b.start) {
+                                              segPercent = ((videoProgressSeconds - b.start) / (b.end - b.start)) * 100;
+                                            }
+                                            return (
+                                              <div key={segIdx} className="h-1 bg-white/25 rounded-full overflow-hidden">
+                                                <div
+                                                  className="h-full bg-gradient-to-r from-amber-400 to-rose-500 transition-all duration-300"
+                                                  style={{ width: `${Math.min(100, Math.max(0, segPercent))}%` }}
+                                                />
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+
+                                        {/* Top Header Bar Info */}
+                                        <div className="flex items-center justify-between text-[8.5px] text-white/95 px-0.5">
+                                          <span className="font-black flex items-center gap-1 drop-shadow-md">
+                                            <span className={`w-2 h-2 rounded-full ${isVideoPlaying ? "bg-rose-500 animate-ping" : "bg-slate-400"}`} />
+                                            <span className="tracking-wider">REELS PREVIEW</span>
+                                          </span>
+                                          <span className="font-mono bg-black/80 px-2 py-0.5 rounded-full border border-white/20 text-amber-300 font-bold">
+                                            00:{videoProgressSeconds.toString().padStart(2, "0")} / 00:30
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Center Big Play / Pause Overlay Icon */}
+                                      {!isVideoPlaying && (
+                                        <div className="my-auto mx-auto z-20 flex flex-col items-center gap-2 animate-fadeIn pointer-events-none">
+                                          <div className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md border-2 border-white/40 flex items-center justify-center text-white shadow-2xl group-hover:scale-110 transition-transform">
+                                            <Play className="w-6 h-6 ml-0.5 text-amber-300 fill-amber-300" />
+                                          </div>
+                                          <span className="text-[10px] font-black text-white bg-black/70 px-2.5 py-0.5 rounded-full border border-white/20 shadow-md">
+                                            ▶ Klik Layar untuk Memutar
+                                          </span>
+                                        </div>
+                                      )}
+
+                                      {/* Right Side Social Action Bar (TikTok / Reels Style) */}
+                                      <div className="absolute right-2 bottom-18 flex flex-col items-center gap-3 z-20">
+                                        {/* Like Button */}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setIsVideoLiked(!isVideoLiked);
+                                          }}
+                                          className="flex flex-col items-center group/btn"
+                                          title="Sukai Video"
+                                        >
+                                          <div className={`w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all ${
+                                            isVideoLiked
+                                              ? "bg-rose-600/90 border-rose-400 scale-110 shadow-lg shadow-rose-600/50"
+                                              : "bg-black/60 border-white/20 hover:bg-black/80"
+                                          }`}>
+                                            <Heart className={`w-4 h-4 transition-transform ${isVideoLiked ? "text-white fill-white scale-110" : "text-white"}`} />
+                                          </div>
+                                          <span className="text-[8px] font-mono font-bold text-white mt-0.5 drop-shadow">
+                                            {(videoLikeCount + (isVideoLiked ? 1 : 0)).toLocaleString("id-ID")}
+                                          </span>
+                                        </button>
+
+                                        {/* Comment Button */}
+                                        <div className="flex flex-col items-center">
+                                          <div className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
+                                            <MessageSquare className="w-4 h-4" />
+                                          </div>
+                                          <span className="text-[8px] font-mono font-bold text-white mt-0.5 drop-shadow">128</span>
+                                        </div>
+
+                                        {/* Share Button */}
+                                        <div className="flex flex-col items-center">
+                                          <div className="w-8 h-8 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white">
+                                            <Share2 className="w-4 h-4" />
+                                          </div>
+                                          <span className="text-[8px] font-mono font-bold text-white mt-0.5 drop-shadow">45</span>
+                                        </div>
+
+                                        {/* Spinning Vinyl Disc with Floating Music Icon */}
+                                        <div className="relative pt-1 flex flex-col items-center">
+                                          <div className={`w-8 h-8 rounded-full bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-950 border-2 border-slate-600 shadow-lg flex items-center justify-center relative ${
+                                            isVideoPlaying ? "animate-spin" : ""
+                                          }`}>
+                                            <div className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-slate-950 flex items-center justify-center" />
+                                          </div>
+                                          {isVideoPlaying && (
+                                            <div className="absolute -top-1 -right-1 text-cyan-300 animate-bounce">
+                                              <Music className="w-3 h-3" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Bottom Section: Kinetic Subtitle, Audio Equalizer & Brand */}
+                                      <div className="z-10 space-y-2 max-w-[195px]">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="px-2 py-0.5 rounded-full text-[8.5px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 font-mono shadow-md">
+                                            {previewItem.payload.scenes?.[activeVideoScene]?.timeRange || "00:00 - 00:07"}
+                                          </span>
+                                          <span className="text-[8.5px] font-bold text-slate-300 drop-shadow truncate">
+                                            Adegan {activeVideoScene + 1}/4
+                                          </span>
+                                        </div>
+
+                                        <div className="p-2.5 rounded-xl bg-black/85 backdrop-blur-md border border-amber-500/50 shadow-xl">
+                                          <p className="text-[10px] font-black text-amber-300 leading-tight drop-shadow-md">
+                                            {previewItem.payload.scenes?.[activeVideoScene]?.captionOverlay || previewItem.payload.hook}
+                                          </p>
+                                        </div>
+
+                                        <div className="flex items-center justify-between text-[8px] text-slate-200 pt-0.5">
+                                          <span className="font-black text-cyan-300 drop-shadow">@dstechsmart</span>
+                                          <div className="flex items-end gap-0.5 h-3">
+                                            <span className={`w-0.5 bg-emerald-400 rounded-full transition-all ${isVideoPlaying ? "h-3 animate-pulse" : "h-1"}`} />
+                                            <span className={`w-0.5 bg-cyan-400 rounded-full transition-all ${isVideoPlaying ? "h-2.5 animate-bounce" : "h-1.5"}`} />
+                                            <span className={`w-0.5 bg-amber-400 rounded-full transition-all ${isVideoPlaying ? "h-3.5 animate-pulse" : "h-1"}`} />
+                                            <span className={`w-0.5 bg-rose-400 rounded-full transition-all ${isVideoPlaying ? "h-2 animate-bounce" : "h-1"}`} />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Action Controls Player di Bawah Smartphone */}
+                                <div className="mt-3 w-[250px] space-y-2">
+                                  {/* TOMBOL UTAMA: RENDER BERKAS VIDEO FISIK NYATA (.MP4) */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRenderAndDownloadVideo(previewItem)}
+                                    disabled={isRenderingVideo}
+                                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-lg ${
+                                      isRenderingVideo
+                                        ? "bg-amber-600 text-slate-950 animate-pulse cursor-wait"
+                                        : "bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-amber-500/20"
+                                    }`}
+                                  >
+                                    {isRenderingVideo ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 animate-spin text-slate-950" />
+                                        <span>Merender Frame Video... {renderProgress}%</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Film className="w-4 h-4 text-slate-950" />
+                                        <span>🎬 Render &amp; Unduh File Video Asli (.MP4)</span>
+                                      </>
+                                    )}
+                                  </button>
+
+                                  {/* Tombol Putar / Jeda Video Reels Lengkap */}
+                                  <button
+                                    type="button"
+                                    onClick={handleTogglePlayVideo}
+                                    className={`w-full py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-md ${
+                                      isVideoPlaying
+                                        ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/40 animate-pulse"
+                                        : "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white shadow-indigo-600/40"
+                                    }`}
+                                  >
+                                    {isVideoPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
+                                    <span>{isVideoPlaying ? "⏸ Jeda Video Reels" : "▶ Putar Simulasi Reels (30s)"}</span>
+                                  </button>
+
+                                  {/* Tombol Reset & Dengarkan Suara Narasi Saja */}
+                                  <div className="grid grid-cols-2 gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setVideoProgressSeconds(0);
+                                        setActiveVideoScene(0);
+                                      }}
+                                      className="py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-slate-700"
+                                      title="Ulangi dari detik ke-0"
+                                    >
+                                      <RotateCcw className="w-3 h-3 text-amber-400" />
+                                      <span>Ulangi Detik 0</span>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePlayVoiceover(previewItem.payload.scenes?.[activeVideoScene]?.voiceoverText || previewItem.payload.fullVoiceoverScript)}
+                                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer border ${
+                                        isPlayingVoiceover
+                                          ? "bg-rose-950/80 text-rose-300 border-rose-500/50"
+                                          : "bg-slate-800 hover:bg-slate-700 text-cyan-300 border-slate-700"
+                                      }`}
+                                    >
+                                      <Volume2 className="w-3 h-3 text-cyan-400" />
+                                      <span className="truncate">{isPlayingVoiceover ? "Stop Suara" : "Suara Saja"}</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 4 Storyboard Scenes List with Photo Thumbnails & Live Seek */}
+                              <div className="md:col-span-7 space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-black text-slate-300 uppercase tracking-wider block">
+                                    Rangkaian Storyboard 4 Adegan Video:
+                                  </span>
+                                  <span className="text-[10px] text-cyan-400 font-bold">
+                                    (Klik adegan untuk langsung memutar ke detik adegan)
+                                  </span>
+                                </div>
+
+                              {(previewItem.payload.scenes || []).map((scene: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  onClick={() => handleSelectScene(idx)}
+                                  className={`p-3 rounded-2xl border transition-all cursor-pointer ${
+                                    activeVideoScene === idx
+                                      ? "bg-indigo-950/70 border-indigo-400 shadow-lg shadow-indigo-900/40 ring-1 ring-indigo-400"
+                                      : "bg-slate-950 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    {/* Thumbnail Image Foto Produk Nyata */}
+                                    <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-700 bg-slate-900 relative shadow-inner group">
+                                      <img
+                                        src={scene.image || previewItem.payload.flyer_image_url || "/service-cctv.png"}
+                                        alt={scene.title || `Adegan ${idx + 1}`}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                      />
+                                      <span className="absolute bottom-0.5 right-0.5 px-1 rounded bg-black/80 text-[7.5px] font-mono text-amber-300 font-bold">
+                                        {scene.timeRange?.split(" - ")?.[0] || "00:00"}
+                                      </span>
+                                      {activeVideoScene === idx && isVideoPlaying && (
+                                        <div className="absolute inset-0 bg-indigo-950/40 backdrop-blur-2xs flex items-center justify-center">
+                                          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center justify-between text-xs mb-1">
+                                        <span className="font-black text-white flex items-center gap-1.5 truncate">
+                                          <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold ${
+                                            activeVideoScene === idx ? "bg-indigo-500 text-white" : "bg-slate-800 text-slate-400"
+                                          }`}>
+                                            {idx + 1}
+                                          </span>
+                                          <span className="truncate">{scene.title || `Adegan ${idx + 1}`}</span>
+                                        </span>
+                                        <span className="text-[9.5px] font-mono font-bold text-amber-400 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
+                                          {scene.timeRange}
+                                        </span>
+                                      </div>
+
+                                      <p className="text-[10.5px] text-slate-300 leading-snug line-clamp-2 mb-1.5">
+                                        <strong className="text-cyan-400">Visual: </strong>{scene.visual}
+                                      </p>
+
+                                      <div className="p-1.5 rounded-lg bg-slate-900 text-[10px] border border-slate-800/80 text-emerald-200 flex items-start gap-1">
+                                        <Volume2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                                        <span className="line-clamp-1">"{scene.voiceoverText}"</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                        {/* CONTENT TAB 2: CAPTION & HASHTAG */}
+                        {activeMediaTab === "caption" && (
+                          <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-white flex items-center gap-1.5">
+                                <MessageSquare className="w-4 h-4 text-cyan-400" />
+                                <span>Teks Caption Lengkap Siap Salin ke Media Sosial:</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyCaption(previewItem.payload.captionText || previewItem.summary)}
+                                className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md shadow-cyan-600/30"
+                              >
+                                {copiedCaption ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                                <span>{copiedCaption ? "✓ Berhasil Disalin!" : "📋 Salin Seluruh Caption"}</span>
+                              </button>
+                            </div>
+
+                            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-200 whitespace-pre-line leading-relaxed max-h-[280px] overflow-y-auto">
+                              {previewItem.payload.captionText || previewItem.summary}
+                            </div>
+
+                            {/* Hashtags Cloud */}
+                            {Array.isArray(previewItem.payload.hashtags) && previewItem.payload.hashtags.length > 0 && (
+                              <div className="space-y-2 pt-2 border-t border-slate-800">
+                                <span className="text-[11px] font-bold text-slate-400 block">Rekomendasi Tagar / Hashtag Algoritma:</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {previewItem.payload.hashtags.map((ht: string, i: number) => (
+                                    <span key={i} className="px-2.5 py-0.5 rounded-lg bg-indigo-950 text-indigo-300 text-[11px] font-mono border border-indigo-800">
+                                      {ht}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* CONTENT TAB 3: FULL VOICEOVER SCRIPT */}
+                        {activeMediaTab === "script" && (
+                          <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-white flex items-center gap-1.5">
+                                <Volume2 className="w-4 h-4 text-emerald-400" />
+                                <span>Naskah Narator Voiceover Dubbing (Audio Script):</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handlePlayVoiceover(previewItem.payload.fullVoiceoverScript || previewItem.summary)}
+                                className={`px-4 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md ${
+                                  isPlayingVoiceover
+                                    ? "bg-rose-600 text-white animate-pulse"
+                                    : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30"
+                                }`}
+                              >
+                                {isPlayingVoiceover ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                                <span>{isPlayingVoiceover ? "Hentikan Suara" : "▶ Putar Suara Narator AI"}</span>
+                              </button>
+                            </div>
+
+                            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-emerald-100 whitespace-pre-line leading-relaxed">
+                              {previewItem.payload.fullVoiceoverScript || previewItem.summary}
+                            </div>
+
+                            <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+                              <span>🎵 Musik Latar: <strong>{previewItem.payload.backgroundAudio || "Corporate Tech Beat (Copyright Free)"}</strong></span>
+                              <span>🔊 Bahasa: <strong>Indonesia (Aksara Percakapan Alami)</strong></span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* CONTENT TAB 4: FLYER PROMOSI 1:1 FEED DENGAN FOTO FISIK PRODUK ASLI */}
+                        {activeMediaTab === "flyer" && (
+                          <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4 text-center">
+                            <span className="text-xs font-black text-white block">
+                              Pratinjau Poster Flyer Promosi Feed (Aspek Rasio Persegi 1:1)
+                            </span>
+                            
+                            {/* Visual Flyer Card Real Photo */}
+                            <div className="w-[320px] h-[320px] mx-auto rounded-3xl bg-slate-950 border-2 border-indigo-500/50 shadow-2xl relative overflow-hidden flex flex-col justify-between p-4 group">
+                              {/* Background Image Produk Nyata */}
+                              <img
+                                src={previewItem.payload.flyer_image_url || "/service-cctv.png"}
+                                alt="Flyer Produk DSTech"
+                                className="absolute inset-0 w-full h-full object-cover brightness-75 group-hover:scale-105 transition-transform duration-700"
+                              />
+                              {/* Gradient Dark Overlay */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/60 to-slate-950/80 pointer-events-none" />
+
+                              {/* Flyer Header: Logo & Badge Garansi */}
+                              <div className="relative z-10 flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-6 h-6 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center font-black text-cyan-300 text-[10px]">
+                                    DST
+                                  </div>
+                                  <span className="text-[10px] font-black tracking-wider text-white">
+                                    PT. DSTECH SMART PERKASA
+                                  </span>
+                                </div>
+                                <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 text-[9px] font-black tracking-wide shadow-md">
+                                  GARANSI RESMI
+                                </span>
+                              </div>
+
+                              {/* Flyer Center Content: Title & Benefit */}
+                              <div className="relative z-10 my-auto text-left space-y-1.5 pt-2">
+                                <span className="inline-block px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 text-[9px] font-black border border-cyan-400/30">
+                                  SOLUSI KEAMANAN IOT &amp; INDUSTRI
+                                </span>
+                                <h4 className="text-sm font-black text-white leading-tight drop-shadow-md">
+                                  {previewItem.payload.videoTitle || previewItem.title}
+                                </h4>
+                                <p className="text-[10.5px] text-slate-200 line-clamp-2 leading-snug drop-shadow-sm">
+                                  {previewItem.payload.hook || previewItem.summary}
+                                </p>
+                              </div>
+
+                              {/* Flyer Footer: Contact WhatsApp & Website */}
+                              <div className="relative z-10 pt-2 border-t border-white/20 flex items-center justify-between text-[9px] text-white">
+                                <span className="flex items-center gap-1 font-bold text-emerald-400">
+                                  <span>📲 WA: 0821-2533-3555</span>
+                                </span>
+                                <span className="font-mono font-bold text-amber-300">
+                                  dstechsmart.com
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+
+                  {/* Modal Footer Controls */}
+                  <div className="p-5 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isPlayingVoiceover && typeof window !== "undefined" && "speechSynthesis" in window) {
+                            window.speechSynthesis.cancel();
+                            setIsPlayingVoiceover(false);
+                          }
+                          setPreviewItem(null);
+                        }}
+                        className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition cursor-pointer"
+                      >
+                        ✕ Tutup Pratinjau
+                      </button>
+
+                      {(previewItem.task_type === "VIDEO_BRANDING" || previewItem.task_type === "SOCIAL_MEDIA_CONTENT") && (
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadScript(previewItem)}
+                          className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-amber-500/40 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Unduh Naskah (.TXT)</span>
+                        </button>
+                      )}
+
+                      {(previewItem.task_type === "VIDEO_BRANDING" || previewItem.task_type === "SOCIAL_MEDIA_CONTENT" || previewItem.task_type === "PROMO_CAMPAIGN") && (
+                        <button
+                          type="button"
+                          onClick={() => handleShareToWhatsAppStatus(previewItem)}
+                          className="px-4 py-2.5 rounded-xl bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 hover:text-emerald-200 border border-emerald-500/50 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                          title="Pasang Teks & Materi Promosi ke Status WhatsApp"
+                        >
+                          <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>📲 Pasang ke Status WA</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {previewItem.status === "PENDING_APPROVAL" ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteQueueItem(previewItem)}
+                          disabled={approvingId === previewItem.id || rejectingId === previewItem.id || deletingId === previewItem.id}
+                          className="px-3.5 py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          title="Hapus Usulan Pekerjaan Ini Dari Antrean"
+                        >
+                          {deletingId === previewItem.id ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          )}
+                          <span>Hapus Draf</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleReject(previewItem)}
+                          disabled={approvingId === previewItem.id || rejectingId === previewItem.id || deletingId === previewItem.id}
+                          className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-rose-950 hover:text-rose-300 text-slate-400 text-xs font-bold transition cursor-pointer disabled:opacity-50"
+                        >
+                          {rejectingId === previewItem.id ? "Menolak..." : "Tolak Usulan"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(previewItem)}
+                          disabled={approvingId === previewItem.id || rejectingId === previewItem.id || deletingId === previewItem.id}
+                          className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-xs font-black shadow-lg shadow-emerald-600/30 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {approvingId === previewItem.id ? (
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Check className="w-4 h-4" />
+                          )}
+                          <span>
+                            {approvingId === previewItem.id
+                              ? "Memproses Publikasi Medsos..."
+                              : previewItem.task_type === "VIDEO_BRANDING" || previewItem.task_type === "SOCIAL_MEDIA_CONTENT" || previewItem.task_type === "PROMO_CAMPAIGN"
+                              ? "🚀 Setujui & Publikasikan Otomatis ke Seluruh Medsos"
+                              : "Setujui & Terapkan Resmi ke Database"}
+                          </span>
+                        </button>
+                      </div>
+                    ) : previewItem.status === "REJECTED" ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                          ✕ Usulan Pekerjaan Ditolak
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteQueueItem(previewItem)}
+                          disabled={deletingId === previewItem.id}
+                          className="px-3.5 py-2.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-200 border border-rose-500/40 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {deletingId === previewItem.id ? (
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                          )}
+                          <span>Hapus Permanen</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" /> Telah Disetujui Resmi
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteQueueItem(previewItem)}
+                          disabled={deletingId === previewItem.id}
+                          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950 hover:text-rose-300 text-slate-400 border border-slate-700 text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                          title="Hapus Dari Riwayat Antrean"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus Arsip</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                </div>
               </div>
             )}
           </div>
@@ -931,8 +2523,8 @@ export default function VirtualOfficePage() {
 
       {/* DRAWER / MODAL DETAIL KARYAWAN AI */}
       {selectedEmployee && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-700 max-w-xl w-full rounded-3xl p-6 text-white shadow-2xl space-y-5 relative">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-slate-900 border-2 border-indigo-500/40 max-w-xl w-full max-h-[92vh] overflow-y-auto rounded-3xl p-6 text-white shadow-2xl space-y-5 relative">
             <button
               onClick={() => {
                 setSelectedEmployee(null);

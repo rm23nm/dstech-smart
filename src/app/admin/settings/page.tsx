@@ -37,7 +37,37 @@ import {
   Star,
   Layers,
   Layout,
+  Video,
+  Key,
+  Radio,
+  Send,
+  HelpCircle,
+  CheckSquare,
 } from "lucide-react";
+
+function YoutubeIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+    </svg>
+  );
+}
+
+function FacebookIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+    </svg>
+  );
+}
+
+function InstagramIcon({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+    </svg>
+  );
+}
 
 function formatRupiah(amount: number): string {
   return "Rp " + (amount || 0).toLocaleString("id-ID");
@@ -119,6 +149,62 @@ export interface EstoreSettingsData {
   featuredHeroes: EstoreHeroItem[];
 }
 
+export interface SocialIntegrationsConfig {
+  youtube?: {
+    enabled: boolean;
+    channelName: string;
+    channelId: string;
+    apiKey: string;
+    clientId: string;
+    clientSecret: string;
+    refreshToken: string;
+    privacyStatus: "public" | "unlisted" | "private";
+    defaultTags: string;
+    autoPublishShorts: boolean;
+  };
+  facebook?: {
+    enabled: boolean;
+    pageName: string;
+    pageId: string;
+    pageAccessToken: string;
+    autoPublishVideos: boolean;
+  };
+  instagram?: {
+    enabled: boolean;
+    igUsername: string;
+    igUserId: string;
+    accessToken: string;
+    autoPublishReels: boolean;
+  };
+  tiktok?: {
+    enabled: boolean;
+    accountName: string;
+    clientKey: string;
+    clientSecret: string;
+    accessToken: string;
+    refreshToken: string;
+    privacyLevel: string;
+    allowComments: boolean;
+    allowDuet: boolean;
+    allowStitch: boolean;
+  };
+  universalWebhook?: {
+    enabled: boolean;
+    webhookUrl: string;
+    secretKey: string;
+    platformLabel: string;
+    autoDispatch: boolean;
+  };
+  whatsappStatus?: {
+    enabled: boolean;
+    gatewayUrl: string;
+    masterSecret: string;
+    deviceSession: string;
+    targetJid: string;
+    autoPublishStatus: boolean;
+  };
+}
+
 export interface SiteSettingsData {
   companyName: string;
   tagline: string;
@@ -145,12 +231,13 @@ export interface SiteSettingsData {
   bankAccounts?: BankAccountItem[];
   letterheadSettings?: LetterheadSettingsData;
   estoreSettings?: EstoreSettingsData;
+  socialIntegrations?: SocialIntegrationsConfig;
   updatedAt?: string;
 }
 
 export default function AdminSettingsPage() {
   // Tab Aktif Utama
-  const [activeTab, setActiveTab] = useState<"profile" | "branding" | "gps" | "banks" | "letterhead" | "estore" | "danger">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "branding" | "gps" | "banks" | "letterhead" | "estore" | "social_api" | "danger">("profile");
 
   const [settings, setSettings] = useState<SiteSettingsData>({
     companyName: "PT. DSTech Smart Perkasa",
@@ -314,6 +401,65 @@ export default function AdminSettingsPage() {
   const [isUploadingHeroBg, setIsUploadingHeroBg] = useState(false);
   const heroBgFileInputRef = useRef<HTMLInputElement>(null);
 
+  // State Integrasi Media Sosial & Otomasi AI Nadia Safitri (Tugas 331)
+  const [socialConfig, setSocialConfig] = useState<SocialIntegrationsConfig>({
+    youtube: {
+      enabled: true,
+      channelName: "DSTech Smart Perkasa",
+      channelId: "UC_dstech_smart_cilegon",
+      apiKey: "",
+      clientId: "",
+      clientSecret: "",
+      refreshToken: "",
+      privacyStatus: "public",
+      defaultTags: "DSTechSmart,CCTVCilegon,SmartHome,BarrierGate,AccessControl,Teknologi,SecuritySystem,Shorts",
+      autoPublishShorts: true,
+    },
+    facebook: {
+      enabled: true,
+      pageName: "DSTech Smart Perkasa",
+      pageId: "dstechsmartperkasa",
+      pageAccessToken: "",
+      autoPublishVideos: true,
+    },
+    instagram: {
+      enabled: true,
+      igUsername: "dstechsmart",
+      igUserId: "",
+      accessToken: "",
+      autoPublishReels: true,
+    },
+    tiktok: {
+      enabled: true,
+      accountName: "@dstechsmart",
+      clientKey: "",
+      clientSecret: "",
+      accessToken: "",
+      refreshToken: "",
+      privacyLevel: "PUBLIC_TO_EVERYONE",
+      allowComments: true,
+      allowDuet: true,
+      allowStitch: true,
+    },
+    universalWebhook: {
+      enabled: true,
+      webhookUrl: "",
+      secretKey: "",
+      platformLabel: "Webhook Multi-Channel (Make / Zapier / n8n / Ayrshare)",
+      autoDispatch: true,
+    },
+    whatsappStatus: {
+      enabled: true,
+      gatewayUrl: "https://smartpro.dstechsmart.com",
+      masterSecret: "DSTECH-MASTER-PRO-2026",
+      deviceSession: "main",
+      targetJid: "status@broadcast",
+      autoPublishStatus: true,
+    },
+  });
+  const [testingPlatform, setTestingPlatform] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<{ [key: string]: { success: boolean; message: string; data?: any } }>({});
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -362,6 +508,18 @@ export default function AdminSettingsPage() {
               : prev.featuredHeroes,
           }));
         }
+        if (json.data.socialIntegrations) {
+          setSocialConfig((prev) => ({
+            ...prev,
+            ...json.data.socialIntegrations,
+            youtube: { ...prev.youtube, ...(json.data.socialIntegrations.youtube || {}) },
+            facebook: { ...prev.facebook, ...(json.data.socialIntegrations.facebook || {}) },
+            instagram: { ...prev.instagram, ...(json.data.socialIntegrations.instagram || {}) },
+            tiktok: { ...prev.tiktok, ...(json.data.socialIntegrations.tiktok || {}) },
+            universalWebhook: { ...prev.universalWebhook, ...(json.data.socialIntegrations.universalWebhook || {}) },
+            whatsappStatus: { ...prev.whatsappStatus, ...(json.data.socialIntegrations.whatsappStatus || {}) },
+          }));
+        }
       }
     } catch (err) {
       console.error("Gagal memuat pengaturan:", err);
@@ -401,6 +559,7 @@ export default function AdminSettingsPage() {
         bankAccounts,
         letterheadSettings: letterheadConfig,
         estoreSettings: estoreConfig,
+        socialIntegrations: socialConfig,
         ...(customData || {}),
       };
 
@@ -422,6 +581,18 @@ export default function AdminSettingsPage() {
           if (data.data.estoreSettings) {
             setEstoreConfig((prev) => ({ ...prev, ...data.data.estoreSettings }));
           }
+          if (data.data.socialIntegrations) {
+            setSocialConfig((prev) => ({
+              ...prev,
+              ...data.data.socialIntegrations,
+              youtube: { ...prev.youtube, ...(data.data.socialIntegrations.youtube || {}) },
+              facebook: { ...prev.facebook, ...(data.data.socialIntegrations.facebook || {}) },
+              instagram: { ...prev.instagram, ...(data.data.socialIntegrations.instagram || {}) },
+              tiktok: { ...prev.tiktok, ...(data.data.socialIntegrations.tiktok || {}) },
+              universalWebhook: { ...prev.universalWebhook, ...(data.data.socialIntegrations.universalWebhook || {}) },
+              whatsappStatus: { ...prev.whatsappStatus, ...(data.data.socialIntegrations.whatsappStatus || {}) },
+            }));
+          }
         }
       } else {
         showToast("error", data.message || "Gagal menyimpan pengaturan.");
@@ -431,6 +602,63 @@ export default function AdminSettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Uji koneksi API Media Sosial ke /api/social-media/publish (Tugas 331)
+  const handleTestSocialConnection = async (platformKey: string) => {
+    try {
+      setTestingPlatform(platformKey);
+      const res = await fetch("/api/social-media/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "test_connection",
+          platform: platformKey,
+          credentials: (socialConfig as any)[platformKey],
+        }),
+      });
+      const data = await res.json();
+      setTestResults((prev) => ({
+        ...prev,
+        [platformKey]: {
+          success: data.success,
+          message: data.message || (data.success ? "Koneksi berhasil terhubung!" : "Koneksi gagal."),
+          data: data.data,
+        },
+      }));
+      if (data.success) {
+        showToast("success", data.message || `Koneksi API ${platformKey} berhasil!`);
+      } else {
+        showToast("error", data.message || `Gagal terhubung ke API ${platformKey}.`);
+      }
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      setTestResults((prev) => ({
+        ...prev,
+        [platformKey]: {
+          success: false,
+          message: `Terjadi kesalahan jaringan: ${errMsg}`,
+        },
+      }));
+      showToast("error", `Gagal menguji koneksi: ${errMsg}`);
+    } finally {
+      setTestingPlatform(null);
+    }
+  };
+
+  // Helper update config per platform (Tugas 331)
+  const updateSocialChannel = (
+    channel: keyof SocialIntegrationsConfig,
+    key: string,
+    value: any
+  ) => {
+    setSocialConfig((prev) => ({
+      ...prev,
+      [channel]: {
+        ...((prev[channel] as any) || {}),
+        [key]: value,
+      },
+    }));
   };
 
   // Handler Upload Background Hero E-Store (Tugas 213)
@@ -677,9 +905,8 @@ export default function AdminSettingsPage() {
       {/* Toast Notification */}
       {toast.show && (
         <div
-          className={`fixed bottom-8 right-8 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl text-white font-bold text-sm animate-in slide-in-from-bottom-5 duration-300 ${
-            toast.type === "success" ? "bg-emerald-600" : "bg-red-600"
-          }`}
+          className={`fixed bottom-8 right-8 z-50 flex items-center gap-3 px-5 py-4 rounded-2xl shadow-2xl text-white font-bold text-sm animate-in slide-in-from-bottom-5 duration-300 ${toast.type === "success" ? "bg-emerald-600" : "bg-red-600"
+            }`}
         >
           {toast.type === "success" ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
           <span>{toast.message}</span>
@@ -721,11 +948,10 @@ export default function AdminSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("profile")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "profile"
-              ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === "profile"
+            ? "bg-slate-900 text-white shadow-md shadow-slate-900/20"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
         >
           <Building2 className="w-4 h-4" />
           <span>🏢 Profil &amp; Legalitas Perusahaan</span>
@@ -734,11 +960,10 @@ export default function AdminSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("branding")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "branding"
-              ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === "branding"
+            ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
         >
           <ImageIcon className="w-4 h-4" />
           <span>🎨 Logo &amp; Branding Website</span>
@@ -747,11 +972,10 @@ export default function AdminSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("gps")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "gps"
-              ? "bg-rose-600 text-white shadow-md shadow-rose-600/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === "gps"
+            ? "bg-rose-600 text-white shadow-md shadow-rose-600/20"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
         >
           <MapPin className="w-4 h-4 text-rose-500" />
           <span>📍 Titik GPS Kantor &amp; Geofencing Presensi</span>
@@ -760,11 +984,10 @@ export default function AdminSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("banks")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "banks"
-              ? "bg-dstech-blue text-white shadow-md shadow-blue-500/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === "banks"
+            ? "bg-dstech-blue text-white shadow-md shadow-blue-500/20"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
         >
           <CreditCard className="w-4 h-4" />
           <span>💳 Rekening Bank Resmi ({bankAccounts.length})</span>
@@ -773,11 +996,10 @@ export default function AdminSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("letterhead")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "letterhead"
-              ? "bg-purple-700 text-white shadow-md shadow-purple-700/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === "letterhead"
+            ? "bg-purple-700 text-white shadow-md shadow-purple-700/20"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
         >
           <FileText className="w-4 h-4" />
           <span>📑 Kop Surat Dokumen (PT &amp; Non-PT)</span>
@@ -786,11 +1008,10 @@ export default function AdminSettingsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("estore")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "estore"
-              ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === "estore"
+            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/20"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
         >
           <ShoppingCart className="w-4 h-4" />
           <span>🛒 Pengaturan E-Store &amp; Hero Showcase ({estoreConfig.featuredHeroes.length})</span>
@@ -798,12 +1019,23 @@ export default function AdminSettingsPage() {
 
         <button
           type="button"
+          onClick={() => setActiveTab("social_api")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === "social_api"
+            ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+        >
+          <Share2 className="w-4 h-4 text-purple-500" />
+          <span>🌐 Integrasi Media Sosial &amp; API AI</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab("danger")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
-            activeTab === "danger"
-              ? "bg-red-600 text-white shadow-md shadow-red-600/20"
-              : "bg-white text-red-600 hover:bg-red-50 border border-red-200"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === "danger"
+            ? "bg-red-600 text-white shadow-md shadow-red-600/20"
+            : "bg-white text-red-600 hover:bg-red-50 border border-red-200"
+            }`}
         >
           <AlertTriangle className="w-4 h-4" />
           <span>⚠️ Zona Bahaya (Pembersihan)</span>
@@ -1367,33 +1599,30 @@ export default function AdminSettingsPage() {
                 <button
                   type="button"
                   onClick={() => setBankFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    bankFilter === "ALL"
-                      ? "bg-slate-900 text-white shadow"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${bankFilter === "ALL"
+                    ? "bg-slate-900 text-white shadow"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
                 >
                   🌐 Semua ({bankAccounts.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setBankFilter("PT")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    bankFilter === "PT"
-                      ? "bg-dstech-blue text-white shadow"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${bankFilter === "PT"
+                    ? "bg-dstech-blue text-white shadow"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
                 >
                   🏢 Khusus PT ({bankAccounts.filter((b) => (b.entityType || "PT") === "PT").length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setBankFilter("NON_PT")}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    bankFilter === "NON_PT"
-                      ? "bg-emerald-600 text-white shadow"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${bankFilter === "NON_PT"
+                    ? "bg-emerald-600 text-white shadow"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
                 >
                   🏬 Khusus Non-PT ({bankAccounts.filter((b) => b.entityType === "NON_PT").length})
                 </button>
@@ -1409,11 +1638,10 @@ export default function AdminSettingsPage() {
               {filteredBanks.map((bank) => (
                 <div
                   key={bank.id}
-                  className={`p-5 rounded-3xl border-2 transition-all relative flex flex-col justify-between gap-4 ${
-                    bank.isDefault
-                      ? "bg-blue-50/50 border-dstech-blue/60 shadow-md shadow-blue-500/5"
-                      : "bg-slate-50/60 border-slate-200/80 hover:border-slate-300"
-                  }`}
+                  className={`p-5 rounded-3xl border-2 transition-all relative flex flex-col justify-between gap-4 ${bank.isDefault
+                    ? "bg-blue-50/50 border-dstech-blue/60 shadow-md shadow-blue-500/5"
+                    : "bg-slate-50/60 border-slate-200/80 hover:border-slate-300"
+                    }`}
                 >
                   <div>
                     <div className="flex items-start justify-between gap-2">
@@ -1426,11 +1654,10 @@ export default function AdminSettingsPage() {
                         )}
                       </div>
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          bank.entityType === "NON_PT"
-                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                            : "bg-blue-100 text-blue-800 border border-blue-300"
-                        }`}
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${bank.entityType === "NON_PT"
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                          : "bg-blue-100 text-blue-800 border border-blue-300"
+                          }`}
                       >
                         {bank.entityType === "NON_PT" ? "Non-PT" : "PT"}
                       </span>
@@ -1450,9 +1677,8 @@ export default function AdminSettingsPage() {
                       type="button"
                       onClick={() => handleToggleDefaultBank(bank.id)}
                       disabled={bank.isDefault}
-                      className={`text-[11px] font-bold transition-colors cursor-pointer ${
-                        bank.isDefault ? "text-emerald-600 font-black cursor-default" : "text-slate-500 hover:text-dstech-blue underline"
-                      }`}
+                      className={`text-[11px] font-bold transition-colors cursor-pointer ${bank.isDefault ? "text-emerald-600 font-black cursor-default" : "text-slate-500 hover:text-dstech-blue underline"
+                        }`}
                     >
                       {bank.isDefault ? "✓ Rekening Utama" : "Set Jadi Utama"}
                     </button>
@@ -1519,22 +1745,20 @@ export default function AdminSettingsPage() {
                 <button
                   type="button"
                   onClick={() => setLetterheadTab("PT")}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    letterheadTab === "PT"
-                      ? "bg-dstech-blue text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${letterheadTab === "PT"
+                    ? "bg-dstech-blue text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                    }`}
                 >
                   🏢 Entitas PT
                 </button>
                 <button
                   type="button"
                   onClick={() => setLetterheadTab("NON_PT")}
-                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                    letterheadTab === "NON_PT"
-                      ? "bg-emerald-600 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${letterheadTab === "NON_PT"
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                    }`}
                 >
                   🏬 Entitas Non-PT
                 </button>
@@ -1771,11 +1995,10 @@ export default function AdminSettingsPage() {
                             letterheadFitMode: mode.id as any,
                           })
                         }
-                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                          (letterheadConfig.letterheadFitMode || "fill") === mode.id
-                            ? "bg-purple-50 border-purple-400 text-purple-900 shadow-xs"
-                            : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
-                        }`}
+                        className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${(letterheadConfig.letterheadFitMode || "fill") === mode.id
+                          ? "bg-purple-50 border-purple-400 text-purple-900 shadow-xs"
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                          }`}
                       >
                         <p className="font-bold text-xs">{mode.label}</p>
                         <p className="text-[10px] text-slate-400 mt-0.5">{mode.desc}</p>
@@ -1995,11 +2218,10 @@ export default function AdminSettingsPage() {
                     <span>Pratinjau Resolusi Lembar Cetak A4:</span>
                   </span>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                      letterheadTab === "NON_PT"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-dstech-blue text-white"
-                    }`}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${letterheadTab === "NON_PT"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-dstech-blue text-white"
+                      }`}
                   >
                     {letterheadTab}
                   </span>
@@ -2022,8 +2244,8 @@ export default function AdminSettingsPage() {
                           letterheadConfig.letterheadFitMode === "cover"
                             ? "cover"
                             : letterheadConfig.letterheadFitMode === "contain"
-                            ? "contain"
-                            : "fill",
+                              ? "contain"
+                              : "fill",
                       }}
                     />
                   ) : (
@@ -2038,16 +2260,14 @@ export default function AdminSettingsPage() {
                   <div
                     className="relative z-10 space-y-2 pointer-events-none"
                     style={{
-                      paddingTop: `${
-                        (letterheadTab === "NON_PT"
-                          ? letterheadConfig.letterheadPaddingTop_NON_PT
-                          : letterheadConfig.letterheadPaddingTop_PT || letterheadConfig.letterheadPaddingTop) || 80
-                      }px`,
-                      paddingBottom: `${
-                        (letterheadTab === "NON_PT"
-                          ? letterheadConfig.letterheadPaddingBottom_NON_PT
-                          : letterheadConfig.letterheadPaddingBottom_PT || letterheadConfig.letterheadPaddingBottom) || 75
-                      }px`,
+                      paddingTop: `${(letterheadTab === "NON_PT"
+                        ? letterheadConfig.letterheadPaddingTop_NON_PT
+                        : letterheadConfig.letterheadPaddingTop_PT || letterheadConfig.letterheadPaddingTop) || 80
+                        }px`,
+                      paddingBottom: `${(letterheadTab === "NON_PT"
+                        ? letterheadConfig.letterheadPaddingBottom_NON_PT
+                        : letterheadConfig.letterheadPaddingBottom_PT || letterheadConfig.letterheadPaddingBottom) || 75
+                        }px`,
                     }}
                   >
                     <div className="border-b border-slate-400/80 pb-1 flex items-center justify-between">
@@ -2215,11 +2435,10 @@ export default function AdminSettingsPage() {
                       key={m.id}
                       type="button"
                       onClick={() => setEstoreConfig((prev) => ({ ...prev, heroBackgroundMode: m.id as any }))}
-                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                        estoreConfig.heroBackgroundMode === m.id
-                          ? "border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-xs"
-                          : "border-slate-200 bg-white hover:bg-slate-50"
-                      }`}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${estoreConfig.heroBackgroundMode === m.id
+                        ? "border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/20 shadow-xs"
+                        : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
                     >
                       <span className="text-lg block mb-1">{m.icon}</span>
                       <span className="text-xs font-black text-slate-900 block leading-tight">{m.label}</span>
@@ -2424,11 +2643,10 @@ export default function AdminSettingsPage() {
               {estoreConfig.featuredHeroes.map((item, idx) => (
                 <div
                   key={item.id || idx}
-                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-                    item.isActive
-                      ? "bg-white border-slate-200 hover:border-emerald-300 shadow-2xs"
-                      : "bg-slate-50/80 border-slate-200 opacity-60"
-                  }`}
+                  className={`p-4 rounded-2xl border transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${item.isActive
+                    ? "bg-white border-slate-200 hover:border-emerald-300 shadow-2xs"
+                    : "bg-slate-50/80 border-slate-200 opacity-60"
+                    }`}
                 >
                   {/* Info Produk & Thumbnail */}
                   <div className="flex items-center gap-3.5 flex-1 min-w-0">
@@ -2503,11 +2721,10 @@ export default function AdminSettingsPage() {
                     <button
                       type="button"
                       onClick={() => handleToggleHeroItem(item.id)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
-                        item.isActive
-                          ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
-                          : "bg-slate-200 text-slate-600 hover:bg-slate-300"
-                      }`}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${item.isActive
+                        ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                        : "bg-slate-200 text-slate-600 hover:bg-slate-300"
+                        }`}
                     >
                       {item.isActive ? "✓ Aktif Tampil" : "Nonaktif"}
                     </button>
@@ -2543,6 +2760,909 @@ export default function AdminSettingsPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* KONTEN TAB: INTEGRASI MEDIA SOSIAL & OTOMASI API AI (Tugas 331) */}
+      {activeTab === "social_api" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Overview Card */}
+          <div className="bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden border border-purple-500/20">
+            <div className="relative z-10 max-w-4xl space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase bg-purple-500/20 text-purple-200 border border-purple-400/30">
+                <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+                <span>Otomasi Multi-Platform • Karyawan AI Nadia Safitri</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Integrasi Media Sosial &amp; API Publikasi Otonom
+              </h2>
+              <p className="text-xs sm:text-sm text-purple-100 leading-relaxed">
+                Hubungkan kanal resmi YouTube Shorts, Facebook Page, Instagram Reels, TikTok, dan Webhook Aggregator. Konten video vertikal 9:16 dan flyer promosi yang dirancang oleh <strong>Nadia Safitri</strong> akan otomatis terbit ke platform media sosial resmi tanpa membebani kapasitas harddisk server VPS (<strong>0 MB Disk Space</strong>).
+              </p>
+
+              {/* Status Badges */}
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <span className="px-3 py-1 rounded-xl text-[11px] font-bold bg-white/10 backdrop-blur text-white border border-white/10 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>0 MB Beban Disk VPS</span>
+                </span>
+                <span className="px-3 py-1 rounded-xl text-[11px] font-bold bg-white/10 backdrop-blur text-white border border-white/10 flex items-center gap-1.5">
+                  <Video className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Format 9:16 Shorts / Reels / TikTok</span>
+                </span>
+                <span className="px-3 py-1 rounded-xl text-[11px] font-bold bg-white/10 backdrop-blur text-white border border-white/10 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Kredensial Terenkripsi di Server Lokal</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* GRID 4 PLATFORM INTEGRASI */}
+          <div className="space-y-6">
+            {/* 1. YOUTUBE SHORTS (Google Cloud Data API v3) */}
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-black text-xl shrink-0 shadow-sm border border-rose-100">
+                    <YoutubeIcon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-black text-slate-900">
+                        YouTube Data API v3 (YouTube Shorts)
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
+                        Shorts 9:16
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Upload otomatis video branding vertikal langsung ke kanal resmi YouTube PT. DSTech Smart Perkasa.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Toggle Aktif YouTube */}
+                <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={socialConfig.youtube?.enabled ?? true}
+                    onChange={(e) => updateSocialChannel("youtube", "enabled", e.target.checked)}
+                    className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-800">
+                    {socialConfig.youtube?.enabled ? "Aktif (Enabled)" : "Nonaktif"}
+                  </span>
+                </label>
+              </div>
+
+              {/* Form Input YouTube */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Nama Channel YouTube
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.youtube?.channelName || ""}
+                    onChange={(e) => updateSocialChannel("youtube", "channelName", e.target.value)}
+                    placeholder="DSTech Smart Perkasa"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Channel ID / Handle
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.youtube?.channelId || ""}
+                    onChange={(e) => updateSocialChannel("youtube", "channelId", e.target.value)}
+                    placeholder="UC_dstech_smart_cilegon atau @dstechsmart"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Google API Key (Public Data &amp; Channel Stats)
+                  </label>
+                  <input
+                    type="password"
+                    value={socialConfig.youtube?.apiKey || ""}
+                    onChange={(e) => updateSocialChannel("youtube", "apiKey", e.target.value)}
+                    placeholder="AIzaSy..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Status Privasi Video Shorts
+                  </label>
+                  <select
+                    value={socialConfig.youtube?.privacyStatus || "public"}
+                    onChange={(e) => updateSocialChannel("youtube", "privacyStatus", e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                  >
+                    <option value="public">Publik (Tayang &amp; Terbuka untuk Seluruh Penonton)</option>
+                    <option value="unlisted">Unlisted (Hanya Penonton dengan Tautan)</option>
+                    <option value="private">Privat (Hanya Akun Admin)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    OAuth2 Client ID (Google Cloud)
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.youtube?.clientId || ""}
+                    onChange={(e) => updateSocialChannel("youtube", "clientId", e.target.value)}
+                    placeholder="123456789-abcdef.apps.googleusercontent.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    OAuth2 Client Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={socialConfig.youtube?.clientSecret || ""}
+                    onChange={(e) => updateSocialChannel("youtube", "clientSecret", e.target.value)}
+                    placeholder="GOCSPX-..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    OAuth2 Refresh Token (Untuk Upload Otomatis Latar Belakang)
+                  </label>
+                  <input
+                    type="password"
+                    value={socialConfig.youtube?.refreshToken || ""}
+                    onChange={(e) => updateSocialChannel("youtube", "refreshToken", e.target.value)}
+                    placeholder="1//04..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Tagar Bawaan Video (Default Tags)
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.youtube?.defaultTags || ""}
+                    onChange={(e) => updateSocialChannel("youtube", "defaultTags", e.target.value)}
+                    placeholder="DSTechSmart, CCTVCilegon, BarrierGate, SmartHome, Shorts"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    Pisahkan tagar dengan koma. Tagar #Shorts akan otomatis disertakan agar masuk ke rekomendasi YouTube Shorts.
+                  </span>
+                </div>
+              </div>
+
+              {/* Action & Feedback YouTube */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => handleTestSocialConnection("youtube")}
+                  disabled={testingPlatform === "youtube"}
+                  className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {testingPlatform === "youtube" ? (
+                    <div className="w-3.5 h-3.5 border-2 border-rose-600/30 border-t-rose-600 rounded-full animate-spin" />
+                  ) : (
+                    <Radio className="w-3.5 h-3.5" />
+                  )}
+                  <span>🧪 Uji Koneksi YouTube Data API</span>
+                </button>
+
+                {testResults["youtube"] && (
+                  <div
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${testResults["youtube"].success
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-amber-50 text-amber-800 border border-amber-200"
+                      }`}
+                  >
+                    {testResults["youtube"].success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                    )}
+                    <span>{testResults["youtube"].message}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Panduan Singkat Setup YouTube */}
+              <details className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 group">
+                <summary className="font-bold text-slate-800 cursor-pointer flex items-center justify-between select-none">
+                  <span className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-rose-500" />
+                    <span>📖 Panduan Mendapatkan Kredensial YouTube Data API v3 (Gratis &amp; Resmi)</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div className="mt-3 space-y-2 text-slate-600 pl-6 border-l-2 border-rose-300">
+                  <p>1. Kunjungi <strong>Google Cloud Console</strong> (<code>console.cloud.google.com</code>) dan buat proyek baru <em>"DSTech Smart"</em>.</p>
+                  <p>2. Di menu <strong>APIs &amp; Services</strong> &gt; <strong>Library</strong>, cari dan aktifkan <strong>"YouTube Data API v3"</strong>.</p>
+                  <p>3. Di menu <strong>Credentials</strong>, klik <strong>Create Credentials</strong> &gt; pilih <strong>API Key</strong> (masukkan ke kolom Google API Key di atas).</p>
+                  <p>4. Untuk upload video otomatis, buat <strong>OAuth 2.0 Client ID</strong> (pilih Web application), lalu dapatkan <strong>Refresh Token</strong> melalui OAuth Playground (scope: <code>https://www.googleapis.com/auth/youtube.upload</code>).</p>
+                  <p>5. Klik <strong>Simpan Semua Pengaturan</strong> dan tombol <strong>Uji Koneksi</strong> untuk memverifikasi.</p>
+                </div>
+              </details>
+            </div>
+
+            {/* 2. META GRAPH API (Facebook Page & Instagram Reels) */}
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xl shrink-0 shadow-sm border border-indigo-100">
+                    <Share2 className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-black text-slate-900">
+                        Meta Graph API (Facebook Page &amp; Instagram Reels)
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                        Reels &amp; Feed
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Publikasi serentak ke Halaman Facebook resmi dan Instagram Reels @dstechsmart.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* SUB-SECTION A: FACEBOOK PAGE */}
+              <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-black text-slate-800">
+                    <FacebookIcon className="w-4 h-4 text-blue-600" />
+                    <span>Halaman Facebook Resmi (Facebook Page)</span>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={socialConfig.facebook?.enabled ?? true}
+                      onChange={(e) => updateSocialChannel("facebook", "enabled", e.target.checked)}
+                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span>{socialConfig.facebook?.enabled ? "Aktif" : "Nonaktif"}</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                      Nama Halaman Facebook
+                    </label>
+                    <input
+                      type="text"
+                      value={socialConfig.facebook?.pageName || ""}
+                      onChange={(e) => updateSocialChannel("facebook", "pageName", e.target.value)}
+                      placeholder="DSTech Smart Perkasa"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                      Page ID / Username
+                    </label>
+                    <input
+                      type="text"
+                      value={socialConfig.facebook?.pageId || ""}
+                      onChange={(e) => updateSocialChannel("facebook", "pageId", e.target.value)}
+                      placeholder="dstechsmartperkasa atau 10009..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                      Facebook Page Access Token
+                    </label>
+                    <input
+                      type="password"
+                      value={socialConfig.facebook?.pageAccessToken || ""}
+                      onChange={(e) => updateSocialChannel("facebook", "pageAccessToken", e.target.value)}
+                      placeholder="EAA..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTestSocialConnection("facebook")}
+                    disabled={testingPlatform === "facebook"}
+                    className="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs border border-blue-200 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingPlatform === "facebook" ? (
+                      <div className="w-3.5 h-3.5 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+                    ) : (
+                      <Radio className="w-3.5 h-3.5" />
+                    )}
+                    <span>🧪 Uji Koneksi Facebook Page</span>
+                  </button>
+
+                  {testResults["facebook"] && (
+                    <span
+                      className={`text-xs font-bold px-3 py-1 rounded-lg ${testResults["facebook"].success
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-amber-100 text-amber-900"
+                        }`}
+                    >
+                      {testResults["facebook"].message}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* SUB-SECTION B: INSTAGRAM REELS */}
+              <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-black text-slate-800">
+                    <InstagramIcon className="w-4 h-4 text-pink-600" />
+                    <span>Instagram Bisnis &amp; Reels Official</span>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={socialConfig.instagram?.enabled ?? true}
+                      onChange={(e) => updateSocialChannel("instagram", "enabled", e.target.checked)}
+                      className="w-4 h-4 text-pink-600 rounded focus:ring-pink-500 cursor-pointer"
+                    />
+                    <span>{socialConfig.instagram?.enabled ? "Aktif" : "Nonaktif"}</span>
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                      Username Instagram
+                    </label>
+                    <input
+                      type="text"
+                      value={socialConfig.instagram?.igUsername || ""}
+                      onChange={(e) => updateSocialChannel("instagram", "igUsername", e.target.value)}
+                      placeholder="dstechsmart"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-pink-500/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                      Instagram Business Account ID
+                    </label>
+                    <input
+                      type="text"
+                      value={socialConfig.instagram?.igUserId || ""}
+                      onChange={(e) => updateSocialChannel("instagram", "igUserId", e.target.value)}
+                      placeholder="17841400..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-pink-500/30"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                      Graph API User Access Token
+                    </label>
+                    <input
+                      type="password"
+                      value={socialConfig.instagram?.accessToken || ""}
+                      onChange={(e) => updateSocialChannel("instagram", "accessToken", e.target.value)}
+                      placeholder="IGQW..."
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-pink-500/30"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTestSocialConnection("instagram")}
+                    disabled={testingPlatform === "instagram"}
+                    className="px-3.5 py-2 rounded-xl bg-pink-50 hover:bg-pink-100 text-pink-700 font-bold text-xs border border-pink-200 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {testingPlatform === "instagram" ? (
+                      <div className="w-3.5 h-3.5 border-2 border-pink-600/30 border-t-pink-600 rounded-full animate-spin" />
+                    ) : (
+                      <Radio className="w-3.5 h-3.5" />
+                    )}
+                    <span>🧪 Uji Koneksi Instagram Reels</span>
+                  </button>
+
+                  {testResults["instagram"] && (
+                    <span
+                      className={`text-xs font-bold px-3 py-1 rounded-lg ${testResults["instagram"].success
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-amber-100 text-amber-900"
+                        }`}
+                    >
+                      {testResults["instagram"].message}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Panduan Singkat Meta Developers */}
+              <details className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 group">
+                <summary className="font-bold text-slate-800 cursor-pointer flex items-center justify-between select-none">
+                  <span className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-indigo-500" />
+                    <span>📖 Panduan Mendapatkan Token Meta Graph API (Facebook Page &amp; Instagram)</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div className="mt-3 space-y-2 text-slate-600 pl-6 border-l-2 border-indigo-300">
+                  <p>1. Buka <strong>Meta for Developers</strong> (<code>developers.facebook.com</code>) dan buat App bertipe <strong>Business</strong>.</p>
+                  <p>2. Hubungkan Halaman Facebook PT. DSTech Smart Perkasa dan akun Instagram Bisnis Anda.</p>
+                  <p>3. Di menu <strong>Graph API Explorer</strong>, pilih permission: <code>pages_show_list</code>, <code>pages_read_engagement</code>, <code>pages_manage_posts</code>, <code>instagram_basic</code>, <code>instagram_content_publish</code>.</p>
+                  <p>4. Buat <em>Never-Expiring Page Token</em> melalui menu System Users di Pengaturan Bisnis Meta agar token tidak pernah kadaluwarsa.</p>
+                </div>
+              </details>
+            </div>
+
+            {/* 3. TIKTOK CONTENT POSTING API */}
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shrink-0 shadow-sm">
+                    <span>🎵</span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-black text-slate-900">
+                        TikTok Content Posting API
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 text-white">
+                        TikTok Viral
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Publikasi video vertikal ke akun TikTok resmi @dstechsmart.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Toggle Aktif TikTok */}
+                <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={socialConfig.tiktok?.enabled ?? true}
+                    onChange={(e) => updateSocialChannel("tiktok", "enabled", e.target.checked)}
+                    className="w-4 h-4 text-slate-900 rounded focus:ring-slate-800 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-800">
+                    {socialConfig.tiktok?.enabled ? "Aktif (Enabled)" : "Nonaktif"}
+                  </span>
+                </label>
+              </div>
+
+              {/* Form Input TikTok */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Username / Handle TikTok
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.tiktok?.accountName || ""}
+                    onChange={(e) => updateSocialChannel("tiktok", "accountName", e.target.value)}
+                    placeholder="@dstechsmart"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-800/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Tingkat Privasi Video TikTok
+                  </label>
+                  <select
+                    value={socialConfig.tiktok?.privacyLevel || "PUBLIC_TO_EVERYONE"}
+                    onChange={(e) => updateSocialChannel("tiktok", "privacyLevel", e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-800/30"
+                  >
+                    <option value="PUBLIC_TO_EVERYONE">Publik (Terbuka untuk Semua Pengguna)</option>
+                    <option value="MUTUAL_FOLLOW_FRIENDS">Teman / Saling Mengikuti</option>
+                    <option value="SELF_ONLY">Hanya Diri Sendiri (Privat)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Client Key (TikTok for Developers)
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.tiktok?.clientKey || ""}
+                    onChange={(e) => updateSocialChannel("tiktok", "clientKey", e.target.value)}
+                    placeholder="aw..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-800/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Client Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={socialConfig.tiktok?.clientSecret || ""}
+                    onChange={(e) => updateSocialChannel("tiktok", "clientSecret", e.target.value)}
+                    placeholder="sb..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-800/30"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    User Access Token TikTok
+                  </label>
+                  <input
+                    type="password"
+                    value={socialConfig.tiktok?.accessToken || ""}
+                    onChange={(e) => updateSocialChannel("tiktok", "accessToken", e.target.value)}
+                    placeholder="act.example..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-slate-800/30"
+                  />
+                </div>
+              </div>
+
+              {/* Toggles Izin Interaksi */}
+              <div className="flex flex-wrap items-center gap-6 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                <span className="font-bold text-slate-700">Izin Interaksi Penonton:</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={socialConfig.tiktok?.allowComments ?? true}
+                    onChange={(e) => updateSocialChannel("tiktok", "allowComments", e.target.checked)}
+                    className="w-4 h-4 text-slate-900 rounded focus:ring-slate-800"
+                  />
+                  <span className="font-semibold text-slate-800">Izinkan Komentar</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={socialConfig.tiktok?.allowDuet ?? true}
+                    onChange={(e) => updateSocialChannel("tiktok", "allowDuet", e.target.checked)}
+                    className="w-4 h-4 text-slate-900 rounded focus:ring-slate-800"
+                  />
+                  <span className="font-semibold text-slate-800">Izinkan Duet</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={socialConfig.tiktok?.allowStitch ?? true}
+                    onChange={(e) => updateSocialChannel("tiktok", "allowStitch", e.target.checked)}
+                    className="w-4 h-4 text-slate-900 rounded focus:ring-slate-800"
+                  />
+                  <span className="font-semibold text-slate-800">Izinkan Stitch</span>
+                </label>
+              </div>
+
+              {/* Action & Feedback TikTok */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => handleTestSocialConnection("tiktok")}
+                  disabled={testingPlatform === "tiktok"}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {testingPlatform === "tiktok" ? (
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Radio className="w-3.5 h-3.5 text-cyan-400" />
+                  )}
+                  <span>🧪 Uji Koneksi TikTok API</span>
+                </button>
+
+                {testResults["tiktok"] && (
+                  <div
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${testResults["tiktok"].success
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-amber-50 text-amber-800 border border-amber-200"
+                      }`}
+                  >
+                    {testResults["tiktok"].message}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 4. UNIVERSAL MULTI-CHANNEL WEBHOOK AGGREGATOR */}
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-xl shrink-0 shadow-sm border border-emerald-100">
+                    <Send className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-black text-slate-900">
+                        Universal Multi-Channel Webhook (Make / Zapier / n8n / Ayrshare)
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                        Paling Fleksibel
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Hubungkan ke skenario Make.com, Zapier, n8n, atau platform manajemen medsos (Ayrshare/Publer/Buffer) untuk menyebarkan konten ke puluhan akun medsos secara simultan.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Toggle Aktif Webhook */}
+                <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={socialConfig.universalWebhook?.enabled ?? true}
+                    onChange={(e) => updateSocialChannel("universalWebhook", "enabled", e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-800">
+                    {socialConfig.universalWebhook?.enabled ? "Aktif (Enabled)" : "Nonaktif"}
+                  </span>
+                </label>
+              </div>
+
+              {/* Form Input Webhook */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    URL Webhook (HTTP POST Endpoint) *
+                  </label>
+                  <input
+                    type="url"
+                    value={socialConfig.universalWebhook?.webhookUrl || ""}
+                    onChange={(e) => updateSocialChannel("universalWebhook", "webhookUrl", e.target.value)}
+                    placeholder="https://hook.eu1.make.com/... atau https://hooks.zapier.com/..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Label Platform Alur
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.universalWebhook?.platformLabel || ""}
+                    onChange={(e) => updateSocialChannel("universalWebhook", "platformLabel", e.target.value)}
+                    placeholder="Make.com Skenario Medsos"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div className="md:col-span-3">
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Secret Key / Header Token (Opsional untuk header <code>X-DSTECH-SECRET</code>)
+                  </label>
+                  <input
+                    type="password"
+                    value={socialConfig.universalWebhook?.secretKey || ""}
+                    onChange={(e) => updateSocialChannel("universalWebhook", "secretKey", e.target.value)}
+                    placeholder="Kunci rahasia pengaman webhook..."
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+              </div>
+
+              {/* Action & Feedback Webhook */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => handleTestSocialConnection("universalWebhook")}
+                  disabled={testingPlatform === "universalWebhook"}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {testingPlatform === "universalWebhook" ? (
+                    <div className="w-3.5 h-3.5 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" />
+                  ) : (
+                    <Radio className="w-3.5 h-3.5" />
+                  )}
+                  <span>🧪 Kirim Ping Uji Coba Webhook (HTTP POST)</span>
+                </button>
+
+                {testResults["universalWebhook"] && (
+                  <div
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${testResults["universalWebhook"].success
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-amber-50 text-amber-800 border border-amber-200"
+                      }`}
+                  >
+                    {testResults["universalWebhook"].success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                    )}
+                    <span>{testResults["universalWebhook"].message}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 5. WHATSAPP STATUS OFFICIAL (SmartPro WA Gateway) */}
+            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-black text-xl shrink-0 shadow-sm border border-emerald-100">
+                    <Phone className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-black text-slate-900">
+                        Status WhatsApp (SmartPro WA Gateway)
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                        status@broadcast
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Penyiaran otomatis materi branding, promosi, dan flyer ke Status WhatsApp resmi PT. DSTech Smart Perkasa. Setiap kontak yang menyimpan nomor kantor akan langsung melihat status promosi ini.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Toggle Aktif WhatsApp Status */}
+                <label className="flex items-center gap-2 cursor-pointer self-start sm:self-auto bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200">
+                  <input
+                    type="checkbox"
+                    checked={socialConfig.whatsappStatus?.enabled ?? true}
+                    onChange={(e) => updateSocialChannel("whatsappStatus", "enabled", e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-slate-800">
+                    {socialConfig.whatsappStatus?.enabled ? "Aktif (Enabled)" : "Nonaktif"}
+                  </span>
+                </label>
+              </div>
+
+              {/* Form Input WhatsApp Status */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    URL SmartPro WA Gateway
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.whatsappStatus?.gatewayUrl || ""}
+                    onChange={(e) => updateSocialChannel("whatsappStatus", "gatewayUrl", e.target.value)}
+                    placeholder="https://smartpro.dstechsmart.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Target Broadcast WhatsApp JID
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.whatsappStatus?.targetJid || "status@broadcast"}
+                    onChange={(e) => updateSocialChannel("whatsappStatus", "targetJid", e.target.value)}
+                    placeholder="status@broadcast"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    ID Sesi Perangkat (Device Session)
+                  </label>
+                  <input
+                    type="text"
+                    value={socialConfig.whatsappStatus?.deviceSession || "main"}
+                    onChange={(e) => updateSocialChannel("whatsappStatus", "deviceSession", e.target.value)}
+                    placeholder="main atau admin2_main"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono text-[11px] focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                    Master Secret Key SmartPro
+                  </label>
+                  <input
+                    type="password"
+                    value={socialConfig.whatsappStatus?.masterSecret || ""}
+                    onChange={(e) => updateSocialChannel("whatsappStatus", "masterSecret", e.target.value)}
+                    placeholder="DSTECH-MASTER-PRO-2026"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  />
+                </div>
+              </div>
+
+              {/* Action & Feedback WA Status */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => handleTestSocialConnection("whatsappStatus")}
+                  disabled={testingPlatform === "whatsappStatus"}
+                  className="px-4 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs border border-emerald-200 transition flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {testingPlatform === "whatsappStatus" ? (
+                    <div className="w-3.5 h-3.5 border-2 border-emerald-600/30 border-t-emerald-600 rounded-full animate-spin" />
+                  ) : (
+                    <Radio className="w-3.5 h-3.5 text-emerald-600" />
+                  )}
+                  <span>🧪 Uji Koneksi SmartPro WA Status</span>
+                </button>
+
+                {testResults["whatsappStatus"] && (
+                  <div
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${
+                      testResults["whatsappStatus"].success
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-amber-50 text-amber-800 border border-amber-200"
+                    }`}
+                  >
+                    {testResults["whatsappStatus"].success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                    )}
+                    <span>{testResults["whatsappStatus"].message}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Panduan Singkat WhatsApp Status */}
+              <details className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs text-slate-600 group">
+                <summary className="font-bold text-slate-800 cursor-pointer flex items-center justify-between select-none">
+                  <span className="flex items-center gap-2">
+                    <HelpCircle className="w-4 h-4 text-emerald-600" />
+                    <span>📖 Bagaimana Cara Kerja Publikasi Status WhatsApp Otomatis?</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <div className="mt-3 space-y-2 text-slate-600 pl-6 border-l-2 border-emerald-400">
+                  <p>1. WhatsApp menggunakan alamat internal khusus <code>status@broadcast</code> untuk memposting cerita atau pembaruan status.</p>
+                  <p>2. Saat Karyawan AI Nadia Safitri mendapatkan persetujuan untuk materi promosi/branding, sistem akan mengirimkan narasi, gambar flyer, dan tautan resmi ke nomor <code>status@broadcast</code> melalui sesi SmartPro WA Gateway.</p>
+                  <p>3. Seluruh kontak yang menyimpan nomor WhatsApp kantor PT. DSTech Smart Perkasa akan langsung melihat status promosi tersebut di tab <strong>Status / Pembaruan</strong> pada aplikasi WhatsApp mereka.</p>
+                  <p>4. <strong>0 MB Beban Harddisk VPS</strong>: Gambar dan video dialirkan secara langsung tanpa disimpan di harddisk lokal VPS.</p>
+                </div>
+              </details>
+            </div>
+
+            {/* TOMBOL SIMPAN PENGATURAN MEDIA SOSIAL */}
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h4 className="text-sm font-black text-slate-900">
+                  Simpan Seluruh Konfigurasi API Media Sosial
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Perubahan akan langsung aktif untuk persetujuan konten Staf AI Nadia Safitri di Kantor Virtual.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleSaveAll(undefined, "Konfigurasi Integrasi Media Sosial berhasil disimpan!")}
+                disabled={saving}
+                className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-purple-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {saving ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Save className="w-4 h-4" />
+                )}
+                <span>{saving ? "Menyimpan Konfigurasi..." : "💾 Simpan Pengaturan Media Sosial"}</span>
+              </button>
             </div>
           </div>
         </div>
@@ -2690,11 +3810,10 @@ export default function AdminSettingsPage() {
                       key={b}
                       type="button"
                       onClick={() => setBankForm({ ...bankForm, bankName: b })}
-                      className={`py-1.5 px-2 rounded-xl text-[10.5px] font-bold border transition-all cursor-pointer text-center ${
-                        bankForm.bankName === b
-                          ? "bg-dstech-blue text-white border-dstech-blue shadow-xs"
-                          : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                      }`}
+                      className={`py-1.5 px-2 rounded-xl text-[10.5px] font-bold border transition-all cursor-pointer text-center ${bankForm.bankName === b
+                        ? "bg-dstech-blue text-white border-dstech-blue shadow-xs"
+                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        }`}
                     >
                       {b}
                     </button>

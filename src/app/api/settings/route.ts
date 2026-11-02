@@ -116,6 +116,62 @@ const DEFAULT_ESTORE_SETTINGS = {
   ]
 };
 
+const DEFAULT_SOCIAL_INTEGRATIONS = {
+  youtube: {
+    enabled: true,
+    channelName: "DSTech Smart Perkasa",
+    channelId: "UC_dstech_smart_cilegon",
+    apiKey: "",
+    clientId: "",
+    clientSecret: "",
+    refreshToken: "",
+    privacyStatus: "public", // "public" | "unlisted" | "private"
+    defaultTags: "DSTechSmart,CCTVCilegon,SmartHome,BarrierGate,AccessControl,Teknologi,SecuritySystem,Shorts",
+    autoPublishShorts: true,
+  },
+  facebook: {
+    enabled: true,
+    pageName: "DSTech Smart Perkasa",
+    pageId: "dstechsmartperkasa",
+    pageAccessToken: "",
+    autoPublishVideos: true,
+  },
+  instagram: {
+    enabled: true,
+    igUsername: "dstechsmart",
+    igUserId: "",
+    accessToken: "",
+    autoPublishReels: true,
+  },
+  tiktok: {
+    enabled: true,
+    accountName: "@dstechsmart",
+    clientKey: "",
+    clientSecret: "",
+    accessToken: "",
+    refreshToken: "",
+    privacyLevel: "PUBLIC_TO_EVERYONE", // "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "SELF_ONLY"
+    allowComments: true,
+    allowDuet: true,
+    allowStitch: true,
+  },
+  universalWebhook: {
+    enabled: true,
+    webhookUrl: "",
+    secretKey: "",
+    platformLabel: "Webhook Multi-Channel (Make / Zapier / n8n / Ayrshare)",
+    autoDispatch: true,
+  },
+  whatsappStatus: {
+    enabled: true,
+    gatewayUrl: "https://smartpro.dstechsmart.com",
+    masterSecret: "DSTECH-MASTER-PRO-2026",
+    deviceSession: "main",
+    targetJid: "status@broadcast",
+    autoPublishStatus: true,
+  },
+};
+
 const DEFAULT_SETTINGS = {
   companyName: "PT. DSTech Smart Perkasa",
   tagline: "Solusi Security System, Smart Automation & IT Infrastructure Handal",
@@ -142,6 +198,7 @@ const DEFAULT_SETTINGS = {
   bankAccounts: DEFAULT_BANK_ACCOUNTS,
   letterheadSettings: DEFAULT_LETTERHEAD_SETTINGS,
   estoreSettings: DEFAULT_ESTORE_SETTINGS,
+  socialIntegrations: DEFAULT_SOCIAL_INTEGRATIONS,
 
   // Titik GPS Kantor & Geofencing Presensi Pegawai
   officeName: "Kantor Pusat PT DSTech Smart Perkasa (Cilegon)",
@@ -188,6 +245,15 @@ function readSettings(): any {
         featuredHeroes: Array.isArray(settings.estoreSettings?.featuredHeroes) && settings.estoreSettings.featuredHeroes.length > 0
           ? settings.estoreSettings.featuredHeroes
           : DEFAULT_ESTORE_SETTINGS.featuredHeroes,
+      };
+      // Pastikan nested socialIntegrations terisi lengkap
+      settings.socialIntegrations = {
+        youtube: { ...DEFAULT_SOCIAL_INTEGRATIONS.youtube, ...(settings.socialIntegrations?.youtube || {}) },
+        facebook: { ...DEFAULT_SOCIAL_INTEGRATIONS.facebook, ...(settings.socialIntegrations?.facebook || {}) },
+        instagram: { ...DEFAULT_SOCIAL_INTEGRATIONS.instagram, ...(settings.socialIntegrations?.instagram || {}) },
+        tiktok: { ...DEFAULT_SOCIAL_INTEGRATIONS.tiktok, ...(settings.socialIntegrations?.tiktok || {}) },
+        universalWebhook: { ...DEFAULT_SOCIAL_INTEGRATIONS.universalWebhook, ...(settings.socialIntegrations?.universalWebhook || {}) },
+        whatsappStatus: { ...DEFAULT_SOCIAL_INTEGRATIONS.whatsappStatus, ...(settings.socialIntegrations?.whatsappStatus || {}) },
       };
     } else {
       const dir = path.dirname(DATA_FILE);
@@ -306,6 +372,7 @@ export async function POST(request: Request) {
       bankAccounts: body.bankAccounts !== undefined ? body.bankAccounts : current.bankAccounts,
       letterheadSettings: body.letterheadSettings !== undefined ? body.letterheadSettings : current.letterheadSettings,
       estoreSettings: body.estoreSettings !== undefined ? body.estoreSettings : current.estoreSettings,
+      socialIntegrations: body.socialIntegrations !== undefined ? body.socialIntegrations : current.socialIntegrations,
 
       // Titik GPS Kantor & Geofencing Presensi Pegawai
       officeName: body.officeName !== undefined ? body.officeName : (current.officeName || "Kantor Pusat PT DSTech Smart Perkasa (Cilegon)"),

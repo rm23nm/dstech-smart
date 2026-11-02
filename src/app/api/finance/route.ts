@@ -1,3 +1,6 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
@@ -208,79 +211,8 @@ function formatAccountFromPaymentMethod(method: string, data: any): string {
 
 function initAndSyncRecurringBills(data: any): boolean {
   let changed = false;
-  if (!data.recurring_bills || !Array.isArray(data.recurring_bills) || data.recurring_bills.length === 0) {
-    data.recurring_bills = [
-      {
-        id: "dstech_rec_bill_1",
-        title: "Tagihan Listrik PLN Kantor PT",
-        category: "Beban Listrik, Air & Internet",
-        businessEntity: "PT",
-        recurringDay: 5,
-        estimatedAmount: 1500000,
-        vendorName: "PT. PLN (Persero) Rayon Cilegon",
-        customerNumber: "5328-9102-4821",
-        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
-        isActive: true,
-        notes: "Pembayaran tagihan listrik operasional kantor setiap tanggal 5",
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: "dstech_rec_bill_2",
-        title: "Tagihan PDAM Air Bersih Kantor",
-        category: "Beban Listrik, Air & Internet",
-        businessEntity: "PT",
-        recurringDay: 10,
-        estimatedAmount: 350000,
-        vendorName: "PDAM Tirta Madani Cilegon",
-        customerNumber: "021-884-129",
-        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
-        isActive: true,
-        notes: "Tagihan air bersih kantor operasional setiap tanggal 10",
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: "dstech_rec_bill_3",
-        title: "Tagihan Internet Wifi & Fiber Optic Kantor",
-        category: "Beban Telekomunikasi & Internet",
-        businessEntity: "PT",
-        recurringDay: 15,
-        estimatedAmount: 650000,
-        vendorName: "Indihome / Telkom Indonesia",
-        customerNumber: "1224-8902-182",
-        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
-        isActive: true,
-        notes: "Langganan internet dedicated kantor setiap tanggal 15",
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: "dstech_rec_bill_4",
-        title: "Sewa Kendaraan Operasional Lapangan",
-        category: "Beban Sewa Kendaraan",
-        businessEntity: "PT",
-        recurringDay: 20,
-        estimatedAmount: 3500000,
-        vendorName: "Rental Mobil DSTech Perkasa",
-        customerNumber: "NOPOL: A 8192 BM",
-        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
-        isActive: true,
-        notes: "Sewa bulanan mobil operasional operasional & teknisi lapangan",
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: "dstech_rec_bill_5",
-        title: "Sewa Ruko & Kantor Operasional Cilegon",
-        category: "Beban Sewa Gedung & Kantor",
-        businessEntity: "PT",
-        recurringDay: 25,
-        estimatedAmount: 5000000,
-        vendorName: "Pemilik Ruko Cilegon Indah",
-        customerNumber: "RUKO NO. 12B CILEGON",
-        paymentMethod: "Transfer Bank BCA (295-074-0321 - PT. DSTech Smart Perkasa)",
-        isActive: true,
-        notes: "Biaya sewa ruko operasional kantor per bulan",
-        createdAt: new Date().toISOString()
-      }
-    ];
+  if (!data.recurring_bills || !Array.isArray(data.recurring_bills)) {
+    data.recurring_bills = [];
     changed = true;
   }
 
@@ -570,6 +502,12 @@ export async function GET() {
       clients: dynamicClients,
       summary,
     },
+  }, {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "Pragma": "no-cache",
+      "Expires": "0",
+    }
   });
 }
 
@@ -3225,8 +3163,15 @@ export async function DELETE(request: Request) {
       if (data.recurring_bills.length === initialLen) {
         return NextResponse.json({ success: false, error: "Template tagihan berulang tidak ditemukan" }, { status: 404 });
       }
+      // Bersihkan juga tagihan operasional terkait yang belum diproses (MENUNGGU_DANA)
+      if (data.operational_bills && Array.isArray(data.operational_bills)) {
+        data.operational_bills = data.operational_bills.filter((b: any) => !(b.templateId === id && b.status === "MENUNGGU_DANA"));
+      }
       writeFinanceData(data);
-      return NextResponse.json({ success: true, message: "Template tagihan berulang berhasil dihapus" });
+      return NextResponse.json(
+        { success: true, message: "Template tagihan berulang berhasil dihapus" },
+        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+      );
     }
 
     if (actionType === "operational_bill") {
@@ -3236,7 +3181,10 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ success: false, error: "Tagihan operasional tidak ditemukan" }, { status: 404 });
       }
       writeFinanceData(data);
-      return NextResponse.json({ success: true, message: "Tagihan operasional berhasil dihapus" });
+      return NextResponse.json(
+        { success: true, message: "Tagihan operasional berhasil dihapus" },
+        { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+      );
     }
 
     if (actionType === "client") {
