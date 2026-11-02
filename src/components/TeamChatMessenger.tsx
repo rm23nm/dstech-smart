@@ -569,7 +569,9 @@ export default function TeamChatMessenger({
       });
       const data = await res.json();
       if (data.success) {
-        if (data.aiReply) {
+        if (Array.isArray(data.aiReplies) && data.aiReplies.length > 0) {
+          setMessages((prev) => [...prev, data.message, ...data.aiReplies]);
+        } else if (data.aiReply) {
           setMessages((prev) => [...prev, data.message, data.aiReply]);
         } else {
           setMessages((prev) => [...prev, data.message]);

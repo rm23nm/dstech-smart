@@ -5,7 +5,46 @@
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
 - **Daftar Antrean Permintaan Pengguna Baru (Queue Backlog)**:
-  *(Semua antrean saat ini sedang aktif dikerjakan pada Tugas 349)*
+  1. *Permintaan 1*: "tulisan pada layar monitornya kurang jelas." (Dijadwalkan segera sebagai Tugas 351 setelah Tugas 350 selesai. Fokus: Pertajam resolusi kanvas tekstur 3D menjadi Ultra-Crisp Hi-DPI 2048x1024, perbesar ukuran font angka KPI utama menjadi sangat besar dan kontras tinggi, tebalkan label metrik, serta sediakan mode/tombol fokus kamera interaktif zoom-in ke monitor dinding agar tulisan terbaca sangat jernih dan tajam dari jarak manapun).
+  2. *Permintaan 2*: "saya melihat karyawan AI yang dihasilkan dari aplikasi N8N dia bisa bekerja dengan sempurna, bagaimana bisa seperti itu?" (Penjelasan arsitektur autonomous agentic workflow n8n vs built-in workforce engine DSTech Smart).
+
+- **Tugas 350 (2026-11-02)**: [SEDANG BERJALAN] Perbaikan Respon Multi-AI & Laporan Aktivitas Riil Divisi Karyawan AI pada Team Chat Messenger (DSTech AI Workforce Hub) (`src/app/api/team-chat/route.ts`, `src/components/TeamChatMessenger.tsx`).
+  *Permintaan User*: "saya coba tes minta laporan, hanya 1 AI yang menjawab, yang lain tidak merespon, dan yang menjawab juga tidak memberikan hasil dari yang saya minta." (dengan tangkapan layar Team Chat Messenger di `/admin/chat`, di mana pimpinan mengklik tombol 'Status Seluruh Staf': "Mohon seluruh staf AI laporkan aktivitas dan tugas prioritas hari ini", namun hanya Dewi Sartika yang merespons dengan jawaban template kosong "Arahan Bapak telah saya catat dan tindaklanjuti...", sedangkan 5 staf AI lainnya tidak merespons sama sekali).
+  *Akar Masalah yang Ditemukan*:
+  1. **Akar Masalah Hanya 1 Staf AI yang Merespons (Single AI Selection Bug)**:
+     - Pada `src/app/api/team-chat/route.ts` baris 160-192 (`handleAiWorkforceChatMessage`), logika penentuan staf AI hanya mendefinisikan variabel tunggal `targetEmp`.
+     - Ketika pengguna mengirimkan pesan broadcast ke grup `dstech_chat_group_ai_workforce` ("Mohon seluruh staf AI laporkan aktivitas dan tugas prioritas hari ini"), karena pesan tidak menyebut nama satu per satu, sistem jatuh ke klausa `else` yang secara baku hanya memilih `emp_dewi_finance` (`targetEmp = aiEmployees[0]`). Akibatnya hanya 1 staf AI (Dewi Sartika) yang dieksekusi, sementara 5 staf AI lainnya (Bambang, Deni, Nadia, Reza, Siti) tidak dipanggil sama sekali.
+  2. **Akar Masalah Respon Tidak Memberikan Hasil / Template Kosong**:
+     - Pada baris 503 `src/app/api/team-chat/route.ts`, jika panggilan Gemini gagal/timeout atau tidak dibekali data riil divisi, sistem menggunakan teks fallback statis generic: `"Siap Pak... Arahan Bapak... telah saya catat dan saya tindaklanjuti sesuai dengan SOP divisi... Segala perkembangannya akan segera saya laporkan kembali..."`. Teks ini tidak memberikan informasi data riil maupun aktivitas apapun kepada pimpinan.
+     - Prompt evaluasi umum tidak menyuplai data divisi masing-masing staf AI (penjualan, proyek teknisi, stok gudang, kampanye sosmed, kunjungan web) melainkan hanya saldo kas umum.
+  *Rencana Solusi Terpadu*:
+  1. **Multi-AI Workforce Response Engine pada Grup Koordinasi (`dstech_chat_group_ai_workforce`)**:
+     - Deteksi apakah pesan di grup ditujukan ke seluruh tim ("seluruh", "semua", "tim", "laporan", "briefing", "aktivitas", "tugas", "evaluasi", "update", "status", "rekap", atau tanpa tag nama tunggal).
+     - Jika iya, aktifkan eksekusi beruntun untuk SELURUH 6 Karyawan AI (Dewi Sartika, Bambang Prakoso, Deni Kurniawan, Nadia Safitri, Reza Firmansyah, Siti Nurhaliza).
+     - Atur timestamp pesan secara berurutan (+1 detik s/d +6 detik) agar alur percakapan tertib layaknya staf manusia yang melapor bergantian.
+  2. **Sintesis Laporan Aktivitas Riil Divisi Karyawan AI Berbasis Data Nyata (ERP, CRM & Operasional)**:
+     - **Dewi Sartika (Finance & Billing)**: Melaporkan data keuangan riil: Omset Rp 664.614.000, Laba Bersih Rp 377.202.100, Kas & Bank Rp 245.244.701, Piutang Klien Rp 7.500.000, Hutang Rp 32.784.000, 9 Pos Tagihan Rutin Rp 56.282.700, serta kesiapan audit mutasi kas harian dan OCR pembacaan nota belanja.
+     - **Bambang Prakoso (Sales & SPH)**: Melaporkan pipeline riil 7 SPH senilai Rp 113.782.750, 1 Proyek Deal SPK terbit, 6 prospek negosiasi aktif (Cluster Elysium, PT Krakatau Posco, PT Banten Construction), serta follow-up closing hari ini.
+     - **Deni Kurniawan (Field Operations & Maintenance)**: Melaporkan 30 proyek aktif ERP, penugasan teknisi pemasangan Barrier Gate MX-80 & CCTV, verifikasi Berita Acara Foto Progres Lapangan (BAKP), dan jadwal commissioning.
+     - **Nadia Safitri (Marketing & Social Media)**: Melaporkan broadcast promosi autopilot WhatsApp, materi video demo palang parkir RFID di Reels/TikTok, serta perolehan lead digital.
+     - **Reza Firmansyah (Product Catalog & Warehouse)**: Melaporkan stok fisik Barrier Gate MX-80, RFID Reader UHF 12m, sensor loop, magnet lock, serta sinkronisasi inventaris e-store & Shopee Tekno20.
+     - **Siti Nurhaliza (Front Office & CS)**: Melaporkan layanan 24 jam live chat widget website DSTech Smart, respon time < 1 menit, dan rekap inquiry konsultasi masuk.
+  3. **Penanganan Fallback Cerdas Tanpa Template Kosong**:
+     - Gunakan Gemini 2.5 Flash (`executeGeminiCall`) untuk penalaran bahasa alami, dan jika terjadi keterlambatan API, gunakan template laporan data riil divisi yang kaya informasi (bukan teks kosong).
+  4. **Dukungan Pengiriman Multi-Balasan pada Frontend (`TeamChatMessenger.tsx`)**:
+     - Perbarui penerimaan respon API dari `data.aiReply` menjadi mendukung `data.aiReplies` (array pesan), sehingga seluruh 6 respon staf AI langsung muncul serentak di layar chat Direktur tanpa perlu refresh.
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mengidentifikasi akar masalah respon tunggal dan template generic pada `src/app/api/team-chat/route.ts`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task350_team_chat_multi_ai_reports/` dan mengamankan berkas target.
+  3. [x] Mencatat rencana kerja step-by-step Tugas 350 di `LAPORAN_PROGRES.md`.
+  4. [ ] Membangun mesin Multi-AI Dispatcher dan generator laporan divisi riil di `src/app/api/team-chat/route.ts`.
+  5. [ ] Menyesuaikan penanganan array `data.aiReplies` di `src/components/TeamChatMessenger.tsx`.
+  6. [ ] Menjalankan validasi TypeScript compiler (`tsc --noEmit`) hingga 0 error.
+  7. [ ] Menjalankan simulasi pengiriman pesan "Mohon seluruh staf AI laporkan aktivitas dan tugas prioritas hari ini" dan memastikan 6 staf AI merespons dengan data riil.
+  8. [ ] Melakukan push commit ke GitHub menggunakan Git CLI resmi.
+  9. [ ] Menjalankan kompilasi dan deploy ke server VPS live aaPanel PM2 `dstech-main`.
+  10. [ ] Memverifikasi kelancaran di browser live.
+  11. [ ] Membersihkan folder cadangan dan menandai Tugas 350 sebagai [SELESAI].
 
 - **Tugas 349 (2026-11-02)**: [SELESAI] Integrasi Data Real Keuangan ERP & Pipeline Siklus SPH pada Layar Monitor 3D Kantor Virtual (Aktivasi Monitor Kiri Keuangan & Monitor Kanan Pipeline) (`src/components/virtual-office/Office3DCanvas.tsx`, `src/app/admin/virtual-office/page.tsx`, `src/app/api/ai-workforce/route.ts`).
   *Permintaan User*: "pada monitor statistik kantor Virtual, tolong masukkan data real yang kita dapat dari keuangan, dan juga pipline siklus. monitor sebelah kiri juga hidupkan," (dengan 3 tangkapan layar: 3D Kantor Virtual, Pipeline SPH di `/admin`, dan Manajemen Keuangan ERP di `/admin/finance`).
@@ -9048,3 +9087,4 @@
 
 
 
+,
