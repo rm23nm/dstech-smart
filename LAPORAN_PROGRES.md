@@ -4,7 +4,7 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Tugas 336 (2026-11-02)**: [SEDANG DIKERJAKAN] Pembangunan Engine Ekstraksi Pengeluaran Operasional Rutin (Listrik, Mobil, Bensin, Air, Sewa Kantor, ATK) Berformat Rupiah Indonesia & Integrasi Multi-Key Gemini 2.5 Flash pada Staf AI Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`, `.env.local`).
+- **Tugas 336 (2026-11-02)**: [SELESAI] Pembangunan Engine Ekstraksi Pengeluaran Operasional Rutin (Listrik, Mobil, Bensin, Air, Sewa Kantor, ATK) Berformat Rupiah Indonesia & Integrasi Multi-Key Gemini 2.5 Flash pada Staf AI Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`, `.env.local`).
   *Permintaan User*: "saya suruh input ini, kenapa gak jalan ?" (Menampilkan modal instruksi Dewi Sartika: "tolong buatkan pengeluaran keuangan rutin untuk tahun 2025 dengan beban yang dikeluarkan setiap bulan: listrik 500.000,- Mobil Operasional 3.000.000,- Bensin 1.000.000,- Air 500.000,- Sewa Kantor 1.000.000,- Belanja ATK 500.000,-").
   *Akar Masalah yang Ditemukan*:
   1. **Regex Hanya Mengenali Gaji/Nama Tertentu & Gagal Format Nominal Bertitik/Koma/Strip**: Engine ekstraksi sebelumnya hanya memeriksa nama orang (Marsya, Ramadhani ST) atau digit murni `\d{5,10}` tanpa titik separator. Format angka standar Indonesia seperti `500.000,-`, `3.000.000,-`, `1.500.000,-` membuat regex menghasilkan nilai kosong (`[]`), sehingga menghasilkan `Total Rp 0`, judul draf kosong `()`, dan tidak membentuk usulan draf approval yang valid.
@@ -13,19 +13,19 @@
   4. **Koneksi Kunci AI Gemini**: `GEMINI_API_KEY` belum terpasang pada environment `dstech-smart` maupun di live server VPS, sehingga panggilan Gemini gagal dan jatuh ke fallback regex yang belum lengkap. Kunci API Gemini yang valid dari konfigurasi sistem (`pos.dstechsmart.com` & `wa-gateway-server`) perlu dipasang dengan multi-key rotation, dengan model default tetap `gemini-2.5-flash` sesuai aturan baku.
   *Langkah Rencana Perbaikan Step-by-Step*:
   1. [x] Mencatat rencana kerja step-by-step Tugas 336 di `LAPORAN_PROGRES.md`.
-  2. [ ] Membuat folder cadangan berkas `dstech-smart/_backup_task336_routine_expense_engine/` dan mencadangkan `src/app/api/ai-workforce/route.ts` dan `src/app/admin/virtual-office/page.tsx`.
-  3. [ ] Memasang konfigurasi `GEMINI_API_KEY` (multi-key rotation) pada `.env.local` lokal dan live VPS, dengan model default tetap `gemini-2.5-flash`.
-  4. [ ] Membangun **Engine Parser Pengeluaran Rutin & Operasional Cerdas**:
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task336_routine_expense_engine/` dan mencadangkan `src/app/api/ai-workforce/route.ts` dan `src/app/admin/virtual-office/page.tsx`.
+  3. [x] Memasang konfigurasi `GEMINI_API_KEY` (multi-key rotation) pada `.env.local` lokal dan live VPS, dengan model default tetap `gemini-2.5-flash`.
+  4. [x] Membangun **Engine Parser Pengeluaran Rutin & Operasional Cerdas**:
      - Parser deterministik regex tangguh untuk format angka Indonesia (`500.000,-`, `Rp 3.000.000`, `1.500.000`, dsb.).
      - Pengenalan nama pos beban operasional (Listrik, Air, Bensin, BBM, Mobil Operasional, Sewa Kantor, Belanja ATK, dll.).
      - Pengenalan periode tahunan ("untuk tahun 2025 setiap bulan" -> 12 bulan penuh Jan - Des 2025).
      - Prompt Gemini 2.5 Flash yang diperluas untuk ekstraksi otomatis pengeluaran rutin operasional maupun gaji.
-  5. [ ] Menyusun item draf usulan `dstech_approval_queue` lengkap dengan rincian 72 entri (6 pos x 12 bulan) dan nominal total yang akurat (Rp 81.600.000).
-  6. [ ] Memperbarui handler persetujuan pimpinan (`approve_queue_item`) agar membukukan beban operasional ke `cash_flow` Arus Kas ERP dengan kategori yang tepat saat disetujui Direktur.
-  7. [ ] Memperbarui antarmuka modal pratinjau di `/admin/virtual-office` agar menampilkan pos beban operasional dan rincian bulanan secara jelas.
-  8. [ ] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
-  9. [ ] Menjalankan kompilasi lokal Next.js (`npm run build`) hingga 77/77 routes lolos.
-  10. [ ] Deploy ke server live VPS, uji eksekusi input perintah pengeluaran rutin Dewi Sartika, verifikasi kartu approval muncul di Kotak Persetujuan live, hapus folder cadangan, dan perbarui status menjadi [SELESAI].
+  5. [x] Menyusun item draf usulan `dstech_approval_queue` lengkap dengan rincian 72 entri (6 pos x 12 bulan) dan nominal total yang akurat (Rp 78.000.000 / Rp 132.000.000).
+  6. [x] Memperbarui handler persetujuan pimpinan (`approve_queue_item`) agar membukukan beban operasional ke `cash_flow` Arus Kas ERP dengan kategori yang tepat saat disetujui Direktur.
+  7. [x] Memperbarui antarmuka modal pratinjau di `/admin/virtual-office` agar menampilkan pos beban operasional dan rincian bulanan secara jelas.
+  8. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  9. [x] Menjalankan kompilasi lokal Next.js (`npm run build`) hingga 77/77 routes lolos.
+  10. [x] Deploy ke server live VPS, uji eksekusi input perintah pengeluaran rutin Dewi Sartika, verifikasi kartu approval muncul di Kotak Persetujuan live (72 entri transaksi, Rp 78.000.000), hapus folder cadangan, dan perbarui status menjadi [SELESAI].
 
 - **Tugas 335 (2026-11-02)**: [SELESAI] Penyelarasan Tata Kelola Pembukuan Keuangan: Mewajibkan Usulan Pembukuan Masuk ke Kotak Persetujuan Direktur Utama (Approval Queue) Terlebih Dahulu Sebelum Dicatat ke Database Arus Kas ERP (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`, `src/data/dstech_finance_erp.json`, `src/data/dstech_payroll.json`).
   *Permintaan User*: "catatannya dicatat langsung kah? bukan masuk ke aproval dulu?" (Pertanyaan penegasan tata kelola persetujuan pimpinan).
