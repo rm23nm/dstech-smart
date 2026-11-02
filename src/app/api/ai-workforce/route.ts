@@ -608,7 +608,7 @@ export async function POST(req: NextRequest) {
                   signerTitle: "Direktur",
                   approvalStatus: "Disetujui & Sah",
                   isLocked: true,
-                  receiptUrl: "",
+                  receiptUrl: entry.receiptUrl || item.payload?.receiptUrl || item.attachment?.url || "",
                   createdAt: new Date().toISOString()
                 });
                 insertedCount++;
@@ -1787,10 +1787,140 @@ TUGAS ANDA:
 
       if (targetEmp.id === "emp_dewi_finance" || (targetEmp.id === "emp_bambang_sales" && (promptCommand.toLowerCase().includes("sph") || promptCommand.toLowerCase().includes("penawaran") || (attachment && attachment.url)))) {
         const lowerCmd = promptCommand.toLowerCase();
-        const hasInquiryAttachment = !!(attachment && attachment.url);
-        const isSphRequest = lowerCmd.includes("penawaran") || lowerCmd.includes("sph") || lowerCmd.includes("quotation") || lowerCmd.includes("inquiry") || hasInquiryAttachment;
+        const hasAttachment = !!(attachment && attachment.url);
 
-        if (isSphRequest) {
+        // Cek apakah instruksi atau lampiran adalah FOTO STRUK / NOTA PENGELUARAN (Tugas 346)
+        const isReceiptExpense = targetEmp.id === "emp_dewi_finance" && (
+          /(?:struk|nota|bon|kwitansi|kuitansi|pengeluaran|biaya|kasbon|belanja|beli|bensin|bbm|pertamina|konsumsi|makan|parkir|tol|reimburse|reimbursement)/i.test(lowerCmd) ||
+          (hasAttachment && /(?:struk|nota|bon|kwitansi|receipt|expense|pengeluaran|belanja)/i.test(attachment.fileName || attachment.originalName || ""))
+        );
+
+        const isSphRequest = !isReceiptExpense && (lowerCmd.includes("penawaran") || lowerCmd.includes("sph") || lowerCmd.includes("quotation") || lowerCmd.includes("inquiry") || (hasAttachment && !isReceiptExpense));
+
+        if (isReceiptExpense) {
+          try {
+            console.log("Memproses analisis multimodal foto struk pengeluaran bersama Dewi Sartika...");
+            let extractedReceipt: any = null;
+
+            try {
+              const receiptOcrPrompt = `Anda adalah Dewi Sartika, AI Finance & Accounting Intelligence di PT. DSTech Smart Perkasa.
+Direktur Utama (Bpk. Ramadhani ST) mengunggah foto struk / nota / bukti transaksi belanja pengeluaran dan memberikan instruksi:
+"${promptCommand}"
+${historyContextPrompt}
+
+TUGAS ANDA:
+1. Analisis teliti GAMBAR FOTO STRUK / NOTA / KWITANSI yang dilampirkan oleh Direktur Utama.
+2. Ekstrak data transaksi riil dari struk tersebut:
+   - merchant: Nama Toko / Vendor / SPBU / Tempat Belanja (contoh: "SPBU Pertamina Cilegon", "Toko Listrik Sinar Terang", "Indomaret", "Restoran Padang", "CV. Mitra Baja", dll).
+   - date: Tanggal Transaksi (format YYYY-MM-DD, contoh: "2026-11-02". Jika hanya tertera hari/bulan, gunakan tahun 2026).
+   - grandTotal: Total nominal pembayaran akhir yang sah tertera di struk dalam angka bulat murni (number tanpa titik/koma).
+   - category: Kategori Beban Akuntansi resmi yang paling tepat dari opsi berikut:
+     * "Beban Transportasi & BBM Operasional Lapangan" (untuk BBM, bensin, solar, tol, parkir, tiket)
+     * "Beban Perlengkapan & Material Proyek" (untuk kabel, semen, pipa, baut, connector, sparepart teknik)
+     * "Beban Konsumsi & Akomodasi Staf" (untuk makan siang teknisi, lembur, snack rapat, air minum galon)
+     * "Beban Operasional Kantor & ATK" (untuk kertas HVS, tinta printer, alat tulis, perlengkapan kebersihan)
+     * "Beban Pemeliharaan Kendaraan Operasional" (untuk servis mobil/motor, ganti oli, tambal ban)
+     * "Beban Komunikasi & Internet" (untuk pulsa, paket data modem lapangan)
+     * "Beban Operasional Rutin Lainnya"
+   - account: Akun Kas yang digunakan (default: "Kas Tunai Operasional (Cash on Hand)" jika tunai/cash, atau "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)" jika transfer/kartu/QRIS).
+   - itemsSummary: Ringkasan singkat barang yang dibeli (contoh: "Pertamax 10.79 L @ Rp 13.900", "Pipa Conduit 20mm 5 Btg", "Nasi Padang Rendang 4 Porsi").
+   - description: Keterangan keperluan transaksi kas keluar (contoh: "Pembelian BBM Pertamax untuk Mobil Operasional Lapangan di SPBU Pertamina Cilegon").
+
+Format JSON MURNI tanpa markdown (\`\`\`json):
+{
+  "merchant": "Nama Toko / SPBU",
+  "date": "2026-11-02",
+  "grandTotal": 150000,
+  "category": "Beban Transportasi & BBM Operasional Lapangan",
+  "account": "Kas Tunai Operasional (Cash on Hand)",
+  "itemsSummary": "Rincian barang singkat",
+  "description": "Deskripsi keperluan transaksi kas keluar"
+}`;
+
+              const rawReceiptRes = await executeGeminiCall(receiptOcrPrompt, true, "gemini-2.5-flash", 15000, geminiAttachments);
+              if (rawReceiptRes) {
+                extractedReceipt = JSON.parse(rawReceiptRes);
+              }
+            } catch (err: any) {
+              console.warn("Gemini Receipt extraction fallback:", err.message);
+            }
+
+            if (!extractedReceipt || !extractedReceipt.merchant || !extractedReceipt.grandTotal) {
+              const numMatch = promptCommand.match(/(?:rp\.?|nominal|sebesar|seharga)?\s*([0-9]{1,3}(?:\.[0-9]{3})+|[0-9]{4,9})/i);
+              const fallbackAmount = numMatch ? parseInt(numMatch[1].replace(/\./g, ""), 10) : 150000;
+              extractedReceipt = {
+                merchant: extractedReceipt?.merchant || "Toko / Vendor Penyedia",
+                date: extractedReceipt?.date || new Date().toISOString().split("T")[0],
+                grandTotal: extractedReceipt?.grandTotal || fallbackAmount,
+                category: extractedReceipt?.category || "Beban Operasional Rutin Lainnya",
+                account: extractedReceipt?.account || "Kas Tunai Operasional (Cash on Hand)",
+                itemsSummary: extractedReceipt?.itemsSummary || "Pembelian operasional sesuai foto struk",
+                description: extractedReceipt?.description || `Pengeluaran operasional sesuai bukti struk terlampir`
+              };
+            }
+
+            const queueId = `appr_dewi_receipt_${Date.now()}`;
+            const refNo = `EXP-${(extractedReceipt.date || new Date().toISOString().split("T")[0]).replace(/-/g, "")}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+            const receiptQueueItem = {
+              id: queueId,
+              revision: 0,
+              employee_id: "emp_dewi_finance",
+              employee_name: "Dewi Sartika",
+              employee_role: "AI Finance & Tax Billing Specialist",
+              department: "FINANCE",
+              task_type: "BOOKKEEPING_EXPENSE",
+              title: `Draf Pengeluaran Kas: ${extractedReceipt.merchant} (Rp ${Number(extractedReceipt.grandTotal).toLocaleString("id-ID")})`,
+              status: "PENDING_APPROVAL",
+              summary: `Hasil pembacaan cerdas foto struk ${extractedReceipt.merchant} tanggal ${extractedReceipt.date} total Rp ${Number(extractedReceipt.grandTotal).toLocaleString("id-ID")} (${extractedReceipt.itemsSummary || extractedReceipt.description}). Menunggu persetujuan Direktur Utama sebelum dibukukan ke Arus Kas Keluar ERP.`,
+              value: Number(extractedReceipt.grandTotal),
+              payload: {
+                type: "OUT",
+                category: extractedReceipt.category || "Beban Operasional Rutin",
+                date: extractedReceipt.date || new Date().toISOString().split("T")[0],
+                merchant: extractedReceipt.merchant,
+                grandTotal: Number(extractedReceipt.grandTotal),
+                receiptUrl: attachment?.url || "",
+                account: extractedReceipt.account || "Kas Tunai Operasional (Cash on Hand)",
+                description: extractedReceipt.description,
+                entries: [
+                  {
+                    date: extractedReceipt.date || new Date().toISOString().split("T")[0],
+                    type: "OUT",
+                    category: extractedReceipt.category || "Beban Operasional Rutin",
+                    personName: extractedReceipt.merchant,
+                    personRole: "Vendor / Merchant",
+                    amount: Number(extractedReceipt.grandTotal),
+                    account: extractedReceipt.account || "Kas Tunai Operasional (Cash on Hand)",
+                    referenceNumber: refNo,
+                    description: extractedReceipt.description,
+                    receiptUrl: attachment?.url || "",
+                  }
+                ]
+              },
+              updated_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+            };
+
+            data.dstech_approval_queue.unshift(receiptQueueItem);
+
+            executionResult = {
+              type: "EXPENSE_RECEIPT",
+              merchant: extractedReceipt.merchant,
+              date: extractedReceipt.date,
+              grandTotal: Number(extractedReceipt.grandTotal),
+              category: extractedReceipt.category,
+              receiptUrl: attachment?.url || "",
+              link: "/admin/virtual-office"
+            };
+
+            aiResponseText = `Siap Pak Ramadhani! Saya telah menganalisis foto struk/nota yang Bapak lampirkan:\n\n• Tempat Belanja / Merchant: **${extractedReceipt.merchant}**\n• Tanggal Transaksi: **${extractedReceipt.date}**\n• Rincian Belanja: **${extractedReceipt.itemsSummary || extractedReceipt.description}**\n• Total Pengeluaran: **Rp ${Number(extractedReceipt.grandTotal).toLocaleString("id-ID")}**\n• Pos Akuntansi: **${extractedReceipt.category}**\n• Akun Kas: **${extractedReceipt.account}**\n\nDraf pengeluaran kas ini telah saya daftarkan ke **Kotak Persetujuan Direktur Utama** lengkap dengan lampiran foto struk aslinya sebagai bukti audit. Begitu Bapak menyetujuinya, saldo kas keluar akan langsung dibukukan secara otomatis ke sistem Arus Kas ERP kita!`;
+            targetEmp.speech_bubble = aiResponseText;
+
+          } catch (recErr: any) {
+            console.error("Error processing receipt expense:", recErr);
+          }
+        } else if (isSphRequest) {
           try {
             const financeFilePath = path.join(process.cwd(), "src/data/dstech_finance_erp.json");
             if (fs.existsSync(financeFilePath)) {

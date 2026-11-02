@@ -4,6 +4,29 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 346 (2026-11-02)**: [SEDANG BERJALAN] Implementasi Pembacaan Foto Struk/Nota Pengeluaran (Receipt OCR & Multimodal AI Expense Recording) oleh Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
+  *Permintaan User*: "dan juka da pengeluaran apabila saya foto saja struk apakah dia bisa mencatatnya? dimana saya harus mengirimkannya?"
+  *Akar Kebutuhan & Desain Solusi*:
+  1. **Pengenalan Multimodal Foto Struk / Bukti Belanja (Gemini 2.5 Flash Vision)**:
+     - Ketika Direktur Utama mengirimkan foto struk/nota/kwitansi (SPBU Pertamina, nota toko material, bon makan siang lembur, struk parkir/tol, nota servis, dll.) ke Dewi Sartika:
+     - AI mengekstrak nama merchant/toko, tanggal transaksi, rincian barang/jasa, total nominal, dan otomatis menentukan kategori beban akuntansi DSTech (BBM Lapangan, Material Proyek, Konsumsi Staf, ATK Kantor, Servis Kendaraan, dll.).
+  2. **Penyusunan Draf Kas Keluar ke Kotak Persetujuan (`dstech_approval_queue`)**:
+     - Dewi menyusun draf usulan `BOOKKEEPING_EXPENSE` lengkap dengan tautan bukti foto struk (`receiptUrl`) dan akun kas yang tepat.
+     - Saat disetujui Direktur Utama, sistem membukukan pengeluaran langsung ke buku besar Arus Kas (`dstech_finance_erp.json`) dengan foto struk tersimpan sebagai bukti transaksi sah.
+  3. **Antarmuka & Tombol Saran Cepat di Kantor Virtual**:
+     - Tambahkan chip saran cepat pada profil Dewi Sartika: `[🧾 Catat Pengeluaran dari Foto Struk]` agar pengguna dapat langsung mengunggah foto dan mengirimkannya dengan satu sentuhan.
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mencatat rencana kerja step-by-step Tugas 346 di `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task346_receipt_ocr_expense_bookkeeping/` dan mengamankan berkas target.
+  3. [x] Mengimplementasikan klasifikasi intent foto struk (`isReceiptExpense`) dan Multimodal Receipt Vision Extractor di `src/app/api/ai-workforce/route.ts`.
+  4. [x] Memastikan tautan berkas foto struk (`receiptUrl`) tersimpan secara permanen ke buku kas saat disetujui di `action === "approve"`.
+  5. [x] Menambahkan tombol saran cepat `🧾 Catat Pengeluaran dari Foto Struk` pada Dewi Sartika di `src/app/admin/virtual-office/page.tsx`.
+  6. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  7. [ ] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses.
+  8. [ ] Menguji simulasi pembacaan foto struk pengeluaran.
+  9. [ ] Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  10. [ ] Bersihkan folder cadangan dan tandai status [SELESAI].
+
 - **Tugas 345 (2026-11-02)**: [SELESAI] Pembangunan Fitur Lampiran Berkas Inquiry (Excel, Gambar/Foto, PDF) & Multimodal AI SPH Generator pada Kantor Virtual (`src/app/api/upload/route.ts`, `src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "kemudian saya ingin agar karyawan AI bisa melakukan pembuatan SPh apa bila saya ada inquery gambar dari client atau list permintaan, bagai mana cara saya melampirkan file inquerynya, misalnya dalam bentuk excel, gambar, pdf atau file lain agar bisa di buatkan sphnya?"
   *Akar Kebutuhan & Desain Solusi*:

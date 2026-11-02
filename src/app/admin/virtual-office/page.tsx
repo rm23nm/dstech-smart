@@ -875,6 +875,7 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
         ];
       case "emp_dewi_finance":
         return [
+          { label: "🧾 Catat Pengeluaran dari Foto Struk", text: "Dewi, tolong baca dan catat pengeluaran dari foto struk/nota belanja yang saya lampirkan ini ke pembukuan kas keluar." },
           { label: "📎 Buat SPH dari File Terlampir", text: "Dewi, tolong pelajari file inquiry klien yang saya lampirkan di sini, lalu buatkan draf SPH resmi lengkap dengan rincian barang, spesifikasi teknis, dan total biayanya." },
           { label: "📑 Buat Draf SPH Exclude PPN", text: "Dewi, tolong siapkan draf SPH penawaran harga dengan opsi PPN Exclude untuk proyek baru." },
           { label: "💰 Rincian Invoice Proyek", text: "Dewi, buatkan rincian invoice tagihan termin untuk proyek barrier gate." },
@@ -1956,6 +1957,25 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                             ))}
                           </div>
                         </div>
+
+                        {/* Bukti Foto Struk / Nota (Jika Ada) */}
+                        {previewItem.payload.receiptUrl && (
+                          <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2 text-slate-300">
+                              <Paperclip className="w-4 h-4 text-cyan-400 shrink-0" />
+                              <span className="font-bold">Bukti Foto Struk / Nota Belanja Terlampir</span>
+                            </div>
+                            <a
+                              href={previewItem.payload.receiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-3 py-1 bg-cyan-700 hover:bg-cyan-600 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm"
+                            >
+                              <span>Lihat Bukti Foto Struk</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
 
