@@ -4,6 +4,32 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 339 (2026-11-02)**: [SELESAI] Penerapan Universal Smart Revision Engine untuk Seluruh Karyawan AI Kantor Virtual (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
+  *Permintaan User*: "untuk permintaan revisi juga harus harus berlaku untuk seluruh karyawan agen lainnya"
+  *Kebutuhan & Rencana Solusi*:
+  1. **Universal Revision Routing & Handlers**:
+     - Setiap karyawan AI di Kantor Virtual (`emp_dewi_finance`, `emp_bambang_sales`, `emp_nadia_marketing`, `emp_reza_catalog`, `emp_deni_field`, `emp_siti_cs`) telah memiliki kemampuan mendeteksi perintah revisi (`revisi`, `ubah`, `ganti`, `koreksi`, `update`, `perbaiki`, `sesuaikan`, `ralat`).
+     - Ketika Direktur Utama memberikan instruksi revisi pada agen mana pun, sistem secara otomatis mencari draf usulan `PENDING_APPROVAL` milik agen/divisi tersebut di `dstech_approval_queue`.
+  2. **Spesifikasi Revisi Per Agen**:
+     - **Dewi Sartika (Finance)**: Revisi draf SPH (harga satuan, diskon %, kuantiti, item barang) dan draf pembukuan pengeluaran rutin/gaji.
+     - **Bambang Prakoso (Sales B2B)**: Revisi draf penawaran klien, nilai deal pipeline CRM (misal 65 juta), target closing, dan catatan prospek B2B.
+     - **Nadia Safitri (Creative Marketing)**: Revisi materi kampanye promo, copywriting broadcast WhatsApp, penawaran diskon %, headline kampanye, dan platform medsos target.
+     - **Reza Firmansyah (Product Catalog)**: Revisi data produk katalog, harga jual/modal, margin markup %, stok inventaris awal, dan spesifikasi teknis suku cadang.
+     - **Deni Kurniawan (Field Dispatcher)**: Revisi jadwal SPK teknisi, alokasi teknisi lapangan (misal ke Ahmad), deadline pengerjaan, dan rincian lingkup tugas inspeksi.
+     - **Siti Nurhaliza (Customer Care)**: Revisi catatan eskalasi tiket aduan dan standar respon solusi pelanggan.
+  3. **Pembaruan Kartu Approval Queue & Lencana Revisi di UI**:
+     - Update in-place pada kartu yang relevan: `revision: (existing.revision || 0) + 1`, beri label judul `(Revisi #X)`, dan update ringkasan serta payload.
+     - Tampilkan lencana visual `Revisi #X` dengan ikon `Sparkles` amber badge pada kartu antrean di `/admin/virtual-office` dan modal rincian preview draf.
+     - Update balon percakapan (`speech_bubble`) agen secara konkret mengonfirmasi apa saja yang telah berhasil direvisi.
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mencatat rencana kerja step-by-step Tugas 339 di `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task339_universal_revision/` dan mencadangkan berkas terkait.
+  3. [x] Membangun modul Universal Revision Handler di `src/app/api/ai-workforce/route.ts` yang menangani revisi draf untuk Bambang Prakoso, Nadia Safitri, Reza Kurniawan, Deni Kurniawan, Siti Nurhaliza, dan Dewi Sartika (SPH & Bookkeeping).
+  4. [x] Memperbarui antarmuka kartu persetujuan di `src/app/admin/virtual-office/page.tsx` agar menampilkan badge indikator `Revisi #X` secara visual pada kartu dan modal preview.
+  5. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) lolos 100% 0 error.
+  6. [x] Menjalankan kompilasi Next.js (`npm run build`) hingga seluruh 77/77 routes sukses lolos.
+  7. [x] Deploy ke server live VPS, uji eksekusi perintah revisi pada karyawan AI, hapus folder cadangan, dan tandai status [SELESAI].
+
 - **Tugas 338 (2026-11-02)**: [SELESAI] Pembangunan Smart Revision Engine Staf AI Dewi Sartika untuk Memperbarui & Menyelaraskan Draf Usulan Pembukuan Pengeluaran Rutin yang Sedang Pending di Kotak Persetujuan (`src/app/api/ai-workforce/route.ts`).
   *Permintaan User*: "ada kesalahan, saya suruh revisi kenapa dia tidak merevisi usulannya? ini kamu yang buat pengajuan atau karyawan AI yang melakukannya?" (Instruksi Direktur Utama: "Revisi, sewa kantor 1.500.000 sewa mobil 5.000.000 bensin 2.000.000 listrik 800.000").
   *Akar Masalah yang Ditemukan*:

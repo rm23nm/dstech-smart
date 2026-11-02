@@ -78,6 +78,7 @@ interface ActivityLog {
 
 export interface ApprovalItem {
   id: string;
+  revision?: number;
   employee_id: string;
   employee_name: string;
   employee_role: string;
@@ -1230,10 +1231,16 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
 
                       {/* Judul & Sasaran */}
                       <div>
-                        <div className="flex items-center gap-1.5 mb-1">
+                        <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                           <span className="px-2 py-0.5 rounded bg-slate-800 text-cyan-400 text-[9px] font-mono font-bold uppercase">
                             {item.task_type.replace("_", " ")}
                           </span>
+                          {item.revision && item.revision > 0 ? (
+                            <span className="px-2 py-0.5 rounded bg-amber-950/90 text-amber-300 text-[9px] font-bold border border-amber-600/70 flex items-center gap-1 shadow-sm">
+                              <Sparkles className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                              <span>Revisi #{item.revision}</span>
+                            </span>
+                          ) : null}
                           {item.tax_type === "exclude" && (
                             <span className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 text-[9px] font-bold border border-indigo-800">
                               Exclude PPN
@@ -1396,10 +1403,16 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                         {previewItem.task_type === "SPH_PROPOSAL" ? "📑" : previewItem.task_type === "BOOKKEEPING_EXPENSE" ? "💰" : previewItem.task_type === "PRODUCT_IMPORT" ? "🛍️" : "📢"}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
                             {previewItem.task_type.replace("_", " ")}
                           </span>
+                          {previewItem.revision && previewItem.revision > 0 ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-950/90 text-amber-300 border border-amber-500/70 flex items-center gap-1 shadow-sm">
+                              <Sparkles className="w-3 h-3 text-amber-400 shrink-0" />
+                              <span>Revisi #{previewItem.revision}</span>
+                            </span>
+                          ) : null}
                           <span className="text-xs text-slate-400">• Disusun oleh:</span>
                           <span className="text-xs font-black text-amber-300">{previewItem.employee_name} ({previewItem.employee_role})</span>
                         </div>

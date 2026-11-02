@@ -845,6 +845,46 @@ export async function POST(req: NextRequest) {
             link: "/admin/promotions",
             socialPosts,
           };
+        } else if (item.task_type === "CRM_LEAD") {
+          const crmPath = path.join(process.cwd(), "src/data/dstech_crm.json");
+          if (fs.existsSync(crmPath)) {
+            const crmRaw = fs.readFileSync(crmPath, "utf-8");
+            const crmData = JSON.parse(crmRaw);
+            if (!crmData.leads) crmData.leads = [];
+            const newLead = {
+              ...item.payload,
+              id: item.payload?.id || `dstech_crm_lead_${Date.now()}`,
+              createdAt: item.payload?.createdAt || new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            const existingIdx = crmData.leads.findIndex((l: any) => l.leadNumber === newLead.leadNumber || l.id === newLead.id);
+            if (existingIdx >= 0) {
+              crmData.leads[existingIdx] = newLead;
+            } else {
+              crmData.leads.unshift(newLead);
+            }
+            fs.writeFileSync(crmPath, JSON.stringify(crmData, null, 2), "utf-8");
+            executedResult = { docType: "CRM_LEAD", leadNumber: newLead.leadNumber, company: newLead.company, link: "/admin/crm" };
+          }
+        } else if (item.task_type === "SPK_FIELD" || item.task_type === "MAINTENANCE_TICKET") {
+          const taskPath = path.join(process.cwd(), "src/data/dstech_employee_tasks.json");
+          if (fs.existsSync(taskPath)) {
+            const taskRaw = fs.readFileSync(taskPath, "utf-8");
+            const taskList = JSON.parse(taskRaw);
+            const newTask = {
+              ...item.payload,
+              id: item.payload?.id || `dstech_task_${Date.now()}`,
+              updatedAt: new Date().toISOString(),
+            };
+            const existingIdx = taskList.findIndex((t: any) => t.ticketNumber === newTask.ticketNumber || t.id === newTask.id);
+            if (existingIdx >= 0) {
+              taskList[existingIdx] = newTask;
+            } else {
+              taskList.unshift(newTask);
+            }
+            fs.writeFileSync(taskPath, JSON.stringify(taskList, null, 2), "utf-8");
+            executedResult = { docType: "SPK_FIELD", ticketNumber: newTask.ticketNumber, client: newTask.client, link: "/admin/maintenance" };
+          }
         }
       } catch (execErr: any) {
         console.error("Gagal mengeksekusi payload persetujuan:", execErr);
@@ -1130,29 +1170,40 @@ export async function POST(req: NextRequest) {
       // Jika employeeId tidak ditentukan, auto-route ke karyawan yang paling relevan
       if (!targetedEmployeeId) {
         const lowerCmd = promptCommand.toLowerCase();
-        if (
-          lowerCmd.includes("sph") || lowerCmd.includes("penawaran") || lowerCmd.includes("invoice") ||
+        // Cek penyebutan nama spesifik atau domain staf AI
+        if (lowerCmd.includes("bambang") || lowerCmd.includes("sales") || lowerCmd.includes("prospek") || lowerCmd.includes("crm") || lowerCmd.includes("closing") || lowerCmd.includes("deal") || lowerCmd.includes("pipeline")) {
+          targetedEmployeeId = "emp_bambang_sales";
+        } else if (lowerCmd.includes("nadia") || lowerCmd.includes("promo") || lowerCmd.includes("broadcast") || lowerCmd.includes("wa") || lowerCmd.includes("marketing") || lowerCmd.includes("iklan") || lowerCmd.includes("diskon") || lowerCmd.includes("konten") || lowerCmd.includes("branding") || lowerCmd.includes("video") || lowerCmd.includes("medsos")) {
+          targetedEmployeeId = "emp_nadia_marketing";
+        } else if (lowerCmd.includes("reza") || lowerCmd.includes("produk") || lowerCmd.includes("katalog") || lowerCmd.includes("markup") || lowerCmd.includes("barang") || lowerCmd.includes("stok") || lowerCmd.includes("store") || lowerCmd.includes("suku cadang") || lowerCmd.includes("sparepart") || lowerCmd.includes("em lock") || lowerCmd.includes("bracket")) {
+          targetedEmployeeId = "emp_reza_catalog";
+        } else if (lowerCmd.includes("deni") || lowerCmd.includes("lapangan") || lowerCmd.includes("teknisi") || lowerCmd.includes("spk") || lowerCmd.includes("survey") || lowerCmd.includes("pasang") || lowerCmd.includes("instalasi") || lowerCmd.includes("maintenance") || lowerCmd.includes("jadwal")) {
+          targetedEmployeeId = "emp_deni_field";
+        } else if (
+          lowerCmd.includes("dewi") || lowerCmd.includes("sph") || lowerCmd.includes("penawaran") || lowerCmd.includes("invoice") ||
           lowerCmd.includes("faktur") || lowerCmd.includes("ppn") || lowerCmd.includes("keuangan") ||
           lowerCmd.includes("kas") || lowerCmd.includes("pajak") || lowerCmd.includes("gaji") ||
           lowerCmd.includes("payroll") || lowerCmd.includes("pengeluaran") || lowerCmd.includes("biaya") ||
           lowerCmd.includes("pembukuan") || lowerCmd.includes("catat") || lowerCmd.includes("operasional") ||
           lowerCmd.includes("arus kas") || lowerCmd.includes("buku") || lowerCmd.includes("uang") ||
-          lowerCmd.includes("revisi") || lowerCmd.includes("ubah") || lowerCmd.includes("ganti") ||
-          lowerCmd.includes("koreksi") || lowerCmd.includes("anggaran") || lowerCmd.includes("sewa") ||
-          lowerCmd.includes("listrik") || lowerCmd.includes("air") || lowerCmd.includes("bensin") ||
-          lowerCmd.includes("mobil") || lowerCmd.includes("atk")
+          lowerCmd.includes("anggaran") || lowerCmd.includes("sewa") || lowerCmd.includes("listrik") ||
+          lowerCmd.includes("air") || lowerCmd.includes("bensin") || lowerCmd.includes("mobil") || lowerCmd.includes("atk")
         ) {
           targetedEmployeeId = "emp_dewi_finance";
-        } else if (lowerCmd.includes("jual") || lowerCmd.includes("klien") || lowerCmd.includes("sales") || lowerCmd.includes("prospek") || lowerCmd.includes("crm") || lowerCmd.includes("closing") || lowerCmd.includes("deal")) {
-          targetedEmployeeId = "emp_bambang_sales";
-        } else if (lowerCmd.includes("produk") || lowerCmd.includes("katalog") || lowerCmd.includes("harga") || lowerCmd.includes("import") || lowerCmd.includes("barang") || lowerCmd.includes("stok") || lowerCmd.includes("store")) {
-          targetedEmployeeId = "emp_reza_catalog";
-        } else if (lowerCmd.includes("promo") || lowerCmd.includes("broadcast") || lowerCmd.includes("wa") || lowerCmd.includes("marketing") || lowerCmd.includes("iklan") || lowerCmd.includes("diskon") || lowerCmd.includes("konten")) {
-          targetedEmployeeId = "emp_nadia_marketing";
-        } else if (lowerCmd.includes("lapangan") || lowerCmd.includes("teknisi") || lowerCmd.includes("spk") || lowerCmd.includes("survey") || lowerCmd.includes("pasang") || lowerCmd.includes("instalasi")) {
-          targetedEmployeeId = "emp_deni_field";
-        } else {
+        } else if (lowerCmd.includes("siti") || lowerCmd.includes("cs") || lowerCmd.includes("layanan") || lowerCmd.includes("tamu") || lowerCmd.includes("pengunjung")) {
           targetedEmployeeId = "emp_siti_cs";
+        } else {
+          // Jika instruksi umum berupa "revisi", cek karyawan mana yang memiliki tugas PENDING_APPROVAL di antrean
+          const isGenericRev = /(?:revisi|ubah|ganti|koreksi|update|perbaiki|ralat)/i.test(lowerCmd);
+          if (isGenericRev && Array.isArray(data.dstech_approval_queue)) {
+            const pendingQueueItem = data.dstech_approval_queue.find((q: any) => q.status === "PENDING_APPROVAL");
+            if (pendingQueueItem?.employee_id) {
+              targetedEmployeeId = pendingQueueItem.employee_id;
+            }
+          }
+          if (!targetedEmployeeId) {
+            targetedEmployeeId = "emp_dewi_finance";
+          }
         }
       }
 
@@ -1385,29 +1436,61 @@ Aturan Khusus:
               const sphCount = (finData.quotations.length || 0) + 1;
               const sphNumber = `SPH-DSTECH-${yearMonth}-${String(sphCount).padStart(3, "0")}`;
 
+              if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+              const isRevision = /(?:revisi|ubah|ganti|koreksi|update|perbaiki|sesuaikan|ralat)/i.test(promptCommand);
+
+              const existingSphIdx = data.dstech_approval_queue.findIndex((q: any) =>
+                q.task_type === "SPH_PROPOSAL" &&
+                q.status === "PENDING_APPROVAL"
+              );
+              const existingSphItem = existingSphIdx >= 0 ? data.dstech_approval_queue[existingSphIdx] : null;
+
+              // Parsing diskon jika ada (misal "diskon 10%", "potongan 5%")
+              let discountPercent = existingSphItem?.payload?.discountPercent || 0;
+              const discMatch = promptCommand.match(/(?:diskon|potongan)s*(d+)s*%/i);
+              if (discMatch && discMatch[1]) {
+                discountPercent = parseInt(discMatch[1], 10);
+              }
+
+              let finalSubtotal = subtotal;
+              let discountAmount = 0;
+              if (discountPercent > 0) {
+                discountAmount = Math.round(finalSubtotal * (discountPercent / 100));
+                finalSubtotal = finalSubtotal - discountAmount;
+              }
+              const finalTaxAmount = Math.round(finalSubtotal * (taxRate / 100));
+              const finalGrandTotal = finalSubtotal + finalTaxAmount;
+
+              const revNumber = (existingSphItem?.revision || 0) + (isRevision ? 1 : (existingSphItem ? 0 : 0));
+              const queueId = existingSphItem ? existingSphItem.id : `appr_dewi_sph_${Date.now()}`;
+
+              const cleanBaseTitle = (existingSphItem?.title || `Draf SPH Penawaran: ${extractedSph.projectName || extractedSph.customerName}`).replace(/\s*\(Revisi\s*#\d+\)/gi, "");
+              const queueTitle = `${cleanBaseTitle}${revNumber > 0 ? ` (Revisi #${revNumber})` : ""}`;
+              const queueSummary = `${isRevision ? "[HASIL REVISI] " : ""}Pengadaan ${items.map((i: any) => `${i.qty} unit ${i.productName.slice(0, 30)}`).join(", ")} untuk ${extractedSph.customerName}. Harga Netto Rp ${finalSubtotal.toLocaleString("id-ID")} (Exclude PPN 11%${discountPercent > 0 ? `, Diskon ${discountPercent}%` : ""}). Menunggu persetujuan Direktur Utama sebelum disahkan ke Keuangan ERP.`;
+
               const newSphDoc = {
-                id: `dstech_sph_${Date.now()}`,
-                quotationNumber: sphNumber,
-                clientId: `client_${Date.now()}`,
-                customerName: extractedSph.customerName || "Klien DSTech",
-                customerOrg: extractedSph.customerName || "Klien DSTech",
+                id: existingSphItem?.payload?.id || `dstech_sph_${Date.now()}`,
+                quotationNumber: existingSphItem?.payload?.quotationNumber || sphNumber,
+                clientId: existingSphItem?.payload?.clientId || `client_${Date.now()}`,
+                customerName: extractedSph.customerName || existingSphItem?.payload?.customerName || "Klien DSTech",
+                customerOrg: extractedSph.customerName || existingSphItem?.payload?.customerOrg || "Klien DSTech",
                 customerPhone: "0812-9988-7766",
-                customerAddress: extractedSph.customerAddress || "Banten / Jabodetabek",
-                subject: extractedSph.subject || `Surat Penawaran Harga - ${extractedSph.customerName}`,
+                customerAddress: extractedSph.customerAddress || existingSphItem?.payload?.customerAddress || "Banten / Jabodetabek",
+                subject: queueTitle,
                 date: new Date().toISOString().split("T")[0],
                 validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
                 validityDays: 14,
                 items: items,
-                subtotal: subtotal,
-                discount: 0,
-                discountType: "fixed",
-                discountPercent: 0,
-                discountLabel: "Diskon Khusus Proyek",
-                revision: 0,
+                subtotal: finalSubtotal,
+                discount: discountAmount,
+                discountType: "percentage",
+                discountPercent: discountPercent,
+                discountLabel: discountPercent > 0 ? `Diskon Khusus Proyek (${discountPercent}%)` : "Diskon Khusus Proyek",
+                revision: revNumber,
                 taxRate: taxRate,
                 taxType: "exclude",
-                taxAmount: taxAmount,
-                grandTotal: grandTotal,
+                taxAmount: finalTaxAmount,
+                grandTotal: finalGrandTotal,
                 hideTaxInPrint: true,
                 terms: "1. Seluruh harga penawaran di atas adalah harga Netto/DPP belum termasuk PPN 11% (Exclude PPN).\n2. Garansi unit perangkat keras resmi 1 (satu) sampai 2 (dua) tahun penggantian unit baru.\n3. Garansi pemeliharaan teknis & jasa instalasi selama 6 (enam) bulan.\n4. Gratis komisioning, pelatihan operator, dan integrasi sistem monitoring.\n5. Pembayaran: DP 50% saat PO terbit, Pelunasan 50% setelah serah terima pekerjaan (BAST).",
                 status: "Terkirim",
@@ -1417,7 +1500,7 @@ Aturan Khusus:
                 approvedTitle: "Direktur Utama",
                 approvedAt: new Date().toLocaleString("id-ID"),
                 verificationCode: `DST-${sphNumber}`,
-                notes: `Diterbitkan secara otonom oleh Dewi Sartika (AI Finance Specialist) atas instruksi Direktur Utama: "${promptCommand}"`,
+                notes: `${isRevision ? "[REVISI DIREKTUR] " : ""}Draf usulan SPH oleh Dewi Sartika atas instruksi: "${promptCommand}"`,
                 attachments: [],
                 businessEntity: "PT",
                 projectId: "",
@@ -1426,20 +1509,47 @@ Aturan Khusus:
                 warehouseId: "dstech_wh_1",
               };
 
-              finData.quotations.unshift(newSphDoc);
-              fs.writeFileSync(financeFilePath, JSON.stringify(finData, null, 2), "utf-8");
-
-              executionResult = {
-                type: "SPH_CREATED",
-                quotationNumber: sphNumber,
-                customerName: extractedSph.customerName,
-                subject: extractedSph.subject,
-                subtotal: subtotal,
-                grandTotal: grandTotal,
-                link: "/admin/finance?tab=quotations",
+              const queueItem = {
+                id: queueId,
+                revision: revNumber,
+                employee_id: "emp_dewi_finance",
+                employee_name: "Dewi Sartika",
+                employee_role: "AI Finance & Tax Billing Specialist",
+                department: "FINANCE",
+                task_type: "SPH_PROPOSAL",
+                title: queueTitle,
+                target_client: extractedSph.customerName,
+                value: finalGrandTotal,
+                tax_type: "exclude",
+                summary: queueSummary,
+                status: "PENDING_APPROVAL",
+                created_at: existingSphItem?.created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                payload: newSphDoc,
               };
 
-              aiResponseText = `Siap Pak Ramadhani! Saya (Dewi Sartika) telah selesai menyusun dan menerbitkan draf Surat Penawaran Harga resmi #${sphNumber} untuk ${extractedSph.customerName} (${extractedSph.subject}) dengan total Netto Rp ${subtotal.toLocaleString("id-ID")} (Exclude PPN 11%). Dokumen telah otomatis masuk ke sistem Keuangan ERP dan siap ditinjau atau dicetak PDF!`;
+              if (existingSphIdx >= 0) {
+                data.dstech_approval_queue[existingSphIdx] = queueItem;
+              } else {
+                data.dstech_approval_queue.unshift(queueItem);
+              }
+              writeWorkforceData(data);
+
+              executionResult = {
+                type: isRevision ? "SPH_REVISED" : "SPH_PROPOSAL_CREATED",
+                queueId: queueItem.id,
+                quotationNumber: newSphDoc.quotationNumber,
+                customerName: extractedSph.customerName,
+                subject: queueTitle,
+                subtotal: finalSubtotal,
+                grandTotal: finalGrandTotal,
+                revision: revNumber,
+                link: "/admin/virtual-office",
+              };
+
+              aiResponseText = isRevision
+                ? `Siap Pak Ramadhani! Draf SPH Penawaran untuk ${extractedSph.customerName} telah BERHASIL SAYA REVISI: Total Netto disesuaikan menjadi Rp ${finalSubtotal.toLocaleString("id-ID")}${discountPercent > 0 ? ` (dengan diskon ${discountPercent}%)` : ""} (Exclude PPN 11%). Draf di Kotak Persetujuan telah diperbarui (Revisi #${revNumber}) dan siap Bapak sahkan!`
+                : `Siap Pak Ramadhani! Saya (Dewi Sartika) telah selesai menyusun draf Surat Penawaran Harga resmi #${sphNumber} untuk ${extractedSph.customerName} (${queueTitle}) dengan total Netto Rp ${finalSubtotal.toLocaleString("id-ID")} (Exclude PPN 11%). Draf telah saya masukkan ke Kotak Persetujuan dan siap ditinjau Bapak sebelum masuk ke sistem Keuangan ERP!`;
             }
           } catch (finErr: any) {
             console.error("Error executing Dewi Finance SPH action:", finErr);
@@ -1662,262 +1772,232 @@ Aturan Khusus:
         }
       }
 
+      // --- REZA FIRMANSYAH (Product Catalog & Procurement Lead) ---
       if (targetEmp.id === "emp_reza_catalog") {
-        const lowerCmd = promptCommand.toLowerCase();
-        if (lowerCmd.includes("tekno20") || lowerCmd.includes("shopee") || lowerCmd.includes("upload") || lowerCmd.includes("produk") || lowerCmd.includes("katalog") || lowerCmd.includes("markup")) {
-          try {
-            const productsFilePath = path.join(process.cwd(), "src/data/dstech_products.json");
-            if (fs.existsSync(productsFilePath)) {
-              const prodRaw = fs.readFileSync(productsFilePath, "utf-8");
-              let prodList: any[] = JSON.parse(prodRaw);
+        try {
+          if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+          const isRevision = /(?:revisi|ubah|ganti|koreksi|update|perbaiki|sesuaikan|ralat)/i.test(promptCommand);
 
-              // 6 Produk Asli Suku Cadang Barrier Gate & Akses Kontrol dengan Deskripsi Toko Otentik, Gambar Sesuai Fisik, dan Kerahasiaan Terjaga
-              const tekno20Imported = [
-                {
-                  id: `dstech_prod_tekno_${Date.now()}_1`,
-                  name: "DStech - Bracket Palang / Roll Boom Barrier Gate BFT Came MX Universal",
-                  category: "Parking & Barrier System",
-                  subCategory: "Sparepart & Aksesoris Barrier Gate",
-                  brand: "Universal BFT/Came/MX",
-                  entityType: "PT",
-                  costPrice: 181500,
-                  price: 272250,
-                  isPromo: false,
-                  discountPercent: 0,
-                  promoTag: "Ready Stock",
-                  installationFee: 100000,
-                  hasInstallationService: true,
-                  stock: 50,
-                  unit: "Pcs",
-                  warehouseStock: { dstech_wh_1: 50, dstech_wh_2: 0, dstech_wh_3: 0 },
-                  commission: "5%",
-                  commissionRate: 5,
-                  commissionType: "ONETIME",
-                  image: "/uploads/dstech_tekno_bracket_palang.jpg",
-                  images: ["/uploads/dstech_tekno_bracket_palang.jpg"],
-                  desc: "Bracket dudukan palang / roll boom arm holder untuk mesin barrier gate otomatis tipe MX-50, MX-80, BFT, CAME, dan sejenisnya.\n\nDibuat dari material plat besi baja tebal berkualitas tinggi dengan finishing cat oven anti-karat, kokoh menahan beban benturan angin kencang maupun getaran operasional motor boom gate.\n\nSpesifikasi & Keunggulan:\n- Kompatibel: Mesin Barrier Gate BFT, Came, MX Series, dan universal boom gate\n- Material: Heavy Duty Steel Plate finishing Powder Coating anti-korosi\n- Diameter / Lubang Poros: Standar as motor barrier gate\n- Lubang Baut: Presisi, mudah disesuaikan (plug & play)\n- Fungsi: Menjepit dan memegang pangkal palang boom arm secara kokoh dan seimbang saat buka-tutup palang.\n\nIsi Paket:\n- 1x Bracket Dudukan Palang Roll Boom\n- Baut pengunci & mur pengencang",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                },
-                {
-                  id: `dstech_prod_tekno_${Date.now()}_2`,
-                  name: "DStech - Sensor W1 Wireless Exit Loop Detector Barrier Gate Palang Parkir",
-                  category: "Parking & Barrier System",
-                  subCategory: "Loop Detector & Vehicle Sensor",
-                  brand: "Sensor W1 Pro",
-                  entityType: "PT",
-                  costPrice: 265000,
-                  price: 397500,
-                  isPromo: false,
-                  discountPercent: 0,
-                  promoTag: "Original",
-                  installationFee: 150000,
-                  hasInstallationService: true,
-                  stock: 35,
-                  unit: "Unit",
-                  warehouseStock: { dstech_wh_1: 35, dstech_wh_2: 0, dstech_wh_3: 0 },
-                  commission: "5%",
-                  commissionRate: 5,
-                  commissionType: "ONETIME",
-                  image: "/uploads/dstech_tekno_sensor_w1.jpg",
-                  images: ["/uploads/dstech_tekno_sensor_w1.jpg"],
-                  desc: "Sensor W1 Wireless Exit Loop Detector merupakan solusi modern pengganti kabel loop tanam konvensional untuk sistem palang parkir otomatis (barrier gate).\n\nMendeteksi kendaraan yang mendekati atau melewati area gerbang secara nirkabel tanpa perlu membongkar, mengikis, atau merusak permukaan aspal/cor beton jalan.\n\nFitur & Keunggulan:\n- Deteksi Nirkabel (Wireless): Pemasangan sangat praktis, hemat waktu dan biaya instalasi tanpa bobok aspal\n- Respon Cepat & Akurat: Sensitivitas tinggi mendeteksi logam bodi mobil, truk, maupun motor\n- Jarak Deteksi Luas: Dapat disesuaikan dengan lebar jalur kendaraan (hingga 3 - 5 meter)\n- Daya Tahan Cuaca: Unit sensor luar tahan air hujan dan panas terik (IP66 Waterproof)\n- Kompatibilitas Universal: Cocok untuk semua kontroler barrier gate (trigger open / trigger anti-hit)\n\nSpesifikasi Teknis:\n- Frekuensi Kerja: 433 MHz / Microwave Radar Sensor\n- Tegangan Operasional: DC 12V - 24V\n- Output Trigger: Relay NO/NC (Dry Contact)\n- Suhu Kerja: -20°C s/d +70°C",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                },
-                {
-                  id: `dstech_prod_tekno_${Date.now()}_3`,
-                  name: "DStech - Emergency Door Release Push Button Break Glass Hijau Access Control",
-                  category: "Security System",
-                  subCategory: "Access Control & Push Button",
-                  brand: "SecurePro K3",
-                  entityType: "PT",
-                  costPrice: 74000,
-                  price: 111000,
-                  isPromo: false,
-                  discountPercent: 0,
-                  promoTag: "Standar K3",
-                  installationFee: 50000,
-                  hasInstallationService: true,
-                  stock: 60,
-                  unit: "Unit",
-                  warehouseStock: { dstech_wh_1: 60, dstech_wh_2: 0, dstech_wh_3: 0 },
-                  commission: "5%",
-                  commissionRate: 5,
-                  commissionType: "ONETIME",
-                  image: "/uploads/dstech_tekno_emergency_door_release.jpg",
-                  images: ["/uploads/dstech_tekno_emergency_door_release.jpg"],
-                  desc: "Tombol darurat pemutus arus pintu (Emergency Door Release) tipe break glass warna hijau standar keselamatan gedung.\n\nDigunakan pada sistem akses kontrol pintu perkantoran, rumah sakit, laboratorium, dan gedung komersial untuk membuka kunci pintu elektromagnetik (EM Lock) secara instan saat terjadi situasi darurat kebakaran atau evakuasi bencana.\n\nFitur & Spesifikasi:\n- Standar Keamanan: Warna Hijau Internasional (Emergency Exit Release)\n- Mekanisme: Kaca pelindung dapat ditekan/dipecahkan saat darurat untuk memutuskan aliran daya kunci magnet secara permanen hingga direset\n- Dilengkapi Kunci Reset (Reset Key): Dapat dipulihkan kembali ke posisi normal setelah pengetesan\n- Material: ABS Fireproof Housing tahan panas dan benturan\n- Kontak Output: NO / NC / COM (Dual Pole Double Throw)\n- Kapasitas Kontak: 3A @ 36V DC Max\n- Dimensi: 86 mm x 86 mm x 50 mm (Ukuran Standar Inbow Dus)",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                },
-                {
-                  id: `dstech_prod_tekno_${Date.now()}_4`,
-                  name: "DStech - Wield Falcon Magnetic Lock Access Control 600Lbs 280Kg EM Lock",
-                  category: "Security System",
-                  subCategory: "Access Control & Magnetic Lock",
-                  brand: "Wield Falcon",
-                  entityType: "PT",
-                  costPrice: 185000,
-                  price: 277500,
-                  isPromo: false,
-                  discountPercent: 0,
-                  promoTag: "Heavy Duty",
-                  installationFee: 150000,
-                  hasInstallationService: true,
-                  stock: 40,
-                  unit: "Set",
-                  warehouseStock: { dstech_wh_1: 40, dstech_wh_2: 0, dstech_wh_3: 0 },
-                  commission: "5%",
-                  commissionRate: 5,
-                  commissionType: "ONETIME",
-                  image: "/uploads/dstech_tekno_em_lock_600lbs.jpg",
-                  images: ["/uploads/dstech_tekno_em_lock_600lbs.jpg"],
-                  desc: "Wield Falcon Electromagnetic Lock (EM Lock) kekuatan 600 Lbs / 280 Kg adalah kunci elektromagnetik andalan untuk pengamanan pintu akses kontrol modern.\n\nBekerja dengan prinsip gaya tarik elektromagnetik kuat tanpa komponen mekanis yang aus, menjamin keandalan jutaan kali buka-tutup pintu tanpa macet.\n\nSpesifikasi & Keunggulan:\n- Kekuatan Tahan Beban (Holding Force): 280 Kg (600 Lbs) Linear Thrust\n- Tegangan Kerja: DC 12V / 24V (Bisa diatur melalui jumper internal)\n- Konsumsi Arus: 12V / 500mA, 24V / 250mA\n- Sensor Status Pintu: Dilengkapi LED indikator status penguncian (Merah/Hijau) & feedback sinyal relay (Door Status Monitoring)\n- Fail-Safe Operation: Otomatis terbuka saat listrik padam untuk standar keselamatan evakuasi darurat\n- Tipe Pintu: Pintu Kayu, Pintu Kaca Tempered, Pintu Logam/Besi, dan Pintu Aluminium (Tersedia bracket L, Z, atau U)\n- Material: Anodized High Strength Aluminum Alloy & Zinc Electroplated Armature Plate",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                },
-                {
-                  id: `dstech_prod_tekno_${Date.now()}_5`,
-                  name: "DStech - Push Button Touch Sensor Exit Button Touchless Access Control No Touch",
-                  category: "Security System",
-                  subCategory: "Access Control & Push Button",
-                  brand: "Touchless Pro",
-                  entityType: "PT",
-                  costPrice: 84500,
-                  price: 126750,
-                  isPromo: false,
-                  discountPercent: 0,
-                  promoTag: "Touchless",
-                  installationFee: 50000,
-                  hasInstallationService: true,
-                  stock: 45,
-                  unit: "Unit",
-                  warehouseStock: { dstech_wh_1: 45, dstech_wh_2: 0, dstech_wh_3: 0 },
-                  commission: "5%",
-                  commissionRate: 5,
-                  commissionType: "ONETIME",
-                  image: "/uploads/dstech_tekno_touchless_button.jpg",
-                  images: ["/uploads/dstech_tekno_touchless_button.jpg"],
-                  desc: "Sakelar tombol keluar tanpa sentuh (Touchless Exit Button) dengan teknologi sensor infra merah aktif untuk sistem akses kontrol pintu higienis dan modern.\n\nCukup lambaikan tangan pada jarak 5 - 15 cm di depan sensor tanpa perlu menyentuh permukaan tombol, mencegah penularan kuman dan bakteri di lingkungan kantor, rumah sakit, klinik, dan pabrik.\n\nFitur & Keunggulan:\n- Bebas Sentuh (No-Touch Infrared): Cukup mendekatkan telapak tangan untuk membuka pintu\n- Indikator LED Dua Warna: Biru Standby, Hijau Saat Terdeteksi (Trigger Aktif)\n- Jarak Respon Sensor: 5 cm - 15 cm (Bisa diatur sensitivitasnya)\n- Plat Stainless Steel: Bahan plat muka stainless tebal tahan gores, tahan karat, dan tampak mewah\n- Daya Tahan: Telah diuji lebih dari 500.000 kali trigger\n\nSpesifikasi Teknis:\n- Tegangan Kerja: DC 12V\n- Kontak Output: NO / NC / COM Relay Output\n- Kapasitas Beban: 3A @ 12V DC\n- Ukuran: 115 mm x 70 mm x 29 mm",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                },
-                {
-                  id: `dstech_prod_tekno_${Date.now()}_6`,
-                  name: "DStech - Arm Palang Bulat Boom Barrier Gate Octagonal 3m - 4m Palang Parkir",
-                  category: "Parking & Barrier System",
-                  subCategory: "Palang & Boom Arm",
-                  brand: "Tekno Barrier",
-                  entityType: "PT",
-                  costPrice: 450000,
-                  price: 675000,
-                  isPromo: false,
-                  discountPercent: 0,
-                  promoTag: "Aluminium Alloy",
-                  installationFee: 250000,
-                  hasInstallationService: true,
-                  stock: 20,
-                  unit: "Batang",
-                  warehouseStock: { dstech_wh_1: 20, dstech_wh_2: 0, dstech_wh_3: 0 },
-                  commission: "5%",
-                  commissionRate: 5,
-                  commissionType: "ONETIME",
-                  image: "/uploads/dstech_img_1793016900513_Palang_Gate_Barier_Tanpa_Lampu.jfif",
-                  images: ["/uploads/dstech_img_1793016900513_Palang_Gate_Barier_Tanpa_Lampu.jfif"],
-                  desc: "Batang palang boom gate aluminium profil oktagonal / bulat berdaya tahan tinggi untuk mesin barrier gate perumahan, perkantoran, dan area parkir komersial.\n\nDilengkapi stiker reflektif prismatik merah-putih yang memantulkan cahaya lampu kendaraan di malam hari untuk keamanan dan visibilitas maksimal pengendara.\n\nSpesifikasi & Keunggulan:\n- Pilihan Panjang: 3 Meter hingga 4 Meter (Dapat dipotong presisi sesuai kebutuhan lebar gerbang)\n- Profil: Oktagonal (Segi Delapan) / Bulat aerodinamis tahan terpaan angin kencang\n- Material: Paduan Aluminium Ringan Berkekuatan Tinggi (High Strength Extruded Aluminum Alloy)\n- Karet Bumper Pengaman: Sisi bawah dilengkapi karet bantalan pelindung untuk mencegah baret pada kendaraan\n- Reflektor: Stiker Reflektif Merah - Putih kualitas tinggi berpendar terang saat tersorot lampu\n- Kompatibilitas: Cocok untuk Barrier Gate MX-50, MX-80, Servo DC, CAME, BFT, dan mesin palang standar lainnya.",
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                },
-              ];
+          const existingQueueIdx = data.dstech_approval_queue.findIndex((q: any) =>
+            (q.employee_id === "emp_reza_catalog" || q.task_type === "PRODUCT_IMPORT" || q.task_type === "CATALOG_UPDATE") &&
+            q.status === "PENDING_APPROVAL"
+          );
+          const existingQueueItem = existingQueueIdx >= 0 ? data.dstech_approval_queue[existingQueueIdx] : null;
 
-              // Hapus data import sebelumnya jika sudah ada agar tidak duplikat
-              prodList = prodList.filter((p: any) => !p.id.includes("tekno"));
-              // Tambahkan produk baru ke urutan paling atas
-              prodList.unshift(...tekno20Imported);
-
-              fs.writeFileSync(productsFilePath, JSON.stringify(prodList, null, 2), "utf-8");
-
-              executionResult = {
-                type: "PRODUCTS_IMPORTED",
-                category: "Barrier Gate & Access Control",
-                count: tekno20Imported.length,
-                link: "/admin/products",
-              };
-
-              aiResponseText = `Siap Pak Ramadhani! Saya (Reza Firmansyah) telah memperbarui dan mengimpor ${tekno20Imported.length} produk suku cadang Barrier Gate & Akses Kontrol ke dalam katalog master dengan deskripsi teknis dan spesifikasi otentik, foto produk presisi sesuai fisik barang, dan harga jual yang telah disesuaikan dengan margin perusahaan. Seluruh informasi supplier tetap terjaga kerahasiaannya dan produk sudah siap dipasarkan di menu Produk & Katalog!`;
-            }
-          } catch (prodErr: any) {
-            console.error("Error executing Reza Catalog import:", prodErr);
+          // Ekstrak harga baru jika ada
+          let newPrice = existingQueueItem?.value || existingQueueItem?.payload?.price || 277500;
+          const priceNumMatch = promptCommand.match(/(?:harga(?:\s+jual)?|price|jadi)\s*(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3}){1,3}|\d{4,9})/i);
+          if (priceNumMatch && priceNumMatch[1]) {
+            newPrice = parseInt(priceNumMatch[1].replace(/\./g, ""), 10);
           }
+
+          // Ekstrak markup / margin jika ada
+          const markupMatch = promptCommand.match(/(\d+)\s*%/);
+          const markupPercent = markupMatch ? parseInt(markupMatch[1], 10) : 0;
+          let costPrice = existingQueueItem?.payload?.costPrice || 185000;
+          if (markupPercent > 0 && costPrice > 0 && !priceNumMatch) {
+            newPrice = Math.round(costPrice * (1 + markupPercent / 100));
+          }
+
+          // Ekstrak stok jika ada
+          let newStock = existingQueueItem?.payload?.stock ?? 0;
+          const stockMatch = promptCommand.match(/stok\s*(?:awal)?\s*(\d+)/i);
+          if (stockMatch && stockMatch[1]) {
+            newStock = parseInt(stockMatch[1], 10);
+          }
+
+          const queueId = existingQueueItem ? existingQueueItem.id : `appr_reza_catalog_${Date.now()}`;
+          const revNumber = (existingQueueItem?.revision || 0) + (isRevision ? 1 : (existingQueueItem ? 0 : 0));
+
+          const cleanBaseTitle = (existingQueueItem?.title || "Usulan Pengadaan Suku Cadang: Wield Falcon Magnetic Lock 600Lbs").replace(/\s*\(Revisi\s*#\d+\)/gi, "");
+          const queueTitle = `${cleanBaseTitle}${revNumber > 0 ? ` (Revisi #${revNumber})` : ""}`;
+          const queueSummary = `${isRevision ? "[HASIL REVISI] " : ""}Penetapan spesifikasi & harga suku cadang katalog: Harga jual Rp ${newPrice.toLocaleString("id-ID")} (Harga modal Rp ${costPrice.toLocaleString("id-ID")}), Stok awal ${newStock} unit. Arahan Direktur: "${promptCommand}". Menunggu persetujuan Direktur Utama.`;
+
+          const updatedPayload = {
+            ...(existingQueueItem?.payload || {}),
+            id: existingQueueItem?.payload?.id || "dstech_prod_appr_emlock",
+            name: existingQueueItem?.payload?.name || "DStech - Wield Falcon Magnetic Lock Access Control 600Lbs 280Kg EM Lock",
+            category: "Security System",
+            subCategory: "Access Control & Magnetic Lock",
+            brand: "Wield Falcon",
+            entityType: "PT",
+            costPrice: costPrice,
+            price: newPrice,
+            stock: newStock,
+            warehouseStock: { dstech_wh_1: newStock, dstech_wh_2: 0, dstech_wh_3: 0 },
+            image: existingQueueItem?.payload?.image || "/uploads/dstech_tekno_em_lock_600lbs.jpg",
+            notes: `Direvisi atas instruksi Direktur: "${promptCommand}"`,
+            updatedAt: new Date().toISOString(),
+          };
+
+          const queueItem = {
+            id: queueId,
+            revision: revNumber,
+            employee_id: "emp_reza_catalog",
+            employee_name: "Reza Firmansyah",
+            employee_role: "AI Product Catalog & Procurement Lead",
+            department: "CATALOG_ESTORE",
+            task_type: "PRODUCT_IMPORT",
+            title: queueTitle,
+            target_client: "Katalog E-Store DSTech",
+            value: newPrice,
+            tax_type: "net",
+            summary: queueSummary,
+            status: "PENDING_APPROVAL",
+            created_at: existingQueueItem?.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            payload: updatedPayload,
+          };
+
+          if (existingQueueIdx >= 0) {
+            data.dstech_approval_queue[existingQueueIdx] = queueItem;
+          } else {
+            data.dstech_approval_queue.unshift(queueItem);
+          }
+          writeWorkforceData(data);
+
+          executionResult = {
+            type: isRevision ? "CATALOG_REVISED" : "CATALOG_PROPOSED",
+            queueId: queueItem.id,
+            price: newPrice,
+            stock: newStock,
+            revision: revNumber,
+            link: "/admin/virtual-office"
+          };
+
+          aiResponseText = isRevision
+            ? `Siap Pak Ramadhani! Usulan katalog suku cadang & penetapan harga telah BERHASIL SAYA REVISI: Harga jual disesuaikan menjadi Rp ${newPrice.toLocaleString("id-ID")} (Stok: ${newStock} unit). Draf usulan di Kotak Persetujuan telah diperbarui (Revisi #${revNumber})!`
+            : `Siap Pak Ramadhani! Saya (Reza Firmansyah) telah menyusun draf penetapan produk & harga katalog suku cadang baru ke dalam Kotak Persetujuan Bapak. Menunggu persetujuan Bapak sebelum live di katalog!`;
+
+          targetEmp.speech_bubble = aiResponseText;
+        } catch (prodErr: any) {
+          console.error("Error executing Reza Catalog action:", prodErr);
         }
       }
 
       // --- BAMBANG PRAKOSO (Sales & B2B Commercial Consultant) ---
       if (targetEmp.id === "emp_bambang_sales") {
         try {
-          const crmFilePath = path.join(process.cwd(), "src/data/dstech_crm.json");
-          if (fs.existsSync(crmFilePath)) {
-            const crmRaw = fs.readFileSync(crmFilePath, "utf-8");
-            let crmData = JSON.parse(crmRaw);
-            if (!crmData.leads) crmData.leads = [];
+          if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+          const isRevision = /(?:revisi|ubah|ganti|koreksi|update|perbaiki|sesuaikan|ralat)/i.test(promptCommand);
 
-            // Ekstrak nama klien / perusahaan
-            let company = "Klien Korporat Baru";
-            const ptMatch = promptCommand.match(/(?:pt\.?|cv\.?|toko|gedung|kawasan|bapak|ibu|bpk)\s+[^,\.\n\r]+?(?=\s+(?:untuk|proyek|kebutuhan|di|dengan)|$)/i);
-            if (ptMatch && ptMatch[0]) {
-              company = ptMatch[0].trim();
-            } else {
-              const matchUntuk = promptCommand.match(/untuk\s+([^,\.\n\r]+)/i);
-              if (matchUntuk && matchUntuk[1]) company = matchUntuk[1].trim();
-            }
+          // Cari draf usulan pending milik Bambang atau CRM_LEAD
+          const existingQueueIdx = data.dstech_approval_queue.findIndex((q: any) =>
+            (q.employee_id === "emp_bambang_sales" || q.task_type === "CRM_LEAD") &&
+            q.status === "PENDING_APPROVAL"
+          );
+          const existingQueueItem = existingQueueIdx >= 0 ? data.dstech_approval_queue[existingQueueIdx] : null;
 
-            const leadNumber = `LEAD-DST-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(crmData.leads.length + 1).padStart(3, "0")}`;
-            const newLead = {
-              id: `dstech_crm_lead_${Date.now()}`,
-              leadNumber: leadNumber,
-              clientName: `PIC ${company}`,
-              company: company,
-              position: "General Affair / Project Manager",
-              phone: "0812-9988-7766",
-              email: `procurement@${company.toLowerCase().replace(/[^a-z0-9]/g, "") || "client"}.co.id`,
-              category: "B2B Industri",
-              projectTitle: `Peluang Pengadaan Proyek Security - ${company}`,
-              estimatedValue: 45000000,
-              stage: "PROPOSAL",
-              probability: 80,
-              source: "Instruksi Direktur Utama (Kantor Virtual)",
-              assignedTo: "RAMADHANI ST",
-              expectedClosingDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-              location: "Banten / Jabodetabek",
-              sphNumber: "",
-              notes: `Didaftarkan oleh Bambang Prakoso (AI Sales Consultant) atas arahan Direktur: "${promptCommand}"`,
-              activities: [
-                {
-                  id: `act_${Date.now()}`,
-                  type: "NOTE",
-                  title: "Inisiasi Pipeline Prospek B2B Baru",
-                  notes: `Bambang Prakoso memproses arahan Direktur: ${promptCommand}. Prospek masuk ke funnel negosiasi aktif.`,
-                  createdAt: new Date().toISOString(),
-                  createdBy: "Bambang Prakoso (AI Sales)"
-                }
-              ],
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-
-            crmData.leads.unshift(newLead);
-            fs.writeFileSync(crmFilePath, JSON.stringify(crmData, null, 2), "utf-8");
-
-            executionResult = {
-              type: "LEAD_CREATED",
-              leadNumber: leadNumber,
-              company: company,
-              link: "/admin/orders",
-            };
-
-            aiResponseText = `Siap Pak Ramadhani! Saya (Bambang Prakoso) telah mendaftarkan ${company} ke dalam CRM Pipeline Penjualan B2B kita (#${leadNumber}) dengan status negosiasi proposal aktif. Saya akan segera kawal progress prospek ini sampai closing deal!`;
+          // Ekstrak nama klien / perusahaan
+          let company = existingQueueItem?.payload?.company || existingQueueItem?.target_client || "Klien Korporat B2B";
+          const ptMatch = promptCommand.match(/(?:pt\.?|cv\.?|toko|gedung|kawasan|rsud|yayasan|bapak|ibu|bpk)\s+[^,\.\n\r]+?(?=\s+(?:untuk|proyek|kebutuhan|di|dengan|senilai)|$)/i);
+          if (ptMatch && ptMatch[0]) {
+            company = ptMatch[0].trim();
+          } else {
+            const matchUntuk = promptCommand.match(/untuk\s+([^,\.\n\r]+)/i);
+            if (matchUntuk && matchUntuk[1]) company = matchUntuk[1].trim();
           }
+
+          // Ekstrak nominal deal
+          let dealValue = existingQueueItem?.value || existingQueueItem?.payload?.value || 45000000;
+          const valJutaMatch = promptCommand.match(/(\d+(?:[\.,]\d+)?)\s*(?:juta|jt)/i);
+          if (valJutaMatch && valJutaMatch[1]) {
+            dealValue = Math.round(parseFloat(valJutaMatch[1].replace(",", ".")) * 1000000);
+          } else {
+            const valNumMatch = promptCommand.match(/\b(\d{1,3}(?:\.\d{3}){1,3})\b/);
+            if (valNumMatch && valNumMatch[1]) {
+              dealValue = parseInt(valNumMatch[1].replace(/\./g, ""), 10);
+            } else {
+              const plainNumMatch = promptCommand.match(/\b(\d{6,10})\b/);
+              if (plainNumMatch && plainNumMatch[1]) {
+                dealValue = parseInt(plainNumMatch[1], 10);
+              }
+            }
+          }
+
+          const queueId = existingQueueItem ? existingQueueItem.id : `appr_bambang_lead_${Date.now()}`;
+          const revNumber = (existingQueueItem?.revision || 0) + (isRevision ? 1 : (existingQueueItem ? 0 : 0));
+          const leadNum = existingQueueItem?.payload?.leadNumber || `LEAD-DST-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(Date.now()).slice(-3)}`;
+
+          const cleanBaseTitle = (existingQueueItem?.title || `Follow-up Prospek: Pipeline B2B ${company}`).replace(/\s*\(Revisi\s*#\d+\)/gi, "");
+          const queueTitle = `${cleanBaseTitle}${revNumber > 0 ? ` (Revisi #${revNumber})` : ""}`;
+          const queueSummary = `${isRevision ? "[HASIL REVISI] " : ""}Pipeline B2B prospek ${company} dengan estimasi nilai deal Rp ${dealValue.toLocaleString("id-ID")}. Arahan Direktur: "${promptCommand}". Menunggu persetujuan sebelum dimasukkan ke Pipeline CRM aktif.`;
+
+          const leadPayload = {
+            id: existingQueueItem?.payload?.id || `dstech_crm_lead_${Date.now()}`,
+            leadNumber: leadNum,
+            clientName: existingQueueItem?.payload?.clientName || `PIC ${company}`,
+            company: company,
+            position: "General Affair / Project Manager",
+            phone: existingQueueItem?.payload?.phone || "0812-9988-7766",
+            email: `procurement@${company.toLowerCase().replace(/[^a-z0-9]/g, "") || "client"}.co.id`,
+            category: "B2B Industri",
+            projectTitle: `Peluang Pengadaan Proyek Security & Access - ${company}`,
+            estimatedValue: dealValue,
+            value: dealValue,
+            stage: "PROPOSAL",
+            probability: 80,
+            source: "Instruksi Direktur Utama (Kantor Virtual)",
+            assignedTo: "RAMADHANI ST",
+            expectedClosingDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+            location: "Banten / Jabodetabek",
+            sphNumber: "",
+            notes: `${isRevision ? "[REVISI DIREKTUR] " : ""}Instruksi Direktur Utama: "${promptCommand}"`,
+            activities: [
+              ...(existingQueueItem?.payload?.activities || []),
+              {
+                id: `act_${Date.now()}`,
+                type: isRevision ? "REVISION" : "NOTE",
+                title: isRevision ? `Revisi #${revNumber} Prospek Deal` : "Inisiasi Pipeline Prospek B2B Baru",
+                notes: `Bambang Prakoso memproses arahan Direktur: "${promptCommand}". Nilai deal disesuaikan menjadi Rp ${dealValue.toLocaleString("id-ID")}.`,
+                createdAt: new Date().toISOString(),
+                createdBy: "Bambang Prakoso (AI Sales)"
+              }
+            ],
+            createdAt: existingQueueItem?.payload?.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+
+          const queueItem = {
+            id: queueId,
+            revision: revNumber,
+            employee_id: "emp_bambang_sales",
+            employee_name: "Bambang Prakoso",
+            employee_role: "Senior AI Sales & Commercial Consultant",
+            department: "SALES",
+            task_type: "CRM_LEAD",
+            title: queueTitle,
+            target_client: company,
+            value: dealValue,
+            tax_type: "net",
+            summary: queueSummary,
+            status: "PENDING_APPROVAL",
+            created_at: existingQueueItem?.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            payload: leadPayload,
+          };
+
+          if (existingQueueIdx >= 0) {
+            data.dstech_approval_queue[existingQueueIdx] = queueItem;
+          } else {
+            data.dstech_approval_queue.unshift(queueItem);
+          }
+          writeWorkforceData(data);
+
+          executionResult = {
+            type: isRevision ? "LEAD_REVISED" : "LEAD_PROPOSED",
+            queueId: queueItem.id,
+            company: company,
+            value: dealValue,
+            revision: revNumber,
+            link: "/admin/virtual-office"
+          };
+
+          aiResponseText = isRevision
+            ? `Siap Pak Ramadhani! Usulan prospek CRM B2B untuk ${company} telah BERHASIL SAYA REVISI: Nilai estimasi closing disesuaikan menjadi Rp ${dealValue.toLocaleString("id-ID")} sesuai arahan Bapak. Draf usulan di Kotak Persetujuan telah diperbarui (Revisi #${revNumber}) dan menunggu persetujuan Bapak!`
+            : `Siap Pak Ramadhani! Saya (Bambang Prakoso) telah menyusun draf prospek pipeline B2B ${company} senilai Rp ${dealValue.toLocaleString("id-ID")} dan memasukkannya ke Kotak Persetujuan Bapak. Menunggu Bapak setujui di Kotak Persetujuan sebelum masuk ke CRM aktif!`;
+
+          targetEmp.speech_bubble = aiResponseText;
         } catch (crmErr: any) {
           console.error("Error executing Bambang Sales action:", crmErr);
         }
@@ -1926,35 +2006,76 @@ Aturan Khusus:
       // --- NADIA SAFITRI (Creative Marketing & Copywriter) ---
       if (targetEmp.id === "emp_nadia_marketing") {
         try {
-          const promoFilePath = path.join(process.cwd(), "src/data/dstech_promotions.json");
-          if (fs.existsSync(promoFilePath)) {
-            const promoRaw = fs.readFileSync(promoFilePath, "utf-8");
-            let promoList = JSON.parse(promoRaw);
+          if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+          const isRevision = /(?:revisi|ubah|ganti|koreksi|update|perbaiki|sesuaikan|ralat)/i.test(promptCommand);
 
-            const promoTitle = `Promo Spesial: ${promptCommand.replace(/^(tolong|bikin|buatkan|nadia|tolong buatkan)\s+/i, "")}`;
-            const newPromo = {
-              id: `dstech_promo_${Date.now()}`,
-              title: promoTitle.slice(0, 75),
-              category: "Brosur Promosi",
-              description: `Materi promosi resmi PT. DSTech Smart Perkasa disusun oleh Nadia Safitri atas instruksi Direktur: "${promptCommand}". Siap dibagikan via WhatsApp Broadcast dan Media Sosial.`,
-              fileUrl: "/service-cctv.png",
-              fileType: "PDF",
-              fileSize: "4.2 MB",
-              downloadCount: 0,
-              createdAt: new Date().toISOString(),
-            };
+          const existingQueueIdx = data.dstech_approval_queue.findIndex((q: any) =>
+            (q.employee_id === "emp_nadia_marketing" || q.task_type === "PROMO_CAMPAIGN" || q.task_type === "VIDEO_BRANDING") &&
+            q.status === "PENDING_APPROVAL"
+          );
+          const existingQueueItem = existingQueueIdx >= 0 ? data.dstech_approval_queue[existingQueueIdx] : null;
 
-            promoList.unshift(newPromo);
-            fs.writeFileSync(promoFilePath, JSON.stringify(promoList, null, 2), "utf-8");
+          const promoTitle = `Promo Spesial: ${promptCommand.replace(/^(?:tolong|bikin|buatkan|nadia|tolong buatkan|revisi|ubah|ganti)\s+/i, "").slice(0, 75)}`;
+          const queueId = existingQueueItem ? existingQueueItem.id : `appr_nadia_promo_${Date.now()}`;
+          const revNumber = (existingQueueItem?.revision || 0) + (isRevision ? 1 : (existingQueueItem ? 0 : 0));
 
-            executionResult = {
-              type: "PROMO_CREATED",
-              title: newPromo.title,
-              link: "/admin/promotions",
-            };
+          // Ekstrak diskon jika ada
+          const diskonMatch = promptCommand.match(/(\d+)\s*%/);
+          const discountStr = diskonMatch ? `${diskonMatch[1]}%` : "";
 
-            aiResponseText = `Siap Pak Ramadhani! Saya (Nadia Safitri) telah selesai merancang materi promosi baru "${newPromo.title}". Materi kampanye dan copywriting telah resmi ditambahkan ke modul Promosi & Media Kit untuk disebarluaskan ke calon mitra dan klien!`;
+          const cleanBaseTitle = (existingQueueItem?.title || promoTitle).replace(/\s*\(Revisi\s*#\d+\)/gi, "");
+          const queueTitle = `${cleanBaseTitle}${revNumber > 0 ? ` (Revisi #${revNumber})` : ""}`;
+          const queueSummary = `${isRevision ? "[HASIL REVISI] " : ""}Materi kampanye promosi & konten medsos resmi PT. DSTech Smart Perkasa. Arahan Direktur: "${promptCommand}"${discountStr ? ` (Diskon: ${discountStr})` : ""}. Menunggu persetujuan Direktur Utama sebelum disebarluaskan.`;
+
+          const updatedPayload = {
+            ...(existingQueueItem?.payload || {}),
+            title: queueTitle,
+            category: existingQueueItem?.payload?.category || "Brosur Promosi",
+            description: queueSummary,
+            notes: `Disusun oleh Nadia Safitri atas instruksi Direktur: "${promptCommand}"`,
+            discount: discountStr || existingQueueItem?.payload?.discount || "",
+            updatedAt: new Date().toISOString(),
+          };
+
+          const queueItem = {
+            id: queueId,
+            revision: revNumber,
+            employee_id: "emp_nadia_marketing",
+            employee_name: "Nadia Safitri",
+            employee_role: existingQueueItem?.employee_role || "AI Creative Marketing & Copywriter",
+            department: "MARKETING",
+            task_type: existingQueueItem?.task_type || "PROMO_CAMPAIGN",
+            title: queueTitle,
+            target_client: existingQueueItem?.target_client || "Mitra & Calon Pelanggan",
+            value: 0,
+            tax_type: "none",
+            summary: queueSummary,
+            status: "PENDING_APPROVAL",
+            created_at: existingQueueItem?.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            payload: updatedPayload,
+          };
+
+          if (existingQueueIdx >= 0) {
+            data.dstech_approval_queue[existingQueueIdx] = queueItem;
+          } else {
+            data.dstech_approval_queue.unshift(queueItem);
           }
+          writeWorkforceData(data);
+
+          executionResult = {
+            type: isRevision ? "PROMO_REVISED" : "PROMO_PROPOSED",
+            queueId: queueItem.id,
+            title: queueTitle,
+            revision: revNumber,
+            link: "/admin/virtual-office"
+          };
+
+          aiResponseText = isRevision
+            ? `Siap Pak Ramadhani! Materi promosi & kampanye branding telah BERHASIL SAYA REVISI: "${promptCommand}". Draf usulan di Kotak Persetujuan telah diperbarui (Revisi #${revNumber}) dan siap Bapak setujui untuk dipublikasikan!`
+            : `Siap Pak Ramadhani! Saya (Nadia Safitri) telah merancang draf materi promosi "${queueTitle}" dan memasukkannya ke Kotak Persetujuan Bapak. Menunggu persetujuan Bapak sebelum disebarkan ke media sosial & WhatsApp!`;
+
+          targetEmp.speech_bubble = aiResponseText;
         } catch (promoErr: any) {
           console.error("Error executing Nadia Marketing action:", promoErr);
         }
@@ -1963,63 +2084,101 @@ Aturan Khusus:
       // --- DENI KURNIAWAN (Field Operations & Dispatcher) ---
       if (targetEmp.id === "emp_deni_field") {
         try {
-          const taskFilePath = path.join(process.cwd(), "src/data/dstech_employee_tasks.json");
-          if (fs.existsSync(taskFilePath)) {
-            const taskRaw = fs.readFileSync(taskFilePath, "utf-8");
-            let taskList = JSON.parse(taskRaw);
+          if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+          const isRevision = /(?:revisi|ubah|ganti|koreksi|update|perbaiki|sesuaikan|ralat)/i.test(promptCommand);
 
-            let clientTarget = "Klien DSTech";
-            const ptMatch = promptCommand.match(/(?:pt\.?|cv\.?|toko|gedung|bapak|ibu|bpk)\s+[^,\.\n\r]+?(?=\s+(?:untuk|ke|di|dengan)|$)/i);
-            if (ptMatch && ptMatch[0]) clientTarget = ptMatch[0].trim();
+          const existingQueueIdx = data.dstech_approval_queue.findIndex((q: any) =>
+            (q.employee_id === "emp_deni_field" || q.task_type === "SPK_FIELD" || q.task_type === "MAINTENANCE_TICKET") &&
+            q.status === "PENDING_APPROVAL"
+          );
+          const existingQueueItem = existingQueueIdx >= 0 ? data.dstech_approval_queue[existingQueueIdx] : null;
 
-            const ticketNumber = `MTC-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(taskList.length + 1).padStart(3, "0")}`;
-            const newTask = {
-              id: `dstech_task_${Date.now()}`,
-              ticketNumber: ticketNumber,
-              entityType: "PT",
-              type: "Installation",
-              title: `SPK Lapangan: Penugasan Teknisi - ${clientTarget}`,
-              client: clientTarget,
-              clientPhone: "0812-9988-7766",
-              clientPic: "PIC Lapangan",
-              location: "Lokasi Proyek Klien",
-              date: new Date().toISOString().split("T")[0],
-              deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-              status: "In Progress",
-              priority: "High",
-              technician: "Ikhsan Maulidi (Lead Field Tech)",
-              technicianPhone: "+6282259494242",
-              scope: [
-                `Menjalankan penugasan resmi Direktur Utama: ${promptCommand}`,
-                "Pemeriksaan jalur kabel, catu daya listrik, dan titik penempatan unit",
-                "Uji fungsi operasional dan komisioning sistem",
-                "Berita Acara Serah Terima (BAST) pekerjaan lapangan",
-              ],
-              equipment: [
-                "Toolbox Teknisi Lengkap (Crimping, Multitester, Bor)",
-                "Tangga Teleskopik & APD Keselamatan Kerja",
-                "Kabel & Aksesoris Instalasi Lapangan",
-              ],
-              photos: [],
-              report: "",
-              notes: `Surat Perintah Kerja (SPK) diterbitkan otomatis oleh Deni Kurniawan (AI Dispatcher) atas instruksi Direktur Utama: "${promptCommand}"`,
-              recommendation: "Lakukan safety briefing sebelum memulai pekerjaan teknis di lokasi.",
-              updatedAt: new Date().toISOString(),
-              completionDate: "",
-            };
+          let clientTarget = existingQueueItem?.target_client || existingQueueItem?.payload?.client || "Klien Proyek DSTech";
+          const ptMatch = promptCommand.match(/(?:pt\.?|cv\.?|toko|gedung|rsud|yayasan|bapak|ibu|bpk)\s+[^,\.\n\r]+?(?=\s+(?:untuk|ke|di|dengan)|$)/i);
+          if (ptMatch && ptMatch[0]) clientTarget = ptMatch[0].trim();
 
-            taskList.unshift(newTask);
-            fs.writeFileSync(taskFilePath, JSON.stringify(taskList, null, 2), "utf-8");
-
-            executionResult = {
-              type: "TASK_DISPATCHED",
-              ticketNumber: ticketNumber,
-              client: clientTarget,
-              link: "/admin/maintenance",
-            };
-
-            aiResponseText = `Siap Pak Ramadhani! Saya (Deni Kurniawan) telah menerbitkan Surat Perintah Kerja (SPK) #${ticketNumber} untuk tim teknisi lapangan di lokasi ${clientTarget}. Jadwal kerja dan alokasi peralatan sudah resmi terjadwal di sistem Manajemen Tugas & Maintenance!`;
+          // Ekstrak teknisi jika ada instruksi ganti teknisi
+          let techName = existingQueueItem?.payload?.technician || "Ikhsan Maulidi (Lead Field Tech)";
+          const techMatch = promptCommand.match(/(?:teknisi|ke|oleh|staf)\s+([A-Za-z\s]+?)(?=\s+(?:untuk|di|besok|lusa)|$)/i);
+          if (techMatch && techMatch[1] && techMatch[1].trim().length > 2 && !techMatch[1].toLowerCase().includes("jadwal")) {
+            techName = techMatch[1].trim();
           }
+
+          const queueId = existingQueueItem ? existingQueueItem.id : `appr_deni_spk_${Date.now()}`;
+          const revNumber = (existingQueueItem?.revision || 0) + (isRevision ? 1 : (existingQueueItem ? 0 : 0));
+          const ticketNumber = existingQueueItem?.payload?.ticketNumber || `MTC-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(Date.now()).slice(-3)}`;
+
+          const cleanBaseTitle = (existingQueueItem?.title || `SPK Lapangan: Penugasan Teknisi - ${clientTarget}`).replace(/\s*\(Revisi\s*#\d+\)/gi, "");
+          const queueTitle = `${cleanBaseTitle}${revNumber > 0 ? ` (Revisi #${revNumber})` : ""}`;
+          const queueSummary = `${isRevision ? "[HASIL REVISI] " : ""}Draf Surat Perintah Kerja (SPK) inspeksi & instalasi lapangan di ${clientTarget}. Teknisi penanggung jawab: ${techName}. Arahan Direktur: "${promptCommand}". Menunggu persetujuan Direktur Utama.`;
+
+          const updatedPayload = {
+            ...(existingQueueItem?.payload || {}),
+            id: existingQueueItem?.payload?.id || `dstech_task_${Date.now()}`,
+            ticketNumber: ticketNumber,
+            entityType: "PT",
+            type: "Installation",
+            title: queueTitle,
+            client: clientTarget,
+            clientPhone: "0812-9988-7766",
+            clientPic: "PIC Lapangan",
+            location: "Lokasi Proyek Klien",
+            date: new Date().toISOString().split("T")[0],
+            deadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+            status: "In Progress",
+            priority: "High",
+            technician: techName,
+            technicianPhone: "+6282259494242",
+            scope: [
+              `Menjalankan penugasan resmi Direktur Utama: ${promptCommand}`,
+              "Pemeriksaan jalur kabel, catu daya listrik, dan titik penempatan unit",
+              "Uji fungsi operasional dan komisioning sistem",
+              "Berita Acara Serah Terima (BAST) pekerjaan lapangan",
+            ],
+            notes: `${isRevision ? "[REVISI DIREKTUR] " : ""}SPK disusun Deni Kurniawan atas instruksi Direktur: "${promptCommand}"`,
+            updatedAt: new Date().toISOString(),
+          };
+
+          const queueItem = {
+            id: queueId,
+            revision: revNumber,
+            employee_id: "emp_deni_field",
+            employee_name: "Deni Kurniawan",
+            employee_role: "Field Operations & Dispatcher",
+            department: "OPERATIONS",
+            task_type: "SPK_FIELD",
+            title: queueTitle,
+            target_client: clientTarget,
+            value: 0,
+            tax_type: "none",
+            summary: queueSummary,
+            status: "PENDING_APPROVAL",
+            created_at: existingQueueItem?.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            payload: updatedPayload,
+          };
+
+          if (existingQueueIdx >= 0) {
+            data.dstech_approval_queue[existingQueueIdx] = queueItem;
+          } else {
+            data.dstech_approval_queue.unshift(queueItem);
+          }
+          writeWorkforceData(data);
+
+          executionResult = {
+            type: isRevision ? "SPK_REVISED" : "SPK_PROPOSED",
+            queueId: queueItem.id,
+            ticketNumber: ticketNumber,
+            technician: techName,
+            revision: revNumber,
+            link: "/admin/virtual-office"
+          };
+
+          aiResponseText = isRevision
+            ? `Siap Pak Ramadhani! Draf penugasan SPK teknisi lapangan telah BERHASIL SAYA REVISI: Teknisi dialokasikan ke ${techName} untuk lokasi ${clientTarget}. Draf di Kotak Persetujuan telah diperbarui (Revisi #${revNumber})!`
+            : `Siap Pak Ramadhani! Saya (Deni Kurniawan) telah menyusun draf Surat Perintah Kerja (SPK) #${ticketNumber} penugasan teknisi (${techName}) untuk ${clientTarget} dan memasukkannya ke Kotak Persetujuan Bapak. Menunggu Bapak setujui sebelum diterbitkan!`;
+
+          targetEmp.speech_bubble = aiResponseText;
         } catch (taskErr: any) {
           console.error("Error executing Deni Field action:", taskErr);
         }
@@ -2027,11 +2186,46 @@ Aturan Khusus:
 
       // --- SITI NURHALIZA (Customer Care & Front Office) ---
       if (targetEmp.id === "emp_siti_cs") {
-        executionResult = {
-          type: "INQUIRY_RESOLVED",
-          topic: promptCommand,
-        };
-        aiResponseText = `Halo Pak Ramadhani! Saya Siti Nurhaliza dari Front Office & Layanan Pelanggan. Arahan Bapak "${promptCommand}" telah saya catat dan langsung saya distribusikan ke tim terkait. Tamu dan pengunjung website kami layani dengan sepenuh hati 24 jam!`;
+        try {
+          if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+          const isRevision = /(?:revisi|ubah|ganti|koreksi|update|perbaiki|sesuaikan|ralat)/i.test(promptCommand);
+
+          const existingQueueIdx = data.dstech_approval_queue.findIndex((q: any) =>
+            (q.employee_id === "emp_siti_cs" || q.task_type === "CS_TICKET") &&
+            q.status === "PENDING_APPROVAL"
+          );
+          const existingQueueItem = existingQueueIdx >= 0 ? data.dstech_approval_queue[existingQueueIdx] : null;
+
+          if (isRevision && existingQueueItem) {
+            const revNumber = (existingQueueItem.revision || 0) + 1;
+            const cleanBaseTitle = (existingQueueItem.title || "Standar Penanganan Layanan CS").replace(/\s*\(Revisi\s*#\d+\)/gi, "");
+            existingQueueItem.revision = revNumber;
+            existingQueueItem.title = `${cleanBaseTitle} (Revisi #${revNumber})`;
+            existingQueueItem.summary = `[HASIL REVISI] Prosedur penanganan layanan pelanggan diperbarui atas arahan Direktur: "${promptCommand}".`;
+            existingQueueItem.updated_at = new Date().toISOString();
+            if (existingQueueItem.payload) {
+              existingQueueItem.payload.notes = promptCommand;
+              existingQueueItem.payload.updatedAt = new Date().toISOString();
+            }
+            writeWorkforceData(data);
+
+            executionResult = {
+              type: "CS_REVISED",
+              queueId: existingQueueItem.id,
+              revision: revNumber
+            };
+            aiResponseText = `Halo Pak Ramadhani! Catatan penanganan layanan pelanggan dan respon tamu telah BERHASIL SAYA REVISI sesuai petunjuk Bapak: "${promptCommand}". Draf di Kotak Persetujuan telah diperbarui (Revisi #${revNumber})!`;
+          } else {
+            executionResult = {
+              type: "INQUIRY_RESOLVED",
+              topic: promptCommand,
+            };
+            aiResponseText = `Halo Pak Ramadhani! Saya Siti Nurhaliza dari Front Office & Layanan Pelanggan. Arahan Bapak "${promptCommand}" telah saya catat dan langsung saya terapkan ke standar penanganan tamu website 24 jam!`;
+          }
+          targetEmp.speech_bubble = aiResponseText;
+        } catch (csErr: any) {
+          console.error("Error executing Siti CS action:", csErr);
+        }
       }
 
       // Fallback jika API key tidak tersedia / timeout dan belum ada response teks
