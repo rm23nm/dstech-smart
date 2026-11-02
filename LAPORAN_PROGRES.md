@@ -4,7 +4,7 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Tugas 335 (2026-11-02)**: [SEDANG DIKERJAKAN] Penyelarasan Tata Kelola Pembukuan Keuangan: Mewajibkan Usulan Pembukuan Masuk ke Kotak Persetujuan Direktur Utama (Approval Queue) Terlebih Dahulu Sebelum Dicatat ke Database Arus Kas ERP (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`, `src/data/dstech_finance_erp.json`, `src/data/dstech_payroll.json`).
+- **Tugas 335 (2026-11-02)**: [SELESAI] Penyelarasan Tata Kelola Pembukuan Keuangan: Mewajibkan Usulan Pembukuan Masuk ke Kotak Persetujuan Direktur Utama (Approval Queue) Terlebih Dahulu Sebelum Dicatat ke Database Arus Kas ERP (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`, `src/data/dstech_finance_erp.json`, `src/data/dstech_payroll.json`).
   *Permintaan User*: "catatannya dicatat langsung kah? bukan masuk ke aproval dulu?" (Pertanyaan penegasan tata kelola persetujuan pimpinan).
   *Penyebab & Solusi Tata Kelola*:
   1. Pengguna menegaskan prinsip utama Kantor Virtual AI DSTech Smart Perkasa: **Semua hasil kerja staf AI (termasuk pembukuan keuangan, pengeluaran gaji, dan kas) 100% TIDAK BOLEH menulis langsung ke database operasional perusahaan sebelum disetujui resmi oleh Bapak Ramadhani ST melalui Kotak Persetujuan Pimpinan**.
@@ -15,15 +15,15 @@
      - 24 transaksi yang sebelumnya sempat dicatat langsung ditarik kembali (revert) dari database keuangan dan dipindahkan ke dalam Kotak Persetujuan Pimpinan sebagai draf resmi menunggu persetujuan Bapak Ramadhani ST.
   *Langkah Rencana Perbaikan Step-by-Step*:
   1. [x] Mencatat rencana kerja step-by-step di `LAPORAN_PROGRES.md`.
-  2. [ ] Membuat folder cadangan berkas `dstech-smart/_backup_task335_approval_queue_bookkeeping/` dan mencadangkan `src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`, `src/data/dstech_finance_erp.json`, `src/data/dstech_payroll.json`.
-  3. [ ] Mengubah logika `action === "order"` pada Dewi Sartika di `src/app/api/ai-workforce/route.ts`: Tidak lagi menulis langsung ke database keuangan, melainkan membuat item antrean `BOOKKEEPING_EXPENSE` berstatus `PENDING_APPROVAL` di `dstech_approval_queue`.
-  4. [ ] Menambahkan handler `item.task_type === "BOOKKEEPING_EXPENSE"` pada `action === "approve_queue_item"` di `src/app/api/ai-workforce/route.ts`: Hanya menulis ke `cash_flow` dan `payrolls` ketika disetujui Direktur.
-  5. [ ] Menambahkan rendering detail pratinjau `BOOKKEEPING_EXPENSE` pada modal pratinjau di `src/app/admin/virtual-office/page.tsx` (tabel rincian per bulan, nama staf, nominal, dan total).
-  6. [ ] Menarik kembali 24 catatan pengeluaran gaji dari `dstech_finance_erp.json` dan `dstech_payroll.json` (lokal & live VPS), lalu memindahkannya menjadi item draf `PENDING_APPROVAL` di Kotak Persetujuan Pimpinan.
-  7. [ ] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) untuk memastikan 0 error.
-  8. [ ] Menjalankan kompilasi Next.js (`npm run build`) untuk verifikasi 77/77 routes sukses (exit code 0).
-  9. [ ] Deploy ke server live VPS 157.66.34.199, memverifikasi kemunculan kartu di Kotak Persetujuan Kantor Virtual live, dan membersihkan folder cadangan sementara.
-  10. [ ] Memperbarui status Tugas 335 menjadi [SELESAI] di `LAPORAN_PROGRES.md` dan menyinkronkan ke direktori root.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task335_approval_queue_bookkeeping/` dan mencadangkan `src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`, `src/data/dstech_finance_erp.json`, `src/data/dstech_payroll.json`.
+  3. [x] Mengubah logika `action === "order"` pada Dewi Sartika di `src/app/api/ai-workforce/route.ts`: Tidak lagi menulis langsung ke database keuangan, melainkan membuat item antrean `BOOKKEEPING_EXPENSE` berstatus `PENDING_APPROVAL` di `dstech_approval_queue`.
+  4. [x] Menambahkan handler `item.task_type === "BOOKKEEPING_EXPENSE"` pada `action === "approve_queue_item"` di `src/app/api/ai-workforce/route.ts`: Hanya menulis ke `cash_flow` dan `payrolls` ketika disetujui Direktur.
+  5. [x] Menambahkan rendering detail pratinjau `BOOKKEEPING_EXPENSE` pada modal pratinjau di `src/app/admin/virtual-office/page.tsx` (tabel rincian per bulan, nama staf, nominal, dan total).
+  6. [x] Menarik kembali 24 catatan pengeluaran gaji dari `dstech_finance_erp.json` dan `dstech_payroll.json` (lokal & live VPS), lalu memindahkannya menjadi item draf `PENDING_APPROVAL` di Kotak Persetujuan Pimpinan.
+  7. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) untuk memastikan 0 error.
+  8. [x] Menjalankan kompilasi Next.js (`npm run build`) untuk verifikasi 77/77 routes sukses (exit code 0).
+  9. [x] Deploy ke server live VPS 157.66.34.199, memverifikasi kemunculan kartu di Kotak Persetujuan Kantor Virtual live, dan membersihkan folder cadangan sementara.
+  10. [x] Memperbarui status Tugas 335 menjadi [SELESAI] di `LAPORAN_PROGRES.md` dan menyinkronkan ke direktori root.
 
 - **Tugas 334 (2026-11-02)**: [SELESAI] Pembangunan Engine Pembukuan Keuangan Otonom & Pencatatan Transaksi Pengeluaran Kas/Gaji Staf AI Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/data/dstech_finance_erp.json`, `src/data/dstech_payroll.json`).
   *Permintaan User*: "saya suruh catat pembukuan keuangan, namun kenapa gak dicatat?" (Instruksi Direktur Utama: "tolong catat pengeluaran gaji pada bulan januari 2025 sampai desember 2025, untuk marsya Oprasional 2000000, RAMADHANI ST, 4500000").
