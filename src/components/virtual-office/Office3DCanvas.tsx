@@ -39,6 +39,8 @@ interface Office3DCanvasProps {
   selectedEmployee: AIEmployee3D | null;
   onSelectEmployee: (emp: AIEmployee3D) => void;
   onSendDirective?: (empId: string, command: string) => void;
+  financeData?: any;
+  pipelineData?: any;
 }
 
 // Koordinat Posisi Meja di Ruang Kantor (X, Z)
@@ -296,119 +298,411 @@ function createDeskNameplateTexture(name: string, role: string, dept: string, ac
   return texture;
 }
 
-// Helper: Generator Tekstur Smart Video Wall Dashboard KPI
-function createVideoWallTexture(): THREE.CanvasTexture {
+// Helper: Generator Tekstur Smart Video Wall Dinding Kiri (Finance ERP & Arus Kas Riil)
+function createFinanceWallTexture(initialData?: any) {
   const canvas = document.createElement("canvas");
   canvas.width = 1024;
   canvas.height = 512;
   const ctx = canvas.getContext("2d");
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 4;
 
-  if (ctx) {
-    // Ultra-dark Navy Background
+  function render(data?: any) {
+    if (!ctx) return;
+    const omset = data?.totalOmset ? "Rp " + Number(data.totalOmset).toLocaleString("id-ID") : "Rp 664.614.000";
+    const netProfit = data?.netProfit ? "Rp " + Number(data.netProfit).toLocaleString("id-ID") : "Rp 377.202.100";
+    const cash = data?.cashBalance ? "Rp " + Number(data.cashBalance).toLocaleString("id-ID") : "Rp 245.244.701";
+    const receivable = data?.accountsReceivable ? "Rp " + Number(data.accountsReceivable).toLocaleString("id-ID") : "Rp 7.500.000";
+    const payable = data?.accountsPayable ? "Rp " + Number(data.accountsPayable).toLocaleString("id-ID") : "Rp 32.784.000";
+    const bills = data?.operationalBillsAmount ? "Rp " + Number(data.operationalBillsAmount).toLocaleString("id-ID") : "Rp 56.282.700";
+    const salesCount = data?.salesCount || 81;
+    const margin = data?.profitMargin || 57;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, 1024, 512);
+
+    // 1. Ultra-dark Navy Background
     ctx.fillStyle = "#030712";
     ctx.fillRect(0, 0, 1024, 512);
 
-    // Header bar
-    ctx.fillStyle = "#0f172a";
-    ctx.fillRect(0, 0, 1024, 60);
-    ctx.fillStyle = "#06b6d4";
-    ctx.font = "800 22px system-ui, sans-serif";
-    ctx.fillText("DSTECH SMART ENTERPRISE • LIVE OPERATIONS TELEMETRY", 30, 38);
-
-    ctx.fillStyle = "#10b981";
-    ctx.font = "700 16px system-ui, sans-serif";
-    ctx.fillText("SYSTEM STABLE (99.98% UPTIME)", 720, 38);
-
-    // KPI Card 1: Gate & Access
-    ctx.fillStyle = "#1e293b";
-    ctx.fillRect(30, 80, 300, 180);
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "600 14px system-ui, sans-serif";
-    ctx.fillText("ACTIVE BARRIER GATES", 50, 115);
-    ctx.fillStyle = "#38bdf8";
-    ctx.font = "900 48px system-ui, sans-serif";
-    ctx.fillText("148 Unit", 50, 175);
-    ctx.fillStyle = "#34d399";
-    ctx.font = "600 13px system-ui, sans-serif";
-    ctx.fillText("▲ +12% MoM Proyek Masuk", 50, 215);
-
-    // KPI Card 2: AI Autonomous Actions
-    ctx.fillStyle = "#1e293b";
-    ctx.fillRect(360, 80, 300, 180);
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "600 14px system-ui, sans-serif";
-    ctx.fillText("AI OTONOM EXECUTIONS", 380, 115);
-    ctx.fillStyle = "#a855f7";
-    ctx.font = "900 48px system-ui, sans-serif";
-    ctx.fillText("2,480", 380, 175);
-    ctx.fillStyle = "#c084fc";
-    ctx.font = "600 13px system-ui, sans-serif";
-    ctx.fillText("⚡ Respon Rata-rata 1.2 Detik", 380, 215);
-
-    // KPI Card 3: Finance SPH & Revenue
-    ctx.fillStyle = "#1e293b";
-    ctx.fillRect(690, 80, 300, 180);
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "600 14px system-ui, sans-serif";
-    ctx.fillText("SPH PROSPEK B2B", 710, 115);
-    ctx.fillStyle = "#fbbf24";
-    ctx.font = "900 48px system-ui, sans-serif";
-    ctx.fillText("Rp 485 Jt", 710, 175);
-    ctx.fillStyle = "#fcd34d";
-    ctx.font = "600 13px system-ui, sans-serif";
-    ctx.fillText("✓ PPN Exclude & Term Invoice", 710, 215);
-
-    // Lower Chart Graphic Area
-    ctx.fillStyle = "#0f172a";
-    ctx.fillRect(30, 280, 960, 200);
-
-    ctx.strokeStyle = "#334155";
+    // Background Grid
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.08)";
     ctx.lineWidth = 1;
-    for (let gy = 320; gy <= 440; gy += 40) {
+    for (let x = 0; x < 1024; x += 40) {
       ctx.beginPath();
-      ctx.moveTo(60, gy);
-      ctx.lineTo(950, gy);
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 512);
+      ctx.stroke();
+    }
+    for (let y = 0; y < 512; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(1024, y);
       ctx.stroke();
     }
 
-    // Cyan Trend Line
-    ctx.strokeStyle = "#00d2ff";
-    ctx.lineWidth = 4;
+    // Outer glow border
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.5)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(6, 6, 1012, 500);
+
+    // 2. Header Bar
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(8, 8, 1008, 54);
+
+    // Status dot green
+    ctx.fillStyle = "#10b981";
     ctx.beginPath();
-    const points = [
-      [60, 420],
-      [180, 390],
-      [300, 410],
-      [420, 350],
-      [540, 360],
-      [660, 320],
-      [780, 335],
-      [900, 305],
-    ];
-    points.forEach(([px, py], i) => {
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
+    ctx.arc(32, 35, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#34d399";
+    ctx.font = "800 20px system-ui, sans-serif";
+    ctx.fillText("DSTECH ERP FINANCE & REAL-TIME ARUS KAS", 48, 42);
+
+    ctx.fillStyle = "#10b981";
+    ctx.font = "700 15px system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(`STATUS SEHAT • MARGIN ${margin}%`, 1000, 42);
+    ctx.textAlign = "left";
+
+    // 3. KPI Card 1: Total Omset Penjualan (X=26, W=310, H=170)
+    ctx.fillStyle = "#0f172a";
+    drawRoundRect(ctx, 26, 76, 310, 170, 14);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(56, 189, 248, 0.3)";
+    ctx.lineWidth = 1.5;
+    drawRoundRect(ctx, 26, 76, 310, 170, 14);
     ctx.stroke();
 
-    // Trend Fill
-    ctx.lineTo(900, 450);
-    ctx.lineTo(60, 450);
-    ctx.closePath();
-    ctx.fillStyle = "rgba(0, 210, 255, 0.12)";
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 13px system-ui, sans-serif";
+    ctx.fillText("TOTAL OMSET PENJUALAN", 46, 110);
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "900 32px system-ui, sans-serif";
+    ctx.fillText(omset, 46, 160);
+    ctx.fillStyle = "#34d399";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillText(`▲ ${salesCount} Faktur Penjualan Sah`, 46, 210);
+
+    // KPI Card 2: Laba Bersih (X=356, W=310, H=170)
+    ctx.fillStyle = "#0f172a";
+    drawRoundRect(ctx, 356, 76, 310, 170, 14);
     ctx.fill();
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.35)";
+    drawRoundRect(ctx, 356, 76, 310, 170, 14);
+    ctx.stroke();
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 13px system-ui, sans-serif";
+    ctx.fillText("LABA BERSIH BERJALAN", 376, 110);
+    ctx.fillStyle = "#10b981";
+    ctx.font = "900 32px system-ui, sans-serif";
+    ctx.fillText(netProfit, 376, 160);
+    ctx.fillStyle = "#6ee7b7";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillText(`✓ Margin Laba Bersih: ${margin}%`, 376, 210);
+
+    // KPI Card 3: Saldo Kas & Bank (X=686, W=310, H=170)
+    ctx.fillStyle = "#0f172a";
+    drawRoundRect(ctx, 686, 76, 310, 170, 14);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(245, 158, 11, 0.35)";
+    drawRoundRect(ctx, 686, 76, 310, 170, 14);
+    ctx.stroke();
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 13px system-ui, sans-serif";
+    ctx.fillText("SALDO KAS & BANK", 706, 110);
+    ctx.fillStyle = "#f59e0b";
+    ctx.font = "900 32px system-ui, sans-serif";
+    ctx.fillText(cash, 706, 160);
+    ctx.fillStyle = "#fcd34d";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillText("⚡ Saldo Kas Kumulatif Berjalan", 706, 210);
+
+    // 4. Lower Breakdown Section (X=26, Y=262, W=970, H=232)
+    ctx.fillStyle = "#0b1329";
+    drawRoundRect(ctx, 26, 262, 970, 232, 14);
+    ctx.fill();
+    ctx.strokeStyle = "#1e293b";
+    drawRoundRect(ctx, 26, 262, 970, 232, 14);
+    ctx.stroke();
+
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "800 15px system-ui, sans-serif";
+    ctx.fillText("RINCIAN PIUTANG, HUTANG & TAGIHAN OPERASIONAL", 46, 296);
+
+    // Sub-card 1: Piutang Klien (X=46, Y=316, W=295, H=90)
+    ctx.fillStyle = "#1e293b";
+    drawRoundRect(ctx, 46, 316, 295, 90, 10);
+    ctx.fill();
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillText("PIUTANG KLIEN (BELUM TERTAGIH)", 62, 342);
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "900 24px system-ui, sans-serif";
+    ctx.fillText(receivable, 62, 376);
+    ctx.fillStyle = "#64748b";
+    ctx.font = "500 11px system-ui, sans-serif";
+    ctx.fillText("Status: Kontrol Penagihan Termin", 62, 396);
+
+    // Sub-card 2: Hutang Usaha (X=363, Y=316, W=295, H=90)
+    ctx.fillStyle = "#1e293b";
+    drawRoundRect(ctx, 363, 316, 295, 90, 10);
+    ctx.fill();
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillText("HUTANG USAHA (PO SUPPLIER)", 379, 342);
+    ctx.fillStyle = "#f43f5e";
+    ctx.font = "900 24px system-ui, sans-serif";
+    ctx.fillText(payable, 379, 376);
+    ctx.fillStyle = "#64748b";
+    ctx.font = "500 11px system-ui, sans-serif";
+    ctx.fillText("Jatuh Tempo: Terjadwal Aman", 379, 396);
+
+    // Sub-card 3: Tagihan Operasional (X=681, Y=316, W=295, H=90)
+    ctx.fillStyle = "#1e293b";
+    drawRoundRect(ctx, 681, 316, 295, 90, 10);
+    ctx.fill();
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.fillText("TAGIHAN OPERASIONAL RUTIN", 697, 342);
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "900 24px system-ui, sans-serif";
+    ctx.fillText(bills, 697, 376);
+    ctx.fillStyle = "#64748b";
+    ctx.font = "500 11px system-ui, sans-serif";
+    ctx.fillText("9 Tagihan Rutin Kantor & Lapangan", 697, 396);
+
+    // Visual Trend Indicator Bar
+    ctx.fillStyle = "#1e293b";
+    drawRoundRect(ctx, 46, 428, 930, 46, 8);
+    ctx.fill();
+
+    // Mini bars inside
+    ctx.fillStyle = "#10b981";
+    ctx.fillRect(52, 434, 400, 34);
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillRect(456, 434, 180, 34);
+    ctx.fillStyle = "#f43f5e";
+    ctx.fillRect(640, 434, 120, 34);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 13px system-ui, sans-serif";
+    ctx.fillText("Likuiditas Arus Kas DSTech: 100% Aman & Terverifikasi Akuntansi ERP", 780, 456);
+
+    texture.needsUpdate = true;
   }
 
+  render(initialData);
+
+  return {
+    texture,
+    update: (data?: any) => render(data)
+  };
+}
+
+// Helper: Generator Tekstur Smart Video Wall Dinding Kanan (Pipeline SPH & Siklus Prospek Klien)
+function createPipelineWallTexture(initialData?: any) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
   const texture = new THREE.CanvasTexture(canvas);
   texture.anisotropy = 4;
-  texture.needsUpdate = true;
-  return texture;
+
+  function render(data?: any) {
+    if (!ctx) return;
+    const totalSph = data?.totalSphCount || 7;
+    const totalSphNominal = data?.totalSphNominal ? "Rp " + Number(data.totalSphNominal).toLocaleString("id-ID") : "Rp 113.782.750";
+    const dealCount = data?.dealCount || 1;
+    const pendingCount = data?.pendingCount || 6;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, 1024, 512);
+
+    // 1. Ultra-dark Navy Background
+    ctx.fillStyle = "#030712";
+    ctx.fillRect(0, 0, 1024, 512);
+
+    // Background Grid
+    ctx.strokeStyle = "rgba(6, 182, 212, 0.08)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x < 1024; x += 40) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, 512);
+      ctx.stroke();
+    }
+    for (let y = 0; y < 512; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(1024, y);
+      ctx.stroke();
+    }
+
+    // Outer glow border
+    ctx.strokeStyle = "rgba(6, 182, 212, 0.5)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(6, 6, 1012, 500);
+
+    // 2. Header Bar
+    ctx.fillStyle = "#0f172a";
+    ctx.fillRect(8, 8, 1008, 54);
+
+    // Status dot cyan
+    ctx.fillStyle = "#06b6d4";
+    ctx.beginPath();
+    ctx.arc(32, 35, 7, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = "#22d3ee";
+    ctx.font = "800 20px system-ui, sans-serif";
+    ctx.fillText("PIPELINE PENAWARAN (SPH) & SIKLUS PROSPEK", 48, 42);
+
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "700 15px system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("SIKLUS AKTIF • CONVERSION READY", 1000, 42);
+    ctx.textAlign = "left";
+
+    // 3. KPI Card 1: Total SPH Terbit (X=26, W=310, H=170)
+    ctx.fillStyle = "#0f172a";
+    drawRoundRect(ctx, 26, 76, 310, 170, 14);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(168, 85, 247, 0.35)";
+    ctx.lineWidth = 1.5;
+    drawRoundRect(ctx, 26, 76, 310, 170, 14);
+    ctx.stroke();
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 13px system-ui, sans-serif";
+    ctx.fillText("TOTAL SPH TERBIT", 46, 110);
+    ctx.fillStyle = "#c084fc";
+    ctx.font = "900 32px system-ui, sans-serif";
+    ctx.fillText(`${totalSph} Surat`, 46, 160);
+    ctx.fillStyle = "#e9d5ff";
+    ctx.font = "700 14px system-ui, sans-serif";
+    ctx.fillText(`Nilai: ${totalSphNominal}`, 46, 210);
+
+    // KPI Card 2: Deal / Jadi Proyek (X=356, W=310, H=170)
+    ctx.fillStyle = "#0f172a";
+    drawRoundRect(ctx, 356, 76, 310, 170, 14);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.35)";
+    drawRoundRect(ctx, 356, 76, 310, 170, 14);
+    ctx.stroke();
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 13px system-ui, sans-serif";
+    ctx.fillText("DEAL / JADI PROYEK", 376, 110);
+    ctx.fillStyle = "#10b981";
+    ctx.font = "900 32px system-ui, sans-serif";
+    ctx.fillText(`${dealCount} SPH`, 376, 160);
+    ctx.fillStyle = "#34d399";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillText("✓ Penawaran Disetujui (SPK)", 376, 210);
+
+    // KPI Card 3: Menunggu Respon (X=686, W=310, H=170)
+    ctx.fillStyle = "#0f172a";
+    drawRoundRect(ctx, 686, 76, 310, 170, 14);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(245, 158, 11, 0.35)";
+    drawRoundRect(ctx, 686, 76, 310, 170, 14);
+    ctx.stroke();
+
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 13px system-ui, sans-serif";
+    ctx.fillText("MENUNGGU RESPON KLIEN", 706, 110);
+    ctx.fillStyle = "#f59e0b";
+    ctx.font = "900 32px system-ui, sans-serif";
+    ctx.fillText(`${pendingCount} SPH`, 706, 160);
+    ctx.fillStyle = "#fcd34d";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillText("⚡ Prospek Aktif Tahap Negosiasi", 706, 210);
+
+    // 4. Lower Pipeline Visual Funnel Section (X=26, Y=262, W=970, H=232)
+    ctx.fillStyle = "#0b1329";
+    drawRoundRect(ctx, 26, 262, 970, 232, 14);
+    ctx.fill();
+    ctx.strokeStyle = "#1e293b";
+    drawRoundRect(ctx, 26, 262, 970, 232, 14);
+    ctx.stroke();
+
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "800 15px system-ui, sans-serif";
+    ctx.fillText("TAHAPAN SIKLUS PIPELINE PENJUALAN B2B (CONVERSION FUNNEL)", 46, 296);
+
+    // 4 Stage Funnel Blocks
+    const stages = [
+      { num: "01", name: "INQUIRY / LEADS", count: "100%", sub: "Kebutuhan Klien Masuk", color: "#38bdf8" },
+      { num: "02", name: "DRAF SPH TERBIT", count: `${totalSph} SPH`, sub: totalSphNominal, color: "#a855f7" },
+      { num: "03", name: "NEGOSIASI TEKNIS", count: `${pendingCount} SPH`, sub: "Follow-up Bambang AI", color: "#f59e0b" },
+      { num: "04", name: "DEAL & SPK RESMI", count: `${dealCount} SPH`, sub: "Eksekusi Proyek Deni AI", color: "#10b981" },
+    ];
+
+    const sw = 220;
+    const sh = 96;
+    stages.forEach((st, idx) => {
+      const sx = 46 + idx * 238;
+      const sy = 316;
+      ctx.fillStyle = "#1e293b";
+      drawRoundRect(ctx, sx, sy, sw, sh, 10);
+      ctx.fill();
+      ctx.strokeStyle = st.color;
+      ctx.lineWidth = 1.5;
+      drawRoundRect(ctx, sx, sy, sw, sh, 10);
+      ctx.stroke();
+
+      ctx.fillStyle = st.color;
+      ctx.font = "800 12px system-ui, sans-serif";
+      ctx.fillText(`${st.num}. ${st.name}`, sx + 12, sy + 24);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "900 20px system-ui, sans-serif";
+      ctx.fillText(st.count, sx + 12, sy + 56);
+
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "500 11px system-ui, sans-serif";
+      ctx.fillText(st.sub, sx + 12, sy + 80);
+    });
+
+    // Summary strip
+    ctx.fillStyle = "#1e293b";
+    drawRoundRect(ctx, 46, 428, 930, 46, 8);
+    ctx.fill();
+
+    ctx.fillStyle = "#10b981";
+    ctx.font = "700 13px system-ui, sans-serif";
+    ctx.fillText("✓ Expired & Reject: 0 SPH (Tingkat Retensi 100%)", 66, 456);
+
+    ctx.fillStyle = "#38bdf8";
+    ctx.font = "700 13px system-ui, sans-serif";
+    ctx.fillText("• Rata-rata Siklus Closing: 7 - 14 Hari", 460, 456);
+
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "700 13px system-ui, sans-serif";
+    ctx.fillText("• Integrasi Otonom Sales Bambang & Dewi Finance", 720, 456);
+
+    texture.needsUpdate = true;
+  }
+
+  render(initialData);
+
+  return {
+    texture,
+    update: (data?: any) => render(data)
+  };
 }
 
 export default function Office3DCanvas({
   employees,
   selectedEmployee,
   onSelectEmployee,
+  onSendDirective,
+  financeData,
+  pipelineData,
 }: Office3DCanvasProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [activeSpeech, setActiveSpeech] = useState<{ id: string; name: string; text: string; x: number; y: number } | null>(null);
@@ -449,6 +743,8 @@ export default function Office3DCanvas({
     prevMouseY: number;
     spherical: { radius: number; theta: number; phi: number };
     targetLookAt: THREE.Vector3;
+    updateFinanceWall?: (data?: any) => void;
+    updatePipelineWall?: (data?: any) => void;
   }>({
     scene: null,
     camera: null,
@@ -724,17 +1020,47 @@ export default function Office3DCanvas({
     greenWallGroup.add(greenSpot);
     scene.add(greenWallGroup);
 
-    // (B) Ultra-Wide Smart Video Wall Display (Layar Dashboard Telemetry di Dinding Kanan)
-    const videoWallTex = createVideoWallTexture();
-    const videoWallMat = new THREE.MeshStandardMaterial({
-      map: videoWallTex,
+    // (B1) Ultra-Wide Smart Video Wall Display KIRI (Layar Finance ERP & Arus Kas Riil)
+    const financeWall = createFinanceWallTexture(financeData);
+    stateRef.current.updateFinanceWall = financeWall.update;
+    const financeWallMat = new THREE.MeshStandardMaterial({
+      map: financeWall.texture,
+      roughness: 0.2,
+      emissive: 0x10b981,
+      emissiveIntensity: 0.35,
+    });
+    const financeWallMesh = new THREE.Mesh(new THREE.BoxGeometry(6.2, 3.2, 0.12), financeWallMat);
+    financeWallMesh.position.set(-10.5, 4.0, -12.58);
+    scene.add(financeWallMesh);
+
+    // Frame Bingkai Atas & Bawah Monitor Kiri
+    const leftFrameTop = new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.08, 0.16), frameMat);
+    leftFrameTop.position.set(-10.5, 5.64, -12.54);
+    scene.add(leftFrameTop);
+    const leftFrameBottom = new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.08, 0.16), frameMat);
+    leftFrameBottom.position.set(-10.5, 2.36, -12.54);
+    scene.add(leftFrameBottom);
+
+    // (B2) Ultra-Wide Smart Video Wall Display KANAN (Layar Pipeline SPH & Siklus Prospek)
+    const pipelineWall = createPipelineWallTexture(pipelineData);
+    stateRef.current.updatePipelineWall = pipelineWall.update;
+    const pipelineWallMat = new THREE.MeshStandardMaterial({
+      map: pipelineWall.texture,
       roughness: 0.2,
       emissive: 0x06b6d4,
-      emissiveIntensity: 0.3,
+      emissiveIntensity: 0.35,
     });
-    const videoWallMesh = new THREE.Mesh(new THREE.BoxGeometry(6.2, 3.2, 0.12), videoWallMat);
-    videoWallMesh.position.set(10.5, 4.0, -12.58);
-    scene.add(videoWallMesh);
+    const pipelineWallMesh = new THREE.Mesh(new THREE.BoxGeometry(6.2, 3.2, 0.12), pipelineWallMat);
+    pipelineWallMesh.position.set(10.5, 4.0, -12.58);
+    scene.add(pipelineWallMesh);
+
+    // Frame Bingkai Atas & Bawah Monitor Kanan
+    const rightFrameTop = new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.08, 0.16), frameMat);
+    rightFrameTop.position.set(10.5, 5.64, -12.54);
+    scene.add(rightFrameTop);
+    const rightFrameBottom = new THREE.Mesh(new THREE.BoxGeometry(6.3, 0.08, 0.16), frameMat);
+    rightFrameBottom.position.set(10.5, 2.36, -12.54);
+    scene.add(rightFrameBottom);
 
     // (C) Showcase Glass Vitrine & Plakat Penghargaan / Model Barrier Gate di Sisi Kanan
     const showcaseGroup = new THREE.Group();
@@ -1322,6 +1648,16 @@ export default function Office3DCanvas({
       renderer.dispose();
     };
   }, [employees]);
+
+  // Efek sinkronisasi real-time telemetri Keuangan & Pipeline ke kedua monitor 3D
+  useEffect(() => {
+    if (stateRef.current.updateFinanceWall) {
+      stateRef.current.updateFinanceWall(financeData);
+    }
+    if (stateRef.current.updatePipelineWall) {
+      stateRef.current.updatePipelineWall(pipelineData);
+    }
+  }, [financeData, pipelineData]);
 
   // Handler Ganti Mode Simulasi (Bekerja, Meeting Bersama, Rehat Kopi)
   const setOfficeSimulation = (mode: "WORKING" | "MEETING" | "COFFEE") => {

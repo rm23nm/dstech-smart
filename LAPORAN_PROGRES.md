@@ -5,7 +5,46 @@
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
 - **Daftar Antrean Permintaan Pengguna Baru (Queue Backlog)**:
-  1. *Permintaan 1*: "pada monitor statistik kantor Virtual, tolong masukkan data real yang kita dapat dari keuangan, dan juga pipline siklus" (Dijadwalkan segera setelah Tugas 348 selesai).
+  *(Semua antrean saat ini sedang aktif dikerjakan pada Tugas 349)*
+
+- **Tugas 349 (2026-11-02)**: [SEDANG BERJALAN] Integrasi Data Real Keuangan ERP & Pipeline Siklus SPH pada Layar Monitor 3D Kantor Virtual (Aktivasi Monitor Kiri Keuangan & Monitor Kanan Pipeline) (`src/components/virtual-office/Office3DCanvas.tsx`, `src/app/admin/virtual-office/page.tsx`, `src/app/api/ai-workforce/route.ts`).
+  *Permintaan User*: "pada monitor statistik kantor Virtual, tolong masukkan data real yang kita dapat dari keuangan, dan juga pipline siklus. monitor sebelah kiri juga hidupkan," (dengan 3 tangkapan layar: 3D Kantor Virtual, Pipeline SPH di `/admin`, dan Manajemen Keuangan ERP di `/admin/finance`).
+  *Akar Kebutuhan & Desain Solusi*:
+  1. **Aktivasi Layar Monitor 3D Dinding Sebelah Kiri (`x = -10.5, y = 4.0, z = -12.58`)**:
+     - Sebelumnya pada dinding sebelah kiri kantor virtual hanya ada bingkai jendela kosong tanpa layar monitor.
+     - Ditambahkan mesh layar 3D Ultra-Wide Smart Video Wall Display (dimensi 6.2 x 3.2 x 0.12) identik dengan monitor dinding kanan, lengkap dengan bingkai akrilik, lampu strip neon cyan, dan tekstur beresolusi tinggi (1024 x 512).
+  2. **Penyajian Data Riil Keuangan ERP pada Monitor Kiri (Financial Telemetry & Cash Flow)**:
+     - Mengambil data riil dari sistem ERP (`dstech_finance_erp.json` / `/api/finance`):
+       - **Total Omset**: Rp 664.614.000 (81 Faktur Penjualan)
+       - **Laba Bersih**: Rp 377.202.100 (Margin Laba Bersih 57%)
+       - **Saldo Kas & Bank**: Rp 245.244.701 (Buku Kas & Bank Berjalan)
+       - **Piutang Klien**: Rp 7.500.000
+       - **Hutang Usaha**: Rp 32.784.000
+       - **Tagihan Operasional Aktif**: Rp 56.282.700 (9 Tagihan Rutin)
+       - Grafik visual arus kas riil (Cash-in vs Cash-out) dengan kurva tren dinamis.
+  3. **Penyajian Data Riil Pipeline & Siklus Penawaran pada Monitor Kanan (Sales Pipeline & Conversion Cycle)**:
+     - Mengambil data riil dari sistem penawaran SPH & CRM:
+       - **Total SPH Terbit**: 7 Surat (Rp 113.782.750)
+       - **Deal / Jadi Proyek**: 1 SPH (Penawaran Disetujui SPK)
+       - **Menunggu Respon**: 6 SPH (Prospek Negosiasi Aktif)
+       - **Expired / Reject**: 0 SPH (100% Rasio Tindak Lanjut Aktif)
+       - **Visualisasi Siklus Pipeline**: Leads Masuk ➔ 100% SPH Terbit ➔ 85.7% Negosiasi ➔ 14.3% Deal SPK ➔ Penagihan Termin / BAST.
+       - Grafik kurva tren velocity siklus closing proyek B2B DSTech.
+  4. **Penyambungan Telemetri Dinamis Real-Time dari Endpoint API**:
+     - Memperkaya endpoint `/api/ai-workforce` (dan pemanggilan `/api/finance` di `page.tsx`) agar memasok data telemetri riil (`dstech_finance_telemetry` dan `dstech_pipeline_telemetry`) ke komponen `<Office3DCanvas />`.
+     - Ketika data keuangan atau SPH diperbarui, kedua monitor 3D langsung memperbarui kanvas tekstur (`texture.needsUpdate = true`).
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mengidentifikasi kebutuhan user dan mencocokkan angka riil dari tangkapan layar keuangan ERP dan pipeline SPH.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task349_virtual_office_monitors_real_data/` dan mengamankan target berkas.
+  3. [x] Mencatat rencana kerja step-by-step Tugas 349 di `LAPORAN_PROGRES.md`.
+  4. [ ] Menyediakan generator data telemetri keuangan dan pipeline riil pada `src/app/api/ai-workforce/route.ts`.
+  5. [ ] Memodifikasi `src/components/virtual-office/Office3DCanvas.tsx` untuk menambahkan monitor 3D dinding kiri dan mengaitkan kedua monitor (kiri: Keuangan ERP, kanan: Pipeline SPH & Siklus) dengan data riil dinamis.
+  6. [ ] Memperbarui `src/app/admin/virtual-office/page.tsx` untuk memuat dan meneruskan data telemetri keuangan & pipeline ke `Office3DCanvas`.
+  7. [ ] Menjalankan validasi TypeScript compiler (`tsc --noEmit`) hingga 0 error.
+  8. [ ] Melakukan push commit ke GitHub `master` menggunakan Git CLI resmi.
+  9. [ ] Menjalankan kompilasi dan deploy ke server VPS live aaPanel PM2 `dstech-main`.
+  10. [ ] Memverifikasi tampilan dan fungsionalitas di server live (`https://dstechsmart.com/admin/virtual-office`).
+  11. [ ] Menghapus folder cadangan dan menandai Tugas 349 sebagai [SELESAI].
 
 - **Tugas 348 (2026-11-02)**: [SELESAI] Perbaikan & Penggantian Logo Resmi Perusahaan PT. DSTech Smart Perkasa pada Papan Reklame 3D Kantor Virtual, Header Halaman, dan Seluruh Komponen Visual (`src/components/virtual-office/Office3DCanvas.tsx`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "logo perusahaan salah, tolong diganti" (dengan tangkapan layar tampilan 3D Kantor Virtual).
