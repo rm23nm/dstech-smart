@@ -1875,7 +1875,18 @@ export async function POST(request: Request) {
         Boolean(activeChatObj?.isAiChat) ||
         Boolean(activeChatObj?.aiEmployeeId);
 
-      if (isTargetAiChat && senderRole !== "AI_WORKFORCE" && !senderId.startsWith("emp_")) {
+      // Daftar eksklusif 6 Staf AI internal bot (hanya bot ini yang dilarang memicu bot lain untuk mencegah infinite loop)
+      const AI_WORKFORCE_BOT_IDS = [
+        "emp_dewi_finance",
+        "emp_bambang_sales",
+        "emp_deni_field",
+        "emp_nadia_marketing",
+        "emp_reza_catalog",
+        "emp_siti_cs",
+      ];
+      const isSenderAiBot = senderRole === "AI_WORKFORCE" || AI_WORKFORCE_BOT_IDS.includes(senderId);
+
+      if (isTargetAiChat && !isSenderAiBot) {
         const aiResponse = await handleAiWorkforceChatMessage({
           chatId,
           chatObj: activeChatObj,
