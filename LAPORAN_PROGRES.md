@@ -4,7 +4,7 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Tugas 346 (2026-11-02)**: [SEDANG BERJALAN] Implementasi Pembacaan Foto Struk/Nota Pengeluaran (Receipt OCR & Multimodal AI Expense Recording) oleh Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
+- **Tugas 346 (2026-11-02)**: [SELESAI] Implementasi Pembacaan Foto Struk/Nota Pengeluaran (Receipt OCR & Multimodal AI Expense Recording) oleh Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "dan juka da pengeluaran apabila saya foto saja struk apakah dia bisa mencatatnya? dimana saya harus mengirimkannya?"
   *Akar Kebutuhan & Desain Solusi*:
   1. **Pengenalan Multimodal Foto Struk / Bukti Belanja (Gemini 2.5 Flash Vision)**:
@@ -22,10 +22,10 @@
   4. [x] Memastikan tautan berkas foto struk (`receiptUrl`) tersimpan secara permanen ke buku kas saat disetujui di `action === "approve"`.
   5. [x] Menambahkan tombol saran cepat `🧾 Catat Pengeluaran dari Foto Struk` pada Dewi Sartika di `src/app/admin/virtual-office/page.tsx`.
   6. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
-  7. [ ] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses.
-  8. [ ] Menguji simulasi pembacaan foto struk pengeluaran.
-  9. [ ] Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
-  10. [ ] Bersihkan folder cadangan dan tandai status [SELESAI].
+  7. [x] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses.
+  8. [x] Menguji simulasi pembacaan foto struk pengeluaran.
+  9. [x] Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  10. [x] Bersihkan folder cadangan dan tandai status [SELESAI].
 
 - **Tugas 345 (2026-11-02)**: [SELESAI] Pembangunan Fitur Lampiran Berkas Inquiry (Excel, Gambar/Foto, PDF) & Multimodal AI SPH Generator pada Kantor Virtual (`src/app/api/upload/route.ts`, `src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "kemudian saya ingin agar karyawan AI bisa melakukan pembuatan SPh apa bila saya ada inquery gambar dari client atau list permintaan, bagai mana cara saya melampirkan file inquerynya, misalnya dalam bentuk excel, gambar, pdf atau file lain agar bisa di buatkan sphnya?"
