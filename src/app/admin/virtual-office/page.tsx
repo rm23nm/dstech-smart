@@ -82,7 +82,7 @@ export interface ApprovalItem {
   employee_name: string;
   employee_role: string;
   department: string;
-  task_type: "SPH_PROPOSAL" | "PRODUCT_IMPORT" | "PROMO_CAMPAIGN" | "CRM_LEAD" | "SPK_FIELD" | "VIDEO_BRANDING" | "SOCIAL_MEDIA_CONTENT";
+  task_type: "SPH_PROPOSAL" | "PRODUCT_IMPORT" | "PROMO_CAMPAIGN" | "CRM_LEAD" | "SPK_FIELD" | "VIDEO_BRANDING" | "SOCIAL_MEDIA_CONTENT" | "BOOKKEEPING_EXPENSE" | string;
   title: string;
   target_client?: string;
   value?: number;
@@ -1393,7 +1393,7 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                   <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-indigo-500/30 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center text-lg font-black shadow-inner">
-                        {previewItem.task_type === "SPH_PROPOSAL" ? "📑" : previewItem.task_type === "PRODUCT_IMPORT" ? "🛍️" : "📢"}
+                        {previewItem.task_type === "SPH_PROPOSAL" ? "📑" : previewItem.task_type === "BOOKKEEPING_EXPENSE" ? "💰" : previewItem.task_type === "PRODUCT_IMPORT" ? "🛍️" : "📢"}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -1524,6 +1524,74 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                               *Klausul resmi tercantum: &ldquo;Harga di atas adalah DPP/Netto belum termasuk PPN (PPN Exclude). Pajak Pertambahan Nilai akan diperhitungkan saat penerbitan Faktur Penjualan.&rdquo;
                             </p>
                           )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 1b. DOKUMEN DRAF PEMBUKUAN KEUANGAN & PENGELUARAN GAJI */}
+                    {previewItem.task_type === "BOOKKEEPING_EXPENSE" && previewItem.payload && (
+                      <div className="p-5 rounded-2xl bg-slate-950 border border-emerald-500/30 space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-800 gap-2">
+                          <div>
+                            <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                              💰 Usulan Pembukuan Pengeluaran Arus Kas &amp; Payroll
+                            </span>
+                            <h4 className="text-sm font-black text-white mt-0.5">{previewItem.title}</h4>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-black border border-emerald-500/40">
+                              Total Rp {(previewItem.payload.grandTotal || previewItem.value || 0).toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Info Ringkas Pembukuan */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Periode</span>
+                            <span className="font-bold text-white">{previewItem.payload.periodLabel || "Jan - Des 2025"}</span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Kategori Kas</span>
+                            <span className="font-bold text-amber-300">{previewItem.payload.category || "Gaji & Upah"}</span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Transaksi</span>
+                            <span className="font-bold text-cyan-300">{previewItem.payload.totalEntries || previewItem.payload.entries?.length || 0} Transaksi</span>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
+                            <span className="text-[10px] text-slate-400 font-bold uppercase block">Akun Sumber Kas</span>
+                            <span className="font-bold text-slate-200 truncate block">Bank BCA PT</span>
+                          </div>
+                        </div>
+
+                        {/* Tabel Rincian Transaksi */}
+                        <div className="space-y-2">
+                          <span className="text-[10.5px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Daftar Rincian Transaksi yang Akan Dibukukan:
+                          </span>
+                          <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-800 bg-slate-900/60 divide-y divide-slate-800/80 text-xs">
+                            {(previewItem.payload.entries || []).map((entry: any, idx: number) => (
+                              <div key={idx} className="p-2.5 flex items-center justify-between hover:bg-slate-800/40 transition">
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">
+                                      {entry.date}
+                                    </span>
+                                    <span className="font-bold text-white">{entry.personName}</span>
+                                    <span className="text-[10px] text-slate-400">({entry.personRole})</span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-400 block">{entry.description}</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className="font-mono font-bold text-rose-400 block">
+                                    - Rp {(entry.amount || 0).toLocaleString("id-ID")}
+                                  </span>
+                                  <span className="text-[9.5px] text-slate-500 font-medium">OUT (Kas Keluar)</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     )}

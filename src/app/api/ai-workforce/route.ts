@@ -371,6 +371,110 @@ export async function POST(req: NextRequest) {
             fs.writeFileSync(finPath, JSON.stringify(finData, null, 2), "utf-8");
             executedResult = { docType: "SPH", number: sphNumber, link: "/admin/finance?tab=quotations" };
           }
+        } else if (item.task_type === "BOOKKEEPING_EXPENSE") {
+          const finPath = path.join(process.cwd(), "src/data/dstech_finance_erp.json");
+          const payPath = path.join(process.cwd(), "src/data/dstech_payroll.json");
+          if (fs.existsSync(finPath)) {
+            const finRaw = fs.readFileSync(finPath, "utf-8");
+            const finData = JSON.parse(finRaw);
+            if (!finData.cash_flow) finData.cash_flow = [];
+
+            let payData: any = { payrolls: [] };
+            if (fs.existsSync(payPath)) {
+              try {
+                payData = JSON.parse(fs.readFileSync(payPath, "utf-8"));
+                if (!payData.payrolls) payData.payrolls = [];
+              } catch (e) {
+                payData = { payrolls: [] };
+              }
+            }
+
+            const entries = item.payload?.entries || [];
+            let insertedCount = 0;
+
+            for (const entry of entries) {
+              const personName = entry.personName || entry.name || "";
+              const existing = finData.cash_flow.find((c: any) =>
+                c.date === entry.date &&
+                c.amount === entry.amount &&
+                c.description && c.description.toLowerCase().includes(personName.toLowerCase())
+              );
+
+              if (!existing) {
+                finData.cash_flow.unshift({
+                  id: `dstech_cf_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                  date: entry.date,
+                  type: entry.type || "OUT",
+                  category: entry.category || "Gaji & Upah Karyawan",
+                  amount: entry.amount,
+                  account: entry.account || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+                  referenceNumber: entry.referenceNumber,
+                  description: entry.description,
+                  notes: `Disetujui resmi oleh Direktur Utama (Bpk. Ramadhani ST) dari usulan pembukuan Dewi Sartika.`,
+                  businessEntity: "PT",
+                  status: "Sukses",
+                  approvedBy: "RAMADHANI ST",
+                  signerTitle: "Direktur",
+                  approvalStatus: "Disetujui & Sah",
+                  isLocked: true,
+                  receiptUrl: "",
+                  createdAt: new Date().toISOString()
+                });
+                insertedCount++;
+              }
+
+              // Catat slip payroll jika kategori gaji
+              if ((entry.category || item.payload?.category || "").toLowerCase().includes("gaji")) {
+                const existingPay = payData.payrolls.find((p: any) =>
+                  p.month === entry.month &&
+                  p.employeeName && p.employeeName.toLowerCase().includes(personName.toLowerCase())
+                );
+                if (!existingPay) {
+                  payData.payrolls.unshift({
+                    id: `dstech_pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+                    slipNumber: `SLIP-DSTECH-${entry.month.replace("-", "")}-${String(payData.payrolls.length + 1).padStart(3, "0")}`,
+                    month: entry.month,
+                    paymentDate: entry.date,
+                    employeeName: personName,
+                    employeeRole: entry.personRole || entry.role || "Staf Operasional",
+                    bankAccount: "Transfer Bank BCA",
+                    baseSalary: entry.amount,
+                    dailyRate: 0,
+                    presenceDays: 22,
+                    presenceRate: 0,
+                    presenceAllowance: 0,
+                    overtimeHours: 0,
+                    overtimeRate: 0,
+                    overtimePay: 0,
+                    positionAllowance: 0,
+                    transportAllowance: 0,
+                    mealAllowance: 0,
+                    bonusProject: 0,
+                    bonusPerformance: 0,
+                    bpjsDeduction: 0,
+                    loanDeduction: 0,
+                    otherDeduction: 0,
+                    totalGross: entry.amount,
+                    totalDeductions: 0,
+                    takeHomePay: entry.amount,
+                    status: "Approved",
+                    paymentMethod: "Transfer Bank BCA",
+                    notes: `Disetujui resmi oleh Direktur Utama dari draf usulan Dewi Sartika`,
+                    approvedBy: "RAMADHANI ST",
+                    approvedAt: new Date().toISOString(),
+                    recordedInCashFlow: true
+                  });
+                }
+              }
+            }
+
+            finData.cash_flow.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            fs.writeFileSync(finPath, JSON.stringify(finData, null, 2), "utf-8");
+            if (fs.existsSync(payPath)) {
+              fs.writeFileSync(payPath, JSON.stringify(payData, null, 2), "utf-8");
+            }
+            executedResult = { docType: "BOOKKEEPING", count: insertedCount, link: "/admin/finance?tab=cash_flow" };
+          }
         } else if (item.task_type === "PRODUCT_IMPORT") {
           const prodPath = path.join(process.cwd(), "src/data/dstech_products.json");
           if (fs.existsSync(prodPath)) {
@@ -1349,123 +1453,90 @@ Aturan Khusus:
                 };
               }
 
-              // 3. Generate Transaksi Arus Kas (cash_flow) & Slip Gaji (payrolls)
-              const createdCashFlowRecords: any[] = [];
-              const createdPayrollRecords: any[] = [];
+              // 3. Susun Draf Transaksi ke Kotak Persetujuan Pimpinan (Approval Queue)
+              // Karyawan AI 100% TIDAK BOLEH menulis langsung ke database kas sebelum disetujui Direktur Utama!
+              const entriesList: any[] = [];
               const yr = extractedBookkeeping.year || 2025;
               const sMonth = extractedBookkeeping.startMonth || 1;
               const eMonth = extractedBookkeeping.endMonth || 12;
-              let grandTotalRecorded = 0;
+              let grandTotalProposal = 0;
 
               for (let m = sMonth; m <= eMonth; m++) {
                 const monthStr = `${yr}-${String(m).padStart(2, "0")}`;
                 const payDate = `${monthStr}-25`;
 
                 for (const item of extractedBookkeeping.items) {
-                  const recId = `dstech_cf_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
                   const refNo = `PAY-${monthStr.replace("-", "")}-${item.name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}`;
-
-                  // Periksa duplikasi agar tidak tercatat ganda
-                  const existingCf = finData.cash_flow.find((c: any) =>
-                    c.date === payDate &&
-                    c.amount === item.amount &&
-                    c.description && c.description.toLowerCase().includes(item.name.toLowerCase())
-                  );
-
-                  if (!existingCf) {
-                    const cfEntry = {
-                      id: recId,
-                      date: payDate,
-                      type: extractedBookkeeping.type || "OUT",
-                      category: item.category || extractedBookkeeping.category || "Gaji & Upah Karyawan",
-                      amount: item.amount,
-                      account: extractedBookkeeping.defaultAccount || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
-                      referenceNumber: refNo,
-                      description: `Pembayaran Gaji ${item.name} (${item.role || "Staf"}) Periode ${monthStr}`,
-                      notes: `Pencatatan pembukuan otomatis Dewi Sartika (AI Finance Specialist) atas instruksi Direktur Utama: "${promptCommand}"`,
-                      businessEntity: "PT",
-                      status: "Sukses",
-                      approvedBy: "RAMADHANI ST",
-                      signerTitle: "Direktur",
-                      approvalStatus: "Disetujui & Sah",
-                      isLocked: true,
-                      receiptUrl: "",
-                      createdAt: new Date().toISOString()
-                    };
-
-                    finData.cash_flow.unshift(cfEntry);
-                    createdCashFlowRecords.push(cfEntry);
-                    grandTotalRecorded += item.amount;
-                  }
-
-                  // Catat slip payroll jika kategori Gaji
-                  if ((item.category || extractedBookkeeping.category || "").toLowerCase().includes("gaji")) {
-                    const existingPay = payData.payrolls.find((p: any) =>
-                      p.month === monthStr &&
-                      p.employeeName && p.employeeName.toLowerCase().includes(item.name.toLowerCase())
-                    );
-
-                    if (!existingPay) {
-                      const payEntry = {
-                        id: `dstech_pay_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-                        slipNumber: `SLIP-DSTECH-${monthStr.replace("-", "")}-${String(payData.payrolls.length + 1).padStart(3, "0")}`,
-                        month: monthStr,
-                        paymentDate: payDate,
-                        employeeName: item.name,
-                        employeeRole: item.role || "Staf Operasional",
-                        bankAccount: "Transfer Bank BCA",
-                        baseSalary: item.amount,
-                        dailyRate: 0,
-                        presenceDays: 22,
-                        presenceRate: 0,
-                        presenceAllowance: 0,
-                        overtimeHours: 0,
-                        overtimeRate: 0,
-                        overtimePay: 0,
-                        positionAllowance: 0,
-                        transportAllowance: 0,
-                        mealAllowance: 0,
-                        bonusProject: 0,
-                        bonusPerformance: 0,
-                        bpjsDeduction: 0,
-                        loanDeduction: 0,
-                        otherDeduction: 0,
-                        totalGross: item.amount,
-                        totalDeductions: 0,
-                        takeHomePay: item.amount,
-                        status: "Approved",
-                        paymentMethod: "Transfer Bank BCA",
-                        notes: `Pencatatan pembukuan otomatis staf AI Dewi Sartika atas instruksi Direktur Utama`,
-                        approvedBy: "RAMADHANI ST",
-                        approvedAt: new Date().toISOString(),
-                        recordedInCashFlow: true
-                      };
-                      payData.payrolls.unshift(payEntry);
-                      createdPayrollRecords.push(payEntry);
-                    }
-                  }
+                  entriesList.push({
+                    month: monthStr,
+                    date: payDate,
+                    type: extractedBookkeeping.type || "OUT",
+                    category: item.category || extractedBookkeeping.category || "Gaji & Upah Karyawan",
+                    personName: item.name,
+                    personRole: item.role || "Staf",
+                    amount: item.amount,
+                    account: extractedBookkeeping.defaultAccount || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+                    referenceNumber: refNo,
+                    description: `Pembayaran Gaji ${item.name} (${item.role || "Staf"}) Periode ${monthStr}`,
+                  });
+                  grandTotalProposal += item.amount;
                 }
               }
 
-              // Urutkan cash_flow berdasarkan tanggal terbaru (descending)
-              finData.cash_flow.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              const periodLabel = sMonth === eMonth ? `Bulan ${sMonth} ${yr}` : `Januari - Desember ${yr}`;
+              const peopleNames = extractedBookkeeping.items.map((i: any) => i.name).join(" & ");
 
-              // Simpan berkas database ERP
-              fs.writeFileSync(financeFilePath, JSON.stringify(finData, null, 2), "utf-8");
-              if (fs.existsSync(payrollFilePath)) {
-                fs.writeFileSync(payrollFilePath, JSON.stringify(payData, null, 2), "utf-8");
-              }
-
-              executionResult = {
-                type: "BOOKKEEPING_RECORDED",
-                cashFlowCount: createdCashFlowRecords.length,
-                payrollCount: createdPayrollRecords.length,
-                totalAmount: grandTotalRecorded,
-                period: `${yr}-${String(sMonth).padStart(2, "0")} s/d ${yr}-${String(eMonth).padStart(2, "0")}`,
-                link: "/admin/finance?tab=cash_flow"
+              const queueItem = {
+                id: `appr_dewi_bookkeeping_${Date.now()}`,
+                employee_id: "emp_dewi_finance",
+                employee_name: "Dewi Sartika",
+                employee_role: "AI Finance & Tax Billing Specialist",
+                department: "FINANCE",
+                task_type: "BOOKKEEPING_EXPENSE",
+                title: `Draf Pembukuan: ${extractedBookkeeping.category || "Pengeluaran Gaji"} (${peopleNames}) Periode ${periodLabel}`,
+                status: "PENDING_APPROVAL",
+                summary: `Usulan pembukuan ${entriesList.length} transaksi pengeluaran gaji (${extractedBookkeeping.items.map((i: any) => `${i.name} Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) periode ${periodLabel} total Rp ${grandTotalProposal.toLocaleString("id-ID")}. Menunggu persetujuan Direktur Utama sebelum dibukukan ke Arus Kas ERP.`,
+                value: grandTotalProposal,
+                payload: {
+                  type: extractedBookkeeping.type || "OUT",
+                  category: extractedBookkeeping.category || "Gaji & Upah Karyawan",
+                  defaultAccount: extractedBookkeeping.defaultAccount || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+                  year: yr,
+                  startMonth: sMonth,
+                  endMonth: eMonth,
+                  periodLabel: periodLabel,
+                  totalEntries: entriesList.length,
+                  grandTotal: grandTotalProposal,
+                  items: extractedBookkeeping.items,
+                  entries: entriesList,
+                },
+                created_at: new Date().toISOString(),
               };
 
-              aiResponseText = `Siap Pak Ramadhani! Saya (Dewi Sartika) telah mencatat seluruh pembukuan pengeluaran keuangan ke sistem Arus Kas ERP dan Payroll. Sebanyak ${createdCashFlowRecords.length} transaksi pengeluaran (total Rp ${grandTotalRecorded.toLocaleString("id-ID")}) untuk periode ${sMonth === eMonth ? `Bulan ${sMonth}` : `Januari - Desember ${yr}`} telah sah dibukukan dan langsung terlihat pada menu Keuangan & ERP!`;
+              if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+              // Hindari duplikat usulan yang persis sama di antrean pending
+              const existingQueueIdx = data.dstech_approval_queue.findIndex((q: any) =>
+                q.task_type === "BOOKKEEPING_EXPENSE" &&
+                q.title === queueItem.title &&
+                q.status === "PENDING_APPROVAL"
+              );
+              if (existingQueueIdx >= 0) {
+                data.dstech_approval_queue[existingQueueIdx] = queueItem;
+              } else {
+                data.dstech_approval_queue.unshift(queueItem);
+              }
+              writeWorkforceData(data);
+
+              executionResult = {
+                type: "BOOKKEEPING_PROPOSAL_CREATED",
+                queueId: queueItem.id,
+                totalEntries: entriesList.length,
+                totalAmount: grandTotalProposal,
+                period: periodLabel,
+                link: "/admin/virtual-office"
+              };
+
+              aiResponseText = `Siap Pak Ramadhani! Draf pembukuan pengeluaran gaji (${extractedBookkeeping.items.map((i: any) => `${i.name} Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(" & ")}) untuk periode ${periodLabel} (Total Rp ${grandTotalProposal.toLocaleString("id-ID")}) telah saya susun dan saya masukkan ke Kotak Persetujuan Anda. Sistem 100% aman dan data belum dibukukan ke Arus Kas ERP sebelum Bapak menyetujuinya di Kotak Persetujuan!`;
             }
           } catch (bookkeepingErr: any) {
             console.error("Error executing Dewi Finance bookkeeping action:", bookkeepingErr);
