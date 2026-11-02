@@ -236,7 +236,9 @@ const DEFAULT_WORKFORCE = {
         fileUrl: "/service-cctv.png"
       }
     }
-  ]
+  ],
+  dstech_dismissed_topics: [],
+  dstech_conversations: {}
 };
 
 function readWorkforceData() {
@@ -257,6 +259,10 @@ function readWorkforceData() {
     }
     if (!Array.isArray(parsed.dstech_dismissed_topics)) {
       parsed.dstech_dismissed_topics = [];
+      writeWorkforceData(parsed);
+    }
+    if (!parsed.dstech_conversations || typeof parsed.dstech_conversations !== "object" || Array.isArray(parsed.dstech_conversations)) {
+      parsed.dstech_conversations = {};
       writeWorkforceData(parsed);
     }
     return parsed;
@@ -1100,6 +1106,27 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // 2e. CLEAR CONVERSATION (Reset Memori Percakapan Karyawan AI - Tugas 341)
+    if (action === "clear_conversation") {
+      const { targetEmployeeId } = body;
+      if (!data.dstech_conversations || typeof data.dstech_conversations !== "object" || Array.isArray(data.dstech_conversations)) {
+        data.dstech_conversations = {};
+      }
+      if (targetEmployeeId) {
+        data.dstech_conversations[targetEmployeeId] = [];
+      } else {
+        data.dstech_conversations = {};
+      }
+      writeWorkforceData(data);
+      return NextResponse.json({
+        success: true,
+        message: targetEmployeeId
+          ? `Riwayat percakapan dengan ${targetEmployeeId} telah dibersihkan.`
+          : "Seluruh riwayat percakapan staf AI telah dibersihkan.",
+        conversations: data.dstech_conversations
+      });
+    }
+
     // 3. TRIGGER AUTOPILOT (Karyawan AI Otonom Menghasilkan Draf Pekerjaan Dinamis, Segar, dan Menghindari Topik Ditolak/Dihapus)
     if (action === "trigger_autopilot") {
       if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
@@ -1606,7 +1633,8 @@ export async function POST(req: NextRequest) {
           lowerCmd.includes("pembukuan") || lowerCmd.includes("catat") || lowerCmd.includes("operasional") ||
           lowerCmd.includes("arus kas") || lowerCmd.includes("buku") || lowerCmd.includes("uang") ||
           lowerCmd.includes("anggaran") || lowerCmd.includes("sewa") || lowerCmd.includes("listrik") ||
-          lowerCmd.includes("air") || lowerCmd.includes("bensin") || lowerCmd.includes("mobil") || lowerCmd.includes("atk")
+          lowerCmd.includes("air") || lowerCmd.includes("bensin") || lowerCmd.includes("mobil") || lowerCmd.includes("atk") ||
+          lowerCmd.includes("input") || lowerCmd.includes("masuk") || lowerCmd.includes("juga")
         ) {
           targetedEmployeeId = "emp_dewi_finance";
         } else if (lowerCmd.includes("siti") || lowerCmd.includes("cs") || lowerCmd.includes("layanan") || lowerCmd.includes("tamu") || lowerCmd.includes("pengunjung")) {
@@ -1628,14 +1656,35 @@ export async function POST(req: NextRequest) {
 
       const targetEmp = data.dstech_employees.find((e: any) => e.id === targetedEmployeeId) || data.dstech_employees[0];
 
+      // AMBIL RIWAYAT MEMORI PERCAKAPAN KARYAWAN AI (Tugas 341)
+      if (!data.dstech_conversations || typeof data.dstech_conversations !== "object" || Array.isArray(data.dstech_conversations)) {
+        data.dstech_conversations = {};
+      }
+      if (!Array.isArray(data.dstech_conversations[targetEmp.id])) {
+        data.dstech_conversations[targetEmp.id] = [];
+      }
+      const employeeChatHistory = data.dstech_conversations[targetEmp.id] || [];
+      const recentChatHistory = employeeChatHistory.slice(-8);
+
+      const historyContextPrompt = recentChatHistory.length > 0
+        ? `\nRIWAYAT PERCAKAPAN SEBELUMNYA DENGAN DIREKTUR UTAMA:\n` +
+          recentChatHistory.map((m: any) => `[${m.sender === "user" ? "Direktur Utama (Bpk. Ramadhani ST)" : targetEmp.name}]: "${m.text}"`).join("\n") + "\n"
+        : "";
+
       // Panggil AI Gemini (default gemini-2.5-flash) dengan Multi-Key Rotation untuk menyusun jawaban
       let aiResponseText = "";
       try {
         const systemInstruction = `Anda adalah ${targetEmp.name}, karyawan AI profesional di PT. DSTech Smart Perkasa dengan jabatan: ${targetEmp.role} (${targetEmp.department}).
-Direktur Utama (Bpk. Ramadhani ST) baru saja memberikan instruksi langsung kepada Anda di kantor: "${promptCommand}".
-Jawablah dengan gaya karyawan profesional, sopan, loyal, sigap, dan solutif (Bahasa Indonesia).
-Berikan konfirmasi bahwa tugas tersebut segera dieksekusi detik ini juga, sebutkan langkah konkret apa yang sedang/akan Anda kerjakan sesuai SOP divisi Anda di DSTech Smart (CCTV, Barrier Gate, Smart Home, ERP Finance, CRM).
-Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
+Anda sedang berdialog langsung dengan Direktur Utama (Bpk. Ramadhani ST).
+${historyContextPrompt}
+INSTRUKSI LANGSUNG TERBARU DARI DIREKTUR UTAMA:
+"${promptCommand}"
+
+TUGAS ANDA:
+1. Pahami instruksi terbaru dalam konteks percakapan sebelumnya. Jika Direktur mengatakan rujukan lanjutan (contoh: "input juga di tahun 2026", "tambah yang tadi", "revisi yang kemarin", dsb.), hubungkan secara cerdas dengan topik, nominal, atau proyek yang sedang dibahas sebelumnya.
+2. Jawablah dengan gaya karyawan profesional, sopan, loyal, sigap, dan solutif (Bahasa Indonesia).
+3. Berikan konfirmasi bahwa tugas tersebut segera dieksekusi detik ini juga, sebutkan langkah konkret apa yang sedang/akan Anda kerjakan sesuai SOP divisi Anda di DSTech Smart (CCTV, Barrier Gate, Smart Home, ERP Finance, CRM).
+4. Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
 
         const geminiSpeech = await executeGeminiCall(systemInstruction, false, "gemini-2.5-flash", 8000);
         if (geminiSpeech) {
@@ -1981,6 +2030,7 @@ Aturan Khusus:
           lowerCmd.includes("koreksi") || lowerCmd.includes("update") || lowerCmd.includes("anggaran") ||
           lowerCmd.includes("sewa") || lowerCmd.includes("listrik") || lowerCmd.includes("air") ||
           lowerCmd.includes("bensin") || lowerCmd.includes("mobil") || lowerCmd.includes("atk") ||
+          lowerCmd.includes("input") || lowerCmd.includes("masuk") || lowerCmd.includes("juga") ||
           /\d{4,}/.test(promptCommand)
         ) {
           try {
@@ -2002,10 +2052,15 @@ Aturan Khusus:
                 }
               }
 
+              // Deteksi instruksi lanjutan tahun (contoh: "menginput juga ditahn 2026", "input juga di tahun 2026", "2026 juga")
+              const yearMatch = promptCommand.match(/(?:tahn|tahun|thn)?\s*(202[4-9])/i);
+              const hasContinuationWord = /(?:juga|lagi|ikut|sama|tambah|input|masukkan|buatkan|seterusnya)/i.test(promptCommand);
+
               // 1. Ekstraksi cerdas instruksi pembukuan dengan AI Gemini 2.5 Flash
               let extractedBookkeeping: any = null;
               try {
                 const bookkeepingPrompt = `Anda adalah Dewi Sartika, AI Finance & Accounting Intelligence di PT. DSTech Smart Perkasa.
+${historyContextPrompt}
 Direktur Utama (Bpk. Ramadhani ST) memberikan perintah pembukuan: "${promptCommand}".
 Tugas: Ekstrak instruksi pembukuan (pengeluaran kas / beban operasional rutin bulanan / gaji karyawan) menjadi format JSON MURNI tanpa markdown (jangan gunakan \`\`\`json).
 Format JSON wajib:
@@ -2013,26 +2068,27 @@ Format JSON wajib:
   "type": "OUT",
   "category": "Beban Operasional Rutin",
   "defaultAccount": "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
-  "year": 2025,
+  "year": ${yearMatch ? parseInt(yearMatch[1], 10) : 2025},
   "startMonth": 1,
   "endMonth": 12,
   "items": [
     {
       "name": "Listrik",
       "role": "Beban Utilitas",
-      "amount": 500000,
+      "amount": 800000,
       "category": "Beban Utilitas & Fasilitas"
     },
     {
       "name": "Mobil Operasional",
       "role": "Beban Kendaraan Operasional",
-      "amount": 3000000,
+      "amount": 5000000,
       "category": "Beban Operasional Kendaraan & Transport"
     }
   ]
 }
 Aturan Khusus:
 - Jika beban rutin atau pengeluaran dikeluarkan setiap bulan sepanjang tahun (contoh "untuk tahun 2025 dengan beban yang dikeluarkan setiap bulan" atau "Januari sampai Desember 2025"), maka startMonth=1, endMonth=12, year=2025.
+- Jika Direktur merujuk pada tahun baru (seperti "input juga ditahn 2026", "buatkan juga 2026"), wariskan pos pengeluaran rutin dari riwayat percakapan sebelumnya untuk tahun tersebut (year: 2026, startMonth: 1, endMonth: 12).
 - Ekstrak SEMUA pos pengeluaran atau nama staf dan nominal rupiah masing-masing secara teliti.
 - Pastikan nominal adalah integer angka bulat (contoh: 500000, 3000000, 1000000, 1500000, 4500000). Bersihkan format titik, koma, dan strip.`;
 
@@ -2044,9 +2100,61 @@ Aturan Khusus:
                 console.warn("Gemini Bookkeeping parsing error:", geminiErr.message);
               }
 
-              // 2. Fallback Deterministik Regex jika Gemini offline / kuota habis / format berbeda
+              // 2. Fallback Deterministik Cerdas (Termasuk Pewarisan Konteks Lanjutan & Riwayat Chat)
               if (!extractedBookkeeping || !extractedBookkeeping.items || extractedBookkeeping.items.length === 0) {
-                extractedBookkeeping = parseDeterministicBookkeeping(promptCommand);
+                const directExtracted = parseDeterministicBookkeeping(promptCommand);
+
+                if (directExtracted.items && directExtracted.items.length > 0) {
+                  extractedBookkeeping = directExtracted;
+                } else if (yearMatch && (hasContinuationWord || directExtracted.items.length === 0)) {
+                  const targetYear = parseInt(yearMatch[1], 10);
+                  
+                  // Ambil pos pengeluaran dari draf yang sudah ada di antrean
+                  let inheritedItems: any[] = [];
+                  const existingProposal = data.dstech_approval_queue?.find((q: any) =>
+                    q.task_type === "BOOKKEEPING_EXPENSE" &&
+                    Array.isArray(q.payload?.items) &&
+                    q.payload.items.length > 0
+                  );
+                  if (existingProposal && existingProposal.payload?.items) {
+                    inheritedItems = JSON.parse(JSON.stringify(existingProposal.payload.items));
+                  }
+
+                  // Jika tidak ada di antrean, scan riwayat percakapan sebelumnya
+                  if (inheritedItems.length === 0 && Array.isArray(recentChatHistory)) {
+                    for (let i = recentChatHistory.length - 1; i >= 0; i--) {
+                      const prevParsed = parseDeterministicBookkeeping(recentChatHistory[i].text);
+                      if (prevParsed && prevParsed.items && prevParsed.items.length > 0) {
+                        inheritedItems = prevParsed.items;
+                        break;
+                      }
+                    }
+                  }
+
+                  // Default operasional cadangan jika belum ada data riwayat
+                  if (inheritedItems.length === 0) {
+                    inheritedItems = [
+                      { name: "Sewa Kantor", role: "Beban Sewa Gedung", amount: 1500000, category: "Beban Operasional Rutin" },
+                      { name: "Mobil Operasional", role: "Beban Kendaraan Operasional", amount: 5000000, category: "Beban Operasional Rutin" },
+                      { name: "Bensin", role: "Beban BBM Operasional", amount: 2000000, category: "Beban Operasional Rutin" },
+                      { name: "Listrik", role: "Beban Listrik PLN", amount: 800000, category: "Beban Operasional Rutin" },
+                      { name: "Air", role: "Beban PDAM", amount: 500000, category: "Beban Operasional Rutin" },
+                      { name: "Belanja ATK", role: "Beban ATK & Operasional Kantor", amount: 500000, category: "Beban Operasional Rutin" }
+                    ];
+                  }
+
+                  extractedBookkeeping = {
+                    type: "OUT",
+                    category: "Beban Operasional Rutin",
+                    defaultAccount: "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+                    year: targetYear,
+                    startMonth: 1,
+                    endMonth: 12,
+                    items: inheritedItems
+                  };
+                } else {
+                  extractedBookkeeping = directExtracted;
+                }
               }
 
               // 3. Susun / Revisi Draf Transaksi ke Kotak Persetujuan Pimpinan (Approval Queue)
@@ -2055,17 +2163,19 @@ Aturan Khusus:
 
               const isRevision = lowerCmd.includes("revisi") || lowerCmd.includes("ubah") || lowerCmd.includes("ganti") || lowerCmd.includes("koreksi");
 
-              // Cari draf usulan sejenis yang sedang menunggu persetujuan (status PENDING_APPROVAL)
+              let finalItems: any[] = extractedBookkeeping.items || [];
+              let yr = extractedBookkeeping.year || (yearMatch ? parseInt(yearMatch[1], 10) : 2025);
+              let sMonth = extractedBookkeeping.startMonth || 1;
+              let eMonth = extractedBookkeeping.endMonth || 12;
+
+              // Cari draf usulan sejenis dengan tahun yang SAMA (status PENDING_APPROVAL)
+              // Draf tahun berbeda (misal 2025 vs 2026) dipisahkan menjadi usulan mandiri
               const existingQueueIdx = data.dstech_approval_queue.findIndex((q: any) =>
                 q.task_type === "BOOKKEEPING_EXPENSE" &&
-                q.status === "PENDING_APPROVAL"
+                q.status === "PENDING_APPROVAL" &&
+                (q.payload?.year === yr || (isRevision && !q.payload?.year))
               );
               const existingQueueItem = existingQueueIdx >= 0 ? data.dstech_approval_queue[existingQueueIdx] : null;
-
-              let finalItems: any[] = extractedBookkeeping.items || [];
-              let yr = extractedBookkeeping.year || (existingQueueItem?.payload?.year || 2025);
-              let sMonth = extractedBookkeeping.startMonth || (existingQueueItem?.payload?.startMonth || 1);
-              let eMonth = extractedBookkeeping.endMonth || (existingQueueItem?.payload?.endMonth || 12);
 
               // JIKA INI PERINTAH REVISI DAN ADA DRAF PENDING: GABUNGKAN / UPDATE POS-POS YANG DIREVISI
               if (isRevision && existingQueueItem && Array.isArray(existingQueueItem.payload?.items)) {
@@ -2131,7 +2241,7 @@ Aturan Khusus:
               const periodLabel = sMonth === eMonth ? `Bulan ${sMonth} ${yr}` : `Januari - Desember ${yr}`;
               const itemNamesSummary = finalItems.map((i: any) => i.name).join(", ");
 
-              const queueId = existingQueueItem ? existingQueueItem.id : `appr_dewi_bookkeeping_${Date.now()}`;
+              const queueId = existingQueueItem ? existingQueueItem.id : `appr_dewi_bookkeeping_${yr}_${Date.now()}`;
               const revNumber = (existingQueueItem?.revision || 0) + (isRevision ? 1 : 0);
 
               const queueItem = {
@@ -2179,8 +2289,12 @@ Aturan Khusus:
                 link: "/admin/virtual-office"
               };
 
+              const isContinuation = (yearMatch !== null || /(?:tahun\s*2026|tahn\s*2026)/i.test(promptCommand)) && existingQueueIdx === -1;
+
               aiResponseText = isRevision
                 ? `Siap Pak Ramadhani! Usulan pembukuan ${proposalTypeLabel.toLowerCase()} tahun ${yr} di Kotak Persetujuan telah BERHASIL SAYA REVISI sesuai instruksi: ${finalItems.map((i: any) => `${i.name}: Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")} (Total akumulasi baru: Rp ${grandTotalProposal.toLocaleString("id-ID")} untuk ${entriesList.length} transaksi). Draf usulan lama di Kotak Persetujuan telah langsung diperbarui dan menunggu persetujuan Bapak!`
+                : isContinuation
+                ? `Siap Pak Ramadhani! Saya memahami instruksi lanjutan Bapak. Berdasarkan rincian pengeluaran operasional sebelumnya (${finalItems.map((i: any) => i.name).join(", ")}), saya telah menyusun draf pembukuan baru untuk periode tahun ${yr} (${periodLabel}) dengan total Rp ${grandTotalProposal.toLocaleString("id-ID")} (${entriesList.length} transaksi) ke Kotak Persetujuan Anda. Sistem 100% aman dan data belum dibukukan ke Arus Kas ERP sebelum Bapak menyetujuinya di Kotak Persetujuan!`
                 : `Siap Pak Ramadhani! Draf pembukuan ${proposalTypeLabel.toLowerCase()} (${finalItems.map((i: any) => `${i.name}: Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) untuk periode ${periodLabel} (Total Rp ${grandTotalProposal.toLocaleString("id-ID")}) telah saya susun dan saya masukkan ke Kotak Persetujuan Anda. Sistem 100% aman dan data belum dibukukan ke Arus Kas ERP sebelum Bapak menyetujuinya di Kotak Persetujuan!`;
               
               targetEmp.speech_bubble = aiResponseText;
@@ -2676,6 +2790,33 @@ Aturan Khusus:
         data.dstech_recent_logs = data.dstech_recent_logs.slice(0, 25);
       }
 
+      // SIMPAN KE MEMORI PERCAKAPAN KARYAWAN AI (Tugas 341)
+      if (!data.dstech_conversations || typeof data.dstech_conversations !== "object" || Array.isArray(data.dstech_conversations)) {
+        data.dstech_conversations = {};
+      }
+      if (!Array.isArray(data.dstech_conversations[targetEmp.id])) {
+        data.dstech_conversations[targetEmp.id] = [];
+      }
+
+      data.dstech_conversations[targetEmp.id].push({
+        id: `msg_u_${Date.now()}`,
+        sender: "user",
+        text: promptCommand,
+        timestamp: new Date().toISOString()
+      });
+
+      data.dstech_conversations[targetEmp.id].push({
+        id: `msg_a_${Date.now() + 1}`,
+        sender: "agent",
+        text: aiResponseText,
+        timestamp: new Date().toISOString(),
+        contextPayload: executionResult
+      });
+
+      if (data.dstech_conversations[targetEmp.id].length > 40) {
+        data.dstech_conversations[targetEmp.id] = data.dstech_conversations[targetEmp.id].slice(-40);
+      }
+
       writeWorkforceData(data);
 
       return NextResponse.json({
@@ -2684,6 +2825,8 @@ Aturan Khusus:
         targetedEmployee: targetEmp,
         aiResponse: aiResponseText,
         executionResult: executionResult,
+        conversations: data.dstech_conversations,
+        employeeConversation: data.dstech_conversations[targetEmp.id],
         log: newLog,
       });
     }

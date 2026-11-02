@@ -523,7 +523,9 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
   const [isSubmittingModalCommand, setIsSubmittingModalCommand] = useState(false);
   const [modalExecutionResult, setModalExecutionResult] = useState<any>(null);
   const [modalAiResponse, setModalAiResponse] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Record<string, Array<{ id: string; sender: "user" | "agent"; text: string; timestamp: string; contextPayload?: any }>>>({});
   const officeContainerRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch initial workforce data
   const fetchWorkforce = async () => {
@@ -539,6 +541,9 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
         } else if (Array.isArray(json.data.dstech_dismissed_topics)) {
           setDismissedCount(json.data.dstech_dismissed_topics.length);
         }
+        if (json.data.dstech_conversations && typeof json.data.dstech_conversations === "object") {
+          setConversations(json.data.dstech_conversations);
+        }
         if (selectedEmployee) {
           const updated = json.data.dstech_employees.find((e: Employee) => e.id === selectedEmployee.id);
           if (updated) setSelectedEmployee(updated);
@@ -551,6 +556,31 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
     }
   };
 
+  const handleClearEmployeeChat = async (employeeId: string) => {
+    if (!confirm(`Hapus seluruh riwayat percakapan dengan ${selectedEmployee?.name}?`)) return;
+    try {
+      const res = await fetch("/api/ai-workforce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear_conversation", targetEmployeeId: employeeId })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setConversations(prev => ({ ...prev, [employeeId]: [] }));
+        setModalAiResponse(null);
+        setModalExecutionResult(null);
+      }
+    } catch (err: any) {
+      alert("Gagal menghapus riwayat obrolan: " + err.message);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedEmployee && chatEndRef.current) {
+      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [selectedEmployee, conversations]);
+
   useEffect(() => {
     fetchWorkforce();
     const interval = setInterval(fetchWorkforce, 8000);
@@ -561,9 +591,9 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
   const toggleFullscreen = () => {
     if (!officeContainerRef.current) return;
     if (!document.fullscreenElement) {
-      officeContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      officeContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => { });
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => { });
     }
   };
 
@@ -808,7 +838,7 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
 
   return (
     <div ref={officeContainerRef} className={`space-y-6 ${isFullscreen ? "p-8 bg-slate-950 text-white min-h-screen overflow-y-auto" : "p-4 md:p-6 max-w-7xl mx-auto"}`}>
-      
+
       {/* Header Bar Kantor Virtual */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-3xl border border-indigo-900/50 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -835,22 +865,20 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
           <div className="flex items-center p-1 rounded-xl bg-slate-900/80 border border-slate-700 shadow-inner">
             <button
               onClick={() => setViewMode("3D")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                viewMode === "3D"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "3D"
                   ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-500/30"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               <Box className="w-3.5 h-3.5" />
               <span>Simulasi 3D</span>
             </button>
             <button
               onClick={() => setViewMode("GRID")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                viewMode === "GRID"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "GRID"
                   ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md"
                   : "text-slate-400 hover:text-white"
-              }`}
+                }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
               <span>Denah Kartu</span>
@@ -896,197 +924,196 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
           />
         </div>
       ) : (
-      /* DENAH KANTOR VIRTUAL (ISOMETRIC / 2.5D INTERACTIVE FLOOR PLAN) */
-      <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl p-6 relative overflow-hidden min-h-[580px]">
-        {/* Background Grid Ambience */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
+        /* DENAH KANTOR VIRTUAL (ISOMETRIC / 2.5D INTERACTIVE FLOOR PLAN) */
+        <div className="bg-slate-900 rounded-3xl border border-slate-800 shadow-2xl p-6 relative overflow-hidden min-h-[580px]">
+          {/* Background Grid Ambience */}
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b15_1px,transparent_1px),linear-gradient(to_bottom,#1e293b15_1px,transparent_1px)] bg-[size:28px_28px] pointer-events-none" />
 
-        {/* Header Ruangan Kantor Info */}
-        <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800 text-xs text-slate-400">
-          <div className="flex items-center gap-4">
-            <span className="font-bold text-slate-200 flex items-center gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              Suhu Ruang: 22°C (AC Nyaman)
-            </span>
-            <span className="hidden sm:inline">•</span>
-            <span className="hidden sm:inline font-bold text-slate-300">
-              WiFi &amp; Gateway: 100% Online
-            </span>
-            <span className="hidden sm:inline">•</span>
-            <span className="font-bold text-cyan-400">
-              Model Otak AI: Google Gemini 2.5 Multi-Agent
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Petunjuk:</span>
-            <span className="text-[11px] text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700">
-              Klik sembarang karyawan untuk interaksi &amp; beri tugas
-            </span>
-          </div>
-        </div>
-
-        {/* TATA RUANG INTERAKTIF KANTOR */}
-        <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
-          
-          {/* MEJA DIREKTUR UTAMA (OWNER SUITE) */}
-          <div className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-indigo-950/70 via-slate-900/90 to-slate-900/90 border border-indigo-500/30 rounded-2xl p-4 shadow-xl relative group">
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-indigo-500/20">
-              <span className="text-xs font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
-                <Award className="w-4 h-4 text-amber-400" />
-                Ruang Direktur Utama &amp; Meja Eksekutif
-              </span>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-800">
-                OWNER COMMAND
-              </span>
-            </div>
-
+          {/* Header Ruangan Kantor Info */}
+          <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-800 text-xs text-slate-400">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-white shadow-lg shadow-amber-500/20 font-black text-xl border-2 border-amber-300">
-                👨‍💼
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm font-black text-white">Ramadhani ST</h3>
-                <p className="text-xs text-amber-300/90 font-medium">Direktur Utama &amp; Pemilik PT. DSTech Smart Perkasa</p>
-                <div className="text-[10px] text-slate-400 flex items-center gap-2">
-                  <span>Status: Siap Memimpin</span>
-                  <span>•</span>
-                  <span>Otoritas Tertinggi SPH &amp; Lapangan</span>
-                </div>
-              </div>
+              <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                Suhu Ruang: 22°C (AC Nyaman)
+              </span>
+              <span className="hidden sm:inline">•</span>
+              <span className="hidden sm:inline font-bold text-slate-300">
+                WiFi &amp; Gateway: 100% Online
+              </span>
+              <span className="hidden sm:inline">•</span>
+              <span className="font-bold text-cyan-400">
+                Model Otak AI: Google Gemini 2.5 Multi-Agent
+              </span>
             </div>
 
-            <div className="mt-3 p-2.5 bg-slate-950/60 rounded-xl border border-indigo-500/20 text-xs text-slate-300 flex items-center gap-2">
-              <span className="text-amber-400">👑</span>
-              <span className="text-[11px] leading-relaxed">
-                Meja pimpinan siap mengarahkan seluruh divisi karyawan AI via Command Bar di bawah.
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Petunjuk:</span>
+              <span className="text-[11px] text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700">
+                Klik sembarang karyawan untuk interaksi &amp; beri tugas
               </span>
             </div>
           </div>
 
-          {/* PANTRY & COFFEE LOUNGE */}
-          <div className="col-span-1 md:col-span-1 lg:col-span-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-800">
-                <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                  <Coffee className="w-4 h-4" />
-                  Pantry Kopi &amp; Lounge Istirahat
+          {/* TATA RUANG INTERAKTIF KANTOR */}
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-6">
+
+            {/* MEJA DIREKTUR UTAMA (OWNER SUITE) */}
+            <div className="col-span-1 md:col-span-2 lg:col-span-2 bg-gradient-to-br from-indigo-950/70 via-slate-900/90 to-slate-900/90 border border-indigo-500/30 rounded-2xl p-4 shadow-xl relative group">
+              <div className="flex items-center justify-between mb-3 pb-2 border-b border-indigo-500/20">
+                <span className="text-xs font-black uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+                  <Award className="w-4 h-4 text-amber-400" />
+                  Ruang Direktur Utama &amp; Meja Eksekutif
                 </span>
-                <span className="text-[10px] font-bold text-slate-500">AREA REHAT</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-800">
+                  OWNER COMMAND
+                </span>
               </div>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Tempat rehat dan diskusi santai bagi karyawan AI saat status mereka sedang senggang atau jeda tugas.
-              </p>
-            </div>
 
-            <div className="flex items-center gap-3 mt-3 pt-2 border-t border-slate-800/60 text-xs text-slate-400">
-              <span className="flex items-center gap-1 text-[11px] text-amber-300 font-bold">
-                ☕ Mesin Espresso: Ready
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1 text-[11px] text-cyan-300 font-bold">
-                💧 Dispenser Air: Dingin &amp; Panas
-              </span>
-            </div>
-          </div>
-
-          {/* KARTU MEJA KERJA TIAP KARYAWAN AI */}
-          {employees.map((emp) => {
-            const isSelected = selectedEmployee?.id === emp.id;
-            return (
-              <div
-                key={emp.id}
-                onClick={() => setSelectedEmployee(emp)}
-                className={`bg-slate-800/80 hover:bg-slate-800 transition-all duration-200 rounded-2xl p-4 border cursor-pointer relative group flex flex-col justify-between ${
-                  isSelected
-                    ? "border-cyan-400 shadow-xl shadow-cyan-500/10 ring-2 ring-cyan-400/30 scale-[1.02]"
-                    : "border-slate-700/70 hover:border-slate-600 shadow-md"
-                }`}
-              >
-                {/* Speech Bubble Melayang di Atas Kepala */}
-                {emp.speech_bubble && (
-                  <div className="mb-3 p-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-[11px] text-slate-200 relative shadow-md group-hover:border-cyan-400/50 transition">
-                    <p className="line-clamp-2 leading-relaxed italic">
-                      &ldquo;{emp.speech_bubble}&rdquo;
-                    </p>
-                    <div className="absolute -bottom-1.5 left-6 w-3 h-3 bg-slate-900 border-r border-b border-slate-700 transform rotate-45" />
-                  </div>
-                )}
-
-                {/* Avatar & Identitas Karyawan */}
-                <div className="flex items-start gap-3 mt-1">
-                  <div className="relative">
-                    <div
-                      className="w-13 h-13 rounded-2xl flex items-center justify-center text-2xl shadow-lg border-2"
-                      style={{
-                        backgroundColor: emp.avatar_color + "20",
-                        borderColor: emp.avatar_color
-                      }}
-                    >
-                      {emp.gender === "female" ? "👩‍💼" : "👨‍💼"}
-                    </div>
-                    {/* Status Dot Indikator */}
-                    <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900" />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <h4 className="text-sm font-black text-white truncate">{emp.name}</h4>
-                    </div>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5">{emp.role}</p>
-                    <div className="mt-1.5">
-                      {getStatusBadge(emp.status)}
-                    </div>
-                  </div>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center text-white shadow-lg shadow-amber-500/20 font-black text-xl border-2 border-amber-300">
+                  👨‍💼
                 </div>
-
-                {/* Aktivitas Saat Ini */}
-                <div className="mt-3 pt-2.5 border-t border-slate-700/60 text-[10.5px] text-slate-300">
-                  <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
-                    Aktivitas Saat Ini:
-                  </span>
-                  <p className="line-clamp-2 leading-tight text-slate-300 font-medium">
-                    {emp.current_activity}
-                  </p>
-                </div>
-
-                {/* Footer Kartu & Tombol Aksi */}
-                <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-center justify-between text-[10px] text-slate-400">
-                  <span className="font-mono text-cyan-400 font-bold">{emp.department}</span>
-                  <span className="flex items-center gap-1 text-slate-300 font-bold group-hover:text-cyan-400 transition">
-                    Kelola <ChevronRight className="w-3 h-3" />
-                  </span>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-black text-white">Ramadhani ST</h3>
+                  <p className="text-xs text-amber-300/90 font-medium">Direktur Utama &amp; Pemilik PT. DSTech Smart Perkasa</p>
+                  <div className="text-[10px] text-slate-400 flex items-center gap-2">
+                    <span>Status: Siap Memimpin</span>
+                    <span>•</span>
+                    <span>Otoritas Tertinggi SPH &amp; Lapangan</span>
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
 
-        {/* LOG AKTIVITAS TERKINI (LIVE TICKER FEED) */}
-        <div className="relative z-10 mt-6 pt-4 border-t border-slate-800">
-          <div className="flex items-center justify-between mb-2.5">
-            <h4 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-              <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
-              Linimasa Kerja Kantor Digital (Live Activity Log)
-            </h4>
-            <span className="text-[10px] text-slate-500 font-mono">Real-time sync</span>
-          </div>
+              <div className="mt-3 p-2.5 bg-slate-950/60 rounded-xl border border-indigo-500/20 text-xs text-slate-300 flex items-center gap-2">
+                <span className="text-amber-400">👑</span>
+                <span className="text-[11px] leading-relaxed">
+                  Meja pimpinan siap mengarahkan seluruh divisi karyawan AI via Command Bar di bawah.
+                </span>
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 max-h-36 overflow-y-auto pr-1">
-            {logs.slice(0, 4).map((l) => (
-              <div key={l.id} className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800 text-[11px] space-y-1">
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="font-bold text-cyan-400">{l.employee_name}</span>
-                  <span className="text-slate-500 font-mono">{new Date(l.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
+            {/* PANTRY & COFFEE LOUNGE */}
+            <div className="col-span-1 md:col-span-1 lg:col-span-2 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 shadow-lg flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-800">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                    <Coffee className="w-4 h-4" />
+                    Pantry Kopi &amp; Lounge Istirahat
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-500">AREA REHAT</span>
                 </div>
-                <p className="text-slate-300 text-[10.5px] leading-tight line-clamp-2">
-                  {l.action}
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Tempat rehat dan diskusi santai bagi karyawan AI saat status mereka sedang senggang atau jeda tugas.
                 </p>
               </div>
-            ))}
+
+              <div className="flex items-center gap-3 mt-3 pt-2 border-t border-slate-800/60 text-xs text-slate-400">
+                <span className="flex items-center gap-1 text-[11px] text-amber-300 font-bold">
+                  ☕ Mesin Espresso: Ready
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1 text-[11px] text-cyan-300 font-bold">
+                  💧 Dispenser Air: Dingin &amp; Panas
+                </span>
+              </div>
+            </div>
+
+            {/* KARTU MEJA KERJA TIAP KARYAWAN AI */}
+            {employees.map((emp) => {
+              const isSelected = selectedEmployee?.id === emp.id;
+              return (
+                <div
+                  key={emp.id}
+                  onClick={() => setSelectedEmployee(emp)}
+                  className={`bg-slate-800/80 hover:bg-slate-800 transition-all duration-200 rounded-2xl p-4 border cursor-pointer relative group flex flex-col justify-between ${isSelected
+                      ? "border-cyan-400 shadow-xl shadow-cyan-500/10 ring-2 ring-cyan-400/30 scale-[1.02]"
+                      : "border-slate-700/70 hover:border-slate-600 shadow-md"
+                    }`}
+                >
+                  {/* Speech Bubble Melayang di Atas Kepala */}
+                  {emp.speech_bubble && (
+                    <div className="mb-3 p-2.5 bg-slate-900/90 border border-slate-700 rounded-xl text-[11px] text-slate-200 relative shadow-md group-hover:border-cyan-400/50 transition">
+                      <p className="line-clamp-2 leading-relaxed italic">
+                        &ldquo;{emp.speech_bubble}&rdquo;
+                      </p>
+                      <div className="absolute -bottom-1.5 left-6 w-3 h-3 bg-slate-900 border-r border-b border-slate-700 transform rotate-45" />
+                    </div>
+                  )}
+
+                  {/* Avatar & Identitas Karyawan */}
+                  <div className="flex items-start gap-3 mt-1">
+                    <div className="relative">
+                      <div
+                        className="w-13 h-13 rounded-2xl flex items-center justify-center text-2xl shadow-lg border-2"
+                        style={{
+                          backgroundColor: emp.avatar_color + "20",
+                          borderColor: emp.avatar_color
+                        }}
+                      >
+                        {emp.gender === "female" ? "👩‍💼" : "👨‍💼"}
+                      </div>
+                      {/* Status Dot Indikator */}
+                      <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-900" />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <h4 className="text-sm font-black text-white truncate">{emp.name}</h4>
+                      </div>
+                      <p className="text-[10px] text-slate-400 truncate mt-0.5">{emp.role}</p>
+                      <div className="mt-1.5">
+                        {getStatusBadge(emp.status)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Aktivitas Saat Ini */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-700/60 text-[10.5px] text-slate-300">
+                    <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 block mb-0.5">
+                      Aktivitas Saat Ini:
+                    </span>
+                    <p className="line-clamp-2 leading-tight text-slate-300 font-medium">
+                      {emp.current_activity}
+                    </p>
+                  </div>
+
+                  {/* Footer Kartu & Tombol Aksi */}
+                  <div className="mt-3 pt-2 border-t border-slate-700/40 flex items-center justify-between text-[10px] text-slate-400">
+                    <span className="font-mono text-cyan-400 font-bold">{emp.department}</span>
+                    <span className="flex items-center gap-1 text-slate-300 font-bold group-hover:text-cyan-400 transition">
+                      Kelola <ChevronRight className="w-3 h-3" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* LOG AKTIVITAS TERKINI (LIVE TICKER FEED) */}
+          <div className="relative z-10 mt-6 pt-4 border-t border-slate-800">
+            <div className="flex items-center justify-between mb-2.5">
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
+                Linimasa Kerja Kantor Digital (Live Activity Log)
+              </h4>
+              <span className="text-[10px] text-slate-500 font-mono">Real-time sync</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2.5 max-h-36 overflow-y-auto pr-1">
+              {logs.slice(0, 4).map((l) => (
+                <div key={l.id} className="p-2.5 bg-slate-950/60 rounded-xl border border-slate-800 text-[11px] space-y-1">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="font-bold text-cyan-400">{l.employee_name}</span>
+                    <span className="text-slate-500 font-mono">{new Date(l.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</span>
+                  </div>
+                  <p className="text-slate-300 text-[10.5px] leading-tight line-clamp-2">
+                    {l.action}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* KOTAK PERSETUJUAN PIMPINAN (AI AUTOPILOT & APPROVAL QUEUE) */}
@@ -1242,13 +1269,12 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                 {filteredApprovalQueue.map((item) => (
                   <div
                     key={item.id}
-                    className={`p-4 rounded-2xl border transition-all flex flex-col justify-between relative group ${
-                      item.status === "APPROVED"
+                    className={`p-4 rounded-2xl border transition-all flex flex-col justify-between relative group ${item.status === "APPROVED"
                         ? "bg-emerald-950/20 border-emerald-500/30"
                         : item.status === "REJECTED"
-                        ? "bg-slate-950/40 border-slate-800 opacity-60"
-                        : "bg-slate-950/70 border-amber-500/30 hover:border-amber-500/60 shadow-lg"
-                    }`}
+                          ? "bg-slate-950/40 border-slate-800 opacity-60"
+                          : "bg-slate-950/70 border-amber-500/30 hover:border-amber-500/60 shadow-lg"
+                      }`}
                   >
                     <div className="space-y-3">
                       {/* Badge Header Pengusul & Status */}
@@ -1264,13 +1290,12 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                         </div>
 
                         <span
-                          className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                            item.status === "APPROVED"
+                          className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${item.status === "APPROVED"
                               ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                               : item.status === "REJECTED"
-                              ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
-                              : "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
-                          }`}
+                                ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                                : "bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"
+                            }`}
                         >
                           {item.status === "APPROVED" ? "✓ Disetujui" : item.status === "REJECTED" ? "✕ Ditolak" : "⏳ Menunggu"}
                         </span>
@@ -1350,8 +1375,8 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                               {approvingId === item.id
                                 ? "Memproses..."
                                 : item.task_type === "VIDEO_BRANDING" || item.task_type === "SOCIAL_MEDIA_CONTENT" || item.task_type === "PROMO_CAMPAIGN"
-                                ? "🚀 Setujui & Posting"
-                                : "Setujui & Terapkan"}
+                                  ? "🚀 Setujui & Posting"
+                                  : "Setujui & Terapkan"}
                             </span>
                           </button>
 
@@ -1442,7 +1467,7 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
             {previewItem && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
                 <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-slate-900 border-2 border-indigo-500/50 rounded-3xl shadow-2xl overflow-hidden">
-                  
+
                   {/* Modal Header */}
                   <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-indigo-500/30 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -1480,7 +1505,7 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
 
                   {/* Modal Body Scrollable */}
                   <div className="p-6 overflow-y-auto space-y-6 text-sm text-slate-300">
-                    
+
                     {/* Ringkasan Draf */}
                     <div className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1.5">
                       <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
@@ -1791,11 +1816,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                           <button
                             type="button"
                             onClick={() => setActiveMediaTab("storyboard")}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                              activeMediaTab === "storyboard"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${activeMediaTab === "storyboard"
                                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                                 : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
-                            }`}
+                              }`}
                           >
                             <Smartphone className="w-3.5 h-3.5" />
                             <span>Player Smartphone &amp; Storyboard</span>
@@ -1803,11 +1827,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                           <button
                             type="button"
                             onClick={() => setActiveMediaTab("caption")}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                              activeMediaTab === "caption"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${activeMediaTab === "caption"
                                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                                 : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
-                            }`}
+                              }`}
                           >
                             <Copy className="w-3.5 h-3.5" />
                             <span>Caption &amp; Tagar Siap Salin</span>
@@ -1815,11 +1838,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                           <button
                             type="button"
                             onClick={() => setActiveMediaTab("script")}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                              activeMediaTab === "script"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${activeMediaTab === "script"
                                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                                 : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
-                            }`}
+                              }`}
                           >
                             <Volume2 className="w-3.5 h-3.5" />
                             <span>Naskah Narator Suara</span>
@@ -1827,11 +1849,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                           <button
                             type="button"
                             onClick={() => setActiveMediaTab("flyer")}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                              activeMediaTab === "flyer"
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${activeMediaTab === "flyer"
                                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                                 : "bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800"
-                            }`}
+                              }`}
                           >
                             <Package className="w-3.5 h-3.5" />
                             <span>Poster Flyer 1:1 Feed</span>
@@ -1914,11 +1935,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                   <button
                                     type="button"
                                     onClick={() => setVideoDisplayMode("SIMULATION")}
-                                    className={`flex-1 py-1.5 px-2 rounded-xl text-[10px] font-black transition flex items-center justify-center gap-1 cursor-pointer ${
-                                      videoDisplayMode === "SIMULATION"
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-[10px] font-black transition flex items-center justify-center gap-1 cursor-pointer ${videoDisplayMode === "SIMULATION"
                                         ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
                                         : "text-slate-400 hover:text-white"
-                                    }`}
+                                      }`}
                                   >
                                     <span>📱 Simulasi Reels</span>
                                   </button>
@@ -1932,11 +1952,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                         setVideoDisplayMode("REAL_VIDEO");
                                       }
                                     }}
-                                    className={`flex-1 py-1.5 px-2 rounded-xl text-[10px] font-black transition flex items-center justify-center gap-1 cursor-pointer ${
-                                      videoDisplayMode === "REAL_VIDEO"
+                                    className={`flex-1 py-1.5 px-2 rounded-xl text-[10px] font-black transition flex items-center justify-center gap-1 cursor-pointer ${videoDisplayMode === "REAL_VIDEO"
                                         ? "bg-amber-500 text-slate-950 font-black shadow-md shadow-amber-500/30"
                                         : "text-amber-400 hover:text-white"
-                                    }`}
+                                      }`}
                                   >
                                     <span>🎬 Video Asli (.MP4)</span>
                                   </button>
@@ -1975,9 +1994,8 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                           "/service-cctv.png"
                                         }
                                         alt={previewItem.payload.scenes?.[activeVideoScene]?.title || "Scene Visual"}
-                                        className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out ${
-                                          isVideoPlaying ? "scale-115 translate-x-1 brightness-105" : "scale-100 brightness-95"
-                                        }`}
+                                        className={`absolute inset-0 w-full h-full object-cover transition-all duration-1000 ease-out ${isVideoPlaying ? "scale-115 translate-x-1 brightness-105" : "scale-100 brightness-95"
+                                          }`}
                                       />
                                       {/* Cinematic Dark Overlay for Contrast & Text Readability */}
                                       <div className="absolute inset-0 bg-gradient-to-b from-black/85 via-black/25 to-black/95 pointer-events-none" />
@@ -1992,10 +2010,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                               {activeVideoScene === 0
                                                 ? "AI VISION: CCTV COLORVU HD"
                                                 : activeVideoScene === 1
-                                                ? "RADAR: FAST BARRIER GATE"
-                                                : activeVideoScene === 2
-                                                ? "PERIMETER: INDUSTRIAL SECURE"
-                                                : "OFFICIAL: DSTECH SMART PERKASA"}
+                                                  ? "RADAR: FAST BARRIER GATE"
+                                                  : activeVideoScene === 2
+                                                    ? "PERIMETER: INDUSTRIAL SECURE"
+                                                    : "OFFICIAL: DSTECH SMART PERKASA"}
                                             </span>
                                             <span className="text-amber-300 font-bold">LIVE 4K</span>
                                           </div>
@@ -2066,11 +2084,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                           className="flex flex-col items-center group/btn"
                                           title="Sukai Video"
                                         >
-                                          <div className={`w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all ${
-                                            isVideoLiked
+                                          <div className={`w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border transition-all ${isVideoLiked
                                               ? "bg-rose-600/90 border-rose-400 scale-110 shadow-lg shadow-rose-600/50"
                                               : "bg-black/60 border-white/20 hover:bg-black/80"
-                                          }`}>
+                                            }`}>
                                             <Heart className={`w-4 h-4 transition-transform ${isVideoLiked ? "text-white fill-white scale-110" : "text-white"}`} />
                                           </div>
                                           <span className="text-[8px] font-mono font-bold text-white mt-0.5 drop-shadow">
@@ -2096,9 +2113,8 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
 
                                         {/* Spinning Vinyl Disc with Floating Music Icon */}
                                         <div className="relative pt-1 flex flex-col items-center">
-                                          <div className={`w-8 h-8 rounded-full bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-950 border-2 border-slate-600 shadow-lg flex items-center justify-center relative ${
-                                            isVideoPlaying ? "animate-spin" : ""
-                                          }`}>
+                                          <div className={`w-8 h-8 rounded-full bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-950 border-2 border-slate-600 shadow-lg flex items-center justify-center relative ${isVideoPlaying ? "animate-spin" : ""
+                                            }`}>
                                             <div className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-slate-950 flex items-center justify-center" />
                                           </div>
                                           {isVideoPlaying && (
@@ -2147,11 +2163,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                     type="button"
                                     onClick={() => handleRenderAndDownloadVideo(previewItem)}
                                     disabled={isRenderingVideo}
-                                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-lg ${
-                                      isRenderingVideo
+                                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-lg ${isRenderingVideo
                                         ? "bg-amber-600 text-slate-950 animate-pulse cursor-wait"
                                         : "bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-amber-500/20"
-                                    }`}
+                                      }`}
                                   >
                                     {isRenderingVideo ? (
                                       <>
@@ -2170,11 +2185,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                   <button
                                     type="button"
                                     onClick={handleTogglePlayVideo}
-                                    className={`w-full py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-md ${
-                                      isVideoPlaying
+                                    className={`w-full py-2 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-md ${isVideoPlaying
                                         ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/40 animate-pulse"
                                         : "bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-indigo-500 text-white shadow-indigo-600/40"
-                                    }`}
+                                      }`}
                                   >
                                     {isVideoPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
                                     <span>{isVideoPlaying ? "⏸ Jeda Video Reels" : "▶ Putar Simulasi Reels (30s)"}</span>
@@ -2198,11 +2212,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                     <button
                                       type="button"
                                       onClick={() => handlePlayVoiceover(previewItem.payload.scenes?.[activeVideoScene]?.voiceoverText || previewItem.payload.fullVoiceoverScript)}
-                                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer border ${
-                                        isPlayingVoiceover
+                                      className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex items-center justify-center gap-1 cursor-pointer border ${isPlayingVoiceover
                                           ? "bg-rose-950/80 text-rose-300 border-rose-500/50"
                                           : "bg-slate-800 hover:bg-slate-700 text-cyan-300 border-slate-700"
-                                      }`}
+                                        }`}
                                     >
                                       <Volume2 className="w-3 h-3 text-cyan-400" />
                                       <span className="truncate">{isPlayingVoiceover ? "Stop Suara" : "Suara Saja"}</span>
@@ -2222,65 +2235,63 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                   </span>
                                 </div>
 
-                              {(previewItem.payload.scenes || []).map((scene: any, idx: number) => (
-                                <div
-                                  key={idx}
-                                  onClick={() => handleSelectScene(idx)}
-                                  className={`p-3 rounded-2xl border transition-all cursor-pointer ${
-                                    activeVideoScene === idx
-                                      ? "bg-indigo-950/70 border-indigo-400 shadow-lg shadow-indigo-900/40 ring-1 ring-indigo-400"
-                                      : "bg-slate-950 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
-                                  }`}
-                                >
-                                  <div className="flex items-start gap-3">
-                                    {/* Thumbnail Image Foto Produk Nyata */}
-                                    <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-700 bg-slate-900 relative shadow-inner group">
-                                      <img
-                                        src={scene.image || previewItem.payload.flyer_image_url || "/service-cctv.png"}
-                                        alt={scene.title || `Adegan ${idx + 1}`}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                      />
-                                      <span className="absolute bottom-0.5 right-0.5 px-1 rounded bg-black/80 text-[7.5px] font-mono text-amber-300 font-bold">
-                                        {scene.timeRange?.split(" - ")?.[0] || "00:00"}
-                                      </span>
-                                      {activeVideoScene === idx && isVideoPlaying && (
-                                        <div className="absolute inset-0 bg-indigo-950/40 backdrop-blur-2xs flex items-center justify-center">
-                                          <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-center justify-between text-xs mb-1">
-                                        <span className="font-black text-white flex items-center gap-1.5 truncate">
-                                          <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold ${
-                                            activeVideoScene === idx ? "bg-indigo-500 text-white" : "bg-slate-800 text-slate-400"
-                                          }`}>
-                                            {idx + 1}
-                                          </span>
-                                          <span className="truncate">{scene.title || `Adegan ${idx + 1}`}</span>
+                                {(previewItem.payload.scenes || []).map((scene: any, idx: number) => (
+                                  <div
+                                    key={idx}
+                                    onClick={() => handleSelectScene(idx)}
+                                    className={`p-3 rounded-2xl border transition-all cursor-pointer ${activeVideoScene === idx
+                                        ? "bg-indigo-950/70 border-indigo-400 shadow-lg shadow-indigo-900/40 ring-1 ring-indigo-400"
+                                        : "bg-slate-950 border-slate-800 hover:border-slate-700 hover:bg-slate-900"
+                                      }`}
+                                  >
+                                    <div className="flex items-start gap-3">
+                                      {/* Thumbnail Image Foto Produk Nyata */}
+                                      <div className="w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-700 bg-slate-900 relative shadow-inner group">
+                                        <img
+                                          src={scene.image || previewItem.payload.flyer_image_url || "/service-cctv.png"}
+                                          alt={scene.title || `Adegan ${idx + 1}`}
+                                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                        />
+                                        <span className="absolute bottom-0.5 right-0.5 px-1 rounded bg-black/80 text-[7.5px] font-mono text-amber-300 font-bold">
+                                          {scene.timeRange?.split(" - ")?.[0] || "00:00"}
                                         </span>
-                                        <span className="text-[9.5px] font-mono font-bold text-amber-400 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
-                                          {scene.timeRange}
-                                        </span>
+                                        {activeVideoScene === idx && isVideoPlaying && (
+                                          <div className="absolute inset-0 bg-indigo-950/40 backdrop-blur-2xs flex items-center justify-center">
+                                            <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                                          </div>
+                                        )}
                                       </div>
 
-                                      <p className="text-[10.5px] text-slate-300 leading-snug line-clamp-2 mb-1.5">
-                                        <strong className="text-cyan-400">Visual: </strong>{scene.visual}
-                                      </p>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between text-xs mb-1">
+                                          <span className="font-black text-white flex items-center gap-1.5 truncate">
+                                            <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold ${activeVideoScene === idx ? "bg-indigo-500 text-white" : "bg-slate-800 text-slate-400"
+                                              }`}>
+                                              {idx + 1}
+                                            </span>
+                                            <span className="truncate">{scene.title || `Adegan ${idx + 1}`}</span>
+                                          </span>
+                                          <span className="text-[9.5px] font-mono font-bold text-amber-400 bg-amber-950/40 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
+                                            {scene.timeRange}
+                                          </span>
+                                        </div>
 
-                                      <div className="p-1.5 rounded-lg bg-slate-900 text-[10px] border border-slate-800/80 text-emerald-200 flex items-start gap-1">
-                                        <Volume2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
-                                        <span className="line-clamp-1">"{scene.voiceoverText}"</span>
+                                        <p className="text-[10.5px] text-slate-300 leading-snug line-clamp-2 mb-1.5">
+                                          <strong className="text-cyan-400">Visual: </strong>{scene.visual}
+                                        </p>
+
+                                        <div className="p-1.5 rounded-lg bg-slate-900 text-[10px] border border-slate-800/80 text-emerald-200 flex items-start gap-1">
+                                          <Volume2 className="w-3 h-3 text-emerald-400 shrink-0 mt-0.5" />
+                                          <span className="line-clamp-1">"{scene.voiceoverText}"</span>
+                                        </div>
                                       </div>
                                     </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
                         {/* CONTENT TAB 2: CAPTION & HASHTAG */}
                         {activeMediaTab === "caption" && (
@@ -2331,11 +2342,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                               <button
                                 type="button"
                                 onClick={() => handlePlayVoiceover(previewItem.payload.fullVoiceoverScript || previewItem.summary)}
-                                className={`px-4 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md ${
-                                  isPlayingVoiceover
+                                className={`px-4 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow-md ${isPlayingVoiceover
                                     ? "bg-rose-600 text-white animate-pulse"
                                     : "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30"
-                                }`}
+                                  }`}
                               >
                                 {isPlayingVoiceover ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                                 <span>{isPlayingVoiceover ? "Hentikan Suara" : "▶ Putar Suara Narator AI"}</span>
@@ -2359,7 +2369,7 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                             <span className="text-xs font-black text-white block">
                               Pratinjau Poster Flyer Promosi Feed (Aspek Rasio Persegi 1:1)
                             </span>
-                            
+
                             {/* Visual Flyer Card Real Photo */}
                             <div className="w-[320px] h-[320px] mx-auto rounded-3xl bg-slate-950 border-2 border-indigo-500/50 shadow-2xl relative overflow-hidden flex flex-col justify-between p-4 group">
                               {/* Background Image Produk Nyata */}
@@ -2498,8 +2508,8 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                             {approvingId === previewItem.id
                               ? "Memproses Publikasi Medsos..."
                               : previewItem.task_type === "VIDEO_BRANDING" || previewItem.task_type === "SOCIAL_MEDIA_CONTENT" || previewItem.task_type === "PROMO_CAMPAIGN"
-                              ? "🚀 Setujui & Publikasikan Otomatis ke Seluruh Medsos"
-                              : "Setujui & Terapkan Resmi ke Database"}
+                                ? "🚀 Setujui & Publikasikan Otomatis ke Seluruh Medsos"
+                                : "Setujui & Terapkan Resmi ke Database"}
                           </span>
                         </button>
                       </div>
@@ -2739,6 +2749,99 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
               </div>
             </div>
 
+            {/* THREAD PERCAKAPAN LANGSUNG DUA ARAH DENGAN KARYAWAN AI (Tugas 341) */}
+            {(() => {
+              const currentEmployeeChat = (selectedEmployee && conversations[selectedEmployee.id]) || [];
+              return (
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Riwayat Obrolan &amp; Memori Dialog:</span>
+                    </span>
+                    {currentEmployeeChat.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleClearEmployeeChat(selectedEmployee.id)}
+                        className="text-[10.5px] text-slate-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer transition font-medium"
+                        title="Bersihkan riwayat percakapan dengan staf ini"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>Reset Obrolan</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Chat Thread Container */}
+                  <div className="max-h-60 overflow-y-auto space-y-2.5 p-3.5 bg-slate-950/90 rounded-2xl border border-slate-800 shadow-inner">
+                    {currentEmployeeChat.length === 0 ? (
+                      <div className="py-6 text-center text-slate-500 text-xs">
+                        <Bot className="w-7 h-7 text-slate-600 mx-auto mb-1.5 opacity-60" />
+                        <p className="font-semibold text-slate-400">Belum ada riwayat dialog dengan {selectedEmployee.name}.</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Ketik instruksi di bawah atau klik contoh perintah untuk mulai berdialog.</p>
+                      </div>
+                    ) : (
+                      currentEmployeeChat.map((msg: any) => (
+                        <div
+                          key={msg.id}
+                          className={`flex gap-2 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                          {msg.sender === "agent" && (
+                            <div
+                              className="w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0 border mt-0.5"
+                              style={{
+                                backgroundColor: selectedEmployee.avatar_color + "25",
+                                borderColor: selectedEmployee.avatar_color
+                              }}
+                            >
+                              {selectedEmployee.gender === "female" ? "👩‍💼" : "👨‍💼"}
+                            </div>
+                          )}
+
+                          <div
+                            className={`max-w-[85%] rounded-2xl p-2.5 text-xs leading-relaxed shadow-md ${
+                              msg.sender === "user"
+                                ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-tr-none"
+                                : "bg-slate-800/95 text-slate-100 border border-slate-700/80 rounded-tl-none"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3 text-[9px] opacity-75 mb-1 pb-1 border-b border-white/10">
+                              <span className="font-bold">
+                                {msg.sender === "user" ? "Direktur Utama (Bpk. Ramadhani ST)" : selectedEmployee.name}
+                              </span>
+                              <span className="font-mono">
+                                {new Date(msg.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                            </div>
+                            <p className="whitespace-pre-line font-medium text-[11.5px]">{msg.text}</p>
+                            {msg.contextPayload?.link && (
+                              <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex items-center justify-between text-[10px]">
+                                <span className="text-emerald-400 font-bold">✓ Usulan telah dibuat</span>
+                                <a
+                                  href={msg.contextPayload.link}
+                                  className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-[9.5px] font-bold transition flex items-center gap-1 shadow-sm"
+                                >
+                                  <span>Lihat di Antrean</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              </div>
+                            )}
+                          </div>
+
+                          {msg.sender === "user" && (
+                            <div className="w-6 h-6 rounded-lg bg-cyan-950 border border-cyan-500/60 flex items-center justify-center text-cyan-300 font-bold text-[9px] shrink-0 mt-0.5">
+                              DIR
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Form Chat & Instruksi Langsung ke Karyawan Ini */}
             <form
               onSubmit={async (e) => {
@@ -2766,6 +2869,11 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                     if (json.aiResponse) {
                       setModalAiResponse(json.aiResponse);
                     }
+                    if (json.conversations) {
+                      setConversations(json.conversations);
+                    } else if (json.employeeConversation && selectedEmployee) {
+                      setConversations((prev) => ({ ...prev, [selectedEmployee.id]: json.employeeConversation }));
+                    }
                     setModalDirectCommand("");
                     fetchWorkforce();
                   } else {
@@ -2777,29 +2885,8 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                   setIsSubmittingModalCommand(false);
                 }
               }}
-              className="pt-3 border-t border-slate-800 space-y-3"
+              className="pt-2 space-y-3"
             >
-              {/* Balasan Langsung Karyawan AI jika baru saja diberi instruksi */}
-              {modalAiResponse && (
-                <div className="p-4 bg-gradient-to-br from-emerald-950/90 via-slate-900 to-indigo-950/80 border-2 border-emerald-500/60 rounded-2xl shadow-xl space-y-2 animate-in fade-in slide-in-from-bottom-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                      <span className="text-xs font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
-                        <Bot className="w-4 h-4 text-emerald-400" />
-                        Respon &amp; Laporan Kerja {selectedEmployee.name}:
-                      </span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                      DIEKSEKUSI OTONOM
-                    </span>
-                  </div>
-                  <div className="bg-black/40 p-3 rounded-xl border border-emerald-500/20 text-xs text-emerald-100 leading-relaxed font-medium whitespace-pre-line">
-                    {modalAiResponse}
-                  </div>
-                </div>
-              )}
-
               {/* Tautan Cepat Hasil Eksekusi Tugas */}
               {modalExecutionResult && (
                 <div className="p-3 bg-emerald-950/70 border border-emerald-800/80 rounded-xl flex items-center justify-between gap-3 text-xs">

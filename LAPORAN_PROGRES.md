@@ -4,6 +4,39 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 341 (2026-11-02)**: [SELESAI] Pembangunan Multi-Turn Conversational Memory & Context-Aware Execution Engine untuk Karyawan AI Kantor Virtual (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
+  *Permintaan User*: "saat saya berkomunikasi dengan agent AI, saya menyuruh untuk menginput juga ditahn 2026, dia belum mengerti. karena dia tidak punya memori percakapan, apa yang saya perintah dengan dia jawab tidak nyambung"
+  *Akar Masalah yang Ditemukan*:
+  1. **Ketiadaan Riwayat Percakapan (Stateless AI Chat)**: Antarmuka chat pada drawer karyawan AI di `/admin/virtual-office` dan backend `/api/ai-workforce` (pada `action === "order"`) tidak menyimpan memori percakapan multi-turn. Setiap instruksi dikirim murni secara terisolasi tanpa riwayat percakapan sebelumnya.
+  2. **AI Gemini Kehilangan Konteks Percakapan**: Gemini 2.5 Flash hanya menerima prompt tunggal `promptCommand` yang baru diketik tanpa riwayat apa yang diperintahkan sebelumnya. Ketika Direktur berkata *"menginput juga ditahn 2026"*, AI tidak tahu apa yang dimaksud dengan "menginput juga" karena detail pengeluaran rutin (listrik, mobil, bensin, air, sewa kantor, ATK) ada di percakapan sebelumnya.
+  3. **Antarmuka Modal Belum Menampilkan Riwayat Obrolan**: UI hanya menampilkan respon terakhir (`modalAiResponse`) yang menimpa balasan lama, bukan thread chat interaktif dua arah layaknya obrolan chat modern.
+  *Kebutuhan & Rencana Solusi*:
+  1. **Penyimpanan Memori Percakapan Karyawan AI (`dstech_conversations`)**:
+     - Tambahkan struktur `dstech_conversations` pada `dstech_ai_workforce.json` per karyawan (`employeeId`).
+     - Menyimpan setiap interaksi: peran pengirim (`user` / `assistant`), teks pesan, timestamp, serta metadata konteks tugas yang dihasilkan.
+     - Sediakan aksi `clear_conversation` jika Direktur ingin me-reset memori percakapan dengan karyawan tertentu.
+  2. **Injeksi Riwayat Percakapan ke Gemini 2.5 Flash**:
+     - Sistem secara otomatis mengambil hingga 8 percakapan terakhir antara Direktur dan Karyawan AI yang bersangkutan.
+     - Riwayat disisipkan ke dalam prompt sistem Gemini sehingga AI memahami rujukan percakapan lanjutan seperti *"juga di tahun 2026"*, *"tambahkan yang tadi"*, *"ganti nilainya"*, dll.
+  3. **Engine Context-Aware Inheritance & Fallback Deterministic**:
+     - Jika pengguna memberikan perintah turunan seperti *"input juga ditahn 2026"* atau *"tambahkan juga di tahun 2026"* pada Staf Keuangan Dewi Sartika, sistem memeriksa riwayat percakapan atau draf pengeluaran rutin yang ada, mengambil daftar item biaya (listrik, mobil, bensin, air, sewa, ATK), dan otomatis membuat draf pembukuan pengeluaran rutin untuk tahun 2026 ke Kotak Persetujuan (`dstech_approval_queue`).
+  4. **Antarmuka Chat Interaktif Dua Arah (Conversation Thread UI)**:
+     - Bangun komponen chat thread interaktif di dalam drawer Karyawan AI di `/admin/virtual-office`:
+       - Bubble pesan Direktur Utama (Bpk. Ramadhani ST) di sebelah kanan (cyan/indigo).
+       - Bubble respon Karyawan AI di sebelah kiri (dark slate/emerald) dengan status eksekusi dan tombol tautan hasil.
+       - Indikator auto-scroll dan tombol "Reset Obrolan".
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mencatat rencana kerja step-by-step Tugas 341 di `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task341_conversational_memory/` dan mencadangkan berkas target.
+  3. [x] Mengimplementasikan penyimpanan dan manajemen `dstech_conversations` di `src/app/api/ai-workforce/route.ts`.
+  4. [x] Membangun konteks percakapan multi-turn pada pemanggilan Gemini 2.5 Flash dan engine Context-Aware Inheritance untuk Staf Keuangan Dewi Sartika (eksekusi pengeluaran rutin tahun 2026).
+  5. [x] Memperbarui antarmuka drawer Karyawan AI di `src/app/admin/virtual-office/page.tsx` menjadi Chat Thread interaktif dengan memori percakapan persisten.
+  6. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  7. [x] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses lolos 100%.
+  8. [x] Menguji percakapan multi-turn (perintah tahun 2025 diikuti "input juga di tahun 2026") dan membuktikan draf pembukuan 2026 masuk ke Kotak Persetujuan.
+  9. [x] Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  10. [x] Bersihkan folder cadangan dan tandai status [SELESAI].
+
 - **Tugas 340 (2026-11-02)**: [SELESAI] Pembangunan Memory Blacklist Penolakan/Penghapusan & Dynamic AI Autopilot Generator Lintas Karyawan AI (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "kemudian saya melihat untuk pengajuan yangsudah saya tolak dan hapus, masih saja AI agennta membuat hasil yang sama. gak ada perubahan. seharusnya jangan itu-itu terus dikerjakan"
   *Akar Masalah yang Ditemukan*:
@@ -8645,7 +8678,7 @@
   8. [x] **Langkah 8**: Verifikasi visual langsung di browser live `https://dstechsmart.com/shop`: dropdown Kategori, Subkategori, dan Merek tampil rapi berdampingan, popover menu merek membuka sempurna menampilkan daftar merek & counter produk, dan filter berjalan akurat.
   9. [x] **Langkah 9**: Bersihkan folder cadangan dan tandai status Tugas 228 menjadi `[SELESAI]`.
 
----
+ d---
 
 ### 229. Tugas: Fitur Neraca Saldo (Trial Balance) & Pemotongan Serta Perhitungan Pajak PPh di Modul Finance Admin (/admin/finance) [SELESAI]
 - **Permintaan Pengguna**:
