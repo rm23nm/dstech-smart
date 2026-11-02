@@ -4,6 +4,23 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 334 (2026-11-02)**: [SEDANG DIKERJAKAN] Pembangunan Engine Pembukuan Keuangan Otonom & Pencatatan Transaksi Pengeluaran Kas/Gaji Staf AI Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/data/dstech_finance_erp.json`, `src/data/dstech_payroll.json`).
+  *Permintaan User*: "saya suruh catat pembukuan keuangan, namun kenapa gak dicatat?" (Instruksi Direktur Utama: "tolong catat pengeluaran gaji pada bulan januari 2025 sampai desember 2025, untuk marsya Oprasional 2000000, RAMADHANI ST, 4500000").
+  *Akar Masalah yang Ditemukan*:
+  1. **Kesalahan Auto-Routing Perintah**: Pada `src/app/api/ai-workforce/route.ts`, logika pendeteksi instruksi ke Dewi Sartika (`emp_dewi_finance`) sebelumnya hanya memeriksa kata kunci: `sph`, `penawaran`, `invoice`, `faktur`, `ppn`, `keuangan`, `kas`, `pajak`. Kata-kata seperti `gaji`, `payroll`, `pengeluaran`, `biaya`, `pembukuan`, `catat`, `operasional` belum terdaftar. Akibatnya, perintah pimpinan salah diarahkan ke **Siti Nurhaliza (Customer Service)** yang hanya menjawab dalam bentuk percakapan teks tanpa eksekusi database.
+  2. **Ketiadaan Engine Pencatatan Pembukuan/Arus Kas pada Dewi Sartika**: Logika eksekusi Dewi Sartika sebelumnya hanya dibuat untuk menyusun Surat Penawaran Harga (SPH). Belum ada modul kecerdasan untuk mengekstrak dan mencatat transaksi pembukuan keuangan, pengeluaran kas operasional, dan slip gaji ke dalam `dstech_finance_erp.json` (`cash_flow`) dan `dstech_payroll.json` (`payrolls`).
+  3. **Data Pengeluaran Gaji Periode Jan - Des 2025 Belum Masuk ke Database**: Karena ketiadaan engine tersebut, 24 transaksi pengeluaran gaji (12 bulan x 2 orang: Marsya Rp 2.000.000/bln dan RAMADHANI ST Rp 4.500.000/bln = Total Rp 78.000.000) belum tercatat di tabel Arus Kas Keluar.
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mengidentifikasi akar masalah routing dan ketiadaan modul pencatatan pembukuan, serta mencatat rencana kerja step-by-step di `LAPORAN_PROGRES.md`.
+  2. [ ] Membuat folder cadangan berkas `dstech-smart/_backup_task334_finance_recording/` dan mencadangkan `src/app/api/ai-workforce/route.ts`, `src/data/dstech_finance_erp.json`, `src/data/dstech_payroll.json`.
+  3. [ ] Memperbarui filter kata kunci auto-routing pada `action === "order"` di `src/app/api/ai-workforce/route.ts` agar kata `gaji`, `payroll`, `pengeluaran`, `biaya`, `pembukuan`, `catat`, `arus kas`, `operasional`, `uang` otomatis masuk ke Dewi Sartika (`emp_dewi_finance`).
+  4. [ ] Membangun modul *Autonomous Financial Bookkeeping & Expense Engine* pada Dewi Sartika di `src/app/api/ai-workforce/route.ts` menggunakan AI Gemini 2.5 Flash & parser fallback deterministik untuk mengekstrak transaksi, periode bulan, dan nominal, lalu mencatatnya secara sah ke `cash_flow` (`dstech_finance_erp.json`) dan `dstech_payroll.json`.
+  5. [ ] Menjalankan eksekusi pencatatan pembukuan pengeluaran gaji 12 bulan (Januari 2025 s/d Desember 2025) untuk Marsya dan RAMADHANI ST pada database lokal dan server live.
+  6. [ ] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) untuk memastikan 0 error.
+  7. [ ] Menjalankan kompilasi Next.js (`npm run build`) untuk verifikasi 77/77 routes sukses (exit code 0).
+  8. [ ] Menerapkan pembaruan ke server live VPS 157.66.34.199, memverifikasi data di `/admin/finance`, dan membersihkan folder cadangan sementara.
+  9. [ ] Memperbarui status Tugas 334 menjadi [SELESAI] di `LAPORAN_PROGRES.md` dan menyinkronkan ke direktori root.
+
 - **Tugas 333 (2026-11-02)**: [SELESAI] Pembangunan Fitur Hapus Usulan Pekerjaan & Pembersihan Antrean Persetujuan Pimpinan pada Kantor Virtual AI (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "saya ingin hapus pekerjaan yang tidak sesuai, namun tidak ada fitur" (beserta screenshot antrean draf pekerjaan di Kantor Virtual AI `dstechsmart.com/admin/virtual-office`).
   *Penyebab & Kebutuhan Fitur*:
