@@ -4,6 +4,46 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Daftar Antrean Permintaan Pengguna Baru (Queue Backlog)**:
+  1. *Permintaan 1*: "logo perusahaan salah, tolong diganti" (Dijadwalkan setelah Tugas 347 selesai).
+  2. *Permintaan 2*: "pada monitor statistik kantor Virtual, tolong masukkan data real yang kita dapat dari keuangan, dan juga pipline siklus" (Dijadwalkan setelah Permintaan 1).
+
+- **Tugas 347 (2026-11-02)**: [SELESAI] Integrasi Seluruh 6 Karyawan AI ke Fitur Pesan Internal (Team Chat Messenger) & Sinkronisasi Komunikasi Penuh Aplikasi Android (`src/app/api/team-chat/route.ts`, `src/components/TeamChatMessenger.tsx`, `src/app/mobile-chat/page.tsx`).
+  *Permintaan User*: "bisakah kamu hubungkan seluruh karyawan AI dengan fitur pesan yang kita miliki, agar komunikasi lebih cepat. nantinya saya tinggal mengirimkan pesan permintaan lewat aplikasi android saja dengan karyawan AInya"
+  *Akar Kebutuhan & Desain Solusi*:
+  1. **Registrasi 6 Karyawan AI sebagai Peserta Resmi Team Chat**:
+     - 6 Karyawan AI terdaftar di kontak internal:
+       - Dewi Sartika (`emp_dewi_finance` / Finance & Billing AI)
+       - Bambang Prakoso (`emp_bambang_sales` / Sales & Commercial AI)
+       - Deni Kurniawan (`emp_deni_field` / Operations & Project AI)
+       - Nadia Safitri (`emp_nadia_marketing` / Digital Marketing AI)
+       - Reza Firmansyah (`emp_reza_catalog` / Product Catalog AI)
+       - Siti Nurhaliza (`emp_siti_cs` / Front Office & CS AI)
+     - Dibuatkan ruang obrolan 1-on-1 langsung (Direct Chat) untuk masing-masing karyawan AI, serta 1 grup koordinasi terpadu: `dstech_chat_group_ai_workforce` ("🤖 DSTech AI Workforce Hub").
+  2. **Autonomous Response Hook pada Team Chat API (`/api/team-chat`)**:
+     - Ketika pengguna (Pak Ramadhani / Direktur) mengirimkan pesan (baik teks, lampiran gambar struk, atau dokumen inquiry SPH) ke chat karyawan AI:
+     - Pesan disimpan ke `dstech_team_messages.json`.
+     - Backend mendeteksi penerima adalah Staf AI, memanggil reasoning Gemini 2.5 Flash (dengan Vision Multimodal jika ada gambar struk/inquiry).
+     - Jika pengguna mengirim foto struk ke Dewi: otomatis jalankan OCR pembacaan struk pengeluaran dan buat draf usulan `BOOKKEEPING_EXPENSE` ke Kotak Persetujuan (`dstech_approval_queue`).
+     - Jika pengguna meminta penawaran / SPH ke Dewi atau Bambang: otomatis buat usulan draf SPH.
+     - Staf AI langsung membalas pesan di thread obrolan Team Chat secara real-time.
+     - Percakapan disinkronisasikan ke `dstech_conversations` di Virtual Office agar memori percakapan selalu utuh dan konsisten di semua platform (Web & Android).
+  3. **Tampilan & Pengalaman Pengguna di Aplikasi Android & Web (`TeamChatMessenger.tsx`)**:
+     - Berikan badge khusus `🤖 Staf AI` dan status `Aktif 24 Jam • Gemini 2.5 Brain` dengan warna avatar khas masing-masing staf.
+     - Tambahkan tombol pintasan cepat (Quick Action Chips) di area obrolan: `[🧾 Kirim Struk Pengeluaran]`, `[📑 Buat Draf SPH]`, `[📊 Laporan Kas ERP]`.
+     - Dukung pengunggahan foto dari kamera Android dan file dokumen inquiry langsung dari ponsel dengan tombol kamera (`📷`) dan paperclip (`📎`).
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Pulihkan server live dari 502 Bad Gateway akibat proses build sebelumnya yang tertunda.
+  2. [x] Catat rencana kerja step-by-step Tugas 347 dan antrean permintaan baru di `LAPORAN_PROGRES.md`.
+  3. [x] Buat folder cadangan berkas `dstech-smart/_backup_task347_ai_team_chat_android/` dan amankan file target.
+  4. [x] Daftarkan 6 Staf AI dan inisialisasi thread chat 1-on-1 + grup AI di `src/app/api/team-chat/route.ts`.
+  5. [x] Implementasikan auto-reasoning Gemini 2.5 Flash & eksekusi usulan tugas di `/api/team-chat` saat menerima pesan dari user.
+  6. [x] Perbarui `src/components/TeamChatMessenger.tsx` dengan badge `🤖 Staf AI`, status online, tombol kamera/lampiran, dan tombol saran cepat untuk mobile Android.
+  7. [x] Jalankan validasi lokal TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  8. [x] Jalankan kompilasi lokal Next.js (`npm run build`) hingga 77/77 routes sukses.
+  9. [x] Push commit `c0edf22` ke GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main` (PID 18485, Status: Online).
+  10. [x] Bersihkan folder cadangan dan tandai status [SELESAI].
+
 - **Tugas 346 (2026-11-02)**: [SELESAI] Implementasi Pembacaan Foto Struk/Nota Pengeluaran (Receipt OCR & Multimodal AI Expense Recording) oleh Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "dan juka da pengeluaran apabila saya foto saja struk apakah dia bisa mencatatnya? dimana saya harus mengirimkannya?"
   *Akar Kebutuhan & Desain Solusi*:
