@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import {
+  triggerDeniAutonomousProgressReport,
+  triggerDewiAutonomousProjectInvoice,
+} from "@/utils/dstech_autonomous_ai";
 
 const DAILY_REPORTS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_daily_reports.json");
 const TASKS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_tasks.json");
@@ -210,6 +214,33 @@ export async function POST(request: Request) {
         }
       } catch (taskErr) {
         console.error("Error updating task with daily report:", taskErr);
+      }
+    }
+
+    // --- OTONOM AI WORKFORCE TRIGGER ---
+    // 1. Deni Kurniawan secara otonom merangkum foto laporan progres ke Kotak Persetujuan
+    if (Array.isArray(newReport.photos) && newReport.photos.length > 0) {
+      try {
+        triggerDeniAutonomousProgressReport(newReport);
+      } catch (deniErr) {
+        console.warn("Deni photo report autonomous trigger error:", deniErr);
+      }
+    }
+
+    // 2. Dewi Sartika secara otonom membuat Faktur Penjualan jika status proyek telah selesai / 100%
+    if (newReport.statusAfter === "Completed" || newReport.statusAfter === "Selesai" || newReport.progressPercentage >= 100) {
+      if (body.projectId) {
+        try {
+          triggerDewiAutonomousProjectInvoice({
+            id: body.projectId,
+            projectCode: newReport.projectCode,
+            projectName: newReport.projectName,
+            clientName: newReport.clientName,
+            businessEntity: "PT",
+          });
+        } catch (dewiErr) {
+          console.warn("Dewi invoice autonomous trigger error:", dewiErr);
+        }
       }
     }
 

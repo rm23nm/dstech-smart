@@ -4,6 +4,10 @@ export const revalidate = 0;
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import {
+  triggerDewiAutonomousProjectInvoice,
+  triggerDeniAutonomousProgressReport,
+} from "@/utils/dstech_autonomous_ai";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
 const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
@@ -3092,6 +3096,21 @@ export async function PUT(request: Request) {
       };
 
       writeFinanceData(data);
+
+      // OTONOM TRIGGER: Jika status proyek beralih menjadi Completed/Selesai, picu Dewi Sartika buat Faktur Penjualan
+      const updatedPrj = data.projects[index];
+      const isCompletedNow =
+        updatedPrj.status?.toLowerCase() === "completed" ||
+        updatedPrj.status?.toLowerCase() === "selesai" ||
+        Number(updatedPrj.progressPercentage) >= 100;
+      if (isCompletedNow) {
+        try {
+          triggerDewiAutonomousProjectInvoice(updatedPrj);
+        } catch (dewiErr) {
+          console.warn("Dewi auto-invoice trigger error:", dewiErr);
+        }
+      }
+
       return NextResponse.json({
         success: true,
         message: `Proyek ${data.projects[index].projectCode} berhasil diperbarui`,
@@ -3134,6 +3153,32 @@ export async function PUT(request: Request) {
       }
 
       writeFinanceData(data);
+
+      // OTONOM TRIGGER 1: Deni Kurniawan merangkum foto laporan progres ke Kotak Persetujuan
+      if (Array.isArray(newPicReport.photos) && newPicReport.photos.length > 0) {
+        try {
+          triggerDeniAutonomousProgressReport({
+            ...newPicReport,
+            projectId: prj.id,
+            projectCode: prj.projectCode,
+            projectName: prj.projectName,
+            clientName: prj.clientName,
+            activityDescription: newPicReport.summaryForClient,
+          });
+        } catch (deniErr) {
+          console.warn("Deni progress report trigger error:", deniErr);
+        }
+      }
+
+      // OTONOM TRIGGER 2: Dewi Sartika membuat Faktur Penjualan jika proyek mencapai 100% / Completed
+      if (prj.status === "Completed" || newPicReport.progressPercentage >= 100) {
+        try {
+          triggerDewiAutonomousProjectInvoice(prj);
+        } catch (dewiErr) {
+          console.warn("Dewi auto-invoice trigger error:", dewiErr);
+        }
+      }
+
       return NextResponse.json({
         success: true,
         message: `Laporan Progress Resmi untuk Klien berhasil diterbitkan oleh PIC (${newPicReport.picName})`,

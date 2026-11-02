@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import {
+  scanAndExecuteAutonomousWorkforce,
+  executeApproveInvoiceProposal,
+  executeApproveProgressReport,
+} from "@/utils/dstech_autonomous_ai";
 
 const DATA_FILE = path.join(process.cwd(), "src/data/dstech_ai_workforce.json");
 
@@ -437,6 +442,13 @@ function parseDeterministicBookkeeping(cmd: string): any {
 
 export async function GET(req: NextRequest) {
   try {
+    // Jalankan pemindaian otonom berkala: deteksi proyek selesai untuk Dewi dan foto teknisi untuk Deni
+    try {
+      scanAndExecuteAutonomousWorkforce();
+    } catch (scanErr) {
+      console.warn("Autonomous scan warning:", scanErr);
+    }
+
     const data = readWorkforceData();
     return NextResponse.json({
       success: true,
@@ -481,7 +493,11 @@ export async function POST(req: NextRequest) {
       // EKSEKUSI DATA SECARA RESMI KE DATABASE SISTEM
       let executedResult: any = null;
       try {
-        if (item.task_type === "SPH_PROPOSAL") {
+        if (item.task_type === "INVOICE_PROPOSAL") {
+          executedResult = executeApproveInvoiceProposal(item);
+        } else if (item.task_type === "FIELD_PROGRESS_REPORT") {
+          executedResult = executeApproveProgressReport(item);
+        } else if (item.task_type === "SPH_PROPOSAL") {
           const finPath = path.join(process.cwd(), "src/data/dstech_finance_erp.json");
           if (fs.existsSync(finPath)) {
             const finRaw = fs.readFileSync(finPath, "utf-8");
@@ -1129,6 +1145,12 @@ export async function POST(req: NextRequest) {
 
     // 3. TRIGGER AUTOPILOT (Karyawan AI Otonom Menghasilkan Draf Pekerjaan Dinamis, Segar, dan Menghindari Topik Ditolak/Dihapus)
     if (action === "trigger_autopilot") {
+      try {
+        scanAndExecuteAutonomousWorkforce();
+      } catch (scanErr) {
+        console.warn("Autopilot scan error:", scanErr);
+      }
+
       if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
       if (!Array.isArray(data.dstech_dismissed_topics)) data.dstech_dismissed_topics = [];
       const nowStr = new Date().toISOString();

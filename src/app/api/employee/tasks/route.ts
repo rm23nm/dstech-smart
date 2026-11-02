@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import {
+  triggerDeniAutonomousProgressReport,
+  triggerDewiAutonomousProjectInvoice,
+} from "@/utils/dstech_autonomous_ai";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_tasks.json");
 
@@ -403,6 +407,44 @@ export async function PUT(request: Request) {
       }
     } catch (finErr) {
       console.error("Error syncing task update to dstech_finance_erp.json:", finErr);
+    }
+
+    // --- OTONOM AI WORKFORCE TRIGGER ---
+    // 1. Deni Kurniawan merangkum foto penugasan ke Kotak Persetujuan
+    if (Array.isArray(body.photos) && body.photos.length > 0) {
+      try {
+        triggerDeniAutonomousProgressReport({
+          id: `task_rep_${savedTask.id}_${Date.now()}`,
+          taskId: savedTask.id,
+          ticketNumber: savedTask.ticketNumber,
+          projectName: savedTask.title,
+          clientName: savedTask.client,
+          technician: savedTask.technician,
+          technicianPhone: savedTask.technicianPhone,
+          progressPercentage: savedTask.status === "Completed" ? 100 : 75,
+          location: savedTask.location,
+          activityDescription: savedTask.report || (Array.isArray(savedTask.scope) ? savedTask.scope.join("; ") : "Pekerjaan teknis lapangan"),
+          photos: body.photos,
+          statusAfter: savedTask.status,
+        });
+      } catch (deniErr) {
+        console.warn("Deni task report autonomous trigger error:", deniErr);
+      }
+    }
+
+    // 2. Dewi Sartika secara otonom membuat Faktur Penjualan jika penugasan proyek berstatus Completed
+    if (body.status === "Completed" && (savedTask.isProject || savedTask.projectId)) {
+      try {
+        triggerDewiAutonomousProjectInvoice({
+          id: savedTask.projectId || savedTask.id,
+          projectCode: savedTask.ticketNumber,
+          projectName: savedTask.title,
+          clientName: savedTask.client,
+          businessEntity: savedTask.entityType || "PT",
+        });
+      } catch (dewiErr) {
+        console.warn("Dewi task completed invoice trigger error:", dewiErr);
+      }
     }
 
     return NextResponse.json(

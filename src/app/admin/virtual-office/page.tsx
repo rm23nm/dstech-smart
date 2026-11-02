@@ -83,7 +83,7 @@ export interface ApprovalItem {
   employee_name: string;
   employee_role: string;
   department: string;
-  task_type: "SPH_PROPOSAL" | "PRODUCT_IMPORT" | "PROMO_CAMPAIGN" | "CRM_LEAD" | "SPK_FIELD" | "VIDEO_BRANDING" | "SOCIAL_MEDIA_CONTENT" | "BOOKKEEPING_EXPENSE" | string;
+  task_type: "SPH_PROPOSAL" | "INVOICE_PROPOSAL" | "FIELD_PROGRESS_REPORT" | "PRODUCT_IMPORT" | "PROMO_CAMPAIGN" | "CRM_LEAD" | "SPK_FIELD" | "VIDEO_BRANDING" | "SOCIAL_MEDIA_CONTENT" | "BOOKKEEPING_EXPENSE" | string;
   title: string;
   target_client?: string;
   value?: number;
@@ -1379,7 +1379,11 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                                 ? "Memproses..."
                                 : item.task_type === "VIDEO_BRANDING" || item.task_type === "SOCIAL_MEDIA_CONTENT" || item.task_type === "PROMO_CAMPAIGN"
                                   ? "🚀 Setujui & Posting"
-                                  : "Setujui & Terapkan"}
+                                  : item.task_type === "INVOICE_PROPOSAL"
+                                    ? "📄 Sahkan Faktur ERP"
+                                    : item.task_type === "FIELD_PROGRESS_REPORT"
+                                      ? "📋 Sahkan Berita Acara"
+                                      : "Setujui & Terapkan"}
                             </span>
                           </button>
 
@@ -1475,7 +1479,17 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                   <div className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-indigo-500/30 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center text-lg font-black shadow-inner">
-                        {previewItem.task_type === "SPH_PROPOSAL" ? "📑" : previewItem.task_type === "BOOKKEEPING_EXPENSE" ? "💰" : previewItem.task_type === "PRODUCT_IMPORT" ? "🛍️" : "📢"}
+                        {previewItem.task_type === "SPH_PROPOSAL"
+                          ? "📑"
+                          : previewItem.task_type === "BOOKKEEPING_EXPENSE"
+                            ? "💰"
+                            : previewItem.task_type === "INVOICE_PROPOSAL"
+                              ? "📄"
+                              : previewItem.task_type === "FIELD_PROGRESS_REPORT"
+                                ? "📋"
+                                : previewItem.task_type === "PRODUCT_IMPORT"
+                                  ? "🛍️"
+                                  : "📢"}
                       </div>
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -1529,6 +1543,194 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                     </div>
 
                     {/* DETAIL SESUAI JENIS PEKERJAAN */}
+                    {/* 0a. DOKUMEN DRAF FAKTUR PENJUALAN (INVOICE) PROYEK SELESAI */}
+                    {previewItem.task_type === "INVOICE_PROPOSAL" && previewItem.payload && (
+                      <div className="p-6 rounded-2xl bg-slate-950 border border-cyan-500/40 space-y-5">
+                        {/* Header Faktur */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="px-2.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 font-mono font-black text-xs border border-cyan-500/30">
+                                {previewItem.payload.invoiceNumber}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">
+                                ✓ Terbit Otonom Proyek Selesai
+                              </span>
+                            </div>
+                            <h4 className="text-base font-black text-white mt-1.5">{previewItem.payload.projectName || previewItem.title}</h4>
+                            <p className="text-xs text-slate-400">Kode Proyek: <span className="font-mono text-cyan-300">{previewItem.payload.projectCode || "-"}</span></p>
+                          </div>
+
+                          <div className="text-left sm:text-right space-y-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Jatuh Tempo Pembayaran</span>
+                            <span className="text-xs font-mono font-black text-amber-400 block">{previewItem.payload.dueDate || "14 Hari Kerja"}</span>
+                            <span className="text-[10px] text-slate-500 block">Tgl Terbit: {previewItem.payload.date}</span>
+                          </div>
+                        </div>
+
+                        {/* Info Klien & Entitas Bisnis */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 text-xs">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Ditagihkan Kepada:</span>
+                            <p className="font-black text-white">{previewItem.payload.customerName || previewItem.target_client}</p>
+                            <p className="text-slate-300 text-[11px] mt-0.5">{previewItem.payload.customerAddress || "Banten / Jabodetabek"}</p>
+                            <p className="text-slate-400 text-[11px] font-mono">Telp: {previewItem.payload.customerPhone || "-"}</p>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Metode & Rekening Pembayaran:</span>
+                            <p className="font-bold text-emerald-400">PT. DSTech Smart Perkasa</p>
+                            <p className="text-slate-300 text-[11px] font-mono">BCA: 295-074-0321</p>
+                            <p className="text-slate-300 text-[11px] font-mono">Mandiri: 163-00-0435889-1</p>
+                          </div>
+                        </div>
+
+                        {/* Tabel Rincian Tagihan */}
+                        <div className="space-y-2">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Rincian Pos Tagihan Pekerjaan:</span>
+                          <div className="overflow-x-auto rounded-xl border border-slate-800">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-slate-900/90 text-slate-400 font-mono text-[10px] uppercase border-b border-slate-800">
+                                <tr>
+                                  <th className="py-2 px-3">Uraian Pekerjaan / Material</th>
+                                  <th className="py-2 px-2 text-center">Qty</th>
+                                  <th className="py-2 px-3 text-right">Harga Satuan</th>
+                                  <th className="py-2 px-3 text-right">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/60 font-sans">
+                                {(previewItem.payload.items || []).map((it: any, idx: number) => (
+                                  <tr key={idx} className="hover:bg-slate-900/40">
+                                    <td className="py-2 px-3 text-white font-medium">{it.productName || it.name}</td>
+                                    <td className="py-2 px-2 text-center font-mono text-slate-300">{it.qty} {it.unit || "Paket"}</td>
+                                    <td className="py-2 px-3 text-right font-mono text-slate-300">Rp {(Number(it.price) || 0).toLocaleString("id-ID")}</td>
+                                    <td className="py-2 px-3 text-right font-mono font-bold text-cyan-300">Rp {(Number(it.total) || 0).toLocaleString("id-ID")}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Ringkasan Subtotal, PPN, Grand Total */}
+                        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                          <div className="flex items-center justify-between text-xs text-slate-300">
+                            <span>Subtotal DPP:</span>
+                            <span className="font-mono font-bold">Rp {(previewItem.payload.subtotal || 0).toLocaleString("id-ID")}</span>
+                          </div>
+                          {previewItem.payload.taxRate > 0 && (
+                            <div className="flex items-center justify-between text-xs text-slate-300">
+                              <span>PPN 11%:</span>
+                              <span className="font-mono font-bold text-amber-400">+ Rp {(previewItem.payload.taxAmount || 0).toLocaleString("id-ID")}</span>
+                            </div>
+                          )}
+                          <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-sm">
+                            <span className="font-black text-white">TOTAL FAKTUR PENJUALAN:</span>
+                            <span className="font-mono font-black text-emerald-400 text-base">
+                              Rp {(previewItem.payload.grandTotal || previewItem.value || 0).toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 0b. DOKUMEN BERITA ACARA KEMAJUAN PEKERJAAN & FOTO TEKNISI */}
+                    {previewItem.task_type === "FIELD_PROGRESS_REPORT" && previewItem.payload && (
+                      <div className="p-6 rounded-2xl bg-slate-950 border border-emerald-500/40 space-y-5">
+                        {/* Header Berita Acara */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono font-black text-xs border border-emerald-500/30">
+                                {previewItem.payload.reportNumber}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 text-[10px] font-bold border border-cyan-500/30">
+                                📋 Berita Acara Progres Lapangan
+                              </span>
+                            </div>
+                            <h4 className="text-base font-black text-white mt-1.5">{previewItem.payload.projectName || previewItem.title}</h4>
+                            <p className="text-xs text-slate-400">Klien: <span className="font-bold text-white">{previewItem.payload.clientName || previewItem.target_client}</span> • Lokasi: <span className="text-slate-300">{previewItem.payload.location || "Site"}</span></p>
+                          </div>
+
+                          <div className="text-left sm:text-right space-y-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Teknisi Pelaksana</span>
+                            <span className="text-xs font-bold text-amber-300 block">👷 {previewItem.payload.technicianName}</span>
+                            <span className="text-[10px] font-mono text-slate-400 block">Tgl: {previewItem.payload.date} ({previewItem.payload.reportTime || "17:00 WIB"})</span>
+                          </div>
+                        </div>
+
+                        {/* Meter Kemajuan Pekerjaan (Progress Bar) */}
+                        <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-black text-white">Capaian Progres Pekerjaan:</span>
+                            <span className="font-mono font-black text-emerald-400 text-sm">{previewItem.payload.progressPercentage}%</span>
+                          </div>
+                          <div className="w-full h-3 rounded-full bg-slate-800 overflow-hidden border border-slate-700/60 relative">
+                            <div
+                              className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 transition-all duration-500"
+                              style={{ width: `${Math.min(100, Math.max(0, previewItem.payload.progressPercentage))}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Uraian Kegiatan & Catatan Teknis */}
+                        <div className="space-y-3">
+                          <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs space-y-1">
+                            <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block">Uraian Kegiatan Pekerjaan Lapangan:</span>
+                            <p className="text-slate-200 leading-relaxed">{previewItem.payload.activityDescription}</p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/80">
+                              <span className="text-[10px] font-bold text-amber-400 uppercase block mb-1">Catatan Kendala (Blockers):</span>
+                              <p className="text-slate-300">{previewItem.payload.blockers || "Tidak ada kendala (Aman & Lancar)"}</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/80">
+                              <span className="text-[10px] font-bold text-cyan-400 uppercase block mb-1">Tindak Lanjut Berikutnya:</span>
+                              <p className="text-slate-300">{previewItem.payload.nextAction || "Melanjutkan tahapan commissioning dan pengetesan"}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Galeri Foto Dokumentasi Lapangan */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-wider block">
+                              📸 Galeri Foto Dokumentasi Lapangan ({(previewItem.payload.photos || []).length} Foto Bukti Fisik):
+                            </span>
+                            <span className="text-[10px] text-emerald-400 font-bold">Terverifikasi Timestamp</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {(previewItem.payload.photos || []).map((photo: any, pIdx: number) => {
+                              const photoUrl = typeof photo === "string" ? photo : (photo.url || photo.data || "/service-cctv.png");
+                              const caption = typeof photo === "string" ? `Foto Titik #${pIdx + 1}` : (photo.caption || `Dokumentasi #${pIdx + 1}`);
+                              return (
+                                <div key={pIdx} className="rounded-xl overflow-hidden bg-slate-900 border border-slate-800 group hover:border-emerald-500/60 transition-all flex flex-col">
+                                  <div className="relative aspect-video w-full overflow-hidden bg-slate-950">
+                                    <img
+                                      src={photoUrl}
+                                      alt={caption}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                  </div>
+                                  <div className="p-2.5 text-[10.5px] space-y-1 flex-1 flex flex-col justify-between">
+                                    <p className="text-slate-200 font-medium line-clamp-2">{caption}</p>
+                                    <div className="flex items-center justify-between text-[9px] text-slate-500 pt-1 border-t border-slate-800/60">
+                                      <span>Titik #{pIdx + 1}</span>
+                                      <a href={photoUrl} target="_blank" rel="noreferrer" className="text-cyan-400 hover:underline flex items-center gap-0.5">
+                                        <span>Lihat Full</span>
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </a>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* 1. DOKUMEN SPH PENAWARAN HARGA */}
                     {previewItem.task_type === "SPH_PROPOSAL" && previewItem.payload && (
                       <div className="p-5 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-4">
@@ -2509,10 +2711,14 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                           )}
                           <span>
                             {approvingId === previewItem.id
-                              ? "Memproses Publikasi Medsos..."
+                              ? "Memproses..."
                               : previewItem.task_type === "VIDEO_BRANDING" || previewItem.task_type === "SOCIAL_MEDIA_CONTENT" || previewItem.task_type === "PROMO_CAMPAIGN"
                                 ? "🚀 Setujui & Publikasikan Otomatis ke Seluruh Medsos"
-                                : "Setujui & Terapkan Resmi ke Database"}
+                                : previewItem.task_type === "INVOICE_PROPOSAL"
+                                  ? "📄 Setujui & Terbitkan Faktur Resmi ERP"
+                                  : previewItem.task_type === "FIELD_PROGRESS_REPORT"
+                                    ? "📋 Setujui Berita Acara & Sahkan Progres"
+                                    : "Setujui & Terapkan Resmi ke Database"}
                           </span>
                         </button>
                       </div>
