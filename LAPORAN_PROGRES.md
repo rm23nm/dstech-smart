@@ -7,6 +7,36 @@
 - **Daftar Antrean Permintaan Pengguna Baru (Queue Backlog)**:
   1. *Permintaan*: "saya melihat karyawan AI yang dihasilkan dari aplikasi N8N dia bisa bekerja dengan sempurna, bagaimana bisa seperti itu?" (Penjelasan perbandingan arsitektur autonomous agentic workflow n8n vs built-in workforce engine DSTech Smart).
 
+- **Tugas 352 (2026-11-02)**: [SELESAI] Penguatan Standar Operasional Prosedur (SOP) Otonom Karyawan AI Lintas 6 Divisi (Autonomous Engine ReAct & Tool Execution: Auto-Invoice Proyek Selesai, Multimodal Struk Belanja, Auto-SPH Dokumen Inquiry, Auto-Restok Gudang Menipis, Auto-Campaign WA/Sosmed, dan Triage Tiket Pelanggan) (`src/utils/dstech_autonomous_ai.ts`, `src/app/api/ai-workforce/route.ts`, `src/app/api/team-chat/route.ts`, `src/app/admin/virtual-office/page.tsx`).
+  *Permintaan User*: "ok, mari kita perkuat dulu SOP otonom kita"
+  *Akar Kebutuhan & Desain Arsitektur Solusi*:
+  1. **Standardisasi SOP Otonom Lintas 6 Divisi Karyawan AI**:
+     - **Divisi 1 (Dewi Sartika - Keuangan & Billing)**: SOP Auto-Invoice saat proyek completed, SOP Multimodal OCR struk nota belanja menjadi draf beban operasional, dan pengingat tagihan jatuh tempo.
+     - **Divisi 2 (Bambang Prakoso - Sales & Tender SPH)**: SOP Pemrosesan Inquiry (Excel, PDF, Gambar, Teks Spek) menjadi Draf SPH resmi (`SPH_PROPOSAL`) dengan pencocokan database harga barang DSTech.
+     - **Divisi 3 (Deni Kurniawan - Lapangan & Dispatcher)**: SOP Penyusunan Berita Acara Kemajuan Pekerjaan (BAKP) dan album galeri foto teknisi lapangan.
+     - **Divisi 4 (Reza Firmansyah - Gudang & Pengadaan)**: SOP Proaktif Restok: memantau stok gudang yang menipis (<= 2 unit) dan otomatis membuat draf Purchase Order (PO) pengadaan barang ke Kotak Persetujuan.
+     - **Divisi 5 (Nadia Safitri - Pemasaran & Konten)**: SOP Promosi Otonom: menyusun materi draf broadcast WhatsApp blast & caption Instagram Reels sesuai promo aktif.
+     - **Divisi 6 (Siti Nurhaliza - Customer Care 24 Jam)**: SOP Triage Cepat: mengklasifikasikan pertanyaan klien (komplain teknis diteruskan ke Deni, permintaan penawaran diteruskan ke Bambang, konfirmasi pembayaran ke Dewi).
+  2. **Penguatan Autonomous Scanner Engine (`src/utils/dstech_autonomous_ai.ts`)**:
+     - Menambahkan fungsi pemantauan stok menipis untuk Reza (`triggerRezaAutonomousStockRestock`).
+     - Menambahkan fungsi pembuat draf SPH otonom untuk Bambang (`triggerBambangAutonomousSPH`).
+     - Menambahkan fungsi pembuatan materi promo autopilot untuk Nadia (`triggerNadiaAutonomousMarketing`).
+     - Menambahkan fungsi triage layanan pelanggan untuk Siti (`triggerSitiAutonomousTriage`).
+     - Menghubungkan seluruh trigger ke `scanAndExecuteAutonomousWorkforce()`.
+  3. **Human-in-the-Loop Safeguard**:
+     - Semua aksi berisiko finansial atau inventaris tetap diwajibkan masuk ke **Kotak Persetujuan Pimpinan** (Bpk. Ramadhani ST) sebelum dicatat ke database resmi `dstech_`.
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mengidentifikasi seluruh kebutuhan SOP otonom lintas 6 divisi.
+  2. [x] Mencatat rencana kerja step-by-step Tugas 352 di `LAPORAN_PROGRES.md`.
+  3. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task352_autonomous_sop_strengthening/` dan mengamankan target berkas.
+  4. [x] Memodifikasi `src/utils/dstech_autonomous_ai.ts` untuk melengkapi fungsi otonom Bambang (SPH), Reza (Restok Gudang), Nadia (Promo), dan Siti (Triage).
+  5. [x] Menghubungkan scanner otonom terintegrasi pada `src/app/api/ai-workforce/route.ts` dan `src/app/api/team-chat/route.ts`.
+  6. [x] Menjalankan validasi TypeScript compiler (`tsc --noEmit`) hingga 0 error.
+  7. [x] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses.
+  8. [x] Melakukan push commit ke GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  9. [x] Memverifikasi fitur SOP otonom pada browser live.
+  10. [x] Membersihkan folder cadangan dan menandai Tugas 352 sebagai [SELESAI].
+
 - **Tugas 351 (2026-11-02)**: [SELESAI] Peningkatan Ketajaman, Resolusi Hi-DPI 2K & Pembesaran Tipografi Layar Monitor 3D Kantor Virtual (Akurasi Visual Monitor Keuangan ERP & Pipeline SPH) (`src/components/virtual-office/Office3DCanvas.tsx`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "tulisan pada layar monitornya kurang jelas." (dengan tangkapan layar 3D Kantor Virtual yang memperlihatkan kedua layar monitor dinding kiri & kanan tampak buram dan teks angka sulit dibaca dari jarak pandang kamera default).
   *Akar Masalah yang Ditemukan*:

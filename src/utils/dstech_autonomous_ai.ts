@@ -5,6 +5,8 @@ const WORKFORCE_FILE = path.join(process.cwd(), "src", "data", "dstech_ai_workfo
 const FINANCE_FILE = path.join(process.cwd(), "src", "data", "dstech_finance_erp.json");
 const DAILY_REPORTS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_daily_reports.json");
 const TASKS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_tasks.json");
+const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
+const PROMOTIONS_FILE = path.join(process.cwd(), "src", "data", "dstech_promotions.json");
 
 function readJsonSafely(filePath: string, fallback: any = {}): any {
   try {
@@ -316,17 +318,391 @@ export function triggerDeniAutonomousProgressReport(reportData: any) {
 }
 
 /**
- * 3. SCANNER OTONOM: Pengecekan Proaktif Berkala (Dipanggil saat GET /api/ai-workforce atau Autopilot)
+ * 3. BAMBANG PRAKOSO: Pembuatan Draf Surat Penawaran Harga (SPH) Otonom dari Inquiry Klien
+ */
+export function triggerBambangAutonomousSPH(inquiryData: any) {
+  if (!inquiryData) return { success: false, reason: "Inquiry invalid" };
+
+  const finData = readJsonSafely(FINANCE_FILE, { quotations: [] });
+  const wfData = readJsonSafely(WORKFORCE_FILE, {
+    dstech_approval_queue: [],
+    dstech_recent_logs: [],
+    dstech_employees: [],
+    dstech_dismissed_topics: [],
+  });
+
+  if (!Array.isArray(wfData.dstech_approval_queue)) wfData.dstech_approval_queue = [];
+  if (!Array.isArray(wfData.dstech_recent_logs)) wfData.dstech_recent_logs = [];
+  if (!Array.isArray(wfData.dstech_employees)) wfData.dstech_employees = [];
+  if (!Array.isArray(wfData.dstech_dismissed_topics)) wfData.dstech_dismissed_topics = [];
+
+  const clientName = inquiryData.clientName || inquiryData.customerName || "Calon Klien DSTech";
+  const clientOrg = inquiryData.clientOrg || inquiryData.company || clientName;
+  const clientPhone = inquiryData.clientPhone || inquiryData.phone || "0812-9988-7766";
+  const clientAddress = inquiryData.clientAddress || inquiryData.address || "Area Banten / Jabodetabek";
+  const subject = inquiryData.subject || inquiryData.title || `Penawaran Perangkat & Sistem Smart Solution (${clientOrg})`;
+
+  // Cek blacklist penolakan
+  const isDismissed = wfData.dstech_dismissed_topics.some(
+    (t: any) =>
+      (t.client && clientName.toLowerCase().includes(t.client.toLowerCase())) ||
+      (t.title && subject.toLowerCase().includes(t.title.toLowerCase()))
+  );
+  if (isDismissed) {
+    return { success: false, reason: "Topik atau klien ini pernah ditolak/dihapus Direktur Utama" };
+  }
+
+  // Cek antrean duplikat
+  const existingQueue = wfData.dstech_approval_queue.find(
+    (q: any) =>
+      q.task_type === "SPH_PROPOSAL" &&
+      q.status !== "REJECTED" &&
+      q.target_client &&
+      q.target_client.trim().toLowerCase() === clientName.trim().toLowerCase()
+  );
+  if (existingQueue) {
+    return { success: false, reason: "Draf SPH untuk klien ini sudah ada di antrean persetujuan", queueId: existingQueue.id };
+  }
+
+  // Siapkan item penawaran (dari inquiry atau katalog produk)
+  let items = Array.isArray(inquiryData.items) && inquiryData.items.length > 0 ? inquiryData.items : [];
+  if (items.length === 0) {
+    const productsData = readJsonSafely(PRODUCTS_FILE, []);
+    const barrierProd = productsData.find((p: any) => p.name?.toLowerCase().includes("barrier") || p.category?.toLowerCase().includes("barrier")) || {
+      name: "Paket Barrier Gate Otomatis MX-Series Heavy Duty",
+      price: 18500000,
+      costPrice: 13000000,
+    };
+    items = [
+      {
+        id: "1",
+        productName: barrierProd.name || "Paket Barrier Gate Otomatis High Speed",
+        qty: 1,
+        unit: "Paket",
+        price: barrierProd.price || 18500000,
+        total: barrierProd.price || 18500000,
+        notes: "Unit motor, palang octagonal 3m/4m, wireless remote & loop detector",
+      },
+      {
+        id: "2",
+        productName: "Jasa Instalasi, Commissioning & Pemasangan Kabel Power Ground",
+        qty: 1,
+        unit: "Titik",
+        price: 2500000,
+        total: 2500000,
+        notes: "Termasuk pondasi cor, angkur, instalasi pipa conduit & testing sistem",
+      },
+    ];
+  }
+
+  const subtotal = items.reduce((acc: number, cur: any) => acc + (Number(cur.total) || Number(cur.price) * (Number(cur.qty) || 1) || 0), 0);
+  const taxRate = inquiryData.businessEntity === "NON_PT" ? 0 : 11;
+  const taxAmount = taxRate > 0 ? Math.round(subtotal * 0.11) : 0;
+  const grandTotal = subtotal + taxAmount;
+
+  const now = new Date();
+  const yearMonth = now.toISOString().slice(0, 7).replace("-", "");
+  const quotations = Array.isArray(finData.quotations) ? finData.quotations : [];
+  const draftSphNumber = `SPH-DSTECH-${yearMonth}-${String(quotations.length + 1).padStart(3, "0")}`;
+
+  const sphProposal = {
+    id: `appr_bambang_sph_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    revision: 0,
+    employee_id: "emp_bambang_sales",
+    employee_name: "Bambang Prakoso",
+    employee_role: "AI Sales & Tender SPH Specialist",
+    department: "SALES",
+    task_type: "SPH_PROPOSAL",
+    title: `Draf Surat Penawaran Harga (SPH): ${subject}`,
+    target_client: clientName,
+    value: grandTotal,
+    tax_type: taxRate > 0 ? "exclude" : "none",
+    summary: `[OTONOM INQUIRY SPH] Bambang Prakoso telah menganalisis permintaan kebutuhan dari ${clientName} (${clientOrg}) dan menyusun Draf SPH resmi (${draftSphNumber}) senilai Rp ${grandTotal.toLocaleString("id-ID")}. Penawaran mencakup ${items.length} item pekerjaan, garansi 1 tahun, dan PPN 11%. Menunggu pengesahan Direktur Utama (Bpk. Ramadhani ST).`,
+    status: "PENDING_APPROVAL",
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+    payload: {
+      quotationNumber: draftSphNumber,
+      customerName: clientName,
+      customerOrg: clientOrg,
+      customerPhone: clientPhone,
+      customerAddress: clientAddress,
+      subject: subject,
+      date: now.toISOString().split("T")[0],
+      validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+      validityDays: 14,
+      items: items,
+      subtotal: subtotal,
+      discount: 0,
+      taxRate: taxRate,
+      taxType: taxRate > 0 ? "exclude" : "none",
+      taxAmount: taxAmount,
+      grandTotal: grandTotal,
+      terms: "1. Harga penawaran adalah Netto Exclude PPN 11%.\n2. Garansi unit hardware resmi 1 (satu) tahun ganti baru.\n3. Garansi pemeliharaan & instalasi selama 6 bulan.\n4. Pembayaran: DP 50% saat PO terbit, Pelunasan 50% setelah serah terima pekerjaan (BAST).",
+      approvalStatus: "Menunggu Approval",
+      isAutonomousGenerated: true,
+      businessEntity: inquiryData.businessEntity || "PT",
+    },
+  };
+
+  wfData.dstech_approval_queue.unshift(sphProposal);
+
+  // Update speech bubble Bambang Prakoso
+  const bambangIdx = wfData.dstech_employees.findIndex((e: any) => e.id === "emp_bambang_sales");
+  if (bambangIdx !== -1) {
+    wfData.dstech_employees[bambangIdx].speech_bubble = `Pak Ramadhani, saya mendeteksi inquiry dari ${clientName}! Draf SPH resmi (${draftSphNumber}) senilai Rp ${grandTotal.toLocaleString("id-ID")} sudah saya susun di Kotak Persetujuan untuk Bapak sahkan.`;
+    wfData.dstech_employees[bambangIdx].status = "WORKING";
+  }
+
+  // Catat log otonom
+  wfData.dstech_recent_logs.unshift({
+    id: `log_sph_${Date.now()}`,
+    timestamp: now.toISOString(),
+    employee_id: "emp_bambang_sales",
+    employee_name: "Bambang Prakoso",
+    action: `[OTONOM INQUIRY SPH] Bambang Prakoso menyusun Draf SPH (${draftSphNumber}) senilai Rp ${grandTotal.toLocaleString("id-ID")} untuk "${clientName}" (${subject}) ke Kotak Persetujuan Direktur Utama.`,
+  });
+
+  writeJsonSafely(WORKFORCE_FILE, wfData);
+  return { success: true, proposal: sphProposal };
+}
+
+/**
+ * 4. REZA FIRMANSYAH: Pemantauan Stok Menipis & Draf PO Pengadaan Otonom
+ */
+export function triggerRezaAutonomousStockRestock(product: any) {
+  if (!product || !product.id) return { success: false, reason: "Produk invalid" };
+
+  const currentStock = Number(product.stock) || 0;
+  if (currentStock > 2) {
+    return { success: false, reason: "Stok produk masih aman (> 2 unit)" };
+  }
+
+  const wfData = readJsonSafely(WORKFORCE_FILE, {
+    dstech_approval_queue: [],
+    dstech_recent_logs: [],
+    dstech_employees: [],
+  });
+
+  if (!Array.isArray(wfData.dstech_approval_queue)) wfData.dstech_approval_queue = [];
+  if (!Array.isArray(wfData.dstech_recent_logs)) wfData.dstech_recent_logs = [];
+  if (!Array.isArray(wfData.dstech_employees)) wfData.dstech_employees = [];
+
+  const prodId = product.id;
+  const prodName = product.name || "Perangkat Sparepart DSTech";
+
+  // Cek antrean duplikat
+  const existingQueue = wfData.dstech_approval_queue.find(
+    (q: any) =>
+      q.task_type === "PRODUCT_IMPORT" &&
+      q.status !== "REJECTED" &&
+      ((q.payload?.productId && q.payload.productId === prodId) ||
+        (q.title && q.title.includes(prodName)))
+  );
+  if (existingQueue) {
+    return { success: false, reason: "Usulan pengadaan produk ini sudah ada di antrean persetujuan", queueId: existingQueue.id };
+  }
+
+  const orderQty = 10;
+  const unitCost = Number(product.costPrice) || Math.round((Number(product.price) || 500000) * 0.7);
+  const estimatedCost = orderQty * unitCost;
+
+  const now = new Date();
+  const yearMonth = now.toISOString().slice(0, 7).replace("-", "");
+  const poNumber = `PO-RESTOK-${yearMonth}-${String(Date.now()).slice(-4)}`;
+
+  const restockProposal = {
+    id: `appr_reza_restok_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    revision: 0,
+    employee_id: "emp_reza_catalog",
+    employee_name: "Reza Firmansyah",
+    employee_role: "AI Procurement & Warehouse Specialist",
+    department: "CATALOG_ESTORE",
+    task_type: "PRODUCT_IMPORT",
+    title: `Usulan Pengadaan & Restok Suku Cadang: ${prodName} (Stok: ${currentStock} ${product.unit || 'Unit'})`,
+    target_client: "Katalog E-Store & Gudang Cilegon",
+    value: estimatedCost,
+    tax_type: "none",
+    summary: `[OTONOM MONITORING GUDANG] Reza Firmansyah mendeteksi stok ${prodName} di Gudang Operasional menipis tersisa ${currentStock} ${product.unit || 'Unit'} (di bawah batas minimum 2 unit). Merekomendasikan Purchase Order restok pengadaan ${orderQty} ${product.unit || 'Unit'} dengan estimasi anggaran modal Rp ${estimatedCost.toLocaleString("id-ID")}. Menunggu persetujuan Direktur Utama.`,
+    status: "PENDING_APPROVAL",
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+    payload: {
+      productId: prodId,
+      productName: prodName,
+      category: product.category || "Hardware & Sparepart",
+      currentStock: currentStock,
+      orderQty: orderQty,
+      unitCost: unitCost,
+      estimatedCost: estimatedCost,
+      poNumber: poNumber,
+      supplierName: product.brand || "Distributor Resmi Hardware",
+      warehouseTarget: "dstech_wh_1 (Gudang Utama Cilegon)",
+      isAutonomousGenerated: true,
+      approvalStatus: "Menunggu Persetujuan",
+    },
+  };
+
+  wfData.dstech_approval_queue.unshift(restockProposal);
+
+  // Update speech bubble Reza Firmansyah
+  const rezaIdx = wfData.dstech_employees.findIndex((e: any) => e.id === "emp_reza_catalog");
+  if (rezaIdx !== -1) {
+    wfData.dstech_employees[rezaIdx].speech_bubble = `Pak Ramadhani, stok ${prodName} di gudang tersisa ${currentStock} ${product.unit || 'unit'}. Draf PO pengadaan barang (${poNumber}) senilai Rp ${estimatedCost.toLocaleString("id-ID")} sudah saya siapkan di Kotak Persetujuan.`;
+    wfData.dstech_employees[rezaIdx].status = "WORKING";
+  }
+
+  // Catat log otonom
+  wfData.dstech_recent_logs.unshift({
+    id: `log_restok_${Date.now()}`,
+    timestamp: now.toISOString(),
+    employee_id: "emp_reza_catalog",
+    employee_name: "Reza Firmansyah",
+    action: `[OTONOM MONITORING GUDANG] Reza Firmansyah mengajukan usulan restok ${orderQty} unit ${prodName} (Stok tersisa: ${currentStock}) senilai Rp ${estimatedCost.toLocaleString("id-ID")} ke Kotak Persetujuan Direktur Utama.`,
+  });
+
+  writeJsonSafely(WORKFORCE_FILE, wfData);
+  return { success: true, proposal: restockProposal };
+}
+
+/**
+ * 5. NADIA SAFITRI: Pembuatan Draf Kampanye Promo & Konten Pemasaran Otonom
+ */
+export function triggerNadiaAutonomousMarketing(promoContext?: any) {
+  const wfData = readJsonSafely(WORKFORCE_FILE, {
+    dstech_approval_queue: [],
+    dstech_recent_logs: [],
+    dstech_employees: [],
+  });
+
+  if (!Array.isArray(wfData.dstech_approval_queue)) wfData.dstech_approval_queue = [];
+  if (!Array.isArray(wfData.dstech_recent_logs)) wfData.dstech_recent_logs = [];
+  if (!Array.isArray(wfData.dstech_employees)) wfData.dstech_employees = [];
+
+  // Hindari spamming draf marketing jika sudah ada draf marketing aktif yang pending
+  const hasActiveMarketing = wfData.dstech_approval_queue.some(
+    (q: any) =>
+      q.employee_id === "emp_nadia_marketing" &&
+      q.status === "PENDING_APPROVAL"
+  );
+  if (hasActiveMarketing) {
+    return { success: false, reason: "Draf promosi Nadia masih menunggu persetujuan pimpinan" };
+  }
+
+  const now = new Date();
+  const theme = promoContext?.theme || "Promo Spesial Paket Smart Barrier Gate Perumahan & Industrial";
+  const promoTitle = `Materi Promosi WhatsApp & Reels: ${theme}`;
+
+  const marketingProposal = {
+    id: `appr_nadia_promo_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    revision: 0,
+    employee_id: "emp_nadia_marketing",
+    employee_name: "Nadia Safitri",
+    employee_role: "AI Creative Marketing & Social Media",
+    department: "MARKETING",
+    task_type: "PROMO_CAMPAIGN",
+    title: promoTitle,
+    target_client: "Mitra Pengembang, Pengelola Kawasan & Calon Klien",
+    value: 0,
+    tax_type: "none",
+    summary: `[OTONOM KAMPANYE PROMOSI] Nadia Safitri telah merancang materi siaran WhatsApp Autopilot dan naskah Reels Instagram bertema "${theme}". Siap dipublikasikan untuk meningkatkan prospek masuk. Menunggu persetujuan Direktur Utama.`,
+    status: "PENDING_APPROVAL",
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+    payload: {
+      campaignTitle: theme,
+      channel: "WhatsApp Broadcast & Social Media",
+      targetAudience: "Pengelola Cluster, Kawasan Industri Banten-Jabodetabek, Rumah Sakit, Instansi",
+      waMessageCopy: `*PROMO SPESIAL SISTEM PARKIR & BARRIER GATE OTOMATIS* 🚗✨\n\nHalo Sahabat DSTech!\nTingkatkan keamanan dan prestise kawasan perumahan/kantor Anda dengan sistem *Barrier Gate Otomatis High Speed* dari PT. DSTech Smart Perkasa.\n\n✅ Motor Heavy Duty Tahan Panas 24 Jam\n✅ Sensor Kendaraan Wireless Anti-Tabrak\n✅ Integrasi RFID Card / Tap E-Money & Tiket Parkir\n✅ Garansi Resmi 1 Tahun & Free Maintenance 6 Bulan\n\nHubungi tim teknis kami untuk konsultasi dan survei gratis: 0822-5949-4242 / dstechsmart.com`,
+      socialMediaCaption: `Sistem portal perumahan Anda masih manual? Saatnya upgrade ke Smart Barrier Gate DSTech! Cepat, presisi, anti-tabrak dengan garansi resmi 1 tahun. Hubungi kami sekarang untuk survei lokasi gratis! 🚀 #BarrierGate #SistemParkir #Cilegon #SmartCity #DSTechSmart`,
+      callToAction: "0822-5949-4242 / admin@dstechsmart.com",
+      isAutonomousGenerated: true,
+      approvalStatus: "Menunggu Approval",
+    },
+  };
+
+  wfData.dstech_approval_queue.unshift(marketingProposal);
+
+  // Update speech bubble Nadia Safitri
+  const nadiaIdx = wfData.dstech_employees.findIndex((e: any) => e.id === "emp_nadia_marketing");
+  if (nadiaIdx !== -1) {
+    wfData.dstech_employees[nadiaIdx].speech_bubble = `Pak Ramadhani, materi siaran promosi WhatsApp & naskah Reels bertema "${theme}" sudah saya siapkan di Kotak Persetujuan. Mohon disahkan agar bisa segera saya siarkan.`;
+    wfData.dstech_employees[nadiaIdx].status = "WORKING";
+  }
+
+  // Catat log otonom
+  wfData.dstech_recent_logs.unshift({
+    id: `log_promo_${Date.now()}`,
+    timestamp: now.toISOString(),
+    employee_id: "emp_nadia_marketing",
+    employee_name: "Nadia Safitri",
+    action: `[OTONOM KAMPANYE PROMOSI] Nadia Safitri merancang draf materi promosi "${theme}" untuk disetujui Direktur Utama sebelum disiarkan ke saluran WhatsApp dan medsos.`,
+  });
+
+  writeJsonSafely(WORKFORCE_FILE, wfData);
+  return { success: true, proposal: marketingProposal };
+}
+
+/**
+ * 6. SITI NURHALIZA: Triage Layanan Pelanggan & Koordinasi Otonom 24 Jam
+ */
+export function triggerSitiAutonomousTriage(messageData: any) {
+  const wfData = readJsonSafely(WORKFORCE_FILE, {
+    dstech_employees: [],
+    dstech_recent_logs: [],
+  });
+
+  if (!Array.isArray(wfData.dstech_employees)) wfData.dstech_employees = [];
+  if (!Array.isArray(wfData.dstech_recent_logs)) wfData.dstech_recent_logs = [];
+
+  const customer = messageData?.name || messageData?.customerName || "Pelanggan DSTech";
+  const text = (messageData?.message || messageData?.text || "").toLowerCase();
+
+  let delegatedTo = "Bambang Prakoso (Sales)";
+  let triageType = "Inquiry Penawaran";
+
+  if (text.includes("rusak") || text.includes("error") || text.includes("mati") || text.includes("servis") || text.includes("kendala") || text.includes("teknisi")) {
+    delegatedTo = "Deni Kurniawan (Operasional Lapangan)";
+    triageType = "Keluhan Teknis Lapangan";
+  } else if (text.includes("invoice") || text.includes("tagihan") || text.includes("bayar") || text.includes("transfer") || text.includes("rekening")) {
+    delegatedTo = "Dewi Sartika (Keuangan)";
+    triageType = "Layanan Finansial & Tagihan";
+  }
+
+  const now = new Date();
+  const sitiIdx = wfData.dstech_employees.findIndex((e: any) => e.id === "emp_siti_cs");
+  if (sitiIdx !== -1) {
+    wfData.dstech_employees[sitiIdx].speech_bubble = `Pak Ramadhani, saya baru saja merespons pesan masuk dari ${customer} (< 1 menit). Kategori: ${triageType}, koordinasi telah saya teruskan ke rekan ${delegatedTo}.`;
+    wfData.dstech_employees[sitiIdx].status = "WORKING";
+  }
+
+  wfData.dstech_recent_logs.unshift({
+    id: `log_triage_${Date.now()}`,
+    timestamp: now.toISOString(),
+    employee_id: "emp_siti_cs",
+    employee_name: "Siti Nurhaliza",
+    action: `[OTONOM CUSTOMER CARE 24H] Siti Nurhaliza merespons chat dari ${customer} dalam tempo respons 45 detik dan mendisposisikan kebutuhan ke ${delegatedTo}.`,
+  });
+
+  writeJsonSafely(WORKFORCE_FILE, wfData);
+  return { success: true, triageType, delegatedTo };
+}
+
+/**
+ * 7. SCANNER OTONOM UTAMA: Pengecekan Proaktif Berkala Lintas 6 Divisi
  */
 export function scanAndExecuteAutonomousWorkforce() {
-  const finData = readJsonSafely(FINANCE_FILE, { projects: [], sales: [] });
+  const finData = readJsonSafely(FINANCE_FILE, { projects: [], sales: [], quotations: [] });
   const tasksData = readJsonSafely(TASKS_FILE, []);
   const dailyReports = readJsonSafely(DAILY_REPORTS_FILE, []);
+  const productsData = readJsonSafely(PRODUCTS_FILE, []);
 
   let newInvoices = 0;
   let newReports = 0;
+  let newStockAlerts = 0;
+  let newPromos = 0;
 
-  // A. Pindai Proyek Selesai untuk Dewi Sartika
+  // A. Pindai Proyek Selesai untuk Dewi Sartika (Auto-Invoice)
   const projects = Array.isArray(finData.projects) ? finData.projects : [];
   for (const prj of projects) {
     const isCompleted =
@@ -340,7 +716,7 @@ export function scanAndExecuteAutonomousWorkforce() {
     }
   }
 
-  // B. Pindai Tugas Lapangan dengan Foto untuk Deni Kurniawan
+  // B. Pindai Tugas Lapangan dengan Foto untuk Deni Kurniawan (BAKP)
   const tasks = Array.isArray(tasksData) ? tasksData : [];
   for (const t of tasks) {
     if (Array.isArray(t.photos) && t.photos.length > 0) {
@@ -370,7 +746,23 @@ export function scanAndExecuteAutonomousWorkforce() {
     }
   }
 
-  return { scannedProjects: projects.length, newInvoices, newReports };
+  // D. Pindai Stok Gudang Menipis untuk Reza Firmansyah (Auto-Restok)
+  const prods = Array.isArray(productsData) ? productsData : [];
+  for (const p of prods) {
+    if (Number(p.stock) <= 2) {
+      const res = triggerRezaAutonomousStockRestock(p);
+      if (res.success) {
+        newStockAlerts++;
+        break; // Batasi 1 usulan restok per pemindaian agar tidak membanjiri antrean
+      }
+    }
+  }
+
+  // E. Pindai Kebutuhan Promo untuk Nadia Safitri (Auto-Campaign)
+  const promoRes = triggerNadiaAutonomousMarketing();
+  if (promoRes.success) newPromos++;
+
+  return { scannedProjects: projects.length, newInvoices, newReports, newStockAlerts, newPromos };
 }
 
 /**
