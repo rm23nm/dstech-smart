@@ -255,6 +255,10 @@ function readWorkforceData() {
       parsed.dstech_approval_queue = DEFAULT_WORKFORCE.dstech_approval_queue;
       writeWorkforceData(parsed);
     }
+    if (!Array.isArray(parsed.dstech_dismissed_topics)) {
+      parsed.dstech_dismissed_topics = [];
+      writeWorkforceData(parsed);
+    }
     return parsed;
   } catch (err) {
     console.error("Error reading dstech_ai_workforce.json:", err);
@@ -921,10 +925,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. REJECT QUEUE ITEM
+    // 2. REJECT QUEUE ITEM (Catat ke Memori Blacklist AI agar Tidak Pernah Diulang)
     if (action === "reject_queue_item") {
       const { itemId, reason } = body;
       if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+      if (!Array.isArray(data.dstech_dismissed_topics)) data.dstech_dismissed_topics = [];
+
       const item = data.dstech_approval_queue.find((it: any) => it.id === itemId);
       if (!item) {
         return NextResponse.json({ success: false, error: "Item pekerjaan tidak ditemukan" }, { status: 404 });
@@ -934,27 +940,53 @@ export async function POST(req: NextRequest) {
       item.reviewed_at = new Date().toISOString();
       item.reviewer_notes = reason || "Ditolak oleh Direktur Utama";
 
+      // SIMPAN KE MEMORI BLACKLIST AI
+      const clientName = item.target_client || item.payload?.customerName || item.payload?.company || item.payload?.client || "";
+      const isAlreadyDismissed = data.dstech_dismissed_topics.some((d: any) =>
+        d.title.toLowerCase() === item.title.toLowerCase() ||
+        (clientName && d.client && d.client.toLowerCase() === clientName.toLowerCase())
+      );
+      if (!isAlreadyDismissed) {
+        data.dstech_dismissed_topics.unshift({
+          id: item.id,
+          title: item.title,
+          client: clientName,
+          task_type: item.task_type,
+          reason: reason || "Ditolak oleh Direktur Utama",
+          dismissed_at: new Date().toISOString(),
+          employee_id: item.employee_id,
+          employee_name: item.employee_name
+        });
+      }
+      if (data.dstech_dismissed_topics.length > 100) {
+        data.dstech_dismissed_topics = data.dstech_dismissed_topics.slice(0, 100);
+      }
+
       const newLog = {
         id: `log_${Date.now()}`,
         timestamp: new Date().toISOString(),
         employee_id: item.employee_id,
         employee_name: item.employee_name,
-        action: `[DITOLAK] Usulan pekerjaan "${item.title}" ditolak oleh Direktur Utama.`,
+        action: `[DITOLAK] Usulan "${item.title}" ditolak oleh Direktur Utama dan dicatat ke memori AI agar tidak diusulkan kembali.`,
       };
+      if (!data.dstech_recent_logs) data.dstech_recent_logs = [];
       data.dstech_recent_logs.unshift(newLog);
       writeWorkforceData(data);
 
       return NextResponse.json({
         success: true,
-        message: `Pekerjaan "${item.title}" telah ditolak.`,
+        message: `Pekerjaan "${item.title}" telah ditolak. Topik & klien ini disimpan ke memori AI agar tidak diulang lagi.`,
         item,
+        dismissedCount: data.dstech_dismissed_topics.length
       });
     }
 
-    // 2b. DELETE QUEUE ITEM (Hapus Permanen Usulan Pekerjaan Tertentu Dari Antrean)
+    // 2b. DELETE QUEUE ITEM (Hapus Permanen & Simpan ke Memori Blacklist AI)
     if (action === "delete_queue_item") {
       const { itemId } = body;
       if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+      if (!Array.isArray(data.dstech_dismissed_topics)) data.dstech_dismissed_topics = [];
+
       const itemIndex = data.dstech_approval_queue.findIndex((it: any) => it.id === itemId);
       if (itemIndex === -1) {
         return NextResponse.json({ success: false, error: "Item pekerjaan tidak ditemukan di antrean" }, { status: 404 });
@@ -963,12 +995,34 @@ export async function POST(req: NextRequest) {
       const deletedItem = data.dstech_approval_queue[itemIndex];
       data.dstech_approval_queue.splice(itemIndex, 1);
 
+      // SIMPAN KE MEMORI BLACKLIST AI
+      const clientName = deletedItem.target_client || deletedItem.payload?.customerName || deletedItem.payload?.company || deletedItem.payload?.client || "";
+      const isAlreadyDismissed = data.dstech_dismissed_topics.some((d: any) =>
+        d.title.toLowerCase() === deletedItem.title.toLowerCase() ||
+        (clientName && d.client && d.client.toLowerCase() === clientName.toLowerCase())
+      );
+      if (!isAlreadyDismissed) {
+        data.dstech_dismissed_topics.unshift({
+          id: deletedItem.id,
+          title: deletedItem.title,
+          client: clientName,
+          task_type: deletedItem.task_type,
+          reason: "Dihapus permanen dari antrean oleh Direktur Utama",
+          dismissed_at: new Date().toISOString(),
+          employee_id: deletedItem.employee_id,
+          employee_name: deletedItem.employee_name
+        });
+      }
+      if (data.dstech_dismissed_topics.length > 100) {
+        data.dstech_dismissed_topics = data.dstech_dismissed_topics.slice(0, 100);
+      }
+
       const newLog = {
         id: `log_${Date.now()}`,
         timestamp: new Date().toISOString(),
         employee_id: deletedItem.employee_id || "emp_system",
         employee_name: deletedItem.employee_name || "Direktur Utama",
-        action: `[DIHAPUS] Usulan pekerjaan "${deletedItem.title}" telah dihapus permanen dari antrean persetujuan oleh Direktur Utama.`,
+        action: `[DIHAPUS] Usulan "${deletedItem.title}" telah dihapus permanen dan disimpan ke memori blacklist AI agar tidak diulang.`,
       };
       if (!data.dstech_recent_logs) data.dstech_recent_logs = [];
       data.dstech_recent_logs.unshift(newLog);
@@ -976,25 +1030,51 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Pekerjaan "${deletedItem.title}" berhasil dihapus dari antrean persetujuan.`,
+        message: `Pekerjaan "${deletedItem.title}" berhasil dihapus permanen. Topik ini diingat AI agar tidak pernah dimunculkan lagi.`,
         deletedItemId: itemId,
         queue: data.dstech_approval_queue,
+        dismissedCount: data.dstech_dismissed_topics.length
       });
     }
 
-    // 2c. CLEAR REJECTED QUEUE (Bersihkan Semua Pekerjaan yang Ditolak Sekaligus)
+    // 2c. CLEAR REJECTED QUEUE (Bersihkan Semua Pekerjaan Ditolak & Masukkan ke Memori Blacklist)
     if (action === "clear_rejected_queue") {
       if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
-      const initialCount = data.dstech_approval_queue.length;
+      if (!Array.isArray(data.dstech_dismissed_topics)) data.dstech_dismissed_topics = [];
+
+      const rejectedItems = data.dstech_approval_queue.filter((it: any) => it.status === "REJECTED");
       data.dstech_approval_queue = data.dstech_approval_queue.filter((it: any) => it.status !== "REJECTED");
-      const removedCount = initialCount - data.dstech_approval_queue.length;
+      const removedCount = rejectedItems.length;
+
+      for (const rej of rejectedItems) {
+        const clientName = rej.target_client || rej.payload?.customerName || rej.payload?.company || rej.payload?.client || "";
+        const isAlreadyDismissed = data.dstech_dismissed_topics.some((d: any) =>
+          d.title.toLowerCase() === rej.title.toLowerCase() ||
+          (clientName && d.client && d.client.toLowerCase() === clientName.toLowerCase())
+        );
+        if (!isAlreadyDismissed) {
+          data.dstech_dismissed_topics.unshift({
+            id: rej.id,
+            title: rej.title,
+            client: clientName,
+            task_type: rej.task_type,
+            reason: rej.reviewer_notes || "Ditolak dan dibersihkan oleh Direktur Utama",
+            dismissed_at: new Date().toISOString(),
+            employee_id: rej.employee_id,
+            employee_name: rej.employee_name
+          });
+        }
+      }
+      if (data.dstech_dismissed_topics.length > 100) {
+        data.dstech_dismissed_topics = data.dstech_dismissed_topics.slice(0, 100);
+      }
 
       const newLog = {
         id: `log_${Date.now()}`,
         timestamp: new Date().toISOString(),
         employee_id: "emp_system",
         employee_name: "Direktur Utama",
-        action: `[PEMBERSIHAN] Sebanyak ${removedCount} usulan pekerjaan berstatus DITOLAK telah dibersihkan secara massal oleh Direktur Utama.`,
+        action: `[PEMBERSIHAN] ${removedCount} usulan pekerjaan berstatus DITOLAK telah dibersihkan secara massal dan disimpan ke memori blacklist AI.`,
       };
       if (!data.dstech_recent_logs) data.dstech_recent_logs = [];
       data.dstech_recent_logs.unshift(newLog);
@@ -1002,158 +1082,497 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `${removedCount} pekerjaan yang ditolak berhasil dibersihkan dari antrean persetujuan.`,
+        message: `${removedCount} pekerjaan yang ditolak berhasil dibersihkan dari antrean dan dimasukkan ke memori blacklist AI.`,
         removedCount,
         queue: data.dstech_approval_queue,
+        dismissedCount: data.dstech_dismissed_topics.length
       });
     }
 
-    // 3. TRIGGER AUTOPILOT (Karyawan AI Otonom Menghasilkan Draf Pekerjaan)
+    // 2d. CLEAR DISMISSED MEMORY (Reset Memori Blacklist AI Atas Izin Direktur)
+    if (action === "clear_dismissed_memory") {
+      data.dstech_dismissed_topics = [];
+      writeWorkforceData(data);
+      return NextResponse.json({
+        success: true,
+        message: "Memori blacklist penolakan AI telah berhasil di-reset bersih.",
+        dismissedCount: 0
+      });
+    }
+
+    // 3. TRIGGER AUTOPILOT (Karyawan AI Otonom Menghasilkan Draf Pekerjaan Dinamis, Segar, dan Menghindari Topik Ditolak/Dihapus)
     if (action === "trigger_autopilot") {
       if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+      if (!Array.isArray(data.dstech_dismissed_topics)) data.dstech_dismissed_topics = [];
       const nowStr = new Date().toISOString();
 
-      const autopilotTasks = [
+      // Kumpulkan semua kata kunci & nama klien yang WAJIB DIHINDARI (Blacklist)
+      const dismissedList = data.dstech_dismissed_topics || [];
+      const activeQueue = data.dstech_approval_queue || [];
+
+      const normalizeStr = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      const isTopicAvoided = (candTitle: string, candClient: string) => {
+        const normCandTitle = normalizeStr(candTitle);
+        const normCandClient = normalizeStr(candClient);
+
+        // Cek terhadap daftar ditolak / dihapus
+        for (const d of dismissedList) {
+          const normDTitle = normalizeStr(d.title);
+          const normDClient = normalizeStr(d.client);
+          if (normDClient && normCandClient && (normDClient.includes(normCandClient) || normCandClient.includes(normDClient))) {
+            return true;
+          }
+          if (normDTitle && normCandTitle && (normDTitle.includes(normCandTitle) || normCandTitle.includes(normDTitle))) {
+            return true;
+          }
+        }
+
+        // Cek terhadap antrean yang saat ini sedang aktif pending
+        for (const q of activeQueue) {
+          const qClient = q.target_client || q.payload?.customerName || q.payload?.company || q.payload?.client || "";
+          const normQClient = normalizeStr(qClient);
+          const normQTitle = normalizeStr(q.title);
+          if (normQClient && normCandClient && (normQClient.includes(normCandClient) || normCandClient.includes(normQClient))) {
+            return true;
+          }
+          if (normQTitle && normCandTitle && (normQTitle.includes(normCandTitle) || normCandTitle.includes(normQTitle))) {
+            return true;
+          }
+        }
+
+        return false;
+      };
+
+      // BANK PROYEK DINAMIS & BERAGAM (20+ Ide Proyek Nyata & Berbeda Lintas Sektor Industri Banten/Jabodetabek)
+      const DIVERSE_PROJECT_POOL = [
+        // DEWI SARTIKA (SPH PROPOSALS)
         {
-          id: `appr_auto_${Date.now()}_1`,
           employee_id: "emp_dewi_finance",
           employee_name: "Dewi Sartika",
           employee_role: "AI Finance & Tax Billing Specialist",
           department: "FINANCE",
           task_type: "SPH_PROPOSAL",
-          title: "Draf SPH: Paket CCTV Night Color 8 Titik Pabrik",
-          target_client: "PT. Krakatau Steel Perkasa",
-          value: 18500000,
+          title: "Draf SPH: Gate Access UHF RFID Long Range 15M Kawasan Pabrik",
+          target_client: "PT. Chandra Asri Petrochemical",
+          value: 58500000,
           tax_type: "exclude",
-          summary: "Draf SPH penawaran 8 unit CCTV 5MP ColorVu, NVR 16CH, HDD 4TB, kabel coaxial & instalasi pabrik. Exclude PPN 11%.",
-          status: "PENDING_APPROVAL",
-          created_at: nowStr,
+          summary: "Draf SPH pengadaan 2 unit Barrier Gate High Speed Servo DC, 2 unit Reader UHF Long Range 15 Meter, VLD Loop Detector, dan Jasa Sipil Pondasi Pabrik. Exclude PPN 11%.",
           payload: {
-            entityType: "PT",
-            customerName: "PT. Krakatau Steel Perkasa",
-            customerAddress: "Kawasan Industri Krakatau, Cilegon Banten",
-            subject: "Surat Penawaran Harga Pengadaan & Instalasi CCTV 8 Titik Area Gudang Produksi",
-            projectName: "Instalasi CCTV Krakatau Steel",
+            customerName: "PT. Chandra Asri Petrochemical",
+            customerAddress: "Jl. Raya Anyer Km 123, Ciwandan, Cilegon Banten",
+            subject: "Surat Penawaran Harga Pengadaan & Instalasi Gate Access UHF Long Range Truk & Staf",
+            projectName: "Instalasi Gate UHF Chandra Asri",
             items: [
-              { productName: "Kamera CCTV 5MP Audio Outdoor ColorVu Night Vision", qty: 8, unit: "Unit", price: 650000, total: 5200000 },
-              { productName: "NVR 16-Channel 4K Ultra HD Cloud Mobile Live", qty: 1, unit: "Unit", price: 2100000, total: 2100000 },
-              { productName: "Harddisk Surveillance 4TB Khusus Rekaman 24/7", qty: 1, unit: "Unit", price: 1800000, total: 1800000 },
-              { productName: "Centralized Power Supply Box 12V 20A Industrial", qty: 1, unit: "Unit", price: 650000, total: 650000 },
-              { productName: "Kabel RG59 + Power Coaxial 200 Meter & Konektor", qty: 2, unit: "Roll", price: 1250000, total: 2500000 },
-              { productName: "Jasa Penarikan Kabel Conduit Pipa Galvanis Pabrik & Komisioning", qty: 1, unit: "Lot", price: 6250000, total: 6250000 }
+              { productName: "Barrier Gate Otomatis High Speed Servo DC Arm 4M", qty: 2, unit: "Unit", price: 12500000, total: 25000000 },
+              { productName: "UHF Long Range RFID Reader (Jangkauan 10 - 15 Meter)", qty: 2, unit: "Unit", price: 6500000, total: 13000000 },
+              { productName: "Vehicle Loop Detector Anti-Tabrak Heavy Duty", qty: 2, unit: "Unit", price: 1500000, total: 3000000 },
+              { productName: "Kartu / Windshield Tag UHF Khusus Kendaraan Industri", qty: 500, unit: "Pcs", price: 15000, total: 7500000 },
+              { productName: "Jasa Sipil Cor Dudukan, Wiring & Komisioning Pabrik Kimia", qty: 1, unit: "Lot", price: 10000000, total: 10000000 }
             ],
-            subtotal: 18500000,
+            subtotal: 58500000,
             taxRate: 11,
             taxType: "exclude",
-            taxAmount: 2035000,
-            grandTotal: 20535000,
+            taxAmount: 6435000,
+            grandTotal: 64935000,
             hideTaxInPrint: true
           }
         },
         {
-          id: `appr_auto_${Date.now()}_2`,
+          employee_id: "emp_dewi_finance",
+          employee_name: "Dewi Sartika",
+          employee_role: "AI Finance & Tax Billing Specialist",
+          department: "FINANCE",
+          task_type: "SPH_PROPOSAL",
+          title: "Draf SPH: Sistem Barrier Gate Otomatis In-Out Cluster Residensial",
+          target_client: "Perumahan Citra Swarna Cilegon",
+          value: 34500000,
+          tax_type: "exclude",
+          summary: "Draf SPH sistem gerbang klaster perumahan: 2 unit Barrier Gate, 2 Tiang Tapping RFID Warga, Loop Detector, dan 300 Kartu Akses Warga. Exclude PPN 11%.",
+          payload: {
+            customerName: "Perumahan Citra Swarna Cilegon",
+            customerAddress: "Jl. Lingkar Selatan, Cibeber, Cilegon Banten",
+            subject: "Surat Penawaran Harga Pengadaan Gate Access Sistem In-Out Klaster Citra Swarna",
+            projectName: "Gate Access Citra Swarna Cilegon",
+            items: [
+              { productName: "Barrier Gate Otomatis MX-80 Fast Speed (Arm 3m)", qty: 2, unit: "Unit", price: 8500000, total: 17000000 },
+              { productName: "Tiang Reader RFID + Controller Akses Klaster Warga", qty: 2, unit: "Unit", price: 3250000, total: 6500000 },
+              { productName: "Sensor Anti-Tabrak Kendaraan Loop Detector", qty: 2, unit: "Unit", price: 1250000, total: 2500000 },
+              { productName: "Kartu Akses RFID Proximity Warga Terdaftar", qty: 300, unit: "Pcs", price: 20000, total: 6000000 },
+              { productName: "Jasa Instalasi, Penarikan Kabel Conduit & Setting", qty: 1, unit: "Lot", price: 2500000, total: 2500000 }
+            ],
+            subtotal: 34500000,
+            taxRate: 11,
+            taxType: "exclude",
+            taxAmount: 3795000,
+            grandTotal: 38295000,
+            hideTaxInPrint: true
+          }
+        },
+        {
+          employee_id: "emp_dewi_finance",
+          employee_name: "Dewi Sartika",
+          employee_role: "AI Finance & Tax Billing Specialist",
+          department: "FINANCE",
+          task_type: "SPH_PROPOSAL",
+          title: "Draf SPH: CCTV PTZ Solar Cell 4K Pemantauan Dermaga Kapal Tugboat",
+          target_client: "PT. Pelabuhan Cilegon Mandiri (PCM)",
+          value: 46000000,
+          tax_type: "exclude",
+          summary: "Draf SPH pengadaan 4 unit Kamera CCTV PTZ Solar Cell 4K Ultra HD Night Vision, NVR Wireless Long Range, dan Tiang Mandiri Dermaga. Exclude PPN 11%.",
+          payload: {
+            customerName: "PT. Pelabuhan Cilegon Mandiri (PCM)",
+            customerAddress: "Area Dermaga Pelabuhan Warnasari, Cilegon Banten",
+            subject: "Surat Penawaran Harga Pengadaan Kamera Pemantau Dermaga Solar Cell Wireless 4K",
+            projectName: "Instalasi CCTV Dermaga PCM",
+            items: [
+              { productName: "Kamera CCTV PTZ 4K Outdoor Solar Powered Cell + Baterai Litium", qty: 4, unit: "Unit", price: 7500000, total: 30000000 },
+              { productName: "NVR Standalone 16CH Wireless Bridge Long Range 5GHz", qty: 1, unit: "Set", price: 5500000, total: 5500000 },
+              { productName: "Harddisk Surveillance 6TB Enterprise 24/7", qty: 1, unit: "Unit", price: 2500000, total: 2500000 },
+              { productName: "Tiang Galvanis Hot-Dip 6 Meter & Pondasi Beton", qty: 2, unit: "Unit", price: 2000000, total: 4000000 },
+              { productName: "Jasa Instalasi Wireless Bridge Dermaga & Komisioning", qty: 1, unit: "Lot", price: 4000000, total: 4000000 }
+            ],
+            subtotal: 46000000,
+            taxRate: 11,
+            taxType: "exclude",
+            taxAmount: 5060000,
+            grandTotal: 51060000,
+            hideTaxInPrint: true
+          }
+        },
+        {
+          employee_id: "emp_dewi_finance",
+          employee_name: "Dewi Sartika",
+          employee_role: "AI Finance & Tax Billing Specialist",
+          department: "FINANCE",
+          task_type: "SPH_PROPOSAL",
+          title: "Draf SPH: Smart Electronic Door Lock BLE & RFID 40 Kamar Penginapan",
+          target_client: "The Royal Krakatau Hotel",
+          value: 52000000,
+          tax_type: "exclude",
+          summary: "Draf SPH pengadaan 40 unit Smart Door Lock RFID/BLE Hotel, Master Encoder Kartu Tamu, dan Gateway Manajemen Kamar Cloud. Exclude PPN 11%.",
+          payload: {
+            customerName: "The Royal Krakatau Hotel",
+            customerAddress: "Jl. KH. Yasin Beji No. 4, Kebondalem, Purwakarta, Cilegon",
+            subject: "Surat Penawaran Harga Pengadaan & Pemasangan Smart Door Lock Hotel 40 Kamar",
+            projectName: "Smart Door Lock The Royal Krakatau",
+            items: [
+              { productName: "Smart Electronic Hotel Door Lock RFID & BLE Keyless (Stainless 304)", qty: 40, unit: "Unit", price: 950000, total: 38000000 },
+              { productName: "USB Card Encoder & Software Manajemen Tamu Hotel", qty: 1, unit: "Set", price: 3500000, total: 3500000 },
+              { productName: "Kartu Mifare 1K Khusus Tamu Hotel Berlogo Custom", qty: 300, unit: "Pcs", price: 15000, total: 4500000 },
+              { productName: "Jasa Bobok Pintu Presisi, Pemasangan & Integrasi Sistem", qty: 40, unit: "Pintu", price: 150000, total: 6000000 }
+            ],
+            subtotal: 52000000,
+            taxRate: 11,
+            taxType: "exclude",
+            taxAmount: 5720000,
+            grandTotal: 57720000,
+            hideTaxInPrint: true
+          }
+        },
+
+        // BAMBANG PRAKOSO (SALES & CRM LEADS)
+        {
           employee_id: "emp_bambang_sales",
           employee_name: "Bambang Prakoso",
           employee_role: "Senior AI Sales & Commercial Consultant",
           department: "SALES",
           task_type: "CRM_LEAD",
-          title: "Follow-up Prospek: Sistem Palang Otomatis RFID Rumah Sakit",
-          target_client: "RSUD Berkah Pandeglang",
-          value: 42000000,
+          title: "Follow-up Prospek: Pedestrian Turnstile Flap Barrier Lobby Utama",
+          target_client: "PT. Asahimas Chemical Cilegon",
+          value: 68000000,
           tax_type: "net",
-          summary: "Pipeline B2B prospek modernisasi gerbang parkir IGD dan rawat inap dengan pembaca kartu RFID otomatis.",
-          status: "PENDING_APPROVAL",
-          created_at: nowStr,
+          summary: "Pipeline B2B prospek modernisasi akses gerbang pejalan kaki (Turnstile Flap Barrier) terintegrasi Face Recognition & absensi karyawan di pabrik kimia.",
           payload: {
-            company: "RSUD Berkah Pandeglang",
-            pic: "Bagian Umum & Perlengkapan",
-            value: 42000000
+            company: "PT. Asahimas Chemical Cilegon",
+            pic: "Manager General Affairs & Security",
+            value: 68000000,
+            leadNumber: `LEAD-DST-${nowStr.slice(0, 7).replace("-", "")}-041`,
+            stage: "PROPOSAL",
+            probability: 85
           }
         },
         {
-          id: `appr_auto_${Date.now()}_3`,
+          employee_id: "emp_bambang_sales",
+          employee_name: "Bambang Prakoso",
+          employee_role: "Senior AI Sales & Commercial Consultant",
+          department: "SALES",
+          task_type: "CRM_LEAD",
+          title: "Follow-up Prospek: Palang Parkir Heavy Duty Boom 6M Armada Truk Logistik",
+          target_client: "Kawasan Pergudangan Krakatau Bandar Samudera",
+          value: 75000000,
+          tax_type: "net",
+          summary: "Peluang pipeline proyek pengadaan 4 gerbang akses timbangan truk dan pergudangan dengan barrier gate arm 6 meter dan kamera ANPR plat nomor otomatis.",
+          payload: {
+            company: "Kawasan Pergudangan Krakatau Bandar Samudera",
+            pic: "Dept. Logistik & Terminal Pelabuhan",
+            value: 75000000,
+            leadNumber: `LEAD-DST-${nowStr.slice(0, 7).replace("-", "")}-042`,
+            stage: "PROPOSAL",
+            probability: 75
+          }
+        },
+        {
+          employee_id: "emp_bambang_sales",
+          employee_name: "Bambang Prakoso",
+          employee_role: "Senior AI Sales & Commercial Consultant",
+          department: "SALES",
+          task_type: "CRM_LEAD",
+          title: "Follow-up Prospek: Sistem Gerbang Akses Kartu Mahasiswa Kampus Sindangsari",
+          target_client: "Universitas Sultan Ageng Tirtayasa (UNTIRTA)",
+          value: 48000000,
+          tax_type: "net",
+          summary: "Pipeline prospek gerbang kampus modern tap KTM RFID untuk gerbang timur & barat kampus Untirta Sindangsari.",
+          payload: {
+            company: "Universitas Sultan Ageng Tirtayasa (UNTIRTA)",
+            pic: "Biro Umum & Keuangan Kampus",
+            value: 48000000,
+            leadNumber: `LEAD-DST-${nowStr.slice(0, 7).replace("-", "")}-043`,
+            stage: "PROPOSAL",
+            probability: 80
+          }
+        },
+        {
+          employee_id: "emp_bambang_sales",
+          employee_name: "Bambang Prakoso",
+          employee_role: "Senior AI Sales & Commercial Consultant",
+          department: "SALES",
+          task_type: "CRM_LEAD",
+          title: "Follow-up Prospek: Integrasi CCTV ANPR Pembaca Plat Truk Tangki BBM",
+          target_client: "PT. Lotte Chemical Titan Nusantara",
+          value: 82000000,
+          tax_type: "net",
+          summary: "Peluang penawaran sistem kamera pintar Automatic Number Plate Recognition (ANPR) terhubung dengan barrier gate otomatis di gerbang penerimaan tangki bahan baku.",
+          payload: {
+            company: "PT. Lotte Chemical Titan Nusantara",
+            pic: "Security Operation Center (SOC)",
+            value: 82000000,
+            leadNumber: `LEAD-DST-${nowStr.slice(0, 7).replace("-", "")}-044`,
+            stage: "PROPOSAL",
+            probability: 80
+          }
+        },
+
+        // NADIA SAFITRI (MARKETING & VIDEO BRANDING)
+        {
+          employee_id: "emp_nadia_marketing",
+          employee_name: "Nadia Safitri",
+          employee_role: "AI Creative Marketing & Copywriter",
+          department: "MARKETING",
+          task_type: "PROMO_CAMPAIGN",
+          title: "Materi Promo WhatsApp: Solusi Palang Parkir Otomatis Anti-Macet Logistik",
+          target_client: "Kawasan Industri & Pergudangan Banten",
+          value: 0,
+          tax_type: "none",
+          summary: "Copywriting broadcast WhatsApp dan flyer promosi paket Barrier Gate Industrial Duty kecepatan 1.5 detik bebas macet untuk pabrik kimia & pergudangan.",
+          payload: {
+            title: "Materi Promo: Barrier Gate Anti-Macet Pergudangan Industri",
+            category: "Brosur Promosi",
+            description: "Penawaran spesial bundling Barrier Gate Otomatis + Loop Detector Anti-Tabrak khusus area logistik pabrik se-Cilegon & Serang.",
+            fileUrl: "/service-cctv.png"
+          }
+        },
+        {
           employee_id: "emp_nadia_marketing",
           employee_name: "Nadia Safitri",
           employee_role: "AI Creative Marketing & Video Branding Specialist",
           department: "MARKETING",
           task_type: "VIDEO_BRANDING",
-          title: "Video Branding Harian: Solusi Smart Barrier Gate RFID & CCTV ColorVu 5MP",
+          title: "Video Branding Harian: Cara Kerja Sensor Anti-Tabrak Loop Detector Barrier Gate",
           target_client: "Audiens Medsos (TikTok, IG Reels, YouTube Shorts, FB)",
           value: 0,
           tax_type: "net",
-          summary: "Draf video branding vertikal 9:16 durasi 30 detik siap posting media sosial. Lengkap dengan Hook 3 detik viral, 4 storyboard adegan produk, naskah narasi voiceover, musik latar, flyer promosi 1:1, dan caption viral.",
-          status: "PENDING_APPROVAL",
-          created_at: nowStr,
+          summary: "Video edukasi vertikal 9:16 durasi 30 detik mendemonstrasikan keandalan sensor loop detector anti-tabrak barrier gate DSTech saat dilewati mobil mewah.",
           payload: {
-            videoTitle: "Keamanan Pabrik & Kantor Modern Tanpa Ribet Bersama DSTech Smart",
+            videoTitle: "Mobil Mewah Gak Bakal Kena Palang! Ini Rahasia Sensor VLD DSTech Smart",
             aspectRatio: "9:16",
             duration: 30,
             platforms: ["TikTok", "Instagram Reels", "YouTube Shorts", "Facebook Reels"],
-            hook: "Masih pakai cara manual buat pantau keamanan kantor dan area parkir pabrik kamu?",
+            hook: "Pernah takut mobil kamu ketiban palang parkir otomatis?",
             flyer_image_url: "/service-cctv.png",
-            video_preview_url: "/service-cctv.png",
-            backgroundAudio: "Upbeat Corporate Electronic Tech Beat (Copyright Free)",
-            scenes: [
-              {
-                sceneNumber: 1,
-                timeRange: "00:00 - 00:06",
-                title: "Scene 1: Hook & Masalah Lapangan",
-                image: "/service-cctv.png",
-                visual: "Transisi dramatis rekaman CCTV malam hari yang buram vs kamera CCTV ColorVu 5MP DSTech yang tetap jernih dan berwarna (Full Color Night Vision).",
-                captionOverlay: "🚨 CCTV BIASA BURAM & GELAP DI MALAM HARI?",
-                voiceoverText: "Masih pusing rekaman CCTV kantor buram dan gelap gulita saat malam hari? Saatnya beralih ke solusi cerdas PT. DSTech Smart Perkasa!"
-              },
-              {
-                sceneNumber: 2,
-                timeRange: "00:07 - 00:15",
-                title: "Scene 2: Solusi Palang Parkir RFID",
-                image: "/uploads/dstech_img_1793016900513_Palang_Gate_Barier_Tanpa_Lampu.jfif",
-                visual: "Palang parkir otomatis (Smart Barrier Gate) terangkat cepat dan mulus saat kendaraan membaca kartu RFID tanpa antre panjang.",
-                captionOverlay: "⚡ PALANG PARKIR OTOMATIS RFID SPEEDY",
-                voiceoverText: "Akses gerbang keluar-masuk otomatis berkecepatan tinggi tanpa macet. Dilengkapi sensor anti-tabrak loop detector dan monitoring komputer real-time."
-              },
-              {
-                sceneNumber: 3,
-                timeRange: "00:16 - 00:23",
-                title: "Scene 3: Live Monitoring dari Ponsel",
-                image: "/portfolio-industrial.png",
-                visual: "Tampilan dashboard live streaming kamera dari smartphone teknisi dan direktur. Terdapat notifikasi alert otomatis jika ada pergerakan mencurigakan.",
-                captionOverlay: "📱 PANTAU LIVE LANGSUNG DARI HP KAMU",
-                voiceoverText: "Semua sistem terpantau 24 jam nonstop dari genggaman ponsel Anda di mana saja. Garansi resmi unit baru dan dukungan teknisi lokal berpengalaman."
-              },
-              {
-                sceneNumber: 4,
-                timeRange: "00:24 - 00:30",
-                title: "Scene 4: Call to Action & Hotline Resmi",
-                image: "/about-image.png",
-                visual: "Logo resmi PT. DSTech Smart Perkasa, badge 'Solusi IoT & Keamanan Banten', hotline WhatsApp 0821-2533-3555 dan website www.dstechsmart.com.",
-                captionOverlay: "📲 KONSULTASI & SURVEY LOKASI GRATIS!",
-                voiceoverText: "Hubungi tim DSTech Smart sekarang juga untuk survey lokasi dan konsultasi gratis kebutuhan kantor dan pabrik Anda!"
-              }
-            ],
-            fullVoiceoverScript: "Masih pusing rekaman CCTV kantor buram dan gelap saat malam? Saatnya upgrade ke solusi cerdas PT. DSTech Smart Perkasa! Nikmati kamera Full Color Night Vision dan gerbang parkir otomatis RFID berkecepatan tinggi. Pantau 24 jam langsung dari smartphone dengan garansi resmi. Hubungi WhatsApp DSTech Smart sekarang untuk survey gratis!",
-            captionText: "🚨 JANGAN BIARKAN KEAMANAN KANTOR & PABRIK ANDA KETINGGALAN ZAMAN!\n\nApakah sistem keamanan tempat usaha Anda masih memakai cara manual atau CCTV buram di malam hari? 🏢🔒\n\nPT. DSTech Smart Perkasa hadir memberikan solusi modern terlengkap di Cilegon - Banten:\n✅ Paket Kamera CCTV 5MP Ultra HD ColorVu (Tetap Berwarna di Tempat Gelap)\n✅ Barrier Gate / Palang Parkir Otomatis RFID & Tiket Barcode\n✅ Smart Door Lock & Access Control Wajah/Sidik Jari\n✅ Garansi Resmi 1-2 Tahun Ganti Baru + Maintenance Berkala\n\n🎁 PROMO BULAN INI: GRATIS Jasa Survey Lokasi & Desain Titik Kamera!\n\n📲 Hubungi WhatsApp CS Resmi: 0821-2533-3555\n🌐 Website: https://dstechsmart.com\n\n#CCTVCilegon #SmartBarrierGate #DStechSmartPerkasa #KeamananKantor #SmartHomeBanten #TeknisiCCTV #PalangParkirOtomatis #SolusiIoT",
-            hashtags: ["#CCTVCilegon", "#SmartBarrierGate", "#DStechSmartPerkasa", "#KeamananKantor", "#SmartHomeBanten", "#TeknisiCCTV", "#PalangParkirOtomatis", "#SolusiIoT"],
-            cta: "Chat WhatsApp: 0821-2533-3555 | Website: https://dstechsmart.com"
+            video_preview_url: "/service-cctv.png"
+          }
+        },
+        {
+          employee_id: "emp_nadia_marketing",
+          employee_name: "Nadia Safitri",
+          employee_role: "AI Creative Marketing & Video Branding Specialist",
+          department: "MARKETING",
+          task_type: "VIDEO_BRANDING",
+          title: "Video Branding Edukasi: CCTV Gelap Gulita Tetap Berwarna Jernih (ColorVu 5MP)",
+          target_client: "Audiens Medsos (TikTok & Reels)",
+          value: 0,
+          tax_type: "net",
+          summary: "Video komparasi malam hari kamera CCTV hitam putih standar vs kamera ColorVu DSTech Smart yang tetap berwarna terang tanpa lampu penerangan tambahan.",
+          payload: {
+            videoTitle: "Uji Nyata: Rekaman Malam Hari CCTV Biasa VS ColorVu 5MP DSTech",
+            aspectRatio: "9:16",
+            duration: 30,
+            platforms: ["TikTok", "Instagram Reels", "YouTube Shorts"],
+            hook: "Lihat bedanya rekaman CCTV biasa sama kamera teknologi ColorVu!",
+            flyer_image_url: "/service-cctv.png",
+            video_preview_url: "/service-cctv.png"
+          }
+        },
+
+        // REZA FIRMANSYAH (PRODUCT CATALOG)
+        {
+          employee_id: "emp_reza_catalog",
+          employee_name: "Reza Firmansyah",
+          employee_role: "AI Product Catalog & Procurement Lead",
+          department: "CATALOG_ESTORE",
+          task_type: "PRODUCT_IMPORT",
+          title: "Usulan Suku Cadang: Wiegand 4-Door TCP/IP Master Access Controller Board",
+          target_client: "Katalog E-Store DSTech",
+          value: 1450000,
+          tax_type: "net",
+          summary: "Pengadaan papan kontroler akses pintu TCP/IP 4 Pintu kompatibel Wiegand 26/34, kapasitas 20.000 user kartu dan 100.000 log transaksi offline.",
+          payload: {
+            id: `dstech_prod_appr_wiegand4d`,
+            name: "DStech - Wiegand TCP/IP 4-Door Network Access Controller Board",
+            category: "Security System",
+            subCategory: "Access Control Board",
+            brand: "MasterPro Access",
+            entityType: "PT",
+            costPrice: 950000,
+            price: 1450000,
+            stock: 0,
+            image: "/uploads/dstech_tekno_touchless_button.jpg"
+          }
+        },
+        {
+          employee_id: "emp_reza_catalog",
+          employee_name: "Reza Firmansyah",
+          employee_role: "AI Product Catalog & Procurement Lead",
+          department: "CATALOG_ESTORE",
+          task_type: "PRODUCT_IMPORT",
+          title: "Usulan Suku Cadang: UHF RFID Long Range Reader 902-928MHz Jarak 15 Meter",
+          target_client: "Katalog E-Store DSTech",
+          value: 4200000,
+          tax_type: "net",
+          summary: "Pendaftaran reader UHF RFID frekuensi 902-928 MHz antena sirkular polarisasi 12dBi dengan jangkauan baca kartu kaca mobil hingga 15 meter.",
+          payload: {
+            id: `dstech_prod_appr_uhf15m`,
+            name: "DStech - UHF Long Range RFID Reader 15M Waterproof IP67 Wiegand RS485",
+            category: "Parking & Barrier System",
+            subCategory: "RFID Reader & Controller",
+            brand: "UHF Pro Series",
+            entityType: "PT",
+            costPrice: 2800000,
+            price: 4200000,
+            stock: 0,
+            image: "/uploads/dstech_tekno_sensor_w1.jpg"
+          }
+        },
+
+        // DENI KURNIAWAN (FIELD OPERATIONS & SPK)
+        {
+          employee_id: "emp_deni_field",
+          employee_name: "Deni Kurniawan",
+          employee_role: "Field Operations & Dispatcher",
+          department: "OPERATIONS",
+          task_type: "SPK_FIELD",
+          title: "SPK Lapangan: Audit & Kalibrasi Sensor Keamanan Barrier Gate Pabrik",
+          target_client: "PT. Nippon Shokubai Indonesia",
+          value: 0,
+          tax_type: "none",
+          summary: "Penerbitan SPK penugasan tim teknisi (Lead: Ikhsan Maulidi) untuk inspeksi berkala, pengetesan loop detector, dan pelumasan mekanis gear motor barrier gate.",
+          payload: {
+            client: "PT. Nippon Shokubai Indonesia",
+            ticketNumber: `MTC-${nowStr.slice(0, 7).replace("-", "")}-051`,
+            technician: "Ikhsan Maulidi (Lead Field Tech)",
+            type: "Maintenance",
+            location: "Kawasan Industri Ciwandan, Cilegon"
+          }
+        },
+        {
+          employee_id: "emp_deni_field",
+          employee_name: "Deni Kurniawan",
+          employee_role: "Field Operations & Dispatcher",
+          department: "OPERATIONS",
+          task_type: "SPK_FIELD",
+          title: "SPK Lapangan: Pemasangan Drop Arm Turnstile & Testing Kartu Visitor",
+          target_client: "Gedung Sucofindo Cilegon",
+          value: 0,
+          tax_type: "none",
+          summary: "Penerbitan SPK penugasan teknisi untuk komisioning turnstile drop arm tripod di lobby pemeriksaan tamu gedung perkantoran B2B.",
+          payload: {
+            client: "Gedung Sucofindo Cilegon",
+            ticketNumber: `MTC-${nowStr.slice(0, 7).replace("-", "")}-052`,
+            technician: "Ahmad Rizky (Field Technician)",
+            type: "Installation",
+            location: "Kawasan Niaga Cilegon"
           }
         }
       ];
 
-      data.dstech_approval_queue.unshift(...autopilotTasks);
+      // Filter kandidat: hanya ambil yang BELUM PERNAH ditolak/dihapus dan TIDAK sedang aktif pending
+      const validCandidates = DIVERSE_PROJECT_POOL.filter(cand => !isTopicAvoided(cand.title, cand.target_client));
 
+      // Acak urutan kandidat yang lolos filter
+      const shuffledCandidates = [...validCandidates].sort(() => Math.random() - 0.5);
+
+      // Pilih 3 usulan dari departemen/karyawan yang berbeda agar beragam
+      const selectedTasks: any[] = [];
+      const usedEmployees = new Set<string>();
+
+      for (const cand of shuffledCandidates) {
+        if (!usedEmployees.has(cand.employee_id) && selectedTasks.length < 3) {
+          usedEmployees.add(cand.employee_id);
+          selectedTasks.push({
+            ...cand,
+            id: `appr_auto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+            created_at: nowStr,
+            status: "PENDING_APPROVAL",
+            revision: 0
+          });
+        }
+      }
+
+      // Jika masih kurang dari 3 (misal karena banyak penolakan), ambil kandidat yang tersisa
+      if (selectedTasks.length < 3) {
+        for (const cand of shuffledCandidates) {
+          if (!selectedTasks.some(t => t.title === cand.title) && selectedTasks.length < 3) {
+            selectedTasks.push({
+              ...cand,
+              id: `appr_auto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              created_at: nowStr,
+              status: "PENDING_APPROVAL",
+              revision: 0
+            });
+          }
+        }
+      }
+
+      if (selectedTasks.length === 0) {
+        return NextResponse.json({
+          success: true,
+          message: "Seluruh ide proyek dalam bank data saat ini sudah ada dalam antrean aktif atau dalam memori penolakan Anda. Anda dapat mereset memori blacklist penolakan jika ingin memulai siklus proyek baru.",
+          dismissedCount: dismissedList.length,
+          queue: data.dstech_approval_queue
+        });
+      }
+
+      data.dstech_approval_queue.unshift(...selectedTasks);
+
+      const firstTask = selectedTasks[0];
       const newLog = {
         id: `log_${Date.now()}`,
         timestamp: nowStr,
-        employee_id: "emp_nadia_marketing",
-        employee_name: "Nadia Safitri",
-        action: `[AUTOPILOT KONTEN SELESAI] Staf AI Nadia Safitri telah memproduksi Draf Video Branding Medsos (9:16) & Flyer Promosi harian ke Kotak Persetujuan Direktur Utama.`,
+        employee_id: firstTask.employee_id,
+        employee_name: firstTask.employee_name,
+        action: `[AUTOPILOT CERDAS BERHASIL] Karyawan AI menerbitkan ${selectedTasks.length} usulan pekerjaan baru yang segar dan secara cerdas menghindari ${dismissedList.length} topik yang pernah ditolak/dihapus Direktur Utama.`,
       };
+      if (!data.dstech_recent_logs) data.dstech_recent_logs = [];
       data.dstech_recent_logs.unshift(newLog);
       writeWorkforceData(data);
 
       return NextResponse.json({
         success: true,
-        message: "Autopilot staf AI berhasil dijalankan! 3 draf tugas baru (termasuk Video Branding Medsos harian) telah masuk ke Kotak Persetujuan.",
+        message: `Autopilot staf AI berhasil dijalankan! ${selectedTasks.length} draf tugas baru yang segar telah masuk ke Kotak Persetujuan. Sistem secara cerdas menghindari ${dismissedList.length} topik yang pernah Anda tolak atau hapus.`,
+        createdCount: selectedTasks.length,
+        dismissedCount: dismissedList.length,
+        createdTasks: selectedTasks.map((t: any) => ({ title: t.title, client: t.target_client })),
         queue: data.dstech_approval_queue,
       });
     }

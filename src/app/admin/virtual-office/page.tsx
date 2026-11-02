@@ -109,6 +109,7 @@ export default function VirtualOfficePage() {
   const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<ApprovalItem | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dismissedCount, setDismissedCount] = useState<number>(0);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   // Media Preview State for Video Branding & Dynamic Living Reels Engine
@@ -533,6 +534,11 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
         setEmployees(json.data.dstech_employees || []);
         setLogs(json.data.dstech_recent_logs || []);
         setApprovalQueue(json.data.dstech_approval_queue || []);
+        if (typeof json.dismissedCount === "number") {
+          setDismissedCount(json.dismissedCount);
+        } else if (Array.isArray(json.data.dstech_dismissed_topics)) {
+          setDismissedCount(json.data.dstech_dismissed_topics.length);
+        }
         if (selectedEmployee) {
           const updated = json.data.dstech_employees.find((e: Employee) => e.id === selectedEmployee.id);
           if (updated) setSelectedEmployee(updated);
@@ -596,9 +602,10 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
       });
       const json = await res.json();
       if (json.success) {
-        setApprovalNotice(`Usulan pekerjaan "${item.title}" telah ditolak dan tidak dimasukkan ke database.`);
+        setApprovalNotice(`Usulan pekerjaan "${item.title}" telah ditolak dan dicatat ke Memori Blacklist AI agar tidak pernah diulang lagi.`);
+        if (typeof json.dismissedCount === "number") setDismissedCount(json.dismissedCount);
         fetchWorkforce();
-        setTimeout(() => setApprovalNotice(null), 5000);
+        setTimeout(() => setApprovalNotice(null), 6000);
       }
     } catch (err: any) {
       alert("Terjadi kesalahan: " + err.message);
@@ -618,13 +625,14 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
       });
       const json = await res.json();
       if (json.success) {
-        setApprovalNotice(`🗑️ Pekerjaan "${item.title}" berhasil dihapus secara permanen.`);
+        setApprovalNotice(`🗑️ Pekerjaan "${item.title}" berhasil dihapus permanen dan dicatat ke Memori Blacklist AI agar tidak pernah diulang.`);
+        if (typeof json.dismissedCount === "number") setDismissedCount(json.dismissedCount);
         setApprovalQueue((prev) => prev.filter((x) => x.id !== item.id));
         if (previewItem?.id === item.id) {
           setPreviewItem(null);
         }
         fetchWorkforce();
-        setTimeout(() => setApprovalNotice(null), 5000);
+        setTimeout(() => setApprovalNotice(null), 6000);
       } else {
         alert("Gagal menghapus: " + (json.error || "Terjadi kesalahan"));
       }
@@ -651,10 +659,11 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
       });
       const json = await res.json();
       if (json.success) {
-        setApprovalNotice(`🗑️ Sebanyak ${json.removedCount ?? rejectedCount} pekerjaan yang ditolak berhasil dibersihkan dari antrean.`);
+        setApprovalNotice(`🗑️ Sebanyak ${json.removedCount ?? rejectedCount} pekerjaan yang ditolak berhasil dibersihkan & dipastikan tersimpan di Memori Blacklist.`);
+        if (typeof json.dismissedCount === "number") setDismissedCount(json.dismissedCount);
         setApprovalQueue((prev) => prev.filter((x) => x.status !== "REJECTED"));
         fetchWorkforce();
-        setTimeout(() => setApprovalNotice(null), 5000);
+        setTimeout(() => setApprovalNotice(null), 6000);
       } else {
         alert("Gagal membersihkan: " + (json.error || "Terjadi kesalahan"));
       }
@@ -662,6 +671,28 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
       alert("Terjadi kesalahan: " + err.message);
     } finally {
       setIsClearingRejected(false);
+    }
+  };
+
+  const handleClearDismissedMemory = async () => {
+    if (!confirm("Reset memori penolakan AI? AI akan dapat mengusulkan kembali topik atau klien yang sebelumnya pernah Anda tolak atau hapus.")) return;
+    try {
+      const res = await fetch("/api/ai-workforce", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear_dismissed_memory" })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDismissedCount(0);
+        setApprovalNotice("✓ Memori penolakan AI telah berhasil di-reset. AI dapat mengajukan topik segar kembali.");
+        fetchWorkforce();
+        setTimeout(() => setApprovalNotice(null), 5000);
+      } else {
+        alert("Gagal reset memori: " + (json.error || "Terjadi kesalahan"));
+      }
+    } catch (e: any) {
+      alert("Gagal reset memori: " + e.message);
     }
   };
 
@@ -1147,6 +1178,22 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                     <Trash2 className={`w-3.5 h-3.5 ${isClearingRejected ? "animate-spin" : "text-rose-400"}`} />
                     <span>{isClearingRejected ? "Membersihkan..." : `Bersihkan Ditolak (${rejectedCount})`}</span>
                   </button>
+                )}
+
+                {/* Indikator Memori Blacklist AI (Tugas 340) */}
+                {dismissedCount > 0 && (
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-950/60 border border-purple-700/50 text-[11px] text-purple-200">
+                    <Bot className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span>Memori AI: <b>{dismissedCount}</b> topik ditolak/dihapus diingat</span>
+                    <button
+                      type="button"
+                      onClick={handleClearDismissedMemory}
+                      title="Reset memori penolakan AI agar topik lama bisa diusulkan kembali"
+                      className="ml-1.5 text-[10px] text-purple-300 hover:text-white underline cursor-pointer font-bold"
+                    >
+                      Reset
+                    </button>
+                  </div>
                 )}
 
                 {/* Tombol Picu Autopilot Staf AI */}

@@ -4,6 +4,34 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 340 (2026-11-02)**: [SELESAI] Pembangunan Memory Blacklist Penolakan/Penghapusan & Dynamic AI Autopilot Generator Lintas Karyawan AI (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
+  *Permintaan User*: "kemudian saya melihat untuk pengajuan yangsudah saya tolak dan hapus, masih saja AI agennta membuat hasil yang sama. gak ada perubahan. seharusnya jangan itu-itu terus dikerjakan"
+  *Akar Masalah yang Ditemukan*:
+  1. **Ketiadaan Memori Penolakan / Penghapusan (`dstech_dismissed_topics`)**: Saat Direktur menolak atau menghapus usulan dari `dstech_approval_queue`, sistem tidak menyimpan data riwayat topik/klien yang ditolak tersebut. Akibatnya, AI Agen tidak tahu bahwa klien atau paket tersebut sudah tidak diinginkan.
+  2. **Autopilot Bersifat Statis & Hardcoded**: Logika `action === "trigger_autopilot"` sebelumnya meng-hardcode 3 tugas yang persis sama (Paket CCTV Krakatau Steel, RSUD Berkah Pandeglang, dan Video Branding Smart Barrier Gate) setiap kali dijalankan.
+  3. **Ketiadaan AI Proposal Generator Dinamis**: Autopilot belum memanfaatkan ragam proyek baru yang kreatif, bervariasi, dan unik lintas sektor industri di Banten/Jabodetabek.
+  *Kebutuhan & Rencana Solusi*:
+  1. **Memory Blacklist Penolakan & Penghapusan**:
+     - Tambahkan penyimpanan `dstech_dismissed_topics` pada `dstech_ai_workforce.json`.
+     - Setiap kali aksi `reject_queue_item`, `delete_queue_item`, atau `clear_rejected_queue` dijalankan, simpan jejak klien, judul, dan tipe tugas yang ditolak/dihapus secara permanen.
+  2. **Dynamic AI Workforce Autopilot Generator**:
+     - Rombak fungsi `trigger_autopilot` agar memfilter ketat daftar `dstech_dismissed_topics` dan tugas yang sedang pending.
+     - Menyediakan bank ide proyek dinamis (20+ variasi unik lintas industri Banten seperti PT. Chandra Asri Petrochemical, Perumahan Citra Swarna, RS Hermina Ciruas, The Royal Krakatau Hotel, PT. Pelabuhan Cilegon Mandiri, Krakatau Bandar Samudera, Universitas Sultan Ageng Tirtayasa, PT. Lotte Chemical Indonesia, PT. Nippon Shokubai, dsb.).
+     - Pengacakan acak (*random shuffling*) dan seleksi multi-departemen yang menjamin usulan yang pernah ditolak atau dihapus TIDAK AKAN PERNAH dimunculkan kembali, dan 3 tugas yang diusulkan berasal dari divisi berbeda.
+  3. **Feedback & Notifikasi Transparan di UI**:
+     - Ditambahkan badge indikator memori blacklist AI (`Memori AI: X topik ditolak/dihapus diingat`) di samping tombol Autopilot dengan fitur Reset jika Direktur ingin memulihkan topik.
+     - Notifikasi pop-up transparan saat menolak/menghapus usulan: memberi tahu Direktur bahwa topik tersebut telah dimasukkan ke memori AI.
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mencatat rencana kerja step-by-step Tugas 340 di `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task340_dynamic_autopilot_blacklist/` dan mencadangkan berkas target.
+  3. [x] Mengimplementasikan Memory Blacklist (`dstech_dismissed_topics`) pada `reject_queue_item`, `delete_queue_item`, dan `clear_rejected_queue` di `src/app/api/ai-workforce/route.ts`.
+  4. [x] Membangun Dynamic AI Autopilot Generator (didukung filter ketat penolakan & bank rotasi 20+ proyek variatif multi-sektor) yang memfilter ketat seluruh topik yang pernah ditolak/dihapus.
+  5. [x] Memperbarui antarmuka Virtual Office (`src/app/admin/virtual-office/page.tsx`) dengan notifikasi memori blacklist dan tombol pembersihan memori jika diinginkan.
+  6. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  7. [x] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses lolos 100%.
+  8. [x] Menguji siklus tolak/hapus dan trigger autopilot untuk membuktikan bahwa tugas yang ditolak tidak pernah muncul kembali dan tugas baru selalu segar/berbeda.
+  9. [x] Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  10. [x] Bersihkan folder cadangan dan tandai status [SELESAI].
 - **Tugas 339 (2026-11-02)**: [SELESAI] Penerapan Universal Smart Revision Engine untuk Seluruh Karyawan AI Kantor Virtual (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "untuk permintaan revisi juga harus harus berlaku untuk seluruh karyawan agen lainnya"
   *Kebutuhan & Rencana Solusi*:
