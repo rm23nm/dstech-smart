@@ -46,6 +46,16 @@ export interface ActivityLog {
   createdBy: string;
 }
 
+export interface StageHistoryEntry {
+  id: string;
+  fromStage: string;
+  fromLabel: string;
+  toStage: string;
+  toLabel: string;
+  timestamp: string;
+  changedBy: string;
+}
+
 export interface Lead {
   id: string;
   leadNumber: string;
@@ -67,6 +77,8 @@ export interface Lead {
   sphNumber?: string;
   notes?: string;
   activities: ActivityLog[];
+  stageHistory?: StageHistoryEntry[];
+  stageUpdatedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -320,6 +332,42 @@ export default function AdminCrmPage() {
     return "Rp " + (Number(val) || 0).toLocaleString("id-ID");
   };
 
+  const formatDateTimeWIB = (dateStr?: string) => {
+    if (!dateStr) return "-";
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleString("id-ID", {
+        timeZone: "Asia/Jakarta",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }) + " WIB";
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatTimeAgo = (dateStr?: string) => {
+    if (!dateStr) return "";
+    try {
+      const diffMs = Date.now() - new Date(dateStr).getTime();
+      if (diffMs < 0) return "Baru saja";
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return "Baru saja";
+      if (diffMins < 60) return `${diffMins} mnt lalu`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours} jam lalu`;
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays < 30) return `${diffDays} hari lalu`;
+      return `${Math.floor(diffDays / 30)} bln lalu`;
+    } catch {
+      return "";
+    }
+  };
+
   const handleOpenAddModal = () => {
     setEditingLead(null);
     setFormData({
@@ -420,11 +468,15 @@ export default function AdminCrmPage() {
         body: JSON.stringify({
           id: leadId,
           stage: targetStage,
+          updatedBy: "Direktur Utama",
         }),
       });
       const data = await res.json();
       if (data.success) {
         showToast("Tahapan prospek berhasil dipindahkan!");
+        if (data.data && selectedDetailLead?.id === leadId) {
+          setSelectedDetailLead(data.data);
+        }
         fetchCrmData();
       }
     } catch (err) {
@@ -788,7 +840,18 @@ export default function AdminCrmPage() {
               return (
                 <div
                   key={st.id}
-                  className="bg-slate-100/90 rounded-3xl border border-slate-200/90 p-4 flex flex-col min-w-[310px] w-[310px] shrink-0 max-h-[820px] shadow-2xs"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const leadId = e.dataTransfer.getData("text/plain");
+                    if (leadId) {
+                      handleMoveStage(leadId, st.id);
+                    }
+                  }}
+                  className="bg-slate-100/90 rounded-3xl border border-slate-200/90 p-4 flex flex-col min-w-[320px] w-[320px] shrink-0 max-h-[860px] shadow-2xs"
                 >
                   {/* Header Kolom Stage */}
                   <div className="pb-3 mb-3 border-b border-slate-200 flex items-center justify-between">
@@ -816,6 +879,10 @@ export default function AdminCrmPage() {
                       stageLeads.map((lead) => (
                         <div
                           key={lead.id}
+                          draggable={true}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("text/plain", lead.id);
+                          }}
                           onClick={() => setSelectedDetailLead(lead)}
                           className="bg-white rounded-2xl border border-slate-200 p-3.5 shadow-2xs hover:shadow-md hover:border-dstech-blue transition-all cursor-pointer group space-y-2.5 relative"
                         >
@@ -868,12 +935,62 @@ export default function AdminCrmPage() {
                             />
                           </div>
 
-                          {/* Footer Kartu & Navigasi Stage */}
-                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1">
-                            <span className="truncate max-w-[120px] flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-slate-400" />
-                              {lead.expectedClosingDate || "Belum diatur"}
-                            </span>
+                          {/* INFORMASI TANGGAL & JAM MASUK & BERPINDAH TAHAP */}
+                          <div className="bg-slate-50/90 rounded-xl p-2.5 border border-slate-200/80 space-y-1.5 text-[10px]">
+                            {/* Waktu Masuk */}
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="flex items-center gap-1 font-semibold text-slate-500 shrink-0">
+                                <Calendar className="w-3 h-3 text-sky-600" />
+                                <span>Masuk:</span>
+                              </span>
+                              <span className="font-mono font-bold text-slate-800 text-right truncate" title={`Masuk pada: ${lead.createdAt}`}>
+                                {formatDateTimeWIB(lead.createdAt)}
+                              </span>
+                            </div>
+
+                            {/* Waktu Berpindah Antar Leads */}
+                            <div className="flex items-center justify-between gap-1 border-t border-slate-200/60 pt-1.5">
+                              <span className="flex items-center gap-1 font-semibold text-slate-500 shrink-0">
+                                <Clock className="w-3 h-3 text-amber-600" />
+                                <span>Pindah:</span>
+                              </span>
+                              <span className="font-mono font-bold text-right" title={`Terakhir berpindah tahap: ${lead.stageUpdatedAt || lead.createdAt}`}>
+                                {lead.stageUpdatedAt && lead.stageUpdatedAt !== lead.createdAt ? (
+                                  <span className="text-amber-800 block">
+                                    {formatDateTimeWIB(lead.stageUpdatedAt)}
+                                    {formatTimeAgo(lead.stageUpdatedAt) && (
+                                      <span className="text-[9px] text-slate-400 font-sans block">({formatTimeAgo(lead.stageUpdatedAt)})</span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500 italic block">
+                                    Sejak masuk {formatTimeAgo(lead.createdAt) ? `(${formatTimeAgo(lead.createdAt)})` : ""}
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Footer Kartu & Navigasi Stage Langsung */}
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100 gap-1.5">
+                            {/* Dropdown Pindah Tahap Cepat */}
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <select
+                                value={st.aliases.includes(lead.stage) ? st.id : lead.stage}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  handleMoveStage(lead.id, e.target.value);
+                                }}
+                                className="text-[10px] font-bold bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-dstech-blue cursor-pointer"
+                                title="Pindahkan Tahapan Prospek Ini"
+                              >
+                                {STAGES.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    ➔ {s.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
 
                             <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                               {lead.stage !== "CLOSED_WON" && lead.stage !== "WON" && (
@@ -946,8 +1063,9 @@ export default function AdminCrmPage() {
                           <span className="font-mono font-black text-slate-900 block">
                             {lead.leadNumber}
                           </span>
-                          <span className="text-[10px] text-slate-400">
-                            {new Date(lead.createdAt).toLocaleDateString("id-ID")}
+                          <span className="text-[10px] text-slate-500 font-mono font-semibold flex items-center gap-1 mt-0.5" title={`Waktu Masuk: ${lead.createdAt}`}>
+                            <Calendar className="w-2.5 h-2.5 text-sky-600 shrink-0" />
+                            <span>{formatDateTimeWIB(lead.createdAt)}</span>
                           </span>
                         </td>
 
@@ -981,9 +1099,19 @@ export default function AdminCrmPage() {
                         </td>
 
                         <td className="py-4 px-5 align-top">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${currentStageObj.badge}`}>
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-black ${currentStageObj.badge} inline-block`}>
                             {currentStageObj.label}
                           </span>
+                          <div className="text-[10px] text-slate-500 font-mono mt-1" title={`Terakhir Berpindah: ${lead.stageUpdatedAt || lead.createdAt}`}>
+                            {lead.stageUpdatedAt && lead.stageUpdatedAt !== lead.createdAt ? (
+                              <span className="text-amber-700 flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                                <span>Pindah: {formatDateTimeWIB(lead.stageUpdatedAt)}</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 italic">Sejak pendaftaran</span>
+                            )}
+                          </div>
                         </td>
 
                         <td className="py-4 px-5 align-top">
@@ -1360,6 +1488,76 @@ export default function AdminCrmPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Informasi Waktu Masuk & Linimasa Perpindahan Tahapan */}
+            <div className="bg-slate-50/90 rounded-2xl border border-slate-200 p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-dstech-blue" />
+                  <span>Informasi Waktu Masuk &amp; Riwayat Perpindahan Tahapan</span>
+                </h3>
+                <span className="text-[10px] font-bold text-slate-500">
+                  {selectedDetailLead.stageHistory?.length || 1} Catatan Riwayat
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-400 block uppercase">Waktu Pertama Masuk:</span>
+                  <div className="text-xs font-black text-slate-900 font-mono mt-0.5 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-sky-600" />
+                    <span>{formatDateTimeWIB(selectedDetailLead.createdAt)}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    {formatTimeAgo(selectedDetailLead.createdAt) ? `Terdaftar ${formatTimeAgo(selectedDetailLead.createdAt)}` : "-"}
+                  </span>
+                </div>
+
+                <div className="bg-white p-3 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-400 block uppercase">Terakhir Berpindah Tahap:</span>
+                  <div className="text-xs font-black text-amber-700 font-mono mt-0.5 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>{formatDateTimeWIB(selectedDetailLead.stageUpdatedAt || selectedDetailLead.createdAt)}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    {selectedDetailLead.stageUpdatedAt && selectedDetailLead.stageUpdatedAt !== selectedDetailLead.createdAt ? (
+                      <span>Berpindah {formatTimeAgo(selectedDetailLead.stageUpdatedAt)}</span>
+                    ) : (
+                      <span>Berada di tahapan ini sejak pertama masuk</span>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              {/* Kronologi Detail Perpindahan Tahap */}
+              {selectedDetailLead.stageHistory && selectedDetailLead.stageHistory.length > 0 && (
+                <div className="pt-2 border-t border-slate-200/60">
+                  <span className="text-[10px] font-black uppercase text-slate-500 block mb-2">
+                    Kronologi Perpindahan Tahapan:
+                  </span>
+                  <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                    {selectedDetailLead.stageHistory.map((item, idx) => (
+                      <div key={item.id || idx} className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-dstech-blue shrink-0"></span>
+                          <div>
+                            <span className="font-bold text-slate-800">
+                              {item.fromLabel} ➔ <strong className="text-dstech-blue">{item.toLabel}</strong>
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-sans">
+                              Oleh: {item.changedBy || "Direktur Utama"}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-mono font-bold text-slate-600 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200 shrink-0">
+                          {formatDateTimeWIB(item.timestamp)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Linimasa & Pencatatan Aktivitas Interaksi */}

@@ -1136,7 +1136,11 @@ export async function POST(req: NextRequest) {
           lowerCmd.includes("kas") || lowerCmd.includes("pajak") || lowerCmd.includes("gaji") ||
           lowerCmd.includes("payroll") || lowerCmd.includes("pengeluaran") || lowerCmd.includes("biaya") ||
           lowerCmd.includes("pembukuan") || lowerCmd.includes("catat") || lowerCmd.includes("operasional") ||
-          lowerCmd.includes("arus kas") || lowerCmd.includes("buku") || lowerCmd.includes("uang")
+          lowerCmd.includes("arus kas") || lowerCmd.includes("buku") || lowerCmd.includes("uang") ||
+          lowerCmd.includes("revisi") || lowerCmd.includes("ubah") || lowerCmd.includes("ganti") ||
+          lowerCmd.includes("koreksi") || lowerCmd.includes("anggaran") || lowerCmd.includes("sewa") ||
+          lowerCmd.includes("listrik") || lowerCmd.includes("air") || lowerCmd.includes("bensin") ||
+          lowerCmd.includes("mobil") || lowerCmd.includes("atk")
         ) {
           targetedEmployeeId = "emp_dewi_finance";
         } else if (lowerCmd.includes("jual") || lowerCmd.includes("klien") || lowerCmd.includes("sales") || lowerCmd.includes("prospek") || lowerCmd.includes("crm") || lowerCmd.includes("closing") || lowerCmd.includes("deal")) {
@@ -1443,7 +1447,12 @@ Aturan Khusus:
         } else if (
           lowerCmd.includes("gaji") || lowerCmd.includes("payroll") || lowerCmd.includes("pengeluaran") ||
           lowerCmd.includes("biaya") || lowerCmd.includes("pembukuan") || lowerCmd.includes("catat") ||
-          lowerCmd.includes("kas") || lowerCmd.includes("operasional") || lowerCmd.includes("arus kas")
+          lowerCmd.includes("kas") || lowerCmd.includes("operasional") || lowerCmd.includes("arus kas") ||
+          lowerCmd.includes("revisi") || lowerCmd.includes("ubah") || lowerCmd.includes("ganti") ||
+          lowerCmd.includes("koreksi") || lowerCmd.includes("update") || lowerCmd.includes("anggaran") ||
+          lowerCmd.includes("sewa") || lowerCmd.includes("listrik") || lowerCmd.includes("air") ||
+          lowerCmd.includes("bensin") || lowerCmd.includes("mobil") || lowerCmd.includes("atk") ||
+          /\d{4,}/.test(promptCommand)
         ) {
           try {
             const financeFilePath = path.join(process.cwd(), "src/data/dstech_finance_erp.json");
@@ -1511,17 +1520,59 @@ Aturan Khusus:
                 extractedBookkeeping = parseDeterministicBookkeeping(promptCommand);
               }
 
-              // 3. Susun Draf Transaksi ke Kotak Persetujuan Pimpinan (Approval Queue)
+              // 3. Susun / Revisi Draf Transaksi ke Kotak Persetujuan Pimpinan (Approval Queue)
               // Karyawan AI 100% TIDAK BOLEH menulis langsung ke database kas sebelum disetujui Direktur Utama!
+              if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
+
+              const isRevision = lowerCmd.includes("revisi") || lowerCmd.includes("ubah") || lowerCmd.includes("ganti") || lowerCmd.includes("koreksi");
+
+              // Cari draf usulan sejenis yang sedang menunggu persetujuan (status PENDING_APPROVAL)
+              const existingQueueIdx = data.dstech_approval_queue.findIndex((q: any) =>
+                q.task_type === "BOOKKEEPING_EXPENSE" &&
+                q.status === "PENDING_APPROVAL"
+              );
+              const existingQueueItem = existingQueueIdx >= 0 ? data.dstech_approval_queue[existingQueueIdx] : null;
+
+              let finalItems: any[] = extractedBookkeeping.items || [];
+              let yr = extractedBookkeeping.year || (existingQueueItem?.payload?.year || 2025);
+              let sMonth = extractedBookkeeping.startMonth || (existingQueueItem?.payload?.startMonth || 1);
+              let eMonth = extractedBookkeeping.endMonth || (existingQueueItem?.payload?.endMonth || 12);
+
+              // JIKA INI PERINTAH REVISI DAN ADA DRAF PENDING: GABUNGKAN / UPDATE POS-POS YANG DIREVISI
+              if (isRevision && existingQueueItem && Array.isArray(existingQueueItem.payload?.items)) {
+                const prevItems: any[] = JSON.parse(JSON.stringify(existingQueueItem.payload.items));
+                
+                const normKey = (s: string) => {
+                  const l = (s || "").toLowerCase();
+                  if (l.includes("sewa") || l.includes("kantor") || l.includes("gedung")) return "sewa_kantor";
+                  if (l.includes("mobil") || l.includes("kendaraan") || l.includes("motor") || l.includes("transport")) return "mobil";
+                  if (l.includes("bensin") || l.includes("bbm") || l.includes("solar")) return "bensin";
+                  if (l.includes("listrik") || l.includes("pln")) return "listrik";
+                  if (l.includes("air") || l.includes("pam") || l.includes("pdam")) return "air";
+                  if (l.includes("atk") || l.includes("tulis") || l.includes("perlengkapan")) return "atk";
+                  return l.replace(/[^a-z0-9]/g, "");
+                };
+
+                for (const newItem of (extractedBookkeeping.items || [])) {
+                  const k = normKey(newItem.name);
+                  const mIdx = prevItems.findIndex((pi: any) => normKey(pi.name) === k);
+                  if (mIdx >= 0) {
+                    prevItems[mIdx].amount = newItem.amount;
+                    if (newItem.name) prevItems[mIdx].name = newItem.name;
+                    if (newItem.category) prevItems[mIdx].category = newItem.category;
+                  } else {
+                    prevItems.push(newItem);
+                  }
+                }
+                finalItems = prevItems;
+              }
+
               const entriesList: any[] = [];
-              const yr = extractedBookkeeping.year || 2025;
-              const sMonth = extractedBookkeeping.startMonth || 1;
-              const eMonth = extractedBookkeeping.endMonth || 12;
               let grandTotalProposal = 0;
 
               for (let m = sMonth; m <= eMonth; m++) {
                 const monthStr = `${yr}-${String(m).padStart(2, "0")}`;
-                for (const item of extractedBookkeeping.items) {
+                for (const item of finalItems) {
                   const isItemSalary = (item.category || extractedBookkeeping.category || "").toLowerCase().includes("gaji");
                   const payDate = isItemSalary ? `${monthStr}-25` : `${monthStr}-10`;
                   const itemPrefix = isItemSalary ? "PAY" : "EXP";
@@ -1546,21 +1597,25 @@ Aturan Khusus:
                 }
               }
 
-              const isSalaryProposal = extractedBookkeeping.items.some((i: any) => (i.category || "").toLowerCase().includes("gaji"));
+              const isSalaryProposal = finalItems.some((i: any) => (i.category || "").toLowerCase().includes("gaji"));
               const proposalTypeLabel = isSalaryProposal ? "Pengeluaran Gaji" : "Pengeluaran Rutin Operasional";
               const periodLabel = sMonth === eMonth ? `Bulan ${sMonth} ${yr}` : `Januari - Desember ${yr}`;
-              const itemNamesSummary = extractedBookkeeping.items.map((i: any) => i.name).join(", ");
+              const itemNamesSummary = finalItems.map((i: any) => i.name).join(", ");
+
+              const queueId = existingQueueItem ? existingQueueItem.id : `appr_dewi_bookkeeping_${Date.now()}`;
+              const revNumber = (existingQueueItem?.revision || 0) + (isRevision ? 1 : 0);
 
               const queueItem = {
-                id: `appr_dewi_bookkeeping_${Date.now()}`,
+                id: queueId,
+                revision: revNumber,
                 employee_id: "emp_dewi_finance",
                 employee_name: "Dewi Sartika",
                 employee_role: "AI Finance & Tax Billing Specialist",
                 department: "FINANCE",
                 task_type: "BOOKKEEPING_EXPENSE",
-                title: `Draf Pembukuan: ${proposalTypeLabel} (${itemNamesSummary}) Periode ${periodLabel}`,
+                title: `Draf Pembukuan: ${proposalTypeLabel} (${itemNamesSummary}) Periode ${periodLabel}${revNumber > 0 ? ` (Revisi #${revNumber})` : ""}`,
                 status: "PENDING_APPROVAL",
-                summary: `Usulan pembukuan ${entriesList.length} transaksi ${proposalTypeLabel.toLowerCase()} (${extractedBookkeeping.items.map((i: any) => `${i.name} Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) periode ${periodLabel} total Rp ${grandTotalProposal.toLocaleString("id-ID")}. Menunggu persetujuan Direktur Utama sebelum dibukukan ke Arus Kas ERP.`,
+                summary: `${isRevision ? "[HASIL REVISI] " : ""}Usulan pembukuan ${entriesList.length} transaksi ${proposalTypeLabel.toLowerCase()} (${finalItems.map((i: any) => `${i.name} Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) periode ${periodLabel} total Rp ${grandTotalProposal.toLocaleString("id-ID")}. Menunggu persetujuan Direktur Utama sebelum dibukukan ke Arus Kas ERP.`,
                 value: grandTotalProposal,
                 payload: {
                   type: "OUT",
@@ -1572,19 +1627,13 @@ Aturan Khusus:
                   periodLabel: periodLabel,
                   totalEntries: entriesList.length,
                   grandTotal: grandTotalProposal,
-                  items: extractedBookkeeping.items,
+                  items: finalItems,
                   entries: entriesList,
                 },
-                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                created_at: existingQueueItem?.created_at || new Date().toISOString(),
               };
 
-              if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
-              // Hindari duplikat usulan yang persis sama di antrean pending
-              const existingQueueIdx = data.dstech_approval_queue.findIndex((q: any) =>
-                q.task_type === "BOOKKEEPING_EXPENSE" &&
-                q.title === queueItem.title &&
-                q.status === "PENDING_APPROVAL"
-              );
               if (existingQueueIdx >= 0) {
                 data.dstech_approval_queue[existingQueueIdx] = queueItem;
               } else {
@@ -1601,7 +1650,11 @@ Aturan Khusus:
                 link: "/admin/virtual-office"
               };
 
-              aiResponseText = `Siap Pak Ramadhani! Draf pembukuan ${proposalTypeLabel.toLowerCase()} (${extractedBookkeeping.items.map((i: any) => `${i.name}: Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) untuk periode ${periodLabel} (Total Rp ${grandTotalProposal.toLocaleString("id-ID")}) telah saya susun dan saya masukkan ke Kotak Persetujuan Anda. Sistem 100% aman dan data belum dibukukan ke Arus Kas ERP sebelum Bapak menyetujuinya di Kotak Persetujuan!`;
+              aiResponseText = isRevision
+                ? `Siap Pak Ramadhani! Usulan pembukuan ${proposalTypeLabel.toLowerCase()} tahun ${yr} di Kotak Persetujuan telah BERHASIL SAYA REVISI sesuai instruksi: ${finalItems.map((i: any) => `${i.name}: Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")} (Total akumulasi baru: Rp ${grandTotalProposal.toLocaleString("id-ID")} untuk ${entriesList.length} transaksi). Draf usulan lama di Kotak Persetujuan telah langsung diperbarui dan menunggu persetujuan Bapak!`
+                : `Siap Pak Ramadhani! Draf pembukuan ${proposalTypeLabel.toLowerCase()} (${finalItems.map((i: any) => `${i.name}: Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) untuk periode ${periodLabel} (Total Rp ${grandTotalProposal.toLocaleString("id-ID")}) telah saya susun dan saya masukkan ke Kotak Persetujuan Anda. Sistem 100% aman dan data belum dibukukan ke Arus Kas ERP sebelum Bapak menyetujuinya di Kotak Persetujuan!`;
+              
+              targetEmp.speech_bubble = aiResponseText;
             }
           } catch (bookkeepingErr: any) {
             console.error("Error executing Dewi Finance bookkeeping action:", bookkeepingErr);

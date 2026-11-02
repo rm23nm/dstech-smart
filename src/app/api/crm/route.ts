@@ -7,6 +7,23 @@ export const revalidate = 0;
 
 const CRM_FILE = path.join(process.cwd(), "src", "data", "dstech_crm.json");
 
+export const STAGE_LABELS_MAP: Record<string, string> = {
+  NEW: "Leads Baru",
+  NEW_LEAD: "Leads Baru",
+  DISCOVERY: "Leads Baru",
+  FOLLOW_UP: "Follow Up",
+  QUALIFIED: "Follow Up",
+  NEGOTIATION: "Negosiasi",
+  PROPOSAL_SENT: "Negosiasi",
+  CLOSED_WON: "Closing (Won)",
+  WON: "Closing (Won)",
+  CLOSED_LOST: "Gagal (Lost)",
+  LOST: "Gagal (Lost)",
+  COMPLAINT: "Komplain",
+  TICKET_OPEN: "Tiket",
+  SUPPORT: "Support",
+};
+
 const INITIAL_LEADS = [
   {
     id: "dstech_crm_lead_1",
@@ -284,6 +301,18 @@ export async function GET(req: Request) {
               assignedTo: spLead.assigned_to || spLead.wa_assigned_to || (existingIdx >= 0 ? data.leads[existingIdx].assignedTo : "RAMADHANI ST"),
               notes: spLead.notes || spLead.wa_notes || "",
               activities: existingIdx >= 0 ? (data.leads[existingIdx].activities || []) : [],
+              stageUpdatedAt: existingIdx >= 0 ? (data.leads[existingIdx].stageUpdatedAt || data.leads[existingIdx].updatedAt || data.leads[existingIdx].createdAt) : (spLead.updatedAt || spLead.wa_updated_at || spLead.createdAt || new Date().toISOString()),
+              stageHistory: existingIdx >= 0 ? (data.leads[existingIdx].stageHistory || []) : [
+                {
+                  id: `stg_init_${spId || cleanPhone || Date.now()}`,
+                  fromStage: "INITIAL",
+                  fromLabel: "Masuk via SmartPro WA Gateway",
+                  toStage: mappedStage,
+                  toLabel: mappedStage === "NEW" ? "Leads Baru" : mappedStage,
+                  timestamp: spLead.createdAt || spLead.wa_created_at || new Date().toISOString(),
+                  changedBy: "SmartPro Sync",
+                }
+              ],
               createdAt: spLead.createdAt || spLead.wa_created_at || new Date().toISOString(),
               updatedAt: spLead.updatedAt || spLead.wa_updated_at || new Date().toISOString()
             };
@@ -323,6 +352,29 @@ export async function GET(req: Request) {
     } catch (spErr) {
       // Abaikan jika SmartPro offline sesaat
     }
+
+    // Pastikan setiap lead memiliki stageUpdatedAt dan stageHistory
+    data.leads = data.leads.map((l: any) => {
+      const stageUpdatedAt = l.stageUpdatedAt || l.updatedAt || l.createdAt;
+      const stageHistory = Array.isArray(l.stageHistory) && l.stageHistory.length > 0
+        ? l.stageHistory
+        : [
+            {
+              id: `stg_init_${l.id}`,
+              fromStage: "INITIAL",
+              fromLabel: "Pendaftaran Masuk",
+              toStage: l.stage,
+              toLabel: STAGE_LABELS_MAP[l.stage] || l.stage,
+              timestamp: l.createdAt || new Date().toISOString(),
+              changedBy: l.assignedTo || "Sistem DSTech",
+            }
+          ];
+      return {
+        ...l,
+        stageUpdatedAt,
+        stageHistory,
+      };
+    });
 
     let leads = data.leads;
 
@@ -528,6 +580,18 @@ export async function POST(req: Request) {
           createdBy: assignedTo,
         },
       ],
+      stageUpdatedAt: nowIso,
+      stageHistory: [
+        {
+          id: `stg_${Date.now()}`,
+          fromStage: "INITIAL",
+          fromLabel: "Pendaftaran Prospek Baru",
+          toStage: stage,
+          toLabel: STAGE_LABELS_MAP[stage] || stage,
+          timestamp: nowIso,
+          changedBy: assignedTo || "Direktur Utama",
+        }
+      ],
       createdAt: nowIso,
       updatedAt: nowIso,
     };
@@ -580,36 +644,43 @@ export async function PATCH(req: Request) {
     const targetLead = data.leads[index];
     const nowIso = new Date().toISOString();
 
-    // Jika terjadi perubahan stage tahapan, tambahkan log aktivitas otomatis
+    // Jika terjadi perubahan stage tahapan, tambahkan log aktivitas dan riwayat perpindahan tahapan
     if (body.stage && body.stage !== targetLead.stage) {
       if (!Array.isArray(targetLead.activities)) {
         targetLead.activities = [];
       }
+      if (!Array.isArray(targetLead.stageHistory)) {
+        targetLead.stageHistory = [];
+      }
 
-      const stageLabels: Record<string, string> = {
-        NEW_LEAD: "Prospek Baru",
-        QUALIFIED: "Kualifikasi & Survey",
-        PROPOSAL_SENT: "Penawaran SPH Terkirim",
-        NEGOTIATION: "Negosiasi Kontrak",
-        WON: "Menang (Closing Deal)",
-        LOST: "Batal / Hilang",
-      };
+      const fromLabel = STAGE_LABELS_MAP[targetLead.stage] || targetLead.stage;
+      const toLabel = STAGE_LABELS_MAP[body.stage] || body.stage;
+      const changedBy = body.updatedBy || "Direktur Utama";
 
-      const fromLabel = stageLabels[targetLead.stage] || targetLead.stage;
-      const toLabel = stageLabels[body.stage] || body.stage;
+      // Catat riwayat perpindahan tahapan (Stage History)
+      targetLead.stageHistory.unshift({
+        id: `stg_${Date.now()}`,
+        fromStage: targetLead.stage,
+        fromLabel,
+        toStage: body.stage,
+        toLabel,
+        timestamp: nowIso,
+        changedBy,
+      });
+      targetLead.stageUpdatedAt = nowIso;
 
       targetLead.activities.unshift({
         id: `act_${Date.now()}`,
-        type: body.stage === "WON" ? "PROPOSAL" : "NOTE",
+        type: (body.stage === "WON" || body.stage === "CLOSED_WON") ? "PROPOSAL" : "NOTE",
         title: `Tahapan Berubah: ${fromLabel} ➔ ${toLabel}`,
-        notes: body.stageNote || `Status prospek berhasil dipindahkan ke tahap ${toLabel}.`,
+        notes: body.stageNote || `Status prospek berpindah dari ${fromLabel} ke ${toLabel} pada ${new Date().toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })} WIB.`,
         createdAt: nowIso,
-        createdBy: body.updatedBy || "Commercial Admin",
+        createdBy: changedBy,
       });
 
       targetLead.stage = body.stage;
-      if (body.stage === "WON") targetLead.probability = 100;
-      if (body.stage === "LOST") targetLead.probability = 0;
+      if (body.stage === "WON" || body.stage === "CLOSED_WON") targetLead.probability = 100;
+      if (body.stage === "LOST" || body.stage === "CLOSED_LOST") targetLead.probability = 0;
     }
 
     // Perbarui field lainnya jika dikirimkan

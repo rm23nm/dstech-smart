@@ -4,6 +4,50 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 338 (2026-11-02)**: [SELESAI] Pembangunan Smart Revision Engine Staf AI Dewi Sartika untuk Memperbarui & Menyelaraskan Draf Usulan Pembukuan Pengeluaran Rutin yang Sedang Pending di Kotak Persetujuan (`src/app/api/ai-workforce/route.ts`).
+  *Permintaan User*: "ada kesalahan, saya suruh revisi kenapa dia tidak merevisi usulannya? ini kamu yang buat pengajuan atau karyawan AI yang melakukannya?" (Instruksi Direktur Utama: "Revisi, sewa kantor 1.500.000 sewa mobil 5.000.000 bensin 2.000.000 listrik 800.000").
+  *Akar Masalah yang Ditemukan*:
+  1. **Logika Filter Kata Kunci Tidak Mengenali Kata "Revisi" dan Nama Pos Non-Gaji**: Pada `src/app/api/ai-workforce/route.ts`, filter instruksi Dewi Sartika sebelumnya hanya mencari kata `"gaji"`, `"payroll"`, `"pengeluaran"`, `"biaya"`, `"pembukuan"`, `"catat"`, `"kas"`, `"operasional"`. Perintah pengguna yang berbunyi `"Revisi, sewa kantor 1.500.000 sewa mobil 5.000.000 bensin 2.000.000 listrik 800.000"` tidak mengandung kata-kata tersebut, sehingga dilempar ke percakapan umum AI (Gemini hanya menghasilkan balasan teks percakapan di speech bubble tanpa mengeksekusi revisi draf antrean persetujuan).
+  2. **Ketiadaan Engine Penggabungan Revisi (Smart Revision & Merge Engine)**: Logika sebelumnya hanya dibuat untuk usulan baru (`create`), belum memiliki kemampuan untuk merevisi draf `BOOKKEEPING_EXPENSE` yang berstatus `PENDING_APPROVAL` dengan memperbarui nominal pos-pos yang direvisi (Sewa Kantor, Mobil Operasional, Bensin, Listrik) sekaligus mempertahankan pos yang tidak diubah (Air PAM dan Belanja ATK).
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mencatat rencana kerja step-by-step Tugas 338 di `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task337_crm_timestamps/route_before_dewi_revision.ts.bak`.
+  3. [x] Memperluas filter routing dan kata kunci eksekusi Dewi Sartika agar mencakup: `revisi`, `ubah`, `ganti`, `koreksi`, `update`, `anggaran`, `sewa`, `listrik`, `air`, `bensin`, `mobil`, `atk`, serta pola angka rupiah.
+  4. [x] Membangun **Smart Revision & Merge Engine**:
+     - Mendeteksi adanya item `BOOKKEEPING_EXPENSE` yang berstatus `PENDING_APPROVAL` di `dstech_approval_queue`.
+     - Menggabungkan pos-pos yang direvisi secara cerdas ke dalam draf usulan lama.
+     - Menghitung ulang 72 transaksi bulanan dan total akumulasi baru (Rp 123.600.000).
+     - Mengupdate draf kartu di Kotak Persetujuan secara in-place dengan label revisi (`Revisi #1`).
+  5. [x] Memperbarui speech bubble Dewi Sartika agar memberikan konfirmasi angka dan rincian revisi yang konkret dan transparan.
+  6. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  7. [x] Menjalankan kompilasi lokal Next.js (`npm run build`) hingga 77/77 routes lolos sukses.
+  8. [x] Deploy ke server live VPS, verifikasi pembaharuan draf di live Kotak Persetujuan, dan tandai status menjadi [SELESAI].
+
+- **Tugas 337 (2026-11-02)**: [SELESAI] Penambahan Informasi Tanggal & Jam Masuk serta Riwayat Waktu Perpindahan Antar Tahapan Leads CRM (`src/app/admin/crm/page.tsx`, `src/app/api/crm/route.ts`).
+  *Permintaan User*: "pada leads prospek, tolong tambahkan informasi tanggal dan jam agar saya bisa memantau kapan leads ini masuk dan berpindah antar leads" (beserta screenshot halaman CRM & Prospek Klien /admin/crm).
+  *Kebutuhan & Rencana Solusi*:
+  1. **Tampilan Tanggal & Jam Masuk (Timestamp Waktu Masuk)**:
+     - Menampilkan tanggal dan jam presisi (WIB) saat prospek/leads pertama kali masuk ke sistem (`createdAt`).
+     - Ditampilkan pada kartu Kanban, tabel prospek, dan modal detail prospek secara jelas, informatif, dan rapi.
+  2. **Pencatatan & Riwayat Waktu Perpindahan Antar Tahapan (Stage History & Timestamp)**:
+     - Menambahkan struktur data `stageHistory` (array riwayat perpindahan tahapan: waktu perpindahan ISO & WIB, tahapan asal, tahapan tujuan, dan nama staf/pengguna yang memindahkan) dan field `stageUpdatedAt` (waktu perpindahan terakhir).
+     - Pada kartu Kanban: Tampilkan status perpindahan terakhir (contoh: "Pindah ke Follow Up: 02 Nov 2026, 16:20 WIB" atau "Baru masuk"), serta tombol/dropdown aksi cepat pindah tahapan dan interaksi drag-and-drop antar kolom kanban.
+     - Pada modal detail prospek: Tambahkan seksi khusus "Linimasa Waktu & Riwayat Perpindahan Tahapan Pipeline" yang memvisualisasikan seluruh perjalanan prospek sejak pertama kali masuk hingga tahapan saat ini.
+     - Pada tampilan tabel: Tambahkan kolom tanggal & jam masuk serta tanggal & jam perpindahan tahapan terakhir.
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mencatat rencana kerja step-by-step Tugas 337 di `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task337_crm_timestamps/` dan mencadangkan `src/app/admin/crm/page.tsx` dan `src/app/api/crm/route.ts`.
+  3. [x] Memperbarui backend API (`src/app/api/crm/route.ts`) untuk mencatat `stageUpdatedAt` dan `stageHistory` saat prospek dibuat (`POST`) maupun saat dipindahkan tahapannya (`PATCH`), serta memastikan backward compatibility untuk data prospek yang sudah ada.
+  4. [x] Memperbarui komponen kartu Kanban di `src/app/admin/crm/page.tsx`:
+     - Tampilkan tanggal & jam masuk (`createdAt`) berformat WIB rapi (contoh: "📥 Masuk: 02 Nov 2026, 16:06 WIB").
+     - Tampilkan waktu perpindahan tahap terakhir (`stageUpdatedAt` / `stageHistory`) (contoh: "🔄 Pindah: 02 Nov 2026, 16:25 WIB").
+     - Tambahkan kontrol pemindahan tahapan langsung dari kartu (dropdown/tombol cepat pindah tahap) serta dukungan Drag-and-Drop HTML5 antar kolom tahapan.
+  5. [x] Memperbarui tampilan Tabel (`viewMode === "table"`) di `src/app/admin/crm/page.tsx` agar menyertakan kolom tanggal & jam masuk dan terakhir pindah tahap.
+  6. [x] Memperbarui modal detail prospek (`selectedDetailLead`) dengan menambahkan seksi linimasa riwayat perpindahan tahapan lengkap dengan waktu presisi WIB.
+  7. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  8. [x] Menjalankan kompilasi lokal Next.js (`npm run build`) hingga seluruh routes lolos sukses.
+  9. [x] Deploy ke server live VPS 157.66.34.199, uji coba pemindahan tahapan prospek di live, verifikasi tampilan tanggal & jam, bersihkan folder cadangan, dan tandai status menjadi [SELESAI].
+
 - **Tugas 336 (2026-11-02)**: [SELESAI] Pembangunan Engine Ekstraksi Pengeluaran Operasional Rutin (Listrik, Mobil, Bensin, Air, Sewa Kantor, ATK) Berformat Rupiah Indonesia & Integrasi Multi-Key Gemini 2.5 Flash pada Staf AI Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`, `.env.local`).
   *Permintaan User*: "saya suruh input ini, kenapa gak jalan ?" (Menampilkan modal instruksi Dewi Sartika: "tolong buatkan pengeluaran keuangan rutin untuk tahun 2025 dengan beban yang dikeluarkan setiap bulan: listrik 500.000,- Mobil Operasional 3.000.000,- Bensin 1.000.000,- Air 500.000,- Sewa Kantor 1.000.000,- Belanja ATK 500.000,-").
   *Akar Masalah yang Ditemukan*:
@@ -8619,7 +8663,7 @@
 - **Permintaan Pengguna**:
   - *"untuk absensi saat ini terkendala. staf yang saya tempatkan dikantor posisinya, namun saat absensi ridak bisa, karena titik GPS tidak sesuai. saya masih bingung dimana harus meperbaiki titik GPS. karena tidak ada pengaturannya. begitu juga titik proyek"*
 - **Status**: **SELESAI (SUDAH DIVERIFIKASI LIVE & BROWSER TESTING)**
-- **Hasil Implementasi & Pembuktian**:
+- **Hasil Implementasi & Pembuktian**:nnya
   1. **Komponen Pengaturan GPS Terpadu (`src/components/GpsGeofenceManager.tsx`)**:
      - **Formulir Titik Koordinat Kantor**: Input Nama Kantor, Alamat Kantor, Latitude (-6.031846), Longitude (106.037198).
      - **Tombol Kunci Lokasi Instan ("📍 Kunci Lokasi Saya Saat Ini")**: Membaca GPS satelit browser secara akurat (`navigator.geolocation.getCurrentPosition` dengan high accuracy) sehingga admin di kantor cukup menekan 1 tombol untuk mengunci koordinat kantor secara otomatis tanpa bingung mencari latitude/longitude.
