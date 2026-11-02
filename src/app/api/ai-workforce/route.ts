@@ -276,6 +276,155 @@ function writeWorkforceData(data: any) {
   }
 }
 
+// ==========================================
+// GOOGLE GEMINI AI MULTI-KEY ROTATION ENGINE
+// Default Model: gemini-2.5-flash (STRICT RULE)
+// ==========================================
+function getGeminiApiKeys(): string[] {
+  const envRaw = process.env.GEMINI_API_KEY || "";
+  const paidKey = process.env.GEMINI_API_KEY_PAID || "";
+  const freeKeys = (process.env.GEMINI_API_KEYS_FREE || "").split(",").map(k => k.replace(/["']/g, "").trim()).filter(Boolean);
+  const parsedEnv = envRaw.split(",").map(k => k.replace(/["']/g, "").trim()).filter(Boolean);
+
+  const keyList = [
+    ...freeKeys,
+    ...parsedEnv,
+    paidKey.replace(/["']/g, "").trim(),
+    "AIzaSyAJLJZW07IfKww2m7USMK51W-XsycEb02w",
+    "AIzaSyA8vir7yUSY25sZwoq5Mmx-sh4YaQ8LMlU",
+    "AIzaSyCPO7o7HvlMjE2KDAq0SqbZb0mFFV5bLoY",
+    "AIzaSyBbyYdhCGiKe9XVr44sOuy5W5Sb6L8a2a0",
+    "AIzaSyCtESMZ27v54-exiKXJOShZ8vKdTwGz77E",
+  ].filter(Boolean);
+
+  return Array.from(new Set(keyList));
+}
+
+let geminiKeyIndex = 0;
+
+async function executeGeminiCall(
+  prompt: string,
+  jsonMode = false,
+  model = "gemini-2.5-flash",
+  timeoutMs = 12000
+): Promise<string | null> {
+  const keys = getGeminiApiKeys();
+  if (keys.length === 0) return null;
+
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const activeKey = keys[(geminiKeyIndex + attempt) % keys.length];
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+      const bodyPayload: any = {
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+      };
+      if (jsonMode) {
+        bodyPayload.generationConfig = { responseMimeType: "application/json" };
+      }
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyPayload),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
+      if (res.ok) {
+        geminiKeyIndex = (geminiKeyIndex + attempt) % keys.length;
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (text) return text;
+      } else {
+        console.warn(`Gemini key index ${(geminiKeyIndex + attempt) % keys.length} returned HTTP ${res.status}`);
+      }
+    } catch (e: any) {
+      console.warn(`Gemini call error on attempt ${attempt}:`, e.message);
+    }
+  }
+  return null;
+}
+
+// ==========================================
+// DETERMINISTIC BOOKKEEPING & EXPENSE PARSER
+// Handles Indonesian Currency, Monthly Routine,
+// Utilities, Transport, Rent, ATK, and Salaries
+// ==========================================
+function parseDeterministicBookkeeping(cmd: string): any {
+  const monthMap: Record<string, number> = {
+    januari: 1, februari: 2, maret: 3, april: 4, mei: 5, juni: 6,
+    juli: 7, agustus: 8, september: 9, oktober: 10, november: 11, desember: 12
+  };
+
+  let year = 2025;
+  const ym = cmd.match(/\b(202[4-9]|203[0-9])\b/);
+  if (ym) year = parseInt(ym[1], 10);
+
+  let startMonth = 1;
+  let endMonth = 12;
+  const mRange = cmd.match(/(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\s*(?:\d{4})?\s*(?:sampai|hingga|s\/d|-)\s*(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\s*(?:\d{4})?/i);
+  if (mRange) {
+    startMonth = monthMap[mRange[1].toLowerCase()] || 1;
+    endMonth = monthMap[mRange[2].toLowerCase()] || 12;
+  } else {
+    const singleMonth = cmd.match(/(?:bulan\s+)(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)/i);
+    if (singleMonth) {
+      startMonth = monthMap[singleMonth[1].toLowerCase()] || 1;
+      endMonth = startMonth;
+    }
+  }
+
+  // Regex matches words (name) followed by amount pattern
+  // Amount pattern handles: 500.000,- | 3.000.000 | 500000 | Rp 500.000
+  const itemRegex = /([a-zA-Z\s\(\)\/\.&]+?)\s*[:=,]?\s*(?:rp\.?\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d+|-)?|\d{5,10})/gi;
+  const items: any[] = [];
+  let m;
+  while ((m = itemRegex.exec(cmd)) !== null) {
+    let rawName = m[1].trim();
+    rawName = rawName.replace(/^(.*?(?:bulan|tahun\s*\d{4}|setiap\s*bulan|beban\s*yang\s*dikeluarkan\s*setiap\s*bulan|pengeluaran\s*keuangan\s*rutin\s*untuk\s*tahun\s*\d{4}))\s*[:=-]?\s*/i, "");
+    rawName = rawName.replace(/^[,\s\-\:\;]+/, "").replace(/[,\s\-\:\;]+$/, "").trim();
+    rawName = rawName.replace(/^(?:dan|untuk|beban|biaya|gaji|pengeluaran|pada)\s+/i, "").trim();
+
+    const rawVal = m[2].replace(/\./g, "").replace(/,-$/, "").replace(/,.*$/, "");
+    const amount = parseInt(rawVal, 10);
+
+    if (rawName.length >= 2 && !isNaN(amount) && amount >= 10000) {
+      let category = "Beban Operasional & Pemeliharaan";
+      let role = "Beban Operasional";
+      const nLower = rawName.toLowerCase();
+      if (nLower.includes("listrik") || nLower.includes("air") || nLower.includes("pam") || nLower.includes("pdam") || nLower.includes("pln") || nLower.includes("internet") || nLower.includes("wifi") || nLower.includes("utilitas")) {
+        category = "Beban Utilitas & Fasilitas";
+        role = "Beban Utilitas";
+      } else if (nLower.includes("bensin") || nLower.includes("bbm") || nLower.includes("mobil") || nLower.includes("kendaraan") || nLower.includes("motor") || nLower.includes("transport")) {
+        category = "Beban Operasional Kendaraan & Transport";
+        role = "Beban Kendaraan Operasional";
+      } else if (nLower.includes("sewa") || nLower.includes("kantor") || nLower.includes("gedung")) {
+        category = "Beban Sewa Tempat & Kantor";
+        role = "Beban Sewa Gedung / Kantor";
+      } else if (nLower.includes("atk") || nLower.includes("alat tulis") || nLower.includes("perlengkapan") || nLower.includes("kertas")) {
+        category = "Beban Perlengkapan & ATK Kantor";
+        role = "Beban Perlengkapan Kantor";
+      } else if (nLower.includes("gaji") || nLower.includes("marsya") || nLower.includes("ramadhani") || nLower.includes("staf") || nLower.includes("karyawan") || nLower.includes("upah")) {
+        category = "Gaji & Upah Karyawan";
+        role = nLower.includes("ramadhani") ? "Direktur Utama" : "Staf Operasional";
+      }
+
+      items.push({ name: rawName, role, amount, category });
+    }
+  }
+
+  const isSalary = items.some(it => it.category === "Gaji & Upah Karyawan");
+
+  return {
+    type: "OUT",
+    category: isSalary ? "Gaji & Upah Karyawan" : "Beban Operasional Rutin",
+    defaultAccount: "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+    year,
+    startMonth,
+    endMonth,
+    items,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const data = readWorkforceData();
@@ -1005,34 +1154,21 @@ export async function POST(req: NextRequest) {
 
       const targetEmp = data.dstech_employees.find((e: any) => e.id === targetedEmployeeId) || data.dstech_employees[0];
 
-      // Panggil AI Gemini (default gemini-2.5-flash) untuk menyusun jawaban dan aksi
-      const apiKey = process.env.GEMINI_API_KEY || "";
+      // Panggil AI Gemini (default gemini-2.5-flash) dengan Multi-Key Rotation untuk menyusun jawaban
       let aiResponseText = "";
-
-      if (apiKey) {
-        try {
-          const systemInstruction = `Anda adalah ${targetEmp.name}, karyawan AI profesional di PT. DSTech Smart Perkasa dengan jabatan: ${targetEmp.role} (${targetEmp.department}).
+      try {
+        const systemInstruction = `Anda adalah ${targetEmp.name}, karyawan AI profesional di PT. DSTech Smart Perkasa dengan jabatan: ${targetEmp.role} (${targetEmp.department}).
 Direktur Utama (Bpk. Ramadhani ST) baru saja memberikan instruksi langsung kepada Anda di kantor: "${promptCommand}".
 Jawablah dengan gaya karyawan profesional, sopan, loyal, sigap, dan solutif (Bahasa Indonesia).
 Berikan konfirmasi bahwa tugas tersebut segera dieksekusi detik ini juga, sebutkan langkah konkret apa yang sedang/akan Anda kerjakan sesuai SOP divisi Anda di DSTech Smart (CCTV, Barrier Gate, Smart Home, ERP Finance, CRM).
 Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
 
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ role: "user", parts: [{ text: systemInstruction }] }]
-            }),
-            signal: AbortSignal.timeout(10000)
-          });
-
-          if (res.ok) {
-            const jsonRes = await res.json();
-            aiResponseText = jsonRes?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-          }
-        } catch (e: any) {
-          console.warn("AI Gemini workforce error:", e.message);
+        const geminiSpeech = await executeGeminiCall(systemInstruction, false, "gemini-2.5-flash", 8000);
+        if (geminiSpeech) {
+          aiResponseText = geminiSpeech;
         }
+      } catch (e: any) {
+        console.warn("AI Gemini speech error:", e.message);
       }
 
       // --- AUTONOMOUS ACTION EXECUTION ENGINE ---
@@ -1049,12 +1185,10 @@ Panjang jawaban maksimal 2-3 kalimat padat dan bersemangat.`;
               const finData = JSON.parse(finRaw);
               if (!finData.quotations) finData.quotations = [];
 
-              // 1. Ekstrak rincian SPH menggunakan AI Gemini atau Fallback Parser yang cerdas
+              // 1. Ekstrak rincian SPH menggunakan AI Gemini 2.5 Flash
               let extractedSph: any = null;
-
-              if (apiKey) {
-                try {
-                  const sphExtractionPrompt = `Anda adalah sistem ERP Intelligence DSTech Smart Perkasa.
+              try {
+                const sphExtractionPrompt = `Anda adalah sistem ERP Intelligence DSTech Smart Perkasa.
 Direktur Utama memberikan perintah: "${promptCommand}".
 Tugas Anda: Buat spesifikasi Surat Penawaran Harga (SPH) resmi yang akurat dalam format JSON MURNI tanpa markdown (jangan gunakan \`\`\`json).
 Format JSON yang wajib dihasilkan:
@@ -1079,26 +1213,12 @@ Aturan Khusus:
 - Jika permintaan mengenai CCTV: Masukkan Kamera CCTV sesuai jumlah unit, DVR/NVR, Harddisk CCTV, Power Supply, Kabel & Jasa Pasang.
 - Harga wajar standar pasar profesional Indonesia. Pastikan total = qty * price.`;
 
-                  const resExtraction = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      contents: [{ role: "user", parts: [{ text: sphExtractionPrompt }] }],
-                      generationConfig: { responseMimeType: "application/json" }
-                    }),
-                    signal: AbortSignal.timeout(12000)
-                  });
-
-                  if (resExtraction.ok) {
-                    const parsed = await resExtraction.json();
-                    const textOut = parsed?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-                    if (textOut) {
-                      extractedSph = JSON.parse(textOut);
-                    }
-                  }
-                } catch (geminiErr: any) {
-                  console.warn("Gemini SPH parsing fallback:", geminiErr.message);
+                const sphTextOut = await executeGeminiCall(sphExtractionPrompt, true, "gemini-2.5-flash", 12000);
+                if (sphTextOut) {
+                  extractedSph = JSON.parse(sphTextOut);
                 }
+              } catch (geminiErr: any) {
+                console.warn("Gemini SPH parsing fallback:", geminiErr.message);
               }
 
               // 2. Fallback cerdas jika Gemini tidak tersedia / error
@@ -1346,111 +1466,49 @@ Aturan Khusus:
 
               // 1. Ekstraksi cerdas instruksi pembukuan dengan AI Gemini 2.5 Flash
               let extractedBookkeeping: any = null;
-              if (apiKey) {
-                try {
-                  const bookkeepingPrompt = `Anda adalah Dewi Sartika, AI Finance & Accounting Intelligence di PT. DSTech Smart Perkasa.
+              try {
+                const bookkeepingPrompt = `Anda adalah Dewi Sartika, AI Finance & Accounting Intelligence di PT. DSTech Smart Perkasa.
 Direktur Utama (Bpk. Ramadhani ST) memberikan perintah pembukuan: "${promptCommand}".
-Tugas: Ekstrak instruksi pembukuan keuangan/gaji/pengeluaran menjadi format JSON MURNI tanpa markdown (jangan gunakan \`\`\`json).
+Tugas: Ekstrak instruksi pembukuan (pengeluaran kas / beban operasional rutin bulanan / gaji karyawan) menjadi format JSON MURNI tanpa markdown (jangan gunakan \`\`\`json).
 Format JSON wajib:
 {
   "type": "OUT",
-  "category": "Gaji & Upah Karyawan",
+  "category": "Beban Operasional Rutin",
   "defaultAccount": "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
   "year": 2025,
   "startMonth": 1,
   "endMonth": 12,
   "items": [
     {
-      "name": "Marsya",
-      "role": "Operasional",
-      "amount": 2000000,
-      "category": "Gaji & Upah Karyawan"
+      "name": "Listrik",
+      "role": "Beban Utilitas",
+      "amount": 500000,
+      "category": "Beban Utilitas & Fasilitas"
     },
     {
-      "name": "RAMADHANI ST",
-      "role": "Direktur",
-      "amount": 4500000,
-      "category": "Gaji & Upah Karyawan"
+      "name": "Mobil Operasional",
+      "role": "Beban Kendaraan Operasional",
+      "amount": 3000000,
+      "category": "Beban Operasional Kendaraan & Transport"
     }
   ]
 }
 Aturan Khusus:
-- Jika ada rentang bulan misal "januari 2025 sampai desember 2025", maka startMonth=1, endMonth=12, year=2025.
-- Ekstrak seluruh nama orang dan nominal rupiah masing-masing secara teliti.
-- Pastikan nominal adalah integer angka bulat (contoh: 2000000, 4500000).`;
+- Jika beban rutin atau pengeluaran dikeluarkan setiap bulan sepanjang tahun (contoh "untuk tahun 2025 dengan beban yang dikeluarkan setiap bulan" atau "Januari sampai Desember 2025"), maka startMonth=1, endMonth=12, year=2025.
+- Ekstrak SEMUA pos pengeluaran atau nama staf dan nominal rupiah masing-masing secara teliti.
+- Pastikan nominal adalah integer angka bulat (contoh: 500000, 3000000, 1000000, 1500000, 4500000). Bersihkan format titik, koma, dan strip.`;
 
-                  const resExtraction = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      contents: [{ role: "user", parts: [{ text: bookkeepingPrompt }] }],
-                      generationConfig: { responseMimeType: "application/json" }
-                    }),
-                    signal: AbortSignal.timeout(12000)
-                  });
-
-                  if (resExtraction.ok) {
-                    const parsed = await resExtraction.json();
-                    const textOut = parsed?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-                    if (textOut) {
-                      extractedBookkeeping = JSON.parse(textOut);
-                    }
-                  }
-                } catch (geminiErr: any) {
-                  console.warn("Gemini Bookkeeping parsing fallback:", geminiErr.message);
+                const geminiBookkeepingJson = await executeGeminiCall(bookkeepingPrompt, true, "gemini-2.5-flash", 12000);
+                if (geminiBookkeepingJson) {
+                  extractedBookkeeping = JSON.parse(geminiBookkeepingJson);
                 }
+              } catch (geminiErr: any) {
+                console.warn("Gemini Bookkeeping parsing error:", geminiErr.message);
               }
 
-              // 2. Fallback Deterministik Regex jika Gemini offline / format berbeda
+              // 2. Fallback Deterministik Regex jika Gemini offline / kuota habis / format berbeda
               if (!extractedBookkeeping || !extractedBookkeeping.items || extractedBookkeeping.items.length === 0) {
-                const monthMap: Record<string, number> = {
-                  januari: 1, februari: 2, maret: 3, april: 4, mei: 5, juni: 6,
-                  juli: 7, agustus: 8, september: 9, oktober: 10, november: 11, desember: 12
-                };
-                let sMonth = 1, eMonth = 12, yr = 2025;
-                const mRange = lowerCmd.match(/(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\s*(\d{4})?\s*(?:sampai|hingga|s\/d|-)\s*(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\s*(\d{4})/i);
-                if (mRange) {
-                  sMonth = monthMap[mRange[1].toLowerCase()] || 1;
-                  eMonth = monthMap[mRange[3].toLowerCase()] || 12;
-                  yr = parseInt(mRange[4], 10) || 2025;
-                } else {
-                  const singleMonthMatch = lowerCmd.match(/(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)\s*(\d{4})?/i);
-                  if (singleMonthMatch) {
-                    sMonth = monthMap[singleMonthMatch[1].toLowerCase()] || new Date().getMonth() + 1;
-                    eMonth = sMonth;
-                    yr = singleMonthMatch[2] ? parseInt(singleMonthMatch[2], 10) : new Date().getFullYear();
-                  }
-                }
-
-                const parsedItems: any[] = [];
-                const pMarsya = lowerCmd.match(/marsya(?:\s+oprasional|\s+operasional)?\s*[:=,]?\s*(?:rp\.?\s*)?(\d+)/i);
-                if (pMarsya) {
-                  parsedItems.push({ name: "Marsya", role: "Operasional", amount: parseInt(pMarsya[1], 10), category: "Gaji & Upah Karyawan" });
-                }
-                const pRama = lowerCmd.match(/ramadhani(?:\s+st)?\s*[:=,]?\s*(?:rp\.?\s*)?(\d+)/i);
-                if (pRama) {
-                  parsedItems.push({ name: "RAMADHANI ST", role: "Direktur", amount: parseInt(pRama[1], 10), category: "Gaji & Upah Karyawan" });
-                }
-
-                if (parsedItems.length === 0) {
-                  const genericMatches = Array.from(lowerCmd.matchAll(/([a-zA-Z\s\.]+?)\s*(?:rp\.?\s*)?(\d{5,10})/gi));
-                  for (const gm of genericMatches) {
-                    const cleanName = gm[1].replace(/tolong|catat|pengeluaran|gaji|pada|bulan|sampai|untuk/gi, "").trim();
-                    if (cleanName.length > 2) {
-                      parsedItems.push({ name: cleanName, role: "Staf", amount: parseInt(gm[2], 10), category: "Gaji & Upah Karyawan" });
-                    }
-                  }
-                }
-
-                extractedBookkeeping = {
-                  type: "OUT",
-                  category: "Gaji & Upah Karyawan",
-                  defaultAccount: "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
-                  year: yr,
-                  startMonth: sMonth,
-                  endMonth: eMonth,
-                  items: parsedItems
-                };
+                extractedBookkeeping = parseDeterministicBookkeeping(promptCommand);
               }
 
               // 3. Susun Draf Transaksi ke Kotak Persetujuan Pimpinan (Approval Queue)
@@ -1463,28 +1521,35 @@ Aturan Khusus:
 
               for (let m = sMonth; m <= eMonth; m++) {
                 const monthStr = `${yr}-${String(m).padStart(2, "0")}`;
-                const payDate = `${monthStr}-25`;
-
                 for (const item of extractedBookkeeping.items) {
-                  const refNo = `PAY-${monthStr.replace("-", "")}-${item.name.replace(/[^a-zA-Z0-9]/g, "").toUpperCase()}`;
+                  const isItemSalary = (item.category || extractedBookkeeping.category || "").toLowerCase().includes("gaji");
+                  const payDate = isItemSalary ? `${monthStr}-25` : `${monthStr}-10`;
+                  const itemPrefix = isItemSalary ? "PAY" : "EXP";
+                  const cleanItemName = (item.name || "Beban").replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 10);
+                  const refNo = `${itemPrefix}-${monthStr.replace("-", "")}-${cleanItemName}`;
+
                   entriesList.push({
                     month: monthStr,
                     date: payDate,
-                    type: extractedBookkeeping.type || "OUT",
-                    category: item.category || extractedBookkeeping.category || "Gaji & Upah Karyawan",
+                    type: "OUT",
+                    category: item.category || extractedBookkeeping.category || "Beban Operasional Rutin",
                     personName: item.name,
-                    personRole: item.role || "Staf",
+                    personRole: item.role || (isItemSalary ? "Staf Operasional" : "Beban Operasional"),
                     amount: item.amount,
                     account: extractedBookkeeping.defaultAccount || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
                     referenceNumber: refNo,
-                    description: `Pembayaran Gaji ${item.name} (${item.role || "Staf"}) Periode ${monthStr}`,
+                    description: isItemSalary
+                      ? `Pembayaran Gaji ${item.name} (${item.role || "Staf"}) Periode ${monthStr}`
+                      : `Pembayaran ${item.category || "Beban Rutin"} ${item.name} Periode ${monthStr}`,
                   });
                   grandTotalProposal += item.amount;
                 }
               }
 
+              const isSalaryProposal = extractedBookkeeping.items.some((i: any) => (i.category || "").toLowerCase().includes("gaji"));
+              const proposalTypeLabel = isSalaryProposal ? "Pengeluaran Gaji" : "Pengeluaran Rutin Operasional";
               const periodLabel = sMonth === eMonth ? `Bulan ${sMonth} ${yr}` : `Januari - Desember ${yr}`;
-              const peopleNames = extractedBookkeeping.items.map((i: any) => i.name).join(" & ");
+              const itemNamesSummary = extractedBookkeeping.items.map((i: any) => i.name).join(", ");
 
               const queueItem = {
                 id: `appr_dewi_bookkeeping_${Date.now()}`,
@@ -1493,13 +1558,13 @@ Aturan Khusus:
                 employee_role: "AI Finance & Tax Billing Specialist",
                 department: "FINANCE",
                 task_type: "BOOKKEEPING_EXPENSE",
-                title: `Draf Pembukuan: ${extractedBookkeeping.category || "Pengeluaran Gaji"} (${peopleNames}) Periode ${periodLabel}`,
+                title: `Draf Pembukuan: ${proposalTypeLabel} (${itemNamesSummary}) Periode ${periodLabel}`,
                 status: "PENDING_APPROVAL",
-                summary: `Usulan pembukuan ${entriesList.length} transaksi pengeluaran gaji (${extractedBookkeeping.items.map((i: any) => `${i.name} Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) periode ${periodLabel} total Rp ${grandTotalProposal.toLocaleString("id-ID")}. Menunggu persetujuan Direktur Utama sebelum dibukukan ke Arus Kas ERP.`,
+                summary: `Usulan pembukuan ${entriesList.length} transaksi ${proposalTypeLabel.toLowerCase()} (${extractedBookkeeping.items.map((i: any) => `${i.name} Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) periode ${periodLabel} total Rp ${grandTotalProposal.toLocaleString("id-ID")}. Menunggu persetujuan Direktur Utama sebelum dibukukan ke Arus Kas ERP.`,
                 value: grandTotalProposal,
                 payload: {
-                  type: extractedBookkeeping.type || "OUT",
-                  category: extractedBookkeeping.category || "Gaji & Upah Karyawan",
+                  type: "OUT",
+                  category: isSalaryProposal ? "Gaji & Upah Karyawan" : "Beban Operasional Rutin",
                   defaultAccount: extractedBookkeeping.defaultAccount || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
                   year: yr,
                   startMonth: sMonth,
@@ -1536,7 +1601,7 @@ Aturan Khusus:
                 link: "/admin/virtual-office"
               };
 
-              aiResponseText = `Siap Pak Ramadhani! Draf pembukuan pengeluaran gaji (${extractedBookkeeping.items.map((i: any) => `${i.name} Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(" & ")}) untuk periode ${periodLabel} (Total Rp ${grandTotalProposal.toLocaleString("id-ID")}) telah saya susun dan saya masukkan ke Kotak Persetujuan Anda. Sistem 100% aman dan data belum dibukukan ke Arus Kas ERP sebelum Bapak menyetujuinya di Kotak Persetujuan!`;
+              aiResponseText = `Siap Pak Ramadhani! Draf pembukuan ${proposalTypeLabel.toLowerCase()} (${extractedBookkeeping.items.map((i: any) => `${i.name}: Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) untuk periode ${periodLabel} (Total Rp ${grandTotalProposal.toLocaleString("id-ID")}) telah saya susun dan saya masukkan ke Kotak Persetujuan Anda. Sistem 100% aman dan data belum dibukukan ke Arus Kas ERP sebelum Bapak menyetujuinya di Kotak Persetujuan!`;
             }
           } catch (bookkeepingErr: any) {
             console.error("Error executing Dewi Finance bookkeeping action:", bookkeepingErr);

@@ -1553,7 +1553,7 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                           </div>
                           <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
                             <span className="text-[10px] text-slate-400 font-bold uppercase block">Kategori Kas</span>
-                            <span className="font-bold text-amber-300">{previewItem.payload.category || "Gaji & Upah"}</span>
+                            <span className="font-bold text-amber-300">{previewItem.payload.category || "Beban Operasional"}</span>
                           </div>
                           <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800">
                             <span className="text-[10px] text-slate-400 font-bold uppercase block">Total Transaksi</span>
@@ -1574,16 +1574,23 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                             {(previewItem.payload.entries || []).map((entry: any, idx: number) => (
                               <div key={idx} className="p-2.5 flex items-center justify-between hover:bg-slate-800/40 transition">
                                 <div className="space-y-0.5">
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold">
                                       {entry.date}
                                     </span>
-                                    <span className="font-bold text-white">{entry.personName}</span>
-                                    <span className="text-[10px] text-slate-400">({entry.personRole})</span>
+                                    <span className="font-bold text-white">{entry.personName || entry.name}</span>
+                                    {entry.personRole && (
+                                      <span className="text-[10px] text-slate-400">({entry.personRole})</span>
+                                    )}
+                                    {entry.category && (
+                                      <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                        {entry.category}
+                                      </span>
+                                    )}
                                   </div>
                                   <span className="text-[10px] text-slate-400 block">{entry.description}</span>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right shrink-0 ml-3">
                                   <span className="font-mono font-bold text-rose-400 block">
                                     - Rp {(entry.amount || 0).toLocaleString("id-ID")}
                                   </span>
