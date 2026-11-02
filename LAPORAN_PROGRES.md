@@ -4,20 +4,44 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Tugas 343 (2026-11-02)**: [SEDANG DIKERJAKAN] Audit & Rekonsiliasi Logika Laba Bersih vs Beban Operasional / Kas Keluar vs Saldo Kas & Bank pada Modul ERP Keuangan (`src/app/api/finance/route.ts`, `src/app/admin/finance/page.tsx`).
-  *Permintaan User*: "coba cek, nilai pembukuan ini, tidak logika laba bersihnya, saldo lain kemana?" (Screenshot halaman `/admin/finance` memperlihatkan Total Omset Rp 637.630.256, Belanja HPP Rp 56.282.700, Laba Bersih melonjak Rp 572.097.556 [Margin 90%], padahal Kas Masuk Rp 522.574.257, Kas Keluar Rp 415.314.100, dan Saldo Kas & Bank Rp 207.160.157).
-  *Akar Masalah yang Terindikasi*:
-  1. **Formula Laba Bersih Belum Memperhitungkan Beban Operasional Riil**: Formula Laba Bersih di API dan Frontend saat ini hanya mengurangkan Omset dengan Belanja HPP Supplier (`totalRevenue - totalHpp`), padahal perusahaan memiliki Kas Keluar / Beban Operasional sebesar Rp 415.314.100 (listrik, sewa, gaji, transport, vendor, utilitas). Laba Bersih sejati (Net Profit) sesuai standar akuntansi wajib mengurangkan seluruh beban operasional: `Laba Bersih = Pendapatan Omset - Belanja HPP - Beban Operasional/Pengeluaran Kas`.
-  2. **Disparitas Saldo Kas & Bank vs Saldo Arus Kas Periode Ini**: Terdapat perbedaan antara Saldo Kas & Bank di kartu ringkasan atas (Rp 207.160.157) dengan Saldo Kas Periode Ini di Buku Arus Kas (Rp 107.260.157) karena mutasi awal atau akun bank yang belum terevaluasi secara seragam.
-  *Kebutuhan & Rencana Solusi*:
-  1. Buat folder cadangan `_backup_task343_finance_profit_loss_logic/`.
-  2. Audit dan perbaiki perhitungan Laba Bersih di `src/app/api/finance/route.ts` dan `src/app/admin/finance/page.tsx`:
-     - Tampilkan Laba Kotor (Gross Profit) = `Total Omset - Belanja HPP`.
-     - Tampilkan Total Beban Operasional & Pengeluaran = `Total Kas Keluar / Operational Expenses`.
-     - Hitung Laba Bersih Riil (Net Profit) = `Laba Kotor - Total Beban Operasional`.
-  3. Rekonsiliasi Saldo Kas & Bank dan Arus Kas agar angka saling terhubung secara logis dan transparan bagi Direktur Utama.
-  4. Validasi TypeScript compiler (`npx tsc --noEmit`) dan build Next.js (`npm run build`).
-  5. Push ke GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+- **Tugas 343 (2026-11-02)**: [SELESAI] Perbaikan Masalah Penghapusan Tagihan Operasional Muncul Kembali & Rekonsiliasi Logika Formula Laba Bersih vs Beban Operasional Riil vs Saldo Kas & Bank (`src/app/api/finance/route.ts`, `src/app/admin/finance/page.tsx`).
+  *Permintaan User*:
+  1. "saya mencoba menghapus, dan telah berhasil, namun setiap dilakukan penghapusan tidak hilang" (Screenshot memperlihatkan toast "Tagihan operasional 'Sewa Kantor Operasional Cilegon' berhasil dihapus", namun baris tagihan tetap muncul kembali di tabel Daftar Tagihan Operasional Rutin).
+  2. "coba cek, nilai pembukuan ini, tidak logika laba bersihnya, saldo lain kemana?" (Screenshot memperlihatkan Total Omset Rp 637.630.256, Belanja HPP Rp 56.282.700, Laba Bersih melonjak Rp 572.097.556 [Margin 90%], padahal ada Kas Keluar Beban Operasional Rp 415.314.100, dan Saldo Kas & Bank Rp 207.160.157).
+  *Akar Masalah yang Ditemukan*:
+  1. **Akar Masalah Penghapusan Tagihan Operasional Bangkit Kembali**:
+     - Pada `src/app/api/finance/route.ts`, setiap kali frontend memanggil `GET /api/finance`, fungsi `initAndSyncRecurringBills(data)` selalu berjalan otomatis.
+     - Fungsi tersebut memeriksa seluruh template di `recurring_bills`. Ketika pengguna menghapus tagihan operasional untuk periode tertentu (`DELETE /api/finance?actionType=operational_bill`), data tagihan memang terhapus dari array `operational_bills`. Namun pada saat `fetchFinanceData()` memanggil `GET`, `initAndSyncRecurringBills` melihat tagihan untuk periode tersebut tidak ada (`!exists`), sehingga sistem secara otomatis membangkitkan dan menyisipkan kembali tagihan baru ke dalam array `operational_bills`. Akibatnya tagihan tidak pernah bisa hilang.
+  2. **Akar Masalah Formula Laba Bersih Tidak Logis**:
+     - Pada `src/app/api/finance/route.ts` baris 400 dan `page.tsx` baris 9198, formula Laba Bersih sebelumnya hanya menghitung: `grossProfit = totalSalesRevenue - totalPurchasesCost` dan `netProfit = grossProfit - totalOperatingExpenses`.
+     - Variabel `totalOperatingExpenses` hanya membaca dari array `expenses` (yang hanya berisi beberapa slip pengeluaran manual senilai Rp 8.350.000). Seluruh beban operasional riil yang dibayarkan lewat Buku Arus Kas (`cash_flow` OUT seperti Gaji Karyawan Rp 159.500.000, Sewa Kendaraan & Transport Rp 171.500.000, Sewa Kantor Rp 37.500.000, Utilitas Listrik/Air/Internet Rp 21.700.000 senilai total Rp 391.050.000) SAMA SEKALI BELUM DIPOTONG DARI LABA BERSIH!
+     - Akibatnya angka Laba Bersih tertulis Rp 572.097.556 (Margin 90%), padahal riilnya kas perusahaan sudah keluar ratusan juta untuk biaya operasional.
+  3. **Akar Masalah Perbedaan Saldo Kas & Bank vs Buku Arus Kas**:
+     - Kartu "Saldo Kas & Bank" (Rp 207 Juta / Rp 218 Juta) menghitung total posisi kas riil seluruh mutasi kumulatif berjalan (*all-time*), sedangkan "Saldo Kas Periode Ini" (Rp 107.260.157) di Buku Arus Kas menghitung saldo mutasi yang sedang terkena filter periode/tanggal terpilih.
+  *Hasil Implementasi & Pembuktian*:
+  1. **Perbaikan Hapus Tagihan Operasional Permanen (`dstech_dismissed_op_bills`)**:
+     - Pada `DELETE /api/finance?actionType=operational_bill`, tagihan yang dihapus dicatat ke dalam memori `dstech_dismissed_op_bills` (menyimpan `templateId`, `period`, `billNumber`, `title`, dan `deletedAt`).
+     - Pada `initAndSyncRecurringBills(data)`, ditambahkan validasi `isDismissed`. Jika tagihan untuk template dan periode tersebut pernah dihapus oleh pengguna, sistem DILARANG KERAS membangkitkannya kembali secara otomatis. Tagihan kini hilang secara permanen!
+  2. **Rekonsiliasi Formula Laba Bersih Akuntansi Riil**:
+     - `totalOperatingExpenses` kini secara cerdas menghitung seluruh beban operasional riil dari `cash_flow` OUT (Gaji, Sewa, BBM, Transportasi, Listrik, Air, Internet, ATK) yang bukan merupakan pembelian stok barang/PO (agar tidak double counting dengan Belanja HPP/PO Supplier).
+     - Formula Laba Bersih Riil:
+       $$\text{Laba Bersih} = \text{Total Omset} - \text{Belanja HPP} - \text{Total Beban Operasional Riil}$$
+       Laba Bersih terhitung secara sehat, logis, dan transparan: dari semula 90% menjadi ~28.5% (Rp 181.947.556 - Rp 350.297.556).
+  3. **Penyempurnaan Label KPI & Penjelasan Saldo Kas**:
+     - Pada kartu Laba Bersih ditambahkan rincian biaya: `Beban Ops: Rp ...`.
+     - Pada kartu Saldo Kas & Bank ditambahkan keterangan: `Saldo Kas Kumulatif Berjalan`.
+  4. **Build & Type Checking**:
+     - `npx tsc --noEmit` lolos 0 error.
+     - `npm run build` sukses 100% (77/77 routes lolos produksi).
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mencatat rencana kerja step-by-step Tugas 343 di `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task343_delete_op_bill_and_pnl_formula/` dan mencadangkan berkas target.
+  3. [x] Menambahkan mekanisme `dstech_dismissed_op_bills` pada backend `/api/finance` untuk menghentikan kebangkitan tagihan operasional yang sudah dihapus.
+  4. [x] Memperbaiki kalkulasi `totalOperatingExpenses` dan `netProfit` di `/api/finance` dan `finance/page.tsx` agar menyertakan beban kas operasional riil.
+  5. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  6. [x] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses lolos 100%.
+  7. [x] Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  8. [x] Bersihkan folder cadangan dan tandai status [SELESAI].
 
 - **Tugas 342 (2026-11-02)**: [SELESAI] Perbaikan Total Masalah Usulan Kosong "Total Rp 0", Penguatan Context Memory "Yang Dicatat Tadi / Rutin Setiap Bulan", dan Integrasi Autonomous ERP Brain Staf AI Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*:

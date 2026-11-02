@@ -9195,8 +9195,18 @@ export default function AdminFinanceERPPage() {
       0
     );
 
+    const scopedOpExpenses = scopedCash
+      .filter((c) => {
+        if (c.type !== "OUT") return false;
+        const cat = (c.category || "").toLowerCase();
+        const desc = (c.description || "").toLowerCase();
+        if (cat.includes("pembelian barang") || cat.includes("po") || cat.includes("supplier") || desc.includes("po-dstech")) return false;
+        return true;
+      })
+      .reduce((sum, c) => sum + (c.amount || 0), 0);
+
     const grossProfit = totalSalesRevenue - totalPurchasesCost;
-    const netProfit = grossProfit - (summary.totalOperatingExpenses || 0);
+    const netProfit = grossProfit - scopedOpExpenses;
 
     const totalCashIn = scopedCash.filter((c) => c.type === "IN").reduce((sum, c) => sum + (c.amount || 0), 0);
     const totalCashOut = scopedCash.filter((c) => c.type === "OUT").reduce((sum, c) => sum + (c.amount || 0), 0);
@@ -9209,6 +9219,7 @@ export default function AdminFinanceERPPage() {
       totalAccountsReceivable,
       totalPurchasesCost,
       totalAccountsPayable,
+      totalOperatingExpenses: scopedOpExpenses,
       grossProfit,
       netProfit,
       currentCashBalance,
@@ -10080,12 +10091,17 @@ export default function AdminFinanceERPPage() {
             <h3 className="text-base sm:text-lg font-black text-emerald-600 truncate">
               {formatRupiah(displaySummary.netProfit)}
             </h3>
-            <p className="text-[10px] text-emerald-700 font-semibold">
-              Margin:{" "}
-              {displaySummary.totalSalesRevenue > 0
-                ? `${Math.round((displaySummary.netProfit / displaySummary.totalSalesRevenue) * 100)}%`
-                : "0%"}
-            </p>
+            <div className="flex items-center justify-between text-[10px] text-emerald-700 font-semibold">
+              <span>
+                Margin:{" "}
+                {displaySummary.totalSalesRevenue > 0
+                  ? `${Math.round((displaySummary.netProfit / displaySummary.totalSalesRevenue) * 100)}%`
+                  : "0%"}
+              </span>
+              <span className="text-slate-400 font-normal">
+                Beban: {formatRupiah(displaySummary.totalOperatingExpenses || 0)}
+              </span>
+            </div>
           </div>
 
           {/* Metric 4: Saldo Kas Riil */}
@@ -10099,7 +10115,7 @@ export default function AdminFinanceERPPage() {
             <h3 className="text-base sm:text-lg font-black text-purple-700 truncate">
               {formatRupiah(displaySummary.currentCashBalance)}
             </h3>
-            <p className="text-[10px] text-slate-500 font-semibold">Kas Berjalan</p>
+            <p className="text-[10px] text-slate-500 font-semibold">Saldo Kas Kumulatif Berjalan</p>
           </div>
 
           {/* Metric 5: Piutang Usaha */}

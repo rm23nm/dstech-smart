@@ -221,6 +221,10 @@ function initAndSyncRecurringBills(data: any): boolean {
     changed = true;
   }
 
+  if (!data.dstech_dismissed_op_bills || !Array.isArray(data.dstech_dismissed_op_bills)) {
+    data.dstech_dismissed_op_bills = [];
+  }
+
   // Generate for current month
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -234,7 +238,11 @@ function initAndSyncRecurringBills(data: any): boolean {
       (b: any) => b.templateId === template.id && b.period === currentPeriod
     );
 
-    if (!exists) {
+    const isDismissed = (data.dstech_dismissed_op_bills || []).some(
+      (d: any) => d.templateId === template.id && d.period === currentPeriod
+    );
+
+    if (!exists && !isDismissed) {
       const dayNum = Math.min(Math.max(Number(template.recurringDay) || 1, 1), 28);
       const dayStr = String(dayNum).padStart(2, "0");
       const billDateStr = `${currentYear}-${currentMonth}-${dayStr}`;
@@ -389,7 +397,25 @@ export async function GET() {
     .filter((p: any) => p.paymentStatus && p.paymentStatus.toLowerCase().includes("hutang"))
     .reduce((acc: number, curr: any) => acc + (Number(curr.grandTotal) || 0), 0);
 
-  const totalOperatingExpenses = expenses.reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
+  // Hitung Beban Operasional Riil Perusahaan:
+  // 1. Kas keluar operasional (cashFlow OUT) seperti Gaji, Sewa, BBM/Transport, Listrik/Utilitas, ATK, dll.
+  //    (Kecualikan pembayaran Pembelian Barang / PO Supplier agar tidak terhitung ganda dengan totalPurchasesCost / Belanja HPP)
+  const cashFlowOpExpenses = cashFlow
+    .filter((c: any) => {
+      if (c.type !== "OUT") return false;
+      const cat = (c.category || "").toLowerCase();
+      const desc = (c.description || "").toLowerCase();
+      if (cat.includes("pembelian barang") || cat.includes("po") || cat.includes("supplier") || desc.includes("po-dstech")) return false;
+      return true;
+    })
+    .reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
+
+  // 2. Slip manual di expenses yang belum tercatat di cashFlow
+  const unlinkedManualExpenses = expenses
+    .filter((e: any) => !cashFlow.some((c: any) => c.referenceId === e.id || c.id === e.cashFlowId))
+    .reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0);
+
+  const totalOperatingExpenses = cashFlowOpExpenses + unlinkedManualExpenses;
 
   const grossProfit = totalSalesRevenue - totalPurchasesCost;
   const netProfit = grossProfit - totalOperatingExpenses;
@@ -3175,14 +3201,27 @@ export async function DELETE(request: Request) {
     }
 
     if (actionType === "operational_bill") {
-      const initialLen = (data.operational_bills || []).length;
-      data.operational_bills = (data.operational_bills || []).filter((b: any) => b.id !== id);
-      if (data.operational_bills.length === initialLen) {
+      const targetBill = (data.operational_bills || []).find((b: any) => b.id === id);
+      if (!targetBill) {
         return NextResponse.json({ success: false, error: "Tagihan operasional tidak ditemukan" }, { status: 404 });
       }
+
+      if (!Array.isArray(data.dstech_dismissed_op_bills)) {
+        data.dstech_dismissed_op_bills = [];
+      }
+      data.dstech_dismissed_op_bills.push({
+        id: targetBill.id,
+        templateId: targetBill.templateId || null,
+        period: targetBill.period || null,
+        billNumber: targetBill.billNumber || null,
+        title: targetBill.title,
+        deletedAt: new Date().toISOString()
+      });
+
+      data.operational_bills = (data.operational_bills || []).filter((b: any) => b.id !== id);
       writeFinanceData(data);
       return NextResponse.json(
-        { success: true, message: "Tagihan operasional berhasil dihapus" },
+        { success: true, message: `Tagihan operasional "${targetBill.title}" berhasil dihapus` },
         { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
       );
     }
