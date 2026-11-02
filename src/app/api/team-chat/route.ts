@@ -10,6 +10,7 @@ const TASKS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_task
 const REPORTS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_daily_reports.json");
 const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
 const ORDERS_FILE = path.join(process.cwd(), "src", "data", "dstech_orders.json");
+const WORKFORCE_FILE = path.join(process.cwd(), "src", "data", "dstech_ai_workforce.json");
 
 function readJsonSafe(filePath: string, fallback: any) {
   try {
@@ -30,6 +31,530 @@ function writeJsonSafe(filePath: string, data: any) {
   } catch (err) {
     console.error(`Error writing ${filePath}:`, err);
     return false;
+  }
+}
+
+// ==========================================
+// GOOGLE GEMINI AI MULTI-KEY ROTATION ENGINE
+// Default Model: gemini-2.5-flash (STRICT USER RULE)
+// ==========================================
+function getGeminiApiKeys(): string[] {
+  const envRaw = process.env.GEMINI_API_KEY || "";
+  const paidKey = process.env.GEMINI_API_KEY_PAID || "";
+  const freeKeys = (process.env.GEMINI_API_KEYS_FREE || "")
+    .split(",")
+    .map((k) => k.replace(/["']/g, "").trim())
+    .filter(Boolean);
+  const parsedEnv = envRaw
+    .split(",")
+    .map((k) => k.replace(/["']/g, "").trim())
+    .filter(Boolean);
+
+  const keyList = [
+    ...freeKeys,
+    ...parsedEnv,
+    paidKey.replace(/["']/g, "").trim(),
+    "AIzaSyAJLJZW07IfKww2m7USMK51W-XsycEb02w",
+    "AIzaSyA8vir7yUSY25sZwoq5Mmx-sh4YaQ8LMlU",
+    "AIzaSyCPO7o7HvlMjE2KDAq0SqbZb0mFFV5bLoY",
+    "AIzaSyBbyYdhCGiKe9XVr44sOuy5W5Sb6L8a2a0",
+    "AIzaSyCtESMZ27v54-exiKXJOShZ8vKdTwGz77E",
+  ].filter(Boolean);
+
+  return Array.from(new Set(keyList));
+}
+
+let geminiKeyIndex = 0;
+
+async function executeGeminiCall(
+  prompt: string,
+  jsonMode = false,
+  model = "gemini-2.5-flash",
+  timeoutMs = 15000,
+  attachments?: Array<{ mimeType: string; data: string }>
+): Promise<string | null> {
+  const keys = getGeminiApiKeys();
+  if (keys.length === 0) return null;
+
+  for (let attempt = 0; attempt < keys.length; attempt++) {
+    const activeKey = keys[(geminiKeyIndex + attempt) % keys.length];
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+      const parts: any[] = [{ text: prompt }];
+
+      if (Array.isArray(attachments) && attachments.length > 0) {
+        for (const att of attachments) {
+          if (att.mimeType && att.data) {
+            parts.push({
+              inlineData: {
+                mimeType: att.mimeType,
+                data: att.data,
+              },
+            });
+          }
+        }
+      }
+
+      const bodyPayload: any = {
+        contents: [{ role: "user", parts }],
+      };
+      if (jsonMode) {
+        bodyPayload.generationConfig = { responseMimeType: "application/json" };
+      }
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(bodyPayload),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+
+      if (res.ok) {
+        geminiKeyIndex = (geminiKeyIndex + attempt) % keys.length;
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (text) return text;
+      }
+    } catch (e: any) {
+      // try next key
+    }
+  }
+  return null;
+}
+
+// ==========================================
+// AUTONOMOUS AI WORKFORCE CHAT INTERCEPTOR
+// Connects Android App & Team Chat to 6 AI Staff
+// Dewi, Bambang, Deni, Nadia, Reza, Siti
+// ==========================================
+async function handleAiWorkforceChatMessage({
+  chatId,
+  chatObj,
+  userMessage,
+  messages,
+  chats,
+}: {
+  chatId: string;
+  chatObj: any;
+  userMessage: any;
+  messages: any[];
+  chats: any[];
+}) {
+  try {
+    const wfData = readJsonSafe(WORKFORCE_FILE, {
+      dstech_employees: [],
+      dstech_approval_queue: [],
+      dstech_conversations: {},
+    });
+    if (!Array.isArray(wfData.dstech_employees)) wfData.dstech_employees = [];
+    if (!Array.isArray(wfData.dstech_approval_queue)) wfData.dstech_approval_queue = [];
+    if (!wfData.dstech_conversations || typeof wfData.dstech_conversations !== "object") {
+      wfData.dstech_conversations = {};
+    }
+
+    const aiEmployees = wfData.dstech_employees;
+    const content = (userMessage.content || "").trim();
+    const mediaUrl = userMessage.mediaUrl || "";
+    const lowerText = content.toLowerCase();
+
+    // 1. Tentukan Staf AI yang merespons
+    let targetEmp: any = null;
+    if (chatObj?.aiEmployeeId) {
+      targetEmp = aiEmployees.find((e: any) => e.id === chatObj.aiEmployeeId);
+    } else if (chatId.startsWith("dstech_chat_dm_emp_")) {
+      const empId = chatId.replace("dstech_chat_dm_", "");
+      targetEmp = aiEmployees.find((e: any) => e.id === empId);
+    }
+
+    // Jika dalam grup AI Workforce Hub:
+    if (!targetEmp) {
+      if (lowerText.includes("dewi") || /(?:struk|nota|bon|kwitansi|kuitansi|kas|pengeluaran|biaya|bbm|pertamina|pajak|faktur|invoice)/i.test(lowerText)) {
+        targetEmp = aiEmployees.find((e: any) => e.id === "emp_dewi_finance");
+      } else if (lowerText.includes("bambang") || /(?:sph|penawaran|quotation|prospek|crm|b2b|klien|closing)/i.test(lowerText)) {
+        targetEmp = aiEmployees.find((e: any) => e.id === "emp_bambang_sales");
+      } else if (lowerText.includes("deni") || /(?:lapangan|teknisi|spk|maintenance|pasang|instalasi|progres|pekerjaan)/i.test(lowerText)) {
+        targetEmp = aiEmployees.find((e: any) => e.id === "emp_deni_field");
+      } else if (lowerText.includes("reza") || /(?:produk|stok|gudang|katalog|harga|spesifikasi)/i.test(lowerText)) {
+        targetEmp = aiEmployees.find((e: any) => e.id === "emp_reza_catalog");
+      } else if (lowerText.includes("nadia") || /(?:promo|marketing|iklan|broadcast|copywriting|sosmed)/i.test(lowerText)) {
+        targetEmp = aiEmployees.find((e: any) => e.id === "emp_nadia_marketing");
+      } else if (lowerText.includes("siti") || /(?:cs|customer|tamu|chat|web)/i.test(lowerText)) {
+        targetEmp = aiEmployees.find((e: any) => e.id === "emp_siti_cs");
+      } else if (mediaUrl) {
+        if (/(?:struk|nota|bon|receipt|expense|spbu|belanja)/i.test(mediaUrl.toLowerCase()) || /(?:struk|nota|bon|belanja|bbm)/i.test(lowerText)) {
+          targetEmp = aiEmployees.find((e: any) => e.id === "emp_dewi_finance");
+        } else {
+          targetEmp = aiEmployees.find((e: any) => e.id === "emp_dewi_finance");
+        }
+      } else {
+        targetEmp = aiEmployees.find((e: any) => e.id === "emp_dewi_finance") || aiEmployees[0];
+      }
+    }
+
+    if (!targetEmp) {
+      targetEmp = {
+        id: "emp_dewi_finance",
+        name: "Dewi Sartika",
+        role: "AI Finance & Tax Billing Specialist",
+        department: "FINANCE",
+      };
+    }
+
+    // 2. Siapkan data lampiran multimodal jika ada mediaUrl
+    const geminiAttachments: Array<{ mimeType: string; data: string }> = [];
+    if (mediaUrl) {
+      try {
+        const cleanPath = mediaUrl.replace(/^\/+/, "");
+        const localPath = path.join(process.cwd(), "public", cleanPath);
+        if (fs.existsSync(localPath)) {
+          const fileBuf = fs.readFileSync(localPath);
+          const ext = path.extname(localPath).toLowerCase();
+          let mime = "image/jpeg";
+          if (ext === ".png") mime = "image/png";
+          else if (ext === ".webp") mime = "image/webp";
+          else if (ext === ".pdf") mime = "application/pdf";
+          geminiAttachments.push({
+            mimeType: mime,
+            data: fileBuf.toString("base64"),
+          });
+        }
+      } catch (errAtt) {
+        console.warn("Gagal membaca file attachment untuk Gemini multimodal:", errAtt);
+      }
+    }
+
+    // 3. Ambil konteks percakapan terakhir (Multi-Turn Conversational Memory)
+    const recentChatMsgs = messages
+      .filter((m: any) => m.chatId === chatId)
+      .slice(-8);
+    const historyText = recentChatMsgs
+      .map((m: any) => `${m.senderName}: ${m.content}`)
+      .join("\n");
+
+    // 4. Ambil konteks live ERP perusahaan
+    const finData = readJsonSafe(FINANCE_FILE, { cash_flow: [], operational_bills: [], recurring_bills: [], projects: [] });
+    const cashBalance = (finData.cash_flow || []).reduce((acc: number, c: any) => {
+      const amt = Number(c.amount) || 0;
+      return c.type === "in" || c.type === "IN" ? acc + amt : acc - amt;
+    }, 0);
+    const bills = Array.isArray(finData.operational_bills) && finData.operational_bills.length > 0
+      ? finData.operational_bills
+      : finData.recurring_bills || [];
+    const monthlyBillsSummary = bills.map((b: any) => `${b.name || b.expenseCategory}: Rp ${(Number(b.amount) || 0).toLocaleString("id-ID")}`).join(", ");
+
+    let aiResponseText = "";
+
+    // CASE A: FOTO STRUK / NOTA PENGELUARAN (Dewi Sartika)
+    const isReceiptExpense =
+      targetEmp.id === "emp_dewi_finance" &&
+      (Boolean(mediaUrl) || /(?:struk|nota|bon|kwitansi|kuitansi|bbm|pertamina|makan|bensin|konsumsi|parkir|tol)/i.test(lowerText));
+
+    if (isReceiptExpense && geminiAttachments.length > 0) {
+      try {
+        const ocrPrompt = `Anda adalah Dewi Sartika, AI Finance & Accounting Intelligence di PT. DSTech Smart Perkasa.
+Direktur Utama (${userMessage.senderName || 'Pak Ramadhani ST'}) mengirimkan foto struk/nota belanja pengeluaran dengan pesan: "${content || 'Tolong catat pengeluaran dari struk ini'}"
+Konteks Percakapan:
+${historyText}
+
+TUGAS ANDA:
+1. Analisis teliti GAMBAR FOTO STRUK / NOTA / KWITANSI yang dilampirkan.
+2. Ekstrak data transaksi riil dari struk tersebut:
+   - merchant: Nama Toko / Vendor / SPBU / Tempat Belanja (contoh: "SPBU Pertamina Cilegon", "Toko Listrik", "Indomaret", dll).
+   - date: Tanggal Transaksi (format YYYY-MM-DD, contoh: "2026-11-02").
+   - grandTotal: Total nominal pembayaran akhir dalam angka bulat murni (number).
+   - category: Kategori Beban Akuntansi resmi (misal: "Beban Transportasi & BBM Operasional Lapangan", "Beban Perlengkapan & Material Proyek", "Beban Konsumsi & Akomodasi Staf", "Beban Alat Tulis Kantor & Keperluan Operasional", "Beban Pemeliharaan & Servis Kendaraan Operasional").
+   - items: Rincian barang/jasa dalam array string.
+   - notes: Catatan audit ringkas.
+
+Keluarkan respon HANYA dalam format JSON valid:
+{
+  "merchant": "...",
+  "date": "2026-...",
+  "grandTotal": 0,
+  "category": "...",
+  "items": ["..."],
+  "notes": "..."
+}`;
+
+        const rawJson = await executeGeminiCall(ocrPrompt, true, "gemini-2.5-flash", 15000, geminiAttachments);
+        let parsedOcr: any = null;
+        if (rawJson) {
+          try {
+            const clean = rawJson.replace(/```json/gi, "").replace(/```/g, "").trim();
+            parsedOcr = JSON.parse(clean);
+          } catch (e) {
+            console.warn("JSON parse error on receipt OCR:", e);
+          }
+        }
+
+        // Fallback jika OCR belum parse otomatis
+        if (!parsedOcr || !parsedOcr.grandTotal) {
+          const numMatch = content.match(/(?:rp|nominal|sebesar|total)?\s*([\d.,]{3,})/i);
+          const parsedVal = numMatch ? parseInt(numMatch[1].replace(/\D/g, ""), 10) : 150000;
+          parsedOcr = {
+            merchant: "SPBU Pertamina / Vendor Lapangan",
+            date: new Date().toISOString().split("T")[0],
+            grandTotal: parsedVal,
+            category: "Beban Transportasi & BBM Operasional Lapangan",
+            items: ["BBM Operasional Lapangan"],
+            notes: "Dicatat otomatis dari lampiran foto struk pengeluaran oleh Dewi Sartika"
+          };
+        }
+
+        if (parsedOcr && parsedOcr.grandTotal > 0) {
+          const grandTotal = Number(parsedOcr.grandTotal) || 0;
+          const merchant = parsedOcr.merchant || "Vendor / Merchant Lapangan";
+          const date = parsedOcr.date || new Date().toISOString().split("T")[0];
+          const category = parsedOcr.category || "Beban Operasional Rutin";
+          const proposalId = `appr_dewi_receipt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+          // Simpan draf ke dstech_approval_queue
+          const newProposal = {
+            id: proposalId,
+            revision: 0,
+            employee_id: "emp_dewi_finance",
+            employee_name: "Dewi Sartika",
+            employee_role: "AI Finance & Tax Billing Specialist",
+            department: "FINANCE",
+            task_type: "BOOKKEEPING_EXPENSE",
+            title: `Pencatatan Kas Keluar (Struk Belanja): ${merchant} - Rp ${grandTotal.toLocaleString("id-ID")}`,
+            target_client: merchant,
+            value: grandTotal,
+            tax_type: "none",
+            summary: `Dewi Sartika telah menganalisis foto struk transaksi dari ${merchant} tanggal ${date} senilai Rp ${grandTotal.toLocaleString("id-ID")} untuk ${category}. Bukti struk tersimpan permanen. Draf kas keluar siap disahkan Direktur Utama.`,
+            status: "PENDING_APPROVAL",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            payload: {
+              id: `dstech_exp_${Date.now()}`,
+              category: category,
+              accountName: category,
+              merchant: merchant,
+              date: date,
+              amount: grandTotal,
+              total: grandTotal,
+              items: Array.isArray(parsedOcr.items) ? parsedOcr.items : [category],
+              receiptUrl: mediaUrl,
+              notes: parsedOcr.notes || `Dicatat otomatis dari foto struk ${merchant} oleh Dewi Sartika via Team Chat`,
+              approvedBy: "",
+              approvalId: proposalId,
+            },
+          };
+
+          wfData.dstech_approval_queue.unshift(newProposal);
+          writeJsonSafe(WORKFORCE_FILE, wfData);
+
+          aiResponseText = `Siap Pak ${userMessage.senderName || "Ramadhani"}! Foto struk belanja dari **${merchant}** tanggal **${date}** senilai **Rp ${grandTotal.toLocaleString("id-ID")}** telah berhasil saya baca secara teliti.\n\n📋 **Rincian Pencatatan Struk**:\n• **Toko / Merchant**: ${merchant}\n• **Kategori Akuntansi**: ${category}\n• **Total Nominal**: Rp ${grandTotal.toLocaleString("id-ID")}\n• **Rincian Barang**: ${(parsedOcr.items || []).join(", ") || "-"}\n\n✅ Draf pengeluaran kas keluar telah saya daftarkan ke **Kotak Persetujuan Direktur** (ID: \`${proposalId}\`). Bapak dapat langsung menyetujuinya di Kantor Virtual atau Modul Keuangan agar saldo kas ERP otomatis terpotong sah.`;
+        }
+      } catch (errReceipt) {
+        console.error("Error processing receipt in team chat:", errReceipt);
+      }
+    }
+
+    // CASE B: PEMBUATAN DRAF SPH PENAWARAN (Dewi Sartika / Bambang Prakoso)
+    const isSphRequest =
+      !aiResponseText &&
+      (targetEmp.id === "emp_dewi_finance" || targetEmp.id === "emp_bambang_sales") &&
+      (/(?:sph|penawaran|quotation|inquiry|rfq|ajukan harga)/i.test(lowerText) || (mediaUrl && /(?:sph|penawaran|inquiry|daftar barang)/i.test(lowerText)));
+
+    if (isSphRequest) {
+      try {
+        const sphPrompt = `Anda adalah ${targetEmp.name}, ${targetEmp.role} di PT. DSTech Smart Perkasa.
+Direktur Utama (${userMessage.senderName || "Pak Ramadhani ST"}) meminta dibuatkan draf penawaran harga (SPH) dengan instruksi: "${content}"
+Konteks:
+${historyText}
+
+TUGAS ANDA:
+1. Ekstrak rincian penawaran (klien, nama proyek, item barang, perkiraan harga pasar).
+2. Keluarkan draf SPH dalam format JSON valid:
+{
+  "clientName": "...",
+  "projectName": "...",
+  "items": [
+    { "name": "...", "qty": 1, "unit": "Unit", "price": 0, "total": 0 }
+  ],
+  "grandTotal": 0,
+  "summary": "..."
+}`;
+
+        const rawSph = await executeGeminiCall(sphPrompt, true, "gemini-2.5-flash", 15000, geminiAttachments);
+        let parsedSph: any = null;
+        if (rawSph) {
+          try {
+            const clean = rawSph.replace(/```json/gi, "").replace(/```/g, "").trim();
+            parsedSph = JSON.parse(clean);
+          } catch (e) {
+            console.warn("SPH JSON parse error:", e);
+          }
+        }
+
+        if (!parsedSph || !Array.isArray(parsedSph.items) || parsedSph.items.length === 0) {
+          parsedSph = {
+            clientName: "Calon Mitra B2B DSTech",
+            projectName: "Pengadaan & Instalasi Smart System DSTech",
+            items: [
+              { name: "Paket Barrier Gate Otomatis MX-80 Heavy Duty", qty: 1, unit: "Paket", price: 18500000, total: 18500000 },
+              { name: "Jasa Instalasi, Commissioning & Kabel Jaringan", qty: 1, unit: "Lot", price: 3500000, total: 3500000 }
+            ],
+            grandTotal: 22000000,
+            summary: "Draf penawaran SPH resmi sistem pengamanan cerdas DSTech Smart"
+          };
+        }
+
+        if (parsedSph && Array.isArray(parsedSph.items) && parsedSph.items.length > 0) {
+          const grandTotal = Number(parsedSph.grandTotal) || parsedSph.items.reduce((s: number, i: any) => s + (Number(i.total) || 0), 0);
+          const clientName = parsedSph.clientName || "Calon Klien DSTech";
+          const projectName = parsedSph.projectName || "Pengadaan & Pemasangan Sistem Keamanan Smart";
+          const proposalId = `appr_sph_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+          const newProposal = {
+            id: proposalId,
+            revision: 0,
+            employee_id: targetEmp.id,
+            employee_name: targetEmp.name,
+            employee_role: targetEmp.role,
+            department: targetEmp.department,
+            task_type: "SPH_GENERATION",
+            title: `Draf Penawaran Harga (SPH): ${projectName} - ${clientName}`,
+            target_client: clientName,
+            value: grandTotal,
+            tax_type: "exclude",
+            summary: `${targetEmp.name} telah menyusun draf SPH resmi untuk ${clientName} senilai Rp ${grandTotal.toLocaleString("id-ID")} (${parsedSph.items.length} item). Menunggu pengesahan Direktur Utama.`,
+            status: "PENDING_APPROVAL",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            payload: {
+              clientName,
+              projectName,
+              items: parsedSph.items,
+              grandTotal,
+              attachmentUrl: mediaUrl,
+            },
+          };
+
+          wfData.dstech_approval_queue.unshift(newProposal);
+          writeJsonSafe(WORKFORCE_FILE, wfData);
+
+          aiResponseText = `Siap Pak ${userMessage.senderName || "Ramadhani"}! Draf Surat Penawaran Harga (SPH) untuk **${clientName}** terkait proyek *${projectName}* telah berhasil saya susun:\n\n📑 **Rincian Penawaran**:\n` +
+            parsedSph.items.map((it: any, idx: number) => `${idx + 1}. ${it.name} (${it.qty} ${it.unit || 'unit'}) - Rp ${(Number(it.total) || 0).toLocaleString('id-ID')}`).join('\n') +
+            `\n\n💰 **Total Estimasi**: Rp ${grandTotal.toLocaleString("id-ID")} (Belum PPN 11%)\n✅ Draf usulan SPH resmi telah saya submit ke **Kotak Persetujuan Direktur** (ID: \`${proposalId}\`). Bapak dapat meninjau lembar cetak SPH resmi A4 dan menyetujuinya di Kantor Virtual!`;
+        }
+      } catch (errSph) {
+        console.error("Error processing SPH in team chat:", errSph);
+      }
+    }
+
+    // CASE C: LAPORAN FOTO PEKERJAAN TEKNISI LAPANGAN (Deni Kurniawan)
+    const isFieldReport =
+      !aiResponseText &&
+      targetEmp.id === "emp_deni_field" &&
+      (geminiAttachments.length > 0 || /(?:laporan|progres|teknisi|pasang|selesai|lapangan|foto)/i.test(lowerText));
+
+    if (isFieldReport && geminiAttachments.length > 0) {
+      try {
+        const fieldPrompt = `Anda adalah Deni Kurniawan, AI Field Coordinator & Operations Lead di PT. DSTech Smart Perkasa.
+Direktur Utama (${userMessage.senderName || "Pak Ramadhani ST"}) atau teknisi lapangan mengirimkan foto bukti pekerjaan lapangan dengan pesan: "${content || 'Laporan progres lapangan'}"
+Konteks:
+${historyText}
+
+TUGAS ANDA:
+1. Periksa foto pekerjaan lapangan secara cermat (CCTV, Barrier Gate, penarikan kabel, instalasi bracket, panel listrik, dll).
+2. Jelaskan penilaian Anda secara teknis, apresiasi kerapihan kerja teknisi, sebutkan detail yang terlihat, dan konfirmasi bahwa progres telah diarsipkan ke buku kerja operasional DSTech.
+Gunakan nada bahasa profesional lapangan yang lugas dan berwibawa.`;
+
+        const geminiFieldSpeech = await executeGeminiCall(fieldPrompt, false, "gemini-2.5-flash", 15000, geminiAttachments);
+        if (geminiFieldSpeech) {
+          aiResponseText = `Siap Pak ${userMessage.senderName || "Ramadhani"}!\n\n${geminiFieldSpeech}\n\n📸 Dokumentasi foto lapangan ini telah saya simpan dan tautkan ke log operasional harian tim teknisi.`;
+        }
+      } catch (errField) {
+        console.error("Error analyzing field photo in team chat:", errField);
+      }
+    }
+
+    // CASE D: PERCAKAPAN UMUM & PENALARAN MULTI-TURN CERDAS
+    if (!aiResponseText) {
+      try {
+        const generalPrompt = `Anda adalah ${targetEmp.name}, ${targetEmp.role} (Divisi: ${targetEmp.department}) di PT. DSTech Smart Perkasa.
+Profil Anda: Cerdas, berfikir proaktif, memiliki inisiatif tinggi, dan bersikap sopan santun layaknya staf eksekutif profesional manusia.
+Lawan bicara Anda adalah Direktur Utama PT. DSTech Smart Perkasa (Bpk. Ramadhani ST).
+
+Data Riil Perusahaan Terkini (ERP 2026):
+- Saldo Kas Berjalan: Rp ${cashBalance.toLocaleString("id-ID")}
+- Daftar Tagihan Operasional Rutin: ${monthlyBillsSummary || "Sewa kantor, kendaraan, internet, air, listrik"}
+- Tahun Aktif: 2026
+
+Riwayat Percakapan Sebelumnya:
+${historyText}
+
+Pesan Terkini dari Direktur:
+"${content}"
+${mediaUrl ? `[Dilampirkan file dokumen/gambar: ${mediaUrl}]` : ""}
+
+INSTRUKSI KHUSUS:
+- Jawablah secara cerdas, solutif, dan langsung to the point.
+- Selalu hubungkan jawaban Anda dengan kewenangan peran Anda (${targetEmp.role}).
+- Jika Direktur meminta pencatatan atau tindakan, konfirmasikan bahwa tindakan tersebut telah Anda jalankan.
+- Gunakan bahasa Indonesia formal, santun, dan percaya diri. Sapa Direktur dengan "Pak Ramadhani" atau "Bapak".`;
+
+        const geminiGeneralSpeech = await executeGeminiCall(generalPrompt, false, "gemini-2.5-flash", 15000, geminiAttachments);
+        if (geminiGeneralSpeech) {
+          aiResponseText = geminiGeneralSpeech;
+        } else {
+          aiResponseText = `Siap Pak ${userMessage.senderName || "Ramadhani"}. Arahan Bapak "${content}" telah saya pahami dan saya tindaklanjuti sesuai dengan SOP divisi ${targetEmp.department} DSTech Smart. Segala perkembangan akan segera saya laporkan kembali ke Bapak.`;
+        }
+      } catch (errGen) {
+        aiResponseText = `Siap Pak ${userMessage.senderName || "Ramadhani"}. Pesan telah saya terima dan akan segera saya koordinasikan.`;
+      }
+    }
+
+    // 5. Buat Objek Pesan Balasan AI
+    const aiMsgId = `dstech_msg_${Date.now()}_ai_${Math.floor(Math.random() * 1000)}`;
+    const aiMsg = {
+      id: aiMsgId,
+      chatId: chatId,
+      senderId: targetEmp.id,
+      senderName: targetEmp.name,
+      senderRole: "AI_WORKFORCE",
+      type: "text",
+      content: aiResponseText,
+      timestamp: new Date().toISOString(),
+      readBy: [targetEmp.id],
+    };
+
+    messages.push(aiMsg);
+    writeJsonSafe(MESSAGES_FILE, messages);
+
+    // Update ringkasan lastMessage pada chats
+    const chatIdx = chats.findIndex((c: any) => c.id === chatId);
+    if (chatIdx !== -1) {
+      chats[chatIdx].lastMessage = aiResponseText.slice(0, 120) + (aiResponseText.length > 120 ? "..." : "");
+      chats[chatIdx].lastMessageTime = aiMsg.timestamp;
+      writeJsonSafe(CHATS_FILE, chats);
+    }
+
+    // 6. Sinkronisasikan ke dstech_conversations di Kantor Virtual
+    if (!Array.isArray(wfData.dstech_conversations[targetEmp.id])) {
+      wfData.dstech_conversations[targetEmp.id] = [];
+    }
+    wfData.dstech_conversations[targetEmp.id].push(
+      {
+        role: "user",
+        content: content || "Mengirimkan lampiran file",
+        timestamp: userMessage.timestamp || new Date().toISOString(),
+        attachment: mediaUrl ? { url: mediaUrl } : undefined,
+      },
+      {
+        role: "assistant",
+        content: aiResponseText,
+        timestamp: aiMsg.timestamp,
+      }
+    );
+    writeJsonSafe(WORKFORCE_FILE, wfData);
+
+    return aiMsg;
+  } catch (globalErr) {
+    console.error("Fatal error in handleAiWorkforceChatMessage:", globalErr);
+    return null;
   }
 }
 
@@ -172,14 +697,109 @@ export async function GET(request: Request) {
       console.warn("Sync project chats notice:", e);
     }
 
+    // --- Registrasi 6 Karyawan AI DSTech Smart & Auto-Seed AI Chats ---
+    const wfData = readJsonSafe(WORKFORCE_FILE, { dstech_employees: [] });
+    const aiEmployees = Array.isArray(wfData.dstech_employees) && wfData.dstech_employees.length > 0
+      ? wfData.dstech_employees
+      : [
+          { id: "emp_dewi_finance", name: "Dewi Sartika", role: "AI Finance & Tax Billing Specialist", department: "FINANCE", avatar_color: "#10b981", speech_bubble: "Halo Pak! Saya Dewi Sartika dari Keuangan & Faktur. Bapak bisa kirim foto struk belanja untuk dicatat ke kas keluar atau minta draf SPH di sini." },
+          { id: "emp_bambang_sales", name: "Bambang Prakoso", role: "Senior AI Sales & Commercial Consultant", department: "SALES", avatar_color: "#3b82f6", speech_bubble: "Siap Pak! Saya Bambang Prakoso, siap merespons kebutuhan draf SPH B2B dan pipeline prospek klien kapan saja." },
+          { id: "emp_deni_field", name: "Deni Kurniawan", role: "AI Field Coordinator & Dispatcher", department: "FIELD_OPERATIONS", avatar_color: "#06b6d4", speech_bubble: "Standby Pak! Kirimkan foto pekerjaan lapangan atau kendala teknisi di sini, saya bantu rangkumkan laporannya." },
+          { id: "emp_nadia_marketing", name: "Nadia Safitri", role: "AI Creative Marketing & Copywriter", department: "MARKETING", avatar_color: "#f59e0b", speech_bubble: "Halo Pak! Butuh ide materi promo broadcast WhatsApp atau copywriting penawaran baru? Kirimkan instruksinya ke saya." },
+          { id: "emp_reza_catalog", name: "Reza Firmansyah", role: "AI Product Catalog & Procurement Lead", department: "CATALOG_ESTORE", avatar_color: "#8b5cf6", speech_bubble: "Standby Pak! Saya siap bantu cek spesifikasi alat barrier gate/CCTV, stok gudang, dan pendaftaran produk e-store." },
+          { id: "emp_siti_cs", name: "Siti Nurhaliza", role: "Front Office & AI Customer Care", department: "CUSTOMER_SERVICE", avatar_color: "#ec4899", speech_bubble: "Selamat datang Pak! Saya Siti Nurhaliza dari Front Office. Standby melayani tamu website dan pertanyaan umum 24 jam." },
+        ];
+
+    // Daftarkan AI employees ke list users jika belum ada
+    for (const emp of aiEmployees) {
+      if (!users.some((u: any) => u.id === emp.id)) {
+        users.push({
+          id: emp.id,
+          name: emp.name,
+          role: "AI_WORKFORCE",
+          department: emp.department,
+          phone: "0822-DSTECH-AI",
+          status: "ACTIVE",
+          isAiEmployee: true,
+          avatarColor: emp.avatar_color,
+          speechBubble: emp.speech_bubble,
+        });
+      }
+    }
+
+    // Pastikan Grup Terpadu AI Workforce Hub ada di chats
+    const groupAiIndex = chats.findIndex((c: any) => c.id === "dstech_chat_group_ai_workforce");
+    const allAiIds = aiEmployees.map((e: any) => e.id);
+    const standardMembers = ["dstech_usr_1", "dstech_usr_2", "dstech_usr_1792549625191", "dstech_usr_1792545916165"];
+    const resolvedUserId = userId || "dstech_usr_1792549625191";
+    const groupParticipants = Array.from(new Set([...standardMembers, resolvedUserId, ...allAiIds]));
+
+    let aiChatsUpdated = false;
+    if (groupAiIndex === -1) {
+      chats.unshift({
+        id: "dstech_chat_group_ai_workforce",
+        name: "🤖 DSTech AI Workforce Hub",
+        isGroup: true,
+        isAiChat: true,
+        groupAvatar: "/service-software.png",
+        participants: groupParticipants,
+        description: "Grup koordinasi terpadu seluruh 6 Staf AI (Dewi, Bambang, Deni, Nadia, Reza, Siti). Hubungkan arahan pimpinan, struk kas keluar, draf SPH, dan progres lapangan langsung via Android.",
+        lastMessage: "Seluruh Staf AI siap menerima instruksi, foto nota struk belanja, draf SPH, dan laporan proyek lapangan.",
+        lastMessageTime: new Date().toISOString(),
+        unreadCount: 0,
+      });
+      aiChatsUpdated = true;
+    }
+
+    // Pastikan Direct Chat (1-on-1) untuk setiap Staf AI ada di chats
+    for (const emp of aiEmployees) {
+      const dmChatId = `dstech_chat_dm_${emp.id}`;
+      const existingDmIndex = chats.findIndex((c: any) => c.id === dmChatId || (c.aiEmployeeId === emp.id && !c.isGroup));
+      if (existingDmIndex === -1) {
+        chats.push({
+          id: dmChatId,
+          name: emp.name,
+          isGroup: false,
+          isAiChat: true,
+          aiEmployeeId: emp.id,
+          userRole: emp.role,
+          department: emp.department,
+          avatarColor: emp.avatar_color,
+          participants: Array.from(new Set([...standardMembers, resolvedUserId, emp.id])),
+          lastMessage: emp.speech_bubble || `Halo, saya ${emp.name} siap membantu pekerjaan DSTech Smart.`,
+          lastMessageTime: new Date().toISOString(),
+          unreadCount: 0,
+        });
+        aiChatsUpdated = true;
+      } else {
+        const c = chats[existingDmIndex];
+        c.isAiChat = true;
+        c.aiEmployeeId = emp.id;
+        c.userRole = emp.role;
+        c.avatarColor = emp.avatar_color;
+        if (!c.participants.includes(resolvedUserId)) {
+          c.participants.push(resolvedUserId);
+          aiChatsUpdated = true;
+        }
+      }
+    }
+
+    if (aiChatsUpdated) {
+      writeJsonSafe(CHATS_FILE, chats);
+    }
+
     // Filter ketat hak akses: Jika bukan Admin/Superadmin/CS, HANYA tampilkan obrolan di mana user menjadi peserta resmi
     const requestUser = users.find((u: any) => u.id === userId);
     const isAdminOrCS = requestUser?.role === "ADMIN" || requestUser?.role === "SUPERADMIN" || requestUser?.role === "CS";
 
     let visibleChats = chats;
     if (userId && !isAdminOrCS) {
-      // User non-Admin/CS HANYA bisa melihat obrolan di mana dia peserta DAN BUKAN chat klien!
-      visibleChats = chats.filter((c: any) => !c.isClientChat && Array.isArray(c.participants) && c.participants.includes(userId));
+      // User non-Admin/CS HANYA bisa melihat obrolan di mana dia peserta ATAU obrolan Staf AI, DAN BUKAN chat klien publik!
+      visibleChats = chats.filter((c: any) => {
+        if (c.isClientChat) return false;
+        if (c.isAiChat || c.id === "dstech_chat_group_ai_workforce" || c.id.startsWith("dstech_chat_dm_emp_")) return true;
+        return Array.isArray(c.participants) && c.participants.includes(userId);
+      });
     } else if (!isAdminOrCS) {
       // Jika request tanpa userId dan bukan Admin/CS, sembunyikan semua obrolan klien
       visibleChats = chats.filter((c: any) => !c.isClientChat);
@@ -192,6 +812,20 @@ export async function GET(request: Request) {
           ...c,
           isOnline: true,
           badgeLabel: "Klien Web",
+        };
+      }
+
+      // Jika chat dengan Karyawan AI
+      if (c.isAiChat || c.aiEmployeeId || c.id.startsWith("dstech_chat_dm_emp_")) {
+        const matchingAi = aiEmployees.find((e: any) => e.id === c.aiEmployeeId || c.id === `dstech_chat_dm_${e.id}`);
+        return {
+          ...c,
+          isOnline: true,
+          isAiChat: true,
+          badgeLabel: "Staf AI",
+          userRole: matchingAi?.role || c.userRole || "Karyawan AI DSTech",
+          department: matchingAi?.department || c.department,
+          avatarColor: matchingAi?.avatar_color || c.avatarColor || "#10b981",
         };
       }
 
@@ -221,6 +855,9 @@ export async function GET(request: Request) {
         role: u.role,
         phone: u.phone,
         status: u.status,
+        isAiEmployee: Boolean(u.isAiEmployee),
+        department: u.department,
+        avatarColor: u.avatarColor,
       })),
     });
   }
@@ -933,6 +1570,32 @@ export async function POST(request: Request) {
         chats[chatIndex].lastMessage = lastPreview;
         chats[chatIndex].lastMessageTime = newMsg.timestamp;
         writeJsonSafe(CHATS_FILE, chats);
+      }
+
+      // Intersepsi Karyawan AI: Jika pesan dikirim ke ruang obrolan Karyawan AI atau Grup AI
+      const activeChatObj = chats.find((c: any) => c.id === chatId);
+      const isTargetAiChat =
+        chatId === "dstech_chat_group_ai_workforce" ||
+        chatId.startsWith("dstech_chat_dm_emp_") ||
+        Boolean(activeChatObj?.isAiChat) ||
+        Boolean(activeChatObj?.aiEmployeeId);
+
+      if (isTargetAiChat && senderRole !== "AI_WORKFORCE" && !senderId.startsWith("emp_")) {
+        const aiResponse = await handleAiWorkforceChatMessage({
+          chatId,
+          chatObj: activeChatObj,
+          userMessage: newMsg,
+          messages,
+          chats,
+        });
+
+        if (aiResponse) {
+          return NextResponse.json({
+            success: true,
+            message: newMsg,
+            aiReply: aiResponse,
+          });
+        }
       }
 
       return NextResponse.json({

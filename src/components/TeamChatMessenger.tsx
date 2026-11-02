@@ -155,6 +155,42 @@ export default function TeamChatMessenger({
   const spkCameraInputRef = useRef<HTMLInputElement>(null);
   const spkGalleryInputRef = useRef<HTMLInputElement>(null);
 
+  // State & Ref Upload Berkas / Kamera Chat Langsung (Mobile Android & Web AI)
+  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; name: string; type: string; size?: number } | null>(null);
+  const [isUploadingChatFile, setIsUploadingChatFile] = useState(false);
+  const chatCameraInputRef = useRef<HTMLInputElement>(null);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadChatAttachment = async (file: File) => {
+    if (!file) return;
+    try {
+      setIsUploadingChatFile(true);
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("docType", "chat_attachment");
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        setPendingAttachment({
+          url: data.url,
+          name: file.name,
+          type: file.type || (file.name.endsWith(".pdf") ? "application/pdf" : "image/jpeg"),
+          size: file.size,
+        });
+      } else {
+        alert(data.message || "Gagal mengunggah berkas");
+      }
+    } catch (e: any) {
+      console.error("Upload error:", e);
+      alert("Gagal mengunggah berkas: " + e.message);
+    } finally {
+      setIsUploadingChatFile(false);
+    }
+  };
+
   const handleUploadReportPhoto = async (file: File) => {
     if (!file) return;
     try {
@@ -506,13 +542,15 @@ export default function TeamChatMessenger({
     }
   };
 
-  // Kirim Pesan Teks Standar
+  // Kirim Pesan Teks Standar & Lampiran Karyawan AI
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim() || !activeChat) return;
+    if ((!inputText.trim() && !pendingAttachment) || !activeChat) return;
 
     const textToSend = inputText.trim();
+    const attToSend = pendingAttachment;
     setInputText("");
+    setPendingAttachment(null);
 
     try {
       const res = await fetch("/api/team-chat", {
@@ -524,18 +562,209 @@ export default function TeamChatMessenger({
           senderId: currentUser.id,
           senderName: currentUser.name,
           senderRole: currentUser.role,
-          type: "text",
+          type: attToSend ? (attToSend.type.startsWith("image/") ? "image" : "file") : "text",
           content: textToSend,
+          mediaUrl: attToSend?.url || undefined,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        setMessages((prev) => [...prev, data.message]);
+        if (data.aiReply) {
+          setMessages((prev) => [...prev, data.message, data.aiReply]);
+        } else {
+          setMessages((prev) => [...prev, data.message]);
+        }
         loadChats();
       }
     } catch (err) {
       console.error("Gagal mengirim pesan:", err);
     }
+  };
+
+  // Helper Pintasan Cepat Karyawan AI (Quick Chips)
+  const renderAiQuickChips = (chat: any) => {
+    const empId = chat.aiEmployeeId || (chat.id.startsWith("dstech_chat_dm_") ? chat.id.replace("dstech_chat_dm_", "") : "");
+
+    if (empId === "emp_dewi_finance") {
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => chatCameraInputRef.current?.click()}
+            className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[11px] font-medium shrink-0 transition flex items-center gap-1 cursor-pointer"
+          >
+            🧾 Ambil Foto Struk Kas
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Dewi, tolong buatkan draf SPH penawaran harga untuk klien ")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            📑 Buat Draf SPH
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Dewi, bagaimana ringkasan saldo kas dan pengeluaran bulan ini?")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            📊 Saldo Kas ERP
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Dewi, tolong cek daftar tagihan operasional rutin tahun 2026")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            💡 Tagihan Rutin 2026
+          </button>
+        </>
+      );
+    }
+
+    if (empId === "emp_bambang_sales") {
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setInputText("Bambang, bagaimana perkembangan prospek klien industri Cilegon minggu ini?")}
+            className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full text-[11px] font-medium shrink-0 transition cursor-pointer"
+          >
+            🤝 Cek Pipeline CRM
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Bambang, tolong buatkan penawaran SPH B2B untuk proyek ")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            📑 Susun SPH B2B
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Bambang, laporkan progres pipeline penjualan bulan ini")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            📈 Target Penjualan
+          </button>
+        </>
+      );
+    }
+
+    if (empId === "emp_deni_field") {
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => chatCameraInputRef.current?.click()}
+            className="px-2.5 py-1 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full text-[11px] font-medium shrink-0 transition flex items-center gap-1 cursor-pointer"
+          >
+            📸 Kirim Foto Lapangan
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Deni, laporkan status penugasan SPK teknisi di lapangan hari ini")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            📋 Status SPK Teknisi
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Deni, bagaimana jadwal servis pemeliharaan berkala klien?")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            🛠️ Jadwal Maintenance
+          </button>
+        </>
+      );
+    }
+
+    if (empId === "emp_nadia_marketing") {
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setInputText("Nadia, buatkan teks broadcast promo WhatsApp untuk Barrier Gate & CCTV")}
+            className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full text-[11px] font-medium shrink-0 transition cursor-pointer"
+          >
+            📣 Promo Broadcast WA
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Nadia, berikan 3 ide konten edukasi untuk Instagram/TikTok DSTech")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            🎯 Ide Konten Sosmed
+          </button>
+        </>
+      );
+    }
+
+    if (empId === "emp_reza_catalog") {
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setInputText("Reza, cek ketersediaan stok barrier gate dan magnetic lock di gudang")}
+            className="px-2.5 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full text-[11px] font-medium shrink-0 transition cursor-pointer"
+          >
+            📦 Cek Stok Gudang
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Reza, tolong rapikan spesifikasi teknis produk katalog e-store")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            🏷️ Update Spesifikasi Produk
+          </button>
+        </>
+      );
+    }
+
+    if (empId === "emp_siti_cs") {
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setInputText("Siti, ada tamu website atau prospek baru yang berkonsultasi hari ini?")}
+            className="px-2.5 py-1 bg-pink-500/10 hover:bg-pink-500/20 text-pink-300 border border-pink-500/30 rounded-full text-[11px] font-medium shrink-0 transition cursor-pointer"
+          >
+            💬 Tamu Web Hari Ini
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Siti, apa saja solusi sistem otomatis yang paling sering ditanyakan klien?")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            ✨ Konsultasi Solusi
+          </button>
+        </>
+      );
+    }
+
+    // Default / Grup Hub
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => chatCameraInputRef.current?.click()}
+          className="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[11px] font-medium shrink-0 transition flex items-center gap-1 cursor-pointer"
+        >
+          🧾 Ambil Foto Struk Kas
+        </button>
+        <button
+          type="button"
+          onClick={() => setInputText("Tim AI, tolong siapkan draf SPH penawaran baru")}
+          className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full text-[11px] font-medium shrink-0 transition cursor-pointer"
+        >
+          📑 Buat Draf SPH
+        </button>
+        <button
+          type="button"
+          onClick={() => setInputText("Mohon seluruh staf AI laporkan aktivitas dan tugas prioritas hari ini")}
+          className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+        >
+          ⚡ Status Seluruh Staf
+        </button>
+      </>
+    );
   };
 
   // Kirim Lampiran Invoice
@@ -884,11 +1113,15 @@ export default function TeamChatMessenger({
                     >
                       <div className="relative flex-shrink-0">
                         <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center font-bold overflow-hidden shadow ${
-                          chat.isClientChat
+                          chat.isAiChat || chat.aiEmployeeId
+                            ? "bg-gradient-to-tr from-emerald-950 via-slate-900 to-cyan-950 border-emerald-500/50 text-emerald-400"
+                            : chat.isClientChat
                             ? "bg-gradient-to-tr from-emerald-950 via-slate-900 to-teal-950 border-emerald-500/50 text-emerald-400"
                             : "bg-gradient-to-tr from-slate-800 to-slate-700 border-slate-700 text-slate-300"
                         }`}>
-                          {chat.isClientChat ? (
+                          {chat.isAiChat || chat.aiEmployeeId ? (
+                            <Sparkles className="w-6 h-6 text-emerald-400" />
+                          ) : chat.isClientChat ? (
                             <MessageSquare className="w-6 h-6 text-emerald-400" />
                           ) : chat.isGroup ? (
                             <Users className="w-6 h-6 text-emerald-400" />
@@ -896,12 +1129,17 @@ export default function TeamChatMessenger({
                             <User className="w-6 h-6 text-cyan-400" />
                           )}
                         </div>
-                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full" />
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full animate-pulse" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <h4 className="text-xs font-bold text-white truncate flex items-center gap-1.5">
                             {chat.name}
+                            {(chat.isAiChat || chat.aiEmployeeId) && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 flex items-center gap-0.5">
+                                🤖 Staf AI
+                              </span>
+                            )}
                             {chat.isClientChat && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0">
                                 Klien Web
@@ -942,7 +1180,9 @@ export default function TeamChatMessenger({
                 .map((u) => {
                   const isCurrent = u.id === currentUser.id;
                   const roleBadgeColor =
-                    u.role === "SUPERADMIN"
+                    u.isAiEmployee || u.role === "AI_WORKFORCE"
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                      : u.role === "SUPERADMIN"
                       ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
                       : u.role === "ADMIN"
                       ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
@@ -958,8 +1198,11 @@ export default function TeamChatMessenger({
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="relative flex-shrink-0">
-                          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-white font-bold text-xs shadow">
-                            {u.name.substring(0, 2).toUpperCase()}
+                          <div
+                            style={{ backgroundColor: u.avatarColor || undefined }}
+                            className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-slate-800 to-slate-700 border border-slate-700 flex items-center justify-center text-white font-bold text-xs shadow"
+                          >
+                            {u.isAiEmployee ? "🤖" : u.name.substring(0, 2).toUpperCase()}
                           </div>
                           <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-950 rounded-full" />
                         </div>
@@ -970,7 +1213,7 @@ export default function TeamChatMessenger({
                           </h4>
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className={`text-[9px] px-1.5 py-0.2 rounded-md font-bold border ${roleBadgeColor}`}>
-                              {u.role}
+                              {u.isAiEmployee ? "🤖 STAF AI" : u.role}
                             </span>
                             {u.phone && (
                               <span className="text-[10px] text-slate-500 truncate">{u.phone}</span>
@@ -1017,11 +1260,15 @@ export default function TeamChatMessenger({
                 </button>
 
                 <div className={`w-9 h-9 md:w-10 md:h-10 rounded-2xl border flex items-center justify-center font-bold flex-shrink-0 ${
-                  activeChat.isClientChat
+                  activeChat.isAiChat || activeChat.aiEmployeeId
+                    ? "bg-gradient-to-tr from-emerald-950 via-slate-900 to-cyan-950 border-emerald-500/50 text-emerald-400"
+                    : activeChat.isClientChat
                     ? "bg-gradient-to-tr from-emerald-950 to-teal-950 border-emerald-500/50 text-emerald-400"
                     : "bg-slate-800 border-slate-700 text-slate-300"
                 }`}>
-                  {activeChat.isClientChat ? (
+                  {activeChat.isAiChat || activeChat.aiEmployeeId ? (
+                    <Sparkles className="w-5 h-5 text-emerald-400" />
+                  ) : activeChat.isClientChat ? (
                     <MessageSquare className="w-5 h-5 text-emerald-400" />
                   ) : activeChat.isGroup ? (
                     <Users className="w-5 h-5 text-emerald-400" />
@@ -1032,7 +1279,12 @@ export default function TeamChatMessenger({
                 <div className="min-w-0">
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
                     {activeChat.name}
-                    {activeChat.isClientChat ? (
+                    {activeChat.isAiChat || activeChat.aiEmployeeId ? (
+                      <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        🤖 Staf AI • Gemini 2.5 Brain
+                      </span>
+                    ) : activeChat.isClientChat ? (
                       <span className="text-[10px] px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full font-bold flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                         Klien Web • Terkunci Admin & CS
@@ -1044,7 +1296,9 @@ export default function TeamChatMessenger({
                     ) : null}
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    {activeChat.isClientChat
+                    {activeChat.isAiChat || activeChat.aiEmployeeId
+                      ? `${activeChat.userRole || activeChat.description || "Staf AI Digital DSTech Smart"} • Online 24 Jam`
+                      : activeChat.isClientChat
                       ? `Klien: ${activeChat.clientName || "Pengunjung"} • No: ${activeChat.clientPhone || "-"} • Live Handover AI Dani`
                       : activeChat.isGroup
                       ? `${activeChat.participants?.length || 4} anggota koordinasi proyek`
@@ -1053,8 +1307,18 @@ export default function TeamChatMessenger({
                 </div>
               </div>
 
-              {/* Tombol Panggilan Suara & Video */}
+              {/* Tombol Panggilan Suara & Video & Link Virtual Office */}
               <div className="flex items-center gap-2">
+                {(activeChat.isAiChat || activeChat.aiEmployeeId) && (
+                  <Link
+                    href="/admin/virtual-office"
+                    className="px-2.5 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-xl text-xs font-semibold flex items-center gap-1 transition shrink-0 border border-emerald-500/30"
+                    title="Buka Kantor Virtual 3D & Kotak Persetujuan Direktur"
+                  >
+                    <span>🏛️</span>
+                    <span className="hidden sm:inline">Virtual Office</span>
+                  </Link>
+                )}
                 <button
                   onClick={() => handleStartCall("audio")}
                   className="p-2.5 text-slate-300 hover:text-emerald-400 hover:bg-slate-800 rounded-xl transition cursor-pointer flex items-center gap-1.5 text-xs font-medium"
@@ -1114,10 +1378,19 @@ export default function TeamChatMessenger({
                     key={msg.id}
                     className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
                   >
-                    {/* Header bubble (Nama Pengirim jika di grup) */}
+                    {/* Header bubble (Nama Pengirim jika di grup / Karyawan AI) */}
                     {!isMe && (
-                      <span className="text-[10px] font-semibold text-emerald-400 mb-1 ml-1">
-                        {msg.senderName} ({msg.senderRole})
+                      <span className="text-[10px] font-semibold text-emerald-400 mb-1 ml-1 flex items-center gap-1">
+                        {msg.senderRole === "AI_WORKFORCE" || msg.senderId?.startsWith("emp_") ? (
+                          <>
+                            <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[9px] font-bold">
+                              🤖 Staf AI
+                            </span>
+                            <span className="text-white font-bold">{msg.senderName}</span>
+                          </>
+                        ) : (
+                          `${msg.senderName} (${msg.senderRole})`
+                        )}
                       </span>
                     )}
 
@@ -1125,10 +1398,44 @@ export default function TeamChatMessenger({
                       className={`max-w-[85%] sm:max-w-[70%] rounded-2xl p-3.5 shadow-lg relative dstech-chat-bubble select-none ${
                         isMe
                           ? "bg-emerald-950/80 border border-emerald-600/40 text-emerald-50 rounded-tr-none"
+                          : (msg.senderRole === "AI_WORKFORCE" || msg.senderId?.startsWith("emp_"))
+                          ? "bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/60 border border-emerald-500/30 text-slate-100 rounded-tl-none shadow-emerald-950/30 shadow-md"
                           : "bg-slate-800/90 border border-slate-700 text-slate-100 rounded-tl-none"
                       }`}
                       onContextMenu={(e) => e.preventDefault()}
                     >
+                      {/* Media Gambar / Foto Struk / Dokumen */}
+                      {msg.mediaUrl && (
+                        <div className="my-2 rounded-xl overflow-hidden border border-slate-700/80 bg-slate-950/80 max-w-sm">
+                          {msg.mediaUrl.match(/\.(jpg|jpeg|png|webp|jfif|gif)$/i) || msg.type === "image" ? (
+                            <a href={msg.mediaUrl} target="_blank" rel="noopener noreferrer" className="block relative group">
+                              <img
+                                src={msg.mediaUrl}
+                                alt="Lampiran Foto"
+                                className="w-full max-h-64 object-cover hover:opacity-95 transition"
+                              />
+                              <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition text-xs text-white gap-1 font-semibold">
+                                <Maximize2 className="w-3.5 h-3.5" /> Buka Foto Penuh
+                              </div>
+                            </a>
+                          ) : (
+                            <a
+                              href={msg.mediaUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-3 flex items-center gap-2.5 text-xs text-cyan-300 hover:text-cyan-200 transition"
+                            >
+                              <FileText className="w-5 h-5 text-cyan-400 shrink-0" />
+                              <div className="truncate flex-1">
+                                <div className="font-bold truncate">Lampiran Dokumen</div>
+                                <div className="text-[10px] text-slate-400 font-mono">Unduh / Buka File</div>
+                              </div>
+                              <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                            </a>
+                          )}
+                        </div>
+                      )}
+
                       {/* 1. Teks Biasa */}
                       {msg.content && (
                         <p className="text-xs leading-relaxed whitespace-pre-wrap mb-1 dstech-protected-message select-none">
@@ -1597,12 +1904,101 @@ export default function TeamChatMessenger({
               </div>
             )}
 
+            {/* Pintasan Cepat Karyawan AI (Quick Action Chips) */}
+            {(activeChat.isAiChat || activeChat.aiEmployeeId || activeChat.id === "dstech_chat_group_ai_workforce") && (
+              <div className="px-3 pt-2.5 pb-1 bg-slate-950/90 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                <span className="text-[10px] text-emerald-400 font-bold shrink-0 flex items-center gap-1 mr-1">
+                  <Sparkles className="w-3 h-3" /> Rekomendasi:
+                </span>
+                {renderAiQuickChips(activeChat)}
+              </div>
+            )}
+
+            {/* Pratinjau Berkas Lampiran Siap Kirim */}
+            {pendingAttachment && (
+              <div className="px-3 py-2 bg-slate-900 border-t border-emerald-500/30 flex items-center justify-between text-xs text-emerald-300 animate-fadeIn">
+                <div className="flex items-center gap-2 truncate">
+                  {pendingAttachment.type.startsWith("image/") ? (
+                    <img
+                      src={pendingAttachment.url}
+                      alt="Pratinjau"
+                      className="w-8 h-8 rounded-lg object-cover border border-emerald-500/40"
+                    />
+                  ) : (
+                    <FileText className="w-6 h-6 text-cyan-400" />
+                  )}
+                  <div className="truncate">
+                    <p className="font-bold truncate text-white">{pendingAttachment.name}</p>
+                    <p className="text-[10px] text-emerald-400 font-medium">Siap diproses oleh Karyawan AI</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingAttachment(null)}
+                  className="p-1 hover:bg-slate-800 text-slate-400 hover:text-rose-400 rounded-lg transition cursor-pointer"
+                  title="Batalkan Lampiran"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Spinner Saat Berkas Diunggah */}
+            {isUploadingChatFile && (
+              <div className="px-3 py-1.5 bg-slate-900 text-cyan-400 text-xs flex items-center gap-2 border-t border-slate-800">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Mengunggah dokumen foto / berkas...</span>
+              </div>
+            )}
+
             {/* Input Bar Footer Obrolan */}
             <div className="p-3 md:p-4 bg-slate-950 border-t border-slate-800 flex items-center gap-2">
+              <input
+                ref={chatCameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleUploadChatAttachment(e.target.files[0]);
+                  }
+                }}
+              />
+              <input
+                ref={chatFileInputRef}
+                type="file"
+                accept="image/*,application/pdf,.xlsx,.xls,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    handleUploadChatAttachment(e.target.files[0]);
+                  }
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={() => chatCameraInputRef.current?.click()}
+                className="p-2.5 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition cursor-pointer shrink-0"
+                title="Ambil Foto Kamera Langsung (Struk Kas / Lapangan)"
+              >
+                <Camera className="w-5 h-5 text-emerald-400" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => chatFileInputRef.current?.click()}
+                className="p-2.5 rounded-xl text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition cursor-pointer shrink-0"
+                title="Lampirkan File / Dokumen Inquiry (Excel / PDF / Gambar)"
+              >
+                <Paperclip className="w-5 h-5 text-cyan-400" />
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowAttachMenu(!showAttachMenu)}
-                className={`p-2.5 rounded-xl transition cursor-pointer ${
+                className={`p-2.5 rounded-xl transition cursor-pointer shrink-0 ${
                   showAttachMenu
                     ? "bg-emerald-600 text-white"
                     : "text-slate-400 hover:text-white hover:bg-slate-800"
@@ -1617,13 +2013,17 @@ export default function TeamChatMessenger({
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Ketik pesan atau koordinasi tim..."
+                  placeholder={
+                    activeChat.isAiChat || activeChat.aiEmployeeId
+                      ? `Kirim instruksi atau foto struk ke ${activeChat.name}...`
+                      : "Ketik pesan atau koordinasi tim..."
+                  }
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition"
                 />
                 <button
                   type="submit"
-                  disabled={!inputText.trim()}
-                  className="p-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl shadow-lg transition cursor-pointer"
+                  disabled={!inputText.trim() && !pendingAttachment}
+                  className="p-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl shadow-lg transition cursor-pointer shrink-0"
                 >
                   <Send className="w-4 h-4" />
                 </button>
