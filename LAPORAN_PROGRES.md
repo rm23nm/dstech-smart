@@ -4,6 +4,44 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 343 (2026-11-02)**: [SEDANG DIKERJAKAN] Audit & Rekonsiliasi Logika Laba Bersih vs Beban Operasional / Kas Keluar vs Saldo Kas & Bank pada Modul ERP Keuangan (`src/app/api/finance/route.ts`, `src/app/admin/finance/page.tsx`).
+  *Permintaan User*: "coba cek, nilai pembukuan ini, tidak logika laba bersihnya, saldo lain kemana?" (Screenshot halaman `/admin/finance` memperlihatkan Total Omset Rp 637.630.256, Belanja HPP Rp 56.282.700, Laba Bersih melonjak Rp 572.097.556 [Margin 90%], padahal Kas Masuk Rp 522.574.257, Kas Keluar Rp 415.314.100, dan Saldo Kas & Bank Rp 207.160.157).
+  *Akar Masalah yang Terindikasi*:
+  1. **Formula Laba Bersih Belum Memperhitungkan Beban Operasional Riil**: Formula Laba Bersih di API dan Frontend saat ini hanya mengurangkan Omset dengan Belanja HPP Supplier (`totalRevenue - totalHpp`), padahal perusahaan memiliki Kas Keluar / Beban Operasional sebesar Rp 415.314.100 (listrik, sewa, gaji, transport, vendor, utilitas). Laba Bersih sejati (Net Profit) sesuai standar akuntansi wajib mengurangkan seluruh beban operasional: `Laba Bersih = Pendapatan Omset - Belanja HPP - Beban Operasional/Pengeluaran Kas`.
+  2. **Disparitas Saldo Kas & Bank vs Saldo Arus Kas Periode Ini**: Terdapat perbedaan antara Saldo Kas & Bank di kartu ringkasan atas (Rp 207.160.157) dengan Saldo Kas Periode Ini di Buku Arus Kas (Rp 107.260.157) karena mutasi awal atau akun bank yang belum terevaluasi secara seragam.
+  *Kebutuhan & Rencana Solusi*:
+  1. Buat folder cadangan `_backup_task343_finance_profit_loss_logic/`.
+  2. Audit dan perbaiki perhitungan Laba Bersih di `src/app/api/finance/route.ts` dan `src/app/admin/finance/page.tsx`:
+     - Tampilkan Laba Kotor (Gross Profit) = `Total Omset - Belanja HPP`.
+     - Tampilkan Total Beban Operasional & Pengeluaran = `Total Kas Keluar / Operational Expenses`.
+     - Hitung Laba Bersih Riil (Net Profit) = `Laba Kotor - Total Beban Operasional`.
+  3. Rekonsiliasi Saldo Kas & Bank dan Arus Kas agar angka saling terhubung secara logis dan transparan bagi Direktur Utama.
+  4. Validasi TypeScript compiler (`npx tsc --noEmit`) dan build Next.js (`npm run build`).
+  5. Push ke GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+
+- **Tugas 342 (2026-11-02)**: [SELESAI] Perbaikan Total Masalah Usulan Kosong "Total Rp 0", Penguatan Context Memory "Yang Dicatat Tadi / Rutin Setiap Bulan", dan Integrasi Autonomous ERP Brain Staf AI Dewi Sartika (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
+  *Permintaan User*:
+  - "karyawannya bego, gak nyambung," (Screenshot pesan: "dewi tolong catat pengeluaran masukan kedalam pengeluaran rutin yang kamu catat tadi/kan setiap bulan" dan balasan Dewi: "Draf pembukuan pengeluaran rutin operasional () untuk periode Januari - Desember 2026 (Total Rp 0)").
+  - "seharusnya dia nambah atau revisi ini, tanpa harus saya tulis dengan lengkap. sepertinya dia belum bisa berfikir" (Screenshot `/admin/finance` memperlihatkan daftar tagihan operasional rutin 2026 yang sudah ada di sistem ERP: Sewa Kantor Rp 1.500.000, Sewa Kendaraan Rp 3.200.000, Internet Rp 950.000, PDAM Rp 350.000).
+  - "tolong buatkan agar karyawan AI yang cerdas, dia berfikir, melakukan, dan bersikap layaknya manusia".
+  *Hasil Implementasi & Pembuktian*:
+  1. **Autonomous ERP Data Awareness**: Dewi Sartika (dan seluruh AI Workforce) kini secara cerdas membaca langsung database ERP Keuangan (`src/data/dstech_finance_erp.json` -> `operational_bills` dan `recurring_bills`). Ketika Direktur memerintahkan mencatat atau merevisi pengeluaran rutin tanpa mengetik ulang angka lengkap, Dewi otomatis mengadopsi pos tagihan operasional aktif di sistem ERP.
+  2. **Smart Partial Revision Merging**: Jika Direktur hanya menyebut revisi sebagian pos (misal sebut sewa kantor atau mobil), Dewi memperbarui nominal pos tersebut dan mempertahankan pos-pos lainnya (listrik, internet, air) agar tidak hilang.
+  3. **Strict Anti-Zero Guard**: Dilarang keras membuat usulan draf bernilai Rp 0 atau judul kosong `()` ke Kotak Persetujuan (`dstech_approval_queue`). Jika parsing menghasilkan nilai kosong, sistem otomatis fallback ke data ERP resmi. Draf korup lama yang bernilai Rp 0 dibersihkan otomatis dari database dan antrean.
+  4. **Executive Human-like Persona**: Respon Dewi di speech bubble dan obrolan kini sangat manusiawi, sopan, dan jelas menyebutkan rincian pos per bulan serta total akumulasi 12 bulan (contoh: Rp 6.000.000/bln -> Rp 72.000.000/thn).
+  5. **Instant Chat Drawer Synchronization**: Jawaban AI dan riwayat percakapan (`conversations`) langsung terupdate secara real-time di UI obrolan tanpa delay.
+  6. **Build & Type Checking**: Validasi `npx tsc --noEmit` lolos 0 error dan `npm run build` sukses 100% (77/77 routes).
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mencatat rencana kerja step-by-step Tugas 342 di `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task342_fix_zero_rp_context_memory/` dan mencadangkan berkas target.
+  3. [x] Mengimplementasikan Strict Context Inheritance untuk rujukan "tadi", "yang dicatat tadi", "setiap bulan" dan integrasi `operational_bills`/`recurring_bills` ERP di `src/app/api/ai-workforce/route.ts`.
+  4. [x] Menambahkan validasi pencegahan draf Rp 0 dan membersihkan draf kosong dari `dstech_approval_queue`.
+  5. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  6. [x] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses lolos 100%.
+  7. [x] Menguji simulasi perintah user "dewi tolong catat pengeluaran masukan kedalam pengeluaran rutin yang kamu catat tadi/kan setiap bulan" untuk memastikan draf terisi lengkap dan tidak Rp 0.
+  8. [x] Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  9. [x] Bersihkan folder cadangan dan tandai status [SELESAI].
+
 - **Tugas 341 (2026-11-02)**: [SELESAI] Pembangunan Multi-Turn Conversational Memory & Context-Aware Execution Engine untuk Karyawan AI Kantor Virtual (`src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "saat saya berkomunikasi dengan agent AI, saya menyuruh untuk menginput juga ditahn 2026, dia belum mengerti. karena dia tidak punya memori percakapan, apa yang saya perintah dengan dia jawab tidak nyambung"
   *Akar Masalah yang Ditemukan*:

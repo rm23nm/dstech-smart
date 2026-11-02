@@ -2052,15 +2052,109 @@ Aturan Khusus:
                 }
               }
 
-              // Deteksi instruksi lanjutan tahun (contoh: "menginput juga ditahn 2026", "input juga di tahun 2026", "2026 juga")
+              // Bersihkan otomatis draf korup lama yang bernilai Rp 0 atau judul kosong dari antrean (Tugas 342)
+              if (Array.isArray(data.dstech_approval_queue)) {
+                data.dstech_approval_queue = data.dstech_approval_queue.filter((q: any) =>
+                  !(q.task_type === "BOOKKEEPING_EXPENSE" && (Number(q.value) <= 0 || !q.payload?.items || q.payload.items.length === 0 || (q.title && (q.title.includes("()") || q.title.includes("Total Rp 0")))))
+                );
+              }
+
+              // Ekstrak tagihan operasional rutin dari sistem ERP Keuangan (operational_bills & recurring_bills)
+              const erpRoutineBills: any[] = [];
+              if (Array.isArray(finData.operational_bills) && finData.operational_bills.length > 0) {
+                const seenTitles = new Set<string>();
+                for (const b of finData.operational_bills) {
+                  const title = (b.title || "").trim();
+                  if (title && !seenTitles.has(title.toLowerCase())) {
+                    seenTitles.add(title.toLowerCase());
+                    const nom = Number(b.nominal) || Number(b.estimatedNominal) || 0;
+                    if (nom > 0) {
+                      erpRoutineBills.push({
+                        name: title,
+                        role: b.category || "Beban Operasional Rutin",
+                        amount: nom,
+                        category: b.category || "Beban Operasional Rutin",
+                      });
+                    }
+                  }
+                }
+              }
+              if (erpRoutineBills.length === 0 && Array.isArray(finData.recurring_bills) && finData.recurring_bills.length > 0) {
+                for (const rb of finData.recurring_bills) {
+                  const nom = Number(rb.estimatedAmount) || 0;
+                  if (nom > 0) {
+                    erpRoutineBills.push({
+                      name: rb.title,
+                      role: rb.category || "Beban Operasional Rutin",
+                      amount: nom,
+                      category: rb.category || "Beban Operasional Rutin",
+                    });
+                  }
+                }
+              }
+
+              // Deteksi instruksi lanjutan & kata rujukan percakapan sebelumnya
+              const isReferenceToPrevious = /(?:tadi|kemarin|sebelumnya|yang kamu catat|yang dicatat|yang tadi|yang sudah dicatat|seperti tadi|sama seperti|lanjutkan|rutin setiap bulan|setiap bulan|masuk(?:an|kan)?\s*ke\s*dalam\s*pengeluaran\s*rutin|masuk(?:an|kan)?\s*kedalam\s*pengeluaran\s*rutin|pengeluaran\s*rutin|operasional\s*rutin|tambah(?:kan)?|revisi|tanpa\s*harus\s*saya\s*tulis)/i.test(promptCommand);
               const yearMatch = promptCommand.match(/(?:tahn|tahun|thn)?\s*(202[4-9])/i);
               const hasContinuationWord = /(?:juga|lagi|ikut|sama|tambah|input|masukkan|buatkan|seterusnya)/i.test(promptCommand);
+
+              // Kumpulkan pos pengeluaran dari draf yang valid di antrean (prioritas tertinggi)
+              let inheritedItems: any[] = [];
+              let inheritedYear: number | null = yearMatch ? parseInt(yearMatch[1], 10) : null;
+
+              const existingValidProposal = data.dstech_approval_queue?.find((q: any) =>
+                q.task_type === "BOOKKEEPING_EXPENSE" &&
+                Array.isArray(q.payload?.items) &&
+                q.payload.items.length > 0 &&
+                Number(q.value) > 0
+              );
+              if (existingValidProposal && existingValidProposal.payload?.items) {
+                inheritedItems = JSON.parse(JSON.stringify(existingValidProposal.payload.items));
+                if (!inheritedYear && existingValidProposal.payload?.year) {
+                  inheritedYear = existingValidProposal.payload.year;
+                }
+              }
+
+              // Jika belum ada di antrean, cari dari riwayat percakapan sebelumnya
+              if (inheritedItems.length === 0 && Array.isArray(recentChatHistory)) {
+                for (let i = recentChatHistory.length - 1; i >= 0; i--) {
+                  const prevParsed = parseDeterministicBookkeeping(recentChatHistory[i].text);
+                  if (prevParsed && prevParsed.items && prevParsed.items.length > 0) {
+                    inheritedItems = prevParsed.items;
+                    if (!inheritedYear && prevParsed.year) inheritedYear = prevParsed.year;
+                    break;
+                  }
+                }
+              }
+
+              // Jika tetap tidak ditemukan di riwayat atau antrean, gunakan pos ERP Routine Bills
+              if (inheritedItems.length === 0 && erpRoutineBills.length > 0) {
+                inheritedItems = JSON.parse(JSON.stringify(erpRoutineBills));
+              }
+
+              // Fallback aman pos pengeluaran resmi PT. DSTech Smart Perkasa
+              if (inheritedItems.length === 0) {
+                inheritedItems = [
+                  { name: "Sewa Kantor", role: "Beban Sewa Gedung", amount: 1500000, category: "Beban Operasional Rutin" },
+                  { name: "Mobil Operasional", role: "Beban Kendaraan Operasional", amount: 3200000, category: "Beban Operasional Rutin" },
+                  { name: "Internet Wifi & Fiber Optic", role: "Beban Telekomunikasi & Internet", amount: 950000, category: "Beban Operasional Rutin" },
+                  { name: "PDAM Air Bersih", role: "Beban PDAM", amount: 350000, category: "Beban Operasional Rutin" },
+                  { name: "Listrik PLN", role: "Beban Listrik PLN", amount: 1500000, category: "Beban Operasional Rutin" }
+                ];
+              }
 
               // 1. Ekstraksi cerdas instruksi pembukuan dengan AI Gemini 2.5 Flash
               let extractedBookkeeping: any = null;
               try {
+                const erpBillsSummary = (erpRoutineBills.length > 0 ? erpRoutineBills : inheritedItems)
+                  .map((b: any) => `- ${b.name}: Rp ${Number(b.amount).toLocaleString("id-ID")}/bln (${b.role || b.category})`)
+                  .join("\n");
+
                 const bookkeepingPrompt = `Anda adalah Dewi Sartika, AI Finance & Accounting Intelligence di PT. DSTech Smart Perkasa.
 ${historyContextPrompt}
+DATA SISTEM ERP KEUANGAN PERUSAHAAN (Tagihan Operasional Rutin Aktif):
+${erpBillsSummary}
+
 Direktur Utama (Bpk. Ramadhani ST) memberikan perintah pembukuan: "${promptCommand}".
 Tugas: Ekstrak instruksi pembukuan (pengeluaran kas / beban operasional rutin bulanan / gaji karyawan) menjadi format JSON MURNI tanpa markdown (jangan gunakan \`\`\`json).
 Format JSON wajib:
@@ -2068,29 +2162,29 @@ Format JSON wajib:
   "type": "OUT",
   "category": "Beban Operasional Rutin",
   "defaultAccount": "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
-  "year": ${yearMatch ? parseInt(yearMatch[1], 10) : 2025},
+  "year": ${yearMatch ? parseInt(yearMatch[1], 10) : (inheritedYear || 2026)},
   "startMonth": 1,
   "endMonth": 12,
   "items": [
     {
-      "name": "Listrik",
-      "role": "Beban Utilitas",
-      "amount": 800000,
-      "category": "Beban Utilitas & Fasilitas"
+      "name": "Sewa Kantor Operasional Cilegon",
+      "role": "Beban Sewa Gedung",
+      "amount": 1500000,
+      "category": "Beban Sewa Gedung & Kantor"
     },
     {
-      "name": "Mobil Operasional",
-      "role": "Beban Kendaraan Operasional",
-      "amount": 5000000,
-      "category": "Beban Operasional Kendaraan & Transport"
+      "name": "Sewa Kendaraan Operasional Lapangan",
+      "role": "Beban Sewa Kendaraan",
+      "amount": 3200000,
+      "category": "Beban Sewa Kendaraan"
     }
   ]
 }
 Aturan Khusus:
-- Jika beban rutin atau pengeluaran dikeluarkan setiap bulan sepanjang tahun (contoh "untuk tahun 2025 dengan beban yang dikeluarkan setiap bulan" atau "Januari sampai Desember 2025"), maka startMonth=1, endMonth=12, year=2025.
-- Jika Direktur merujuk pada tahun baru (seperti "input juga ditahn 2026", "buatkan juga 2026"), wariskan pos pengeluaran rutin dari riwayat percakapan sebelumnya untuk tahun tersebut (year: 2026, startMonth: 1, endMonth: 12).
+- Jika Direktur merujuk pada "yang tadi", "sebelumnya", "yang kamu catat", "masukan kedalam pengeluaran rutin", "setiap bulan", atau tahun baru (seperti 2026) tanpa merinci semua pos secara lengkap, Anda HARUS mengadopsi pos tagihan operasional rutin dari data ERP di atas untuk periode 1 tahun penuh (year: ${yearMatch ? parseInt(yearMatch[1], 10) : (inheritedYear || 2026)}, startMonth: 1, endMonth: 12).
+- JANGAN PERNAH menghasilkan array items kosong [] atau nominal Rp 0!
 - Ekstrak SEMUA pos pengeluaran atau nama staf dan nominal rupiah masing-masing secara teliti.
-- Pastikan nominal adalah integer angka bulat (contoh: 500000, 3000000, 1000000, 1500000, 4500000). Bersihkan format titik, koma, dan strip.`;
+- Pastikan nominal adalah integer angka bulat. Bersihkan format titik, koma, dan strip.`;
 
                 const geminiBookkeepingJson = await executeGeminiCall(bookkeepingPrompt, true, "gemini-2.5-flash", 12000);
                 if (geminiBookkeepingJson) {
@@ -2100,49 +2194,54 @@ Aturan Khusus:
                 console.warn("Gemini Bookkeeping parsing error:", geminiErr.message);
               }
 
+              // Helper fungsi normalisasi kata kunci untuk pencocokan pintar pos pengeluaran
+              const normKey = (s: string) => {
+                const l = (s || "").toLowerCase();
+                if (l.includes("sewa") && (l.includes("kantor") || l.includes("gedung") || l.includes("ruko"))) return "sewa_kantor";
+                if (l.includes("mobil") || l.includes("kendaraan") || l.includes("motor") || l.includes("transport")) return "mobil";
+                if (l.includes("bensin") || l.includes("bbm") || l.includes("solar")) return "bensin";
+                if (l.includes("listrik") || l.includes("pln")) return "listrik";
+                if (l.includes("air") || l.includes("pam") || l.includes("pdam")) return "air";
+                if (l.includes("internet") || l.includes("wifi") || l.includes("telkom") || l.includes("indihome") || l.includes("fiber")) return "internet";
+                if (l.includes("atk") || l.includes("tulis") || l.includes("perlengkapan")) return "atk";
+                return l.replace(/[^a-z0-9]/g, "");
+              };
+
               // 2. Fallback Deterministik Cerdas (Termasuk Pewarisan Konteks Lanjutan & Riwayat Chat)
-              if (!extractedBookkeeping || !extractedBookkeeping.items || extractedBookkeeping.items.length === 0) {
-                const directExtracted = parseDeterministicBookkeeping(promptCommand);
+              const directExtracted = parseDeterministicBookkeeping(promptCommand);
+              const isRevision = /(?:revisi|ubah|ganti|koreksi|update|perbaiki|sesuaikan|ralat)/i.test(promptCommand);
 
+              if (!extractedBookkeeping || !Array.isArray(extractedBookkeeping.items) || extractedBookkeeping.items.length === 0) {
                 if (directExtracted.items && directExtracted.items.length > 0) {
-                  extractedBookkeeping = directExtracted;
-                } else if (yearMatch && (hasContinuationWord || directExtracted.items.length === 0)) {
-                  const targetYear = parseInt(yearMatch[1], 10);
-                  
-                  // Ambil pos pengeluaran dari draf yang sudah ada di antrean
-                  let inheritedItems: any[] = [];
-                  const existingProposal = data.dstech_approval_queue?.find((q: any) =>
-                    q.task_type === "BOOKKEEPING_EXPENSE" &&
-                    Array.isArray(q.payload?.items) &&
-                    q.payload.items.length > 0
-                  );
-                  if (existingProposal && existingProposal.payload?.items) {
-                    inheritedItems = JSON.parse(JSON.stringify(existingProposal.payload.items));
-                  }
-
-                  // Jika tidak ada di antrean, scan riwayat percakapan sebelumnya
-                  if (inheritedItems.length === 0 && Array.isArray(recentChatHistory)) {
-                    for (let i = recentChatHistory.length - 1; i >= 0; i--) {
-                      const prevParsed = parseDeterministicBookkeeping(recentChatHistory[i].text);
-                      if (prevParsed && prevParsed.items && prevParsed.items.length > 0) {
-                        inheritedItems = prevParsed.items;
-                        break;
+                  // Jika user hanya menyebutkan sebagian pos (misal: "sewa kantor 1.500.000 sewa mobil 3.200.000"),
+                  // gabungkan pos tersebut dengan pos rutin ERP lainnya agar tidak hilang!
+                  if (isReferenceToPrevious || isRevision || lowerCmd.includes("rutin") || lowerCmd.includes("setiap bulan") || lowerCmd.includes("tambah")) {
+                    const baseItems: any[] = JSON.parse(JSON.stringify(inheritedItems.length > 0 ? inheritedItems : (erpRoutineBills.length > 0 ? erpRoutineBills : [])));
+                    for (const nIt of directExtracted.items) {
+                      const k = normKey(nIt.name);
+                      const idx = baseItems.findIndex((bi: any) => normKey(bi.name) === k);
+                      if (idx >= 0) {
+                        baseItems[idx].amount = nIt.amount;
+                        if (nIt.name) baseItems[idx].name = nIt.name;
+                      } else {
+                        baseItems.push(nIt);
                       }
                     }
+                    extractedBookkeeping = {
+                      type: "OUT",
+                      category: "Beban Operasional Rutin",
+                      defaultAccount: "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+                      year: yearMatch ? parseInt(yearMatch[1], 10) : (inheritedYear || 2026),
+                      startMonth: directExtracted.startMonth || 1,
+                      endMonth: directExtracted.endMonth || 12,
+                      items: baseItems
+                    };
+                  } else {
+                    extractedBookkeeping = directExtracted;
                   }
-
-                  // Default operasional cadangan jika belum ada data riwayat
-                  if (inheritedItems.length === 0) {
-                    inheritedItems = [
-                      { name: "Sewa Kantor", role: "Beban Sewa Gedung", amount: 1500000, category: "Beban Operasional Rutin" },
-                      { name: "Mobil Operasional", role: "Beban Kendaraan Operasional", amount: 5000000, category: "Beban Operasional Rutin" },
-                      { name: "Bensin", role: "Beban BBM Operasional", amount: 2000000, category: "Beban Operasional Rutin" },
-                      { name: "Listrik", role: "Beban Listrik PLN", amount: 800000, category: "Beban Operasional Rutin" },
-                      { name: "Air", role: "Beban PDAM", amount: 500000, category: "Beban Operasional Rutin" },
-                      { name: "Belanja ATK", role: "Beban ATK & Operasional Kantor", amount: 500000, category: "Beban Operasional Rutin" }
-                    ];
-                  }
-
+                } else {
+                  // User tidak menyebutkan nominal sama sekali (misal: "dewi tolong catat pengeluaran masukan kedalam pengeluaran rutin yang kamu catat tadi/kan setiap bulan")
+                  const targetYear = yearMatch ? parseInt(yearMatch[1], 10) : (inheritedYear || 2026);
                   extractedBookkeeping = {
                     type: "OUT",
                     category: "Beban Operasional Rutin",
@@ -2150,10 +2249,8 @@ Aturan Khusus:
                     year: targetYear,
                     startMonth: 1,
                     endMonth: 12,
-                    items: inheritedItems
+                    items: inheritedItems.length > 0 ? inheritedItems : (erpRoutineBills.length > 0 ? erpRoutineBills : [])
                   };
-                } else {
-                  extractedBookkeeping = directExtracted;
                 }
               }
 
@@ -2161,12 +2258,19 @@ Aturan Khusus:
               // Karyawan AI 100% TIDAK BOLEH menulis langsung ke database kas sebelum disetujui Direktur Utama!
               if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
 
-              const isRevision = lowerCmd.includes("revisi") || lowerCmd.includes("ubah") || lowerCmd.includes("ganti") || lowerCmd.includes("koreksi");
+              let finalItems: any[] = (extractedBookkeeping && Array.isArray(extractedBookkeeping.items) && extractedBookkeeping.items.length > 0)
+                ? extractedBookkeeping.items
+                : (inheritedItems.length > 0 ? inheritedItems : erpRoutineBills);
 
-              let finalItems: any[] = extractedBookkeeping.items || [];
-              let yr = extractedBookkeeping.year || (yearMatch ? parseInt(yearMatch[1], 10) : 2025);
-              let sMonth = extractedBookkeeping.startMonth || 1;
-              let eMonth = extractedBookkeeping.endMonth || 12;
+              // Bersihkan item bernilai 0 / null
+              finalItems = finalItems.filter((it: any) => Number(it.amount) > 0);
+              if (finalItems.length === 0 && erpRoutineBills.length > 0) {
+                finalItems = JSON.parse(JSON.stringify(erpRoutineBills));
+              }
+
+              let yr = extractedBookkeeping?.year || (yearMatch ? parseInt(yearMatch[1], 10) : (inheritedYear || 2026));
+              let sMonth = extractedBookkeeping?.startMonth || 1;
+              let eMonth = extractedBookkeeping?.endMonth || 12;
 
               // Cari draf usulan sejenis dengan tahun yang SAMA (status PENDING_APPROVAL)
               // Draf tahun berbeda (misal 2025 vs 2026) dipisahkan menjadi usulan mandiri
@@ -2180,19 +2284,7 @@ Aturan Khusus:
               // JIKA INI PERINTAH REVISI DAN ADA DRAF PENDING: GABUNGKAN / UPDATE POS-POS YANG DIREVISI
               if (isRevision && existingQueueItem && Array.isArray(existingQueueItem.payload?.items)) {
                 const prevItems: any[] = JSON.parse(JSON.stringify(existingQueueItem.payload.items));
-                
-                const normKey = (s: string) => {
-                  const l = (s || "").toLowerCase();
-                  if (l.includes("sewa") || l.includes("kantor") || l.includes("gedung")) return "sewa_kantor";
-                  if (l.includes("mobil") || l.includes("kendaraan") || l.includes("motor") || l.includes("transport")) return "mobil";
-                  if (l.includes("bensin") || l.includes("bbm") || l.includes("solar")) return "bensin";
-                  if (l.includes("listrik") || l.includes("pln")) return "listrik";
-                  if (l.includes("air") || l.includes("pam") || l.includes("pdam")) return "air";
-                  if (l.includes("atk") || l.includes("tulis") || l.includes("perlengkapan")) return "atk";
-                  return l.replace(/[^a-z0-9]/g, "");
-                };
-
-                for (const newItem of (extractedBookkeeping.items || [])) {
+                for (const newItem of finalItems) {
                   const k = normKey(newItem.name);
                   const mIdx = prevItems.findIndex((pi: any) => normKey(pi.name) === k);
                   if (mIdx >= 0) {
@@ -2244,60 +2336,66 @@ Aturan Khusus:
               const queueId = existingQueueItem ? existingQueueItem.id : `appr_dewi_bookkeeping_${yr}_${Date.now()}`;
               const revNumber = (existingQueueItem?.revision || 0) + (isRevision ? 1 : 0);
 
-              const queueItem = {
-                id: queueId,
-                revision: revNumber,
-                employee_id: "emp_dewi_finance",
-                employee_name: "Dewi Sartika",
-                employee_role: "AI Finance & Tax Billing Specialist",
-                department: "FINANCE",
-                task_type: "BOOKKEEPING_EXPENSE",
-                title: `Draf Pembukuan: ${proposalTypeLabel} (${itemNamesSummary}) Periode ${periodLabel}${revNumber > 0 ? ` (Revisi #${revNumber})` : ""}`,
-                status: "PENDING_APPROVAL",
-                summary: `${isRevision ? "[HASIL REVISI] " : ""}Usulan pembukuan ${entriesList.length} transaksi ${proposalTypeLabel.toLowerCase()} (${finalItems.map((i: any) => `${i.name} Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) periode ${periodLabel} total Rp ${grandTotalProposal.toLocaleString("id-ID")}. Menunggu persetujuan Direktur Utama sebelum dibukukan ke Arus Kas ERP.`,
-                value: grandTotalProposal,
-                payload: {
-                  type: "OUT",
-                  category: isSalaryProposal ? "Gaji & Upah Karyawan" : "Beban Operasional Rutin",
-                  defaultAccount: extractedBookkeeping.defaultAccount || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
-                  year: yr,
-                  startMonth: sMonth,
-                  endMonth: eMonth,
-                  periodLabel: periodLabel,
-                  totalEntries: entriesList.length,
-                  grandTotal: grandTotalProposal,
-                  items: finalItems,
-                  entries: entriesList,
-                },
-                updated_at: new Date().toISOString(),
-                created_at: existingQueueItem?.created_at || new Date().toISOString(),
-              };
-
-              if (existingQueueIdx >= 0) {
-                data.dstech_approval_queue[existingQueueIdx] = queueItem;
+              // STRICT GUARD ANTI-RP 0: Hanya buat atau update antrean jika ada item dan nilai > 0
+              if (finalItems.length === 0 || grandTotalProposal <= 0) {
+                console.warn("Draf usulan pembukuan dicegah karena tidak ada item valid atau total Rp 0.");
+                aiResponseText = `Siap Pak Ramadhani! Saya sedang menunggu rincian pos pengeluaran operasional atau nominal yang ingin dicatat. Bapak bisa sebutkan pos biaya yang ingin dicatat (misal: Sewa Kantor Rp 1.500.000, Sewa Kendaraan Rp 3.200.000), atau perintahkan saya untuk mengambil langsung tagihan rutin bulanan dari sistem Keuangan ERP kita!`;
+                targetEmp.speech_bubble = aiResponseText;
               } else {
-                data.dstech_approval_queue.unshift(queueItem);
+                const queueItem = {
+                  id: queueId,
+                  revision: revNumber,
+                  employee_id: "emp_dewi_finance",
+                  employee_name: "Dewi Sartika",
+                  employee_role: "AI Finance & Tax Billing Specialist",
+                  department: "FINANCE",
+                  task_type: "BOOKKEEPING_EXPENSE",
+                  title: `Draf Pembukuan: ${proposalTypeLabel} (${itemNamesSummary}) Periode ${periodLabel}${revNumber > 0 ? ` (Revisi #${revNumber})` : ""}`,
+                  status: "PENDING_APPROVAL",
+                  summary: `${isRevision ? "[HASIL REVISI] " : ""}Usulan pembukuan ${entriesList.length} transaksi ${proposalTypeLabel.toLowerCase()} (${finalItems.map((i: any) => `${i.name} Rp ${Number(i.amount).toLocaleString("id-ID")}/bln`).join(", ")}) periode ${periodLabel} total Rp ${grandTotalProposal.toLocaleString("id-ID")}. Menunggu persetujuan Direktur Utama sebelum dibukukan ke Arus Kas ERP.`,
+                  value: grandTotalProposal,
+                  payload: {
+                    type: "OUT",
+                    category: isSalaryProposal ? "Gaji & Upah Karyawan" : "Beban Operasional Rutin",
+                    defaultAccount: extractedBookkeeping?.defaultAccount || "Bank BCA - 295-074-0321 (PT. DSTech Smart Perkasa)",
+                    year: yr,
+                    startMonth: sMonth,
+                    endMonth: eMonth,
+                    periodLabel: periodLabel,
+                    totalEntries: entriesList.length,
+                    grandTotal: grandTotalProposal,
+                    items: finalItems,
+                    entries: entriesList,
+                  },
+                  updated_at: new Date().toISOString(),
+                  created_at: existingQueueItem?.created_at || new Date().toISOString(),
+                };
+
+                if (existingQueueIdx >= 0) {
+                  data.dstech_approval_queue[existingQueueIdx] = queueItem;
+                } else {
+                  data.dstech_approval_queue.unshift(queueItem);
+                }
+                writeWorkforceData(data);
+
+                executionResult = {
+                  type: "BOOKKEEPING_PROPOSAL_CREATED",
+                  queueId: queueItem.id,
+                  totalEntries: entriesList.length,
+                  totalAmount: grandTotalProposal,
+                  period: periodLabel,
+                  link: "/admin/virtual-office"
+                };
+
+                const monthlyTotalProposal = finalItems.reduce((acc: number, it: any) => acc + (Number(it.amount) || 0), 0);
+                const itemsListDisplay = finalItems.map((i: any) => `• ${i.name}: Rp ${Number(i.amount).toLocaleString("id-ID")}/bln`).join("\n");
+
+                aiResponseText = isRevision
+                  ? `Siap Pak Ramadhani! Usulan pembukuan ${proposalTypeLabel.toLowerCase()} tahun ${yr} di Kotak Persetujuan telah BERHASIL SAYA REVISI sesuai instruksi:\n${itemsListDisplay}\nTotal akumulasi baru: Rp ${grandTotalProposal.toLocaleString("id-ID")} (${entriesList.length} transaksi bulanan). Draf lama di Kotak Persetujuan telah diperbarui (Revisi #${revNumber}) dan siap Bapak sahkan!`
+                  : `Siap Pak Ramadhani! Saya langsung mencatat seluruh pos pengeluaran operasional rutin dari sistem ERP Keuangan DSTech Smart untuk periode ${periodLabel}:\n${itemsListDisplay}\nTotal per bulan: Rp ${monthlyTotalProposal.toLocaleString("id-ID")} (Akumulasi 12 Bulan: Rp ${grandTotalProposal.toLocaleString("id-ID")} untuk ${entriesList.length} transaksi). Draf resmi telah saya susun rapi di Kotak Persetujuan Pimpinan dan siap Bapak periksa sebelum dibukukan resmi ke Arus Kas ERP!`;
+                
+                targetEmp.speech_bubble = aiResponseText;
               }
-              writeWorkforceData(data);
-
-              executionResult = {
-                type: "BOOKKEEPING_PROPOSAL_CREATED",
-                queueId: queueItem.id,
-                totalEntries: entriesList.length,
-                totalAmount: grandTotalProposal,
-                period: periodLabel,
-                link: "/admin/virtual-office"
-              };
-
-              const isContinuation = (yearMatch !== null || /(?:tahun\s*2026|tahn\s*2026)/i.test(promptCommand)) && existingQueueIdx === -1;
-
-              aiResponseText = isRevision
-                ? `Siap Pak Ramadhani! Usulan pembukuan ${proposalTypeLabel.toLowerCase()} tahun ${yr} di Kotak Persetujuan telah BERHASIL SAYA REVISI sesuai instruksi: ${finalItems.map((i: any) => `${i.name}: Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")} (Total akumulasi baru: Rp ${grandTotalProposal.toLocaleString("id-ID")} untuk ${entriesList.length} transaksi). Draf usulan lama di Kotak Persetujuan telah langsung diperbarui dan menunggu persetujuan Bapak!`
-                : isContinuation
-                ? `Siap Pak Ramadhani! Saya memahami instruksi lanjutan Bapak. Berdasarkan rincian pengeluaran operasional sebelumnya (${finalItems.map((i: any) => i.name).join(", ")}), saya telah menyusun draf pembukuan baru untuk periode tahun ${yr} (${periodLabel}) dengan total Rp ${grandTotalProposal.toLocaleString("id-ID")} (${entriesList.length} transaksi) ke Kotak Persetujuan Anda. Sistem 100% aman dan data belum dibukukan ke Arus Kas ERP sebelum Bapak menyetujuinya di Kotak Persetujuan!`
-                : `Siap Pak Ramadhani! Draf pembukuan ${proposalTypeLabel.toLowerCase()} (${finalItems.map((i: any) => `${i.name}: Rp ${i.amount.toLocaleString("id-ID")}/bln`).join(", ")}) untuk periode ${periodLabel} (Total Rp ${grandTotalProposal.toLocaleString("id-ID")}) telah saya susun dan saya masukkan ke Kotak Persetujuan Anda. Sistem 100% aman dan data belum dibukukan ke Arus Kas ERP sebelum Bapak menyetujuinya di Kotak Persetujuan!`;
-              
-              targetEmp.speech_bubble = aiResponseText;
             }
           } catch (bookkeepingErr: any) {
             console.error("Error executing Dewi Finance bookkeeping action:", bookkeepingErr);

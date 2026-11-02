@@ -770,6 +770,9 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
       if (json.success) {
         setCommandSuccessNote(json.aiResponse || "Perintah berhasil didelegasikan!");
         setExecutiveCommand("");
+        if (json.conversations && typeof json.conversations === "object") {
+          setConversations(json.conversations);
+        }
         fetchWorkforce();
       } else {
         alert(json.error || "Gagal mengirim perintah");
