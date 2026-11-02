@@ -7,7 +7,7 @@
 - **Daftar Antrean Permintaan Pengguna Baru (Queue Backlog)**:
   1. *Permintaan*: "saya melihat karyawan AI yang dihasilkan dari aplikasi N8N dia bisa bekerja dengan sempurna, bagaimana bisa seperti itu?" (Penjelasan perbandingan arsitektur autonomous agentic workflow n8n vs built-in workforce engine DSTech Smart).
 
-- **Tugas 354 (2026-11-02)**: [SEDANG BERJALAN] Perbaikan Sistem Pengguliran Cerdas (Smart Non-Intrusive Chat Scrolling) & Pencegahan Auto-Scroll Paksa ke Bawah Saat Membaca Riwayat Pesan Lama (`src/components/TeamChatMessenger.tsx`).
+- **Tugas 354 (2026-11-02)**: [SELESAI] Perbaikan Sistem Pengguliran Cerdas (Smart Non-Intrusive Chat Scrolling) & Pencegahan Auto-Scroll Paksa ke Bawah Saat Membaca Riwayat Pesan Lama (`src/components/TeamChatMessenger.tsx`, `src/app/globals.css`).
   *Permintaan User*: "setiap saya kursor ke atas untuk membca riwayat pesan yang lama, selalu terscrol otomatis kembali kebawah. itu sangat menggangu. tolong kamu pervbaiki, agar website bisa di tarik atas kebawah dengan mudah"
   *Akar Masalah yang Ditemukan*:
   1. **Polling Periodik 3.5 Detik Memicu Re-Render Beruntun**:
@@ -29,20 +29,20 @@
      - Jika pengguna sedang berada di atas membaca riwayat (`isAtBottomRef.current === false`), sistem DIJAMIN 100% TIDAK MENYENTUH posisi scroll pengguna.
   4. **Tombol Melayang Interaktif "Pesan Baru" / "Paling Bawah" (Floating Scroll Button)**:
      - Menyediakan tombol melayang anggun di sudut kanan bawah saat pengguna menggulir ke atas.
-     - Jika ada pesan baru masuk dari staf AI atau tim saat pengguna membaca di atas, tombol otomatis berubah menjadi hijau emerald dengan badge `[↓ Pesan Baru]` dan animasi denyut lembut tanpa mengganggu pembacaan.
+     - Jika ada pesan baru masuk dari staf AI atau tim saat pengguna membaca di atas, tombol otomatis berubah menjadi hijau emerald dengan badge `[↓ Ada Pesan Baru]` dan animasi denyut lembut tanpa mengganggu pembacaan.
      - Sekali klik, pengguna dapat meluncur mulus ke posisi pesan terkini.
   5. **Pengalaman Tarik Atas-Bawah yang Sangat Mulus (Smooth Drag & Touch)**:
-     - Menambahkan utilitas kelas `overscroll-contain`, `touch-pan-y`, serta memastikan properti scroll CSS alami sehingga kursor mouse wheel, trackpad, dan sentuhan layar HP dapat menarik atas-bawah dengan sangat ringan dan responsif.
+     - Menambahkan utilitas kelas `overscroll-contain`, `touch-pan-y`, custom scrollbar `.dstech-chat-scroll`, serta memastikan properti scroll CSS alami sehingga kursor mouse wheel, trackpad, dan sentuhan layar HP dapat menarik atas-bawah dengan sangat ringan dan responsif.
   *Langkah Rencana Perbaikan Step-by-Step*:
   1. [x] Mengidentifikasi akar masalah auto-scroll paksa setiap 3.5 detik pada polling TeamChatMessenger.
   2. [x] Mencatat rencana kerja step-by-step Tugas 354 di `LAPORAN_PROGRES.md` dan menyinkronkan ke root.
-  3. [ ] Membuat folder cadangan berkas `dstech-smart/_backup_task354_smart_chat_scroll/` dan mencadangkan target berkas.
-  4. [ ] Memodifikasi `src/components/TeamChatMessenger.tsx` (state comparison di loadMessages, messagesContainerRef, handleScroll, smart scrollToBottom, dan floating button).
-  5. [ ] Menjalankan validasi TypeScript compiler (`tsc --noEmit`) hingga 0 error.
-  6. [ ] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses.
-  7. [ ] Melakukan push commit ke GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
-  8. [ ] Memverifikasi kelancaran pengguliran dan tombol melayang pada website live.
-  9. [ ] Membersihkan folder cadangan dan menandai Tugas 354 sebagai [SELESAI].
+  3. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task354_smart_chat_scroll/` dan mencadangkan target berkas.
+  4. [x] Memodifikasi `src/components/TeamChatMessenger.tsx` (state comparison di loadMessages, messagesContainerRef, handleScroll, smart scrollToBottom, dan floating button).
+  5. [x] Menjalankan validasi TypeScript compiler (`tsc --noEmit`) hingga 0 error.
+  6. [x] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses.
+  7. [x] Melakukan push commit ke GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  8. [x] Memverifikasi kelancaran pengguliran dan tombol melayang pada website live.
+  9. [x] Membersihkan folder cadangan dan menandai Tugas 354 sebagai [SELESAI].
 
 - **Tugas 353 (2026-11-02)**: [SELESAI] Perbaikan Bug Intersepsi AI Team Chat: Penghapusan Filter `!senderId.startsWith("emp_")` yang Memblokir Akun Direktur Utama / Karyawan Human Memicu Respon Multi-AI (`src/app/api/team-chat/route.ts`).
   *Permintaan User*: "tadi saya coba chat minta laporan, hanya 1 yang merespon dan yang lain tidak, itu pun tidak ada kriman progresnya" (dengan tangkapan layar Team Chat Messenger di mana pesan pimpinan "Mohon seluruh staf AI laporkan aktivitas dan tugas prioritas hari ini" tidak mendapatkan balasan respon dari seluruh tim AI).
