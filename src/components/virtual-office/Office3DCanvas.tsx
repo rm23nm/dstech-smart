@@ -56,15 +56,38 @@ const WORKSTATION_SLOTS: Record<string, { deskX: number; deskZ: number; chairX: 
 const MEETING_AREA = { x: 0, z: 1 };
 const PANTRY_AREA = { x: -11, z: -9 };
 
+// Helper: Gambar Rounded Rectangle kompatibel lintas peramban
+function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
 // Helper: Generator Tekstur Logo & Backdrop Perusahaan Resmi PT. DSTECH SMART PERKASA
 function createCorporateSignTexture(): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = 1024;
   canvas.height = 300;
   const ctx = canvas.getContext("2d");
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.anisotropy = 8;
 
-  if (ctx) {
-    // Background Dark Glossy Gradient
+  function render(logoImg?: HTMLImageElement) {
+    if (!ctx) return;
+
+    // Reset transform & clear
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.shadowBlur = 0;
+
+    // 1. Background Dark Glossy Gradient
     const bgGrad = ctx.createLinearGradient(0, 0, 1024, 300);
     bgGrad.addColorStop(0, "#030712");
     bgGrad.addColorStop(0.5, "#0b1528");
@@ -72,7 +95,7 @@ function createCorporateSignTexture(): THREE.CanvasTexture {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, 1024, 300);
 
-    // Grid High-Tech Subtle Lines
+    // 2. Grid High-Tech Subtle Lines
     ctx.strokeStyle = "rgba(0, 210, 255, 0.12)";
     ctx.lineWidth = 1;
     for (let x = 0; x < 1024; x += 40) {
@@ -88,17 +111,17 @@ function createCorporateSignTexture(): THREE.CanvasTexture {
       ctx.stroke();
     }
 
-    // Outer Neon Border
+    // 3. Outer Neon Border
     ctx.strokeStyle = "#00d2ff";
     ctx.lineWidth = 4;
     ctx.strokeRect(12, 12, 1000, 276);
 
-    // Inner Gold Accent Line
+    // 4. Inner Gold Accent Line
     ctx.strokeStyle = "rgba(245, 158, 11, 0.6)";
     ctx.lineWidth = 2;
     ctx.strokeRect(20, 20, 984, 260);
 
-    // Glowing Corner Nodes
+    // 5. Glowing Corner Nodes
     const corners = [
       [12, 12],
       [1012, 12],
@@ -112,84 +135,100 @@ function createCorporateSignTexture(): THREE.CanvasTexture {
       ctx.fill();
     });
 
-    // Logo Cyber Shield Emblem (Kiri)
-    const lx = 90;
-    const ly = 150;
+    // 6. LOGO RESMI PT. DSTECH SMART PERKASA (Kiri)
+    const badgeX = 42;
+    const badgeY = 60;
+    const badgeW = 205;
+    const badgeH = 175;
+
+    // Kapsul Akrilik Putih Bersinar untuk Logo Resmi
     ctx.save();
-    ctx.translate(lx, ly);
-
-    // Hexagon Glow
-    ctx.fillStyle = "rgba(14, 165, 233, 0.25)";
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const angle = (i * Math.PI) / 3;
-      const hx = Math.cos(angle) * 58;
-      const hy = Math.sin(angle) * 58;
-      if (i === 0) ctx.moveTo(hx, hy);
-      else ctx.lineTo(hx, hy);
-    }
-    ctx.closePath();
+    ctx.shadowColor = "#38bdf8";
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.96)";
+    drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 18);
     ctx.fill();
-    ctx.strokeStyle = "#06b6d4";
+
+    // Border Kapsul Neon Cyan
+    ctx.strokeStyle = "#00d2ff";
     ctx.lineWidth = 3;
+    drawRoundRect(ctx, badgeX, badgeY, badgeW, badgeH, 18);
     ctx.stroke();
-
-    // Inner Shield
-    ctx.fillStyle = "#0284c7";
-    ctx.beginPath();
-    ctx.moveTo(0, -38);
-    ctx.lineTo(32, -18);
-    ctx.lineTo(32, 15);
-    ctx.quadraticCurveTo(32, 38, 0, 48);
-    ctx.quadraticCurveTo(-32, 38, -32, 15);
-    ctx.lineTo(-32, -18);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = "#fbbf24";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Emblem Letters "DST"
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "900 24px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("DST", 0, 8);
     ctx.restore();
 
-    // Official Company Name (Teks Utama Emas & Putih Bercahaya)
+    // Render Gambar Logo Resmi
+    if (logoImg && logoImg.complete && logoImg.naturalWidth > 0) {
+      const pad = 12;
+      const maxW = badgeW - pad * 2;
+      const maxH = badgeH - pad * 2;
+      const imgRatio = logoImg.naturalWidth / logoImg.naturalHeight;
+      let drawW = maxW;
+      let drawH = drawW / imgRatio;
+      if (drawH > maxH) {
+        drawH = maxH;
+        drawW = drawH * imgRatio;
+      }
+      const imgX = badgeX + (badgeW - drawW) / 2;
+      const imgY = badgeY + (badgeH - drawH) / 2;
+      ctx.drawImage(logoImg, imgX, imgY, drawW, drawH);
+    } else {
+      // Tampilan Fallback Sementara saat gambar dimuat
+      ctx.save();
+      ctx.fillStyle = "#0284c7";
+      ctx.font = "900 24px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("DSTECH", badgeX + badgeW / 2, badgeY + badgeH / 2 - 12);
+      ctx.fillStyle = "#ef4444";
+      ctx.font = "800 16px sans-serif";
+      ctx.fillText("SMART", badgeX + badgeW / 2, badgeY + badgeH / 2 + 16);
+      ctx.restore();
+    }
+
+    // 7. Official Company Name (Teks Utama Emas & Putih Bercahaya)
     ctx.textAlign = "left";
     ctx.fillStyle = "#ffffff";
-    ctx.font = "900 52px system-ui, -apple-system, sans-serif";
+    ctx.font = "900 48px system-ui, -apple-system, sans-serif";
     ctx.shadowColor = "#38bdf8";
     ctx.shadowBlur = 15;
-    ctx.fillText("PT. DSTECH SMART PERKASA", 180, 115);
+    ctx.fillText("PT. DSTECH SMART PERKASA", 270, 115);
 
-    // Subtitle Badge
+    // 8. Subtitle Badge
     ctx.shadowBlur = 0;
     ctx.fillStyle = "#38bdf8";
-    ctx.font = "800 24px system-ui, -apple-system, sans-serif";
-    ctx.letterSpacing = "4px";
-    ctx.fillText("AI AUTONOMOUS COMMAND CENTER & SMART WORKFORCE", 185, 165);
+    ctx.font = "800 22px system-ui, -apple-system, sans-serif";
+    ctx.fillText("AI AUTONOMOUS COMMAND CENTER & SMART WORKFORCE", 272, 165);
 
-    // Tagline / Bidang Solusi
+    // 9. Tagline / Bidang Solusi
     ctx.fillStyle = "#94a3b8";
-    ctx.font = "500 18px system-ui, -apple-system, sans-serif";
-    ctx.fillText("Security Systems • Barrier Gate • Access Control • Cloud ERP Automation", 185, 205);
+    ctx.font = "500 17px system-ui, -apple-system, sans-serif";
+    ctx.fillText("Security Systems • Barrier Gate • Access Control • Cloud ERP Automation", 272, 205);
 
-    // Status Indicator
+    // 10. Status Indicator
     ctx.fillStyle = "#10b981";
     ctx.beginPath();
-    ctx.arc(192, 238, 6, 0, Math.PI * 2);
+    ctx.arc(279, 238, 6, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "#34d399";
     ctx.font = "700 15px system-ui, -apple-system, sans-serif";
-    ctx.fillText("SISTEM OPERASIONAL AKTIF 24/7", 208, 243);
+    ctx.fillText("SISTEM OPERASIONAL AKTIF 24/7", 295, 243);
+
+    texture.needsUpdate = true;
   }
 
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.anisotropy = 8;
-  texture.needsUpdate = true;
+  // Render awal (sinkron)
+  render();
+
+  // Muat logo resmi PT. DSTech Smart Perkasa secara asinkron
+  if (typeof window !== "undefined") {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.src = "/logo.png";
+    img.onload = () => {
+      render(img);
+    };
+  }
+
   return texture;
 }
 

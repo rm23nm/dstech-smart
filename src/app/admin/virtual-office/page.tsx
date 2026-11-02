@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import NextImage from "next/image";
 import Link from "next/link";
 import Office3DCanvas from "@/components/virtual-office/Office3DCanvas";
 import {
@@ -912,22 +913,27 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
       {/* Header Bar Kantor Virtual */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 rounded-3xl border border-indigo-900/50 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1.5 shadow-xs">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              LIVE 24/7 AI DIGITAL WORKFORCE
-            </span>
-            <span className="text-slate-400 text-xs">•</span>
-            <span className="text-xs font-bold text-slate-300">PT. DSTech Smart Perkasa</span>
+        <div className="relative z-10 flex items-start sm:items-center gap-4">
+          <div className="hidden sm:flex relative w-16 h-16 bg-white/95 rounded-2xl p-2 border border-cyan-400/40 shadow-xl shadow-cyan-500/10 items-center justify-center shrink-0">
+            <NextImage src="/logo.png" alt="Logo PT. DSTech Smart Perkasa" fill className="object-contain p-1.5" priority />
           </div>
-          <h1 className="text-2xl md:text-3xl font-black flex items-center gap-3 tracking-tight">
-            <Building2 className="w-8 h-8 text-cyan-400" />
-            <span>Kantor Virtual &amp; Divisi Karyawan AI</span>
-          </h1>
-          <p className="text-xs text-slate-300 mt-1.5 max-w-2xl leading-relaxed">
-            Seluruh divisi operasional back-office, sales penawaran SPH, faktur ERP, promosi, dan CS berjalan otomatis secara otonom di bawah komando Direktur Utama.
-          </p>
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center gap-1.5 shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                LIVE 24/7 AI DIGITAL WORKFORCE
+              </span>
+              <span className="text-slate-400 text-xs">•</span>
+              <span className="text-xs font-bold text-slate-300">PT. DSTech Smart Perkasa</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-black flex items-center gap-3 tracking-tight">
+              <Building2 className="w-8 h-8 text-cyan-400 sm:hidden" />
+              <span>Kantor Virtual &amp; Divisi Karyawan AI</span>
+            </h1>
+            <p className="text-xs text-slate-300 mt-1.5 max-w-2xl leading-relaxed">
+              Seluruh divisi operasional back-office, sales penawaran SPH, faktur ERP, promosi, dan CS berjalan otomatis secara otonom di bawah komando Direktur Utama.
+            </p>
+          </div>
         </div>
 
         <div className="relative z-10 flex flex-wrap items-center gap-2.5">
@@ -2674,9 +2680,9 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
 
                               {/* Flyer Header: Logo & Badge Garansi */}
                               <div className="relative z-10 flex items-center justify-between">
-                                <div className="flex items-center gap-1.5">
-                                  <div className="w-6 h-6 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center font-black text-cyan-300 text-[10px]">
-                                    DST
+                                <div className="flex items-center gap-2">
+                                  <div className="relative w-7 h-7 rounded-lg bg-white/95 p-0.5 shadow-sm border border-cyan-400/40 flex items-center justify-center shrink-0">
+                                    <NextImage src="/logo.png" alt="Logo PT. DSTech Smart Perkasa" fill className="object-contain p-0.5" />
                                   </div>
                                   <span className="text-[10px] font-black tracking-wider text-white">
                                     PT. DSTECH SMART PERKASA
