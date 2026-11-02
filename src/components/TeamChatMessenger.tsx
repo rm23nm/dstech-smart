@@ -315,16 +315,76 @@ export default function TeamChatMessenger({
   };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isAtBottomRef = useRef<boolean>(true);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
+  const [hasNewMessagesScrolledUp, setHasNewMessagesScrolledUp] = useState(false);
+  const prevMessagesCountRef = useRef<number>(0);
+  const activeChatIdRef = useRef<string | null>(null);
 
   // Auto scroll ke pesan terbawah
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = (smooth = true) => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: smooth ? "smooth" : "auto",
+      });
+    } else if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
+    }
+    isAtBottomRef.current = true;
+    setShowScrollBottomBtn(false);
+    setHasNewMessagesScrolledUp(false);
+  };
+
+  // Deteksi posisi scroll pengguna saat menggulir mouse wheel / touch
+  const handleScroll = () => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const isNearBottom = distanceFromBottom < 100;
+    isAtBottomRef.current = isNearBottom;
+
+    if (isNearBottom) {
+      setShowScrollBottomBtn(false);
+      setHasNewMessagesScrolledUp(false);
+    } else {
+      setShowScrollBottomBtn(true);
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    const isChatChanged = activeChatIdRef.current !== activeChat?.id;
+    activeChatIdRef.current = activeChat?.id || null;
+
+    if (isChatChanged) {
+      // Ketika berpindah obrolan, reset status scroll dan langsung arahkan ke pesan terbawah
+      isAtBottomRef.current = true;
+      setShowScrollBottomBtn(false);
+      setHasNewMessagesScrolledUp(false);
+      prevMessagesCountRef.current = messages.length;
+      setTimeout(() => {
+        scrollToBottom(false);
+      }, 60);
+      return;
+    }
+
+    // Jika pesan baru masuk
+    if (messages.length > prevMessagesCountRef.current) {
+      if (isAtBottomRef.current) {
+        // Pengguna sedang berada di dasar obrolan: gulir mulus ke pesan baru
+        scrollToBottom(true);
+      } else {
+        // PENGGUNA SEDANG MENGGULIR KE ATAS MEMBACA RIWAYAT LAMA:
+        // JANGAN PERNAH MENGGANGGU POSISI SCROLL PENGGUNA!
+        setHasNewMessagesScrolledUp(true);
+        setShowScrollBottomBtn(true);
+      }
+    }
+
+    prevMessagesCountRef.current = messages.length;
+  }, [messages, activeChat?.id]);
 
   // Load Chats & Users
   const loadChats = async () => {
@@ -360,7 +420,20 @@ export default function TeamChatMessenger({
       const res = await fetch(`/api/team-chat?action=messages&chatId=${chatId}`);
       const data = await res.json();
       if (data.success) {
-        setMessages(data.messages || []);
+        setMessages((prev) => {
+          const incoming: any[] = data.messages || [];
+          if (prev.length === incoming.length && prev.length > 0) {
+            const prevLast = prev[prev.length - 1];
+            const incomingLast = incoming[incoming.length - 1];
+            if (prevLast?.id === incomingLast?.id && prevLast?.timestamp === incomingLast?.timestamp) {
+              // Referensi identik: React tidak akan melakukan re-render atau memicu useEffect
+              return prev;
+            }
+          } else if (prev.length === 0 && incoming.length === 0) {
+            return prev;
+          }
+          return incoming;
+        });
       }
     } catch (err) {
       console.error("Gagal memuat pesan:", err);
@@ -536,6 +609,7 @@ export default function TeamChatMessenger({
         setMessages((prev) => [...prev, data.message]);
         setAttachModalType(null);
         loadChats();
+        setTimeout(() => scrollToBottom(true), 40);
       }
     } catch (err) {
       console.error("Gagal kirim informasi proyek:", err);
@@ -577,6 +651,7 @@ export default function TeamChatMessenger({
           setMessages((prev) => [...prev, data.message]);
         }
         loadChats();
+        setTimeout(() => scrollToBottom(true), 40);
       }
     } catch (err) {
       console.error("Gagal mengirim pesan:", err);
@@ -792,6 +867,7 @@ export default function TeamChatMessenger({
         setMessages((prev) => [...prev, data.message]);
         setAttachModalType(null);
         loadChats();
+        setTimeout(() => scrollToBottom(true), 40);
       }
     } catch (err) {
       console.error("Gagal kirim invoice:", err);
@@ -821,6 +897,7 @@ export default function TeamChatMessenger({
         setMessages((prev) => [...prev, data.message]);
         setAttachModalType(null);
         loadChats();
+        setTimeout(() => scrollToBottom(true), 40);
       }
     } catch (err) {
       console.error("Gagal kirim produk:", err);
@@ -850,6 +927,7 @@ export default function TeamChatMessenger({
         setMessages((prev) => [...prev, data.message]);
         setAttachModalType(null);
         loadChats();
+        setTimeout(() => scrollToBottom(true), 40);
       }
     } catch (err) {
       console.error("Gagal kirim pesanan:", err);
@@ -879,6 +957,7 @@ export default function TeamChatMessenger({
         setMessages((prev) => [...prev, data.message]);
         setAttachModalType(null);
         loadChats();
+        setTimeout(() => scrollToBottom(true), 40);
       }
     } catch (err) {
       console.error("Gagal kirim penugasan:", err);
@@ -908,6 +987,7 @@ export default function TeamChatMessenger({
         setMessages((prev) => [...prev, data.message]);
         setAttachModalType(null);
         loadChats();
+        setTimeout(() => scrollToBottom(true), 40);
 
         // Sinkronkan juga laporan bukti pekerjaan ini ke sistem Laporan Harian resmi & Tiket
         try {
@@ -1372,7 +1452,11 @@ export default function TeamChatMessenger({
             )}
 
             {/* Area Pesan Chat (Bubble Messages) */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-pattern">
+            <div
+              ref={messagesContainerRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-pattern overscroll-contain touch-pan-y dstech-chat-scroll"
+            >
               {messages.map((msg) => {
                 const isMe = msg.senderId === currentUser.id;
                 return (
@@ -1810,6 +1894,28 @@ export default function TeamChatMessenger({
               })}
               <div ref={messagesEndRef} />
             </div>
+
+            {/* Tombol Melayang Scroll-to-Bottom Saat Pengguna Menggulir ke Atas Membaca Riwayat */}
+            {showScrollBottomBtn && (
+              <div className="absolute bottom-20 md:bottom-24 right-4 md:right-8 z-30 animate-fadeIn pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={() => scrollToBottom(true)}
+                  className={`px-3.5 py-2 rounded-full shadow-2xl backdrop-blur-md flex items-center gap-2 text-xs font-bold transition-all duration-200 transform hover:scale-105 cursor-pointer border ${
+                    hasNewMessagesScrolledUp
+                      ? "bg-emerald-600/95 hover:bg-emerald-500 text-white border-emerald-400 shadow-emerald-950/80 animate-bounce"
+                      : "bg-slate-900/95 hover:bg-slate-800 text-slate-200 border-slate-700 hover:border-slate-500 shadow-slate-950/80"
+                  }`}
+                  title="Gulir kembali ke pesan terbaru"
+                >
+                  <ChevronDown className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{hasNewMessagesScrolledUp ? "↓ Ada Pesan Baru" : "↓ Pesan Terbaru"}</span>
+                  {hasNewMessagesScrolledUp && (
+                    <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* Menu Lampiran Data Perusahaan (Popup) */}
             {showAttachMenu && (
