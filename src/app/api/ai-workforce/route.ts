@@ -321,7 +321,8 @@ async function executeGeminiCall(
   prompt: string,
   jsonMode = false,
   model = "gemini-2.5-flash",
-  timeoutMs = 12000
+  timeoutMs = 15000,
+  attachments?: Array<{ mimeType: string; data: string }>
 ): Promise<string | null> {
   const keys = getGeminiApiKeys();
   if (keys.length === 0) return null;
@@ -330,8 +331,23 @@ async function executeGeminiCall(
     const activeKey = keys[(geminiKeyIndex + attempt) % keys.length];
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
+      const parts: any[] = [{ text: prompt }];
+
+      if (Array.isArray(attachments) && attachments.length > 0) {
+        for (const att of attachments) {
+          if (att.mimeType && att.data) {
+            parts.push({
+              inlineData: {
+                mimeType: att.mimeType,
+                data: att.data,
+              },
+            });
+          }
+        }
+      }
+
       const bodyPayload: any = {
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        contents: [{ role: "user", parts }],
       };
       if (jsonMode) {
         bodyPayload.generationConfig = { responseMimeType: "application/json" };
@@ -462,7 +478,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { action, employeeId, command, status, newSpeech } = body;
+    const { action, employeeId, command, status, newSpeech, attachment } = body;
     const data = readWorkforceData();
 
     if (action === "update_status") {
@@ -1716,13 +1732,65 @@ TUGAS ANDA:
         console.warn("AI Gemini speech error:", e.message);
       }
 
+      // 0. MULTIMODAL INQUIRY ATTACHMENT PROCESSOR (Tugas 345)
+      // Mendukung Berkas Gambar (JPG/PNG/WEBP), PDF (TOR/RAB), dan Spreadsheet Excel/CSV (.xlsx/.xls/.csv)
+      let attachmentContextText = "";
+      const geminiAttachments: Array<{ mimeType: string; data: string }> = [];
+
+      if (attachment && attachment.url) {
+        try {
+          const rawUrl = attachment.url.replace(/^\//, "");
+          const filePath = path.join(process.cwd(), "public", rawUrl);
+          if (fs.existsSync(filePath)) {
+            const ext = path.extname(filePath).toLowerCase();
+            const origName = attachment.originalName || attachment.fileName || "berkas_inquiry";
+            if ([".jpg", ".jpeg", ".png", ".webp"].includes(ext)) {
+              const buf = fs.readFileSync(filePath);
+              const b64 = buf.toString("base64");
+              const mType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
+              geminiAttachments.push({ mimeType: mType, data: b64 });
+              attachmentContextText = `\n[TERLAMPIR BERKAS GAMBAR INQUIRY DARI KLIEN: "${origName}"]\nFoto/gambar inquiry klien ini telah disertakan secara visual. Analisis teks tulisan tangan, tabel kebutuhan, nama barang, kuantitas, dan spesifikasi di dalam gambar ini secara mendalam.\n`;
+            } else if (ext === ".pdf") {
+              const buf = fs.readFileSync(filePath);
+              const b64 = buf.toString("base64");
+              geminiAttachments.push({ mimeType: "application/pdf", data: b64 });
+              attachmentContextText = `\n[TERLAMPIR DOKUMEN PDF INQUIRY / SPESIFIKASI DARI KLIEN: "${origName}"]\nDokumen PDF ini telah disertakan. Analisis lembar spesifikasi, daftar barang yang diminta, volume/kuantitas, dan syarat teknis di dalamnya.\n`;
+            } else if ([".xlsx", ".xls", ".csv"].includes(ext)) {
+              try {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                const xlsx = require("xlsx");
+                const workbook = xlsx.readFile(filePath);
+                let excelTables = "";
+                for (const sName of workbook.SheetNames) {
+                  const sheet = workbook.Sheets[sName];
+                  const csvData = xlsx.utils.sheet_to_csv(sheet);
+                  if (csvData && csvData.trim()) {
+                    excelTables += `\n--- LEMBAR SPREADSHEET (${sName}) ---\n${csvData.trim()}\n`;
+                  }
+                }
+                if (excelTables.trim()) {
+                  attachmentContextText = `\n[TERLAMPIR SPREADSHEET EXCEL/CSV DARI KLIEN: "${origName}"]\nBerikut adalah data tabel rincian kebutuhan barang/pekerjaan yang diekstrak dari berkas spreadsheet Excel klien:\n${excelTables}\n`;
+                }
+              } catch (xErr: any) {
+                console.warn("Gagal mengekstrak berkas excel inquiry:", xErr.message);
+              }
+            }
+          }
+        } catch (attErr: any) {
+          console.warn("Error parsing multimodal attachment:", attErr.message);
+        }
+      }
+
       // --- AUTONOMOUS ACTION EXECUTION ENGINE ---
       // Karyawan AI mengeksekusi tugas nyata ke sistem database operasional perusahaan
       let executionResult: any = null;
 
-      if (targetEmp.id === "emp_dewi_finance") {
+      if (targetEmp.id === "emp_dewi_finance" || (targetEmp.id === "emp_bambang_sales" && (promptCommand.toLowerCase().includes("sph") || promptCommand.toLowerCase().includes("penawaran") || (attachment && attachment.url)))) {
         const lowerCmd = promptCommand.toLowerCase();
-        if (lowerCmd.includes("penawaran") || lowerCmd.includes("sph") || lowerCmd.includes("quotation")) {
+        const hasInquiryAttachment = !!(attachment && attachment.url);
+        const isSphRequest = lowerCmd.includes("penawaran") || lowerCmd.includes("sph") || lowerCmd.includes("quotation") || lowerCmd.includes("inquiry") || hasInquiryAttachment;
+
+        if (isSphRequest) {
           try {
             const financeFilePath = path.join(process.cwd(), "src/data/dstech_finance_erp.json");
             if (fs.existsSync(financeFilePath)) {
@@ -1730,21 +1798,31 @@ TUGAS ANDA:
               const finData = JSON.parse(finRaw);
               if (!finData.quotations) finData.quotations = [];
 
-              // 1. Ekstrak rincian SPH menggunakan AI Gemini 2.5 Flash
+              // 1. Ekstrak rincian SPH menggunakan AI Gemini 2.5 Flash (dengan Multimodal Vision / Table Context)
               let extractedSph: any = null;
               try {
-                const sphExtractionPrompt = `Anda adalah sistem ERP Intelligence DSTech Smart Perkasa.
-Direktur Utama memberikan perintah: "${promptCommand}".
-Tugas Anda: Buat spesifikasi Surat Penawaran Harga (SPH) resmi yang akurat dalam format JSON MURNI tanpa markdown (jangan gunakan \`\`\`json).
-Format JSON yang wajib dihasilkan:
+                const sphExtractionPrompt = `Anda adalah sistem AI Intelligence & Commercial Quotation Specialist di PT. DSTech Smart Perkasa.
+Direktur Utama (Bpk. Ramadhani ST) memberikan instruksi:
+"${promptCommand}"
+${attachmentContextText}
+${historyContextPrompt}
+
+TUGAS ANDA:
+1. Analisis teliti instruksi dan BERKAS LAMPIRAN INQUIRY (Gambar / PDF / Tabel Excel) yang dilampirkan klien jika ada.
+2. Ekstrak nama klien/perusahaan (contoh: PT. Krakatau Posco, PT. Chandra Asri, RSUD, dll). Jika tidak tertera, gunakan nama klien pada berkas atau "Klien Mitra DSTech".
+3. Ekstrak SETIAP item barang/jasa yang diminta, spesifikasi teknis, kuantitas (qty), dan satuan (Unit/Lot/Pcs/Set).
+4. Berikan harga satuan (price) yang wajar, profesional, dan kompetitif sesuai standar pasar perangkat IoT/keamanan/CCTV/Barrier Gate industri di Banten.
+5. Hitung total = qty * price.
+
+Format JSON MURNI yang wajib dihasilkan tanpa markdown (\`\`\`json):
 {
-  "customerName": "Nama Perusahaan / Klien yang bersih tanpa kata sambung atau instruksi (contoh: 'PT. Tunas Buana Properti')",
-  "customerAddress": "Alamat / Lokasi yang tertera (contoh: 'Cluster Elysium') atau 'Indonesia'",
-  "subject": "Judul Subjek Penawaran Resmi (contoh: 'Surat Penawaran Harga Pengadaan & Instalasi Gate Access Sistem In-Out Cluster Elysium')",
-  "projectName": "Nama Proyek Ringkas (contoh: 'Instalasi Gate Access In-Out Cluster Elysium')",
+  "customerName": "Nama Perusahaan / Klien yang bersih tanpa kata sambung atau instruksi",
+  "customerAddress": "Alamat / Lokasi yang tertera atau 'Banten / Jabodetabek'",
+  "subject": "Judul Subjek Penawaran Resmi",
+  "projectName": "Nama Proyek Ringkas",
   "items": [
     {
-      "productName": "Nama barang/jasa yang spesifik dan profesional sesuai kebutuhan (jika barrier gate berikan barrier gate & controller, jika CCTV berikan CCTV & DVR)",
+      "productName": "Nama barang/jasa spesifik sesuai kebutuhan inquiry klien",
       "qty": 1,
       "unit": "Unit / Pcs / Lot / Set",
       "price": 1000000,
@@ -1754,11 +1832,11 @@ Format JSON yang wajib dihasilkan:
   ]
 }
 Aturan Khusus:
-- Jika permintaan mengenai Barrier Gate / Gate Access / Palang Parkir In-Out: Masukkan Barrier Gate Otomatis (2 Unit jika In-Out), Tiang Reader RFID, Loop Detector Sensor Anti-Tabrak, Kartu Akses Warga, dan Jasa Pemasangan & Wiring.
-- Jika permintaan mengenai CCTV: Masukkan Kamera CCTV sesuai jumlah unit, DVR/NVR, Harddisk CCTV, Power Supply, Kabel & Jasa Pasang.
-- Harga wajar standar pasar profesional Indonesia. Pastikan total = qty * price.`;
+- Jika permintaan mengenai Barrier Gate / Gate Access / Palang Parkir In-Out: Masukkan Barrier Gate Otomatis, Tiang Reader RFID, Loop Detector Sensor Anti-Tabrak, Kartu Akses, dan Jasa Pasang.
+- Jika permintaan mengenai CCTV: Masukkan Kamera CCTV, DVR/NVR, Harddisk Surveillance, Power Supply Box, Kabel Coaxial/UTP & Jasa Pasang.
+- Jika dari lampiran Excel/Gambar/PDF: Ambil persis seluruh item yang ada di lembar inquiry tersebut.`;
 
-                const sphTextOut = await executeGeminiCall(sphExtractionPrompt, true, "gemini-2.5-flash", 12000);
+                const sphTextOut = await executeGeminiCall(sphExtractionPrompt, true, "gemini-2.5-flash", 15000, geminiAttachments);
                 if (sphTextOut) {
                   extractedSph = JSON.parse(sphTextOut);
                 }
@@ -1990,8 +2068,12 @@ Aturan Khusus:
                 approvedTitle: "Direktur Utama",
                 approvedAt: new Date().toLocaleString("id-ID"),
                 verificationCode: `DST-${sphNumber}`,
-                notes: `${isRevision ? "[REVISI DIREKTUR] " : ""}Draf usulan SPH oleh Dewi Sartika atas instruksi: "${promptCommand}"`,
-                attachments: [],
+                notes: attachment
+                  ? `${isRevision ? "[REVISI DIREKTUR] " : ""}Draf usulan SPH diolah dari berkas inquiry klien "${attachment.originalName || attachment.fileName}" oleh ${targetEmp.name}.`
+                  : `${isRevision ? "[REVISI DIREKTUR] " : ""}Draf usulan SPH oleh ${targetEmp.name} atas instruksi: "${promptCommand}"`,
+                attachments: attachment?.url ? [attachment.url] : [],
+                inquiryFileName: attachment ? (attachment.originalName || attachment.fileName) : undefined,
+                inquiryFileUrl: attachment?.url || undefined,
                 businessEntity: "PT",
                 projectId: "",
                 projectName: extractedSph.projectName || `Proyek ${extractedSph.customerName}`,
@@ -2002,10 +2084,10 @@ Aturan Khusus:
               const queueItem = {
                 id: queueId,
                 revision: revNumber,
-                employee_id: "emp_dewi_finance",
-                employee_name: "Dewi Sartika",
-                employee_role: "AI Finance & Tax Billing Specialist",
-                department: "FINANCE",
+                employee_id: targetEmp.id,
+                employee_name: targetEmp.name,
+                employee_role: targetEmp.role,
+                department: targetEmp.department,
                 task_type: "SPH_PROPOSAL",
                 title: queueTitle,
                 target_client: extractedSph.customerName,
@@ -2034,12 +2116,14 @@ Aturan Khusus:
                 subtotal: finalSubtotal,
                 grandTotal: finalGrandTotal,
                 revision: revNumber,
+                inquiryFileName: attachment ? (attachment.originalName || attachment.fileName) : undefined,
                 link: "/admin/virtual-office",
               };
 
+              const fileNote = attachment ? ` berdasarkan berkas inquiry "${attachment.originalName || attachment.fileName}"` : "";
               aiResponseText = isRevision
-                ? `Siap Pak Ramadhani! Draf SPH Penawaran untuk ${extractedSph.customerName} telah BERHASIL SAYA REVISI: Total Netto disesuaikan menjadi Rp ${finalSubtotal.toLocaleString("id-ID")}${discountPercent > 0 ? ` (dengan diskon ${discountPercent}%)` : ""} (Exclude PPN 11%). Draf di Kotak Persetujuan telah diperbarui (Revisi #${revNumber}) dan siap Bapak sahkan!`
-                : `Siap Pak Ramadhani! Saya (Dewi Sartika) telah selesai menyusun draf Surat Penawaran Harga resmi #${sphNumber} untuk ${extractedSph.customerName} (${queueTitle}) dengan total Netto Rp ${finalSubtotal.toLocaleString("id-ID")} (Exclude PPN 11%). Draf telah saya masukkan ke Kotak Persetujuan dan siap ditinjau Bapak sebelum masuk ke sistem Keuangan ERP!`;
+                ? `Siap Pak Ramadhani! Draf SPH Penawaran untuk ${extractedSph.customerName}${fileNote} telah BERHASIL DIREVISI: Total Netto disesuaikan menjadi Rp ${finalSubtotal.toLocaleString("id-ID")}${discountPercent > 0 ? ` (dengan diskon ${discountPercent}%)` : ""} (Exclude PPN 11%). Draf di Kotak Persetujuan telah diperbarui (Revisi #${revNumber}) dan siap Bapak sahkan!`
+                : `Siap Pak Ramadhani! Saya (${targetEmp.name}) telah selesai menganalisis dan menyusun draf Surat Penawaran Harga resmi #${sphNumber} untuk ${extractedSph.customerName}${fileNote} (${queueTitle}) dengan total Netto Rp ${finalSubtotal.toLocaleString("id-ID")} (Exclude PPN 11%). Draf telah saya masukkan ke Kotak Persetujuan dan siap ditinjau Bapak sebelum masuk ke sistem Keuangan ERP!`;
             }
           } catch (finErr: any) {
             console.error("Error executing Dewi Finance SPH action:", finErr);
@@ -2922,7 +3006,14 @@ Aturan Khusus:
         id: `msg_u_${Date.now()}`,
         sender: "user",
         text: promptCommand,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        attachment: attachment ? {
+          url: attachment.url,
+          fileName: attachment.fileName,
+          originalName: attachment.originalName,
+          type: attachment.type,
+          size: attachment.size,
+        } : undefined,
       });
 
       data.dstech_conversations[targetEmp.id].push({

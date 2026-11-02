@@ -50,7 +50,8 @@ import {
   Music,
   RotateCcw,
   Loader2,
-  Trash2
+  Trash2,
+  Paperclip
 } from "lucide-react";
 
 interface Employee {
@@ -523,9 +524,72 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
   const [isSubmittingModalCommand, setIsSubmittingModalCommand] = useState(false);
   const [modalExecutionResult, setModalExecutionResult] = useState<any>(null);
   const [modalAiResponse, setModalAiResponse] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<Record<string, Array<{ id: string; sender: "user" | "agent"; text: string; timestamp: string; contextPayload?: any }>>>({});
+  const [conversations, setConversations] = useState<Record<string, Array<{
+    id: string;
+    sender: "user" | "agent";
+    text: string;
+    timestamp: string;
+    contextPayload?: any;
+    attachment?: {
+      url: string;
+      fileName: string;
+      originalName: string;
+      type: string;
+      size?: number;
+    };
+  }>>>({});
+  const [attachedFile, setAttachedFile] = useState<{
+    url: string;
+    fileName: string;
+    originalName: string;
+    size: number;
+    type: string;
+  } | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const officeContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Unggah File Inquiry Client (Excel, Gambar/Foto, PDF) untuk Analisis Multimodal AI
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      alert("Ukuran file maksimal adalah 15MB");
+      return;
+    }
+
+    setIsUploadingAttachment(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("prefix", "dstech_inquiry_");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const json = await res.json();
+      if (json.success && json.url) {
+        setAttachedFile({
+          url: json.url,
+          fileName: json.fileName || file.name,
+          originalName: file.name,
+          size: file.size,
+          type: file.type || (file.name.endsWith(".xlsx") ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "application/octet-stream"),
+        });
+      } else {
+        alert(json.error || "Gagal mengunggah file inquiry");
+      }
+    } catch (err: any) {
+      console.error("Error upload inquiry file:", err);
+      alert("Terjadi kesalahan koneksi saat mengunggah file");
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
 
   // Fetch initial workforce data
   const fetchWorkforce = async () => {
@@ -811,12 +875,14 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
         ];
       case "emp_dewi_finance":
         return [
+          { label: "📎 Buat SPH dari File Terlampir", text: "Dewi, tolong pelajari file inquiry klien yang saya lampirkan di sini, lalu buatkan draf SPH resmi lengkap dengan rincian barang, spesifikasi teknis, dan total biayanya." },
           { label: "📑 Buat Draf SPH Exclude PPN", text: "Dewi, tolong siapkan draf SPH penawaran harga dengan opsi PPN Exclude untuk proyek baru." },
           { label: "💰 Rincian Invoice Proyek", text: "Dewi, buatkan rincian invoice tagihan termin untuk proyek barrier gate." },
           { label: "📊 Cek Arus Kas & Piutang", text: "Dewi, bagaimana rekap arus kas masuk dan piutang pelanggan saat ini?" }
         ];
       case "emp_bambang_sales":
         return [
+          { label: "📎 Buat Penawaran dari File Klien", text: "Bambang, tolong cek daftar permintaan dari file inquiry terlampir, lalu koordinasikan penyusunan SPH ke Dewi Finance." },
           { label: "💼 Follow-up Barrier Gate", text: "Bambang, tolong follow-up calon klien pabrik kimia Cilegon untuk paket Barrier Gate RFID." },
           { label: "📋 Catat Prospek Baru", text: "Bambang, tolong catat prospek klien baru proyek perumahan klaster di Serang." },
           { label: "🤝 Jadwal Presentasi Proyek", text: "Bambang, buatkan agenda konsultasi teknis sistem akses kontrol minggu ini." }
@@ -3023,6 +3089,32 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                               </span>
                             </div>
                             <p className="whitespace-pre-line font-medium text-[11.5px]">{msg.text}</p>
+                            {msg.attachment && (
+                              <div className="mt-2 p-2 bg-slate-900/90 border border-slate-700/80 rounded-xl flex items-center justify-between gap-2 text-xs">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                  <Paperclip className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                  <div className="truncate">
+                                    <span className="text-cyan-300 font-semibold truncate block text-[11px]">
+                                      {msg.attachment.originalName || msg.attachment.fileName}
+                                    </span>
+                                    {msg.attachment.size && (
+                                      <span className="text-[9px] text-slate-400 font-mono">
+                                        {(msg.attachment.size / 1024).toFixed(1)} KB
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <a
+                                  href={msg.attachment.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-[10px] font-bold shrink-0 transition flex items-center gap-1"
+                                >
+                                  <span>Unduh</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              </div>
+                            )}
                             {msg.contextPayload?.link && (
                               <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex items-center justify-between text-[10px]">
                                 <span className="text-emerald-400 font-bold">✓ Usulan telah dibuat</span>
@@ -3055,7 +3147,8 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                if (!modalDirectCommand.trim() || isSubmittingModalCommand) return;
+                const commandToSend = modalDirectCommand.trim() || (attachedFile ? `Tolong buatkan draf penawaran harga SPH dari file inquiry terlampir: ${attachedFile.originalName}` : "");
+                if (!commandToSend || isSubmittingModalCommand) return;
                 setIsSubmittingModalCommand(true);
                 try {
                   const res = await fetch("/api/ai-workforce", {
@@ -3063,8 +3156,9 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       action: "order",
-                      command: modalDirectCommand.trim(),
+                      command: commandToSend,
                       employeeId: selectedEmployee.id,
+                      attachment: attachedFile,
                     }),
                   });
                   const json = await res.json();
@@ -3084,6 +3178,8 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                       setConversations((prev) => ({ ...prev, [selectedEmployee.id]: json.employeeConversation }));
                     }
                     setModalDirectCommand("");
+                    setAttachedFile(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
                     fetchWorkforce();
                   } else {
                     alert(json.error || "Gagal memproses instruksi");
@@ -3113,6 +3209,34 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
+                </div>
+              )}
+
+              {/* Pratinjau Berkas Lampiran Inquiry (Jika Ada) */}
+              {attachedFile && (
+                <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-gradient-to-r from-cyan-950/90 via-slate-900 to-blue-950/80 border border-cyan-500/50 rounded-xl text-xs text-cyan-200 shadow-lg animate-in fade-in slide-in-from-bottom-1">
+                  <div className="flex items-center gap-2.5 truncate">
+                    <div className="p-1.5 bg-cyan-500/20 rounded-lg text-cyan-300">
+                      <Paperclip className="w-4 h-4" />
+                    </div>
+                    <div className="truncate">
+                      <span className="font-bold truncate text-[11.5px] block text-cyan-100">{attachedFile.originalName}</span>
+                      <span className="text-[9.5px] text-cyan-400 font-mono">
+                        {(attachedFile.size / 1024).toFixed(1)} KB • Siap dipelajari AI untuk draf SPH
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttachedFile(null);
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+                    className="p-1 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition cursor-pointer shrink-0"
+                    title="Batalkan lampiran file ini"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
               )}
 
@@ -3150,18 +3274,46 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Input File Tersembunyi (Excel, Gambar, PDF) */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept=".xlsx,.xls,.csv,.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx"
+                  className="hidden"
+                />
+
+                {/* Tombol Lampiran Berkas Paperclip */}
+                <button
+                  type="button"
+                  disabled={isUploadingAttachment || isSubmittingModalCommand}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/60 rounded-xl transition flex items-center justify-center shrink-0 cursor-pointer shadow-sm"
+                  title="Lampirkan File Inquiry Client (Excel .xlsx, Gambar/Foto, PDF)"
+                >
+                  {isUploadingAttachment ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                  ) : (
+                    <Paperclip className="w-4 h-4" />
+                  )}
+                </button>
+
                 <input
                   type="text"
                   value={modalDirectCommand}
                   onChange={(e) => setModalDirectCommand(e.target.value)}
-                  placeholder={`Ketik instruksi untuk ${selectedEmployee.name}... (Enter untuk kirim)`}
+                  placeholder={
+                    attachedFile
+                      ? `File terlampir! Ketik instruksi tambahan untuk ${selectedEmployee.name} (atau langsung Kirim)...`
+                      : `Ketik instruksi untuk ${selectedEmployee.name}... (Enter untuk kirim)`
+                  }
                   disabled={isSubmittingModalCommand}
                   className="flex-1 px-3.5 py-2.5 bg-slate-950 border border-slate-700 focus:border-cyan-500 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none transition shadow-inner"
                 />
                 <button
                   type="submit"
-                  disabled={isSubmittingModalCommand || !modalDirectCommand.trim()}
-                  className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-cyan-600/30"
+                  disabled={isSubmittingModalCommand || (!modalDirectCommand.trim() && !attachedFile)}
+                  className="px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-cyan-600/30 cursor-pointer"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Kirim</span>

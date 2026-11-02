@@ -4,6 +4,32 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 345 (2026-11-02)**: [SELESAI] Pembangunan Fitur Lampiran Berkas Inquiry (Excel, Gambar/Foto, PDF) & Multimodal AI SPH Generator pada Kantor Virtual (`src/app/api/upload/route.ts`, `src/app/api/ai-workforce/route.ts`, `src/app/admin/virtual-office/page.tsx`).
+  *Permintaan User*: "kemudian saya ingin agar karyawan AI bisa melakukan pembuatan SPh apa bila saya ada inquery gambar dari client atau list permintaan, bagai mana cara saya melampirkan file inquerynya, misalnya dalam bentuk excel, gambar, pdf atau file lain agar bisa di buatkan sphnya?"
+  *Akar Kebutuhan & Desain Solusi*:
+  1. **Tombol Lampiran Berkas Multiformat di Chat Drawer Kantor Virtual**:
+     - Tambahkan tombol lampiran berkas (`📎` / Paperclip) pada drawer chat interaktif Karyawan AI di `/admin/virtual-office`.
+     - Mendukung format file: Gambar (JPG, PNG, WEBP), Dokumen PDF, dan Spreadsheet Excel/CSV (.xlsx, .xls, .csv).
+     - Menampilkan pratinjau badge file terlampir lengkap dengan nama berkas, ukuran, dan tombol batal sebelum pesan dikirim.
+     - Riwayat obrolan menampilkan tautan file lampiran yang dapat diklik/diunduh secara transparan.
+  2. **Dukungan Tipe MIME Excel di Endpoint Upload (`/api/upload`)**:
+     - Buka akses tipe MIME untuk spreadsheet Excel (`.xlsx`, `.xls`, `.csv`) dan dokumen dengan pembatasan ukuran aman 10MB dan prefix file `dstech_inquiry_`.
+  3. **Multimodal AI SPH Generator Engine (Gemini 2.5 Flash & XLSX Parser)**:
+     - Jika berkas adalah Gambar atau PDF: berkas dibaca dan dikirimkan sebagai `inlineData` (base64 multimodal) ke Gemini 2.5 Flash agar AI dapat membaca teks tulisan tangan, tabel RFQ, atau dokumen penawaran klien secara langsung.
+     - Jika berkas adalah Excel / CSV: sistem mengurai lembar kerja menggunakan pustaka `xlsx` menjadi tabel data tabular yang disuntikkan ke prompt analisis AI.
+     - Karyawan AI (Dewi Sartika & Bambang Prakoso) mengekstrak seluruh nama barang, spesifikasi teknis, volume/kuantiti, serta mencocokkan harga wajar pasar/katalog DSTech, kemudian menyusun draf SPH resmi ke Kotak Persetujuan (`dstech_approval_queue`).
+  *Langkah Rencana Perbaikan Step-by-Step*:
+  1. [x] Mencatat rencana kerja step-by-step Tugas 345 di `LAPORAN_PROGRES.md`.
+  2. [x] Membuat folder cadangan berkas `dstech-smart/_backup_task345_inquiry_file_attachment_sph/` dan mencadangkan berkas target.
+  3. [x] Memperluas validasi tipe berkas di `src/app/api/upload/route.ts` agar mendukung Excel (`.xlsx`, `.xls`, `.csv`).
+  4. [x] Membangun Multimodal Attachment Handler & XLSX Parser pada `executeGeminiCall` dan `action === "order"` di `src/app/api/ai-workforce/route.ts`.
+  5. [x] Menambahkan antarmuka upload lampiran berkas, chip pratinjau, dan indikator lampiran di chat drawer `src/app/admin/virtual-office/page.tsx`.
+  6. [x] Menjalankan validasi TypeScript compiler (`npx tsc --noEmit`) hingga 0 error.
+  7. [x] Menjalankan kompilasi Next.js (`npm run build`) hingga 77/77 routes sukses lolos 100%.
+  8. [x] Menguji alur upload lampiran dan pembuatan draf SPH berbasis file inquiry secara langsung.
+  9. [x] Push ke remote GitHub dan deploy live ke VPS aaPanel PM2 `dstech-main`.
+  10. [x] Bersihkan folder cadangan dan tandai status [SELESAI].
+
 - **Tugas 344 (2026-11-02)**: [SELESAI] Implementasi Otomatisasi Pembuatan Invoice Proyek Selesai (Dewi Sartika) & Penyusunan Laporan Progres Foto Teknisi Lapangan (Deni Kurniawan) (`src/utils/dstech_autonomous_ai.ts`, `src/app/api/ai-workforce/route.ts`, `src/app/api/finance/route.ts`, `src/app/api/employee/daily-reports/route.ts`, `src/app/api/employee/tasks/route.ts`, `src/app/admin/virtual-office/page.tsx`).
   *Permintaan User*: "kalau begitu begini, setiap project atau kegiatan yang awalnya berstatus diproses sehingga telah selesai atau completed, apakah karyawan AI bisa langsung membuat invoice tanpa saya suruh? kemudian jika ada teknisi mengirimkan foto untuk laporan progres, karyawan AI bisa menyusunnya?"
   *Akar Kebutuhan & Desain Solusi*:

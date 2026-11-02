@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     const docType = (formData.get("docType") as string) || "image";
 
-    // Validate mime type (Gambar & Dokumen PDF)
+    // Validate mime type (Gambar, Dokumen PDF, & Spreadsheet Excel / CSV)
     const validTypes = [
       "image/jpeg",
       "image/png",
@@ -35,11 +35,20 @@ export async function POST(request: Request) {
       "image/jfif",
       "image/pjpeg",
       "application/pdf",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+      "application/vnd.ms-excel", // .xls
+      "text/csv", // .csv
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+      "application/msword", // .doc
+      "text/plain", // .txt
     ];
+    const rawExt = (path.extname(file.name) || "").toLowerCase();
+    const isAllowedExt = [".jpg", ".jpeg", ".png", ".webp", ".jfif", ".gif", ".pdf", ".xlsx", ".xls", ".csv", ".docx", ".doc", ".txt"].includes(rawExt);
     const isJfifByName = file.name.toLowerCase().endsWith(".jfif");
-    if (!validTypes.includes(file.type) && !isJfifByName) {
+
+    if (!validTypes.includes(file.type) && !isAllowedExt && !isJfifByName) {
       return NextResponse.json(
-        { success: false, message: "Format file tidak didukung. Harap upload gambar (JPG, PNG, WEBP, JFIF) atau dokumen PDF." },
+        { success: false, message: "Format file tidak didukung. Harap upload gambar (JPG, PNG, WEBP), dokumen PDF, atau spreadsheet Excel/CSV (.xlsx, .xls, .csv)." },
         { status: 400 }
       );
     }
@@ -60,8 +69,8 @@ export async function POST(request: Request) {
     }
 
     // Generate safe filename with mandatory dstech_ prefix
-    const rawExt = (path.extname(file.name) || (file.type === "application/pdf" ? ".pdf" : ".jpg")).toLowerCase();
-    let cleanExt = rawExt.startsWith(".") ? rawExt : `.${rawExt}`;
+    const fileExt = (rawExt || (file.type === "application/pdf" ? ".pdf" : ".jpg")).toLowerCase();
+    let cleanExt = fileExt.startsWith(".") ? fileExt : `.${fileExt}`;
     // Normalisasi format JFIF/JPEG menjadi .jpg standar agar selalu dikenali Nginx & Next.js Optimizer
     if (cleanExt === ".jfif" || cleanExt === ".jpeg" || cleanExt === ".pjpeg") {
       cleanExt = ".jpg";
@@ -72,7 +81,8 @@ export async function POST(request: Request) {
       .replace(/[^a-zA-Z0-9_-]/g, "_")
       .substring(0, 30);
 
-    const prefix = file.type === "application/pdf" || docType === "archive" || docType === "document" ? "dstech_doc" : "dstech_img";
+    const isDoc = file.type === "application/pdf" || docType === "archive" || docType === "document" || [".pdf", ".xlsx", ".xls", ".csv", ".docx", ".doc", ".txt"].includes(cleanExt);
+    const prefix = isDoc ? "dstech_doc" : "dstech_img";
     const fileName = `${prefix}_${Date.now()}_${safeBaseName}${cleanExt}`;
     const filePath = path.join(uploadDir, fileName);
 
