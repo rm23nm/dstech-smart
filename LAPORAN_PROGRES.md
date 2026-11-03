@@ -4,7 +4,7 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Tugas 374 (2026-11-03)**: [SEDANG BERJALAN] Penambahan Staf Karyawan AI Baru "Arya Pratama, S.Kom" (AI Full-Stack Developer & Software Architect) Bertenaga Qwen 2.5 Coder (Lokal VPS 1.5B & Cloud 32B) pada Kantor Virtual 3D, Team Chat, dan Multi-AI Settings (`src/data/dstech_ai_workforce.json`, `src/utils/dstech_inhouse_ai_agent.ts`, `src/components/virtual-office/Office3DCanvas.tsx`, `src/app/api/team-chat/route.ts`, `src/components/TeamChatMessenger.tsx`, `src/utils/dstech_ai_multi_provider.ts`, `src/app/admin/settings/page.tsx`).
+- **Tugas 374 (2026-11-03)**: [SELESAI] Penambahan Staf Karyawan AI Baru "Arya Pratama, S.Kom" (AI Full-Stack Developer & Software Architect) Bertenaga Qwen 2.5 Coder (Lokal VPS 1.5B & Cloud 32B) pada Kantor Virtual 3D, Team Chat, dan Multi-AI Settings (`src/data/dstech_ai_workforce.json`, `src/utils/dstech_inhouse_ai_agent.ts`, `src/components/virtual-office/Office3DCanvas.tsx`, `src/app/api/team-chat/route.ts`, `src/components/TeamChatMessenger.tsx`, `src/utils/dstech_ai_multi_provider.ts`, `src/app/admin/settings/page.tsx`).
   *Permintaan & Arahan User*:
   - User menanyakan apakah Qwen bisa menjadi developer/pembuat aplikasi/website dan menyetujui penambahan versi `qwen2.5-coder`.
   - Mengingat server VPS memiliki RAM 5.9 GB (tersisa ~1.2 GB bebas) tanpa GPU, model `qwen2.5-coder:32b` (~20 GB) berisiko memicu crash OOM jika dipaksa di lokal VPS, sehingga diterapkan arsitektur dual-mode:
@@ -31,8 +31,13 @@
   6. [x] [LANGKAH 6] Tambahkan handler chat Arya dan tombol aksi cepat di `src/app/api/team-chat/route.ts` dan `src/components/TeamChatMessenger.tsx`.
   7. [x] [LANGKAH 7] Tambahkan opsi model Qwen Coder di `src/utils/dstech_ai_multi_provider.ts` dan `src/app/admin/settings/page.tsx`.
   8. [x] [LANGKAH 8] Jalankan uji kompilasi lokal `tsc --noEmit` & `npm run build` untuk memastikan 0 error (Lolos bersih 0 error, 81/81 routes berhasil dibangun).
-  9. [ ] [LANGKAH 9] Deploy ke live VPS `157.66.34.199:11587`, build Next.js, dan restart PM2 `dstech-main`.
-  10. [ ] [LANGKAH 10] Verifikasi live chat dengan Arya Pratama, bersihkan folder backup, dan tandai Tugas 374 sebagai [SELESAI].
+  9. [x] [LANGKAH 9] Deploy ke live VPS `157.66.34.199:11587`, build Next.js, dan restart PM2 `dstech-main` (Commit `b697da2`, PID 264192 online).
+  10. [x] [LANGKAH 10] Verifikasi live chat dengan Arya Pratama, bersihkan folder backup, dan tandai Tugas 374 sebagai [SELESAI].
+  *Hasil Pengujian Live Server*:
+  - **Uji Panggilan Spesifik Arya Pratama**: Direktur mengirim instruksi: "Arya, tolong laporkan kesiapan modul coding dan integrasi Qwen Coder". Arya Pratama, S.Kom langsung merespons secara spesifik (Status 200 OK) mengonfirmasi kesiapan engine Qwen 2.5 Coder in-house lokal VPS, kepatuhan database prefix (`dstech_`, `wa_`, `access_`, `mosque_`, POS mandiri), dan lolos uji kompilasi `tsc`.
+  - **Uji Broadcast Laporan Pagi Tim AI**: Seluruh 7 staf AI resmi (Dewi, Bambang, Deni, Nadia, Reza, Siti, dan Arya Pratama) serentak merespons beruntun tanpa ada staf yang terlewat.
+  - **Ollama Engine VPS**: Model `qwen2.5-coder:1.5b` (986 MB) aktif berjalan 100% offline di server VPS tanpa memakan kuota cloud.
+  - **Kantor Virtual 3D & Settings**: Meja kerja 3D Arya aktif di zona `IT_DEV_DESK`, dan kartu pengaturan Qwen Coder tersedia di `/admin/settings`.
 
 - **Tugas 373 (2026-11-03)**: [SELESAI] Penambahan Fitur Pratinjau Interaktif Produk Lengkap (Live Store & Modal Preview) pada Manajemen Produk Admin (`src/app/admin/products/page.tsx`).
   *Permintaan User*: "saya tidak bisa melihat hasil preview dri produk yang diupload" (disertai tangkapan layar tabel produk di `/admin/products`).
