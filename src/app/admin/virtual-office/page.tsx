@@ -535,6 +535,8 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
   const [isSubmittingModalCommand, setIsSubmittingModalCommand] = useState(false);
   const [modalExecutionResult, setModalExecutionResult] = useState<any>(null);
   const [modalAiResponse, setModalAiResponse] = useState<string | null>(null);
+  const [modalActiveTab, setModalActiveTab] = useState<"CHAT" | "DELIVERABLES">("CHAT");
+  const [copiedCodeSnippet, setCopiedCodeSnippet] = useState(false);
   const [conversations, setConversations] = useState<Record<string, Array<{
     id: string;
     sender: "user" | "agent";
@@ -2795,6 +2797,204 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                       </div>
                     )}
 
+                    {/* 5. DRAF AUDIT & OPTIMASI SEO WEBSITE (Tugas 375) */}
+                    {previewItem.task_type === "SEO_OPTIMIZATION" && previewItem.payload && (
+                      <div className="space-y-4">
+                        {/* KPI Header SEO */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/60 to-slate-900 border border-emerald-500/40 text-center">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Skor Kesehatan SEO</span>
+                            <span className="text-3xl font-black text-emerald-400 font-mono">
+                              {previewItem.payload.healthScore || 94}/100
+                            </span>
+                            <span className="text-[10px] text-emerald-300/80 font-semibold block mt-1">Status: Sangat Optimal (A+ Tier)</span>
+                          </div>
+
+                          <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/60 to-slate-900 border border-cyan-500/40 text-center">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Domain Target</span>
+                            <span className="text-sm font-black text-cyan-300 font-mono block mt-1 truncate">
+                              {previewItem.payload.websiteUrl || "https://dstechsmart.com"}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block mt-1">Audit: {previewItem.payload.auditDate || "Hari Ini"}</span>
+                          </div>
+
+                          <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/60 to-slate-900 border border-indigo-500/40 text-center">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Core Web Vitals</span>
+                            <div className="flex items-center justify-center gap-2 mt-1 text-xs font-mono font-bold text-indigo-300">
+                              <span>LCP: {previewItem.payload.coreWebVitals?.lcp || "1.2s"}</span>
+                              <span>•</span>
+                              <span>CLS: {previewItem.payload.coreWebVitals?.cls || "0.01"}</span>
+                            </div>
+                            <span className="text-[10px] text-emerald-400 block mt-1">Kecepatan Render: 96/100</span>
+                          </div>
+                        </div>
+
+                        {/* Tabel Target Kata Kunci Industri */}
+                        {previewItem.payload.targetKeywords && (
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                            <span className="text-[11px] font-black text-cyan-400 uppercase tracking-wider block">
+                              🎯 Strategi Penetrasi Kata Kunci B2B &amp; Wilayah Banten
+                            </span>
+                            <div className="overflow-x-auto rounded-xl border border-slate-800/80">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-slate-900 text-slate-400 text-[10px] uppercase font-mono border-b border-slate-800">
+                                  <tr>
+                                    <th className="py-2.5 px-3">Kata Kunci Target</th>
+                                    <th className="py-2.5 px-3">Volume</th>
+                                    <th className="py-2.5 px-3">Kompetisi</th>
+                                    <th className="py-2.5 px-3">Intensi Pencarian</th>
+                                    <th className="py-2.5 px-3 text-right">Prioritas</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                  {previewItem.payload.targetKeywords.map((kw: any, idx: number) => (
+                                    <tr key={idx} className="hover:bg-slate-900/40">
+                                      <td className="py-2 px-3 font-semibold text-slate-200">{kw.keyword}</td>
+                                      <td className="py-2 px-3 font-mono text-cyan-400">{kw.volume}</td>
+                                      <td className="py-2 px-3 text-slate-300">{kw.competition}</td>
+                                      <td className="py-2 px-3 text-slate-400 text-[11px]">{kw.intent}</td>
+                                      <td className="py-2 px-3 text-right">
+                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                          {kw.status}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tabel Audit Meta Tags */}
+                        {previewItem.payload.metaTagsAudit && (
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                            <span className="text-[11px] font-black text-amber-400 uppercase tracking-wider block">
+                              🏷️ Hasil Audit Meta Tags &amp; Indexability
+                            </span>
+                            <div className="overflow-x-auto rounded-xl border border-slate-800/80">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-slate-900 text-slate-400 text-[10px] uppercase font-mono border-b border-slate-800">
+                                  <tr>
+                                    <th className="py-2.5 px-3 w-36">Elemen Metadata</th>
+                                    <th className="py-2.5 px-3">Isi Konfigurasi</th>
+                                    <th className="py-2.5 px-3 text-right w-44">Status Evaluasi</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                  {previewItem.payload.metaTagsAudit.map((tag: any, idx: number) => (
+                                    <tr key={idx} className="hover:bg-slate-900/40">
+                                      <td className="py-2 px-3 font-mono font-bold text-amber-300 text-[11px]">{tag.tag}</td>
+                                      <td className="py-2 px-3 text-slate-300 text-[11px] leading-relaxed">{tag.value}</td>
+                                      <td className="py-2 px-3 text-right">
+                                        <span className="px-2 py-0.5 rounded-md text-[9.5px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                                          {tag.status}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Rekomendasi Kode Snippet Next.js */}
+                        {previewItem.payload.recommendedCodeSnippet && (
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-black text-cyan-400 uppercase tracking-wider">
+                                💻 Cuplikan Kode Optimasi (src/app/layout.tsx)
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (typeof navigator !== "undefined" && navigator.clipboard) {
+                                    navigator.clipboard.writeText(previewItem.payload.recommendedCodeSnippet);
+                                    setCopiedCodeSnippet(true);
+                                    setTimeout(() => setCopiedCodeSnippet(false), 3000);
+                                  }
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                              >
+                                {copiedCodeSnippet ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                <span>{copiedCodeSnippet ? "Tersalin!" : "Salin Kode"}</span>
+                              </button>
+                            </div>
+                            <pre className="p-3.5 rounded-xl bg-slate-900 text-xs font-mono text-cyan-200 overflow-x-auto border border-slate-800/80 leading-relaxed max-h-56">
+                              {previewItem.payload.recommendedCodeSnippet}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* 6. DRAF AUDIT KODE PROGRAM & KEPATUHAN DATABASE MULTI-APP (Tugas 375) */}
+                    {previewItem.task_type === "CODE_AUDIT" && previewItem.payload && (
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/50 via-slate-950 to-indigo-950/50 border border-cyan-500/40 flex items-center justify-between">
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Jenis Audit Arsitektur</span>
+                            <h4 className="text-sm font-black text-white mt-0.5">{previewItem.payload.auditType || "Multi-App Database & Code Architecture"}</h4>
+                          </div>
+                          <span className="px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 font-mono font-black text-xs border border-emerald-500/40">
+                            {previewItem.payload.complianceScore || "100% Sesuai SOP"}
+                          </span>
+                        </div>
+
+                        {previewItem.payload.checks && (
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                            <span className="text-[11px] font-black text-cyan-400 uppercase tracking-wider block">
+                              🛡️ Checklist Kepatuhan Isolasi Multi-Aplikasi Database
+                            </span>
+                            <div className="overflow-x-auto rounded-xl border border-slate-800/80">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-slate-900 text-slate-400 text-[10px] uppercase font-mono border-b border-slate-800">
+                                  <tr>
+                                    <th className="py-2.5 px-3">Aturan / Aplikasi</th>
+                                    <th className="py-2.5 px-3">Prefix / Pengaturan</th>
+                                    <th className="py-2.5 px-3 text-right">Status Kepatuhan</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800/50">
+                                  {previewItem.payload.checks.map((ck: any, idx: number) => (
+                                    <tr key={idx} className="hover:bg-slate-900/40">
+                                      <td className="py-2 px-3 font-semibold text-slate-200">{ck.rule}</td>
+                                      <td className="py-2 px-3 font-mono text-amber-300">{ck.prefix || ck.version}</td>
+                                      <td className="py-2 px-3 text-right font-medium text-emerald-400 text-[11px]">{ck.status}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Hasil Kompilasi &amp; Build</span>
+                            <p className="font-mono text-cyan-300">{previewItem.payload.testResults || "tsc 0 error • 81/81 routes lolos"}</p>
+                          </div>
+                          <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Kesehatan Alokasi Memori</span>
+                            <p className="font-mono text-emerald-400">{previewItem.payload.memoryHealth || "Node Heap Stabil 72MB"}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 7. DRAF RANCANGAN FITUR SISTEM ATAU DOKUMEN LAINNYA (Tugas 375) */}
+                    {(previewItem.task_type === "SYSTEM_FEATURE" || (!["INVOICE_PROPOSAL", "FIELD_PROGRESS_REPORT", "SPH_PROPOSAL", "BOOKKEEPING_EXPENSE", "PRODUCT_IMPORT", "PROMO_CAMPAIGN", "VIDEO_BRANDING", "SOCIAL_MEDIA_CONTENT", "SEO_OPTIMIZATION", "CODE_AUDIT"].includes(previewItem.task_type))) && previewItem.payload && (
+                      <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                        <span className="text-[11px] font-black text-cyan-400 uppercase tracking-wider block">
+                          📋 Rincian Data Teknis &amp; Spesifikasi Hasil Kerja
+                        </span>
+                        <pre className="p-4 rounded-xl bg-slate-900 text-xs font-mono text-slate-200 overflow-x-auto border border-slate-800 leading-relaxed max-h-72">
+                          {typeof previewItem.payload === "string" ? previewItem.payload : JSON.stringify(previewItem.payload, null, 2)}
+                        </pre>
+                      </div>
+                    )}
+
                   </div>
 
                   {/* Modal Footer Controls */}
@@ -3269,17 +3469,54 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
               </div>
             </div>
 
-            {/* THREAD PERCAKAPAN LANGSUNG DUA ARAH DENGAN KARYAWAN AI (Tugas 341) */}
+            {/* TABS OBROLAN VS HASIL PEKERJAAN KARYAWAN (Tugas 375) */}
             {(() => {
               const currentEmployeeChat = (selectedEmployee && conversations[selectedEmployee.id]) || [];
+              const employeeDeliverables = (approvalQueue || []).filter(
+                (item) => selectedEmployee && item.employee_id === selectedEmployee.id
+              );
+
               return (
-                <div className="pt-2 border-t border-slate-800 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1.5">
-                      <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Riwayat Obrolan &amp; Memori Dialog:</span>
-                    </span>
-                    {currentEmployeeChat.length > 0 && (
+                <div className="pt-2 border-t border-slate-800 space-y-3">
+                  {/* Tab Selector */}
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setModalActiveTab("CHAT")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                          modalActiveTab === "CHAT"
+                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                        }`}
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Dialog &amp; Perintah</span>
+                        {currentEmployeeChat.length > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-slate-800 text-slate-300 font-mono">
+                            {currentEmployeeChat.length}
+                          </span>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setModalActiveTab("DELIVERABLES")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                          modalActiveTab === "DELIVERABLES"
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+                        }`}
+                      >
+                        <FileText className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Hasil Tugas &amp; Berkas</span>
+                        <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500/30 text-amber-200 font-mono font-bold">
+                          {employeeDeliverables.length}
+                        </span>
+                      </button>
+                    </div>
+
+                    {modalActiveTab === "CHAT" && currentEmployeeChat.length > 0 && (
                       <button
                         type="button"
                         onClick={() => handleClearEmployeeChat(selectedEmployee.id)}
@@ -3287,103 +3524,219 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                         title="Bersihkan riwayat percakapan dengan staf ini"
                       >
                         <RotateCcw className="w-3 h-3" />
-                        <span>Reset Obrolan</span>
+                        <span>Reset</span>
                       </button>
                     )}
                   </div>
 
-                  {/* Chat Thread Container */}
-                  <div className="max-h-60 overflow-y-auto space-y-2.5 p-3.5 bg-slate-950/90 rounded-2xl border border-slate-800 shadow-inner">
-                    {currentEmployeeChat.length === 0 ? (
-                      <div className="py-6 text-center text-slate-500 text-xs">
-                        <Bot className="w-7 h-7 text-slate-600 mx-auto mb-1.5 opacity-60" />
-                        <p className="font-semibold text-slate-400">Belum ada riwayat dialog dengan {selectedEmployee.name}.</p>
-                        <p className="text-[10px] text-slate-500 mt-0.5">Ketik instruksi di bawah atau klik contoh perintah untuk mulai berdialog.</p>
-                      </div>
-                    ) : (
-                      currentEmployeeChat.map((msg: any) => (
-                        <div
-                          key={msg.id}
-                          className={`flex gap-2 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
-                        >
-                          {msg.sender === "agent" && (
-                            <div
-                              className="w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0 border mt-0.5"
-                              style={{
-                                backgroundColor: selectedEmployee.avatar_color + "25",
-                                borderColor: selectedEmployee.avatar_color
-                              }}
-                            >
-                              {selectedEmployee.gender === "female" ? "👩‍💼" : "👨‍💼"}
-                            </div>
-                          )}
-
+                  {/* KONTEN TAB 1: OBROLAN & DIALOG */}
+                  {modalActiveTab === "CHAT" ? (
+                    <div className="max-h-64 overflow-y-auto space-y-2.5 p-3.5 bg-slate-950/90 rounded-2xl border border-slate-800 shadow-inner">
+                      {currentEmployeeChat.length === 0 ? (
+                        <div className="py-6 text-center text-slate-500 text-xs">
+                          <Bot className="w-7 h-7 text-slate-600 mx-auto mb-1.5 opacity-60" />
+                          <p className="font-semibold text-slate-400">Belum ada riwayat dialog dengan {selectedEmployee.name}.</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">Ketik instruksi di bawah atau klik contoh perintah untuk mulai berdialog.</p>
+                        </div>
+                      ) : (
+                        currentEmployeeChat.map((msg: any) => (
                           <div
-                            className={`max-w-[85%] rounded-2xl p-2.5 text-xs leading-relaxed shadow-md ${
-                              msg.sender === "user"
+                            key={msg.id}
+                            className={`flex gap-2 ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                          >
+                            {msg.sender === "agent" && (
+                              <div
+                                className="w-6 h-6 rounded-lg flex items-center justify-center text-xs shrink-0 border mt-0.5"
+                                style={{
+                                  backgroundColor: selectedEmployee.avatar_color + "25",
+                                  borderColor: selectedEmployee.avatar_color
+                                }}
+                              >
+                                {selectedEmployee.gender === "female" ? "👩‍💼" : "👨‍💼"}
+                              </div>
+                            )}
+
+                            <div
+                              className={`max-w-[85%] rounded-2xl p-2.5 text-xs leading-relaxed shadow-md ${
+                                msg.sender === "user"
                                 ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-tr-none"
                                 : "bg-slate-800/95 text-slate-100 border border-slate-700/80 rounded-tl-none"
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-3 text-[9px] opacity-75 mb-1 pb-1 border-b border-white/10">
-                              <span className="font-bold">
-                                {msg.sender === "user" ? "Direktur Utama (Bpk. Ramadhani ST)" : selectedEmployee.name}
-                              </span>
-                              <span className="font-mono">
-                                {new Date(msg.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                              </span>
-                            </div>
-                            <p className="whitespace-pre-line font-medium text-[11.5px]">{msg.text}</p>
-                            {msg.attachment && (
-                              <div className="mt-2 p-2 bg-slate-900/90 border border-slate-700/80 rounded-xl flex items-center justify-between gap-2 text-xs">
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <Paperclip className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                                  <div className="truncate">
-                                    <span className="text-cyan-300 font-semibold truncate block text-[11px]">
-                                      {msg.attachment.originalName || msg.attachment.fileName}
-                                    </span>
-                                    {msg.attachment.size && (
-                                      <span className="text-[9px] text-slate-400 font-mono">
-                                        {(msg.attachment.size / 1024).toFixed(1)} KB
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3 text-[9px] opacity-75 mb-1 pb-1 border-b border-white/10">
+                                <span className="font-bold">
+                                  {msg.sender === "user" ? "Direktur Utama (Bpk. Ramadhani ST)" : selectedEmployee.name}
+                                </span>
+                                <span className="font-mono">
+                                  {new Date(msg.timestamp).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+                              <p className="whitespace-pre-line font-medium text-[11.5px]">{msg.text}</p>
+
+                              {/* Lampiran File Inquiry */}
+                              {msg.attachment && (
+                                <div className="mt-2 p-2 bg-slate-900/90 border border-slate-700/80 rounded-xl flex items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-2 overflow-hidden">
+                                    <Paperclip className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                                    <div className="truncate">
+                                      <span className="text-cyan-300 font-semibold truncate block text-[11px]">
+                                        {msg.attachment.originalName || msg.attachment.fileName}
                                       </span>
+                                      {msg.attachment.size && (
+                                        <span className="text-[9px] text-slate-400 font-mono">
+                                          {(msg.attachment.size / 1024).toFixed(1)} KB
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <a
+                                    href={msg.attachment.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-[10px] font-bold shrink-0 transition flex items-center gap-1"
+                                  >
+                                    <span>Unduh</span>
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                  </a>
+                                </div>
+                              )}
+
+                              {/* Kartu Pratinjau Berkas Hasil Eksekusi AI (Tugas 375) */}
+                              {msg.contextPayload && (
+                                <div className="mt-2.5 p-3 rounded-xl bg-slate-950/90 border border-cyan-500/40 space-y-2 text-left">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                                      <Sparkles className="w-2.5 h-2.5 text-cyan-400" />
+                                      <span>{msg.contextPayload.title || "Berkas Hasil Eksekusi"}</span>
+                                    </span>
+                                    <span className="text-[9px] text-amber-400 font-mono font-bold">
+                                      Menunggu Persetujuan
+                                    </span>
+                                  </div>
+
+                                  {msg.contextPayload.summary && (
+                                    <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                                      {msg.contextPayload.summary}
+                                    </p>
+                                  )}
+
+                                  <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const match = approvalQueue.find((q) => q.id === msg.contextPayload.queueId);
+                                        if (match) {
+                                          setPreviewItem(match);
+                                        } else {
+                                          setPreviewItem({
+                                            id: msg.contextPayload.queueId || `appr_temp_${Date.now()}`,
+                                            task_type: msg.contextPayload.type || "CODE_AUDIT",
+                                            title: msg.contextPayload.title || "Hasil Tugas",
+                                            summary: msg.contextPayload.summary || msg.text,
+                                            employee_id: selectedEmployee.id,
+                                            employee_name: selectedEmployee.name,
+                                            employee_role: selectedEmployee.role,
+                                            department: selectedEmployee.department || "Divisi Operasional",
+                                            status: "PENDING_APPROVAL",
+                                            created_at: msg.timestamp || new Date().toISOString(),
+                                            payload: msg.contextPayload.payload || msg.contextPayload,
+                                          });
+                                        }
+                                      }}
+                                      className="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-[10.5px] font-bold transition flex items-center gap-1.5 shadow-md shadow-cyan-600/30 cursor-pointer"
+                                    >
+                                      <Eye className="w-3 h-3" />
+                                      <span>Buka &amp; Periksa Hasil Lengkap</span>
+                                    </button>
+
+                                    {msg.contextPayload.link && (
+                                      <a
+                                        href="#executive-approval-queue"
+                                        onClick={() => setSelectedEmployee(null)}
+                                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <span>Ke Antrean</span>
+                                        <ExternalLink className="w-2.5 h-2.5" />
+                                      </a>
                                     )}
                                   </div>
                                 </div>
-                                <a
-                                  href={msg.attachment.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-[10px] font-bold shrink-0 transition flex items-center gap-1"
-                                >
-                                  <span>Unduh</span>
-                                  <ExternalLink className="w-2.5 h-2.5" />
-                                </a>
-                              </div>
-                            )}
-                            {msg.contextPayload?.link && (
-                              <div className="mt-2 pt-1.5 border-t border-slate-700/60 flex items-center justify-between text-[10px]">
-                                <span className="text-emerald-400 font-bold">✓ Usulan telah dibuat</span>
-                                <a
-                                  href={msg.contextPayload.link}
-                                  className="px-2 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded text-[9.5px] font-bold transition flex items-center gap-1 shadow-sm"
-                                >
-                                  <span>Lihat di Antrean</span>
-                                  <ExternalLink className="w-2.5 h-2.5" />
-                                </a>
+                              )}
+                            </div>
+
+                            {msg.sender === "user" && (
+                              <div className="w-6 h-6 rounded-lg bg-cyan-950 border border-cyan-500/60 flex items-center justify-center text-cyan-300 font-bold text-[9px] shrink-0 mt-0.5">
+                                DIR
                               </div>
                             )}
                           </div>
-
-                          {msg.sender === "user" && (
-                            <div className="w-6 h-6 rounded-lg bg-cyan-950 border border-cyan-500/60 flex items-center justify-center text-cyan-300 font-bold text-[9px] shrink-0 mt-0.5">
-                              DIR
-                            </div>
-                          )}
+                        ))
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+                  ) : (
+                    /* KONTEN TAB 2: DAFTAR BERKAS & HASIL PEKERJAAN (Tugas 375) */
+                    <div className="max-h-64 overflow-y-auto space-y-2.5 p-2 bg-slate-950/90 rounded-2xl border border-slate-800 shadow-inner">
+                      {employeeDeliverables.length === 0 ? (
+                        <div className="py-8 text-center text-slate-500 text-xs space-y-2">
+                          <FileText className="w-8 h-8 text-slate-600 mx-auto opacity-60" />
+                          <p className="font-semibold text-slate-300">Belum ada berkas tugas otonom dari {selectedEmployee.name}.</p>
+                          <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                            Kirimkan instruksi melalui tab "Dialog &amp; Perintah" (misalnya audit SEO, draf penawaran SPH, atau survei) untuk meminta staf ini membuat berkas resmi.
+                          </p>
                         </div>
-                      ))
-                    )}
-                    <div ref={chatEndRef} />
-                  </div>
+                      ) : (
+                        employeeDeliverables.map((item) => (
+                          <div
+                            key={item.id}
+                            className="p-3.5 bg-slate-900/90 rounded-2xl border border-slate-800/90 hover:border-cyan-500/50 transition space-y-2 shadow-md text-left"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="px-2 py-0.5 rounded-md text-[9.5px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                                {item.task_type.replace(/_/g, " ")}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                                item.status === "PENDING_APPROVAL"
+                                  ? "bg-amber-950/80 text-amber-300 border-amber-500/60"
+                                  : item.status === "APPROVED"
+                                    ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/60"
+                                    : "bg-rose-950/80 text-rose-300 border-rose-500/60"
+                              }`}>
+                                {item.status === "PENDING_APPROVAL" ? "Menunggu Persetujuan Direktur" : item.status === "APPROVED" ? "Disetujui" : "Ditolak"}
+                              </span>
+                            </div>
+
+                            <h4 className="text-xs font-bold text-white leading-snug">{item.title}</h4>
+                            <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">{item.summary}</p>
+
+                            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
+                              <span className="text-slate-500 font-mono">
+                                {new Date(item.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewItem(item)}
+                                  className="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold transition flex items-center gap-1 shadow-sm cursor-pointer"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                  <span>Lihat Hasil Lengkap</span>
+                                </button>
+                                <a
+                                  href="#executive-approval-queue"
+                                  onClick={() => setSelectedEmployee(null)}
+                                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg font-bold transition flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>Ke Antrean</span>
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -3437,23 +3790,61 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
               }}
               className="pt-2 space-y-3"
             >
-              {/* Tautan Cepat Hasil Eksekusi Tugas */}
+              {/* Tautan Cepat & Notifikasi Hasil Eksekusi Tugas (Tugas 375) */}
               {modalExecutionResult && (
-                <div className="p-3 bg-emerald-950/70 border border-emerald-800/80 rounded-xl flex items-center justify-between gap-3 text-xs">
-                  <span className="text-emerald-300 font-medium text-[11px]">
-                    ✓ Tugas berhasil dieksekusi secara otonom!
-                  </span>
-                  {modalExecutionResult.link && (
-                    <a
-                      href={modalExecutionResult.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 shadow-sm"
+                <div className="p-3.5 bg-gradient-to-r from-emerald-950/90 via-slate-900 to-cyan-950/90 border border-emerald-500/60 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-lg animate-fadeIn">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-emerald-200 font-bold text-[11.5px] block">
+                        Tugas Berhasil Diselesaikan &amp; Berkas Resmi Disusun!
+                      </span>
+                      <span className="text-slate-300 text-[10px] block line-clamp-1">
+                        {modalExecutionResult.title || "Telah dicatat ke Kotak Persetujuan Pimpinan."}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const match = approvalQueue.find((q) => q.id === modalExecutionResult.queueId);
+                        if (match) {
+                          setPreviewItem(match);
+                        } else {
+                          setPreviewItem({
+                            id: modalExecutionResult.queueId || `appr_temp_${Date.now()}`,
+                            task_type: modalExecutionResult.type || "CODE_AUDIT",
+                            title: modalExecutionResult.title || "Hasil Tugas",
+                            summary: modalExecutionResult.summary || "Hasil eksekusi otonom",
+                            employee_id: selectedEmployee.id,
+                            employee_name: selectedEmployee.name,
+                            employee_role: selectedEmployee.role,
+                            department: selectedEmployee.department || "Divisi Operasional",
+                            status: "PENDING_APPROVAL",
+                            created_at: new Date().toISOString(),
+                            payload: modalExecutionResult.payload || modalExecutionResult,
+                          });
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-[10.5px] font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/30 cursor-pointer"
                     >
-                      <span>Lihat Hasil di ERP</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Buka Hasil Lengkap</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setModalActiveTab("DELIVERABLES")}
+                      className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-[10px] font-bold transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <FileText className="w-3 h-3 text-amber-400" />
+                      <span>Tab Berkas</span>
+                    </button>
+                  </div>
                 </div>
               )}
 

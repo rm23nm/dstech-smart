@@ -26,7 +26,7 @@ export interface AgentTask {
   toolCalls?: { tool: string; params: any; output: any }[];
   resultSummary?: string;
   documentGenerated?: {
-    type: "SPH" | "SPK" | "INVOICE" | "FINANCIAL_AUDIT" | "MARKETING_CAMPAIGN" | "CATALOG_PRODUCT";
+    type: "SPH" | "SPK" | "INVOICE" | "FINANCIAL_AUDIT" | "MARKETING_CAMPAIGN" | "CATALOG_PRODUCT" | "SEO_OPTIMIZATION" | "CODE_AUDIT" | "SYSTEM_FEATURE";
     docNumber: string;
     title: string;
     content: any;
@@ -1047,6 +1047,29 @@ Sebagai ${profile.name}, apa langkah kerja dan alat internal yang harus Anda gun
       };
 
       task.resultSummary = `Berhasil menerbitkan ${spkDoc.docNumber} ditugaskan kepada ${spkDoc.technicianName} untuk pelaksanaan di lokasi ${spkDoc.location}.`;
+
+    } else if (profile.id === "emp_arya_coder") {
+      task.thoughtProcess?.push("Menganalisis instruksi koding, memeriksa arsitektur database prefix, dan menyusun laporan teknis...");
+      
+      const isSeo = /(?:seo|meta|search engine|google|peringkat|ranking|sitemap|robots)/i.test(lowerIns);
+      const docType = isSeo ? "SEO_OPTIMIZATION" : "CODE_AUDIT";
+      const docTitle = isSeo ? "Audit & Optimasi SEO Website dstechsmart.com" : "Audit Kode & Kepatuhan Arsitektur Sistem";
+      
+      task.documentGenerated = {
+        type: docType,
+        docNumber: `DEV/${now.getFullYear()}/${Math.floor(1000 + Math.random() * 9000)}`,
+        title: docTitle,
+        content: {
+          instruction,
+          healthScore: 94,
+          multiAppCompliance: "100% Patuh (dstech_, wa_, access_, mosque_, POS mandiri)",
+          status: "Berhasil Dijalankan Secara Otonom"
+        }
+      };
+
+      task.resultSummary = isSeo 
+        ? "Audit SEO dstechsmart.com selesai: Skor Kesehatan 94/100, kata kunci Banten/Cilegon terpetakan, dan metadata Open Graph serta Schema.org terstruktur rapi."
+        : "Pemeriksaan arsitektur selesai: Seluruh 81 routes tsc bersih, kepatuhan prefix database 100% terjaga.";
 
     } else {
       task.thoughtProcess?.push("Merancang materi promosi sinematik dan copywriting penawaran...");

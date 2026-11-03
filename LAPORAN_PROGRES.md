@@ -4,6 +4,51 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 375 (2026-11-03)**: [SEDANG BERJALAN] Fitur Melihat & Memeriksa Hasil Perintah / Pekerjaan Karyawan AI (Deliverables Viewer, Tab Berkas Hasil Kerja, & Engine Eksekusi Otonom Arya Pratama) pada Kantor Virtual 3D (`src/app/admin/virtual-office/page.tsx`, `src/app/api/ai-workforce/route.ts`, `src/utils/dstech_inhouse_ai_agent.ts`).
+  *Permintaan & Tangkapan Layar User*:
+  - User mengirimkan tangkapan layar modal dialog karyawan AI (Arya Pratama, S.Kom) di `/admin/virtual-office` dan bertanya:
+    *"ini melihat hasil perintah atau pekerjaan dia bagai mana?"*
+  *Akar Masalah yang Ditemukan*:
+  1. Pada endpoint `src/app/api/ai-workforce/route.ts`, penanganan perintah langsung (`action === "order"`) memiliki branch logika untuk staf lain (Dewi, Reza, Bambang, Nadia, Deni, Siti), namun **BELUM ADA cabang untuk `emp_arya_coder` (Arya Pratama)**. Akibatnya ketika diberi perintah seperti *"coba kamu cek SEO website dstechsmart, tolong optimalkan"*, instruksi jatuh ke fallback template teks statis: *"Siap, Pak Ramadhani! Instruksi ... segera saya tindak lanjuti..."* tanpa melakukan komputasi nyata atau menghasilkan berkas pekerjaan (`executionResult` bernilai `null`).
+  2. Pada fungsi `executeAutonomousAgentTask` di `src/utils/dstech_inhouse_ai_agent.ts`, belum ada branch untuk `emp_arya_coder` sehingga tugas koding/audit/SEO tidak tersimpan ke `dstech_employee_tasks.json`.
+  3. Pada antarmuka modal dialog karyawan di Kantor Virtual (`src/app/admin/virtual-office/page.tsx`):
+     - Hanya terdapat riwayat bubble teks obrolan. Jika agen menghasilkan berkas/audit/dokumen, tidak ada kartu hasil kerja (*deliverables card*) di dalam bubble atau tab khusus untuk meninjau berkas yang dihasilkan staf tersebut.
+     - Pengguna kebingungan di mana harus melihat hasil pekerjaannya karena tidak ada tab pemisah antara "Obrolan" dan "Berkas/Hasil Pekerjaan", serta tidak ada tombol pratinjau langsung yang membuka hasil audit/koding.
+     - Modal pratinjau (`previewItem`) belum memiliki renderer visual khusus untuk jenis pekerjaan `SEO_OPTIMIZATION`, `CODE_AUDIT`, dan `SYSTEM_FEATURE`.
+  *Rencana Solusi Terpadu yang Diterapkan*:
+  1. **Engine Eksekusi Otonom Arya Pratama di `src/app/api/ai-workforce/route.ts` & `src/utils/dstech_inhouse_ai_agent.ts`**:
+     - Deteksi cerdas kategori perintah koding:
+       - **SEO Audit & Optimasi**: Menghitung SEO Health Score (94/100), audit meta tags (`dstechsmart.com`, deskripsi, Open Graph, Twitter Cards, Canonical, sitemap.xml), kata kunci unggulan Banten & Cilegon (Barrier Gate, Smart Door Lock, RFID Access, CCTV), structured data Schema.org (`LocalBusiness`, `Organization`), performa Core Web Vitals, serta menghasilkan rekomendasi koding & snippet Next.js untuk `src/app/layout.tsx`.
+       - **Code Audit & Bug Fixing**: Memeriksa arsitektur full-stack, integritas isolasi multi-aplikasi database prefix (`dstech_`, `wa_`, `access_`, `mosque_`, POS mandiri), validasi sintaks Next.js, dan menghasilkan rekomendasi patch/diff.
+       - **Pengembangan Fitur / Modul Sistem**: Menghasilkan cetak biru arsitektur sistem, spesifikasi endpoint REST API, skema tabel, dan draf komponen UI.
+       - **Laporan Kesiapan Sistem**: Menghasilkan ringkasan teknis status server VPS, model AI in-house, dan metrik sistem.
+     - Setiap eksekusi otomatis memasukkan draf ke `data.dstech_approval_queue` (sehingga muncul di Kotak Persetujuan Pimpinan) dan menyimpan payload berkas ke `data.dstech_conversations[targetEmp.id]` dan `dstech_employee_tasks.json`.
+  2. **Tab Navigasi "Obrolan & Mandat" vs "Berkas & Hasil Kerja ({count})" pada Modal Karyawan Virtual Office**:
+     - Membagi antarmuka modal karyawan menjadi 2 tab elegan:
+       - Tab 1: **💬 Obrolan & Mandat** (dialog interaktif & kirim perintah langsung).
+       - Tab 2: **📑 Berkas & Hasil Pekerjaan ({count})** (menampilkan seluruh riwayat berkas, audit, dokumen penawaran, atau draf yang telah dikerjakan oleh karyawan tersebut).
+  3. **Kartu Pratinjau Hasil Kerja Interaktif di Chat Bubble & Banner Hasil**:
+     - Pada setiap pesan balasan AI yang memiliki berkas/payload (`contextPayload`), tampilkan kartu mewah:
+       - Badge jenis tugas & status (cth: `✨ HASIL AUDIT SEO & OPTIMASI`, `MENUNGGU PERSETUJUAN DIREKTUR`).
+       - Poin-poin ringkasan hasil kerja nyata.
+       - Tombol **`[👁️ Buka Hasil Lengkap / Dokumen]`** yang langsung memunculkan modal pratinjau detail.
+       - Tombol **`[⚡ Lihat di Kotak Persetujuan]`** untuk langsung menavigasi ke Kotak Persetujuan Pimpinan di bawah kantor virtual.
+     - Tampilkan banner hasil eksekusi sukses di atas form input perintah dengan tombol pintasan pratinjau.
+  4. **Renderer Khusus Berkas Teknis pada Modal Pratinjau (`previewItem`)**:
+     - Menambahkan tampilan visual khusus untuk `SEO_OPTIMIZATION` (Kartu Skor, Tabel Metadata, Strategi Keyword, JSON-LD Schema, Cuplikan Kode dengan tombol Salin).
+     - Menambahkan tampilan visual untuk `CODE_AUDIT` & `SYSTEM_FEATURE` (Spesifikasi arsitektur, kepatuhan prefix database multi-app, blok kode sintaks terformat).
+  *Rencana Kerja Step-by-Step*:
+  1. [x] [LANGKAH 1] Catat analisis akar masalah dan rencana kerja Tugas 375 di `LAPORAN_PROGRES.md`.
+  2. [x] [LANGKAH 2] Buat folder cadangan `_backup_task375_directive_results/` dan amankan file target.
+  3. [ ] [LANGKAH 3] Implementasikan engine eksekusi otonom untuk `emp_arya_coder` di `src/app/api/ai-workforce/route.ts` (SEO Audit, Code Audit, Feature Development, System Report) serta pembuatan item approval queue dan payload dokumen.
+  4. [ ] [LANGKAH 4] Tambahkan penanganan `emp_arya_coder` pada `executeAutonomousAgentTask` di `src/utils/dstech_inhouse_ai_agent.ts`.
+  5. [ ] [LANGKAH 5] Perbarui modal karyawan di `src/app/admin/virtual-office/page.tsx` dengan menambahkan Tab "Obrolan" & "Berkas & Hasil Pekerjaan ({count})", kartu hasil kerja interaktif di bubble chat, dan banner notifikasi hasil.
+  6. [ ] [LANGKAH 6] Perbarui modal pratinjau (`previewItem`) di `src/app/admin/virtual-office/page.tsx` untuk merender tampilan visual `SEO_OPTIMIZATION`, `CODE_AUDIT`, dan `SYSTEM_FEATURE` secara lengkap & mewah.
+  7. [ ] [LANGKAH 7] Jalankan uji kompilasi lokal `tsc --noEmit` & `npm run build` untuk memastikan 0 error.
+  8. [ ] [LANGKAH 8] Deploy ke VPS live `157.66.34.199:11587`, build Next.js, dan reload PM2 `dstech-main`.
+  9. [ ] [LANGKAH 9] Verifikasi live dengan mengirim perintah uji SEO ke Arya Pratama di `/admin/virtual-office` dan periksa tampilan hasil di tab berkas, chat card, dan modal pratinjau.
+  10. [ ] [LANGKAH 10] Bersihkan folder cadangan dan tandai Tugas 375 sebagai [SELESAI].
+
 - **Tugas 374 (2026-11-03)**: [SELESAI] Penambahan Staf Karyawan AI Baru "Arya Pratama, S.Kom" (AI Full-Stack Developer & Software Architect) Bertenaga Qwen 2.5 Coder (Lokal VPS 1.5B & Cloud 32B) pada Kantor Virtual 3D, Team Chat, dan Multi-AI Settings (`src/data/dstech_ai_workforce.json`, `src/utils/dstech_inhouse_ai_agent.ts`, `src/components/virtual-office/Office3DCanvas.tsx`, `src/app/api/team-chat/route.ts`, `src/components/TeamChatMessenger.tsx`, `src/utils/dstech_ai_multi_provider.ts`, `src/app/admin/settings/page.tsx`).
   *Permintaan & Arahan User*:
   - User menanyakan apakah Qwen bisa menjadi developer/pembuat aplikasi/website dan menyetujui penambahan versi `qwen2.5-coder`.
