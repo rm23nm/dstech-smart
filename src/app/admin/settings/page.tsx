@@ -3868,6 +3868,7 @@ export default function AdminSettingsPage() {
                   <option value="deepseek">DeepSeek AI (V3 &amp; R1)</option>
                   <option value="claude">Anthropic Claude 3.5</option>
                   <option value="groq">Meta LLaMA 3.3 (Groq)</option>
+                  <option value="qwen">Qwen 2.5 Coder (Lokal VPS &amp; Cloud)</option>
                 </select>
               </div>
             </div>

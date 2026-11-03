@@ -13,6 +13,7 @@ const SCHEDULES_FILE = path.join(DATA_DIR, "dstech_agent_schedules.json");
 // URL Engine AI Lokal Ollama (100% In-House di Server VPS)
 const OLLAMA_BASE_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434";
 export const DEFAULT_INHOUSE_MODEL = "qwen2.5:3b";
+export const DEFAULT_CODER_MODEL = "qwen2.5-coder:1.5b";
 
 export interface AgentTask {
   id: string;
@@ -1368,4 +1369,14 @@ ${c.recommendations || "Lakukan follow-up pembayaran segera."}`;
   return `*DOKUMEN RESMI PT. DSTECH SMART PERKASA*
 ${doc.title || "Dokumen Otonom"}
 ${doc.resultSummary || ""}`;
+}
+
+
+export async function callLocalCoderLLM(
+  prompt: string,
+  systemPrompt: string = "Anda adalah Arya Pratama, AI Software Developer PT. DSTech Smart Perkasa. Tuliskan kode yang bersih, bebas bug, dan sesuai standar Next.js/TypeScript.",
+  model: string = DEFAULT_CODER_MODEL,
+  timeoutMs: number = 8000
+): Promise<{ text: string; error?: string }> {
+  return callLocalInHouseLLM(prompt, systemPrompt, model, timeoutMs);
 }

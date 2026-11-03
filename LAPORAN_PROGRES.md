@@ -4,6 +4,36 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
+- **Tugas 374 (2026-11-03)**: [SEDANG BERJALAN] Penambahan Staf Karyawan AI Baru "Arya Pratama, S.Kom" (AI Full-Stack Developer & Software Architect) Bertenaga Qwen 2.5 Coder (Lokal VPS 1.5B & Cloud 32B) pada Kantor Virtual 3D, Team Chat, dan Multi-AI Settings (`src/data/dstech_ai_workforce.json`, `src/utils/dstech_inhouse_ai_agent.ts`, `src/components/virtual-office/Office3DCanvas.tsx`, `src/app/api/team-chat/route.ts`, `src/components/TeamChatMessenger.tsx`, `src/utils/dstech_ai_multi_provider.ts`, `src/app/admin/settings/page.tsx`).
+  *Permintaan & Arahan User*:
+  - User menanyakan apakah Qwen bisa menjadi developer/pembuat aplikasi/website dan menyetujui penambahan versi `qwen2.5-coder`.
+  - Mengingat server VPS memiliki RAM 5.9 GB (tersisa ~1.2 GB bebas) tanpa GPU, model `qwen2.5-coder:32b` (~20 GB) berisiko memicu crash OOM jika dipaksa di lokal VPS, sehingga diterapkan arsitektur dual-mode:
+    1. **Qwen 2.5 Coder 1.5B In-House Lokal VPS**: Dipasang di Ollama VPS untuk eksekusi kode ringan, perbaikan sintaks, dan pembuatan script mandiri 100% offline tanpa biaya.
+    2. **Qwen 2.5 Coder 32B Cloud / Gemini 2.5 Flash**: Digunakan untuk perancangan arsitektur sistem skala besar tanpa membebani RAM VPS.
+  *Rencana Solusi Terpadu yang Diterapkan*:
+  1. **Pengunduhan Model Qwen Coder di VPS**: Menjalankan `ollama pull qwen2.5-coder:1.5b` di server VPS.
+  2. **Profil Staf AI Baru (Arya Pratama, S.Kom)**:
+     - Jabatan: AI Full-Stack Developer & Software Architect.
+     - Divisi: IT, Software & AI Systems.
+     - Keahlian: Next.js & React Full-Stack, Backend API, Database Architecture (dstech_, wa_, access_, mosque_), Bug Fixing & Code Audit, Zero Downtime Deployment.
+     - Meja Kerja 3D: Posisi workstation `IT_DEV_DESK` di Kantor Virtual 3D.
+  3. **Integrasi Team Chat & Intersepsi Instruksi Koding**:
+     - Menambahkan handler khusus jika Direktur memanggil "Arya" atau memerintahkan pembuatan kode program, modul web, perbaikan bug, atau audit database.
+     - Menyediakan tombol aksi cepat (*quick action buttons*) untuk Arya di sidebar Team Chat Messenger.
+  4. **Pembaruan Panel Multi-AI Settings**:
+     - Menambahkan pilihan model `qwen2.5-coder:1.5b` (Lokal In-House VPS) dan `qwen2.5-coder:32b` (Cloud Senior Architect) pada daftar model AI di sistem.
+  *Rencana Kerja Step-by-Step*:
+  1. [x] [LANGKAH 1] Catat analisis akar masalah dan rencana kerja Tugas 374 di `LAPORAN_PROGRES.md`.
+  2. [x] [LANGKAH 2] Buat folder cadangan `_backup_task374_arya_coder/` dan amankan file target.
+  3. [x] [LANGKAH 3] Verifikasi unduhan model `qwen2.5-coder:1.5b` di Ollama VPS (Ollama pull selesai di server VPS).
+  4. [x] [LANGKAH 4] Tambahkan profil Arya Pratama di `src/data/dstech_ai_workforce.json` dan `src/utils/dstech_inhouse_ai_agent.ts`.
+  5. [x] [LANGKAH 5] Tambahkan meja kerja dan avatar 3D Arya di `src/components/virtual-office/Office3DCanvas.tsx`.
+  6. [x] [LANGKAH 6] Tambahkan handler chat Arya dan tombol aksi cepat di `src/app/api/team-chat/route.ts` dan `src/components/TeamChatMessenger.tsx`.
+  7. [x] [LANGKAH 7] Tambahkan opsi model Qwen Coder di `src/utils/dstech_ai_multi_provider.ts` dan `src/app/admin/settings/page.tsx`.
+  8. [x] [LANGKAH 8] Jalankan uji kompilasi lokal `tsc --noEmit` & `npm run build` untuk memastikan 0 error (Lolos bersih 0 error, 81/81 routes berhasil dibangun).
+  9. [ ] [LANGKAH 9] Deploy ke live VPS `157.66.34.199:11587`, build Next.js, dan restart PM2 `dstech-main`.
+  10. [ ] [LANGKAH 10] Verifikasi live chat dengan Arya Pratama, bersihkan folder backup, dan tandai Tugas 374 sebagai [SELESAI].
+
 - **Tugas 373 (2026-11-03)**: [SELESAI] Penambahan Fitur Pratinjau Interaktif Produk Lengkap (Live Store & Modal Preview) pada Manajemen Produk Admin (`src/app/admin/products/page.tsx`).
   *Permintaan User*: "saya tidak bisa melihat hasil preview dri produk yang diupload" (disertai tangkapan layar tabel produk di `/admin/products`).
   *Akar Masalah yang Ditemukan*:

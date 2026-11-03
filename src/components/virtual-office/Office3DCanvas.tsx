@@ -51,6 +51,7 @@ const WORKSTATION_SLOTS: Record<string, { deskX: number; deskZ: number; chairX: 
   emp_reza_catalog: { deskX: 8, deskZ: 0, chairX: 8.9, chairZ: 0, rotY: -Math.PI * 0.5, label: "E-Store & Catalog" },
   emp_nadia_marketing: { deskX: 8, deskZ: -5, chairX: 8.9, chairZ: -5, rotY: -Math.PI * 0.5, label: "Marketing Lounge" },
   emp_deni_field: { deskX: 8, deskZ: 7, chairX: 8.9, chairZ: 7, rotY: -Math.PI * 0.5, label: "Field Operations" },
+  emp_arya_dev: { deskX: -4, deskZ: 10, chairX: -4, chairZ: 10.9, rotY: Math.PI, label: "IT & Software Engineering Hub" },
   director_ramadhani: { deskX: 0, deskZ: -9, chairX: 0, chairZ: -9.9, rotY: 0, label: "Meja Direktur Utama" },
 };
 

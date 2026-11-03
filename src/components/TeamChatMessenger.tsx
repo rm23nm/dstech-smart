@@ -816,6 +816,34 @@ export default function TeamChatMessenger({
       );
     }
 
+    if (empId === "emp_arya_dev") {
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => setInputText("Arya, tolong audit status kode website dan integrasi AI Qwen Coder")}
+            className="px-2.5 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-full text-[11px] font-medium shrink-0 transition cursor-pointer"
+          >
+            💻 Audit Kode &amp; Qwen Coder
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Arya, buatkan fitur modul baru untuk sistem website")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            ⚡ Buat Modul Website
+          </button>
+          <button
+            type="button"
+            onClick={() => setInputText("Arya, pastikan pemisahan prefix database dstech_, wa_, access_, mosque_ aman")}
+            className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-full text-[11px] shrink-0 transition cursor-pointer"
+          >
+            🛡️ Cek Database Prefix
+          </button>
+        </>
+      );
+    }
+
     // Default / Grup Hub
     return (
       <>

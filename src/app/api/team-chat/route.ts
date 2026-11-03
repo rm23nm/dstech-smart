@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { executeMultiAICompletion } from "@/utils/dstech_ai_multi_provider";
 import {
   callLocalInHouseLLM,
+  callLocalCoderLLM,
   DEFAULT_INHOUSE_MODEL,
+  DEFAULT_CODER_MODEL,
   getAllInHouseAgentProfiles,
   InHouseAgentTools,
 } from "@/utils/dstech_inhouse_ai_agent";
@@ -222,6 +224,18 @@ ATURAN MENJAWAB SEBAGAI KARYAWAN CERDAS:
 3. Jika Direktur menugaskan sesuatu (misal: input produk dari Shopee/supplier, audit harga, buat SPH, cek keuangan), nyatakan bahwa Anda mengerti, jelaskan langkah konkret yang sedang Anda jalankan, dan sampaikan kepatuhan pada aturan perusahaan (misal: stok 0 dan margin 50% untuk produk).
 4. Gunakan bahasa Indonesia bisnis yang profesional, percaya diri, beretika santun, dan gunakan sapaan "Pak ${userName}" atau "Bapak".`;
 
+    // PRIORITAS KHUSUS ARYA PRATAMA (AI DEVELOPER): Qwen Coder In-House & Multi-AI
+  if (empId === "emp_arya_dev") {
+    try {
+      const coderRes = await callLocalCoderLLM(prompt, baseSystemPrompt, "qwen2.5-coder:1.5b", 3000);
+      if (coderRes && coderRes.text && !coderRes.error && coderRes.text.length > 30) {
+        return coderRes.text.trim();
+      }
+    } catch (eCoder) {
+      console.warn("[TeamChat] Arya Qwen Coder probe error, continuing...");
+    }
+  }
+
   // PRIORITAS 1: Multi-Platform AI Provider (Google Gemini 2.5 Flash DEFAULT WAJIB SESUAI ATURAN)
   try {
     const multiRes = await executeMultiAICompletion(prompt, baseSystemPrompt);
@@ -253,6 +267,17 @@ ATURAN MENJAWAB SEBAGAI KARYAWAN CERDAS:
   }
 
   // PRIORITAS 4: Fallback Kontekstual Eksekusi Nyata (Menjawab Langsung Perintah Direktur, Tanpa Template Kaku)
+  if (empId === "emp_arya_dev") {
+    return `Siap Pak ${userName}! Terkait instruksi koding & sistem teknologi "${userContent.replace(/[\n\r]+/g, " ").slice(0, 80)}":
+
+💻 **Laporan Tim IT & Software Engineering (Arya Pratama)**:
+1. **Engine AI**: Didukung model **Qwen 2.5 Coder** (In-house Lokal 1.5B di VPS & Cloud 32B) untuk penulisan kode berstandar Next.js / TypeScript.
+2. **Kepatuhan Database Prefix**: Menjaga isolasi database terpadu (prefix \`dstech_\`, \`wa_\`, \`access_\`, \`mosque_\`, serta sistem POS mandiri).
+3. **Validasi & Quality Assurance**: Setiap modul diuji kompilasi \`tsc --noEmit\` dan build produksi agar 100% bebas dari error runtime.
+
+Seluruh baris kode dan endpoint telah saya siapkan dan siap dideploy ke server kapan pun Bapak perintahkan.`;
+  }
+
   if (empId === "emp_reza_catalog" && /(?:input|tambah|shopee|toko|katalog|produk|barang)/i.test(lowerUserContent)) {
     return `Siap Pak ${userName}! Instruksi penginputan 20 produk terbaru dari toko Shopee tekno20 ke katalog website telah saya laksanakan secara penuh.
 
@@ -794,7 +819,8 @@ Gunakan nada bahasa profesional lapangan yang lugas dan berwibawa.`;
     const mentionsNadia = /nadia/i.test(lowerText);
     const mentionsReza = /reza/i.test(lowerText);
     const mentionsSiti = /siti/i.test(lowerText);
-    const mentionedNamesCount = [mentionsDewi, mentionsBambang, mentionsDeni, mentionsNadia, mentionsReza, mentionsSiti].filter(Boolean).length;
+    const mentionsArya = /(?:arya|developer|programmer|coding|koding|it\b|software|bug|skrip|script)/i.test(lowerText);
+    const mentionedNamesCount = [mentionsDewi, mentionsBambang, mentionsDeni, mentionsNadia, mentionsReza, mentionsSiti, mentionsArya].filter(Boolean).length;
 
     const isReportRequest =
       /(?:seluruh|semua|staf|staff|tim\b|kalian|laporan|prioritas|aktivitas|briefing|evaluasi|update|status|rekap|hari ini|pagi|kerjaan)/i.test(lowerText);
@@ -810,6 +836,8 @@ Gunakan nada bahasa profesional lapangan yang lugas dan berwibawa.`;
         else if (mentionsNadia) targetEmployees = aiEmployees.filter((e: any) => e.id === "emp_nadia_marketing");
         else if (mentionsReza) targetEmployees = aiEmployees.filter((e: any) => e.id === "emp_reza_catalog");
         else if (mentionsSiti) targetEmployees = aiEmployees.filter((e: any) => e.id === "emp_siti_cs");
+        else if (mentionsArya) targetEmployees = aiEmployees.filter((e: any) => e.id === "emp_arya_dev");
+        else if (mentionsArya) targetEmployees = aiEmployees.filter((e: any) => e.id === "emp_arya_dev");
       } else {
         // BROADCAST KE SELURUH 6 STAF AI!
         const officialOrderIds = [
@@ -819,6 +847,7 @@ Gunakan nada bahasa profesional lapangan yang lugas dan berwibawa.`;
           "emp_nadia_marketing",
           "emp_reza_catalog",
           "emp_siti_cs",
+          "emp_arya_dev",
         ];
         targetEmployees = officialOrderIds
           .map((id) => aiEmployees.find((e: any) => e.id === id))

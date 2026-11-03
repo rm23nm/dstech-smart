@@ -4,7 +4,7 @@ import path from "path";
 const SETTINGS_FILE = path.join(process.cwd(), "src", "data", "dstech_settings.json");
 
 export interface DstechAISettings {
-  active_provider: "gemini" | "openai" | "deepseek" | "claude" | "groq";
+  active_provider: "gemini" | "openai" | "deepseek" | "claude" | "groq" | "qwen";
   // Google Gemini (Default: gemini-2.5-flash WAJIB SESUAI ATURAN)
   gemini_model: string;
   gemini_keys_free: string;
@@ -21,6 +21,9 @@ export interface DstechAISettings {
   // Meta LLaMA via Groq
   groq_key: string;
   groq_model: string;
+  // Qwen Coder & In-House AI
+  qwen_key: string;
+  qwen_model: string;
   // Video Engine
   video_engine: string;
   video_aspect_ratio: string;
@@ -39,6 +42,8 @@ export const DSTECH_DEFAULT_AI_SETTINGS: DstechAISettings = {
   claude_model: "claude-3-5-sonnet-20241022",
   groq_key: process.env.GROQ_API_KEY || "",
   groq_model: "llama-3.3-70b-versatile",
+  qwen_key: process.env.QWEN_API_KEY || "",
+  qwen_model: "qwen2.5-coder:1.5b",
   video_engine: "veo",
   video_aspect_ratio: "9:16",
 };
@@ -70,6 +75,11 @@ export const DSTECH_AI_MODELS = {
     { id: "llama-3.3-70b-versatile", name: "LLaMA 3.3 70B (Kecepatan Kilat via Groq LPU)" },
     { id: "llama-3.1-8b-instant", name: "LLaMA 3.1 8B Instant (Ultra Cepat)" },
     { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B (32k Context)" },
+  ],
+  qwen: [
+    { id: "qwen2.5-coder:1.5b", name: "Qwen 2.5 Coder 1.5B (In-House Lokal VPS - Ringan & Cepat)" },
+    { id: "qwen2.5-coder:32b", name: "Qwen 2.5 Coder 32B (Full-Stack Senior Architect via Cloud)" },
+    { id: "qwen2.5:3b", name: "Qwen 2.5 3B (Asisten Otonom & Bisnis Lokal VPS)" },
   ],
 };
 
@@ -469,6 +479,31 @@ export async function executeMultiAICompletion(
       return callClaude(prompt, systemInstruction, modelOverride || settings.claude_model, settings.claude_key);
     case "groq":
       return callGroq(prompt, systemInstruction, modelOverride || settings.groq_model, settings.groq_key);
+        case "qwen": {
+      const qwenModel = modelOverride || settings.qwen_model || "qwen2.5-coder:1.5b";
+      try {
+        // Panggil Ollama lokal VPS
+        const res = await fetch("http://127.0.0.1:11434/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: qwenModel,
+            prompt: `${systemInstruction ? systemInstruction + "\n\n" : ""}${prompt}`,
+            stream: false,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.response) {
+            return { success: true, text: data.response.trim(), provider: "qwen", model: qwenModel };
+          }
+        }
+      } catch (err: any) {
+        console.warn("[Multi-AI] Qwen local probe failed:", err.message);
+      }
+      return { success: false, error: "Gagal memproses dengan Qwen Coder lokal.", provider: "qwen", model: qwenModel };
+    }
     case "gemini":
     default:
       return callGemini(prompt, systemInstruction, modelOverride || settings.gemini_model || "gemini-2.5-flash", settings);
