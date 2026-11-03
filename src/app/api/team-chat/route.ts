@@ -318,6 +318,37 @@ async function handleAiWorkforceChatMessage({
       wfData.dstech_conversations = {};
     }
 
+    // Auto-sync profil Arya Pratama jika belum tercatat di database runtime
+    if (!wfData.dstech_employees.some((e: any) => e.id === "emp_arya_dev")) {
+      wfData.dstech_employees.push({
+        id: "emp_arya_dev",
+        name: "Arya Pratama, S.Kom",
+        role: "AI Full-Stack Developer & Software Architect",
+        department: "IT_SOFTWARE_DEV",
+        desk_zone: "IT_DEV_DESK",
+        gender: "male",
+        avatar_color: "#2563eb",
+        status: "WORKING",
+        current_activity: "Mengoptimasi engine website Next.js, audit database prefix, dan integrasi Qwen Coder AI",
+        speech_bubble: "Siap Pak Ramadhani! Saya siap membantu pengembangan fitur website, audit kode, dan pembuatan aplikasi otomatis dengan Qwen Coder.",
+        kpi: {
+          modules_built: 42,
+          bugs_fixed: 89,
+          code_uptime: "99.9%",
+          api_endpoints: 36,
+          tasks_completed: 15,
+        },
+        skills: [
+          "Full-Stack Next.js & React",
+          "Database Architecture (dstech_, wa_, access_, mosque_)",
+          "Backend REST API & Webhook",
+          "Audit Bug & Syntax Optimization",
+          "Qwen Coder & Multi-AI Integration",
+        ],
+      });
+      writeJsonSafe(WORKFORCE_FILE, wfData);
+    }
+
     const aiEmployees = wfData.dstech_employees;
     const content = (userMessage.content || "").trim();
     const mediaUrl = userMessage.mediaUrl || "";
