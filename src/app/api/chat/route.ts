@@ -1,25 +1,27 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { callLocalInHouseLLM, DEFAULT_INHOUSE_MODEL } from "@/utils/dstech_inhouse_ai_agent";
+import { executeMultiAICompletion } from "@/utils/dstech_ai_multi_provider";
 
 export const dynamic = "force-dynamic";
 
 const SETTINGS_FILE = path.join(process.cwd(), "src", "data", "dstech_settings.json");
-const CRM_FILE = path.join(process.cwd(), "src", "data", "dstech_crm.json");
 const ORDERS_FILE = path.join(process.cwd(), "src", "data", "dstech_orders.json");
+const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
 
 function getSettings() {
   try {
     if (fs.existsSync(SETTINGS_FILE)) {
-      const data = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
-      return data;
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
     }
   } catch (e) {}
   return {
     whatsapp: "6282259494242",
     whatsappSales: "6282259494242",
     whatsappTechnical: "6282259494242",
-    whatsappComplaint: "6282259494242"
+    whatsappComplaint: "6282259494242",
+    companyName: "PT. DSTech Smart Perkasa",
   };
 }
 
@@ -33,14 +35,22 @@ function getOrders(): any[] {
   return [];
 }
 
+function getProducts(): any[] {
+  try {
+    if (fs.existsSync(PRODUCTS_FILE)) {
+      const prods = JSON.parse(fs.readFileSync(PRODUCTS_FILE, "utf-8"));
+      return Array.isArray(prods) ? prods : [];
+    }
+  } catch (e) {}
+  return [];
+}
+
 function findOrderByQuery(query: string, visitorPhone?: string): any | null {
   const orders = getOrders();
   if (!orders || orders.length === 0) return null;
   const qClean = query.trim().toLowerCase();
   const digits = query.replace(/\D/g, "");
-  const visPhoneDigits = (visitorPhone || "").replace(/\D/g, "");
 
-  // 1. Coba match Order Number (misal: ORD/DST/202610/001 atau ORD-DST atau order_...)
   const orderNumMatch = query.match(/ORD[\/\-_]?DST[\/\-_]?\d+[\/\-_]?\d+/i) || query.match(/order_\d+/i);
   if (orderNumMatch) {
     const rawTarget = orderNumMatch[0].toLowerCase().replace(/[\/\-_]/g, "");
@@ -52,7 +62,6 @@ function findOrderByQuery(query: string, visitorPhone?: string): any | null {
     if (found) return found;
   }
 
-  // 2. Coba match Tracking / Resi Number
   const foundByResi = orders.find((o) => {
     if (!o.trackingNumber || !o.trackingNumber.trim()) return false;
     const resi = o.trackingNumber.trim().toLowerCase();
@@ -60,7 +69,6 @@ function findOrderByQuery(query: string, visitorPhone?: string): any | null {
   });
   if (foundByResi) return foundByResi;
 
-  // 3. Coba match Nomor Telepon jika ada digit >= 9
   if (digits.length >= 9) {
     const foundByPhone = orders.find((o) => {
       const p1 = (o.customerPhone || "").replace(/\D/g, "");
@@ -71,18 +79,105 @@ function findOrderByQuery(query: string, visitorPhone?: string): any | null {
     if (foundByPhone) return foundByPhone;
   }
 
-  // 4. Jika visitorPhone ada dan pertanyaan menanyakan pesanan
-  if (visPhoneDigits.length >= 9) {
-    const foundByVisitorPhone = orders.find((o) => {
-      const p1 = (o.customerPhone || "").replace(/\D/g, "");
-      const p2 = (o.shippingAddress?.phone || "").replace(/\D/g, "");
-      return (p1 && (p1.includes(visPhoneDigits) || visPhoneDigits.includes(p1))) ||
-             (p2 && (p2.includes(visPhoneDigits) || visPhoneDigits.includes(p2)));
-    });
-    if (foundByVisitorPhone) return foundByVisitorPhone;
+  return null;
+}
+
+function searchMatchedProducts(query: string): any[] {
+  const products = getProducts();
+  if (!products || products.length === 0) return [];
+  const q = query.toLowerCase().trim();
+
+  // Jika pengunjung bertanya umum seputar katalog/produk apa saja yang ada
+  const isGeneralCatalog = /^(ada produk apa|produk apa|jual apa|katalog|daftar produk|list produk|produknya apa|ada apa saja|barang apa|layanan apa|jasa apa|bisa pasang apa)/i.test(q);
+  if (isGeneralCatalog) {
+    const flagshipIds = [
+      "dstech_prod_reza_shopee_01", // Barrier Gate Servo DC MX-50
+      "dstech_prod_2",              // CCTV Hikvision 4CH HD
+      "dstech_prod_1",              // Smart Doorlock X-100 / Tuya
+      "dstech_prod_reza_shopee_10", // Flap Barrier Turnstile
+    ];
+    const flagships = products.filter((p) => flagshipIds.includes(p.id));
+    if (flagships.length >= 3) return flagships;
+    return products.slice(0, 4);
   }
 
-  return null;
+  const words = q.split(/\s+/).filter((w) => w.length > 2);
+
+  const scored = products.map((p) => {
+    let score = 0;
+    const pName = (p.name || "").toLowerCase();
+    const pCat = (p.category || "").toLowerCase();
+    const pDesc = (p.desc || "").toLowerCase();
+
+    if (pName.includes(q)) score += 10;
+    if (pCat.includes(q)) score += 5;
+
+    for (const w of words) {
+      if (pName.includes(w)) score += 3;
+      if (pCat.includes(w)) score += 2;
+      if (pDesc.includes(w)) score += 1;
+    }
+    return { product: p, score };
+  });
+
+  return scored
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4)
+    .map((s) => s.product);
+}
+
+function generateSmartFallback(message: string, matchedProducts: any[], settings: any): string {
+  const lower = message.trim().toLowerCase();
+
+  // 1. Sapaan Ramah Alami (Greetings)
+  const isGreetingOnly = /^(halo|hai|hey|pagi|selamat|assalam|siang|sore|malam|p\b|permisi|tes|test)$/i.test(lower) ||
+    /^(halo|hai|hey|selamat pagi|selamat siang|selamat sore|selamat malam|assalamu'?alaikum)\b[!.? ]*$/i.test(lower);
+    
+  if (isGreetingOnly) {
+    let waktu = "pagi";
+    const currentHour = new Date().getHours();
+    if (currentHour >= 11 && currentHour < 15) waktu = "siang";
+    else if (currentHour >= 15 && currentHour < 18) waktu = "sore";
+    else if (currentHour >= 18 || currentHour < 5) waktu = "malam";
+    if (lower.includes("pagi")) waktu = "pagi";
+    else if (lower.includes("siang")) waktu = "siang";
+    else if (lower.includes("sore")) waktu = "sore";
+    else if (lower.includes("malam")) waktu = "malam";
+
+    return `Selamat ${waktu}! Selamat datang di PT. DSTech Smart Perkasa. Saya Siti dari tim layanan pelanggan. Ada yang bisa kami bantu seputar sistem keamanan, barrier gate otomatis, CCTV, atau akses kontrol untuk lokasi Anda hari ini?`;
+  }
+
+  // 2. Pertanyaan Umum Produk / Katalog ("ada produk apa saja", "jual apa saja", dll)
+  if (/produk apa|jual apa|katalog|daftar produk|list barang|ada apa|bisa pasang apa|solusi apa/i.test(lower)) {
+    return `Halo! Di PT. DSTech Smart Perkasa, kami menyediakan berbagai solusi teknologi dan sistem keamanan terintegrasi, antara lain:
+
+1. **Barrier Gate & Sistem Parkir Otomatis**: Palang parkir otomatis mesin Servo Brushless kecepatan tinggi (0.6s - 1.2s), MX-80 Heavy Duty, sensor radar 79GHz, loop detector, reader RFID UHF jarak jauh 15 meter, serta pos tiket kasir dispenser.
+2. **Pedestrian Gate / Turnstile**: Flap Barrier otomatis SUS304 dan Tripod Turnstile untuk gedung perkantoran, pabrik, atau fasilitas umum.
+3. **Akses Kontrol & Smart Door Lock**: Terminal Face Recognition & Sidik Jari, Smart Lock Tuya WiFi, Drop Bolt, dan Magnetic Lock 600 Lbs.
+4. **CCTV AI Surveillance**: Kamera pengawas resolusi tinggi dengan kecerdasan buatan (deteksi manusia, kendaraan, dan night color vision).
+5. **Visual Display & IoT**: Running Text LED P10 outdoor tahan cuaca, Traffic Light LED 100mm, dan Variable Message Sign (VMS).
+
+Seluruh perangkat bergaransi resmi 1 tahun dan didukung jasa pemasangan langsung oleh tim teknisi bersertifikat kami. Apakah ada kebutuhan tertentu atau lokasi yang ingin Anda pasangi sistem ini?`;
+  }
+
+  // 3. Pertanyaan Harga / Penawaran
+  if (/harga|biaya|tarif|berapa|pricelist|penawaran|paket|ongkir/i.test(lower)) {
+    if (matchedProducts.length > 0) {
+      const list = matchedProducts.slice(0, 3).map((p) => `- **${p.name}**: Rp ${Number(p.price).toLocaleString("id-ID")} (Garansi Resmi 1 Tahun)`).join("\n");
+      return `Halo! Untuk informasi estimasi harga solusi perangkat kami, berikut beberapa produk yang relevan:\n\n${list}\n\nUntuk perhitungan paket lengkap berikut jasa instalasi dan kabel di lokasi Anda, tim konsultan kami siap membuatkan penawaran resmi (SPH). Boleh kami tahu lokasi pemasangannya di mana?`;
+    }
+    return `Halo! Untuk estimasi biaya paket lengkap (termasuk unit, material, dan jasa instalasi teknisi resmi), tim konsultan kami siap membuatkan draf Surat Penawaran Harga (SPH) resmi. Boleh kami tahu kebutuhan sistem yang ingin dipasang dan lokasinya?`;
+  }
+
+  // 4. Pertanyaan Spesifikasi / Produk Relevan
+  if (matchedProducts.length > 0) {
+    const list = matchedProducts.slice(0, 3).map((p) => `- **${p.name}**: Rp ${Number(p.price).toLocaleString("id-ID")}`).join("\n");
+    return `Halo! Terkait kebutuhan Anda, kami memiliki beberapa solusi perangkat unggulan di PT. DSTech Smart Perkasa:\n\n${list}\n\nSeluruh perangkat kami bergaransi resmi 1 tahun. Apakah ada spesifikasi khusus atau kapasitas yang ingin Anda konsultasikan lebih lanjut?`;
+  }
+
+  // 5. Default Ramah & Terbuka
+  return `Halo! Terima kasih telah menghubungi PT. DSTech Smart Perkasa. Kami melayani pengadaan dan pemasangan Barrier Gate Otomatis, CCTV AI Surveillance, Access Control & Smart Door Lock, Turnstile, serta IoT.\n\nBoleh kami tahu apa yang sedang Anda butuhkan atau kendala yang ingin diselesaikan di lokasi Anda? Kami siap bantu rekomendasikan solusi terbaiknya.`;
 }
 
 export async function POST(req: Request) {
@@ -100,10 +195,9 @@ export async function POST(req: Request) {
     const waTechnical = (settings.whatsappTechnical || cleanMainWa).replace(/\D/g, "") || cleanMainWa;
     const waComplaint = (settings.whatsappComplaint || cleanMainWa).replace(/\D/g, "") || cleanMainWa;
 
-    // Deteksi tipe portal dan identitas internal
     const rawPath = (visitorInfo?.currentPath || "").toLowerCase();
-    const portalType: "SUPERADMIN" | "ADMIN" | "EMPLOYEE" | "PARTNER" | "PUBLIC" = 
-      visitorInfo?.portalType || 
+    const portalType: "SUPERADMIN" | "ADMIN" | "EMPLOYEE" | "PARTNER" | "PUBLIC" =
+      visitorInfo?.portalType ||
       (rawPath.startsWith("/superadmin") ? "SUPERADMIN" :
        rawPath.startsWith("/admin") ? "ADMIN" :
        rawPath.startsWith("/employee") ? "EMPLOYEE" :
@@ -111,468 +205,250 @@ export async function POST(req: Request) {
 
     const isInternalUser = portalType === "SUPERADMIN" || portalType === "ADMIN" || portalType === "EMPLOYEE";
     const userName = visitorInfo?.name ? visitorInfo.name.split(" ")[0] : "";
+    const lower = message.toLowerCase();
 
-    // Panggil Engine AI Screening SmartPro HANYA untuk portal PUBLIC
-    // Untuk portal internal (Superadmin, Admin, Employee, Partner), langsung layani via Role-Aware Copilot Engine!
-    const SMARTPRO_URL = process.env.SMARTPRO_API_URL || "https://smartpro.dstechsmart.com";
     let aiResponseData: any = null;
 
-    if (portalType === "PUBLIC") {
-      try {
-        const resSmartPro = await fetch(`${SMARTPRO_URL}/api/external/ai-chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            secret: process.env.LICENSE_MASTER_KEY || "DSTECH-MASTER-PRO-2026",
-            message: message.trim(),
-            history: Array.isArray(history) ? history.slice(-8) : [],
-            portalType: portalType,
-            isInternalUser: isInternalUser,
-            visitorInfo: {
-              ...visitorInfo,
-              portalType,
-              isInternalUser,
-            },
-            companyProfile: {
-              companyName: settings.companyName || "PT. DSTech Smart Perkasa",
-              address: settings.address || "PERUM BUKIT CILEGON ASRI BLOK DB NO. 19, KEL. BAGENDUNG, KEC. CILEGON, KOTA CILEGON - BANTEN",
-              googleMapsUrl: settings.googleMapsUrl || "https://maps.google.com/?q=Perum+Bukit+Cilegon+Asri+Cilegon+Banten",
-              serviceArea: settings.serviceArea || "Banten (Cilegon, Serang, Tangerang), Jabodetabek, dan Seluruh Wilayah Indonesia (Nasional)",
-              whatsapp: settings.whatsappDisplay || "+62 822-5949-4242",
-              email: settings.email || "cs@dstechsmart.com"
-            }
-          }),
-          signal: AbortSignal.timeout(18000)
-        });
+    // ==========================================
+    // KASUS 1: PORTAL SUPERADMIN & ADMIN (ERP COPILOT)
+    // ==========================================
+    if (portalType === "SUPERADMIN" || portalType === "ADMIN") {
+      let reply = "";
+      const quickReplies = [
+        "📄 Cara Buat Faktur Baru",
+        "📑 Cara Terbitkan SPH",
+        "📦 Cara Input Produk & Stok",
+        "🎨 Cara Atur E-Store Hero",
+        "📊 Panduan Buku Arus Kas"
+      ];
 
-        if (resSmartPro.ok) {
-          const json = await resSmartPro.json();
-          if (json.success && json.data) {
-            aiResponseData = json.data;
-          }
-        }
-      } catch (err: any) {
-        console.warn("[DSTech Chat API] SmartPro AI unreachable or timeout:", err?.message);
-      }
-    }
-
-    // Engine Cerdas Penanganan Peran Lokal (Role-Aware Local Copilot Engine)
-    if (!aiResponseData) {
-      const lower = message.toLowerCase();
-
-      // ==========================================
-      // KASUS 1: PORTAL SUPERADMIN & ADMIN (ERP COPILOT)
-      // ==========================================
-      if (portalType === "SUPERADMIN" || portalType === "ADMIN") {
-        let reply = "";
-        const quickReplies = [
-          "📄 Cara Buat Faktur Baru",
-          "📝 Cara Terbitkan SPH",
-          "📦 Cara Input Produk & Stok",
-          "🛒 Cara Atur E-Store Hero",
-          "💰 Panduan Buku Arus Kas"
-        ];
-
-        if (lower.includes("faktur") || lower.includes("invoice") || lower.includes("tagihan") || lower.includes("termin")) {
-          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Berikut langkah mudah membuat Faktur Penjualan di sistem ERP:\n\n` +
-                  `1. Buka menu Keuangan (/admin/finance) ➔ Tab "Penjualan & Faktur".\n` +
-                  `2. Klik tombol "+ Terbitkan Faktur Baru" di pojok kanan atas.\n` +
-                  `3. Pilih Klien dari Master Klien (otomatis isi alamat & kontak) atau ketik manual.\n` +
-                  `4. Tentukan Entitas Bisnis (PT. DSTech / Usaha Mandiri Non-PT) dan pilih Titik Gudang Logistik.\n` +
-                  `5. Tambah item barang: Klik tombol "📦 Pilih dari List / Master" untuk memilih produk dari katalog dengan auto-fill harga & ketersediaan stok riil.\n` +
-                  `6. Tentukan skema pembayaran (Lunas, Uang Muka DP, atau Multi-Termin bertahap 30-40-30 dsb.) dan tarif PPN (11%, 12%, atau Bebas PPN 0%).\n` +
-                  `7. Klik "Simpan Faktur". Dokumen otomatis memiliki nomor INV resmi, QR barcode verifikasi, dan siap dicetak standar A4 (2 halaman) atau dibagikan link publik ber-PIN via WhatsApp/Email.`;
-        } else if (lower.includes("sph") || lower.includes("penawaran") || lower.includes("quotation") || lower.includes("prospek")) {
-          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Berikut cara menerbitkan Surat Penawaran Harga (SPH):\n\n` +
-                  `1. Masuk ke Keuangan (/admin/finance) ➔ Tab "Penawaran (SPH)".\n` +
-                  `2. Klik tombol "+ Terbitkan SPH Baru".\n` +
-                  `3. Pilih Klien sasaran dan masa berlaku penawaran (validUntil).\n` +
-                  `4. Masukkan rincian produk, spesifikasi teknis, harga, dan ketentuan garansi.\n` +
-                  `5. Simpan. SPH akan terbit lengkap dengan Kop Surat resmi, pengesahan direksi, dan paraf di setiap halaman lampiran.\n` +
-                  `6. Jika penawaran disetujui klien, Anda bisa langsung mengonversinya menjadi Proyek Baru atau Faktur Penjualan dengan 1-klik (tombol "🚀 Jadikan Proyek Baru" atau "⚡ Konversi Faktur").`;
-        } else if (lower.includes("produk") || lower.includes("katalog") || lower.includes("stok") || lower.includes("barang")) {
-          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Berikut cara mengelola Master Produk & Stok:\n\n` +
-                  `1. Buka menu Produk (/admin/products atau /superadmin/products).\n` +
-                  `2. Klik "+ Tambah Produk".\n` +
-                  `3. Isi Nama Produk, Kategori (CCTV, Smart Home, Barrier Gate, dsb.), Harga Modal, Harga Jual, dan Stok Gudang.\n` +
-                  `4. Unggah foto produk resmi (sistem akan menyimpan dengan prefix aman dstech_img_).\n` +
-                  `5. Klik "Simpan Produk". Produk langsung otomatis tersinkronisasi ke katalog marketplace toko online (/shop) dan muncul di pilihan Faktur/SPH.`;
-        } else if (lower.includes("estore") || lower.includes("e-store") || lower.includes("hero") || lower.includes("banner") || lower.includes("toko online") || lower.includes("background")) {
-          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Untuk mengatur Banner Hero & Produk Unggulan E-Store:\n\n` +
-                  `1. Buka menu Pengaturan Sistem (/admin/settings).\n` +
-                  `2. Pilih Tab "🛒 Pengaturan E-Store & Hero Showcase".\n` +
-                  `3. Pada Bagian 1: Pilih mode latar belakang (Gradient Modern, Dark Minimalist, Deep Cyber Navy, atau Upload Gambar Kustom / Banner URL + slider opasitas gelap).\n` +
-                  `4. Pada Bagian 2: Anda dapat mengganti Teks Judul Hero, Teks Highlight Biru, Subjudul Promo, dan Durasi Auto-Play slide (4s/6s/8s/10s).\n` +
-                  `5. Pada Bagian 3: Klik tombol "+ Tambah Produk ke Hero" untuk memilih produk langsung dari katalog master. Anda bisa mengatur badge promo (Best Seller, Hot Deal), geser urutan slide naik/turun, atau hapus slide.\n` +
-                  `6. Klik "Simpan Semua Pengaturan". Perubahan langsung aktif di halaman /shop.`;
-        } else if (lower.includes("kas") || lower.includes("cash") || lower.includes("arus kas") || lower.includes("rekening") || lower.includes("bank")) {
-          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Berikut panduan pencatatan Buku Arus Kas & Rekening:\n\n` +
-                  `1. Masuk ke Keuangan (/admin/finance) ➔ Tab "Buku Arus Kas".\n` +
-                  `2. Klik tombol "+ Catat Arus Kas Masuk/Keluar".\n` +
-                  `3. Pilih Jenis Transaksi: Kas Masuk (IN) untuk penerimaan piutang/penjualan, atau Kas Keluar (OUT) untuk beban operasional/logistik.\n` +
-                  `4. Pilih Entitas Bisnis dan Rekening Bank Resmi tujuan (BCA PT, Mandiri, atau Kas Tunai).\n` +
-                  `5. Masukkan nominal rupiah, tanggal transaksi, deskripsi keterangan, dan upload foto bukti nota/kuitansi.\n` +
-                  `6. Untuk mengatur daftar nomor rekening resmi perusahaan, klik tombol "⚙️ Atur Rekening Resmi" di modal arus kas.`;
-        } else if (/\bpo\b/i.test(lower) || lower.includes("purchase order") || lower.includes("pembelian") || lower.includes("supplier") || lower.includes("vendor")) {
-          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Untuk menerbitkan Purchase Order (PO) ke Supplier:\n\n` +
-                  `1. Buka Keuangan (/admin/finance) ➔ Tab "Pembelian & PO Supplier".\n` +
-                  `2. Klik "+ Buat Purchase Order".\n` +
-                  `3. Pilih Vendor dari Master Supplier (atau tambah supplier baru).\n` +
-                  `4. Masukkan item barang belanja pengadaan, tentukan termin dan pajak PPN.\n` +
-                  `5. Simpan PO. Anda dapat mencetak lembar resmi PO A4 ber-Kop Surat atau melakukan otorisasi Approval Tanda Tangan Digital Direksi (Canvas Pad).`;
-        } else if (lower.includes("laba rugi") || lower.includes("p&l") || lower.includes("pnl") || lower.includes("laporan")) {
-          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Berikut cara melihat & mengekspor Laporan Laba Rugi (P&L):\n\n` +
-                  `1. Masuk ke Keuangan (/admin/finance) ➔ Tab "Laba Rugi (P&L)".\n` +
-                  `2. Pilih filter Entitas Bisnis: Semua Entitas, Khusus PT. DSTech Smart Perkasa, atau Usaha Mandiri Non-PT.\n` +
-                  `3. Tentukan Rentang Periode Waktu: Bulan Berjalan, Kuartal, Tahun Ini, atau pilih Rentang Tanggal Kustom (Custom Date Range) dengan kalender tanggal mulai & selesai.\n` +
-                  `4. Sistem otomatis mengkalkulasi Pendapatan Penjualan, Harga Pokok Penjualan (HPP / Biaya PO Supplier), Pengeluaran Operasional Kas Keluar, hingga Laba Bersih & Margin Persentase Profit.\n` +
-                  `5. Anda dapat mengklik tombol "Cetak Lembar P&L A4" atau "Unduh PDF" untuk dokumen laporan resmi ber-Kop Surat DSTech.`;
-        } else {
-          reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Superadmin / Admin DSTech"}! Saya Dani, Copilot AI Sistem ERP PT. DSTech Smart Perkasa. 🛡️\n\n` +
-                  `Sebagai rekan pengelola sistem, saya siap memandu Anda cara pemakaian aplikasi, antara lain:\n` +
-                  `• Cara buat Faktur Penjualan, SPH Penawaran, & PO Supplier\n` +
-                  `• Cara input produk, kategori, dan stok gudang logistik\n` +
-                  `• Cara atur Banner Hero & Promo Toko Online (E-Store)\n` +
-                  `• Cara catat pembukuan kas masuk/keluar & laporan laba rugi (P&L)\n` +
-                  `• Panduan presensi GPS selfie, kontrak PKWT, dan pengaturan sistem\n\n` +
-                  `Silakan ketik modul atau formulir apa yang ingin Anda pelajari langkah penggunaannya!`;
-        }
-
-        aiResponseData = {
-          reply,
-          department: "TECHNICAL",
-          department_label: "Copilot Operasional Sistem ERP",
-          client_name: userName || "Admin DSTech",
-          client_phone: null,
-          ready_for_handover: false,
-          handover_reason: null,
-          handover_summary: null,
-          matched_products: [],
-          quick_replies: quickReplies
-        };
-
-      // ==========================================
-      // KASUS 2: PORTAL KARYAWAN & TEKNISI (FIELD OPS GUIDE)
-      // ==========================================
-      } else if (portalType === "EMPLOYEE") {
-        let reply = "";
-        const quickReplies = [
-          "📍 Cara Absen GPS & Selfie",
-          "📦 Cara Ambil Material Gudang",
-          "🔄 Cara Konversi Roll ke Meter",
-          "📋 Lapor Progres Tugas",
-          "🛡️ SOP Pemasangan CCTV & K3"
-        ];
-
-        if (lower.includes("absen") || lower.includes("presensi") || lower.includes("checkin") || lower.includes("gps") || lower.includes("selfie")) {
-          reply = `Halo Rekan Teknisi! Berikut panduan Absensi Harian di portal /employee:\n\n` +
-                  `1. Buka kartu "Presensi Hari Ini" di bagian atas portal.\n` +
-                  `2. Klik tombol "Check-In (Masuk)" saat mulai kerja, atau "Check-Out (Pulang)" saat selesai tugas.\n` +
-                  `3. Izinkan akses Kamera dan Lokasi GPS perangkat Anda.\n` +
-                  `4. Peta radar satelit otomatis mendeteksi koordinat Anda. Arahkan kamera dan klik "Jepret Foto Selfie Wajah".\n` +
-                  `5. Klik "Simpan Presensi". Jam hadir dan peta lokasi langsung tercatat resmi di database pusat.`;
-        } else if (lower.includes("material") || lower.includes("ambil") || lower.includes("gudang") || lower.includes("kabel") || lower.includes("stok")) {
-          reply = `Halo Rekan Teknisi! Berikut cara Pengajuan Pengambilan Material Lapangan:\n\n` +
-                  `1. Pada portal /employee, buka modal "Permohonan Pengambilan Material".\n` +
-                  `2. Pilih Proyek / Surat Tugas aktif yang sedang Anda kerjakan.\n` +
-                  `3. Pilih barang yang dibutuhkan langsung dari daftar stok gudang aktif (nama, kode, dan sisa stok tampil otomatis).\n` +
-                  `4. Anda dapat mengambil multi-item sekaligus (+ Tambah Baris Barang).\n` +
-                  `5. Jika barang memiliki opsi konversi (seperti Kabel Roll ⇄ Meter), Anda bisa memilih mengambil dalam satuan meter eceran maupun roll utuh. Sistem otomatis mengkalkulasi pengurangannya.\n` +
-                  `6. Klik "Kirim Permohonan". Tim logistik gudang akan segera menyiapkan material Anda.`;
-        } else if (lower.includes("konversi") || lower.includes("roll") || lower.includes("meter") || lower.includes("kalkulator")) {
-          reply = `Halo Rekan Teknisi! Untuk konversi satuan material lapangan:\n\n` +
-                  `• 1 Roll Kabel UTP LAN standar = 305 Meter.\n` +
-                  `• 1 Dus Konektor RJ45 standar = 50 Pcs atau 100 Pcs.\n` +
-                  `• Anda dapat menggunakan widget "Kalkulator Konversi Satuan Lapangan" di portal /employee untuk menghitung cepat kebutuhan kabel eceran ke roll secara presisi tanpa takut salah hitung.`;
-        } else if (lower.includes("sop") || lower.includes("k3") || lower.includes("cctv") || lower.includes("pasang") || lower.includes("panduan")) {
-          reply = `Halo Rekan Teknisi! Berikut poin penting SOP & K3 Teknisi DSTech:\n\n` +
-                  `1. Selalu gunakan perlengkapan K3 (Helm proyek, rompi, sepatu safety, dan sabuk pengaman bila bekerja di ketinggian > 2 meter).\n` +
-                  `2. Instalasi CCTV: Pastikan jalur kabel tidak berdekatan dengan kabel listrik tegangan tinggi (minimal jarak 15 cm) untuk menghindari induksi nois.\n` +
-                  `3. Gunakan konektor DC waterproof dan box junction pelindung luar ruangan.\n` +
-                  `4. Pastikan grounding DVR/NVR dan switch terpasang baik untuk melindungi perangkat dari lonjakan petir.\n` +
-                  `5. Panduan SOP lengkap dan diagram instalasi dapat Anda buka kapan saja di menu "Pusat Panduan SOP & KMS" portal /employee.`;
-        } else {
-          reply = `Halo Rekan Tim Lapangan ${userName ? userName : "DSTech"}! Saya Asisten AI Khusus Portal Karyawan & Teknisi. 🛠️\n\n` +
-                  `Saya siap mendampingi operasional kerja Anda di lapangan:\n` +
-                  `• Panduan absensi masuk/pulang via GPS satelit & kamera selfie live\n` +
-                  `• Tata cara pengajuan material gudang & rumus konversi satuan\n` +
-                  `• Panduan update status penugasan proyek & pelaporan kendala\n` +
-                  `• Standar K3 dan SOP instalasi teknis perangkat DSTech\n\n` +
-                  `Silakan tanyakan panduan tugas apa yang sedang Anda butuhkan!`;
-        }
-
-        aiResponseData = {
-          reply,
-          department: "TECHNICAL",
-          department_label: "Asisten Operasional Teknisi Lapangan",
-          client_name: userName || "Teknisi DSTech",
-          client_phone: null,
-          ready_for_handover: false,
-          handover_reason: null,
-          handover_summary: null,
-          matched_products: [],
-          quick_replies: quickReplies
-        };
-
-      // ==========================================
-      // KASUS 3: PORTAL MITRA AFILIASI (PARTNER GUIDE)
-      // ==========================================
-      } else if (portalType === "PARTNER") {
-        let reply = "";
-        const quickReplies = [
-          "🔗 Cara Sebar Link Referral",
-          "💰 Skema Komisi Mitra",
-          "📥 Unduh Materi Promosi",
-          "💳 Syarat Penarikan Komisi"
-        ];
-
-        if (lower.includes("referral") || lower.includes("link") || lower.includes("kode") || lower.includes("sebar")) {
-          reply = `Halo Mitra Resmi DSTech! Berikut cara memanfaatkan Link Referral Anda:\n\n` +
-                  `1. Masuk ke Dashboard Mitra (/affiliate).\n` +
-                  `2. Di kartu profil mitra, klik tombol "Salin Link Referral" (format: dstechsmart.com/ref/KODE_ANDA).\n` +
-                  `3. Bagikan link tersebut ke relasi, grup WhatsApp, media sosial, atau calon klien yang membutuhkan CCTV / Smart Home.\n` +
-                  `4. Setiap kali pengunjung membuka link Anda dan melakukan pemesanan, transaksi otomatis tercatat atas nama referral Anda.`;
-        } else if (lower.includes("komisi") || lower.includes("persen") || lower.includes("bonus") || lower.includes("cair") || lower.includes("tarik")) {
-          reply = `Halo Mitra Resmi DSTech! Mengenai Komisi Kemitraan:\n\n` +
-                  `• Komisi dihitung otomatis dari total nilai transaksi bersih yang berhasil lunas dan terverifikasi oleh finance DSTech.\n` +
-                  `• Anda dapat memantau status komisi (Pending, Disetujui, Dicairkan) secara transparan pada tabel Riwayat Komisi di /affiliate.\n` +
-                  `• Penarikan komisi dapat diajukan langsung ke nomor rekening terdaftar Anda setelah mencapai batas minimum penarikan Rp 100.000.`;
-        } else if (lower.includes("materi") || lower.includes("katalog") || lower.includes("brosur") || lower.includes("banner")) {
-          reply = `Halo Mitra Resmi DSTech! Untuk materi promosi:\n\n` +
-                  `Buka bagian "Materi Promosi & Unduh Katalog" di portal /affiliate. Anda dapat mengunduh E-Katalog PDF resmi, brosur spesifikasi produk resolusi tinggi, dan banner siap pakai untuk status WhatsApp atau media sosial Anda.`;
-        } else {
-          reply = `Halo Mitra Resmi ${userName ? userName : "DSTech"}! Saya Asisten AI Program Kemitraan Afiliasi DSTech Smart. 🤝\n\n` +
-                  `Saya siap membantu Anda memaksimalkan potensi penghasilan kemitraan:\n` +
-                  `• Panduan mendapatkan & menyebarkan tautan referral\n` +
-                  `• Penjelasan skema komisi & reward pencapaian penjualan\n` +
-                  `• Akses unduh materi promosi & brosur katalog resmi\n` +
-                  `• Informasi cara pencairan saldo komisi ke rekening bank Anda\n\n` +
-                  `Ada yang ingin Anda tanyakan seputar program kemitraan kami?`;
-        }
-
-        aiResponseData = {
-          reply,
-          department: "SALES",
-          department_label: "Pemandu Sukses Mitra Afiliasi",
-          client_name: userName || "Mitra DSTech",
-          client_phone: null,
-          ready_for_handover: false,
-          handover_reason: null,
-          handover_summary: null,
-          matched_products: [],
-          quick_replies: quickReplies
-        };
-
-      // ==========================================
-      // KASUS 4: PENGUNJUNG PUBLIK / CALON KLIEN (SALES & ORDER TRACKING)
-      // ==========================================
+      if (lower.includes("faktur") || lower.includes("invoice") || lower.includes("tagihan")) {
+        reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Untuk membuat Faktur Penjualan:
+` +
+                `1. Buka menu Keuangan (/admin/finance) -> Tab "Penjualan & Faktur".
+` +
+                `2. Klik tombol "+ Terbitkan Faktur Baru".
+` +
+                `3. Pilih Klien & Produk dari katalog, tentukan termin, lalu Simpan.`;
+      } else if (lower.includes("sph") || lower.includes("penawaran")) {
+        reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Untuk menerbitkan SPH Resmi:
+` +
+                `1. Buka menu Keuangan -> Tab "Penawaran SPH".
+` +
+                `2. Klik "+ Buat SPH Baru", pilih klien, tambahkan barang/jasa, lalu cetak PDF resmi berkop surat PT. DSTech Smart Perkasa.`;
       } else {
-        const isOrderKeyword = /pesanan|order|resi|tracking|lacak|pengiriman|kirim|barang saya|sampai mana|belum sampai|status barang/i.test(lower);
-        const matchedOrder = findOrderByQuery(message, visitorInfo?.phone);
+        reply = `Halo ${userName ? `Pak/Bu ${userName}` : "Admin"}! Saya siap membantu operasional ERP DSTech Smart (Faktur, SPH, Katalog, Absensi, atau Pengaturan Sistem). Apa yang ingin Anda kelola saat ini?`;
+      }
 
-        if (matchedOrder) {
-          const statusMap: Record<string, string> = {
-            PENDING: "Menunggu Pembayaran",
-            BELUM_BAYAR: "Menunggu Pembayaran Transfer",
-            PAID: "Lunas (Diverifikasi, Siap Dipacking)",
-            MENUNGGU_KONFIRMASI: "Lunas (Menunggu Konfirmasi Gudang)",
-            PROCESSING: "Sedang Diproses & Dipacking di Gudang Logistik",
-            DIPROSES: "Sedang Diproses di Gudang Logistik",
-            SHIPPED: "Sedang Dikirim Menuju Alamat Tujuan",
-            DIKIRIM: "Dalam Pengiriman",
-            DELIVERED: "Pesanan Telah Sampai / Diterima",
-            SELESAI: "Selesai & Diterima",
-            CANCELLED: "Dibatalkan",
-            DIBATALKAN: "Dibatalkan"
-          };
-          const friendlyStatus = statusMap[(matchedOrder.status || "").toUpperCase()] || matchedOrder.status || "Dalam Proses";
-          const courier = matchedOrder.shippingCourier || "Armada Ekspedisi DSTech";
-          const resi = matchedOrder.trackingNumber || "(Resi sedang disiapkan tim logistik)";
-          const totalVal = matchedOrder.total || matchedOrder.grandTotal || 0;
-          const totalFormatted = new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(totalVal);
-          const itemsSummary = (matchedOrder.items || []).map((it: any) => `• ${it.productName || it.name} (${it.qty || 1}x)`).join("\n") || "Item pesanan DSTech Smart";
-          const recipient = matchedOrder.shippingAddress?.recipientName || matchedOrder.customerName || "Pelanggan";
-          const city = matchedOrder.shippingAddress?.city || "Kota Tujuan";
+      aiResponseData = {
+        reply,
+        department: "INTERNAL_ERP",
+        department_label: "Admin ERP AI Copilot",
+        client_name: userName || "Admin",
+        client_phone: null,
+        ready_for_handover: false,
+        handover_reason: null,
+        handover_summary: null,
+        matched_products: [],
+        quick_replies: quickReplies,
+      };
 
-          const hasTrouble = /rusak|pecah|salah kirim|lama|komplain|komplen|kendala|batal|belum sampai/i.test(lower);
+    // ==========================================
+    // KASUS 2: PORTAL KARYAWAN & TEKNISI (FIELD OPS)
+    // ==========================================
+    } else if (portalType === "EMPLOYEE") {
+      let reply = `Halo ${userName || "Rekan Teknisi"}! Ada kendala lapangan atau absensi yang bisa dibantu? Pastikan GPS aktif saat melakukan presensi check-in/out.`;
+      aiResponseData = {
+        reply,
+        department: "INTERNAL_OPS",
+        department_label: "Teknisi Field Ops Guide",
+        client_name: userName || "Karyawan",
+        client_phone: null,
+        ready_for_handover: false,
+        handover_reason: null,
+        handover_summary: null,
+        matched_products: [],
+        quick_replies: ["📍 Presensi GPS", "🛠️ Laporan Harian", "📋 Cek Tugas Proyek"],
+      };
 
-          const replyText = `Halo Kak ${recipient}! Berikut data pelacakan resmi pesanan Anda di DSTech Smart:\n\n` +
-            `📦 Nomor Pesanan: ${matchedOrder.orderNumber}\n` +
-            `📊 Status Pesanan: ${friendlyStatus}\n` +
-            `🚚 Ekspedisi: ${courier}\n` +
-            `🏷️ No. Resi: ${resi}\n` +
-            `📍 Kota Tujuan: ${city}\n` +
-            `💰 Total Nilai: ${totalFormatted}\n\n` +
-            `🛒 Rincian Barang:\n${itemsSummary}\n\n` +
-            (hasTrouble
-              ? `⚠️ Kami mendeteksi Anda mengalami kendala pada pesanan ini. Anda dapat langsung mengklik tombol "Hubungkan ke Tim Admin / CS" atau Panggilan Telepon di bawah agar tim kami segera membantu menyelesaikan kendala Anda!`
-              : `Pesanan Anda terpantau aman dalam sistem kami. Jika ada perubahan alamat, konfirmasi pengiriman, atau pertanyaan lainnya, silakan hubungkan langsung ke tim Admin/CS kami!`);
+    // ==========================================
+    // KASUS 3: PORTAL PARTNER AFFILIATE
+    // ==========================================
+    } else if (portalType === "PARTNER") {
+      let reply = `Halo Mitra DSTech Smart! Anda berhak mendapatkan komisi 5% - 15% untuk setiap referral klien proyek CCTV, Barrier Gate, atau Smart Home yang deal. Bagikan link referral Anda untuk mulai menghasilkan komisi.`;
+      aiResponseData = {
+        reply,
+        department: "AFFILIATE",
+        department_label: "Partner Growth Guide",
+        client_name: userName || "Mitra",
+        client_phone: null,
+        ready_for_handover: false,
+        handover_reason: null,
+        handover_summary: null,
+        matched_products: [],
+        quick_replies: ["💰 Cek Komisi", "🔗 Salin Link Referral", "📦 Katalog Produk"],
+      };
 
-          aiResponseData = {
-            reply: replyText,
-            department: hasTrouble ? "COMPLAINT" : "SALES",
-            department_label: hasTrouble ? "Tim Penanganan Komplain & Logistik" : "Tim Layanan Pelanggan & Logistik",
-            client_name: recipient,
-            client_phone: matchedOrder.customerPhone || matchedOrder.shippingAddress?.phone || visitorInfo?.phone || null,
-            ready_for_handover: hasTrouble || isOrderKeyword,
-            handover_reason: hasTrouble 
-              ? `Kendala pesanan ${matchedOrder.orderNumber}: ${message}` 
-              : `Konsultasi pesanan ${matchedOrder.orderNumber} (${friendlyStatus})`,
-            handover_summary: `Halo Admin/CS PT. DSTech Smart Perkasa,\nSaya ingin menanyakan pesanan [${matchedOrder.orderNumber}] atas nama ${recipient}.\nStatus: ${friendlyStatus}\nKeluhan/Pertanyaan: "${message}".\nMohon dibantu. Terima kasih!`,
-            matched_products: [],
-            matched_order: {
-              id: matchedOrder.id,
-              orderNumber: matchedOrder.orderNumber,
-              status: matchedOrder.status,
-              friendlyStatus,
-              shippingCourier: courier,
-              trackingNumber: matchedOrder.trackingNumber || "",
-              customerName: recipient,
-              customerPhone: matchedOrder.customerPhone || matchedOrder.shippingAddress?.phone || "",
-              city: city,
-              totalFormatted,
-              items: matchedOrder.items || []
-            },
-            quick_replies: [
-              hasTrouble ? "🚨 Komplain ke Admin/CS" : "💬 Tanya CS Pengiriman",
-              "📞 Panggilan Suara CS",
-              "📹 Panggilan Video CS",
-              "🛒 Belanja Produk Lain"
-            ]
-          };
-        } else if (isOrderKeyword) {
-          aiResponseData = {
-            reply: `Halo! Saya Dani, siap membantu mengecek status pesanan dan pengiriman Anda secara real-time. 📦🚚\n\n` +
-                   `Agar saya dapat mencarikan data pesanan Anda dengan akurat, silakan ketikkan:\n` +
-                   `• **Nomor Pesanan** Anda (contoh: *ORD/DST/202610/001*), atau\n` +
-                   `• **Nomor Resi Pengiriman**, atau\n` +
-                   `• **Nomor WhatsApp** yang Anda gunakan saat memesan.\n\n` +
-                   `Jika Anda mengalami kendala atau paket belum sampai, Anda juga bisa langsung klik tombol **"Hubungkan ke Tim Admin / CS"** di bawah!`,
-            department: "COMPLAINT",
-            department_label: "Tim Penanganan Komplain & Pengiriman",
-            client_name: visitorInfo?.name || null,
-            client_phone: visitorInfo?.phone || null,
-            ready_for_handover: true,
-            handover_reason: "Klien menanyakan status pesanan & pengiriman.",
-            handover_summary: `Halo Tim Admin / CS PT. DSTech Smart Perkasa,\nSaya ingin melacak pesanan saya via website mengenai: "${message}".\nMohon dibantu cek status pengiriman. Terima kasih!`,
-            matched_products: [],
-            quick_replies: [
-              "💬 Hubungkan ke Admin/CS",
-              "📞 Panggilan Suara CS",
-              "📹 Panggilan Video CS",
-              "🛒 Cek Toko Online"
-            ]
-          };
-        } else {
-          let dept = "SALES";
-          let deptLabel = "Tim Support Sales & Penawaran";
-          let isReady = false;
+    // ==========================================
+    // KASUS 4: PENGUNJUNG PUBLIK (IN-HOUSE AI CONSULTANT)
+    // ==========================================
+    } else {
+      // 1. Cek Pelacakan Pesanan
+      const isOrderKeyword = /pesanan|order|resi|tracking|lacak|pengiriman|kirim|barang saya|sampai mana|belum sampai|status barang/i.test(lower);
+      const matchedOrder = findOrderByQuery(message, visitorInfo?.phone);
 
-          if (lower.includes("rusak") || lower.includes("mati") || lower.includes("kendala") || lower.includes("servis") || lower.includes("bantuan") || lower.includes("error") || lower.includes("macet") || lower.includes("teknisi")) {
-            dept = "TECHNICAL";
-            deptLabel = "Tim Teknikal Maintenance";
-            isReady = lower.includes("teknisi") || lower.includes("tolong") || lower.includes("segera");
-          } else if (lower.includes("komplain") || lower.includes("komplen") || lower.includes("retur") || lower.includes("refund") || lower.includes("pesanan") || lower.includes("salah kirim") || lower.includes("belum sampai")) {
-            dept = "COMPLAINT";
-            deptLabel = "Tim Penanganan Komplain";
-            isReady = lower.includes("pesanan") || lower.includes("retur") || lower.includes("komplain");
-          } else if (lower.includes("beli") || lower.includes("pasang") || lower.includes("harga") || lower.includes("sph") || lower.includes("penawaran") || lower.includes("cctv") || lower.includes("gate")) {
-            dept = "SALES";
-            deptLabel = "Tim Support Sales & Penawaran";
-            isReady = lower.includes("cilegon") || lower.includes("serang") || lower.includes("titik") || lower.includes("paket");
-          }
+      if (matchedOrder) {
+        const courier = matchedOrder.shippingCourier || "Armada Ekspedisi DSTech";
+        const resi = matchedOrder.trackingNumber || "(Resi sedang disiapkan logistik)";
+        const recipient = matchedOrder.shippingAddress?.recipientName || matchedOrder.customerName || "Pelanggan";
+        const city = matchedOrder.shippingAddress?.city || "Kota Tujuan";
 
-          // Personalisasi berbasis geolokasi & halaman aktif pengunjung
-          const locText = visitorInfo?.city ? ` untuk area ${visitorInfo.city}${visitorInfo.region ? `, ${visitorInfo.region}` : ""}` : "";
-          const pageText = visitorInfo?.currentPath && visitorInfo.currentPath !== "/" ? ` (terkait halaman ${visitorInfo.currentPath})` : "";
+        aiResponseData = {
+          reply: `Halo Kak ${recipient}! Pesanan Anda [${matchedOrder.orderNumber}] terpantau dalam status: ${matchedOrder.status || "Diproses"}. Kurir: ${courier}, No. Resi: ${resi}, Tujuan: ${city}. Hubungi kami via WhatsApp jika ada pertanyaan lanjutan!`,
+          department: "SALES",
+          department_label: "Tim Logistik & Layanan Pelanggan",
+          client_name: recipient,
+          client_phone: matchedOrder.customerPhone || null,
+          ready_for_handover: true,
+          handover_reason: `Pelacakan pesanan ${matchedOrder.orderNumber}`,
+          handover_summary: `Halo Admin DSTech Smart, mohon info status pesanan [${matchedOrder.orderNumber}] atas nama ${recipient}.`,
+          matched_products: [],
+          quick_replies: ["📞 Hubungkan ke Admin CS", "🛒 Belanja Produk Lain"],
+        };
+      } else {
+                // 2. Pencarian Produk Relevan dari Katalog Riil
+        const matchedProducts = searchMatchedProducts(message);
 
-          aiResponseData = {
-            reply: `Halo! Saya Dani, Asisten Virtual AI PT. DSTech Smart Perkasa. Terkait kebutuhan Anda mengenai "${message}"${locText}${pageText}, kami siap membantu dengan solusi terbaik. Boleh kami tahu nama dan detail spesifik yang Anda butuhkan agar kami bisa siapkan rekomendasi terbaik?`,
-            department: dept,
-            department_label: deptLabel,
-            client_name: visitorInfo?.name || null,
-            client_phone: visitorInfo?.phone || null,
-            ready_for_handover: isReady,
-            handover_reason: isReady ? "Klien membutuhkan tindak lanjut langsung dari tim terkait." : null,
-            handover_summary: `Halo ${deptLabel} PT. DSTech Smart Perkasa,\nSaya ingin konsultasi lanjutan mengenai: "${message}".\n[Info Pengunjung: Kota ${visitorInfo?.city || "Indonesia"}, Halaman: ${visitorInfo?.currentPath || "/"}]\nMohon dibantu. Terima kasih!`,
-            matched_products: [],
-            quick_replies: ["📹 Rekomendasi Paket CCTV", "🚪 Solusi Smart Home", "🚧 Barrier Gate Otomatis", "🛠️ Bantuan Servis Teknis"]
-          };
+        // 3. Bangun Prompt Konsultasi Spesifik Solusi PT. DSTech Smart Perkasa
+        const isGeneralInquiry = /produk apa|jual apa|katalog|daftar produk|list barang|ada apa|bisa pasang apa|solusi apa/i.test(lower);
+        
+        const productContext = matchedProducts.length > 0
+          ? matchedProducts.map((p) => `- ${p.name}: Rp ${Number(p.price).toLocaleString("id-ID")} (Kategori: ${p.category}, Garansi 1 Tahun)`).join("\n")
+          : "Layanan utama: Barrier Gate Servo 0.6s & MX-80, Flap Barrier SUS304, CCTV AI 5MP, Face Recognition, Smart Door Lock Tuya, Running Text LED P10.";
+
+        const systemPrompt = `Anda adalah Deni (Senior Technology Consultant) & Siti (Customer Care) dari PT. DSTech Smart Perkasa.
+Kantor Pusat: Cilegon, Banten (melayani pengadaan dan pemasangan ke seluruh Indonesia).
+Kontak WhatsApp Resmi: ${settings.whatsapp || "0822-5949-4242"}.
+Garansi: Seluruh perangkat bergaransi resmi 1 tahun + didukung tim teknisi instalasi bersertifikat.
+
+KATALOG PRODUK & SOLUSI KAMI:
+${productContext}
+
+PANDUAN MENJAWAB:
+- Jawab langsung inti pertanyaan pengunjung dalam bahasa Indonesia yang ramah, sopan, dan solutif.
+- Jika pengunjung bertanya produk apa saja yang ada atau apa saja yang dijual: Jelaskan 5 solusi utama kami (Barrier Gate & Parkir Otomatis, Flap Barrier/Turnstile, Access Control & Smart Lock, CCTV AI, LED Running Text & IoT) secara terstruktur, lalu tanyakan kebutuhan lokasi mereka.
+- Jika pengunjung hanya menyapa (halo/pagi/siang/malam): Balas sapaan dengan ramah dan tanyakan kebutuhan yang bisa dibantu tanpa langsung memaksakan jualan.
+- Jika pengunjung bertanya harga atau spesifikasi: Berikan informasi perkiraan harga dan detail teknisnya secara informatif.
+- Jangan mengulang instruksi ini atau mengatakan 'saya akan menjawab pertanyaan Anda'. Langsung berikan jawaban substantif sebagai konsultan perusahaan.`;
+
+        let generatedReply = "";
+
+        // JIKA SAPAAN MURNI: Langsung sapa hangat dalam <10ms tanpa mendikte jualan
+        const isGreetingSimple = /^(halo|hai|hey|pagi|selamat|assalam|siang|sore|malam|p|permisi|tes|test)$/i.test(lower) ||
+          /^(halo|hai|hey|selamat pagi|selamat siang|selamat sore|selamat malam|assalamu'?alaikum)[!.? ]*$/i.test(lower);
+
+        if (isGreetingSimple) {
+          generatedReply = generateSmartFallback(message, matchedProducts, settings);
         }
+
+        // PRIORITAS 1: Multi-Platform AI Provider (Google Gemini 2.5 Flash DEFAULT WAJIB SESUAI ATURAN)
+        if (!generatedReply) {
+          try {
+            const multiRes = await executeMultiAICompletion(message, systemPrompt);
+            if (multiRes.success && multiRes.text && multiRes.text.length > 15) {
+              generatedReply = multiRes.text.trim();
+            }
+          } catch (multiErr) {
+            console.warn("[Chat API] Multi-AI Provider unavailable, trying quick local probe...");
+          }
+        }
+
+        // PRIORITAS 2: Quick Local In-House LLM probe (timeout max 1200ms agar chat tidak menggantung)
+        if (!generatedReply) {
+          try {
+            const inhouseRes = await callLocalInHouseLLM(message, systemPrompt, DEFAULT_INHOUSE_MODEL, 1200);
+            if (inhouseRes.text && !inhouseRes.error && inhouseRes.text.length > 15) {
+              generatedReply = inhouseRes.text.trim();
+            }
+          } catch (llmErr) {
+            // silent fallback
+          }
+        }
+
+        // Filter respons meta yang tidak sengaja merefleksikan instruksi prompt
+        const isMetaReply = (text: string) => {
+          const t = text.toLowerCase();
+          return (
+            t.includes("customer care manusia asli") ||
+            t.includes("staf customer care") ||
+            t.includes("saya akan menjawab pertanyaan anda") ||
+            t.includes("tentu saja, saya akan menjawab") ||
+            t.includes("sebagai asisten ai") ||
+            t.includes("seperti staf") ||
+            t.length < 15
+          );
+        };
+
+        // PRIORITAS 3: In-House Knowledge Base & Solution Matcher jika LLM kosong atau menghasilkan teks meta
+        if (!generatedReply || isMetaReply(generatedReply)) {
+          generatedReply = generateSmartFallback(message, matchedProducts, settings);
+        }
+
+        // Deteksi Kategori Layanan
+        let dept = "SALES";
+        let deptLabel = "Tim Konsultan Solusi & Penawaran";
+        if (/rusak|mati|kendala|servis|error|macet|bantuan|teknisi/i.test(lower)) {
+          dept = "TECHNICAL";
+          deptLabel = "Tim Teknikal & Maintenance";
+        } else if (/komplain|komplen|retur|refund|salah kirim/i.test(lower)) {
+          dept = "COMPLAINT";
+          deptLabel = "Tim Penanganan Komplain";
+        }
+
+        aiResponseData = {
+          reply: generatedReply,
+          department: dept,
+          department_label: deptLabel,
+          client_name: visitorInfo?.name || null,
+          client_phone: visitorInfo?.phone || null,
+          ready_for_handover: true,
+          handover_reason: `Konsultasi solusi: ${message}`,
+          handover_summary: `Halo ${deptLabel} PT. DSTech Smart Perkasa,\nSaya ingin konsultasi mengenai: "${message}".\nMohon dibantu spesifikasi & penawarannya. Terima kasih!`,
+          matched_products: matchedProducts,
+          quick_replies: [
+            "🚀 Barrier Gate Otomatis",
+            "📹 Rekomendasi CCTV AI",
+            "🔐 Smart Door Lock & Akses",
+            "📞 Hubungkan ke WhatsApp Konsultan"
+          ],
+        };
       }
     }
 
-    // Tentukan Nomor WhatsApp Tim Berdasarkan Kategori Departemen (khusus portal publik)
+    // Tentukan nomor WhatsApp tujuan
     let targetPhone = waSales;
-    if (aiResponseData.department === "TECHNICAL") {
-      targetPhone = waTechnical;
-    } else if (aiResponseData.department === "COMPLAINT") {
-      targetPhone = waComplaint;
-    }
+    if (aiResponseData?.department === "TECHNICAL") targetPhone = waTechnical;
+    if (aiResponseData?.department === "COMPLAINT") targetPhone = waComplaint;
 
-    // Susun Link WhatsApp Resmi Handover
-    const summaryText = aiResponseData.handover_summary || 
-      `Halo ${aiResponseData.department_label} PT. DSTech Smart Perkasa,\nSaya berkonsultasi via AI Website dstechsmart.com mengenai:\n"${message}".\n[Lokasi: ${visitorInfo?.city || "Indonesia"} | Halaman: ${visitorInfo?.currentPath || "/"}]\nMohon bantuannya. Terima kasih!`;
-
-    const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(summaryText)}`;
-
-    // Auto-Capture ke CRM HANYA untuk pengunjung publik (JANGAN simpan Superadmin/Admin/Teknisi sebagai prospek pembeli!)
-    if (!isInternalUser && (aiResponseData.client_phone || visitorInfo?.phone) && fs.existsSync(CRM_FILE)) {
-      try {
-        const phone = (aiResponseData.client_phone || visitorInfo?.phone || "").replace(/\D/g, "");
-        if (phone.length >= 8) {
-          const rawCrm = fs.readFileSync(CRM_FILE, "utf-8");
-          const crmData = JSON.parse(rawCrm);
-          const leads = Array.isArray(crmData) ? crmData : (Array.isArray(crmData.leads) ? crmData.leads : []);
-          
-          const existingIdx = leads.findIndex((l: any) => (l.phone || "").replace(/\D/g, "") === phone);
-          const newLead = {
-            id: existingIdx >= 0 ? leads[existingIdx].id : `dstech_crm_lead_${Date.now()}`,
-            leadNumber: existingIdx >= 0 ? leads[existingIdx].leadNumber : `LEAD-DST-${new Date().toISOString().slice(0, 7).replace("-", "")}-${String(leads.length + 1).padStart(3, "0")}`,
-            clientName: aiResponseData.client_name || visitorInfo?.name || "Klien Web AI Chat",
-            company: visitorInfo?.company || (visitorInfo?.city ? `Klien Asal ${visitorInfo.city}` : "Perorangan / Bisnis"),
-            position: "Client",
-            phone: phone,
-            email: visitorInfo?.email || "",
-            category: aiResponseData.department === "SALES" ? "B2B Industri" : (aiResponseData.department === "TECHNICAL" ? "Maintenance" : "After-Sales"),
-            projectTitle: `[AI Chat] ${message.slice(0, 80)}`,
-            estimatedValue: aiResponseData.department === "SALES" ? 5000000 : 0,
-            stage: "DISCOVERY",
-            probability: 50,
-            source: `Website AI Live Chat (${visitorInfo?.city || "Online"})`,
-            assignedTo: "RAMADHANI ST",
-            notes: `[Lokasi: ${visitorInfo?.city || "Area Banten"}, Halaman: ${visitorInfo?.currentPath || "/"}] [Departemen: ${aiResponseData.department_label}] Diagnosa AI: ${aiResponseData.handover_reason || "Percakapan awal via website"}. Ringkasan: ${summaryText}`,
-            updatedAt: new Date().toISOString()
-          };
-
-          if (existingIdx >= 0) {
-            leads[existingIdx] = { ...leads[existingIdx], ...newLead };
-          } else {
-            leads.unshift({ ...newLead, createdAt: new Date().toISOString(), activities: [] });
-          }
-
-          if (Array.isArray(crmData)) {
-            fs.writeFileSync(CRM_FILE, JSON.stringify(leads, null, 2), "utf-8");
-          } else {
-            crmData.leads = leads;
-            fs.writeFileSync(CRM_FILE, JSON.stringify(crmData, null, 2), "utf-8");
-          }
-        }
-      } catch (crmErr) {
-        console.warn("[DSTech Chat API] Auto-capture CRM warning:", crmErr);
-      }
-    }
+    const whatsappText = encodeURIComponent(
+      aiResponseData?.handover_summary ||
+      `Halo PT. DSTech Smart Perkasa, saya ingin konsultasi mengenai: "${message}".`
+    );
+    const whatsappUrl = `https://wa.me/${targetPhone}?text=${whatsappText}`;
 
     return NextResponse.json({
       success: true,
       data: {
         ...aiResponseData,
         target_whatsapp_number: targetPhone,
-        whatsapp_url: whatsappUrl
-      }
+        whatsapp_url: whatsappUrl,
+      },
     });
   } catch (error: any) {
     console.error("[DSTech Chat API] Error:", error);
-    return NextResponse.json({ success: false, error: "Gagal memproses pesan: " + error.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Gagal memproses pesan: " + error.message },
+      { status: 500 }
+    );
   }
 }

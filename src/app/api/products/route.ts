@@ -241,7 +241,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, category, subCategory, brand, price, costPrice, originalPrice, isPromo, discountPercent, promoTag, stock, commission, commissionType, desc, image, entityType } = body;
+    const { name, category, subCategory, brand, price, costPrice, originalPrice, isPromo, discountPercent, promoTag, stock, commission, commissionType, desc, image, entityType, sourceUrl, dstech_source_url, referralUrl } = body;
+    const rawSourceUrl = (sourceUrl || dstech_source_url || referralUrl || "").trim();
 
     if (!name || name.trim() === "") {
       return NextResponse.json({ success: false, message: "Nama produk wajib diisi" }, { status: 400 });
@@ -290,6 +291,20 @@ export async function POST(req: Request) {
       discountPercent: calculatedDiscount,
       promoTag: promoTag ? String(promoTag).trim() : (promoActive ? "PROMO SPESIAL" : ""),
       costPrice: parsedCostPrice,
+      sourceUrl: rawSourceUrl,
+      dstech_source_url: rawSourceUrl,
+      dstech_margin_policy: "50%_OF_REFERENCE_COST",
+      lastPriceAudit: new Date().toISOString(),
+      priceHistory: parsedCostPrice > 0 ? [
+        {
+          date: new Date().toISOString(),
+          costPrice: parsedCostPrice,
+          price: parsedPrice,
+          marginPercent: parsedCostPrice > 0 ? Math.round(((parsedPrice - parsedCostPrice) / parsedCostPrice) * 100) : 50,
+          sourceUrl: rawSourceUrl,
+          note: "Pendaftaran Produk (Margin 50% Referensi)",
+        }
+      ] : [],
       installationFee: parsedInstallationFee,
       hasInstallationService: parsedHasInstallation,
       stock: parsedStock,
@@ -325,7 +340,10 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, name, category, subCategory, brand, price, costPrice, originalPrice, isPromo, discountPercent, promoTag, stock, commission, commissionType, desc, image, unit, warehouseStock, entityType } = body;
+    const { id, name, category, subCategory, brand, price, costPrice, originalPrice, isPromo, discountPercent, promoTag, stock, commission, commissionType, desc, image, unit, warehouseStock, entityType, sourceUrl, dstech_source_url, referralUrl } = body;
+    const rawSourceUrl = sourceUrl !== undefined
+      ? String(sourceUrl).trim()
+      : (dstech_source_url !== undefined ? String(dstech_source_url).trim() : (referralUrl !== undefined ? String(referralUrl).trim() : undefined));
 
     if (!id) {
       return NextResponse.json({ success: false, message: "ID produk wajib disertakan" }, { status: 400 });
@@ -382,6 +400,23 @@ export async function PUT(req: Request) {
       discountPercent: calculatedDiscount,
       promoTag: promoTag !== undefined ? String(promoTag).trim() : (products[index].promoTag || (promoActive ? "PROMO SPESIAL" : "")),
       costPrice: parsedCostPrice,
+      sourceUrl: rawSourceUrl !== undefined ? rawSourceUrl : (products[index].sourceUrl || products[index].dstech_source_url || ""),
+      dstech_source_url: rawSourceUrl !== undefined ? rawSourceUrl : (products[index].dstech_source_url || products[index].sourceUrl || ""),
+      dstech_margin_policy: "50%_OF_REFERENCE_COST",
+      lastPriceAudit: parsedPrice !== products[index].price ? new Date().toISOString() : (products[index].lastPriceAudit || new Date().toISOString()),
+      priceHistory: (parsedPrice !== products[index].price || parsedCostPrice !== products[index].costPrice)
+        ? [
+            ...(Array.isArray(products[index].priceHistory) ? products[index].priceHistory : []),
+            {
+              date: new Date().toISOString(),
+              costPrice: parsedCostPrice,
+              price: parsedPrice,
+              marginPercent: parsedCostPrice > 0 ? Math.round(((parsedPrice - parsedCostPrice) / parsedCostPrice) * 100) : 50,
+              sourceUrl: rawSourceUrl !== undefined ? rawSourceUrl : (products[index].sourceUrl || ""),
+              note: "Pembaruan Harga Manual / Penyelarasan Admin",
+            }
+          ]
+        : products[index].priceHistory,
       installationFee: body.installationFee !== undefined
         ? (typeof body.installationFee === "number" ? body.installationFee : parseFloat(body.installationFee) || 0)
         : (products[index].installationFee ?? getCategoryDefaultInstallationFee(products[index].category, products[index].name)),

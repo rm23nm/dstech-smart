@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import GpsGeofenceManager from "@/components/GpsGeofenceManager";
 import {
   Settings,
@@ -14,6 +15,7 @@ import {
   CheckCircle2,
   AlertCircle,
   ExternalLink,
+  ArrowRight,
   ShieldCheck,
   Smartphone,
   Eye,
@@ -232,12 +234,13 @@ export interface SiteSettingsData {
   letterheadSettings?: LetterheadSettingsData;
   estoreSettings?: EstoreSettingsData;
   socialIntegrations?: SocialIntegrationsConfig;
+  dstech_ai_settings?: any;
   updatedAt?: string;
 }
 
 export default function AdminSettingsPage() {
   // Tab Aktif Utama
-  const [activeTab, setActiveTab] = useState<"profile" | "branding" | "gps" | "banks" | "letterhead" | "estore" | "social_api" | "danger">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "branding" | "gps" | "banks" | "letterhead" | "estore" | "social_api" | "multi_ai" | "danger">("profile");
 
   const [settings, setSettings] = useState<SiteSettingsData>({
     companyName: "PT. DSTech Smart Perkasa",
@@ -460,6 +463,37 @@ export default function AdminSettingsPage() {
   const [testingPlatform, setTestingPlatform] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<{ [key: string]: { success: boolean; message: string; data?: any } }>({});
 
+  // State Multi-Platform AI & Video Studio (Tugas 355)
+  const [aiConfig, setAiConfig] = useState<any>({
+    active_provider: "gemini",
+    gemini_model: "gemini-2.5-flash",
+    gemini_keys_free: "",
+    gemini_key_paid: "",
+    openai_key: "",
+    openai_model: "gpt-4o",
+    deepseek_key: "",
+    deepseek_model: "deepseek-chat",
+    claude_key: "",
+    claude_model: "claude-3-5-sonnet-20241022",
+    groq_key: "",
+    groq_model: "llama-3.3-70b-versatile",
+    video_engine: "veo",
+    video_aspect_ratio: "9:16",
+  });
+  const [testingProvider, setTestingProvider] = useState<string | null>(null);
+  const [testConnMessage, setTestConnMessage] = useState<{ provider: string; success: boolean; message: string } | null>(null);
+  const [savingAiSettings, setSavingAiSettings] = useState(false);
+
+  // Auto switch tab if ?tab=multi_ai
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const p = new URLSearchParams(window.location.search);
+      if (p.get("tab") === "multi_ai") {
+        setActiveTab("multi_ai");
+      }
+    }
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -520,6 +554,12 @@ export default function AdminSettingsPage() {
             whatsappStatus: { ...prev.whatsappStatus, ...(json.data.socialIntegrations.whatsappStatus || {}) },
           }));
         }
+        if (json.data.dstech_ai_settings) {
+          setAiConfig((prev: any) => ({
+            ...prev,
+            ...json.data.dstech_ai_settings,
+          }));
+        }
       }
     } catch (err) {
       console.error("Gagal memuat pengaturan:", err);
@@ -548,6 +588,93 @@ export default function AdminSettingsPage() {
   }, []);
 
   // Save all settings to API
+
+  // Handlers Multi-Platform AI & Video Studio (Tugas 355)
+  const handleSaveAiSettings = async () => {
+    try {
+      setSavingAiSettings(true);
+      const res = await fetch("/api/ai-multi-provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "save_settings",
+          settings: aiConfig,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("success", "Pengaturan Multi-Platform AI & Video berhasil disimpan!");
+      } else {
+        showToast("error", data.message || "Gagal menyimpan pengaturan AI.");
+      }
+    } catch (err: any) {
+      showToast("error", err?.message || "Terjadi kesalahan saat menyimpan AI settings.");
+    } finally {
+      setSavingAiSettings(false);
+    }
+  };
+
+  const handleTestAiConnection = async (provider: string) => {
+    let key = "";
+    let model = "";
+    if (provider === "gemini") {
+      key = aiConfig.gemini_key_paid || (aiConfig.gemini_keys_free ? aiConfig.gemini_keys_free.split(",")[0].trim() : "");
+      model = aiConfig.gemini_model || "gemini-2.5-flash";
+    } else if (provider === "openai") {
+      key = aiConfig.openai_key;
+      model = aiConfig.openai_model || "gpt-4o";
+    } else if (provider === "deepseek") {
+      key = aiConfig.deepseek_key;
+      model = aiConfig.deepseek_model || "deepseek-chat";
+    } else if (provider === "claude") {
+      key = aiConfig.claude_key;
+      model = aiConfig.claude_model || "claude-3-5-sonnet-20241022";
+    } else if (provider === "groq") {
+      key = aiConfig.groq_key;
+      model = aiConfig.groq_model || "llama-3.3-70b-versatile";
+    }
+
+    if (!key) {
+      showToast("error", `Harap isi API Key untuk ${provider.toUpperCase()} terlebih dahulu.`);
+      return;
+    }
+
+    try {
+      setTestingProvider(provider);
+      setTestConnMessage(null);
+      const res = await fetch("/api/ai-multi-provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "test_connection",
+          provider,
+          apiKey: key,
+          model,
+        }),
+      });
+      const data = await res.json();
+      setTestConnMessage({
+        provider,
+        success: data.success,
+        message: data.message,
+      });
+      if (data.success) {
+        showToast("success", data.message);
+      } else {
+        showToast("error", data.message);
+      }
+    } catch (err: any) {
+      setTestConnMessage({
+        provider,
+        success: false,
+        message: err?.message || "Gagal menghubungi server API.",
+      });
+      showToast("error", "Koneksi gagal.");
+    } finally {
+      setTestingProvider(null);
+    }
+  };
+
   const handleSaveAll = async (
     customData?: Partial<SiteSettingsData>,
     successMsg: string = "Pengaturan situs berhasil disimpan."
@@ -1015,6 +1142,18 @@ export default function AdminSettingsPage() {
         >
           <ShoppingCart className="w-4 h-4" />
           <span>🛒 Pengaturan E-Store &amp; Hero Showcase ({estoreConfig.featuredHeroes.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("multi_ai")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${activeTab === "multi_ai"
+            ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-600/20"
+            : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+        >
+          <Key className="w-4 h-4 text-indigo-400" />
+          <span>🔑 Integrasi API Multi-Platform AI</span>
         </button>
 
         <button
@@ -3667,6 +3806,505 @@ export default function AdminSettingsPage() {
           </div>
         </div>
       )}
+
+      {/* KONTEN TAB: MULTI-PLATFORM AI & VIDEO STUDIO (Tugas 355) */}
+      {activeTab === "multi_ai" && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header Overview Card */}
+          <div className="bg-gradient-to-r from-blue-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden border border-blue-500/20">
+            <div className="relative z-10 max-w-4xl space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                <Key className="w-3.5 h-3.5 text-indigo-300" />
+                <span>Pengaturan Sistem &amp; Kredensial Multi-AI</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                Integrasi API Multi-Platform AI &amp; Kredensial Engine
+              </h2>
+              <p className="text-xs sm:text-sm text-blue-100 leading-relaxed">
+                Kelola 5 mesin kecerdasan buatan terkemuka (Google Gemini bawaan versi 2.5 Flash, OpenAI ChatGPT/Sora, DeepSeek AI, Anthropic Claude, dan Meta LLaMA via Groq). Konfigurasi API Key di halaman ini secara otomatis memberdayakan Karyawan AI <strong>Nadia Safitri</strong>, chatbot otomatis, dan studio video promosi.
+              </p>
+
+              {/* Status Badges */}
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <span className="px-3 py-1 rounded-xl text-[11px] font-bold bg-white/10 backdrop-blur text-white border border-white/10 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Default: Gemini 2.5 Flash</span>
+                </span>
+                <span className="px-3 py-1 rounded-xl text-[11px] font-bold bg-white/10 backdrop-blur text-white border border-white/10 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>DeepSeek V3 / R1 &amp; Claude 3.5</span>
+                </span>
+                <span className="px-3 py-1 rounded-xl text-[11px] font-bold bg-white/10 backdrop-blur text-white border border-white/10 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-indigo-300" />
+                  <span>Terhubung Nadia Safitri (Otomasi Pemasaran)</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 1: PENGATURAN KREDENSIAL MULTI-AI */}
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-sm space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Key className="w-5 h-5 text-indigo-600" />
+                  <span>1. Konfigurasi Kredensial Multi-Platform AI</span>
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Pilih provider aktif utama dan masukkan API Key masing-masing platform.
+                </p>
+              </div>
+
+              {/* Selector Provider Aktif */}
+              <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
+                <span className="text-xs font-bold text-slate-700 whitespace-nowrap">Provider Utama:</span>
+                <select
+                  value={aiConfig.active_provider || "gemini"}
+                  onChange={(e) => setAiConfig({ ...aiConfig, active_provider: e.target.value })}
+                  className="text-xs font-bold bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="gemini">Google Gemini (Default)</option>
+                  <option value="openai">OpenAI (ChatGPT &amp; Sora)</option>
+                  <option value="deepseek">DeepSeek AI (V3 &amp; R1)</option>
+                  <option value="claude">Anthropic Claude 3.5</option>
+                  <option value="groq">Meta LLaMA 3.3 (Groq)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Test Connection Alert Box */}
+            {testConnMessage && (
+              <div className={`p-4 rounded-2xl text-xs font-bold border flex items-center gap-2 animate-in fade-in ${
+                testConnMessage.success ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-rose-50 text-rose-800 border-rose-200"
+              }`}>
+                {testConnMessage.success ? <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" /> : <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />}
+                <span>{testConnMessage.message}</span>
+              </div>
+            )}
+
+            {/* Quick Shortcut Links Bar */}
+            <div className="bg-gradient-to-r from-slate-50 via-indigo-50/40 to-slate-50 p-4 rounded-2xl border border-indigo-100/80 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-2 text-xs font-black text-slate-800">
+                <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span>Pintas Cepat Resmi Dapatkan API Key:</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-blue-700 border border-blue-200 hover:bg-blue-50 hover:border-blue-300 transition-all flex items-center gap-1.5 shadow-xs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                  <span>Google AI Studio</span>
+                  <ExternalLink className="w-3 h-3 text-blue-500" />
+                </a>
+                <a
+                  href="https://platform.openai.com/api-keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 transition-all flex items-center gap-1.5 shadow-xs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                  <span>OpenAI Platform</span>
+                  <ExternalLink className="w-3 h-3 text-emerald-500" />
+                </a>
+                <a
+                  href="https://platform.deepseek.com/api_keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-sky-700 border border-sky-200 hover:bg-sky-50 hover:border-sky-300 transition-all flex items-center gap-1.5 shadow-xs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-sky-600"></span>
+                  <span>DeepSeek Platform</span>
+                  <ExternalLink className="w-3 h-3 text-sky-500" />
+                </a>
+                <a
+                  href="https://console.anthropic.com/settings/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-amber-700 border border-amber-200 hover:bg-amber-50 hover:border-amber-300 transition-all flex items-center gap-1.5 shadow-xs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-600"></span>
+                  <span>Anthropic Console</span>
+                  <ExternalLink className="w-3 h-3 text-amber-500" />
+                </a>
+                <a
+                  href="https://console.groq.com/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-white text-rose-700 border border-rose-200 hover:bg-rose-50 hover:border-rose-300 transition-all flex items-center gap-1.5 shadow-xs"
+                >
+                  <span className="w-2 h-2 rounded-full bg-rose-600"></span>
+                  <span>Groq Cloud (LLaMA)</span>
+                  <ExternalLink className="w-3 h-3 text-rose-500" />
+                </a>
+              </div>
+            </div>
+
+            {/* Grid 5 Provider Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* 1. Google Gemini Card */}
+              <div className="p-5 rounded-2xl border border-blue-100 bg-blue-50/30 space-y-3">
+                <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-blue-600"></span>
+                    <h4 className="text-sm font-black text-slate-900">Google Gemini</h4>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href="https://aistudio.google.com/app/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-black bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition"
+                      title="Buka Google AI Studio untuk membuat atau mengambil API Key gratis/berbayar"
+                    >
+                      <span>🔑 Dapatkan Key</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700">
+                      Default
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">Pilihan Model Gemini</label>
+                  <select
+                    value={aiConfig.gemini_model || "gemini-2.5-flash"}
+                    onChange={(e) => setAiConfig({ ...aiConfig, gemini_model: e.target.value })}
+                    className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold"
+                  >
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Bawaan Utama / Cepat &amp; Cerdas)</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (Penalaran Tinggi &amp; Multimodal)</option>
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash (Kecepatan Tinggi)</option>
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Stabil &amp; Ringan)</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro (Konteks Besar)</option>
+                    <option value="gemini-3.0">Gemini 3.0 (Preview / Mendatang)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">Gemini Paid API Key (Fallback)</label>
+                  <input
+                    type="password"
+                    value={aiConfig.gemini_key_paid || ""}
+                    onChange={(e) => setAiConfig({ ...aiConfig, gemini_key_paid: e.target.value })}
+                    placeholder="AIzaSy..."
+                    className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">Gemini Free API Keys (Pisahkan Koma untuk Rotasi)</label>
+                  <textarea
+                    rows={2}
+                    value={aiConfig.gemini_keys_free || ""}
+                    onChange={(e) => setAiConfig({ ...aiConfig, gemini_keys_free: e.target.value })}
+                    placeholder="Key1, Key2, Key3..."
+                    className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200 font-mono"
+                  />
+                  <p className="text-[10px] text-blue-700 font-medium mt-1">
+                    💡 Dapatkan API Key instan di <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-blue-900">Google AI Studio</a>. Pisahkan koma untuk rotasi kunci otomatis.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleTestAiConnection("gemini")}
+                  disabled={testingProvider === "gemini"}
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  {testingProvider === "gemini" ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  <span>Test Koneksi Gemini</span>
+                </button>
+              </div>
+
+              {/* 2. OpenAI Card */}
+              <div className="p-5 rounded-2xl border border-emerald-100 bg-emerald-50/30 space-y-3">
+                <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-emerald-600"></span>
+                    <h4 className="text-sm font-black text-slate-900">OpenAI (ChatGPT &amp; Sora)</h4>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href="https://platform.openai.com/api-keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition"
+                      title="Buka OpenAI Platform untuk membuat Secret Key"
+                    >
+                      <span>🔑 Dapatkan Key</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700">
+                      GPT-4o &amp; Sora
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">Pilihan Model OpenAI</label>
+                  <select
+                    value={aiConfig.openai_model || "gpt-4o"}
+                    onChange={(e) => setAiConfig({ ...aiConfig, openai_model: e.target.value })}
+                    className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold"
+                  >
+                    <option value="gpt-4o">GPT-4o (Flagship Multimodal Teks &amp; Gambar)</option>
+                    <option value="gpt-4o-mini">GPT-4o Mini (Hemat Biaya &amp; Responsif)</option>
+                    <option value="o1-mini">o1-mini (Penalaran Kompleks)</option>
+                    <option value="o3-mini">o3-mini (Penalaran Cepat Terbaru)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">OpenAI API Key</label>
+                  <input
+                    type="password"
+                    value={aiConfig.openai_key || ""}
+                    onChange={(e) => setAiConfig({ ...aiConfig, openai_key: e.target.value })}
+                    placeholder="sk-proj-..."
+                    className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200"
+                  />
+                  <p className="text-[10px] text-emerald-700 font-medium mt-1">
+                    💡 Buat Secret Key di <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-emerald-900">OpenAI Platform (API Keys)</a>.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTestAiConnection("openai")}
+                    disabled={testingProvider === "openai"}
+                    className="px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    {testingProvider === "openai" ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    <span>Test Koneksi OpenAI</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. DeepSeek Card */}
+              <div className="p-5 rounded-2xl border border-sky-100 bg-sky-50/30 space-y-3">
+                <div className="flex items-center justify-between border-b border-sky-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-sky-600"></span>
+                    <h4 className="text-sm font-black text-slate-900">DeepSeek AI</h4>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href="https://platform.deepseek.com/api_keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-black bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition"
+                      title="Buka DeepSeek Open Platform untuk membuat API Key V3 & R1"
+                    >
+                      <span>🔑 Dapatkan Key</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-700">
+                      V3 &amp; R1
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">Pilihan Model DeepSeek</label>
+                  <select
+                    value={aiConfig.deepseek_model || "deepseek-chat"}
+                    onChange={(e) => setAiConfig({ ...aiConfig, deepseek_model: e.target.value })}
+                    className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold"
+                  >
+                    <option value="deepseek-chat">DeepSeek-V3 (Super Pintar, Cepat, Biaya Termurah)</option>
+                    <option value="deepseek-reasoner">DeepSeek-R1 (Penalaran Mendalam / Chain of Thought)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">DeepSeek API Key</label>
+                  <input
+                    type="password"
+                    value={aiConfig.deepseek_key || ""}
+                    onChange={(e) => setAiConfig({ ...aiConfig, deepseek_key: e.target.value })}
+                    placeholder="sk-..."
+                    className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200"
+                  />
+                  <p className="text-[10px] text-sky-700 font-medium mt-1">
+                    💡 Dapatkan API Key di <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-sky-900">DeepSeek Open Platform</a> (Biaya sangat murah &amp; penalaran tinggi).
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTestAiConnection("deepseek")}
+                    disabled={testingProvider === "deepseek"}
+                    className="px-3.5 py-1.5 rounded-xl bg-sky-600 text-white font-bold text-xs hover:bg-sky-700 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    {testingProvider === "deepseek" ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    <span>Test Koneksi DeepSeek</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Anthropic Claude Card */}
+              <div className="p-5 rounded-2xl border border-amber-100 bg-amber-50/30 space-y-3">
+                <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-amber-600"></span>
+                    <h4 className="text-sm font-black text-slate-900">Anthropic Claude</h4>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href="https://console.anthropic.com/settings/keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition"
+                      title="Buka Anthropic Console untuk membuat API Key Claude 3.5"
+                    >
+                      <span>🔑 Dapatkan Key</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">
+                      Claude 3.5 Sonnet
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">Pilihan Model Claude</label>
+                  <select
+                    value={aiConfig.claude_model || "claude-3-5-sonnet-20241022"}
+                    onChange={(e) => setAiConfig({ ...aiConfig, claude_model: e.target.value })}
+                    className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold"
+                  >
+                    <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Gaya Bahasa Sangat Natural)</option>
+                    <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku (Ringan, Responsif &amp; Cepat)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600">Anthropic Claude API Key</label>
+                  <input
+                    type="password"
+                    value={aiConfig.claude_key || ""}
+                    onChange={(e) => setAiConfig({ ...aiConfig, claude_key: e.target.value })}
+                    placeholder="sk-ant-..."
+                    className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200"
+                  />
+                  <p className="text-[10px] text-amber-700 font-medium mt-1">
+                    💡 Dapatkan API Key di <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-amber-900">Anthropic Console</a>.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTestAiConnection("claude")}
+                    disabled={testingProvider === "claude"}
+                    className="px-3.5 py-1.5 rounded-xl bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    {testingProvider === "claude" ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    <span>Test Koneksi Claude</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 5. Meta LLaMA via Groq Card */}
+              <div className="p-5 rounded-2xl border border-rose-100 bg-rose-50/30 space-y-3 md:col-span-2">
+                <div className="flex items-center justify-between border-b border-rose-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-rose-600"></span>
+                    <h4 className="text-sm font-black text-slate-900">Meta LLaMA 3.3 (via Groq Cloud LPU)</h4>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <a
+                      href="https://console.groq.com/keys"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-black bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition"
+                      title="Buka Groq Cloud Console untuk membuat API Key gratis (Free Tier)"
+                    >
+                      <span>🔑 Dapatkan Key (Gratis)</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
+                      Ultra Fast Inference
+                    </span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600">Pilihan Model LLaMA / Groq</label>
+                    <select
+                      value={aiConfig.groq_model || "llama-3.3-70b-versatile"}
+                      onChange={(e) => setAiConfig({ ...aiConfig, groq_model: e.target.value })}
+                      className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200 font-semibold"
+                    >
+                      <option value="llama-3.3-70b-versatile">LLaMA 3.3 70B (Kecepatan Kilat via Groq LPU)</option>
+                      <option value="llama-3.1-8b-instant">LLaMA 3.1 8B Instant (Ultra Cepat)</option>
+                      <option value="mixtral-8x7b-32768">Mixtral 8x7B (32k Context)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-600">Groq Cloud API Key</label>
+                    <input
+                      type="password"
+                      value={aiConfig.groq_key || ""}
+                      onChange={(e) => setAiConfig({ ...aiConfig, groq_key: e.target.value })}
+                      placeholder="gsk_..."
+                      className="w-full mt-1 text-xs px-3 py-2 rounded-xl bg-white border border-slate-200"
+                    />
+                    <p className="text-[10px] text-rose-700 font-medium mt-1">
+                      💡 Buat API Key gratis di <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-rose-900">Groq Cloud Console</a> (Gratis, kecepatan kilat ratusan token/detik).
+                    </p>
+                  </div>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTestAiConnection("groq")}
+                    disabled={testingProvider === "groq"}
+                    className="px-3.5 py-1.5 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    {testingProvider === "groq" ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                    <span>Test Koneksi Groq LLaMA</span>
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Save Multi-AI Configuration Button */}
+            <div className="pt-4 border-t border-slate-100 flex justify-end">
+              <button
+                type="button"
+                onClick={handleSaveAiSettings}
+                disabled={savingAiSettings}
+                className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/25 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {savingAiSettings ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{savingAiSettings ? "Menyimpan Konfigurasi..." : "💾 Simpan Pengaturan Multi-AI"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Banner Tautan ke Halaman Mandiri AI Studio & Video Creator */}
+          <div className="bg-gradient-to-r from-rose-500/10 via-indigo-500/10 to-blue-500/10 p-6 sm:p-8 rounded-3xl border border-indigo-200/60 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2.5 rounded-2xl bg-rose-600 text-white shadow-xs">
+                  <Video className="w-5 h-5" />
+                </span>
+                <h4 className="text-base font-black text-slate-900">
+                  AI Video Creator &amp; Storyboard Studio Terpisah di Ruang Kerja Khusus
+                </h4>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed max-w-2xl pl-12">
+                Seluruh kredensial API Key di atas telah terhubung penuh ke engine AI. Untuk merancang naskah video komersial, visual adegan demi adegan (storyboard), prompt sinematik (Google Veo, OpenAI Sora, Runway Gen-3, Luma, Kling), dan antrean publikasi otomatis Nadia Safitri, silakan akses halaman mandiri <strong>AI Studio &amp; Video Creator</strong>.
+              </p>
+            </div>
+
+            <Link
+              href="/admin/ai-studio"
+              className="px-6 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-indigo-600/25 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            >
+              <span>Buka AI Video Studio</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      )}
+
 
       {/* MODAL PEMILIHAN PRODUK DARI KATALOG UNTUK HERO SHOWCASE (Tugas 213) */}
       {isSelectProductModalOpen && (

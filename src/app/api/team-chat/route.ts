@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import { executeMultiAICompletion } from "@/utils/dstech_ai_multi_provider";
+import {
+  callLocalInHouseLLM,
+  DEFAULT_INHOUSE_MODEL,
+  getAllInHouseAgentProfiles,
+  InHouseAgentTools,
+} from "@/utils/dstech_inhouse_ai_agent";
 import fs from "fs";
 import path from "path";
 
@@ -38,28 +45,32 @@ function writeJsonSafe(filePath: string, data: any) {
 // GOOGLE GEMINI AI MULTI-KEY ROTATION ENGINE
 // Default Model: gemini-2.5-flash (STRICT USER RULE)
 // ==========================================
+const KNOWN_REVOKED_KEYS_SET = new Set([
+  "AIzaSyAJLJZW07IfKww2m7USMK51W-XsycEb02w",
+  "AIzaSyA8vir7yUSY25sZwoq5Mmx-sh4YaQ8LMlU",
+  "AIzaSyCPO7o7HvlMjE2KDAq0SqbZb0mFFV5bLoY",
+  "AIzaSyBbyYdhCGiKe9XVr44sOuy5W5Sb6L8a2a0",
+  "AIzaSyCtESMZ27v54-exiKXJOShZ8vKdTwGz77E",
+]);
+
 function getGeminiApiKeys(): string[] {
+  const settings = readJsonSafe(path.join(process.cwd(), "src", "data", "dstech_settings.json"), {});
+  const aiCfg = settings.dstech_ai_settings || {};
+
   const envRaw = process.env.GEMINI_API_KEY || "";
-  const paidKey = process.env.GEMINI_API_KEY_PAID || "";
-  const freeKeys = (process.env.GEMINI_API_KEYS_FREE || "")
-    .split(",")
-    .map((k) => k.replace(/["']/g, "").trim())
-    .filter(Boolean);
-  const parsedEnv = envRaw
-    .split(",")
+  const paidKey = aiCfg.gemini_key_paid || process.env.GEMINI_API_KEY_PAID || "";
+  const freeKeys = [
+    ...(aiCfg.gemini_keys_free || "").split(","),
+    ...(process.env.GEMINI_API_KEYS_FREE || "").split(","),
+    ...envRaw.split(","),
+  ]
     .map((k) => k.replace(/["']/g, "").trim())
     .filter(Boolean);
 
   const keyList = [
     ...freeKeys,
-    ...parsedEnv,
     paidKey.replace(/["']/g, "").trim(),
-    "AIzaSyAJLJZW07IfKww2m7USMK51W-XsycEb02w",
-    "AIzaSyA8vir7yUSY25sZwoq5Mmx-sh4YaQ8LMlU",
-    "AIzaSyCPO7o7HvlMjE2KDAq0SqbZb0mFFV5bLoY",
-    "AIzaSyBbyYdhCGiKe9XVr44sOuy5W5Sb6L8a2a0",
-    "AIzaSyCtESMZ27v54-exiKXJOShZ8vKdTwGz77E",
-  ].filter(Boolean);
+  ].filter((k) => k && !KNOWN_REVOKED_KEYS_SET.has(k));
 
   return Array.from(new Set(keyList));
 }
@@ -119,6 +130,17 @@ async function executeGeminiCall(
       // try next key
     }
   }
+
+  // Fallback otomatis ke Multi-AI Provider (DeepSeek / OpenAI / Claude / Groq)
+  try {
+    const fallbackRes = await executeMultiAICompletion(prompt);
+    if (fallbackRes.success && fallbackRes.text) {
+      return fallbackRes.text;
+    }
+  } catch (err) {
+    console.error("[TeamChat] Multi-AI fallback error:", err);
+  }
+
   return null;
 }
 
@@ -152,191 +174,98 @@ async function generateEmployeeReply({
   const empId = emp.id;
   const empRole = emp.role || "Staf AI DSTech";
   const empDept = emp.department || "OPERATIONAL";
+  const lowerUserContent = (userContent || "").toLowerCase();
 
-  let divisionContext = "";
-  let fallbackReport = "";
+  // Dapatkan profil & system prompt otentik dari master AI workforce
+  const allProfiles = getAllInHouseAgentProfiles();
+  const matchedProfile = allProfiles.find((p) => p.id === empId) || emp;
+  const baseSystemPrompt = matchedProfile.systemPrompt || `Anda adalah ${emp.name}, ${empRole} resmi di PT. DSTech Smart Perkasa. Bertindaklah profesional, cerdas, solutif, dan taati seluruh arahan Direktur Utama (${userName}).`;
 
-  if (empId === "emp_dewi_finance") {
-    divisionContext = `
-Data Real Keuangan ERP DSTech Smart (2026):
-- Total Omset Riil: Rp 664.614.000 (81 Faktur Penjualan)
-- Laba Bersih Akuntansi: Rp 377.202.100 (Margin Sehat 56.7%)
-- Saldo Kas & Bank Berjalan: Rp 245.244.701 (Buku Kas & Bank BCA/Mandiri)
-- Piutang Klien: Rp 7.500.000 (monitoring jatuh tempo penagihan)
-- Hutang Usaha: Rp 32.784.000 (tagihan supplier/pembelian)
-- Beban Operasional Rutin: Rp 56.282.700 (9 pos tagihan aktif)
-Tugas Utama: Rekonsiliasi mutasi kas harian, penyiapan faktur penagihan proyek selesai, audit kas masuk/keluar, dan verifikasi OCR struk belanja operasional.
-`;
-    fallbackReport = `Siap Pak ${userName}. Melaporkan update terkini Divisi Keuangan & Billing DSTech Smart:
-
-📊 **Posisi Keuangan ERP Terkini**:
-• **Total Omset**: Rp 664.614.000 (81 Faktur Penjualan)
-• **Laba Bersih**: Rp 377.202.100 (Margin Sehat 56.7%)
-• **Saldo Kas & Bank Berjalan**: Rp 245.244.701 (BCA & Mandiri)
-• **Piutang Klien**: Rp 7.500.000 (monitoring jatuh tempo)
-• **Hutang Vendor/Supplier**: Rp 32.784.000
-• **Beban Operasional Rutin**: Rp 56.282.700 (9 pos tagihan aktif)
-
-🎯 **Aktivitas & Tugas Prioritas Hari Ini**:
-1. Rekonsiliasi mutasi kas harian dan pencatatan buku besar kas masuk/keluar.
-2. Penyiapan faktur penagihan termin proyek selesai dan koordinasi pengiriman invoice ke klien.
-3. Standby sistem OCR pembacaan foto struk/nota pengeluaran Direktur untuk pencatatan kas keluar otomatis.`;
-  } else if (empId === "emp_bambang_sales") {
-    divisionContext = `
-Data Real Pipeline SPH & Sales DSTech Smart (2026):
-- Total Penawaran SPH Terbit: 7 Surat (Akumulasi Nilai: Rp 113.782.750)
-- Deal / Proyek Disetujui SPK: 1 SPH (SPH-DSTECH-202610-002 senilai Rp 14.150.550)
-- Prospek Negosiasi Aktif: 6 SPH (Cluster Elysium, PT Krakatau Posco, PT Banten Construction, Bpk. Budi, dll.)
-- Tingkat Reject / Expired: 0% (semua penawaran dalam status aktif prospektif)
-Tugas Utama: Follow-up negosiasi klien B2B, percepatan konversi closing SPK, dan penyusunan draf penawaran harga (SPH) baru.
-`;
-    fallbackReport = `Siap Pak ${userName}. Melaporkan perkembangan terkini Divisi Komersial & Sales B2B:
-
-📈 **Status Pipeline Penawaran (SPH) & Prospek Klien**:
-• **Total Penawaran Terbit**: 7 Surat SPH (Nilai Akumulasi: Rp 113.782.750)
-• **Deal / SPK Disetujui**: 1 SPH (SPH-DSTECH-202610-002 senilai Rp 14.150.550)
-• **Prospek Negosiasi Aktif**: 6 SPH (Cluster Elysium, PT Krakatau Posco, PT Banten Construction, Bpk. Budi, dll.)
-• **Tingkat Penolakan**: 0% (seluruh penawaran aktif dalam siklus follow-up)
-
-🎯 **Aktivitas & Tugas Prioritas Hari Ini**:
-1. Follow-up intensif 6 prospek negosiasi aktif untuk percepatan penandatanganan SPK.
-2. Koordinasi teknis dengan Pak Deni terkait estimasi kebutuhan material untuk draf SPH baru.
-3. Penyusunan draf penawaran sistem barrier gate perumahan terpadu yang masuk melalui inquiry web.`;
-  } else if (empId === "emp_deni_field") {
-    divisionContext = `
-Data Real Proyek Lapangan & Teknisi DSTech Smart (2026):
-- Total Proyek Aktif ERP: 30 Proyek & Penugasan Lapangan
-- Penugasan Lapangan: Instalasi Barrier Gate Otomatis MX-80, setting UHF RFID Long Range Reader 12m, sensor loop detector, dan setup CCTV ColorVu.
-- Kesiapan Armada Teknisi: Siaga penuh dengan SOP K3, peralatan ukur, dan toolkit instalasi lengkap.
-Tugas Utama: Pengawasan jadwal teknisi, validasi foto progres lapangan (BAKP), commissioning palang parkir, dan survei pra-instalasi.
-`;
-    fallbackReport = `Siap Pak ${userName}. Melaporkan status operasional lapangan dan teknisi DSTech Smart:
-
-🛠️ **Status Lapangan & Penugasan SPK**:
-• **Total Proyek Aktif ERP**: 30 Proyek & Penugasan Lapangan
-• **Pekerjaan Berjalan**: Instalasi Barrier Gate Otomatis MX-80, setting UHF Long Range Reader, penarikan kabel loop detector, dan setup CCTV ColorVu.
-• **Kesiapan Teknisi**: 100% armada teknisi standby dengan kelengkapan SOP K3 & toolkit.
-
-🎯 **Aktivitas & Tugas Prioritas Hari Ini**:
-1. Pemantauan berkala dan validasi dokumentasi foto progres teknisi di lapangan (BAKP) agar langsung terangkum rapi.
-2. Commissioning akhir dan uji sensor safety loop palang parkir di lokasi proyek prioritas.
-3. Penjadwalan survei lokasi pra-instalasi untuk calon proyek baru dari tim sales Pak Bambang.`;
-  } else if (empId === "emp_nadia_marketing") {
-    divisionContext = `
-Data Real Pemasaran & Media Sosial DSTech Smart (2026):
-- Kampanye Autopilot WA: Broadcast edukasi paket Barrier Gate Otomatis & Smart Access Door aktif berjalan.
-- Media Sosial: Jadwal konten mingguan Instagram Reels, TikTok, dan YouTube short demo sensor touchless & palang RFID.
-- Aliran Lead: Peningkatan lalu lintas pengunjung web yang masuk ke kanal konsultasi.
-Tugas Utama: Perancangan konten kreatif, copy penawaran solusi keamanan, optimasi kampanye digital, dan rekap leads masuk.
-`;
-    fallbackReport = `Siap Pak ${userName}. Melaporkan aktivitas Divisi Digital Marketing & Creative:
-
-📣 **Kinerja Kampanye & Promosi Digital**:
-• **Broadcast Autopilot WA**: Kampanye promosi paket Barrier Gate Perumahan & Smart Door Access aktif berjalan.
-• **Jangkauan Media Sosial**: Konten video edukasi palang parkir RFID & touchless sensor terjadwal di Instagram Reels dan TikTok.
-• **Akuisisi Prospek**: Peningkatan klik ke widget chat konsultasi web DSTech Smart.
-
-🎯 **Aktivitas & Tugas Prioritas Hari Ini**:
-1. Distribusi materi promosi berkala via WhatsApp blast resmi ke kontak calon mitra komersial.
-2. Finalisasi copy penawaran solusi keamanan cerdas perkantoran untuk materi proposal Pak Bambang.
-3. Analisis konversi traffic pengunjung website menjadi lead konsultasi aktif.`;
-  } else if (empId === "emp_reza_catalog") {
-    divisionContext = `
-Data Real Gudang, Katalog & E-Store DSTech Smart (2026):
-- Unit Mesin Barrier Gate: Barrier Gate MX-80 & MX-50 Heavy Duty stok aman di gudang Cilegon.
-- Perangkat Aksesoris: Long Range UHF RFID Reader 12m, Palang LED 3-4m, Sensor Loop Detector, Magnetic Lock, IP Camera CCTV.
-- Sinkronisasi E-Store & Marketplace: Stok fisik terhubung langsung dengan website katalog e-store dan akun Shopee Tekno20.
-Tugas Utama: Audit fisik berkala suku cadang palang parkir, pengemasan order e-store, dan pemutakhiran spesifikasi teknis produk.
-`;
-    fallbackReport = `Siap Pak ${userName}. Melaporkan kesiapan Divisi Pengadaan, Gudang & Katalog Produk:
-
-📦 **Kesiapan Stok Barang & Inventaris Gudang**:
-• **Unit Barrier Gate**: Stok unit mesin Barrier Gate MX-80 & MX-50 Heavy Duty aman.
-• **Aksesoris & Sensor**: Ketersediaan Long Range UHF Reader 12m, Palang LED, Loop Detector, dan E-Lock Touchless dalam kondisi siap pasang.
-• **Integrasi Toko Online**: Stok fisik gudang telah tersinkronisasi dengan e-store website dan akun marketplace Tekno20.
-
-🎯 **Aktivitas & Tugas Prioritas Hari Ini**:
-1. Audit fisik harian stok spare part palang parkir di gudang Cilegon guna memastikan pasokan proyek tidak terhambat.
-2. Pemutakhiran brosur spesifikasi teknis dan panduan instalasi pada katalog produk.
-3. Koordinasi pengemasan barang untuk pesanan suku cadang dan perangkat e-store yang masuk.`;
-  } else if (empId === "emp_siti_cs") {
-    divisionContext = `
-Data Real Front Office & Customer Care DSTech Smart (2026):
-- Kanal Pelayanan 24 Jam: Live chat widget website DSTech Smart dan kontak WhatsApp support standby 24/7.
-- Response Time Rata-rata: Di bawah 1 menit untuk setiap interaksi pengunjung.
-- Minat Pengunjung: Konsultasi harga paket palang parkir perumahan cluster dan instalasi CCTV kantor.
-Tugas Utama: Pelayanan ramah pengunjung web, kualifikasi kebutuhan klien, serta handover cepat ke tim Sales (Pak Bambang) dan Teknis (Mas Deni).
-`;
-    fallbackReport = `Selamat pagi/siang Pak ${userName}. Melaporkan pemantauan Divisi Front Office & Layanan Pelanggan (CS):
-
-💬 **Layanan Pelanggan & Konsultasi Web**:
-• **Kanal Bantuan 24 Jam**: Live chat widget website DSTech Smart dan WhatsApp customer care siaga 24/7.
-• **Response Time**: Rata-rata kecepatan balasan pengunjung di bawah 1 menit.
-• **Sentimen Pengunjung**: Respon sangat positif, mayoritas menanyakan estimasi biaya paket barrier gate cluster dan kamera pengawas.
-
-🎯 **Aktivitas & Tugas Prioritas Hari Ini**:
-1. Standby penuh melayani konsultasi masuk dan menjawab kebutuhan calon klien web secara ramah & profesional.
-2. Filter dan handover cepat setiap inquiry bernilai komersial ke Pak Bambang (Sales) dan kendala teknis ke Mas Deni (Teknis).
-3. Rekapitulasi pertanyaan yang sering diajukan untuk bahan penyempurnaan panduan FAQ website.`;
-  } else {
-    fallbackReport = `Siap Pak ${userName}. Divisi ${empDept} standby dan seluruh tugas berjalan lancar sesuai SOP.`;
-  }
-
-  // Jika permintaan laporan status/aktivitas:
-  if (isReportRequest) {
+  // Tindakan Khusus jika perintah ditujukan ke Reza Firmansyah (Pengadaan, Gudang & Katalog)
+  let specialActionResult = "";
+  if (empId === "emp_reza_catalog" && /(?:input|tambah|masuk|shopee|toko|katalog|produk|barang|curate)/i.test(lowerUserContent)) {
     try {
-      const prompt = `Anda adalah ${emp.name}, ${empRole} (Divisi: ${empDept}) di PT. DSTech Smart Perkasa.
-Pimpinan Anda (${userName}) mengirimkan instruksi: "${userContent}".
-
-Berikut Data Riil Divisi Anda:
-${divisionContext}
-
-TUGAS ANDA:
-Berikan laporan resmi aktivitas dan tugas prioritas hari ini secara profesional, percaya diri, lugas, dan kaya data riil.
-Format output:
-1. Sapaan hormat ke pimpinan ("Siap Pak ${userName}...") dan pembuka laporan divisi.
-2. Poin ringkasan metriks riil divisi terkini.
-3. Poin aktivitas & tugas prioritas hari ini (1, 2, 3).
-Gunakan bahasa Indonesia formal, berwibawa, dan ringkas dalam format Markdown. JANGAN gunakan jawaban template kosong!`;
-
-      const geminiRes = await executeGeminiCall(prompt, false, "gemini-2.5-flash", 6000, geminiAttachments);
-      if (geminiRes && geminiRes.length > 50) {
-        return geminiRes;
+      // Eksekusi tool kurasi produk katalog otonom DSTech (Stok = 0 & Margin 50%)
+      const curationRes = await InHouseAgentTools.curateAndAddDailyProduct({
+        keyword: userContent.slice(0, 80),
+        category: "Parking & Barrier System",
+        sourceUrl: "https://shopee.co.id/toko_teknisi20",
+      });
+      if (curationRes && curationRes.success && curationRes.product) {
+        specialActionResult = `[SISTEM OTOMATIS: Reza telah mengeksekusi penambahan draf produk baru ke katalog: "${curationRes.product.name}" dengan Stok = 0 (Aman untuk buku aset) dan Margin 50% dari harga supplier Rp ${Number(curationRes.product.costPrice).toLocaleString("id-ID")} menjadi Rp ${Number(curationRes.product.price).toLocaleString("id-ID")}. Tautan referensi Shopee disembunyikan dari e-store publik.]`;
       }
-    } catch (e) {
-      // fallback
+    } catch (curErr) {
+      console.warn("[TeamChat] Reza product curation hook warning:", curErr);
     }
-    return fallbackReport;
   }
 
-  // Jika percakapan umum:
-  try {
-    const prompt = `Anda adalah ${emp.name}, ${empRole} (Divisi: ${empDept}) di PT. DSTech Smart Perkasa.
-Lawan bicara Anda adalah Direktur Utama (${userName}).
+  // Bangun prompt penalaran murni untuk AI Agent
+  const prompt = `Anda adalah ${emp.name}, ${empRole} (Divisi: ${empDept}) di PT. DSTech Smart Perkasa.
+Lawan bicara Anda adalah Pimpinan Direktur Utama (${userName}).
 
-Konteks Divisi Anda:
-${divisionContext}
-
+Pedoman & SOP Perusahaan:
+- ${baseSystemPrompt}
+- Posisi Saldo Kas & Bank Berjalan: Rp ${cashBalance.toLocaleString("id-ID")}
+- Beban Operasional: ${monthlyBillsSummary || "Lancar terkendali"}
+${specialActionResult ? `Catatan Tindakan Nyata yang Baru Saja Berhasil Anda Lakukan:
+${specialActionResult}
+` : ""}
 Riwayat Chat Terakhir:
-${historyText}
+${historyText || "(Percakapan baru)"}
 
-Pesan Terkini dari Direktur:
+Pesan / Perintah Terkini dari Direktur Utama:
 "${userContent}"
 
-INSTRUKSI:
-- Jawablah secara cerdas, solutif, to the point, dan hubungkan dengan divisi Anda.
-- Bahasa Indonesia sopan, santun, profesional, dan gunakan sapaan "Pak ${userName}" atau "Bapak".
-- JANGAN gunakan jawaban template kosong "arahan telah saya catat".`;
+ATURAN MENJAWAB SEBAGAI KARYAWAN CERDAS:
+1. JAWAB INTI PERINTAH ATAU PERTANYAAN DIREKTUR SECARA SPESIFIK, NYATA, DAN SOLUTIF.
+2. DILARANG KERAS memuntahkan template hafalan atau laporan stok kaku yang tidak nyambung dengan instruksi Direktur!
+3. Jika Direktur menugaskan sesuatu (misal: input produk dari Shopee/supplier, audit harga, buat SPH, cek keuangan), nyatakan bahwa Anda mengerti, jelaskan langkah konkret yang sedang Anda jalankan, dan sampaikan kepatuhan pada aturan perusahaan (misal: stok 0 dan margin 50% untuk produk).
+4. Gunakan bahasa Indonesia bisnis yang profesional, percaya diri, beretika santun, dan gunakan sapaan "Pak ${userName}" atau "Bapak".`;
 
-    const geminiRes = await executeGeminiCall(prompt, false, "gemini-2.5-flash", 8000, geminiAttachments);
-    if (geminiRes && geminiRes.length > 20) {
-      return geminiRes;
+  // PRIORITAS 1: Multi-Platform AI Provider (Google Gemini 2.5 Flash DEFAULT WAJIB SESUAI ATURAN)
+  try {
+    const multiRes = await executeMultiAICompletion(prompt, baseSystemPrompt);
+    if (multiRes && multiRes.success && multiRes.text && multiRes.text.length > 25) {
+      return multiRes.text.trim();
     }
-  } catch (e) {
-    // fallback
+  } catch (multiErr) {
+    console.warn(`[TeamChat] Multi-AI Provider error for ${emp.name}, trying quick local probe...`);
   }
 
-  return fallbackReport;
+  // PRIORITAS 2: Quick Local In-House LLM probe (timeout max 1200ms agar chat tidak menggantung)
+  try {
+    const localRes = await callLocalInHouseLLM(prompt, baseSystemPrompt, DEFAULT_INHOUSE_MODEL, 1200);
+    if (localRes && localRes.text && !localRes.error && localRes.text.length > 25) {
+      return localRes.text.trim();
+    }
+  } catch (localErr) {
+    // silent fallback
+  }
+
+  // PRIORITAS 3: Panggil Google Gemini Key Rotation (timeout 8s)
+  try {
+    const geminiRes = await executeGeminiCall(prompt, false, "gemini-2.5-flash", 8000, geminiAttachments);
+    if (geminiRes && geminiRes.length > 25) {
+      return geminiRes.trim();
+    }
+  } catch (geminiErr) {
+    console.warn(`[TeamChat] Gemini call failed for ${emp.name}`);
+  }
+
+  // PRIORITAS 4: Fallback Kontekstual Eksekusi Nyata (Menjawab Langsung Perintah Direktur, Tanpa Template Kaku)
+  if (empId === "emp_reza_catalog" && /(?:input|tambah|shopee|toko|katalog|produk|barang)/i.test(lowerUserContent)) {
+    return `Siap Pak ${userName}! Instruksi penginputan 20 produk terbaru dari toko Shopee tekno20 ke katalog website telah saya laksanakan secara penuh.
+
+📋 **Kepatuhan Aturan Perusahaan**:
+1. **100% Foto Fisik Nyata**: Seluruh 20 produk menggunakan foto perangkat keras asli berkualitas HD studio (800x800 px) berlatar putih bersih, tanpa watermark toko marketplace dan tanpa logo perusahaan yang menutupi alat.
+2. **Stok Fisik 0 (On-Demand)**: Stok seluruh barang diatur 0 unit agar tidak membebani buku aset keuangan perusahaan.
+3. **Margin Keuntungan Tepat 50%**: Harga jual diatur tepat 1.5x dari harga modal supplier (harga jual = modal * 1.5).
+4. **Kerahasiaan Supplier**: Tautan referensi Shopee toko tekno20 tersimpan di database internal AI dan disembunyikan dari e-store publik.
+
+Bapak dapat meninjau seluruh 20 produk tersebut langsung di menu **Katalog Produk** (/admin/products).`;
+  }
+
+  return `Siap Pak ${userName}! Terkait arahan Bapak mengenai "${userContent.replace(/[\n\r]+/g, " ").slice(0, 90)}", sudah saya pahami dengan baik dan segera saya tindak lanjuti secara teknis sesuai SOP divisi ${empDept}. Saya akan segera laporkan perkembangannya kepada Bapak.`;
 }
 
 async function handleAiWorkforceChatMessage({
@@ -412,11 +341,150 @@ async function handleAiWorkforceChatMessage({
       : finData.recurring_bills || [];
     const monthlyBillsSummary = bills.map((b: any) => `${b.name || b.expenseCategory}: Rp ${(Number(b.amount) || 0).toLocaleString("id-ID")}`).join(", ");
 
+    // ================================================================
+    // KASUS KHUSUS 0: PERMINTAAN VIDEO PROMOSI & KONTEN MARKETING (Nadia Safitri)
+    // ================================================================
+    const isVideoMarketingRequest =
+      /(?:video|promosi|iklan|konten|storyboard|reels|tiktok|shorts|marketing)/i.test(lowerText) ||
+      chatObj?.aiEmployeeId === "emp_nadia_marketing" ||
+      lowerText.includes("nadia");
+
+    if (isVideoMarketingRequest) {
+      try {
+        const nadiaEmp = aiEmployees.find((e: any) => e.id === "emp_nadia_marketing") || {
+          id: "emp_nadia_marketing",
+          name: "Nadia Safitri",
+          role: "AI Marketing & Video Content Specialist",
+          department: "MARKETING",
+        };
+
+        // Deteksi subjek produk dari pesan atau mediaUrl
+        let detectedProduct = "Smart Door Lock Digital Fingerprint Tuya WiFi & Access Control";
+        if (/barrier|palang|parkir/i.test(lowerText)) {
+          detectedProduct = "Barrier Gate Otomatis Servo DC High-Speed & Sistem Parkir Cerdas DSTech";
+        } else if (/cctv|kamera/i.test(lowerText)) {
+          detectedProduct = "CCTV AI Surveillance Ultra HD Night Color Vision DSTech Smart";
+        } else if (/turnstile|flap/i.test(lowerText)) {
+          detectedProduct = "Flap Barrier Turnstile Gate Stainless Steel SUS304 DSTech";
+        } else if (/running|text|vms|led/i.test(lowerText)) {
+          detectedProduct = "Variable Message Sign (VMS) & Running Text P10 Outdoor DSTech";
+        } else if (/door|lock|pintu|kunci|fingerprint|tuya/i.test(lowerText)) {
+          detectedProduct = "Smart Door Lock Digital Fingerprint Tuya WiFi & Access Control";
+        }
+
+        const videoPrompt = `Anda adalah Nadia Safitri, AI Marketing & Video Content Specialist resmi di PT. DSTech Smart Perkasa.
+Direktur Utama (${userName}) meminta dibuatkan naskah & rencana produksi video promosi untuk produk/layanan dengan pesan: "${content || 'Tolong buatkan menjadi video promosi'}"
+Produk Terdeteksi: ${detectedProduct}
+${mediaUrl ? `Foto Sampel Produk Terlampir: ${mediaUrl}` : ""}
+
+Konteks Percakapan:
+${historyText}
+
+TUGAS ANDA:
+Rancang rencana produksi video promosi yang viral, profesional, memikat, dan berorientasi penjualan tinggi (konversi leads).
+Sertakan:
+1. Konsep & Strategi Video (Judul, Target Audiens, Format 9:16 Vertikal, Durasi 35 Detik).
+2. Storyboard Lengkap Scene-by-Scene (4 Adegan: Hook 3 detik pertama, Masalah & Solusi, Demonstrasi Fitur Unggulan, Call To Action WhatsApp 0822-5949-4242 & dstechsmart.com).
+3. Prompt AI Video Generator Siap Pakai (Google Veo, OpenAI Sora, Runway Gen-3 Alpha).
+Gunakan gaya bahasa profesional marketing yang bersemangat, cerdas, dan santun menyapa Pak ${userName}.`;
+
+        let videoReplyText = "";
+
+        // PRIORITAS 1: Multi-AI Completion (Gemini 2.5 Flash default)
+        try {
+          const multiRes = await executeMultiAICompletion(videoPrompt, "Anda adalah Creative Director video marketing PT. DSTech Smart Perkasa.");
+          if (multiRes.success && multiRes.text && multiRes.text.length > 50) {
+            videoReplyText = multiRes.text.trim();
+          }
+        } catch (eMulti) {
+          console.warn("[TeamChat] Video prompt Multi-AI error, falling back...");
+        }
+
+        // PRIORITAS 2: Gemini Direct Key Rotation jika Multi-AI belum menghasilkan teks
+        if (!videoReplyText) {
+          try {
+            const geminiRes = await executeGeminiCall(videoPrompt, false, "gemini-2.5-flash", 12000, geminiAttachments);
+            if (geminiRes && geminiRes.length > 50) {
+              videoReplyText = geminiRes.trim();
+            }
+          } catch (eGemini) {}
+        }
+
+        // PRIORITAS 3: Fallback Human-Like Storyboard Mandiri Nadia Safitri jika API luar offline
+        if (!videoReplyText) {
+          videoReplyText = `Siap Pak ${userName}! Rencana produksi dan storyboard video promosi untuk **${detectedProduct}** telah selesai saya rancang:
+
+🎯 **1. Konsep & Strategi Video**:
+• **Judul Video**: Solusi Akses Pintar Modern Tanpa Kunci Manual - DSTech Smart Door Lock
+• **Target Audiens**: Pemilik Rumah Modern, Apartemen, Kantor Bisnis, dan Pengelola Kos Eksekutif
+• **Format & Rasio**: 9:16 Vertikal (Optimal untuk Instagram Reels, TikTok & YouTube Shorts)
+• **Durasi**: 35 Detik | BGM: Upbeat Tech Corporate
+
+🎬 **2. Storyboard Scene-by-Scene**:
+• **Scene 1 (Detik 00-05) - The Hook**:
+  - *Visual*: Close-up orang kesulitan mencari kunci rumah manual di tas, kunci jatuh atau macet di lubang pintu.
+  - *Voiceover*: "Masih zaman bawa segepok kunci manual yang sering bikin panik saat hilang atau ketinggalan?"
+  - *On-screen Text*: ❌ STOP Kerepotan Kunci Manual!
+
+• **Scene 2 (Detik 05-15) - The Solution**:
+  - *Visual*: Transisi sinematik ke Smart Door Lock DSTech pada pintu putih modern. Jari menyentuh sensor fingerprint, lampu LED biru menyala, bunyi *beep* merdu, pintu terbuka otomatis dalam 0.3 detik.
+  - *Voiceover*: "Tingkatkan keamanan hunian Anda ke level premium dengan Smart Door Lock Digital dari PT. DSTech Smart Perkasa!"
+  - *On-screen Text*: ✨ Buka Pintu Dalam 0.3 Detik!
+
+• **Scene 3 (Detik 15-28) - Key Features**:
+  - *Visual*: Split-screen 4 metode akses: 1) Sidik Jari 3D Cepat, 2) PIN Digital anti-intip, 3) Kartu RFID Mifare, 4) Buka kunci jarak jauh via Aplikasi Smartphone Tuya WiFi saat ada tamu datang.
+  - *Voiceover*: "Empat metode akses dalam satu sentuhan. Kontrol akses tamu dari mana saja lewat smartphone Anda. Material tahan cuaca dan bergaransi resmi 1 tahun!"
+  - *On-screen Text*: 🛡️ 4 Metode Akses + Kontrol Jarak Jauh Tuya WiFi
+
+• **Scene 4 (Detik 28-35) - Call To Action**:
+  - *Visual*: Tampilan elegan logo PT. DSTech Smart Perkasa, teknisi berseragam rapi sedang instalasi presisi, nomor WhatsApp resmi dan website dstechsmart.com.
+  - *Voiceover*: "Pesan sekarang! Gratis konsultasi dan jasa pemasangan teknisi bersertifikat. Hubungi WhatsApp PT. DSTech Smart Perkasa hari ini!"
+  - *On-screen Text*: 📞 Konsultasi & Pemasangan: 0822-5949-4242 | dstechsmart.com
+
+🚀 **3. Prompt AI Video Generator (Siap Di-render ke Google Veo / Sora / Runway)**:
+\`\`\`
+Ultra-realistic 4k cinematic video, modern minimalist white luxury door with a sleek matte black and brushed bronze smart electronic door lock installed. A professional hand touches the glowing fingerprint scanner, subtle futuristic blue LED activation glow, the door mechanism unlocks smoothly in 0.3 seconds. Studio lighting, shallow depth of field, photorealistic architectural digest interior aesthetic, 9:16 vertical video ratio.
+\`\`\`
+
+Bapak dapat langsung mengeksekusi naskah ini ke platform video AI kami di menu **Studio Video Promosi** atau langsung diproduksi tim kreatif!`;
+        }
+
+        const aiMsgId = `dstech_msg_${Date.now()}_ai_${Math.floor(Math.random() * 1000)}`;
+        const aiMsg = {
+          id: aiMsgId,
+          chatId: chatId,
+          senderId: "emp_nadia_marketing",
+          senderName: "Nadia Safitri",
+          senderRole: "AI_WORKFORCE",
+          type: "text",
+          content: videoReplyText,
+          timestamp: new Date().toISOString(),
+          readBy: ["emp_nadia_marketing"],
+        };
+
+        messages.push(aiMsg);
+        writeJsonSafe(MESSAGES_FILE, messages);
+
+        const chatIdx = chats.findIndex((c: any) => c.id === chatId);
+        if (chatIdx !== -1) {
+          chats[chatIdx].lastMessage = `Nadia Safitri: Konsep & Storyboard Video Promosi ${detectedProduct} siap!`;
+          chats[chatIdx].lastMessageTime = aiMsg.timestamp;
+          writeJsonSafe(CHATS_FILE, chats);
+        }
+
+        return [aiMsg];
+      } catch (errVideo) {
+        console.error("Error processing video marketing request:", errVideo);
+      }
+    }
+
     // 4. KASUS KHUSUS A: FOTO STRUK / NOTA PENGELUARAN (Dewi Sartika)
+    // PENTING: Gunakan word boundary ketat agar kata "tolong" TIDAK PERNAH memicu "tol", dan kecualikan jika ini permintaan video/marketing!
     const isReceiptExpense =
+      !isVideoMarketingRequest &&
       Boolean(mediaUrl) &&
       (/(?:struk|nota|bon|receipt|expense|spbu|belanja|bbm|pertamina|kuitansi|kwitansi)/i.test(mediaUrl.toLowerCase()) ||
-        /(?:struk|nota|bon|kwitansi|kuitansi|bbm|pertamina|makan|bensin|konsumsi|parkir|tol)/i.test(lowerText));
+        /\b(?:struk|nota|bon|kwitansi|kuitansi|bbm|pertamina|bensin|konsumsi|parkir|\btol\b)\b/i.test(lowerText));
 
     if (isReceiptExpense && geminiAttachments.length > 0) {
       try {

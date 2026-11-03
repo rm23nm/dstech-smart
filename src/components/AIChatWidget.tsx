@@ -169,21 +169,21 @@ export function getPortalRoleConfig(pathname: string, user?: any): PortalRoleCon
   // Default: Public Client / Prospective Customer
   return {
     portalType: "PUBLIC",
-    title: "Dani — AI Consultant",
-    badge: "✨ AI Consultant • Gemini 2.5",
-    badgeColor: "bg-blue-500/20 text-blue-300 border-blue-400/30",
-    avatarBg: "from-blue-500 to-indigo-500",
-    greetingText: "Halo! Saya Dani, Virtual AI Consultant resmi PT. DSTech Smart Perkasa. 👋\n\nAda yang bisa saya bantu hari ini? Anda bisa menanyakan spesifikasi produk CCTV, solusi Smart Home & Barrier Gate, bantuan kendala teknis, atau permohonan survei & penawaran.",
+    title: "Deni — In-House AI Consultant",
+    badge: "⚡ In-House AI • DSTech Autonomous",
+    badgeColor: "bg-emerald-500/20 text-emerald-300 border-emerald-400/30",
+    avatarBg: "from-blue-600 via-indigo-600 to-emerald-600",
+    greetingText: "Halo! Saya Deni, In-House AI Consultant resmi PT. DSTech Smart Perkasa. ✨\n\nAda yang bisa saya bantu terkait solusi Security System, Barrier Gate Otomatis, CCTV AI AcuSense, Smart Home, atau penawaran proyek hari ini?",
     quickReplies: [
-      "📹 Rekomendasi Paket CCTV",
-      "🚪 Pasang Smart Doorlock",
-      "🚧 Barrier Gate Otomatis",
-      "🛠️ Kendala Teknis / Perbaikan",
-      "⚠️ Komplain Pesanan Toko"
+      "🚀 Pasang Barrier Gate Otomatis",
+      "📹 Rekomendasi Paket CCTV AI",
+      "🔐 Smart Door Lock & Akses Pintu",
+      "📦 Lacak Status Pesanan Saya",
+      "📞 Hubungkan ke WhatsApp Konsultan"
     ],
-    placeholder: "Tulis pertanyaan Anda di sini...",
-    teaserTitle: "Konsultasi CCTV & Smart System",
-    teaserText: "Tanyakan estimasi biaya, spesifikasi, dan solusi keamanan untuk kebutuhan Anda."
+    placeholder: "Ketik pertanyaan konsultasi / spesifikasi kebutuhan Anda...",
+    teaserTitle: "Konsultasi AI Gratis 24/7",
+    teaserText: "Tanyakan spesifikasi CCTV, Barrier Gate, Smart Home, atau hitung estimasi biaya di sini." 
   };
 }
 

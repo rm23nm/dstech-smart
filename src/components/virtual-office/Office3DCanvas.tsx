@@ -54,6 +54,21 @@ const WORKSTATION_SLOTS: Record<string, { deskX: number; deskZ: number; chairX: 
   director_ramadhani: { deskX: 0, deskZ: -9, chairX: 0, chairZ: -9.9, rotY: 0, label: "Meja Direktur Utama" },
 };
 
+// Slot meja dinamis untuk Karyawan AI kustom yang baru direkrut
+const DYNAMIC_SLOTS = [
+  { deskX: -4, deskZ: 10, chairX: -4, chairZ: 10.9, rotY: Math.PI, label: "Workstation AI A" },
+  { deskX: 4, deskZ: 10, chairX: 4, chairZ: 10.9, rotY: Math.PI, label: "Workstation AI B" },
+  { deskX: 7, deskZ: -9, chairX: 7, chairZ: -9.9, rotY: 0, label: "Executive Annex" },
+  { deskX: -12, deskZ: 2, chairX: -12.9, chairZ: 2, rotY: Math.PI * 0.5, label: "Specialist Hub 1" },
+  { deskX: 12, deskZ: 2, chairX: 12.9, chairZ: 2, rotY: -Math.PI * 0.5, label: "Specialist Hub 2" },
+  { deskX: 12, deskZ: -3, chairX: 12.9, chairZ: -3, rotY: -Math.PI * 0.5, label: "Specialist Hub 3" },
+];
+
+function getEmployeeWorkstationSlot(empId: string, index = 0) {
+  if (WORKSTATION_SLOTS[empId]) return WORKSTATION_SLOTS[empId];
+  return DYNAMIC_SLOTS[index % DYNAMIC_SLOTS.length];
+}
+
 // Titik Temu Bersama
 const MEETING_AREA = { x: 0, z: 1 };
 const PANTRY_AREA = { x: -11, z: -9 };
@@ -1314,6 +1329,14 @@ export default function Office3DCanvas({
       createDeskWithComputerAndNameplate(slot.deskX, slot.deskZ, slot.rotY, key, glow);
     });
 
+    // Spawn Meja Kerja Tambahan untuk Karyawan AI Kustom
+    employees.forEach((emp, idx) => {
+      if (!WORKSTATION_SLOTS[emp.id]) {
+        const slot = getEmployeeWorkstationSlot(emp.id, idx);
+        createDeskWithComputerAndNameplate(slot.deskX, slot.deskZ, slot.rotY, emp.id, 0xa855f7);
+      }
+    });
+
     // Meja Rapat Bundar Tengah (Meeting Hub)
     const meetingTable = new THREE.Mesh(
       new THREE.CylinderGeometry(2.4, 2.4, 0.12, 32),
@@ -1464,8 +1487,8 @@ export default function Office3DCanvas({
     };
 
     // Spawn Karakter untuk Semua Karyawan AI
-    employees.forEach((emp) => {
-      const slot = WORKSTATION_SLOTS[emp.id] || { chairX: 0, chairZ: 0, rotY: 0 };
+    employees.forEach((emp, idx) => {
+      const slot = getEmployeeWorkstationSlot(emp.id, idx);
       const charObj = createHumanoid3D(emp, slot);
       stateRef.current.characters.set(emp.id, charObj);
     });
@@ -1717,7 +1740,8 @@ export default function Office3DCanvas({
 
     chars.forEach((char, id) => {
       if (mode === "WORKING") {
-        const slot = WORKSTATION_SLOTS[id];
+        const empIdx = employees.findIndex((e) => e.id === id);
+        const slot = getEmployeeWorkstationSlot(id, empIdx >= 0 ? empIdx : 0);
         if (slot) {
           char.targetPos.set(slot.chairX, 0, slot.chairZ);
           char.targetRotY = slot.rotY;

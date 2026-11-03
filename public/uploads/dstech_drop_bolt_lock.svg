@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="50%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="primaryMetal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="30%" stop-color="#64748b"/>
+      <stop offset="70%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accentMetal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="amberMetal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="50%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <filter id="studioShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="20" flood-color="#0f172a" flood-opacity="0.22"/>
+    </filter>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="800" height="800" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle Studio Grid -->
+  <g opacity="0.3" stroke="#cbd5e1" stroke-width="1">
+    <line x1="100" y1="0" x2="100" y2="800"/>
+    <line x1="250" y1="0" x2="250" y2="800"/>
+    <line x1="400" y1="0" x2="400" y2="800"/>
+    <line x1="550" y1="0" x2="550" y2="800"/>
+    <line x1="700" y1="0" x2="700" y2="800"/>
+    <line x1="0" y1="200" x2="800" y2="200"/>
+    <line x1="0" y1="400" x2="800" y2="400"/>
+    <line x1="0" y1="600" x2="800" y2="600"/>
+  </g>
+
+  <!-- Studio Floor Shadow -->
+  <ellipse cx="400" cy="620" rx="280" ry="42" fill="#0f172a" opacity="0.16" filter="blur(14px)"/>
+
+  <!-- Top Studio Header Badge -->
+  <rect x="50" y="45" width="220" height="34" rx="8" fill="#0f172a"/>
+  <circle cx="70" cy="62" r="6" fill="#0284c7"/>
+  <circle cx="70" cy="62" r="3" fill="#38bdf8"/>
+  <text x="86" y="66" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="800" fill="#f8fafc" letter-spacing="1">DSTECH SMART</text>
+  
+  <rect x="530" y="45" width="220" height="34" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="640" y="67" font-family="'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#475569" text-anchor="middle" letter-spacing="1">GENUINE TEKNO20 HW</text>
+
+  <!-- Product Hardware Drawing -->
+  <g filter="url(#studioShadow)">
+    
+        <!-- Brushed Aluminium Drop Bolt Housing -->
+        <rect x="180" y="240" width="440" height="150" rx="14" fill="url(#primaryMetal)" stroke="#1e293b" stroke-width="3"/>
+        <rect x="220" y="270" width="360" height="90" rx="8" fill="#334155"/>
+        
+        <!-- Cylindrical Solid Stainless Steel Bolt Pin -->
+        <circle cx="400" cy="460" r="22" fill="#cbd5e1" stroke="#475569" stroke-width="3"/>
+        <rect x="382" y="340" width="36" height="110" rx="4" fill="#e2e8f0" stroke="#334155" stroke-width="2"/>
+        
+        <!-- Status Indicator LED & Time Delay Jumper -->
+        <circle cx="250" cy="315" r="8" fill="#22c55e" stroke="#15803d" stroke-width="2"/>
+        <text x="270" y="320" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f8fafc">12V STATUS</text>
+        <rect x="490" y="300" width="70" height="30" rx="6" fill="#0f172a"/>
+        <text x="525" y="320" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#38bdf8" text-anchor="middle">DELAY</text>
+        
+  </g>
+
+  <!-- Product Title & Details Footer -->
+  <g transform="translate(400, 685)">
+    <rect x="-350" y="0" width="700" height="80" rx="16" fill="#0f172a" opacity="0.95"/>
+    <text x="0" y="32" font-family="'Segoe UI', Roboto, sans-serif" font-size="19" font-weight="800" fill="#f8fafc" text-anchor="middle" letter-spacing="0.5">ELECTRIC DROP BOLT LOCK FRAMELESS</text>
+    <text x="0" y="55" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#38bdf8" text-anchor="middle" letter-spacing="1.5">FAIL SAFE / FAIL SECURE HEAVY DUTY • DC 12V • TIME DELAY 0/3/6/9s • TEMPERED GLASS DOOR</text>
+  </g>
+</svg>

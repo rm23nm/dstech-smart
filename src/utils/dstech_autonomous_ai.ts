@@ -8,6 +8,74 @@ const TASKS_FILE = path.join(process.cwd(), "src", "data", "dstech_employee_task
 const PRODUCTS_FILE = path.join(process.cwd(), "src", "data", "dstech_products.json");
 const PROMOTIONS_FILE = path.join(process.cwd(), "src", "data", "dstech_promotions.json");
 
+/**
+ * Filter Cerdas Memori Penolakan & Evaluasi Direktur Utama
+ * Mencegah AI Agent mengajukan kembali usulan yang pernah ditolak/dihapus Direktur
+ */
+export function isProposalBlockedByDirector(
+  taskType: string,
+  title: string,
+  client: string,
+  wfData: any
+): { blocked: boolean; reason?: string } {
+  const dismissed = Array.isArray(wfData.dstech_dismissed_topics) ? wfData.dstech_dismissed_topics : [];
+  const evaluations = Array.isArray(wfData.dstech_director_evaluations) ? wfData.dstech_director_evaluations : [];
+  const allBlacklist = [...dismissed, ...evaluations];
+
+  const lowerTitle = (title || "").toLowerCase();
+  const lowerClient = (client || "").toLowerCase();
+  const cleanKeyword = lowerTitle
+    .replace(/^(?:usulan|draf|pengadaan|restok|suku cadang|sph|invoice|penawaran|materi promo|promo spesial)[:\s\-_]*/gi, "")
+    .replace(/\(stok:\s*\d+[^)]*\)/gi, "")
+    .replace(/po-[a-z0-9\-_]+/gi, "")
+    .trim();
+
+  // 1. Cek terhadap Memori Penolakan & Evaluasi Direktur
+  for (const item of allBlacklist) {
+    const itemTitle = (item.title || "").toLowerCase();
+    const itemClient = (item.client || "").toLowerCase();
+    const itemClean = (item.clean_keyword || itemTitle)
+      .replace(/^(?:usulan|draf|pengadaan|restok|suku cadang|sph|invoice|penawaran|materi promo|promo spesial)[:\s\-_]*/gi, "")
+      .replace(/\(stok:\s*\d+[^)]*\)/gi, "")
+      .trim();
+
+    if (lowerTitle && itemTitle && (lowerTitle === itemTitle || lowerTitle.includes(itemTitle) || itemTitle.includes(lowerTitle))) {
+      return { blocked: true, reason: item.reason || "Pernah ditolak/dievaluasi oleh Direktur Utama" };
+    }
+
+    if (cleanKeyword && itemClean && cleanKeyword.length > 3 && itemClean.length > 3) {
+      if (cleanKeyword.includes(itemClean) || itemClean.includes(cleanKeyword)) {
+        return { blocked: true, reason: item.reason || "Topik usulan serupa pernah ditolak Direktur Utama" };
+      }
+    }
+
+    if (lowerClient && itemClient && (lowerClient.includes(itemClient) || itemClient.includes(lowerClient)) && item.task_type === taskType) {
+      return { blocked: true, reason: item.reason || `Pekerjaan untuk klien ${client} pernah ditolak Direktur Utama` };
+    }
+
+    if (/stok\s*0|zero\s*asset|restok|stok\s*habis/i.test(item.reason || "") && /restok|pengadaan\s*suku\s*cadang/i.test(lowerTitle)) {
+      return { blocked: true, reason: item.reason || "Pengajuan restok dilarang sesuai kebijakan zero physical stock" };
+    }
+  }
+
+  // 2. Cek apakah ada di antrean yang berstatus REJECTED
+  if (Array.isArray(wfData.dstech_approval_queue)) {
+    const rejectedItem = wfData.dstech_approval_queue.find((q: any) => {
+      if (q.status !== "REJECTED") return false;
+      const qTitle = (q.title || "").toLowerCase();
+      const qClient = (q.target_client || q.payload?.customerName || "").toLowerCase();
+      return (lowerTitle && qTitle && (lowerTitle.includes(qTitle) || qTitle.includes(lowerTitle))) ||
+             (cleanKeyword && qTitle.includes(cleanKeyword)) ||
+             (lowerClient && qClient && (lowerClient.includes(qClient) || qClient.includes(lowerClient)) && q.task_type === taskType);
+    });
+    if (rejectedItem) {
+      return { blocked: true, reason: rejectedItem.reviewer_notes || "Usulan ini pernah ditolak Direktur Utama dan belum direvisi" };
+    }
+  }
+
+  return { blocked: false };
+}
+
 function readJsonSafely(filePath: string, fallback: any = {}): any {
   try {
     if (fs.existsSync(filePath)) {
@@ -79,14 +147,10 @@ export function triggerDewiAutonomousProjectInvoice(project: any) {
     return { success: false, reason: "Draf invoice untuk proyek ini sudah ada di antrean persetujuan", queueId: existingQueue.id };
   }
 
-  // Cek blacklist penolakan
-  const isDismissed = wfData.dstech_dismissed_topics.some(
-    (t: any) =>
-      (t.client && clientName.toLowerCase().includes(t.client.toLowerCase())) ||
-      (t.title && t.title.toLowerCase().includes(projectName.toLowerCase()))
-  );
-  if (isDismissed) {
-    return { success: false, reason: "Klien atau topik proyek ini pernah ditolak/dihapus Direktur Utama" };
+  // Cek memori evaluasi & penolakan Direktur Utama
+  const dewiCheck = isProposalBlockedByDirector("INVOICE_PROPOSAL", projectName, clientName, wfData);
+  if (dewiCheck.blocked) {
+    return { success: false, reason: `Draf invoice dicegah AI Guard: ${dewiCheck.reason}` };
   }
 
   const now = new Date();
@@ -238,11 +302,16 @@ export function triggerDeniAutonomousProgressReport(reportData: any) {
     };
   });
 
-  // Cek apakah laporan ini sudah pernah dirangkum sebelumnya di queue
+  // Cek memori evaluasi & penolakan Direktur Utama
+  const deniCheck = isProposalBlockedByDirector("FIELD_PROGRESS_REPORT", projectName, clientName, wfData);
+  if (deniCheck.blocked) {
+    return { success: false, reason: `Draf BAKP dicegah AI Guard: ${deniCheck.reason}` };
+  }
+
+  // Cek apakah laporan ini sudah pernah dirangkum sebelumnya di queue (pending atau approved)
   const existingQueue = wfData.dstech_approval_queue.find(
     (q: any) =>
       q.task_type === "FIELD_PROGRESS_REPORT" &&
-      q.status !== "REJECTED" &&
       ((q.payload?.reportId && q.payload.reportId === reportId) ||
         (q.payload?.taskId && q.payload.taskId === taskId && q.payload.progressPercentage === progressPercentage))
   );
@@ -342,14 +411,10 @@ export function triggerBambangAutonomousSPH(inquiryData: any) {
   const clientAddress = inquiryData.clientAddress || inquiryData.address || "Area Banten / Jabodetabek";
   const subject = inquiryData.subject || inquiryData.title || `Penawaran Perangkat & Sistem Smart Solution (${clientOrg})`;
 
-  // Cek blacklist penolakan
-  const isDismissed = wfData.dstech_dismissed_topics.some(
-    (t: any) =>
-      (t.client && clientName.toLowerCase().includes(t.client.toLowerCase())) ||
-      (t.title && subject.toLowerCase().includes(t.title.toLowerCase()))
-  );
-  if (isDismissed) {
-    return { success: false, reason: "Topik atau klien ini pernah ditolak/dihapus Direktur Utama" };
+  // Cek memori evaluasi & penolakan Direktur Utama
+  const budiCheck = isProposalBlockedByDirector("SPH_PROPOSAL", subject, clientName, wfData);
+  if (budiCheck.blocked) {
+    return { success: false, reason: `Draf SPH dicegah AI Guard: ${budiCheck.reason}` };
   }
 
   // Cek antrean duplikat
@@ -470,13 +535,93 @@ export function triggerBambangAutonomousSPH(inquiryData: any) {
 /**
  * 4. REZA FIRMANSYAH: Pemantauan Stok Menipis & Draf PO Pengadaan Otonom
  */
-export function triggerRezaAutonomousStockRestock(product: any) {
-  if (!product || !product.id) return { success: false, reason: "Produk invalid" };
-
-  const currentStock = Number(product.stock) || 0;
-  if (currentStock > 2) {
-    return { success: false, reason: "Stok produk masih aman (> 2 unit)" };
+/**
+ * Penyelarasan & Audit Harga Harian AI Agent Reza Firmansyah (Margin Keuntungan 50% dari Harga Referensi)
+ */
+export function syncAndAuditAutonomousProductPrices(applyUpdates = true) {
+  const products = readJsonSafely(PRODUCTS_FILE, []);
+  if (!Array.isArray(products) || products.length === 0) {
+    return { success: true, auditedCount: 0, updatedCount: 0, updates: [] };
   }
+
+  let auditedCount = 0;
+  let updatedCount = 0;
+  const updates: any[] = [];
+  const now = new Date().toISOString();
+
+  for (const p of products) {
+    const cost = Number(p.costPrice) || 0;
+    if (cost <= 0) continue;
+
+    auditedCount++;
+    const targetPrice = Math.round(cost * 1.5);
+    const currentPrice = Number(p.price) || 0;
+
+    if (Math.abs(currentPrice - targetPrice) > 100) {
+      updatedCount++;
+      updates.push({
+        id: p.id,
+        name: p.name,
+        oldPrice: currentPrice,
+        newPrice: targetPrice,
+        costPrice: cost,
+        sourceUrl: p.sourceUrl || p.dstech_source_url || "",
+      });
+
+      if (applyUpdates) {
+        p.price = targetPrice;
+        p.lastPriceAudit = now;
+        p.dstech_margin_policy = "50%_OF_REFERENCE_COST";
+        if (!Array.isArray(p.priceHistory)) p.priceHistory = [];
+        p.priceHistory.push({
+          date: now,
+          costPrice: cost,
+          price: targetPrice,
+          marginPercent: 50,
+          sourceUrl: p.sourceUrl || p.dstech_source_url || "",
+          note: "Penyelarasan Harian AI Agent Reza (Margin 50% dari Harga Referensi)",
+        });
+      }
+    }
+  }
+
+  if (applyUpdates && updatedCount > 0) {
+    writeJsonSafely(PRODUCTS_FILE, products);
+
+    // Catat ke log aktivitas AI Workforce
+    try {
+      const wfData = readJsonSafely(WORKFORCE_FILE, {});
+      if (!Array.isArray(wfData.dstech_recent_logs)) wfData.dstech_recent_logs = [];
+      wfData.dstech_recent_logs.unshift({
+        id: `log_price_${Date.now()}`,
+        timestamp: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB",
+        type: "PRICE_SYNC",
+        message: `Reza Firmansyah menyelaraskan harga ${updatedCount} produk: harga jual diperbarui dengan margin keuntungan 50% dari harga referensi.`,
+        badge: "MARGIN 50%",
+      });
+      if (wfData.dstech_recent_logs.length > 50) wfData.dstech_recent_logs = wfData.dstech_recent_logs.slice(0, 50);
+
+      for (const emp of wfData.dstech_employees || []) {
+        if (emp.id === "emp_reza_catalog") {
+          emp.speech_bubble = `Pak Ramadhani, saya telah menyelaraskan harga jual katalog (${updatedCount} produk diperbarui) agar tepat dengan batasan margin keuntungan 50% dari harga referensi.`;
+        }
+      }
+      writeJsonSafely(WORKFORCE_FILE, wfData);
+    } catch (e) {}
+  }
+
+  return { success: true, auditedCount, updatedCount, updates };
+}
+
+export function triggerRezaAutonomousStockRestock(product: any) {
+  // Pengajuan restok dinonaktifkan permanen sesuai instruksi Direktur (kebijakan zero physical stock)
+  // Perusahaan beroperasi on-demand / pre-order sehingga stok sengaja 0 agar tidak menambah nilai aset pada pembukuan keuangan.
+  return {
+    success: false,
+    reason: "Pengajuan restok dinonaktifkan permanen sesuai kebijakan akuntansi perusahaan (stok fisik sengaja 0 agar tidak membebani nilai aset pembukuan).",
+  };
+  /* KODE LAMA RESTOK DINONAKTIFKAN PERMANEN:
+  if (!product || !product.id) return { success: false, reason: "Produk invalid" };
 
   const wfData = readJsonSafely(WORKFORCE_FILE, {
     dstech_approval_queue: [],
@@ -563,6 +708,7 @@ export function triggerRezaAutonomousStockRestock(product: any) {
 
   writeJsonSafely(WORKFORCE_FILE, wfData);
   return { success: true, proposal: restockProposal };
+  */
 }
 
 /**
@@ -579,7 +725,13 @@ export function triggerNadiaAutonomousMarketing(promoContext?: any) {
   if (!Array.isArray(wfData.dstech_recent_logs)) wfData.dstech_recent_logs = [];
   if (!Array.isArray(wfData.dstech_employees)) wfData.dstech_employees = [];
 
-  // Hindari spamming draf marketing jika sudah ada draf marketing aktif yang pending
+  // Cek memori evaluasi & penolakan Direktur Utama
+  const nadiaCheck = isProposalBlockedByDirector("PROMO_CAMPAIGN", "Promo Spesial", "Pemasaran", wfData);
+  if (nadiaCheck.blocked) {
+    return { success: false, reason: `Draf promosi dicegah AI Guard: ${nadiaCheck.reason}` };
+  }
+
+  // Hindari spamming draf marketing jika sudah ada draf marketing aktif yang pending atau rejected
   const hasActiveMarketing = wfData.dstech_approval_queue.some(
     (q: any) =>
       q.employee_id === "emp_nadia_marketing" &&
@@ -746,16 +898,11 @@ export function scanAndExecuteAutonomousWorkforce() {
     }
   }
 
-  // D. Pindai Stok Gudang Menipis untuk Reza Firmansyah (Auto-Restok)
-  const prods = Array.isArray(productsData) ? productsData : [];
-  for (const p of prods) {
-    if (Number(p.stock) <= 2) {
-      const res = triggerRezaAutonomousStockRestock(p);
-      if (res.success) {
-        newStockAlerts++;
-        break; // Batasi 1 usulan restok per pemindaian agar tidak membanjiri antrean
-      }
-    }
+  // D. Pemantauan Restok Dinonaktifkan Permanen (Stok Fisik 0).
+  // Digantikan dengan: Penyelarasan & Audit Harga Harian AI (Margin Keuntungan 50% dari Harga Referensi Modal)
+  const priceSync = syncAndAuditAutonomousProductPrices(true);
+  if (priceSync.updatedCount > 0) {
+    newStockAlerts += priceSync.updatedCount;
   }
 
   // E. Pindai Kebutuhan Promo untuk Nadia Safitri (Auto-Campaign)

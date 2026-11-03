@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="50%" stop-color="#f1f5f9"/>
+      <stop offset="100%" stop-color="#e2e8f0"/>
+    </linearGradient>
+    <linearGradient id="primaryMetal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="30%" stop-color="#64748b"/>
+      <stop offset="70%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accentMetal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ef4444"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+    <linearGradient id="amberMetal" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="50%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <filter id="studioShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="24" stdDeviation="20" flood-color="#0f172a" flood-opacity="0.22"/>
+    </filter>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="800" height="800" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle Studio Grid -->
+  <g opacity="0.3" stroke="#cbd5e1" stroke-width="1">
+    <line x1="100" y1="0" x2="100" y2="800"/>
+    <line x1="250" y1="0" x2="250" y2="800"/>
+    <line x1="400" y1="0" x2="400" y2="800"/>
+    <line x1="550" y1="0" x2="550" y2="800"/>
+    <line x1="700" y1="0" x2="700" y2="800"/>
+    <line x1="0" y1="200" x2="800" y2="200"/>
+    <line x1="0" y1="400" x2="800" y2="400"/>
+    <line x1="0" y1="600" x2="800" y2="600"/>
+  </g>
+
+  <!-- Studio Floor Shadow -->
+  <ellipse cx="400" cy="620" rx="280" ry="42" fill="#0f172a" opacity="0.16" filter="blur(14px)"/>
+
+  <!-- Top Studio Header Badge -->
+  <rect x="50" y="45" width="220" height="34" rx="8" fill="#0f172a"/>
+  <circle cx="70" cy="62" r="6" fill="#0284c7"/>
+  <circle cx="70" cy="62" r="3" fill="#38bdf8"/>
+  <text x="86" y="66" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="800" fill="#f8fafc" letter-spacing="1">DSTECH SMART</text>
+  
+  <rect x="530" y="45" width="220" height="34" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="640" y="67" font-family="'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#475569" text-anchor="middle" letter-spacing="1">GENUINE TEKNO20 HW</text>
+
+  <!-- Product Hardware Drawing -->
+  <g filter="url(#studioShadow)">
+    
+        <!-- Heavy Duty VMS Running Text Cabinet -->
+        <rect x="100" y="230" width="600" height="280" rx="20" fill="#0f172a" stroke="#334155" stroke-width="5"/>
+        <rect x="120" y="250" width="560" height="240" rx="12" fill="#020617"/>
+        
+        <!-- P10 Glowing LED Matrix Text -->
+        <g filter="url(#softGlow)">
+          <text x="400" y="325" font-family="'Courier New', monospace" font-size="30" font-weight="900" fill="#22c55e" text-anchor="middle" letter-spacing="3">SISA SLOT: 084</text>
+          <text x="400" y="390" font-family="'Courier New', monospace" font-size="28" font-weight="900" fill="#fbbf24" text-anchor="middle" letter-spacing="2">TARIF MOTOR: RP 2.000</text>
+          <text x="400" y="450" font-family="'Courier New', monospace" font-size="28" font-weight="900" fill="#38bdf8" text-anchor="middle" letter-spacing="2">TARIF MOBIL: RP 5.000</text>
+        </g>
+        
+  </g>
+
+  <!-- Product Title & Details Footer -->
+  <g transform="translate(400, 685)">
+    <rect x="-350" y="0" width="700" height="80" rx="16" fill="#0f172a" opacity="0.95"/>
+    <text x="0" y="32" font-family="'Segoe UI', Roboto, sans-serif" font-size="19" font-weight="800" fill="#f8fafc" text-anchor="middle" letter-spacing="0.5">VMS DISPLAY TARIF & SLOT PARKIR P10</text>
+    <text x="0" y="55" font-family="'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#38bdf8" text-anchor="middle" letter-spacing="1.5">RUNNING TEXT OUTDOOR RS485 / TCP-IP • BRIGHT LED P10 MATRIX • WEATHERPROOF IP65 • AUTO SYNC</text>
+  </g>
+</svg>

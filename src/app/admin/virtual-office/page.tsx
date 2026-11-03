@@ -112,6 +112,12 @@ export default function VirtualOfficePage() {
   const [previewItem, setPreviewItem] = useState<ApprovalItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [dismissedCount, setDismissedCount] = useState<number>(0);
+
+  // Evaluasi & Alasan Penolakan Usulan Kerja AI (Reflective Feedback)
+  const [rejectionModalItem, setRejectionModalItem] = useState<ApprovalItem | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionAlsoDelete, setRejectionAlsoDelete] = useState(false);
+  const [isSubmittingRejection, setIsSubmittingRejection] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   // Real Telemetry Data untuk Monitor 3D (Finance ERP & Sales Pipeline)
@@ -730,25 +736,47 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
     }
   };
 
-  const handleReject = async (item: ApprovalItem) => {
-    if (!confirm(`Apakah Anda yakin ingin menolak usulan pekerjaan "${item.title}"?`)) return;
-    setRejectingId(item.id);
+  const openRejectionModal = (item: ApprovalItem) => {
+    setRejectionModalItem(item);
+    setRejectionReason("");
+    setRejectionAlsoDelete(false);
+  };
+
+  const handleReject = (item: ApprovalItem) => {
+    openRejectionModal(item);
+  };
+
+  const submitRejectionFeedback = async () => {
+    if (!rejectionModalItem) return;
+    const finalReason = rejectionReason.trim() || "Ditolak dan dievaluasi oleh Direktur Utama";
+    setIsSubmittingRejection(true);
+    setRejectingId(rejectionModalItem.id);
     try {
+      const actionName = rejectionAlsoDelete ? "delete_queue_item" : "reject_queue_item";
       const res = await fetch("/api/ai-workforce", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reject_queue_item", itemId: item.id })
+        body: JSON.stringify({
+          action: actionName,
+          itemId: rejectionModalItem.id,
+          reason: finalReason
+        })
       });
       const json = await res.json();
       if (json.success) {
-        setApprovalNotice(`Usulan pekerjaan "${item.title}" telah ditolak dan dicatat ke Memori Blacklist AI agar tidak pernah diulang lagi.`);
+        setApprovalNotice(`Usulan "${rejectionModalItem.title}" telah ${rejectionAlsoDelete ? 'dihapus permanen' : 'ditolak'}. Alasan evaluasi: "${finalReason}" telah dipelajari oleh ${rejectionModalItem.employee_name}.`);
         if (typeof json.dismissedCount === "number") setDismissedCount(json.dismissedCount);
+        if (previewItem?.id === rejectionModalItem.id) setPreviewItem(null);
+        setRejectionModalItem(null);
         fetchWorkforce();
-        setTimeout(() => setApprovalNotice(null), 6000);
+        setTimeout(() => setApprovalNotice(null), 8000);
+      } else {
+        alert(json.error || "Gagal memproses penolakan");
       }
     } catch (err: any) {
       alert("Terjadi kesalahan: " + err.message);
     } finally {
+      setIsSubmittingRejection(false);
       setRejectingId(null);
     }
   };
@@ -2898,6 +2926,151 @@ Disusun secara otonom oleh Karyawan AI Nadia Safitri - PT. DSTech Smart Perkasa
                     )}
                   </div>
 
+                </div>
+              </div>
+            )}
+
+            {/* MODAL EVALUASI & ALASAN PENOLAKAN USULAN KERJA AI (REFLECTIVE FEEDBACK) */}
+            {rejectionModalItem && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
+                <div className="relative w-full max-w-xl flex flex-col bg-slate-900 border-2 border-rose-500/50 rounded-3xl shadow-2xl overflow-hidden">
+                  {/* Header */}
+                  <div className="p-5 bg-gradient-to-r from-slate-900 via-rose-950/60 to-slate-900 border-b border-rose-500/30 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-400/40 flex items-center justify-center text-lg font-black shadow-inner">
+                        🛡️
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-rose-200 flex items-center gap-2">
+                          Evaluasi & Alasan Penolakan Usulan
+                        </h3>
+                        <p className="text-xs text-rose-300/70">
+                          Umpan balik Direktur Utama akan dipelajari oleh AI Agent agar tidak mengulangi kesalahan serupa.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setRejectionModalItem(null)}
+                      className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Body */}
+                  <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                    {/* Info Usulan */}
+                    <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs text-slate-400">
+                        <span className="font-semibold text-slate-300">Pengusul: {rejectionModalItem.employee_name}</span>
+                        <span className="text-[11px] text-indigo-400">{rejectionModalItem.employee_role}</span>
+                      </div>
+                      <div className="text-sm font-bold text-white leading-snug">
+                        {rejectionModalItem.title}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        Target/Klien: <span className="text-slate-200 font-medium">{rejectionModalItem.target_client || "-"}</span>
+                        {Number(rejectionModalItem.value) > 0 && (
+                          <span className="ml-2 text-emerald-400 font-bold">
+                            (Rp {Number(rejectionModalItem.value).toLocaleString("id-ID")})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Preset Alasan Cepat */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        Pilih Alasan Evaluasi Cepat (Klik untuk memilih):
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          "Stok fisik sengaja 0 (kebijakan zero asset), jangan usulkan restok",
+                          "Margin keuntungan melebihi batasan 50% dari harga referensi",
+                          "Harga barang tidak masuk akal / terlalu mahal, cari referensi yang valid",
+                          "Bukan proyek atau klien prioritas saat ini, tunda pengajuan",
+                          "Spesifikasi teknis perangkat/jasa keliru atau tidak memenuhi standar",
+                          "Format draf penawaran/laporan kurang lengkap, perlu direvisi ulang"
+                        ].map((presetText, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setRejectionReason(presetText)}
+                            className={`text-[11px] px-2.5 py-1.5 rounded-xl border transition text-left cursor-pointer ${
+                              rejectionReason === presetText
+                                ? "bg-rose-500/20 text-rose-300 border-rose-400 font-bold"
+                                : "bg-slate-800/70 text-slate-300 border-slate-700/60 hover:bg-slate-800 hover:text-white"
+                            }`}
+                          >
+                            {presetText}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Textarea Input Alasan Spesifik */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                        <span>Uraian Alasan / Arahan Perbaikan Khusus Direktur:</span>
+                        <span className="text-[11px] text-slate-500">Wajib diisi agar AI belajar</span>
+                      </label>
+                      <textarea
+                        value={rejectionReason}
+                        onChange={(e) => setRejectionReason(e.target.value)}
+                        rows={3}
+                        placeholder="Ketik alasan mengapa usulan ini ditolak atau arahan apa yang harus diperbaiki oleh AI..."
+                        className="w-full px-3.5 py-2.5 rounded-2xl bg-slate-950 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-rose-400 resize-none"
+                      />
+                    </div>
+
+                    {/* Checkbox Hapus Permanen */}
+                    <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-slate-950/50 border border-slate-800/80 cursor-pointer hover:bg-slate-950 transition">
+                      <input
+                        type="checkbox"
+                        checked={rejectionAlsoDelete}
+                        onChange={(e) => setRejectionAlsoDelete(e.target.checked)}
+                        className="rounded border-slate-700 text-rose-600 focus:ring-rose-500 w-4 h-4 cursor-pointer"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-slate-200">Hapus usulan sekaligus dari antrean</span>
+                        <span className="block text-[11px] text-slate-400">
+                          Jika dicentang, usulan langsung dibersihkan permanen dari antrean dan dicatat ke memori AI.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-end gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setRejectionModalItem(null)}
+                      disabled={isSubmittingRejection}
+                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="button"
+                      onClick={submitRejectionFeedback}
+                      disabled={isSubmittingRejection || !rejectionReason.trim()}
+                      className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSubmittingRejection ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Menyimpan Evaluasi...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                          <span>Tolak & Kirim Evaluasi ke AI</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

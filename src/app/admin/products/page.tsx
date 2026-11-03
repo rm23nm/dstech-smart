@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import * as XLSX from "xlsx";
 import { 
-  Plus, 
+  Plus,
+  ExternalLink, 
   Search, 
   Edit2, 
   Trash2, 
@@ -47,6 +48,17 @@ export interface ProductItem {
   entityType?: "PT" | "NON_PT";
   price: number;
   costPrice?: number;
+  sourceUrl?: string;
+  dstech_source_url?: string;
+  lastPriceAudit?: string;
+  priceHistory?: Array<{
+    date: string;
+    costPrice: number;
+    price: number;
+    marginPercent: number;
+    sourceUrl?: string;
+    note?: string;
+  }>;
   installationFee?: number;
   hasInstallationService?: boolean;
   stock: number;
@@ -72,6 +84,8 @@ export interface CategoryOption {
   subCategories: { id: string; name: string; slug: string }[];
 }
 
+const NEUTRAL_PRODUCT_FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5'%3E%3Cpath d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'/%3E%3Cpolyline points='3.27 6.96 12 12.01 20.73 6.96'/%3E%3Cline x1='12' y1='22.08' x2='12' y2='12'/%3E%3C/svg%3E";
+
 const CATEGORIES = [
   "All Categories",
   "Security System",
@@ -96,6 +110,8 @@ export default function ProductAdmin() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<ProductItem | null>(null);
+  const [previewActiveImage, setPreviewActiveImage] = useState<string>("");
 
   // Bulk Excel Upload & Export States
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
@@ -118,6 +134,7 @@ export default function ProductAdmin() {
     entityType: "PT" | "NON_PT";
     price: string;
     costPrice: string;
+    sourceUrl: string;
     installationFee: string;
     hasInstallationService: boolean;
     stock: string;
@@ -137,6 +154,7 @@ export default function ProductAdmin() {
     entityType: "PT",
     price: "",
     costPrice: "",
+    sourceUrl: "",
     installationFee: "150000",
     hasInstallationService: true,
     stock: "10",
@@ -149,6 +167,30 @@ export default function ProductAdmin() {
     brochureSize: "",
     desc: ""
   });
+
+  const [isSyncingPrices, setIsSyncingPrices] = useState(false);
+
+  const handleSyncPricesAI = async () => {
+    setIsSyncingPrices(true);
+    try {
+      const res = await fetch("/api/ai-inhouse-agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync_product_prices" }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || "Audit harga berhasil diselaraskan dengan batasan margin 50%!");
+        fetchProducts();
+      } else {
+        showToast(data.message || "Gagal sinkronisasi harga", "error");
+      }
+    } catch (err: any) {
+      showToast("Terjadi kendala jaringan saat sinkronisasi harga: " + err.message, "error");
+    } finally {
+      setIsSyncingPrices(false);
+    }
+  };
 
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -761,6 +803,7 @@ export default function ProductAdmin() {
       entityType: selectedEntityTab === "NON_PT" ? "NON_PT" : "PT",
       price: "",
       costPrice: "",
+      sourceUrl: "",
       installationFee: "150000",
       hasInstallationService: true,
       stock: "10",
@@ -791,6 +834,7 @@ export default function ProductAdmin() {
       entityType: product.entityType || "PT",
       price: String(product.price),
       costPrice: String(product.costPrice !== undefined ? product.costPrice : ""),
+      sourceUrl: product.sourceUrl || product.dstech_source_url || "",
       installationFee: String(product.installationFee !== undefined ? product.installationFee : 150000),
       hasInstallationService: product.hasInstallationService !== false,
       stock: String(product.stock),
@@ -829,6 +873,8 @@ export default function ProductAdmin() {
       entityType: formData.entityType || "PT",
       price: parseFloat(formData.price) || 0,
       costPrice: parseFloat(formData.costPrice) || 0,
+      sourceUrl: formData.sourceUrl.trim(),
+      dstech_source_url: formData.sourceUrl.trim(),
       installationFee: parseFloat(formData.installationFee) || 0,
       hasInstallationService: formData.hasInstallationService,
       stock: parseInt(formData.stock, 10) || 0,
@@ -896,6 +942,8 @@ export default function ProductAdmin() {
       entityType: formData.entityType || "PT",
       price: parseFloat(formData.price) || 0,
       costPrice: parseFloat(formData.costPrice) || 0,
+      sourceUrl: formData.sourceUrl.trim(),
+      dstech_source_url: formData.sourceUrl.trim(),
       installationFee: parseFloat(formData.installationFee) || 0,
       hasInstallationService: formData.hasInstallationService,
       stock: parseInt(formData.stock, 10) || 0,
@@ -1044,6 +1092,31 @@ export default function ProductAdmin() {
             <span>Upload Excel</span>
           </button>
           <button
+            type="button"
+            onClick={handleSyncPricesAI}
+            disabled={isSyncingPrices}
+            id="btn-sync-prices-ai"
+            className="h-12 px-5 rounded-2xl bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all self-start sm:self-auto cursor-pointer disabled:opacity-50"
+            title="AI Agent (Reza) menyelaraskan harga seluruh produk katalog dengan batasan margin keuntungan 50% dari harga referensi modal"
+          >
+            {isSyncingPrices ? (
+              <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-indigo-600" />
+            )}
+            <span>{isSyncingPrices ? "Menyelaraskan..." : "Audit Harga AI (50%)"}</span>
+          </button>
+                    <Link
+            href="/shop"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-12 px-5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all self-start sm:self-auto cursor-pointer"
+            title="Buka etalase toko online publik (/shop) di tab baru"
+          >
+            <ExternalLink className="w-4 h-4 text-emerald-400" />
+            <span>Lihat Toko Publik</span>
+          </Link>
+<button
             onClick={handleOpenAdd}
             id="btn-add-product"
             className="h-12 px-6 rounded-2xl bg-dstech-red hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center justify-center gap-2 shadow-xl shadow-red-500/20 active:scale-95 transition-all self-start sm:self-auto cursor-pointer"
@@ -1227,20 +1300,49 @@ export default function ProductAdmin() {
                     <td className="p-5 sm:p-6">
                       <div className="flex items-center gap-4">
                         {p.image ? (
-                          <div className="w-12 h-12 rounded-xl border border-slate-200 overflow-hidden flex-shrink-0 bg-white shadow-sm">
+                          <div
+                            onClick={() => {
+                              setPreviewProduct(p);
+                              setPreviewActiveImage(p.image || (p.images && p.images[0]) || "");
+                            }}
+                            className="w-12 h-12 rounded-xl border border-slate-200 overflow-hidden flex-shrink-0 bg-white shadow-sm cursor-pointer hover:ring-2 hover:ring-dstech-blue transition-all group/thumb relative"
+                            title="Klik untuk Pratinjau Produk"
+                          >
                             <img
                               src={p.image}
                               alt={p.name}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.onerror = null;
+                                target.src = NEUTRAL_PRODUCT_FALLBACK;
+                              }}
                             />
+                            <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center transition-opacity">
+                              <Eye className="w-4 h-4 text-white drop-shadow" />
+                            </div>
                           </div>
                         ) : (
-                          <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-400 flex-shrink-0">
+                          <div
+                            onClick={() => {
+                              setPreviewProduct(p);
+                              setPreviewActiveImage("");
+                            }}
+                            className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-400 flex-shrink-0 cursor-pointer hover:bg-blue-50 hover:text-dstech-blue transition-colors"
+                            title="Klik untuk Pratinjau Produk"
+                          >
                             <Package className="w-6 h-6 text-dstech-blue" />
                           </div>
                         )}
                         <div>
-                          <p className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-dstech-blue transition-colors">
+                          <p
+                            onClick={() => {
+                              setPreviewProduct(p);
+                              setPreviewActiveImage(p.image || (p.images && p.images[0]) || "");
+                            }}
+                            className="font-bold text-slate-900 text-sm sm:text-base group-hover:text-dstech-blue transition-colors cursor-pointer hover:underline"
+                            title="Klik untuk Pratinjau Produk"
+                          >
                             {p.name}
                           </p>
                           <div className="flex flex-wrap items-center gap-1.5 mt-1">
@@ -1282,6 +1384,18 @@ export default function ProductAdmin() {
                                 title="Unduh Berkas Brosur / E-Katalog PDF"
                               >
                                 <FileText className="w-2.5 h-2.5" /> Brosur PDF
+                              </a>
+                            )}
+                            {p.sourceUrl && (
+                              <a
+                                href={p.sourceUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[10px] font-bold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-orange-100 transition shadow-2xs"
+                                title="Buka Link Sumber Referensi Toko Shopee (Toko Tekno20)"
+                              >
+                                <ExternalLink className="w-2.5 h-2.5" /> Sumber Shopee ↗
                               </a>
                             )}
                             {p.commissionType && (
@@ -1351,6 +1465,17 @@ export default function ProductAdmin() {
                     </td>
                     <td className="p-5 sm:p-6 text-right">
                       <div className="inline-flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPreviewProduct(p);
+                            setPreviewActiveImage(p.image || (p.images && p.images[0]) || "");
+                          }}
+                          className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-600 border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer shadow-xs"
+                          title="Pratinjau / Preview Produk Lengkap"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => handleOpenEdit(p)}
                           className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-600 hover:text-dstech-blue border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer"
@@ -1483,6 +1608,11 @@ export default function ProductAdmin() {
                             src={imgUrl}
                             alt={`Foto ${imgIdx + 1}`}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null;
+                              target.src = NEUTRAL_PRODUCT_FALLBACK;
+                            }}
                           />
                           {isPrimary && (
                             <div className="absolute top-1 left-1 bg-dstech-blue text-white text-[9px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shadow-sm">
@@ -1711,9 +1841,27 @@ export default function ProductAdmin() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* 1. Modal Beli (HPP) */}
                 <div>
-                  <label className="block text-xs font-black text-amber-900 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <span>📦 Modal Beli / HPP (Rp)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                      <span>📦 Modal Beli / HPP (Rp)</span>
+                    </label>
+                    {parseFloat(formData.costPrice) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cost = parseFloat(formData.costPrice) || 0;
+                          const target = Math.round(cost * 1.5);
+                          setFormData((prev) => ({ ...prev, price: String(target) }));
+                          showToast(`Margin 50% diterapkan: Harga Jual Rp ${target.toLocaleString("id-ID")}`, "success");
+                        }}
+                        className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Kunci margin keuntungan tepat 50% dari harga referensi"
+                      >
+                        <Sparkles className="w-3 h-3 text-indigo-600" />
+                        Kunci Margin 50% (Rp {Math.round((parseFloat(formData.costPrice) || 0) * 1.5).toLocaleString("id-ID")})
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="number"
                     min="0"
@@ -1722,7 +1870,7 @@ export default function ProductAdmin() {
                     placeholder="Contoh: 2500000"
                     className="w-full h-12 px-4 rounded-xl border border-amber-300 bg-amber-50/40 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Biaya perolehan dari supplier</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Biaya perolehan / harga referensi dari supplier</p>
                 </div>
 
                 {/* 2. Harga Jual Retail */}
@@ -1759,22 +1907,60 @@ export default function ProductAdmin() {
                 </div>
               </div>
 
-              {/* Kalkulasi Otomatis Laba Kotor & Margin Produk (Tugas 221) */}
+              {/* Field Link Referensi Produk Asal (Disembunyikan dari Estore Publik) */}
+              <div className="space-y-1.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🔗 Link Referensi / Referral Produk Asal</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    🔒 Disembunyikan dari Estore Publik
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  value={formData.sourceUrl}
+                  onChange={(e) => setFormData({ ...formData, sourceUrl: e.target.value })}
+                  placeholder="Contoh: https://shopee.co.id/... atau link supplier resmi distributor"
+                  className="w-full h-11 px-4 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+                {formData.sourceUrl && (
+                  <div className="mt-1 flex items-center justify-between">
+                    <a
+                      href={formData.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 px-2.5 py-1 rounded-md border border-orange-200 transition"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Buka Tautan Sumber Shopee (Toko Tekno20) ↗
+                    </a>
+                  </div>
+                )}
+                <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                  Link referensi ini hanya digunakan oleh <strong>AI Agent (Reza)</strong> & Admin untuk memantau perubahan harga harian secara otomatis. Pengunjung estore publik tidak dapat melihat link ini.
+                </p>
+              </div>
+
+              {/* Kalkulasi Otomatis Laba Kotor & Margin Produk (Tugas 221 & Batasan 50% Tugas 362) */}
               {(() => {
                 const sellP = parseFloat(formData.price) || 0;
                 const costP = parseFloat(formData.costPrice) || 0;
                 if (sellP > 0 && costP > 0) {
                   const grossProfit = sellP - costP;
                   const marginPct = ((grossProfit / sellP) * 100).toFixed(1);
+                  const marginOfCost = ((grossProfit / costP) * 100).toFixed(1);
                   const isProfit = grossProfit >= 0;
+                  const isOverLimit = Number(marginOfCost) > 50.1;
                   return (
-                    <div
-                      className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs font-bold ${
-                        isProfit
-                          ? "bg-emerald-50/80 border-emerald-200 text-emerald-950"
-                          : "bg-red-50/80 border-red-200 text-red-950"
-                      }`}
-                    >
+                    <div className="space-y-2">
+                      <div
+                        className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs font-bold ${
+                          isProfit
+                            ? "bg-emerald-50/80 border-emerald-200 text-emerald-950"
+                            : "bg-red-50/80 border-red-200 text-red-950"
+                        }`}
+                      >
                       <div className="flex items-center gap-2">
                         <div
                           className={`w-7 h-7 rounded-lg flex items-center justify-center ${
@@ -1799,11 +1985,33 @@ export default function ProductAdmin() {
                             isProfit ? "bg-emerald-200 text-emerald-800" : "bg-red-200 text-red-800"
                           }`}
                         >
-                          Margin {marginPct}%
+                          Margin {marginPct}% (Markup Ref: {marginOfCost}%)
                         </span>
                       </div>
                     </div>
-                  );
+                    {isOverLimit && (
+                      <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between text-xs text-amber-900">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>
+                            <strong>Perhatian Batasan Margin:</strong> Margin keuntungan ({marginOfCost}%) melebihi batas 50% dari harga referensi. Batas 50%: Rp {Math.round(costP * 1.5).toLocaleString("id-ID")}.
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = Math.round(costP * 1.5);
+                            setFormData((prev) => ({ ...prev, price: String(target) }));
+                            showToast(`Harga disesuaikan ke margin 50%: Rp ${target.toLocaleString("id-ID")}`, "success");
+                          }}
+                          className="shrink-0 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] transition-colors ml-2 cursor-pointer"
+                        >
+                          Terapkan 50%
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
                 }
                 return null;
               })()}
@@ -2075,6 +2283,11 @@ export default function ProductAdmin() {
                             src={imgUrl}
                             alt={`Foto ${imgIdx + 1}`}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.onerror = null;
+                              target.src = NEUTRAL_PRODUCT_FALLBACK;
+                            }}
                           />
                           {isPrimary && (
                             <div className="absolute top-1 left-1 bg-dstech-blue text-white text-[9px] font-black px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shadow-sm">
@@ -2303,9 +2516,27 @@ export default function ProductAdmin() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* 1. Modal Beli (HPP) */}
                 <div>
-                  <label className="block text-xs font-black text-amber-900 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                    <span>📦 Modal Beli / HPP (Rp)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center gap-1">
+                      <span>📦 Modal Beli / HPP (Rp)</span>
+                    </label>
+                    {parseFloat(formData.costPrice) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cost = parseFloat(formData.costPrice) || 0;
+                          const target = Math.round(cost * 1.5);
+                          setFormData((prev) => ({ ...prev, price: String(target) }));
+                          showToast(`Margin 50% diterapkan: Harga Jual Rp ${target.toLocaleString("id-ID")}`, "success");
+                        }}
+                        className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Kunci margin keuntungan tepat 50% dari harga referensi"
+                      >
+                        <Sparkles className="w-3 h-3 text-indigo-600" />
+                        Kunci Margin 50% (Rp {Math.round((parseFloat(formData.costPrice) || 0) * 1.5).toLocaleString("id-ID")})
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="number"
                     min="0"
@@ -2314,7 +2545,7 @@ export default function ProductAdmin() {
                     placeholder="Contoh: 2500000"
                     className="w-full h-12 px-4 rounded-xl border border-amber-300 bg-amber-50/40 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">Biaya perolehan dari supplier</p>
+                  <p className="text-[10px] text-slate-400 mt-1">Biaya perolehan / harga referensi dari supplier</p>
                 </div>
 
                 {/* 2. Harga Jual Retail */}
@@ -2349,22 +2580,60 @@ export default function ProductAdmin() {
                 </div>
               </div>
 
-              {/* Kalkulasi Otomatis Laba Kotor & Margin Produk (Tugas 221) */}
+              {/* Field Link Referensi Produk Asal (Disembunyikan dari Estore Publik) */}
+              <div className="space-y-1.5 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🔗 Link Referensi / Referral Produk Asal</span>
+                  </label>
+                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    🔒 Disembunyikan dari Estore Publik
+                  </span>
+                </div>
+                <input
+                  type="url"
+                  value={formData.sourceUrl}
+                  onChange={(e) => setFormData({ ...formData, sourceUrl: e.target.value })}
+                  placeholder="Contoh: https://shopee.co.id/... atau link supplier resmi distributor"
+                  className="w-full h-11 px-4 rounded-xl border border-slate-300 bg-white text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+                {formData.sourceUrl && (
+                  <div className="mt-1 flex items-center justify-between">
+                    <a
+                      href={formData.sourceUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 px-2.5 py-1 rounded-md border border-orange-200 transition"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      Buka Tautan Sumber Shopee (Toko Tekno20) ↗
+                    </a>
+                  </div>
+                )}
+                <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                  Link referensi ini hanya digunakan oleh <strong>AI Agent (Reza)</strong> & Admin untuk memantau perubahan harga harian secara otomatis. Pengunjung estore publik tidak dapat melihat link ini.
+                </p>
+              </div>
+
+              {/* Kalkulasi Otomatis Laba Kotor & Margin Produk (Tugas 221 & Batasan 50% Tugas 362) */}
               {(() => {
                 const sellP = parseFloat(formData.price) || 0;
                 const costP = parseFloat(formData.costPrice) || 0;
                 if (sellP > 0 && costP > 0) {
                   const grossProfit = sellP - costP;
                   const marginPct = ((grossProfit / sellP) * 100).toFixed(1);
+                  const marginOfCost = ((grossProfit / costP) * 100).toFixed(1);
                   const isProfit = grossProfit >= 0;
+                  const isOverLimit = Number(marginOfCost) > 50.1;
                   return (
-                    <div
-                      className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs font-bold ${
-                        isProfit
-                          ? "bg-emerald-50/80 border-emerald-200 text-emerald-950"
-                          : "bg-red-50/80 border-red-200 text-red-950"
-                      }`}
-                    >
+                    <div className="space-y-2">
+                      <div
+                        className={`p-3.5 rounded-2xl border flex items-center justify-between text-xs font-bold ${
+                          isProfit
+                            ? "bg-emerald-50/80 border-emerald-200 text-emerald-950"
+                            : "bg-red-50/80 border-red-200 text-red-950"
+                        }`}
+                      >
                       <div className="flex items-center gap-2">
                         <div
                           className={`w-7 h-7 rounded-lg flex items-center justify-center ${
@@ -2389,11 +2658,33 @@ export default function ProductAdmin() {
                             isProfit ? "bg-emerald-200 text-emerald-800" : "bg-red-200 text-red-800"
                           }`}
                         >
-                          Margin {marginPct}%
+                          Margin {marginPct}% (Markup Ref: {marginOfCost}%)
                         </span>
                       </div>
                     </div>
-                  );
+                    {isOverLimit && (
+                      <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between text-xs text-amber-900">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span>
+                            <strong>Perhatian Batasan Margin:</strong> Margin keuntungan ({marginOfCost}%) melebihi batas 50% dari harga referensi. Batas 50%: Rp {Math.round(costP * 1.5).toLocaleString("id-ID")}.
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = Math.round(costP * 1.5);
+                            setFormData((prev) => ({ ...prev, price: String(target) }));
+                            showToast(`Harga disesuaikan ke margin 50%: Rp ${target.toLocaleString("id-ID")}`, "success");
+                          }}
+                          className="shrink-0 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[10px] transition-colors ml-2 cursor-pointer"
+                        >
+                          Terapkan 50%
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
                 }
                 return null;
               })()}
@@ -2550,6 +2841,275 @@ export default function ProductAdmin() {
                 >
                   {formSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Perbarui Produk</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Pratinjau Produk Lengkap (Preview Modal) */}
+      {previewProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 shadow-2xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-100">
+            {/* Header Modal */}
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-6 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-xl sm:text-2xl font-black text-slate-900">Pratinjau Produk</h3>
+                  <p className="text-slate-400 font-medium text-xs mt-0.5">
+                    Tampilan visual &amp; kelengkapan spesifikasi yang dilihat pembeli di etalase toko
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewProduct(null)}
+                className="w-10 h-10 rounded-2xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                title="Tutup Pratinjau"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Konten Pratinjau (Scrollable) */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+                {/* Kolom Kiri: Galeri Foto Produk */}
+                <div className="space-y-3">
+                  <div className="aspect-square rounded-2xl border border-slate-200 overflow-hidden bg-slate-50 relative group shadow-sm flex items-center justify-center">
+                    {previewActiveImage || previewProduct.image ? (
+                      <img
+                        src={previewActiveImage || previewProduct.image}
+                        alt={previewProduct.name}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = NEUTRAL_PRODUCT_FALLBACK;
+                        }}
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-300 gap-2">
+                        <Package className="w-16 h-16" />
+                        <span className="text-xs font-bold text-slate-400">Belum ada foto produk</span>
+                      </div>
+                    )}
+                    {previewProduct.entityType === "NON_PT" ? (
+                      <span className="absolute top-3 left-3 bg-amber-500/90 backdrop-blur-sm text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow flex items-center gap-1">
+                        <Store className="w-3 h-3" /> Non-PT / Ritel
+                      </span>
+                    ) : (
+                      <span className="absolute top-3 left-3 bg-dstech-blue/90 backdrop-blur-sm text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow flex items-center gap-1">
+                        <Building2 className="w-3 h-3" /> PT. DSTech Resmi
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Thumbnail Switcher Galeri */}
+                  {Array.isArray(previewProduct.images) && previewProduct.images.length > 1 && (
+                    <div>
+                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+                        Galeri Foto ({previewProduct.images.length} Gambar):
+                      </p>
+                      <div className="grid grid-cols-5 gap-2">
+                        {previewProduct.images.map((imgUrl, imgIdx) => {
+                          const isSelected = (previewActiveImage || previewProduct.image) === imgUrl;
+                          return (
+                            <button
+                              key={imgIdx}
+                              type="button"
+                              onClick={() => setPreviewActiveImage(imgUrl)}
+                              className={`aspect-square rounded-xl overflow-hidden border-2 bg-white transition-all cursor-pointer relative group ${
+                                isSelected ? "border-dstech-blue ring-2 ring-blue-300" : "border-slate-200 hover:border-slate-400 opacity-70 hover:opacity-100"
+                              }`}
+                            >
+                              <img
+                                src={imgUrl}
+                                alt={`Thumbnail ${imgIdx + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  target.src = NEUTRAL_PRODUCT_FALLBACK;
+                                }}
+                              />
+                              {previewProduct.image === imgUrl && (
+                                <span className="absolute bottom-0 inset-x-0 bg-dstech-blue/90 text-white text-[8px] font-bold text-center py-0.2">
+                                  Utama
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Brosur PDF Download Card */}
+                  {previewProduct.brochureUrl && (
+                    <div className="p-3.5 rounded-2xl border border-emerald-200 bg-emerald-50/60 flex items-center justify-between gap-3 shadow-2xs">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-emerald-950 truncate">
+                            {previewProduct.brochureName || "Brosur & Spesifikasi Teknis (PDF)"}
+                          </p>
+                          <p className="text-[10px] text-emerald-700 font-medium">
+                            {previewProduct.brochureSize || "Format PDF Resmi"}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={previewProduct.brochureUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm shrink-0 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Unduh PDF</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Kolom Kanan: Detail & Data Finansial */}
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-2.5 py-0.5 rounded-md">
+                        {previewProduct.category}
+                      </span>
+                      {previewProduct.subCategory && (
+                        <span className="text-xs font-semibold text-dstech-blue bg-blue-50 border border-blue-100 px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                          <Tag className="w-3 h-3" />
+                          {previewProduct.subCategory}
+                        </span>
+                      )}
+                      {previewProduct.brand && (
+                        <span className="text-xs font-bold text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-md">
+                          🛡️ {previewProduct.brand}
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
+                      {previewProduct.name}
+                    </h2>
+                  </div>
+
+                  {/* Kotak Harga & Margin Finansial */}
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200 space-y-3">
+                    <div className="flex items-baseline justify-between">
+                      <div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Harga Jual Konsumen</span>
+                        <p className="text-2xl sm:text-3xl font-black text-dstech-blue">
+                          Rp {previewProduct.price.toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modal HPP</span>
+                        <p className="text-sm font-bold text-slate-600 font-mono">
+                          Rp {(previewProduct.costPrice || 0).toLocaleString("id-ID")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200/80 grid grid-cols-2 gap-2 text-xs">
+                      <div className="p-2 rounded-xl bg-white border border-slate-200/60">
+                        <span className="text-[10px] text-slate-400 block font-medium">Margin Laba</span>
+                        <span className="font-bold text-emerald-600">
+                          Rp {(previewProduct.price - (previewProduct.costPrice || 0)).toLocaleString("id-ID")}{" "}
+                          ({previewProduct.price > 0 ? Math.round(((previewProduct.price - (previewProduct.costPrice || 0)) / previewProduct.price) * 100) : 0}%)
+                        </span>
+                      </div>
+                      <div className="p-2 rounded-xl bg-white border border-slate-200/60">
+                        <span className="text-[10px] text-slate-400 block font-medium">Komisi Afiliasi</span>
+                        <span className="font-bold text-dstech-blue">
+                          {previewProduct.commission || "10%"}{" "}
+                          <span className="text-[10px] text-slate-500 font-normal">
+                            (≈ Rp {Math.round((previewProduct.price * (previewProduct.commissionRate || 10)) / 100).toLocaleString("id-ID")})
+                          </span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ketersediaan Stok & Jasa Pemasangan */}
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="p-3 rounded-xl border border-slate-200 bg-white">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Ketersediaan Stok</span>
+                      <span className={`text-xs font-black inline-flex items-center gap-1.5 mt-0.5 ${
+                        previewProduct.stock > 10 ? "text-emerald-600" : previewProduct.stock > 0 ? "text-amber-600" : "text-red-600"
+                      }`}>
+                        <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                        {previewProduct.stock} Unit Siap Pasang
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl border border-slate-200 bg-white">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Layanan Teknisi</span>
+                      <span className="text-xs font-bold text-slate-800 block mt-0.5 truncate">
+                        {previewProduct.hasInstallationService
+                          ? `Tersedia (+Rp ${(previewProduct.installationFee || 0).toLocaleString("id-ID")})`
+                          : "Tanpa Jasa Pasang"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Deskripsi & Spesifikasi Produk */}
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-dstech-blue" /> Deskripsi &amp; Spesifikasi Produk
+                    </h4>
+                    <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 max-h-52 overflow-y-auto text-xs leading-relaxed text-slate-700 space-y-2">
+                      {previewProduct.desc ? (
+                        <ProductDescriptionViewer desc={previewProduct.desc} />
+                      ) : (
+                        <p className="text-slate-400 italic">Belum ada keterangan deskripsi untuk produk ini.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer Aksi Modal */}
+            <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 mt-4 flex-shrink-0">
+              <a
+                href={`/shop?search=${encodeURIComponent(previewProduct.name)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 transition-all cursor-pointer shadow-md"
+                title="Buka etalase toko online publik untuk produk ini di tab baru"
+              >
+                <ExternalLink className="w-4 h-4 text-emerald-400" />
+                <span>Buka di Toko Web Publik</span>
+              </a>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetToEdit = previewProduct;
+                    setPreviewProduct(null);
+                    handleOpenEdit(targetToEdit);
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-dstech-blue border border-blue-200 font-bold text-xs uppercase tracking-wider inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Edit Produk</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewProduct(null)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                >
+                  Tutup
                 </button>
               </div>
             </div>

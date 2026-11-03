@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   LayoutDashboard,
+  Bot,
   Package,
   Users,
   UserCog,
@@ -221,6 +222,7 @@ export default function AdminLayout({
       label: "Dashboard",
       href: "/admin",
       icon: LayoutDashboard,
+  Bot,
       active: pathname === "/admin",
     },
     {
@@ -229,6 +231,13 @@ export default function AdminLayout({
       href: "/admin/virtual-office",
       icon: Building2,
       active: pathname.startsWith("/admin/virtual-office"),
+    },
+    {
+      id: "ai-workforce",
+      label: "🤖 Tim AI Agent Otonom",
+      href: "/admin/ai-workforce",
+      icon: Bot,
+      active: pathname.startsWith("/admin/ai-workforce"),
     },
     {
       id: "finance",
@@ -341,6 +350,13 @@ export default function AdminLayout({
       href: "/admin/promotions",
       icon: FileDown,
       active: pathname.startsWith("/admin/promotions"),
+    },
+    {
+      id: "ai-video-studio",
+      label: "🎬 AI Studio & Video Creator",
+      href: "/admin/ai-studio",
+      icon: Sparkles,
+      active: pathname.startsWith("/admin/ai-studio"),
     },
     {
       id: "livestream",

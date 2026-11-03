@@ -87,7 +87,7 @@ const DEFAULT_WORKFORCE = {
         auto_descriptions: 94,
         stock_accuracy: "99.8%"
       },
-      skills: ["Import Produk Otomatis", "Copywriting Spesifikasi Teknis", "Katalog SEO-Friendly", "Sinkronisasi Harga Modal & Margin"]
+      skills: ["Kurasi Foto Real Alat Fisik Asli", "Peningkatan Resolusi HD Studio", "Pembersihan Watermark Toko Lain", "Sinkronisasi Modal + Margin 50%", "Zero Stock On-Demand"]
     },
     {
       id: "emp_nadia_marketing",
@@ -1066,11 +1066,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 2. REJECT QUEUE ITEM (Catat ke Memori Blacklist AI agar Tidak Pernah Diulang)
+    // 2. REJECT QUEUE ITEM DENGAN EVALUASI DIREKTUR & PEMBELAJARAN REFLEKTIF AI
     if (action === "reject_queue_item") {
       const { itemId, reason } = body;
+      const cleanReason = (reason && String(reason).trim()) ? String(reason).trim() : "Ditolak dan dievaluasi oleh Direktur Utama";
+
       if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
       if (!Array.isArray(data.dstech_dismissed_topics)) data.dstech_dismissed_topics = [];
+      if (!Array.isArray(data.dstech_director_evaluations)) data.dstech_director_evaluations = [];
 
       const item = data.dstech_approval_queue.find((it: any) => it.id === itemId);
       if (!item) {
@@ -1079,28 +1082,93 @@ export async function POST(req: NextRequest) {
 
       item.status = "REJECTED";
       item.reviewed_at = new Date().toISOString();
-      item.reviewer_notes = reason || "Ditolak oleh Direktur Utama";
+      item.reviewer_notes = cleanReason;
 
-      // SIMPAN KE MEMORI BLACKLIST AI
       const clientName = item.target_client || item.payload?.customerName || item.payload?.company || item.payload?.client || "";
-      const isAlreadyDismissed = data.dstech_dismissed_topics.some((d: any) =>
-        d.title.toLowerCase() === item.title.toLowerCase() ||
-        (clientName && d.client && d.client.toLowerCase() === clientName.toLowerCase())
-      );
-      if (!isAlreadyDismissed) {
-        data.dstech_dismissed_topics.unshift({
-          id: item.id,
-          title: item.title,
-          client: clientName,
-          task_type: item.task_type,
-          reason: reason || "Ditolak oleh Direktur Utama",
-          dismissed_at: new Date().toISOString(),
-          employee_id: item.employee_id,
-          employee_name: item.employee_name
-        });
-      }
+      const cleanKeyword = item.title
+        .replace(/^(?:Usulan|Draf|Pengadaan|Restok|Suku Cadang|SPH|Invoice|Penawaran|Materi Promo|Promo Spesial)[:\s\-_]*/gi, "")
+        .replace(/\(Stok:\s*\d+[^)]*\)/gi, "")
+        .replace(/PO-[A-Z0-9\-_]+/gi, "")
+        .trim();
+
+      // SIMPAN KE MEMORI EVALUASI DIREKTUR & BLACKLIST AI
+      data.dstech_dismissed_topics.unshift({
+        id: item.id,
+        title: item.title,
+        clean_keyword: cleanKeyword,
+        client: clientName,
+        task_type: item.task_type,
+        reason: cleanReason,
+        dismissed_at: new Date().toISOString(),
+        employee_id: item.employee_id,
+        employee_name: item.employee_name
+      });
       if (data.dstech_dismissed_topics.length > 100) {
         data.dstech_dismissed_topics = data.dstech_dismissed_topics.slice(0, 100);
+      }
+
+      data.dstech_director_evaluations.unshift({
+        id: `eval_${Date.now()}`,
+        item_id: item.id,
+        title: item.title,
+        clean_keyword: cleanKeyword,
+        client: clientName,
+        task_type: item.task_type,
+        employee_id: item.employee_id,
+        employee_name: item.employee_name,
+        reason: cleanReason,
+        created_at: new Date().toISOString()
+      });
+      if (data.dstech_director_evaluations.length > 100) {
+        data.dstech_director_evaluations = data.dstech_director_evaluations.slice(0, 100);
+      }
+
+      // RESPON REFLEKTIF: Update Speech Bubble Karyawan AI Pengusul
+      if (Array.isArray(data.dstech_employees)) {
+        const empIndex = data.dstech_employees.findIndex((e: any) => e.id === item.employee_id);
+        if (empIndex !== -1) {
+          const shortReason = cleanReason.length > 110 ? cleanReason.slice(0, 107) + "..." : cleanReason;
+          data.dstech_employees[empIndex].speech_bubble = `Pak Ramadhani, saya memahami alasan penolakan: "${shortReason}". Saya telah mencatat evaluasi ini ke memori kerja dan memastikan tidak mengulangi kesalahan serupa ke depan.`;
+          data.dstech_employees[empIndex].status = "WORKING";
+        }
+      }
+
+      // SINKRONKAN KE KNOWLEDGE MANAGEMENT SYSTEM (KMS) SEBAGAI DIRECTIVE RESMI
+      try {
+        const KMS_FILE = path.join(process.cwd(), "src/data/dstech_kms.json");
+        if (fs.existsSync(KMS_FILE)) {
+          const kmsRaw = fs.readFileSync(KMS_FILE, "utf-8");
+          const kmsList = JSON.parse(kmsRaw);
+          if (Array.isArray(kmsList)) {
+            kmsList.unshift({
+              id: `dstech_kms_eval_${Date.now()}`,
+              title: `Evaluasi Direktur: Penolakan Usulan "${item.title.slice(0, 65)}"`,
+              category: "directive_direktur",
+              categoryLabel: "Arahan & Evaluasi Direktur Utama",
+              summary: `Alasan Evaluasi: ${cleanReason}. Seluruh AI Agent dilarang mengajukan usulan serupa.`,
+              content: `CATATAN EVALUASI & INSTRUKSI DIREKTUR UTAMA:
+Pada ${new Date().toLocaleDateString("id-ID")}, Direktur Utama menolak usulan "${item.title}" yang diajukan oleh ${item.employee_name}.
+
+ALASAN PENOLAKAN DARI DIREKTUR:
+"${cleanReason}"
+
+TINDAKAN WAJIB AI AGENT:
+1. Memahami letak kesalahan teknis/finansial/kebijakan pada usulan tersebut.
+2. Tidak mengulangi pengajuan usulan serupa ke antrean persetujuan.
+3. Menyesuaikan logika harga, stok fisik, atau penawaran sesuai arahan Direktur.`,
+              downloadUrl: "",
+              fileSize: "",
+              contactName: "Direktur Utama",
+              contactPhone: "",
+              contactRole: "Executive Board",
+              updatedAt: new Date().toISOString().slice(0, 10),
+              updatedBy: "Direktur Utama",
+            });
+            fs.writeFileSync(KMS_FILE, JSON.stringify(kmsList.slice(0, 200), null, 2), "utf-8");
+          }
+        }
+      } catch (kmsErr) {
+        console.warn("[KMS Directive] Gagal sinkronisasi evaluasi ke KMS:", kmsErr);
       }
 
       const newLog = {
@@ -1108,7 +1176,7 @@ export async function POST(req: NextRequest) {
         timestamp: new Date().toISOString(),
         employee_id: item.employee_id,
         employee_name: item.employee_name,
-        action: `[DITOLAK] Usulan "${item.title}" ditolak oleh Direktur Utama dan dicatat ke memori AI agar tidak diusulkan kembali.`,
+        action: `[EVALUASI DITERIMA] Usulan "${item.title}" ditolak oleh Direktur Utama. Alasan: "${cleanReason}". AI Agent mencatat evaluasi ke memori pembelajaran permanen.`,
       };
       if (!data.dstech_recent_logs) data.dstech_recent_logs = [];
       data.dstech_recent_logs.unshift(newLog);
@@ -1116,17 +1184,20 @@ export async function POST(req: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        message: `Pekerjaan "${item.title}" telah ditolak. Topik & klien ini disimpan ke memori AI agar tidak diulang lagi.`,
+        message: `Usulan "${item.title}" telah ditolak dengan catatan evaluasi: "${cleanReason}". AI Agent telah menerima feedback dan mencatatnya ke memori pembelajaran.`,
         item,
         dismissedCount: data.dstech_dismissed_topics.length
       });
     }
 
-    // 2b. DELETE QUEUE ITEM (Hapus Permanen & Simpan ke Memori Blacklist AI)
+    // 2b. DELETE QUEUE ITEM (Hapus Permanen & Simpan Catatan ke Memori Blacklist AI)
     if (action === "delete_queue_item") {
-      const { itemId } = body;
+      const { itemId, reason } = body;
+      const cleanReason = (reason && String(reason).trim()) ? String(reason).trim() : "Dihapus permanen dari antrean oleh Direktur Utama";
+
       if (!data.dstech_approval_queue) data.dstech_approval_queue = [];
       if (!Array.isArray(data.dstech_dismissed_topics)) data.dstech_dismissed_topics = [];
+      if (!Array.isArray(data.dstech_director_evaluations)) data.dstech_director_evaluations = [];
 
       const itemIndex = data.dstech_approval_queue.findIndex((it: any) => it.id === itemId);
       if (itemIndex === -1) {
@@ -1136,26 +1207,47 @@ export async function POST(req: NextRequest) {
       const deletedItem = data.dstech_approval_queue[itemIndex];
       data.dstech_approval_queue.splice(itemIndex, 1);
 
-      // SIMPAN KE MEMORI BLACKLIST AI
       const clientName = deletedItem.target_client || deletedItem.payload?.customerName || deletedItem.payload?.company || deletedItem.payload?.client || "";
-      const isAlreadyDismissed = data.dstech_dismissed_topics.some((d: any) =>
-        d.title.toLowerCase() === deletedItem.title.toLowerCase() ||
-        (clientName && d.client && d.client.toLowerCase() === clientName.toLowerCase())
-      );
-      if (!isAlreadyDismissed) {
-        data.dstech_dismissed_topics.unshift({
-          id: deletedItem.id,
-          title: deletedItem.title,
-          client: clientName,
-          task_type: deletedItem.task_type,
-          reason: "Dihapus permanen dari antrean oleh Direktur Utama",
-          dismissed_at: new Date().toISOString(),
-          employee_id: deletedItem.employee_id,
-          employee_name: deletedItem.employee_name
-        });
-      }
+      const cleanKeyword = deletedItem.title
+        .replace(/^(?:Usulan|Draf|Pengadaan|Restok|Suku Cadang|SPH|Invoice|Penawaran|Materi Promo|Promo Spesial)[:\s\-_]*/gi, "")
+        .replace(/\(Stok:\s*\d+[^)]*\)/gi, "")
+        .replace(/PO-[A-Z0-9\-_]+/gi, "")
+        .trim();
+
+      data.dstech_dismissed_topics.unshift({
+        id: deletedItem.id,
+        title: deletedItem.title,
+        clean_keyword: cleanKeyword,
+        client: clientName,
+        task_type: deletedItem.task_type,
+        reason: cleanReason,
+        dismissed_at: new Date().toISOString(),
+        employee_id: deletedItem.employee_id,
+        employee_name: deletedItem.employee_name
+      });
       if (data.dstech_dismissed_topics.length > 100) {
         data.dstech_dismissed_topics = data.dstech_dismissed_topics.slice(0, 100);
+      }
+
+      data.dstech_director_evaluations.unshift({
+        id: `eval_${Date.now()}`,
+        item_id: deletedItem.id,
+        title: deletedItem.title,
+        clean_keyword: cleanKeyword,
+        client: clientName,
+        task_type: deletedItem.task_type,
+        employee_id: deletedItem.employee_id,
+        employee_name: deletedItem.employee_name,
+        reason: cleanReason,
+        created_at: new Date().toISOString()
+      });
+
+      // Update Speech Bubble Karyawan
+      if (Array.isArray(data.dstech_employees)) {
+        const empIndex = data.dstech_employees.findIndex((e: any) => e.id === deletedItem.employee_id);
+        if (empIndex !== -1) {
+          data.dstech_employees[empIndex].speech_bubble = `Pak Ramadhani, usulan "${deletedItem.title}" telah dihapus (${cleanReason}). Saya menyesuaikan memori kerja agar tidak mengulanginya.`;
+        }
       }
 
       const newLog = {
@@ -1163,7 +1255,7 @@ export async function POST(req: NextRequest) {
         timestamp: new Date().toISOString(),
         employee_id: deletedItem.employee_id || "emp_system",
         employee_name: deletedItem.employee_name || "Direktur Utama",
-        action: `[DIHAPUS] Usulan "${deletedItem.title}" telah dihapus permanen dan disimpan ke memori blacklist AI agar tidak diulang.`,
+        action: `[DIHAPUS] Usulan "${deletedItem.title}" telah dihapus permanen. Catatan evaluasi: "${cleanReason}".`,
       };
       if (!data.dstech_recent_logs) data.dstech_recent_logs = [];
       data.dstech_recent_logs.unshift(newLog);

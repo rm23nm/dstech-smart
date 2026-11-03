@@ -373,6 +373,7 @@ export async function POST(request: Request) {
       letterheadSettings: body.letterheadSettings !== undefined ? body.letterheadSettings : current.letterheadSettings,
       estoreSettings: body.estoreSettings !== undefined ? body.estoreSettings : current.estoreSettings,
       socialIntegrations: body.socialIntegrations !== undefined ? body.socialIntegrations : current.socialIntegrations,
+      dstech_ai_settings: body.dstech_ai_settings !== undefined ? body.dstech_ai_settings : current.dstech_ai_settings,
 
       // Titik GPS Kantor & Geofencing Presensi Pegawai
       officeName: body.officeName !== undefined ? body.officeName : (current.officeName || "Kantor Pusat PT DSTech Smart Perkasa (Cilegon)"),
