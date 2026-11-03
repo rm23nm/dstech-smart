@@ -4,7 +4,7 @@
 ### 1. Rincian Perbaikan/Pekerjaan yang Sudah Dilakukan
 *(Daftar ini tidak boleh dihapus, selalu tambahkan yang baru)*
 #### 0. Rencana & Langkah Perbaikan Sedang Berjalan (Active Step-by-Step Execution Plan)
-- **Tugas 373 (2026-11-03)**: [SEDANG BERJALAN] Penambahan Fitur Pratinjau Interaktif Produk Lengkap (Live Store & Modal Preview) pada Manajemen Produk Admin (`src/app/admin/products/page.tsx`).
+- **Tugas 373 (2026-11-03)**: [SELESAI] Penambahan Fitur Pratinjau Interaktif Produk Lengkap (Live Store & Modal Preview) pada Manajemen Produk Admin (`src/app/admin/products/page.tsx`).
   *Permintaan User*: "saya tidak bisa melihat hasil preview dri produk yang diupload" (disertai tangkapan layar tabel produk di `/admin/products`).
   *Akar Masalah yang Ditemukan*:
   1. Pada tabel manajemen produk `/admin/products`, kolom "Aksi" hanya menyediakan tombol Edit (`Edit2`) dan Hapus (`Trash2`). Tidak tersedia tombol "Pratinjau / Preview" (`Eye`).
@@ -33,9 +33,13 @@
   5. [x] [LANGKAH 5] Tambahkan tombol pintasan "Buka Katalog Toko Online" di header admin produk.
   6. [x] [LANGKAH 6] Jalankan uji kompilasi lokal `tsc --noEmit` untuk memastikan 0 error (Lolos bersih 0 error).
   7. [x] [LANGKAH 7] Jalankan kompilasi produksi Next.js `npm run build` (Lolos 81/81 routes berhasil dibangun).
-  8. [ ] [LANGKAH 8] Deploy ke live VPS `157.66.34.199:11587`, build Next.js, dan restart PM2 `dstech-main`.
-  9. [ ] [LANGKAH 9] Verifikasi fungsionalitas pratinjau produk pada server live.
-  10. [ ] [LANGKAH 10] Bersihkan folder backup `_backup_product_preview/` dan tandai Tugas 373 sebagai [SELESAI].
+  8. [x] [LANGKAH 8] Deploy ke live VPS `157.66.34.199:11587`, build Next.js, dan restart PM2 `dstech-main` (Commit `aab912a`, 81/81 routes berhasil, PM2 PID 234749 status online).
+  9. [x] [LANGKAH 9] Verifikasi fungsionalitas pratinjau produk pada server live (`https://dstechsmart.com/admin/products` dan `https://dstechsmart.com/shop` status 200 OK).
+  10. [x] [LANGKAH 10] Bersihkan folder backup `_backup_product_preview/` dan tandai Tugas 373 sebagai [SELESAI].
+  *Hasil Pengujian Live Server*:
+  - **Tombol Mata (Pratinjau) & Klik Thumbnail/Judul**: Pada tabel produk di `/admin/products`, admin kini dapat mengklik icon Mata (`Eye`), foto thumbnail, maupun judul nama produk untuk langsung membuka modal pratinjau.
+  - **Modal Interaktif Mewah**: Menampilkan galeri foto dengan thumbnail switcher, badge PT vs Non-PT, Merek/Brand, Kategori, Harga Jual Konsumen vs Modal HPP, Margin Laba %, Komisi Afiliasi, Ketersediaan Stok, Jasa Pasang, Brosur PDF resmi, serta deskripsi spesifikasi terformat rapi.
+  - **Pintasan Toko Publik**: Terdapat tombol `[🌐 Buka di Toko Web Publik]` pada footer modal (`/shop?search=...`) dan tombol global `[🌐 Lihat Toko Publik]` di header atas halaman admin produk.
 
 
 - **Tugas 372 (2026-11-03)**: [SELESAI] Perbaikan Fatal Bug Regex Deteksi Struk ("Tolong" Terpicu Substring "Tol"), Penambahan Handler Otomatis Pembuatan Video Promosi oleh Staf AI Nadia Safitri, dan Pembersihan Draf Kas Keluar Palsu di Approval Queue (`src/app/api/team-chat/route.ts`, `src/data/dstech_ai_workforce.json`).
