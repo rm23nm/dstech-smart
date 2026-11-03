@@ -125,6 +125,32 @@ const DEFAULT_WORKFORCE = {
         field_on_time: "96.5%"
       },
       skills: ["Penerbitan SPK Lapangan", "Plotting Rute & GPS Klien", "Alokasi Alat dari Inventory", "Monitoring Hasil Instalasi"]
+    },
+    {
+      id: "emp_arya_coder",
+      name: "Arya Pratama, S.Kom",
+      role: "AI Full-Stack Developer & Software Architect",
+      department: "IT_SOFTWARE",
+      desk_zone: "IT_DEV_DESK",
+      gender: "male",
+      avatar_color: "#6366f1",
+      status: "WORKING",
+      current_activity: "Mengembangkan arsitektur Next.js, API multi-database, dan audit modul sistem otomatisasi",
+      speech_bubble: "Modul koding Next.js, kepatuhan prefix database dstech_, dan engine Qwen Coder siap dieksekusi.",
+      kpi: {
+        modules_built: 42,
+        code_commits: 89,
+        code_uptime: "99.8%",
+        api_endpoints: 38,
+        tasks_completed: 15
+      },
+      skills: [
+        "Full-Stack Next.js & React",
+        "Database Architecture (dstech_, wa_, access_, mosque_)",
+        "Bantahan REST API & Webhook",
+        "Audit Bug & Syntax Optimization",
+        "Zero Downtime Deployment"
+      ]
     }
   ],
   dstech_recent_logs: [
@@ -257,6 +283,14 @@ function readWorkforceData() {
     if (!parsed.dstech_employees || parsed.dstech_employees.length === 0) {
       writeWorkforceData(DEFAULT_WORKFORCE);
       return JSON.parse(JSON.stringify(DEFAULT_WORKFORCE));
+    }
+    // Pastikan Arya Pratama selalu terdaftar di memori dstech_employees (Tugas 374 & 375)
+    if (!parsed.dstech_employees.some((e: any) => e.id === "emp_arya_coder")) {
+      const aryaTemplate = DEFAULT_WORKFORCE.dstech_employees.find((e: any) => e.id === "emp_arya_coder");
+      if (aryaTemplate) {
+        parsed.dstech_employees.push(aryaTemplate);
+        writeWorkforceData(parsed);
+      }
     }
     if (parsed.dstech_approval_queue === undefined || parsed.dstech_approval_queue === null) {
       parsed.dstech_approval_queue = DEFAULT_WORKFORCE.dstech_approval_queue;
@@ -1850,7 +1884,9 @@ TINDAKAN WAJIB AI AGENT:
       if (!targetedEmployeeId) {
         const lowerCmd = promptCommand.toLowerCase();
         // Cek penyebutan nama spesifik atau domain staf AI
-        if (lowerCmd.includes("bambang") || lowerCmd.includes("sales") || lowerCmd.includes("prospek") || lowerCmd.includes("crm") || lowerCmd.includes("closing") || lowerCmd.includes("deal") || lowerCmd.includes("pipeline")) {
+        if (lowerCmd.includes("arya") || lowerCmd.includes("coding") || lowerCmd.includes("koding") || lowerCmd.includes("developer") || lowerCmd.includes("programmer") || lowerCmd.includes("seo") || lowerCmd.includes("bug") || lowerCmd.includes("audit") || lowerCmd.includes("database") || lowerCmd.includes("prefix") || lowerCmd.includes("arsitektur") || lowerCmd.includes("sintaks") || lowerCmd.includes("api")) {
+          targetedEmployeeId = "emp_arya_coder";
+        } else if (lowerCmd.includes("bambang") || lowerCmd.includes("sales") || lowerCmd.includes("prospek") || lowerCmd.includes("crm") || lowerCmd.includes("closing") || lowerCmd.includes("deal") || lowerCmd.includes("pipeline")) {
           targetedEmployeeId = "emp_bambang_sales";
         } else if (lowerCmd.includes("nadia") || lowerCmd.includes("promo") || lowerCmd.includes("broadcast") || lowerCmd.includes("wa") || lowerCmd.includes("marketing") || lowerCmd.includes("iklan") || lowerCmd.includes("diskon") || lowerCmd.includes("konten") || lowerCmd.includes("branding") || lowerCmd.includes("video") || lowerCmd.includes("medsos")) {
           targetedEmployeeId = "emp_nadia_marketing";
